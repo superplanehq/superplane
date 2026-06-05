@@ -5,14 +5,14 @@ import type { FileContents } from "@pierre/diffs/react";
 
 import type { PendingFileChange } from "./types";
 
-interface FilesDiffDialogProps {
+interface DiffDialogProps {
   changes: PendingFileChange[];
   loadedContentByPath: Record<string, string>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function FilesDiffDialog({ changes, loadedContentByPath, open, onOpenChange }: FilesDiffDialogProps) {
+export function DiffDialog({ changes, loadedContentByPath, open, onOpenChange }: DiffDialogProps) {
   const diffFiles = useMemo(
     () =>
       changes.map((change) => ({

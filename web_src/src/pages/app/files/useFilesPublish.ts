@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
-import { encodeRepositoryFileContent } from "./lib/canvas-repository-files";
+import { encodeRepositoryFileContent } from "./lib/repository-files";
 import { mergeLoadedContentAfterPublish } from "./lib/files-pending-state";
 import type { PendingFileChange, FilesHeaderActionsState } from "./types";
 

@@ -1,4 +1,4 @@
-import { FilesCanvasView } from "./FilesCanvasView";
+import { FilesView } from "./FilesView";
 import type { CanvasFile, FilesHeaderActionsState } from "./types";
 
 export type { CanvasFile, FilesHeaderActionsState } from "./types";
@@ -25,7 +25,7 @@ export function FilesOverlayLayer({
   if (!isFilesMode) return null;
 
   return (
-    <FilesCanvasView
+    <FilesView
       canvasId={canvasId}
       isEditing={isEditing}
       canWrite={canWrite}

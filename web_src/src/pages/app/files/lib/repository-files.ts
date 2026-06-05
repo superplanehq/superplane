@@ -14,7 +14,7 @@ export function buildRepositoryFileUrl(canvasId: string, path: string): string {
   return `/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params.toString()}`;
 }
 
-export async function fetchCanvasRepositoryFileContent(canvasId: string, path: string): Promise<string> {
+export async function fetchRepositoryFileContent(canvasId: string, path: string): Promise<string> {
   const response = await fetch(buildRepositoryFileUrl(canvasId, path), {
     credentials: "include",
     headers: withOrganizationHeader().headers,

@@ -88,7 +88,7 @@ import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
 import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
-import { useFilesFromCanvas } from "./files/useFilesFromCanvas";
+import { useAppFiles } from "./files/useAppFiles";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
@@ -5256,7 +5256,7 @@ export function AppPage() {
     onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const appFiles = useFilesFromCanvas({
+  const appFiles = useAppFiles({
     canvasYamlPayload,
     panels: consoleQuery.data?.panels,
     layout: consoleQuery.data?.layout,

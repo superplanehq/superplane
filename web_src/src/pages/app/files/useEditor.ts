@@ -3,18 +3,18 @@ import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
-import { useFilesEditorLifecycle } from "./useFilesEditorLifecycle";
-import { useFilesPendingState } from "./useFilesPendingState";
+import { useEditorLifecycle } from "./useEditorLifecycle";
+import { usePendingState } from "./usePendingState";
 import { useFilesPublish } from "./useFilesPublish";
 import { useFilesTabState } from "./useFilesTabState";
 import {
-  useRepositoryFilesCatalog,
+  useCatalog,
   useRepositoryPathLists,
   useRepositorySelectedFileQuery,
-} from "./useRepositoryFilesCatalog";
+} from "./useCatalog";
 import type { CanvasFile, FilesHeaderActionsState } from "./types";
 
-type UseRepositoryFilesEditorOptions = {
+type UseEditorOptions = {
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
@@ -23,17 +23,17 @@ type UseRepositoryFilesEditorOptions = {
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 };
 
-export function useRepositoryFilesEditor({
+export function useEditor({
   canvasId,
   isEditing,
   canWrite,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
-}: UseRepositoryFilesEditorOptions) {
+}: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
-  const catalog = useRepositoryFilesCatalog(canvasId, files);
+  const catalog = useCatalog(canvasId, files);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
   const [isDiffOpen, setIsDiffOpen] = useState(false);
@@ -45,7 +45,7 @@ export function useRepositoryFilesEditor({
   const allPathsRef = useRef(bootstrapPaths.allPaths);
   const finalRepositoryPathsRef = useRef(bootstrapPaths.finalRepositoryPaths);
   const openFileRef = useRef<(path: string) => void>(() => {});
-  const pending = useFilesPendingState({
+  const pending = usePendingState({
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
     finalRepositoryPathsRef,
@@ -82,7 +82,7 @@ export function useRepositoryFilesEditor({
     onHeaderActionsChange,
     commitFiles,
   });
-  useFilesEditorLifecycle({
+  useEditorLifecycle({
     isEditing,
     resetPendingState: pending.resetPendingState,
     setIsDiffOpen,

@@ -5,7 +5,7 @@ import { applyPendingContentUpdate, applyPendingDelete } from "./lib/files-pendi
 import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./lib/files-paths";
 import type { PendingFileChange } from "./types";
 
-type UseFilesPendingStateOptions = {
+type UsePendingStateOptions = {
   generatedPathSet: Set<string>;
   generatedPaths: string[];
   finalRepositoryPathsRef: RefObject<string[]>;
@@ -14,14 +14,14 @@ type UseFilesPendingStateOptions = {
   openFile: (path: string) => void;
 };
 
-export function useFilesPendingState({
+export function usePendingState({
   generatedPathSet,
   generatedPaths,
   finalRepositoryPathsRef,
   allPathsRef,
   loadedContentByPathRef,
   openFile,
-}: UseFilesPendingStateOptions) {
+}: UsePendingStateOptions) {
   const [pendingChangesByPath, setPendingChangesByPath] = useState<Record<string, PendingFileChange>>({});
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
 

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { buildFinalRepositoryPaths, buildRenderableTreePaths, getPathValidationError } from "./lib/files-paths";
 import type { PendingFileChange, CanvasFile } from "./types";
 
-export function useRepositoryFilesCatalog(canvasId: string | undefined, files: CanvasFile[]) {
+export function useCatalog(canvasId: string | undefined, files: CanvasFile[]) {
   const canUseRepository = !!canvasId;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";

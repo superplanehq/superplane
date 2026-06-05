@@ -23,7 +23,7 @@ type CanvasYamlPayload = {
   yamlText: string;
 } | null;
 
-export function buildCanvasFiles({
+export function buildAppFiles({
   canvasYamlPayload,
   panels,
   layout,

@@ -4,14 +4,14 @@ import { createPortal } from "react-dom";
 
 import { FileEditor } from "./FileEditor";
 import { FileList } from "./FileList";
-import { FilesTabBar } from "./FilesTabBar";
-import { FilesDiffHeaderAction, FilesIconButton } from "./FilesUi";
-import { useRepositoryFilesEditor } from "./useRepositoryFilesEditor";
+import { TabBar } from "./TabBar";
+import { DiffHeaderAction, IconButton } from "./FilesUi";
+import { useEditor } from "./useEditor";
 import type { CanvasFile, FilesHeaderActionsState } from "./types";
 
-const FilesDiffDialog = lazy(() => import("./FilesDiffDialog").then((module) => ({ default: module.FilesDiffDialog })));
+const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default: module.DiffDialog })));
 
-export function FilesCanvasView({
+export function FilesView({
   canvasId,
   isEditing,
   canWrite,
@@ -26,7 +26,7 @@ export function FilesCanvasView({
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 }) {
-  const editor = useRepositoryFilesEditor({
+  const editor = useEditor({
     canvasId,
     isEditing,
     canWrite,
@@ -45,9 +45,9 @@ export function FilesCanvasView({
         {editor.canManageRepositoryFiles ? (
           <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
             <div className="ml-auto flex shrink-0 items-center">
-              <FilesIconButton label="New file" onClick={editor.startNewFile} className="size-6 hover:bg-transparent">
+              <IconButton label="New file" onClick={editor.startNewFile} className="size-6 hover:bg-transparent">
                 <FilePlus2 className="h-3.5 w-3.5" />
-              </FilesIconButton>
+              </IconButton>
             </div>
           </div>
         ) : null}
@@ -68,7 +68,7 @@ export function FilesCanvasView({
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <FilesTabBar
+        <TabBar
           openTabs={editor.openTabs}
           selectedPath={editor.selectedPath}
           pendingChangesByPath={editor.pendingChangesByPath}
@@ -90,7 +90,7 @@ export function FilesCanvasView({
 
       {editor.isDiffOpen ? (
         <Suspense fallback={null}>
-          <FilesDiffDialog
+          <DiffDialog
             changes={editor.pendingChanges}
             loadedContentByPath={editor.loadedContentByPath}
             open={editor.isDiffOpen}
@@ -100,7 +100,7 @@ export function FilesCanvasView({
       ) : null}
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
-            <FilesDiffHeaderAction
+            <DiffHeaderAction
               hasPendingChanges={editor.pendingChanges.length > 0}
               onDiffOpen={() => editor.setIsDiffOpen(true)}
             />,

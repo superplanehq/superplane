@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 
 import type { PendingFileChange } from "./types";
 
-export function FilesTabBar({
+export function TabBar({
   openTabs,
   selectedPath,
   pendingChangesByPath,
