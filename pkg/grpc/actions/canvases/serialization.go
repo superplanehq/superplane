@@ -358,7 +358,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 		return err
 	}
 
-	if len(parts) > 1 {
+	if len(parts) > 1 && !registry.IsCoreBlock(node.Component) {
 		err := validateIntegration(organizationID, node.Integration, node.Component)
 		if err != nil {
 			return err
