@@ -13,33 +13,30 @@ import (
 func Test__UpdateAlertingPolicy__Setup(t *testing.T) {
 	u := &UpdateAlertingPolicy{}
 	policy := "projects/my-project/alertPolicies/123"
+	setup := func(cfg map[string]any) error {
+		return u.Setup(core.SetupContext{Configuration: cfg, Metadata: &contexts.MetadataContext{}})
+	}
 
 	t.Run("no updates -> error", func(t *testing.T) {
-		require.ErrorContains(t, u.Setup(core.SetupContext{
-			Configuration: map[string]any{"alertPolicy": policy},
-			Metadata:      &contexts.MetadataContext{},
-		}), "at least one field")
-	})
-
-	t.Run("metric without comparison/duration -> error", func(t *testing.T) {
-		require.Error(t, u.Setup(core.SetupContext{
-			Configuration: map[string]any{"alertPolicy": policy, "metricType": "compute.googleapis.com/instance/cpu/utilization"},
-			Metadata:      &contexts.MetadataContext{},
-		}))
+		require.ErrorContains(t, setup(map[string]any{"alertPolicy": policy}), "at least one field")
 	})
 
 	t.Run("invalid enabled -> error", func(t *testing.T) {
-		require.ErrorContains(t, u.Setup(core.SetupContext{
-			Configuration: map[string]any{"alertPolicy": policy, "enabled": "maybe"},
-			Metadata:      &contexts.MetadataContext{},
-		}), "enabled")
+		require.ErrorContains(t, setup(map[string]any{"alertPolicy": policy, "enabled": "maybe"}), "enabled")
+	})
+
+	t.Run("invalid combiner -> error", func(t *testing.T) {
+		require.ErrorContains(t, setup(map[string]any{"alertPolicy": policy, "combiner": "XOR"}), "combiner")
+	})
+
+	t.Run("invalid conditions -> error", func(t *testing.T) {
+		cond := cpuCondition()
+		cond["duration"] = "42s"
+		require.Error(t, setup(map[string]any{"alertPolicy": policy, "conditions": []any{cond}}))
 	})
 
 	t.Run("displayName only -> valid", func(t *testing.T) {
-		require.NoError(t, u.Setup(core.SetupContext{
-			Configuration: map[string]any{"alertPolicy": policy, "displayName": "New name"},
-			Metadata:      &contexts.MetadataContext{},
-		}))
+		require.NoError(t, setup(map[string]any{"alertPolicy": policy, "displayName": "New name"}))
 	})
 }
 
@@ -47,7 +44,7 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 	u := &UpdateAlertingPolicy{}
 	policy := "projects/my-project/alertPolicies/123"
 
-	t.Run("updates displayName and enabled via updateMask", func(t *testing.T) {
+	t.Run("updates displayName, enabled, severity via updateMask", func(t *testing.T) {
 		var patchURL string
 		var patchBody map[string]any
 		mc := &mockClient{
@@ -62,7 +59,7 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := u.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"alertPolicy": policy, "displayName": "New name", "enabled": "false"},
+			Configuration:  map[string]any{"alertPolicy": policy, "displayName": "New name", "enabled": "false", "severity": "WARNING"},
 			ExecutionState: state,
 		})
 
@@ -72,41 +69,38 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 		assert.Contains(t, patchURL, "updateMask=")
 		assert.Contains(t, patchURL, "displayName")
 		assert.Contains(t, patchURL, "enabled")
+		assert.Contains(t, patchURL, "severity")
 		assert.Equal(t, "New name", patchBody["displayName"])
 		assert.Equal(t, false, patchBody["enabled"])
+		assert.Equal(t, "WARNING", patchBody["severity"])
 		_, hasConditions := patchBody["conditions"]
-		assert.False(t, hasConditions, "conditions should not be sent when metric is unchanged")
+		assert.False(t, hasConditions)
 	})
 
-	t.Run("rebuilds condition when metric provided", func(t *testing.T) {
+	t.Run("replaces conditions when provided", func(t *testing.T) {
 		var patchBody map[string]any
 		mc := &mockClient{
 			projectID: "my-project",
 			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
 				patchBody, _ = body.(map[string]any)
 				assert.Contains(t, url, "conditions")
-				return alertPolicyJSON(policy, "High CPU", true, comparisonGT, 0.9, "300s"), nil
+				return alertPolicyJSON(policy, "High CPU", true, comparisonLT, 0.9, "300s"), nil
 			},
 		}
 		withFactory(mc)
 
+		cond := cpuCondition()
+		cond["comparison"] = comparisonLT
+		cond["threshold"] = 0.9
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := u.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"alertPolicy": policy,
-				"metricType":  "compute.googleapis.com/instance/cpu/utilization",
-				"comparison":  comparisonGT,
-				"threshold":   0.9,
-				"duration":    "300s",
-			},
+			Configuration:  map[string]any{"alertPolicy": policy, "conditions": []any{cond}},
 			ExecutionState: state,
 		})
 
 		require.NoError(t, err)
 		assert.True(t, state.Passed)
-		conds, ok := patchBody["conditions"].([]any)
-		require.True(t, ok)
-		require.Len(t, conds, 1)
+		require.Len(t, patchBody["conditions"].([]any), 1)
 	})
 
 	t.Run("clears notification channels when provided empty", func(t *testing.T) {
@@ -132,7 +126,7 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 		assert.True(t, state.Passed)
 		assert.Contains(t, patchURL, "notificationChannels")
 		channels, ok := patchBody["notificationChannels"].([]string)
-		require.True(t, ok, "notificationChannels must be sent as a (possibly empty) slice")
+		require.True(t, ok)
 		assert.Empty(t, channels)
 	})
 

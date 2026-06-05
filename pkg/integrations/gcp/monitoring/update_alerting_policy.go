@@ -18,15 +18,18 @@ import (
 type UpdateAlertingPolicy struct{}
 
 type UpdateAlertingPolicySpec struct {
-	AlertPolicy          string   `mapstructure:"alertPolicy"`
-	DisplayName          string   `mapstructure:"displayName"`
-	MetricType           string   `mapstructure:"metricType"`
-	Comparison           string   `mapstructure:"comparison"`
-	Threshold            *float64 `mapstructure:"threshold"`
-	Duration             string   `mapstructure:"duration"`
-	Enabled              string   `mapstructure:"enabled"`
-	NotificationChannels []string `mapstructure:"notificationChannels"`
-	Documentation        string   `mapstructure:"documentation"`
+	AlertPolicy           string          `mapstructure:"alertPolicy"`
+	DisplayName           string          `mapstructure:"displayName"`
+	Conditions            []ConditionSpec `mapstructure:"conditions"`
+	Combiner              string          `mapstructure:"combiner"`
+	Severity              string          `mapstructure:"severity"`
+	NotificationChannels  []string        `mapstructure:"notificationChannels"`
+	UserLabels            []KeyValueSpec  `mapstructure:"userLabels"`
+	Enabled               string          `mapstructure:"enabled"`
+	AutoClose             string          `mapstructure:"autoClose"`
+	NotificationRateLimit string          `mapstructure:"notificationRateLimit"`
+	Documentation         string          `mapstructure:"documentation"`
+	DocumentationSubject  string          `mapstructure:"documentationSubject"`
 }
 
 func (u *UpdateAlertingPolicy) Name() string {
@@ -38,7 +41,7 @@ func (u *UpdateAlertingPolicy) Label() string {
 }
 
 func (u *UpdateAlertingPolicy) Description() string {
-	return "Update an existing Cloud Monitoring alerting policy's threshold, state, or notifications"
+	return "Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications"
 }
 
 func (u *UpdateAlertingPolicy) Documentation() string {
@@ -46,30 +49,31 @@ func (u *UpdateAlertingPolicy) Documentation() string {
 
 ## Use Cases
 
-- **Threshold tuning**: Adjust the threshold as baselines change
-- **Enable/disable**: Toggle a policy on or off during maintenance windows
-- **Notification changes**: Re-point a policy at different notification channels
+- **Threshold tuning**: Adjust a condition's threshold as baselines change
+- **Enable/disable**: Toggle a policy during maintenance windows
+- **Re-route**: Change notification channels, severity, or alert strategy
 
 ## Configuration
 
 - **Alerting Policy**: The policy to update (required, supports expressions)
-- **Display Name**: New name (optional)
-- **Metric / Comparison / Threshold / Duration**: Set the **Metric** to rebuild the alert condition. When changing the condition, all four are used together.
+- **Conditions**: Provide to **replace** the policy's conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **Combiner**: OR / AND / AND-with-matching-resource
+- **Severity**: Critical / Error / Warning
 - **Enabled**: Enable, disable, or leave unchanged
-- **Notification Channels**: Replace the policy's notification channels (optional)
-- **Documentation**: New markdown documentation (optional)
+- **Notification Channels**: Replace channels (provide empty to clear)
+- **User Labels**: Replace user labels
+- **Auto-close / Notification rate limit**: Replace the alert strategy
+- **Documentation / subject**: Replace the documentation
 
 ## Output
 
-Returns the updated policy:
-- **name**, **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
-- **comparison**, **thresholdValue**, **duration**, **filter**: the resulting condition
+Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition summary.
 
 ## Important Notes
 
 - At least one field must be provided
-- Changing the **Metric** replaces the policy's condition(s) with a single new threshold condition
-- Requires the ` + "`roles/monitoring.editor`" + ` IAM role on the integration's service account`
+- Providing **Conditions** replaces all existing conditions; **Auto-close/rate limit** replace the whole alert strategy together
+- Requires the ` + "`roles/monitoring.editor`" + ` IAM role`
 }
 
 func (u *UpdateAlertingPolicy) Icon() string {
@@ -85,116 +89,38 @@ func (u *UpdateAlertingPolicy) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (u *UpdateAlertingPolicy) Configuration() []configuration.Field {
-	return []configuration.Field{
-		alertPolicySelectorField(),
-		{
-			Name:        "displayName",
-			Label:       "Display Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Description: "New human-readable name for the policy.",
-			Placeholder: "e.g. High CPU on production instances",
-		},
-		{
-			Name:        "metricType",
-			Label:       "Metric",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Togglable:   true,
-			Description: "Set to rebuild the alert condition. Used with Comparison, Threshold, and Duration.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: metricFieldOptions()},
-			},
-		},
-		{
-			Name:        "comparison",
-			Label:       "Comparison",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Description: "Fire when the metric value is above or below the threshold.",
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: comparisonOptions},
-			},
-		},
-		{
-			Name:        "threshold",
-			Label:       "Threshold",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Description: "The numeric threshold that triggers the alert.",
-			Placeholder: "e.g. 0.8",
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-		},
-		{
-			Name:        "duration",
-			Label:       "Duration",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Description: "How long the condition must hold before firing.",
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "metricType", Values: metricValues()},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: durationOptions},
-			},
-		},
-		{
-			Name:        "enabled",
-			Label:       "Enabled",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Description: "Enable or disable the policy, or leave it unchanged.",
-			Default:     "",
-			TypeOptions: &configuration.TypeOptions{
+	fields := []configuration.Field{alertPolicySelectorField()}
+
+	// Conditions are optional on update (provide to replace them).
+	conditions := conditionsField()
+	conditions.Required = false
+	conditions.Togglable = true
+	fields = append(fields, conditions)
+
+	// Reuse the create option fields, but make combiner/enabled "unchanged"
+	// friendly: no combiner default, and enabled becomes a 3-way select.
+	for _, f := range policyOptionFields() {
+		switch f.Name {
+		case "combiner":
+			f.Default = nil
+			f.Description = "Change how conditions combine (leave unset to keep current)."
+		case "enabled":
+			f.Type = configuration.FieldTypeSelect
+			f.Togglable = true
+			f.Default = nil
+			f.Description = "Enable or disable the policy (leave off to keep unchanged)."
+			f.TypeOptions = &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Unchanged", Value: ""},
 						{Label: "Enabled", Value: "true"},
 						{Label: "Disabled", Value: "false"},
 					},
 				},
-			},
-		},
-		{
-			Name:        "notificationChannels",
-			Label:       "Notification Channels",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Togglable:   true,
-			Description: "Replace the policy's notification channels.",
-			Placeholder: "Select notification channels",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:  ResourceTypeNotificationChannel,
-					Multi: true,
-				},
-			},
-		},
-		{
-			Name:        "documentation",
-			Label:       "Documentation",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Description: "New markdown documentation included in notifications.",
-			Placeholder: "e.g. Runbook: scale out the instance group",
-		},
+			}
+		}
+		fields = append(fields, f)
 	}
+	return fields
 }
 
 func (u *UpdateAlertingPolicy) Setup(ctx core.SetupContext) error {
@@ -206,22 +132,29 @@ func (u *UpdateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	if err := validateAlertPolicySelection(spec.AlertPolicy); err != nil {
 		return err
 	}
-
-	if spec.MetricType != "" {
-		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, false); err != nil {
-			return err
-		}
-	}
-
-	if err := validateEnabledOption(spec.Enabled); err != nil {
+	if err := validateUpdateFields(spec, ctx.Configuration); err != nil {
 		return err
 	}
-
-	if !hasUpdates(spec, configHasKey(ctx.Configuration, "notificationChannels")) {
+	if !hasUpdates(spec, ctx.Configuration) {
 		return errors.New("at least one field to update is required")
 	}
 
 	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
+}
+
+func validateUpdateFields(spec UpdateAlertingPolicySpec, cfg any) error {
+	if configHasKey(cfg, "conditions") {
+		if _, err := buildConditions(spec.Conditions); err != nil {
+			return err
+		}
+	}
+	if spec.Combiner != "" && !isValidCombiner(spec.Combiner) {
+		return errors.New("invalid combiner")
+	}
+	if !isValidSeverity(spec.Severity) {
+		return errors.New("invalid severity")
+	}
+	return validateEnabledOption(spec.Enabled)
 }
 
 // validateEnabledOption guards the three-way enabled select. It is enforced in
@@ -243,15 +176,20 @@ func configHasKey(cfg any, key string) bool {
 	return ok
 }
 
-// hasUpdates reports whether the spec carries at least one change. Notification
-// channels are tracked by key presence (channelsProvided) so an empty selection
-// can be sent to clear all channels.
-func hasUpdates(spec UpdateAlertingPolicySpec, channelsProvided bool) bool {
+// hasUpdates reports whether the spec carries at least one change. Togglable
+// fields are tracked by key presence so empty values can be sent to clear them.
+func hasUpdates(spec UpdateAlertingPolicySpec, cfg any) bool {
 	return strings.TrimSpace(spec.DisplayName) != "" ||
-		spec.MetricType != "" ||
+		configHasKey(cfg, "conditions") ||
+		spec.Combiner != "" ||
+		spec.Severity != "" ||
 		spec.Enabled != "" ||
-		channelsProvided ||
-		strings.TrimSpace(spec.Documentation) != ""
+		configHasKey(cfg, "notificationChannels") ||
+		configHasKey(cfg, "userLabels") ||
+		configHasKey(cfg, "autoClose") ||
+		configHasKey(cfg, "notificationRateLimit") ||
+		configHasKey(cfg, "documentation") ||
+		configHasKey(cfg, "documentationSubject")
 }
 
 func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
@@ -260,11 +198,10 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	channelsProvided := configHasKey(ctx.Configuration, "notificationChannels")
-	if !hasUpdates(spec, channelsProvided) {
+	if !hasUpdates(spec, ctx.Configuration) {
 		return ctx.ExecutionState.Fail("error", "at least one field to update is required")
 	}
-	if err := validateEnabledOption(spec.Enabled); err != nil {
+	if err := validateUpdateFields(spec, ctx.Configuration); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -285,22 +222,27 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		policy["displayName"] = dn
 		mask = append(mask, "displayName")
 	}
-	if spec.MetricType != "" {
-		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, false); err != nil {
+	if configHasKey(ctx.Configuration, "conditions") {
+		conditions, err := buildConditions(spec.Conditions)
+		if err != nil {
 			return ctx.ExecutionState.Fail("error", err.Error())
 		}
-		policy["conditions"] = []any{
-			buildThresholdCondition(spec.MetricType, spec.Comparison, *spec.Threshold, spec.Duration),
-		}
+		policy["conditions"] = conditions
 		mask = append(mask, "conditions")
+	}
+	if spec.Combiner != "" {
+		policy["combiner"] = spec.Combiner
+		mask = append(mask, "combiner")
+	}
+	if spec.Severity != "" {
+		policy["severity"] = spec.Severity
+		mask = append(mask, "severity")
 	}
 	if spec.Enabled != "" {
 		policy["enabled"] = spec.Enabled == "true"
 		mask = append(mask, "enabled")
 	}
-	if channelsProvided {
-		// nil (toggled on with no selection) must serialize as [] to clear all
-		// channels, not null.
+	if configHasKey(ctx.Configuration, "notificationChannels") {
 		channels := spec.NotificationChannels
 		if channels == nil {
 			channels = []string{}
@@ -308,8 +250,28 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		policy["notificationChannels"] = channels
 		mask = append(mask, "notificationChannels")
 	}
-	if doc := strings.TrimSpace(spec.Documentation); doc != "" {
-		policy["documentation"] = map[string]any{"content": doc, "mimeType": "text/markdown"}
+	if configHasKey(ctx.Configuration, "userLabels") {
+		labels := buildUserLabels(spec.UserLabels)
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		policy["userLabels"] = labels
+		mask = append(mask, "userLabels")
+	}
+	if configHasKey(ctx.Configuration, "autoClose") || configHasKey(ctx.Configuration, "notificationRateLimit") {
+		strategy := buildAlertStrategy(spec.AutoClose, spec.NotificationRateLimit)
+		if strategy == nil {
+			strategy = map[string]any{}
+		}
+		policy["alertStrategy"] = strategy
+		mask = append(mask, "alertStrategy")
+	}
+	if configHasKey(ctx.Configuration, "documentation") || configHasKey(ctx.Configuration, "documentationSubject") {
+		doc := buildDocumentation(spec.Documentation, spec.DocumentationSubject)
+		if doc == nil {
+			doc = map[string]any{}
+		}
+		policy["documentation"] = doc
 		mask = append(mask, "documentation")
 	}
 

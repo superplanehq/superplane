@@ -14,11 +14,16 @@ import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
 
-interface CreateAlertingPolicyConfiguration {
-  displayName?: string;
+interface AlertConditionConfig {
   metricType?: string;
   comparison?: string;
   threshold?: number;
+}
+
+interface CreateAlertingPolicyConfiguration {
+  displayName?: string;
+  conditions?: AlertConditionConfig[];
+  severity?: string;
 }
 
 interface AlertPolicySelectorConfiguration {
@@ -39,6 +44,8 @@ interface AlertingPolicyOutputData {
   id?: string;
   displayName?: string;
   enabled?: boolean;
+  severity?: string;
+  conditionsCount?: number;
   comparison?: string;
   thresholdValue?: number;
   duration?: string;
@@ -91,20 +98,26 @@ function baseProps(
   };
 }
 
+function getPolicyOutput(context: ExecutionDetailsContext): AlertingPolicyOutputData | undefined {
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  return outputs?.default?.[0]?.data as AlertingPolicyOutputData | undefined;
+}
+
 function policyDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
   if (context.execution.createdAt) {
     details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
   }
-  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-  const result = outputs?.default?.[0]?.data as AlertingPolicyOutputData | undefined;
+  const result = getPolicyOutput(context);
   if (!result) return details;
 
   if (result.displayName) details["Display Name"] = result.displayName;
   if (result.id) details["Policy ID"] = result.id;
   if (result.enabled !== undefined) details["Enabled"] = result.enabled ? "Yes" : "No";
+  if (result.severity) details["Severity"] = result.severity;
+  if (result.conditionsCount !== undefined) details["Conditions"] = String(result.conditionsCount);
   if (result.comparison && result.thresholdValue !== undefined) {
-    details["Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
+    details["First Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
   }
   if (result.duration) details["Duration"] = result.duration;
   return details;
@@ -142,18 +155,27 @@ export const updateAlertingPolicyMapper: ComponentBaseMapper = {
   subtitle,
 };
 
+function conditionSummary(conditions: AlertConditionConfig[]): string | undefined {
+  const first = conditions[0];
+  if (!first?.metricType) {
+    return conditions.length > 0 ? `${conditions.length} condition${conditions.length > 1 ? "s" : ""}` : undefined;
+  }
+  const label = metricLabels[first.metricType] || first.metricType;
+  const cmp = first.comparison ? comparisonLabels[first.comparison] || "" : "";
+  const suffix = cmp && first.threshold !== undefined ? ` ${cmp} ${first.threshold}` : "";
+  const more = conditions.length > 1 ? ` +${conditions.length - 1}` : "";
+  return `${label}${suffix}${more}`;
+}
+
 function createMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const config = node.configuration as CreateAlertingPolicyConfiguration | undefined;
   if (config?.displayName) metadata.push({ icon: "bell", label: config.displayName });
-  if (config?.metricType) {
-    const label = metricLabels[config.metricType] || config.metricType;
-    const cmp = config.comparison ? comparisonLabels[config.comparison] || "" : "";
-    metadata.push({
-      icon: "chart-line",
-      label: cmp && config.threshold !== undefined ? `${label} ${cmp} ${config.threshold}` : label,
-    });
-  }
+
+  const summary = conditionSummary(config?.conditions ?? []);
+  if (summary) metadata.push({ icon: "chart-line", label: summary });
+
+  if (config?.severity) metadata.push({ icon: "triangle-alert", label: config.severity });
   return metadata;
 }
 

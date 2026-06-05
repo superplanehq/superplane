@@ -26,15 +26,6 @@ func apiErrorMessage(action, roleHint string, err error) string {
 	return fmt.Sprintf("%s: %v", action, err)
 }
 
-const (
-	comparisonGT = "COMPARISON_GT"
-	comparisonLT = "COMPARISON_LT"
-
-	// alignmentPeriod is the per-series alignment window for the condition's
-	// aggregation. 60s matches the native resolution of Compute Engine metrics.
-	alignmentPeriod = "60s"
-)
-
 // metricOption couples a user-facing label with the Cloud Monitoring metric type
 // and the aligner appropriate for it (gauge metrics use ALIGN_MEAN; delta/cumulative
 // counters use ALIGN_RATE to express a per-second rate).
@@ -60,17 +51,6 @@ func metricFieldOptions() []configuration.FieldOption {
 	return opts
 }
 
-// metricValues returns every supported metric type, used to drive the
-// "show/require these fields when a metric is chosen" conditions on the Update
-// component.
-func metricValues() []string {
-	values := make([]string, 0, len(instanceMetricOptions))
-	for _, m := range instanceMetricOptions {
-		values = append(values, m.Value)
-	}
-	return values
-}
-
 func metricByType(metricType string) (metricOption, bool) {
 	for _, m := range instanceMetricOptions {
 		if m.Value == metricType {
@@ -78,15 +58,6 @@ func metricByType(metricType string) (metricOption, bool) {
 		}
 	}
 	return metricOption{}, false
-}
-
-var comparisonOptions = []configuration.FieldOption{
-	{Label: "Above threshold", Value: comparisonGT},
-	{Label: "Below threshold", Value: comparisonLT},
-}
-
-func isValidComparison(comparison string) bool {
-	return comparison == comparisonGT || comparison == comparisonLT
 }
 
 var durationOptions = []configuration.FieldOption{
@@ -112,36 +83,100 @@ func instanceMetricFilter(metricType string) string {
 	return fmt.Sprintf(`metric.type="%s" AND resource.type="gce_instance"`, metricType)
 }
 
-// buildThresholdCondition assembles a single conditionThreshold for the policy.
-func buildThresholdCondition(metricType, comparison string, threshold float64, duration string) map[string]any {
-	aligner := "ALIGN_MEAN"
-	if m, ok := metricByType(metricType); ok {
-		aligner = m.Aligner
-	}
-	return map[string]any{
-		"displayName": conditionDisplayName(metricType, comparison, threshold),
-		"conditionThreshold": map[string]any{
-			"filter":         instanceMetricFilter(metricType),
-			"comparison":     comparison,
-			"thresholdValue": threshold,
-			"duration":       duration,
-			"trigger":        map[string]any{"count": 1},
-			"aggregations": []any{
-				map[string]any{
-					"alignmentPeriod":  alignmentPeriod,
-					"perSeriesAligner": aligner,
-				},
-			},
-		},
-	}
+// --- policy-level vocabulary (combiner, severity, alert strategy, labels) ---
+
+var combinerOptions = []configuration.FieldOption{
+	{Label: "Any condition is met (OR)", Value: "OR"},
+	{Label: "All conditions are met (AND)", Value: "AND"},
+	{Label: "All conditions, same resource (AND_WITH_MATCHING_RESOURCE)", Value: "AND_WITH_MATCHING_RESOURCE"},
 }
 
-func conditionDisplayName(metricType, comparison string, threshold float64) string {
-	op := ">"
-	if comparison == comparisonLT {
-		op = "<"
+func isValidCombiner(combiner string) bool {
+	switch combiner {
+	case "OR", "AND", "AND_WITH_MATCHING_RESOURCE":
+		return true
 	}
-	return fmt.Sprintf("%s %s %g", lastSegment(metricType), op, threshold)
+	return false
+}
+
+var severityOptions = []configuration.FieldOption{
+	{Label: "Critical", Value: "CRITICAL"},
+	{Label: "Error", Value: "ERROR"},
+	{Label: "Warning", Value: "WARNING"},
+}
+
+func isValidSeverity(severity string) bool {
+	switch severity {
+	case "", "CRITICAL", "ERROR", "WARNING":
+		return true
+	}
+	return false
+}
+
+var autoCloseOptions = []configuration.FieldOption{
+	{Label: "30 minutes", Value: "1800s"},
+	{Label: "1 hour", Value: "3600s"},
+	{Label: "1 day", Value: "86400s"},
+	{Label: "7 days", Value: "604800s"},
+}
+
+var notificationRateLimitOptions = []configuration.FieldOption{
+	{Label: "Every 5 minutes", Value: "300s"},
+	{Label: "Every 30 minutes", Value: "1800s"},
+	{Label: "Every 1 hour", Value: "3600s"},
+}
+
+// buildAlertStrategy assembles the optional alertStrategy block, returning nil
+// when neither auto-close nor a notification rate limit is configured.
+func buildAlertStrategy(autoClose, rateLimit string) map[string]any {
+	strategy := map[string]any{}
+	if autoClose != "" {
+		strategy["autoClose"] = autoClose
+	}
+	if rateLimit != "" {
+		strategy["notificationRateLimit"] = map[string]any{"period": rateLimit}
+	}
+	if len(strategy) == 0 {
+		return nil
+	}
+	return strategy
+}
+
+// KeyValueSpec is one user label (key/value pair).
+type KeyValueSpec struct {
+	Key   string `mapstructure:"key"`
+	Value string `mapstructure:"value"`
+}
+
+func buildUserLabels(pairs []KeyValueSpec) map[string]string {
+	labels := map[string]string{}
+	for _, p := range pairs {
+		key := strings.TrimSpace(p.Key)
+		if key != "" {
+			labels[key] = p.Value
+		}
+	}
+	if len(labels) == 0 {
+		return nil
+	}
+	return labels
+}
+
+// buildDocumentation assembles the optional documentation block.
+func buildDocumentation(content, subject string) map[string]any {
+	content = strings.TrimSpace(content)
+	subject = strings.TrimSpace(subject)
+	if content == "" && subject == "" {
+		return nil
+	}
+	doc := map[string]any{"mimeType": "text/markdown"}
+	if content != "" {
+		doc["content"] = content
+	}
+	if subject != "" {
+		doc["subject"] = subject
+	}
+	return doc
 }
 
 // alertPolicy models the subset of the Cloud Monitoring AlertPolicy resource we
@@ -150,6 +185,7 @@ type alertPolicy struct {
 	Name                 string   `json:"name"`
 	DisplayName          string   `json:"displayName"`
 	Combiner             string   `json:"combiner"`
+	Severity             string   `json:"severity"`
 	Enabled              *bool    `json:"enabled"`
 	NotificationChannels []string `json:"notificationChannels"`
 	Conditions           []struct {
@@ -174,6 +210,9 @@ func policyPayload(p *alertPolicy) map[string]any {
 	}
 	if p.Enabled != nil {
 		payload["enabled"] = *p.Enabled
+	}
+	if p.Severity != "" {
+		payload["severity"] = p.Severity
 	}
 	if len(p.NotificationChannels) > 0 {
 		payload["notificationChannels"] = p.NotificationChannels

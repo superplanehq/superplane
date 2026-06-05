@@ -14,22 +14,22 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const maxPolicyConditions = 6
+
 type CreateAlertingPolicy struct{}
 
 type CreateAlertingPolicySpec struct {
-	DisplayName string `mapstructure:"displayName"`
-	MetricType  string `mapstructure:"metricType"`
-	Comparison  string `mapstructure:"comparison"`
-	// Threshold is a pointer so an omitted value (nil) is rejected rather than
-	// silently decoding to 0 (e.g. "CPU above 0").
-	Threshold            *float64 `mapstructure:"threshold"`
-	Duration             string   `mapstructure:"duration"`
-	NotificationChannels []string `mapstructure:"notificationChannels"`
-	// Enabled is a pointer so an omitted value (nil) can default to true,
-	// matching the field default and docs. A plain bool would decode to false
-	// when the key is absent (e.g. for programmatic/expression configs).
-	Enabled       *bool  `mapstructure:"enabled"`
-	Documentation string `mapstructure:"documentation"`
+	DisplayName           string          `mapstructure:"displayName"`
+	Conditions            []ConditionSpec `mapstructure:"conditions"`
+	Combiner              string          `mapstructure:"combiner"`
+	Severity              string          `mapstructure:"severity"`
+	NotificationChannels  []string        `mapstructure:"notificationChannels"`
+	UserLabels            []KeyValueSpec  `mapstructure:"userLabels"`
+	Enabled               *bool           `mapstructure:"enabled"`
+	AutoClose             string          `mapstructure:"autoClose"`
+	NotificationRateLimit string          `mapstructure:"notificationRateLimit"`
+	Documentation         string          `mapstructure:"documentation"`
+	DocumentationSubject  string          `mapstructure:"documentationSubject"`
 }
 
 func (c *CreateAlertingPolicy) Name() string {
@@ -41,41 +41,42 @@ func (c *CreateAlertingPolicy) Label() string {
 }
 
 func (c *CreateAlertingPolicy) Description() string {
-	return "Create a Cloud Monitoring alerting policy that triggers when a Compute Engine instance metric crosses a threshold"
+	return "Create a Cloud Monitoring alerting policy that triggers when Compute Engine instance metrics cross thresholds"
 }
 
 func (c *CreateAlertingPolicy) Documentation() string {
-	return `The Create Alerting Policy component creates a Cloud Monitoring alerting policy that fires when a Compute Engine instance metric crosses a threshold for a sustained duration.
+	return `The Create Alerting Policy component creates a Cloud Monitoring alerting policy with one or more threshold conditions on Compute Engine instance metrics.
 
 ## Use Cases
 
-- **Capacity management**: Alert when CPU utilization stays above a safe operating level
-- **Performance monitoring**: Detect network or disk throughput saturation
-- **Automated workflows**: React to instance metric breaches downstream
+- **Capacity management**: Alert when CPU stays above a safe level
+- **Composite alerts**: Combine multiple conditions (e.g. high CPU AND high network) with a combiner
+- **Severity routing**: Tag policies Critical/Error/Warning and rate-limit or auto-close incidents
 
 ## Configuration
 
 - **Display Name**: Human-readable name for the policy (required)
-- **Metric**: The Compute Engine instance metric to monitor — CPU utilization, network, or disk (required)
-- **Comparison**: Fire when the value is above or below the threshold (required)
-- **Threshold**: The numeric threshold (required). For CPU utilization this is a fraction (e.g. ` + "`0.8`" + ` = 80%)
-- **Duration**: How long the condition must hold before firing (required)
-- **Notification Channels**: Existing Cloud Monitoring notification channels to alert (optional)
+- **Conditions**: One or more threshold conditions (required). Each has:
+  - **Metric**, **Comparison** (above ` + "`>`" + ` or below ` + "`<`" + `), **Threshold**, **Duration**
+  - Optional **Aligner**, **Rolling window**, **Group reducer** + **Group by fields** (aggregation)
+  - Optional **Trigger** by count or percent of time series
+- **Combiner**: How multiple conditions combine — OR / AND / AND-with-matching-resource (default OR)
+- **Severity**: Critical / Error / Warning (optional)
+- **Notification Channels**: Existing channels to alert (optional)
+- **User Labels**: Key/value labels on the policy (optional)
 - **Enabled**: Whether the policy is active (default: true)
-- **Documentation**: Markdown shown in notifications when the policy fires (optional)
+- **Auto-close** / **Notification rate limit**: Alert strategy (optional)
+- **Documentation** / **Documentation subject**: Markdown shown in notifications (optional)
 
 ## Output
 
-Returns the created policy:
-- **name**: Full resource name (` + "`projects/<project>/alertPolicies/<id>`" + `) for use in Get/Update/Delete
-- **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
-- **comparison**, **thresholdValue**, **duration**, **filter**: the condition that was created
+Returns the created policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition's **comparison**, **thresholdValue**, **duration**, **filter**.
 
 ## Important Notes
 
 - Requires the ` + "`roles/monitoring.editor`" + ` IAM role on the integration's service account
-- The policy monitors the metric across **all** Compute Engine instances in the project
-- Without notification channels the policy still fires but only surfaces in the Cloud Monitoring console`
+- Conditions monitor the metric across **all** Compute Engine instances in the project
+- Up to 6 conditions per policy`
 }
 
 func (c *CreateAlertingPolicy) Icon() string {
@@ -91,7 +92,7 @@ func (c *CreateAlertingPolicy) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
-	return []configuration.Field{
+	return append([]configuration.Field{
 		{
 			Name:        "displayName",
 			Label:       "Display Name",
@@ -100,43 +101,49 @@ func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
 			Description: "Human-readable name for the alerting policy.",
 			Placeholder: "e.g. High CPU on production instances",
 		},
-		{
-			Name:        "metricType",
-			Label:       "Metric",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Description: "The Compute Engine instance metric to monitor.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: metricFieldOptions()},
+		conditionsField(),
+	}, policyOptionFields()...)
+}
+
+// conditionsField is the repeatable conditions list, shared by Create and Update.
+func conditionsField() configuration.Field {
+	maxItems := maxPolicyConditions
+	return configuration.Field{
+		Name:        "conditions",
+		Label:       "Conditions",
+		Type:        configuration.FieldTypeList,
+		Required:    true,
+		Description: "One or more threshold conditions on instance metrics.",
+		TypeOptions: &configuration.TypeOptions{
+			List: &configuration.ListTypeOptions{
+				ItemLabel:      "Condition",
+				MaxItems:       &maxItems,
+				ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeObject, Schema: conditionFields()},
 			},
 		},
+	}
+}
+
+// policyOptionFields are the policy-level options shared by Create and Update.
+func policyOptionFields() []configuration.Field {
+	return []configuration.Field{
 		{
-			Name:        "comparison",
-			Label:       "Comparison",
+			Name:        "combiner",
+			Label:       "Condition Combiner",
 			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Description: "Fire when the metric value is above or below the threshold.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: comparisonOptions},
-			},
+			Required:    false,
+			Description: "How multiple conditions combine to fire the policy.",
+			Default:     "OR",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: combinerOptions}},
 		},
 		{
-			Name:        "threshold",
-			Label:       "Threshold",
-			Type:        configuration.FieldTypeNumber,
-			Required:    true,
-			Description: "The numeric threshold that triggers the alert. CPU utilization is a fraction (0.8 = 80%).",
-			Placeholder: "e.g. 0.8",
-		},
-		{
-			Name:        "duration",
-			Label:       "Duration",
+			Name:        "severity",
+			Label:       "Severity",
 			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Description: "How long the condition must hold before the policy fires.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{Options: durationOptions},
-			},
+			Required:    false,
+			Togglable:   true,
+			Description: "Incident severity for the policy.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: severityOptions}},
 		},
 		{
 			Name:        "notificationChannels",
@@ -147,9 +154,20 @@ func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
 			Description: "Existing notification channels to alert when the policy fires.",
 			Placeholder: "Select notification channels",
 			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:  ResourceTypeNotificationChannel,
-					Multi: true,
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeNotificationChannel, Multi: true},
+			},
+		},
+		{
+			Name:        "userLabels",
+			Label:       "User Labels",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Key/value labels attached to the policy.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Label",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeObject, Schema: keyValueFields()},
 				},
 			},
 		},
@@ -162,6 +180,24 @@ func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
 			Default:     true,
 		},
 		{
+			Name:        "autoClose",
+			Label:       "Auto-close incidents after",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Togglable:   true,
+			Description: "Automatically close incidents that stop receiving data after this duration.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: autoCloseOptions}},
+		},
+		{
+			Name:        "notificationRateLimit",
+			Label:       "Notification rate limit",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Togglable:   true,
+			Description: "Minimum time between repeated notifications for an incident.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: notificationRateLimitOptions}},
+		},
+		{
 			Name:        "documentation",
 			Label:       "Documentation",
 			Type:        configuration.FieldTypeString,
@@ -170,7 +206,38 @@ func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
 			Description: "Markdown content included in notifications when the policy fires.",
 			Placeholder: "e.g. Runbook: scale out the instance group",
 		},
+		{
+			Name:        "documentationSubject",
+			Label:       "Documentation subject",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Subject line for notifications (overrides the default).",
+		},
 	}
+}
+
+func keyValueFields() []configuration.Field {
+	return []configuration.Field{
+		{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true},
+		{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: false},
+	}
+}
+
+func validateCreateSpec(spec CreateAlertingPolicySpec) error {
+	if strings.TrimSpace(spec.DisplayName) == "" {
+		return errors.New("displayName is required")
+	}
+	if _, err := buildConditions(spec.Conditions); err != nil {
+		return err
+	}
+	if spec.Combiner != "" && !isValidCombiner(spec.Combiner) {
+		return errors.New("invalid combiner")
+	}
+	if !isValidSeverity(spec.Severity) {
+		return errors.New("invalid severity")
+	}
+	return nil
 }
 
 func (c *CreateAlertingPolicy) Setup(ctx core.SetupContext) error {
@@ -178,32 +245,7 @@ func (c *CreateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, true)
-}
-
-// validatePolicyCondition validates the shared condition fields. When
-// requireDisplayName is false (the update flow) the display name may be empty,
-// but the metric/comparison/threshold/duration are validated together.
-func validatePolicyCondition(displayName, metricType, comparison string, threshold *float64, duration string, requireDisplayName bool) error {
-	if requireDisplayName && strings.TrimSpace(displayName) == "" {
-		return errors.New("displayName is required")
-	}
-	if metricType == "" {
-		return errors.New("metricType is required")
-	}
-	if _, ok := metricByType(metricType); !ok {
-		return fmt.Errorf("invalid metricType %q", metricType)
-	}
-	if !isValidComparison(comparison) {
-		return errors.New("comparison must be COMPARISON_GT or COMPARISON_LT")
-	}
-	if threshold == nil {
-		return errors.New("threshold is required")
-	}
-	if !isValidDuration(duration) {
-		return errors.New("invalid duration: must be one of 0s, 60s, 300s, 600s, 1800s")
-	}
-	return nil
+	return validateCreateSpec(spec)
 }
 
 func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
@@ -212,7 +254,12 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, true); err != nil {
+	if err := validateCreateSpec(spec); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+
+	conditions, err := buildConditions(spec.Conditions)
+	if err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -221,27 +268,38 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	project := client.ProjectID()
+	combiner := spec.Combiner
+	if combiner == "" {
+		combiner = "OR"
+	}
 	enabled := true
 	if spec.Enabled != nil {
 		enabled = *spec.Enabled
 	}
+
 	policy := map[string]any{
 		"displayName": strings.TrimSpace(spec.DisplayName),
-		"combiner":    "OR",
+		"combiner":    combiner,
 		"enabled":     enabled,
-		"conditions": []any{
-			buildThresholdCondition(spec.MetricType, spec.Comparison, *spec.Threshold, spec.Duration),
-		},
+		"conditions":  conditions,
+	}
+	if spec.Severity != "" {
+		policy["severity"] = spec.Severity
 	}
 	if len(spec.NotificationChannels) > 0 {
 		policy["notificationChannels"] = spec.NotificationChannels
 	}
-	if doc := strings.TrimSpace(spec.Documentation); doc != "" {
-		policy["documentation"] = map[string]any{"content": doc, "mimeType": "text/markdown"}
+	if labels := buildUserLabels(spec.UserLabels); labels != nil {
+		policy["userLabels"] = labels
+	}
+	if doc := buildDocumentation(spec.Documentation, spec.DocumentationSubject); doc != nil {
+		policy["documentation"] = doc
+	}
+	if strategy := buildAlertStrategy(spec.AutoClose, spec.NotificationRateLimit); strategy != nil {
+		policy["alertStrategy"] = strategy
 	}
 
-	endpoint := fmt.Sprintf("%s/projects/%s/alertPolicies", monitoringBaseURL, project)
+	endpoint := fmt.Sprintf("%s/projects/%s/alertPolicies", monitoringBaseURL, client.ProjectID())
 	body, err := client.PostURL(context.Background(), endpoint, policy)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create alerting policy", roleHintWrite, err))

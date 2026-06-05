@@ -112,25 +112,64 @@ func Test__ParsePolicyName(t *testing.T) {
 	})
 }
 
-func Test__BuildThresholdCondition(t *testing.T) {
-	t.Run("cpu uses ALIGN_MEAN", func(t *testing.T) {
-		cond := buildThresholdCondition("compute.googleapis.com/instance/cpu/utilization", comparisonGT, 0.8, "300s")
-		ct := cond["conditionThreshold"].(map[string]any)
+func ptrFloat(f float64) *float64 { return &f }
+
+func Test__BuildConditions(t *testing.T) {
+	t.Run("cpu defaults to ALIGN_MEAN + count trigger", func(t *testing.T) {
+		out, err := buildConditions([]ConditionSpec{{
+			MetricType: "compute.googleapis.com/instance/cpu/utilization",
+			Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+		}})
+		require.NoError(t, err)
+		require.Len(t, out, 1)
+		ct := out[0].(map[string]any)["conditionThreshold"].(map[string]any)
 		assert.Equal(t, comparisonGT, ct["comparison"])
 		assert.Equal(t, 0.8, ct["thresholdValue"])
 		assert.Equal(t, "300s", ct["duration"])
 		assert.Contains(t, ct["filter"], `resource.type="gce_instance"`)
-		aggs := ct["aggregations"].([]any)
-		agg := aggs[0].(map[string]any)
+		assert.Equal(t, 1, ct["trigger"].(map[string]any)["count"])
+		agg := ct["aggregations"].([]any)[0].(map[string]any)
 		assert.Equal(t, "ALIGN_MEAN", agg["perSeriesAligner"])
+		assert.Equal(t, "60s", agg["alignmentPeriod"])
 	})
 
-	t.Run("network counter uses ALIGN_RATE", func(t *testing.T) {
-		cond := buildThresholdCondition("compute.googleapis.com/instance/network/sent_bytes_count", comparisonLT, 1000, "60s")
-		ct := cond["conditionThreshold"].(map[string]any)
-		aggs := ct["aggregations"].([]any)
-		agg := aggs[0].(map[string]any)
-		assert.Equal(t, "ALIGN_RATE", agg["perSeriesAligner"])
+	t.Run("honors aligner, window, reducer, group-by, percent trigger", func(t *testing.T) {
+		out, err := buildConditions([]ConditionSpec{{
+			MetricType: "compute.googleapis.com/instance/network/sent_bytes_count",
+			Comparison: comparisonLT, Threshold: ptrFloat(1000), Duration: "60s",
+			Aligner: "ALIGN_MAX", AlignmentPeriod: "300s",
+			CrossSeriesReducer: "REDUCE_SUM", GroupByFields: []string{"resource.zone"},
+			TriggerType: triggerPercent, TriggerValue: ptrFloat(50),
+		}})
+		require.NoError(t, err)
+		ct := out[0].(map[string]any)["conditionThreshold"].(map[string]any)
+		agg := ct["aggregations"].([]any)[0].(map[string]any)
+		assert.Equal(t, "ALIGN_MAX", agg["perSeriesAligner"])
+		assert.Equal(t, "300s", agg["alignmentPeriod"])
+		assert.Equal(t, "REDUCE_SUM", agg["crossSeriesReducer"])
+		assert.Equal(t, []string{"resource.zone"}, agg["groupByFields"])
+		assert.Equal(t, 50.0, ct["trigger"].(map[string]any)["percent"])
+	})
+
+	t.Run("multiple conditions", func(t *testing.T) {
+		out, err := buildConditions([]ConditionSpec{
+			{MetricType: "compute.googleapis.com/instance/cpu/utilization", Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s"},
+			{MetricType: "compute.googleapis.com/instance/disk/read_bytes_count", Comparison: comparisonGT, Threshold: ptrFloat(1000), Duration: "60s"},
+		})
+		require.NoError(t, err)
+		assert.Len(t, out, 2)
+	})
+
+	t.Run("missing threshold errors", func(t *testing.T) {
+		_, err := buildConditions([]ConditionSpec{{
+			MetricType: "compute.googleapis.com/instance/cpu/utilization", Comparison: comparisonGT, Duration: "300s",
+		}})
+		require.ErrorContains(t, err, "threshold is required")
+	})
+
+	t.Run("empty conditions errors", func(t *testing.T) {
+		_, err := buildConditions(nil)
+		require.ErrorContains(t, err, "at least one condition")
 	})
 }
 
