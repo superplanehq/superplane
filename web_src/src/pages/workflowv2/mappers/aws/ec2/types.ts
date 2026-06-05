@@ -43,3 +43,14 @@ export interface Ec2Instance {
   vpcId?: string;
   region?: string;
 }
+
+export interface ElbLoadBalancer {
+  loadBalancerArn?: string;
+  name?: string;
+  dnsName?: string;
+  scheme?: string;
+  type?: string;
+  state?: string;
+  vpcId?: string;
+  region?: string;
+}

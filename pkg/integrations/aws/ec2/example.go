@@ -46,6 +46,12 @@ var exampleOutputGetInstanceBytes []byte
 //go:embed example_output_manage_instance_power.json
 var exampleOutputManageInstancePowerBytes []byte
 
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -84,6 +90,12 @@ var exampleOutputGetInstance map[string]any
 
 var exampleOutputManageInstancePowerOnce sync.Once
 var exampleOutputManageInstancePower map[string]any
+
+var exampleOutputCreateLoadBalancerOnce sync.Once
+var exampleOutputCreateLoadBalancer map[string]any
+
+var exampleOutputDeleteLoadBalancerOnce sync.Once
+var exampleOutputDeleteLoadBalancer map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -162,5 +174,21 @@ func (c *ManageInstancePower) ExampleOutput() map[string]any {
 		&exampleOutputManageInstancePowerOnce,
 		exampleOutputManageInstancePowerBytes,
 		&exampleOutputManageInstancePower,
+	)
+}
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateLoadBalancerOnce,
+		exampleOutputCreateLoadBalancerBytes,
+		&exampleOutputCreateLoadBalancer,
+	)
+}
+
+func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteLoadBalancerOnce,
+		exampleOutputDeleteLoadBalancerBytes,
+		&exampleOutputDeleteLoadBalancer,
 	)
 }
