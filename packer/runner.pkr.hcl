@@ -67,10 +67,11 @@ source "amazon-ebs" "ubuntu_amd64" {
     most_recent = true
   }
 
-  ssh_username = "ubuntu"
+  ssh_username         = "ubuntu"
+  iam_instance_profile = "fleet-manager-profile"
 
   ami_name        = "${var.ami_name_prefix}-amd64-${local.timestamp}"
-  ami_description = "SuperPlane runner AMI — amd64, Ubuntu 24.04, built ${local.timestamp}"
+  ami_description = "SuperPlane runner AMI - amd64, Ubuntu 24.04, built ${local.timestamp}"
 
   tags = {
     Name           = "${var.ami_name_prefix}-amd64"
@@ -95,10 +96,11 @@ source "amazon-ebs" "ubuntu_arm64" {
     most_recent = true
   }
 
-  ssh_username = "ubuntu"
+  ssh_username         = "ubuntu"
+  iam_instance_profile = "fleet-manager-profile"
 
   ami_name        = "${var.ami_name_prefix}-arm64-${local.timestamp}"
-  ami_description = "SuperPlane runner AMI — arm64, Ubuntu 24.04, built ${local.timestamp}"
+  ami_description = "SuperPlane runner AMI - arm64, Ubuntu 24.04, built ${local.timestamp}"
 
   tags = {
     Name           = "${var.ami_name_prefix}-arm64"
@@ -120,6 +122,7 @@ build {
   provisioner "shell" {
     script           = "packer/scripts/install.sh"
     environment_vars = ["RUNNER_S3_URI=${var.runner_s3_uri_amd64}"]
+    execute_command  = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
     pause_before     = "15s"
   }
 
@@ -136,6 +139,7 @@ build {
   provisioner "shell" {
     script           = "packer/scripts/install.sh"
     environment_vars = ["RUNNER_S3_URI=${var.runner_s3_uri_arm64}"]
+    execute_command  = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
     pause_before     = "15s"
   }
 

@@ -38,7 +38,8 @@ apt-get install -qy nodejs
 
 # AWS CLI v2
 ARCH=$(dpkg --print-architecture)  # amd64 or arm64
-curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH/amd64/x86_64}.zip" \
+AWS_CLI_ARCH=$([ "$ARCH" = "arm64" ] && echo "aarch64" || echo "x86_64")
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_CLI_ARCH}.zip" \
   -o /tmp/awscliv2.zip
 unzip -q /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install --update
