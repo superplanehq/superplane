@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string, versionID string) (*pb.GetCanvasDashboardResponse, error) {
+func GetConsole(ctx context.Context, organizationID, canvasID string, versionID string) (*pb.GetConsoleResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -33,14 +33,14 @@ func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string, ve
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
-	var dashboard *models.CanvasDashboard
+	var version *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveDashboardVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
 		if resolveErr != nil {
 			return resolveErr
 		}
 
-		version, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
+		v, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
 		if loadErr != nil {
 			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.NotFound, "version not found")
@@ -48,24 +48,25 @@ func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string, ve
 			return loadErr
 		}
 
-		if accessErr := ensureDashboardVersionReadable(ctx, tx, canvas, version); accessErr != nil {
+		if accessErr := ensureConsoleVersionReadable(ctx, tx, canvas, v); accessErr != nil {
 			return accessErr
 		}
 
-		dashboard = models.CanvasDashboardFromVersion(version)
+		version = v
 		return nil
 	})
+
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, status.Error(codes.Internal, "failed to load canvas dashboard")
+		return nil, status.Error(codes.Internal, "failed to load console")
 	}
 
-	serialized, err := serializeCanvasDashboard(dashboard)
+	serialized, err := serializeConsole(version)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to serialize canvas dashboard")
+		return nil, status.Error(codes.Internal, "failed to serialize console")
 	}
 
-	return &pb.GetCanvasDashboardResponse{Dashboard: serialized}, nil
+	return &pb.GetConsoleResponse{Console: serialized}, nil
 }

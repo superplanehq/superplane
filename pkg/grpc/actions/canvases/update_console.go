@@ -17,14 +17,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateCanvasDashboard(
+func UpdateConsole(
 	ctx context.Context,
 	organizationID,
 	canvasID string,
 	versionID string,
-	panels []*pb.DashboardPanel,
-	layout []*pb.DashboardLayoutItem,
-) (*pb.UpdateCanvasDashboardResponse, error) {
+	panels []*pb.Console_Panel,
+	layout []*pb.Console_LayoutItem,
+) (*pb.UpdateConsoleResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -53,19 +53,19 @@ func UpdateCanvasDashboard(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	modelPanels, err := deserializeDashboardPanels(panels)
+	modelPanels, err := deserializeConsolePanels(panels)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	modelLayout := deserializeDashboardLayout(layout)
+	modelLayout := deserializeConsoleLayout(layout)
 
-	if err := validateDashboardInput(modelPanels, modelLayout); err != nil {
+	if err := validateConsoleInput(modelPanels, modelLayout); err != nil {
 		return nil, err
 	}
 
-	var saved *models.CanvasDashboard
+	var newVersion *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveDashboardVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -93,35 +93,37 @@ func UpdateCanvasDashboard(
 			return draftErr
 		}
 
-		record, updateErr := models.UpdateCanvasVersionDashboardInTransaction(tx, version, modelPanels, modelLayout)
+		v, updateErr := models.UpdateCanvasVersionConsoleInTransaction(tx, version, modelPanels, modelLayout)
 		if updateErr != nil {
 			return updateErr
 		}
-		saved = record
+
+		newVersion = v
 		return nil
 	})
+
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		log.WithError(err).Error("failed to update canvas dashboard")
-		return nil, status.Error(codes.Internal, "failed to update canvas dashboard")
+		log.WithError(err).Error("failed to update console")
+		return nil, status.Error(codes.Internal, "failed to update console")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), saved.VersionID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), newVersion.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
 	}
 
-	serialized, err := serializeCanvasDashboard(saved)
+	console, err := serializeConsole(newVersion)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to serialize canvas dashboard")
+		return nil, status.Error(codes.Internal, "failed to serialize console")
 	}
 
-	return &pb.UpdateCanvasDashboardResponse{Dashboard: serialized}, nil
+	return &pb.UpdateConsoleResponse{Console: console}, nil
 }
 
-func validateDashboardInput(panels []models.DashboardPanel, layout []models.DashboardLayoutItem) error {
-	if err := models.ValidateDashboardContent(panels, layout); err != nil {
+func validateConsoleInput(panels []models.ConsolePanel, layout []models.ConsoleLayoutItem) error {
+	if err := models.ValidateConsoleContent(panels, layout); err != nil {
 		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	return nil

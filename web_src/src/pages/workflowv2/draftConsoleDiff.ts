@@ -1,8 +1,8 @@
-import type { CanvasesCanvasDashboard, CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-client";
+import type { CanvasesConsole, ConsoleLayoutItem, ConsolePanel } from "@/api-client";
 
 export type DraftConsoleDiffCounts = { added: number; updated: number; removed: number };
 
-function comparablePanels(panels: CanvasesDashboardPanel[] | undefined): unknown[] {
+function comparablePanels(panels: ConsolePanel[] | undefined): unknown[] {
   return (panels ?? [])
     .map((panel) => ({
       id: panel.id ?? "",
@@ -12,7 +12,7 @@ function comparablePanels(panels: CanvasesDashboardPanel[] | undefined): unknown
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
-function comparableLayout(layout: CanvasesDashboardLayoutItem[] | undefined): unknown[] {
+function comparableLayout(layout: ConsoleLayoutItem[] | undefined): unknown[] {
   return (layout ?? [])
     .map((item) => ({
       i: item.i ?? "",
@@ -26,7 +26,7 @@ function comparableLayout(layout: CanvasesDashboardLayoutItem[] | undefined): un
     .sort((left, right) => left.i.localeCompare(right.i));
 }
 
-function comparableConsoleSnapshot(dashboard?: CanvasesCanvasDashboard | null): string {
+function comparableConsoleSnapshot(dashboard?: CanvasesConsole | null): string {
   return JSON.stringify({
     panels: comparablePanels(dashboard?.panels),
     layout: comparableLayout(dashboard?.layout),
@@ -35,20 +35,20 @@ function comparableConsoleSnapshot(dashboard?: CanvasesCanvasDashboard | null): 
 
 /** True when draft console differs from live (panels and/or layout). */
 export function hasDraftVersusLiveConsoleDiff(
-  liveDashboard?: CanvasesCanvasDashboard | null,
-  draftDashboard?: CanvasesCanvasDashboard | null,
+  liveDashboard?: CanvasesConsole | null,
+  draftDashboard?: CanvasesConsole | null,
 ): boolean {
   return comparableConsoleSnapshot(liveDashboard) !== comparableConsoleSnapshot(draftDashboard);
 }
 
-function panelSnapshot(panel: CanvasesDashboardPanel | undefined): string {
+function panelSnapshot(panel: ConsolePanel | undefined): string {
   return JSON.stringify({
     type: panel?.type ?? "",
     content: panel?.content ?? {},
   });
 }
 
-function layoutSnapshot(item: CanvasesDashboardLayoutItem | undefined): string {
+function layoutSnapshot(item: ConsoleLayoutItem | undefined): string {
   return JSON.stringify({
     x: item?.x ?? 0,
     y: item?.y ?? 0,
@@ -59,18 +59,18 @@ function layoutSnapshot(item: CanvasesDashboardLayoutItem | undefined): string {
   });
 }
 
-function indexPanels(panels: CanvasesDashboardPanel[] | undefined): Map<string, CanvasesDashboardPanel> {
+function indexPanels(panels: ConsolePanel[] | undefined): Map<string, ConsolePanel> {
   return new Map((panels ?? []).map((panel) => [panel.id ?? "", panel]));
 }
 
-function indexLayout(layout: CanvasesDashboardLayoutItem[] | undefined): Map<string, CanvasesDashboardLayoutItem> {
+function indexLayout(layout: ConsoleLayoutItem[] | undefined): Map<string, ConsoleLayoutItem> {
   return new Map((layout ?? []).map((item) => [item.i ?? "", item]));
 }
 
 /** Counts changed console items by panel/layout id for the edit-mode header badge. */
 export function getDraftConsoleDiffCounts(
-  liveDashboard?: CanvasesCanvasDashboard | null,
-  draftDashboard?: CanvasesCanvasDashboard | null,
+  liveDashboard?: CanvasesConsole | null,
+  draftDashboard?: CanvasesConsole | null,
 ): DraftConsoleDiffCounts {
   const livePanels = indexPanels(liveDashboard?.panels);
   const draftPanels = indexPanels(draftDashboard?.panels);

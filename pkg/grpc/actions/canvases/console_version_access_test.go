@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// These tests pin down the access rules for the dashboard / version
+// These tests pin down the access rules for the console / version
 // endpoints that gate the change-request review flow. Two regression
 // guards are encoded here:
 //
@@ -28,7 +28,7 @@ import (
 //     produced by `superplane console set`).
 //  2. Drafts remain user-private: only their owner can read them.
 
-func TestEnsureDashboardVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T) {
+func TestEnsureConsoleVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T) {
 	r := support.Setup(t)
 	authorCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
@@ -44,11 +44,11 @@ func TestEnsureDashboardVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	t.Run("GetCanvasDashboard returns the snapshot console to a reviewer", func(t *testing.T) {
-		resp, err := GetCanvasDashboard(reviewerCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
+	t.Run("GetConsole returns the snapshot console to a reviewer", func(t *testing.T) {
+		resp, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
 		require.NoError(t, err, "reviewer should see the CR snapshot console")
-		require.NotNil(t, resp.GetDashboard())
-		assert.Equal(t, snapshotVersionID, resp.GetDashboard().GetVersionId())
+		require.NotNil(t, resp.GetConsole())
+		assert.Equal(t, snapshotVersionID, resp.GetConsole().GetVersionId())
 	})
 
 	t.Run("DescribeCanvasVersion returns the snapshot to a reviewer", func(t *testing.T) {
@@ -58,14 +58,14 @@ func TestEnsureDashboardVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing
 		assert.Equal(t, snapshotVersionID, resp.GetVersion().GetMetadata().GetId())
 	})
 
-	t.Run("GetCanvasDashboard returns the snapshot console to its owner", func(t *testing.T) {
-		resp, err := GetCanvasDashboard(authorCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
+	t.Run("GetConsole returns the snapshot console to its owner", func(t *testing.T) {
+		resp, err := GetConsole(authorCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
 		require.NoError(t, err)
-		assert.Equal(t, snapshotVersionID, resp.GetDashboard().GetVersionId())
+		assert.Equal(t, snapshotVersionID, resp.GetConsole().GetVersionId())
 	})
 }
 
-func TestEnsureDashboardVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
+func TestEnsureConsoleVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
 	r := support.Setup(t)
 	authorCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
@@ -75,8 +75,8 @@ func TestEnsureDashboardVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	t.Run("GetCanvasDashboard denies non-owners on a draft", func(t *testing.T) {
-		_, err := GetCanvasDashboard(reviewerCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+	t.Run("GetConsole denies non-owners on a draft", func(t *testing.T) {
+		_, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, draftVersionID)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -92,13 +92,13 @@ func TestEnsureDashboardVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
 	})
 
 	t.Run("Owner can still read their draft", func(t *testing.T) {
-		resp, err := GetCanvasDashboard(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+		resp, err := GetConsole(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID)
 		require.NoError(t, err)
-		assert.Equal(t, draftVersionID, resp.GetDashboard().GetVersionId())
+		assert.Equal(t, draftVersionID, resp.GetConsole().GetVersionId())
 	})
 }
 
-func TestEnsureDashboardVersionReadable_NoCRStillDenies(t *testing.T) {
+func TestEnsureConsoleVersionReadable_NoCRStillDenies(t *testing.T) {
 	r := support.Setup(t)
 	authorCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
@@ -121,7 +121,7 @@ func TestEnsureDashboardVersionReadable_NoCRStillDenies(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	_, err := GetCanvasDashboard(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID.String())
+	_, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID.String())
 	require.Error(t, err)
 	s, ok := status.FromError(err)
 	require.True(t, ok)
