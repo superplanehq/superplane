@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -168,15 +169,9 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hasArgv := len(req.Command) > 0
-	var normalizedCmds []string
-	for _, c := range req.Commands {
-		c = strings.TrimSpace(c)
-		if c != "" {
-			normalizedCmds = append(normalizedCmds, c)
-		}
-	}
-	hasShell := len(normalizedCmds) > 0
+	normalizedCmds := api.NormalizeCommandLines(req.Commands)
+	script := strings.TrimSpace(req.Script)
+	kind := api.EffectiveRunMode(&req.CreateTaskRequest)
 
 	mode := models.ExecutionHost
 	switch strings.ToLower(strings.TrimSpace(req.ExecutionMode)) {
@@ -192,6 +187,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	task := &models.Task{
 		ID:            uuid.NewString(),
 		FleetID:       fleet.ID,
+		RunMode:       kind,
 		WebhookURL:    strings.TrimSpace(req.WebhookURL),
 		Status:        models.StatusQueued,
 		CreatedAt:     time.Now().UTC(),
@@ -199,10 +195,25 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		DockerImage:   req.DockerImage,
 		Environment:   api.CloneEnvironment(req.Environment),
 	}
-	if hasShell {
+	switch kind {
+	case models.RunModeJavaScript:
+		task.Script = script
+		if len(bytes.TrimSpace(req.MessageChain)) > 0 {
+			if !json.Valid(req.MessageChain) {
+				writeError(w, http.StatusBadRequest, "message_chain must be valid JSON")
+				return
+			}
+			task.MessageChainJSON = string(req.MessageChain)
+		} else {
+			task.MessageChainJSON = "{}"
+		}
+	case models.RunModeCommandList:
 		task.Commands = normalizedCmds
-	} else if hasArgv {
+	case models.RunModeArgv:
 		task.Command = req.Command
+	default:
+		writeError(w, http.StatusBadRequest, "invalid run_mode")
+		return
 	}
 	if req.ExecutionTimeoutSeconds != nil {
 		v := *req.ExecutionTimeoutSeconds
@@ -475,19 +486,46 @@ func (s *Server) taskLogForTask(taskID string) *api.TaskLogSink {
 }
 
 func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
+	kind := api.EffectiveRunMode(req)
 	hasArgv := len(req.Command) > 0
-	hasCmds := false
-	for _, c := range req.Commands {
-		if strings.TrimSpace(c) != "" {
-			hasCmds = true
-			break
+	hasCmds := len(api.NormalizeCommandLines(req.Commands)) > 0
+	script := strings.TrimSpace(req.Script)
+	hasScript := script != ""
+	hasChain := len(bytes.TrimSpace(req.MessageChain)) > 0
+
+	switch kind {
+	case models.RunModeCommandList:
+		if !hasCmds {
+			return "commands required for run_mode command_list"
 		}
+		if hasArgv || hasScript || hasChain {
+			return "only commands allowed for run_mode command_list"
+		}
+	case models.RunModeArgv:
+		if !hasArgv {
+			return "command required for run_mode argv"
+		}
+		if hasCmds || hasScript || hasChain {
+			return "only command allowed for run_mode argv"
+		}
+	case models.RunModeJavaScript:
+		if !hasScript {
+			return "script required for run_mode javascript_script"
+		}
+		if hasArgv || hasCmds {
+			return "only script and message_chain allowed for run_mode javascript_script"
+		}
+		if hasChain && !json.Valid(req.MessageChain) {
+			return "message_chain must be valid JSON"
+		}
+	default:
+		if strings.TrimSpace(req.RunMode) != "" {
+			return "invalid run_mode"
+		}
+		return "command, commands, or script required"
 	}
-	switch {
-	case hasArgv && hasCmds:
-		return "specify either command or commands, not both"
-	case !hasArgv && !hasCmds:
-		return "command or commands required"
+	if strings.TrimSpace(req.RunMode) != "" && kind != models.RunMode(strings.ToLower(strings.TrimSpace(req.RunMode))) {
+		return "run_mode does not match request body"
 	}
 	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(req.ExecutionMode)))
 	switch mode {

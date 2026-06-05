@@ -18,9 +18,17 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 	if err != nil {
 		return nil, err
 	}
+	runMode := string(t.RunMode)
+	if runMode == "" {
+		runMode = string(models.InferRunMode(t.Commands, t.Command, t.Script))
+	}
+	if runMode == "" {
+		runMode = string(models.RunModeCommandList)
+	}
 	row := &brokermodels.Task{
 		ID:                      t.ID,
 		FleetID:                 t.FleetID,
+		RunMode:                 runMode,
 		CommandJSON:             string(cmdJSON),
 		WebhookURL:              t.WebhookURL,
 		Status:                  string(t.Status),
@@ -36,6 +44,12 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		LeaseUntil:              t.LeaseUntil,
 		ExecutionTimeoutSeconds: t.ExecutionTimeoutSeconds,
 		ExitCode:                t.ExitCode,
+	}
+	if strings.TrimSpace(t.Script) != "" {
+		row.ScriptJSON = t.Script
+	}
+	if mc := strings.TrimSpace(t.MessageChainJSON); mc != "" {
+		row.MessageChainJSON = mc
 	}
 	if len(t.Commands) > 0 {
 		b, err := json.Marshal(t.Commands)
@@ -77,6 +91,9 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 	t := &models.Task{
 		ID:                      row.ID,
 		FleetID:                 row.FleetID,
+		RunMode:                 models.RunMode(row.RunMode),
+		Script:                  row.ScriptJSON,
+		MessageChainJSON:        row.MessageChainJSON,
 		Command:                 cmd,
 		Commands:                cmds,
 		Environment:             env,
@@ -94,6 +111,9 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		LeaseUntil:              row.LeaseUntil,
 		ExecutionTimeoutSeconds: row.ExecutionTimeoutSeconds,
 		ExitCode:                row.ExitCode,
+	}
+	if t.RunMode == "" {
+		t.RunMode = models.InferRunMode(t.Commands, t.Command, t.Script)
 	}
 	if t.ClaimedAt != nil {
 		ct := t.ClaimedAt.UTC()

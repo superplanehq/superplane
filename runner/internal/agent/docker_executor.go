@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 )
 
 // DockerExecutor runs a task inside a Docker container using a
@@ -107,7 +108,20 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(pullOut)
 	}
 
+	var jsWorkDir string
+	if api.RunModeForTask(task) == models.RunModeJavaScript {
+		var prepErr error
+		jsWorkDir, prepErr = prepareDockerJavaScriptWorkDir(task)
+		if prepErr != nil {
+			return 1, "", prepErr
+		}
+		defer os.RemoveAll(jsWorkDir)
+	}
+
 	runArgs := []string{"run", "-d", "--name", name}
+	if jsWorkDir != "" {
+		runArgs = append(runArgs, "-v", jsWorkDir+":"+dockerJavaScriptWorkMount+":ro")
+	}
 	if rp := strings.TrimSpace(resultHostPath); rp != "" {
 		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 		if ferr != nil {
@@ -136,6 +150,9 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 	startedAt := time.Now()
 	if hasSingleCommand {
 		writeLiveLogCommandStart(live, 0, singleCommandText, startedAt)
+	} else if api.RunModeForTask(task) == models.RunModeJavaScript {
+		writeLiveLogCommandStart(live, 0, "node "+javaScriptProgramName, startedAt)
+		hasSingleCommand = true
 	}
 	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
 	if hasSingleCommand {
@@ -188,6 +205,11 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 		return nil, err
 	}
 	var args []string
+	switch api.RunModeForTask(task) {
+	case models.RunModeJavaScript:
+		args := append([]string{"exec"}, envArgs...)
+		return append(args, name, "node", dockerJavaScriptProgramPath()), nil
+	}
 	switch {
 	case len(task.Commands) > 0:
 		directives := normalizeDirectiveLines(task.Commands)
