@@ -50,7 +50,7 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "dashboard" | "memory" | "runs") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory" | "runs") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
@@ -195,8 +195,8 @@ export function buildCurrentCanvasActions({
       label: "Console",
       description: currentCanvasName,
       icon: PanelTop,
-      onSelect: () => goToCurrentCanvasView("dashboard"),
-      keywords: ["dashboard", "console"],
+      onSelect: () => goToCurrentCanvasView("console"),
+      keywords: ["console"],
     },
     {
       id: "current-canvas-runs",
@@ -296,7 +296,7 @@ function buildOrganizationRootActions(
       description: organizationName,
       icon: Home,
       onSelect: () => goTo(`/${organizationId}`),
-      keywords: ["home", "dashboard", "canvases", "projects"],
+      keywords: ["home", "canvases", "projects"],
     },
     {
       id: "templates",

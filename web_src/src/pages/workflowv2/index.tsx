@@ -84,9 +84,9 @@ import type {
   ChangeRequestAction,
   QueuedCanvasSaveRequest,
 } from "./canvasSaveTypes";
-import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
-import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
-import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
+import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
+import { useConsoleModeActions } from "./console/useConsoleModeActions";
+import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
 import { useWorkflowFilesFromCanvas } from "./useWorkflowFilesFromCanvas";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -180,14 +180,14 @@ export function WorkflowPageV2() {
   const {
     isRunsMode,
     setIsRunsMode,
-    setIsDashboardMode,
+    setIsConsoleMode,
     isMemoryMode,
     setIsMemoryMode,
     setIsFilesMode,
-    isDashboardAddPanelOpen,
-    setIsDashboardAddPanelOpen,
-    isDashboardYamlOpen,
-    setIsDashboardYamlOpen,
+    isConsoleAddPanelOpen,
+    setIsConsoleAddPanelOpen,
+    isConsoleYamlOpen,
+    setIsConsoleYamlOpen,
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
@@ -1056,11 +1056,11 @@ export function WorkflowPageV2() {
     () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
     [isViewingLiveVersion, nodeExecutionsMap],
   );
-  const dashboardNodeStatuses = useMemo(
-    () => deriveDashboardNodeStatuses(visibleNodeExecutionsMap),
+  const consoleNodeStatuses = useMemo(
+    () => deriveConsoleNodeStatuses(visibleNodeExecutionsMap),
     [visibleNodeExecutionsMap],
   );
-  const handleDashboardTriggerNode = useDashboardTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
+  const handleConsoleTriggerNode = useConsoleTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
   const visibleNodeQueueItemsMap = useMemo(
     () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
     [isViewingLiveVersion, nodeQueueItemsMap],
@@ -1146,7 +1146,7 @@ export function WorkflowPageV2() {
     enabled: !isTemplate,
     registerIgnoredCanvasVersionUpdatedEcho,
   });
-  const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
+  const { consoleQuery, updateConsoleMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
     canvasConsoleVersionDiff;
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
@@ -4234,7 +4234,7 @@ export function WorkflowPageV2() {
         refetchType: "all",
       }),
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId), refetchType: "all" }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId), refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId), refetchType: "all" }),
     ]);
   }, [organizationId, canvasId, queryClient]);
 
@@ -4845,10 +4845,10 @@ export function WorkflowPageV2() {
     setIsVersionControlOpen(false);
   }, []);
 
-  const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
-    setIsDashboardMode,
-    setIsDashboardAddPanelOpen,
-    setIsDashboardYamlOpen,
+  const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
+    setIsConsoleMode,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleYamlOpen,
     setIsRunsMode,
     setIsMemoryMode,
     setIsFilesMode,
@@ -4858,9 +4858,9 @@ export function WorkflowPageV2() {
 
   const { handleSelectMemoryMode, handleExitMemoryMode } = useMemoryModeActions({
     setIsMemoryMode,
-    setIsDashboardMode,
-    setIsDashboardAddPanelOpen,
-    setIsDashboardYamlOpen,
+    setIsConsoleMode,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleYamlOpen,
     setIsRunsMode,
     setIsFilesMode,
     setSearchParams,
@@ -4869,9 +4869,9 @@ export function WorkflowPageV2() {
 
   const { handleSelectFilesMode, handleExitFilesMode } = useFilesModeActions({
     setIsFilesMode,
-    setIsDashboardMode,
-    setIsDashboardAddPanelOpen,
-    setIsDashboardYamlOpen,
+    setIsConsoleMode,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleYamlOpen,
     setIsRunsMode,
     setIsMemoryMode,
     setSelectedRunId,
@@ -4880,23 +4880,23 @@ export function WorkflowPageV2() {
 
   const {
     handleSelectCanvasView,
-    handleDashboardAddPanelDialogOpenChange,
-    onDashboardAddPanel,
-    onDashboardOpenYaml,
-    dashboardYamlReadOnly,
+    handleConsoleAddPanelDialogOpenChange,
+    onConsoleAddPanel,
+    onConsoleOpenYaml,
+    consoleYamlReadOnly,
   } = useWorkflowViewModeActions({
     ...urlViewFlags,
     hasEditableVersion,
     isTemplate,
     canUpdateCanvas,
     canvasDeletedRemotely,
-    handleExitDashboardMode,
+    handleExitConsoleMode,
     handleExitMemoryMode,
     handleExitFilesMode,
     handleExitRunsMode,
     handleToggleEditMode,
-    setIsDashboardAddPanelOpen,
-    setIsDashboardYamlOpen,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleYamlOpen,
   });
 
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
@@ -5259,12 +5259,12 @@ export function WorkflowPageV2() {
 
   const workflowFiles = useWorkflowFilesFromCanvas({
     canvasYamlPayload,
-    panels: dashboardQuery.data?.panels,
-    layout: dashboardQuery.data?.layout,
+    panels: consoleQuery.data?.panels,
+    layout: consoleQuery.data?.layout,
     canvasId,
     canvasName: canvas?.metadata?.name,
-    consoleLoading: dashboardQuery.isLoading,
-    consoleError: dashboardQuery.error,
+    consoleLoading: consoleQuery.isLoading,
+    consoleError: consoleQuery.error,
   });
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
@@ -5474,25 +5474,25 @@ export function WorkflowPageV2() {
       <div className="relative h-full w-full">
         <WorkflowPageModeOverlays
           urlViewFlags={urlViewFlags}
-          dashboard={{
+          console={{
             canActOnCanvas,
             editLocked: isReadOnly,
-            showDashboardEditControls: isEditing,
-            onDashboardAddPanel,
-            onDashboardOpenYaml,
-            dashboardYamlReadOnly,
-            dashboardQuery,
-            updateDashboardMutation,
-            addPanelDialogOpen: isDashboardAddPanelOpen,
-            onAddPanelDialogOpenChange: handleDashboardAddPanelDialogOpenChange,
-            yamlModalOpen: isDashboardYamlOpen,
-            onYamlModalOpenChange: setIsDashboardYamlOpen,
+            showConsoleEditControls: isEditing,
+            onConsoleAddPanel,
+            onConsoleOpenYaml,
+            consoleYamlReadOnly,
+            consoleQuery,
+            updateConsoleMutation,
+            addPanelDialogOpen: isConsoleAddPanelOpen,
+            onAddPanelDialogOpenChange: handleConsoleAddPanelDialogOpenChange,
+            yamlModalOpen: isConsoleYamlOpen,
+            onYamlModalOpenChange: setIsConsoleYamlOpen,
             canvasId: canvasId || undefined,
             canvasName: canvas?.metadata?.name || undefined,
             organizationId: organizationId || undefined,
             canvasNodes,
-            nodeStatuses: dashboardNodeStatuses,
-            onTriggerNode: handleDashboardTriggerNode,
+            nodeStatuses: consoleNodeStatuses,
+            onTriggerNode: handleConsoleTriggerNode,
           }}
           memory={{
             canEdit: canEditCanvasMemory({
@@ -5625,7 +5625,7 @@ export function WorkflowPageV2() {
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onExitRunsMode={handleExitRunsMode}
-          onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
+          onSelectConsole={isTemplate ? undefined : handleSelectConsoleMode}
           onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
