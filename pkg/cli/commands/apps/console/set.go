@@ -60,23 +60,23 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	body := openapi_client.CanvasesUpdateCanvasDashboardBody{}
+	body := openapi_client.CanvasesUpdateConsoleBody{}
 	body.SetVersionId(versionID)
 	body.SetPanels(apiPanelsFromYAML(resource.Spec.Panels))
 	body.SetLayout(apiLayoutFromYAML(resource.Spec.Layout))
 
 	response, _, err := ctx.API.CanvasAPI.
-		CanvasesUpdateCanvasDashboard(ctx.Context, canvasID).
+		CanvasesUpdateConsole(ctx.Context, canvasID).
 		Body(body).
 		Execute()
 	if err != nil {
 		return err
 	}
-	if response.Dashboard == nil {
-		return fmt.Errorf("update succeeded but server did not return a dashboard")
+	if response.Console == nil {
+		return fmt.Errorf("update succeeded but server did not return a console")
 	}
 
-	dashboard := *response.Dashboard
+	console := *response.Console
 
 	// When change management is enabled, drafts are not visible from the
 	// UI on their own; the user can only see/approve them via a change
@@ -91,14 +91,14 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(consoleYAMLFromAPI(resource.Metadata.Name, dashboard))
+		return ctx.Renderer.Render(consoleYAMLFromAPI(resource.Metadata.Name, console))
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", strings.TrimSpace(dashboard.GetVersionId()))
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(dashboard.GetPanels()))
-		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(dashboard.GetLayout()))
+		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", strings.TrimSpace(console.GetVersionId()))
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.GetPanels()))
+		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(console.GetLayout()))
 		if createdChangeRequestID != "" {
 			_, err := fmt.Fprintf(stdout, "Change request: %s (open)\n", createdChangeRequestID)
 			return err

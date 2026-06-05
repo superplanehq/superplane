@@ -77,11 +77,11 @@ func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
 // FetchConsole loads and parses an optional console.yaml from a public GitHub
 // repository at the given ref. The console is opt-in: a missing file returns
 // (nil, nil) so callers can install the app without one. Parse and validation
-// errors from models.DashboardFromYML are wrapped and surfaced to the caller.
+// errors from models.ConsoleFromYML are wrapped and surfaced to the caller.
 //
 // Callers must pass a non-empty ref. Resolve it via FetchCanvas first so the
 // canvas and console are read from the same commit.
-func FetchConsole(repo *Repository, ref string) (*models.DashboardYAML, error) {
+func FetchConsole(repo *Repository, ref string) (*models.ConsoleYAML, error) {
 	if ref == "" {
 		return nil, fmt.Errorf("console fetch requires a resolved ref")
 	}
@@ -94,7 +94,7 @@ func FetchConsole(repo *Repository, ref string) (*models.DashboardYAML, error) {
 		return nil, err
 	}
 
-	console, err := models.DashboardFromYML(body)
+	console, err := models.ConsoleFromYML(body)
 	if err != nil {
 		return nil, fmt.Errorf("parse console yaml: %w", err)
 	}

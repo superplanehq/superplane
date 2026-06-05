@@ -170,7 +170,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
   },
   {
     category: "Canvases",
-    icon: "dashboard",
+    icon: "console",
     permissions: [
       {
         id: "canvas.read",
