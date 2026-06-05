@@ -8,10 +8,6 @@ const modeConfig = {
     label: "Build",
     description: "Build mode — make changes to the canvas",
   },
-  architect: {
-    label: "Plan",
-    description: "Plan mode — design before building",
-  },
   operator: {
     label: "Ask",
     description: "Ask mode — read-only questions and diagnostics",
@@ -20,15 +16,13 @@ const modeConfig = {
 
 function indicatorClasses(mode: AgentMode): string {
   if (mode === "builder") return "border-0 bg-[var(--purple)]";
-  if (mode === "operator") return "bg-slate-500 border-transparent";
-  return "bg-white border-transparent";
+  return "bg-slate-500 border-transparent";
 }
 
 function labelColor(key: AgentMode, isActive: boolean): string {
   if (!isActive) return "text-slate-600 hover:text-slate-700";
   if (key === "builder") return "text-white";
-  if (key === "operator") return "text-white";
-  return "text-slate-900";
+  return "text-white";
 }
 
 export function ModeToggle({

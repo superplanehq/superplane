@@ -1,10 +1,12 @@
-import { ArrowUp, Loader2, Square } from "lucide-react";
-import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
-import { ModeToggle } from "./ModeToggle";
+import { ComposerToolbar } from "./ComposerToolbar";
+import { useMentions } from "./useMentions";
+import { useMentionCandidates } from "./useMentionCandidates";
+import { MentionDropdown } from "./MentionDropdown";
+import { MentionTextarea } from "./MentionTextarea";
+import type { SuperplaneComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun } from "@/api-client";
 
 export function ChatComposer({
   onSend,
@@ -16,6 +18,8 @@ export function ChatComposer({
   agentMode,
   onModeSwitch,
   modeDisabled,
+  nodes,
+  runs,
 }: {
   onSend: (content: string) => Promise<void>;
   onStop: () => void;
@@ -26,86 +30,135 @@ export function ChatComposer({
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   modeDisabled?: boolean;
+  nodes?: SuperplaneComponentsNode[];
+  runs?: CanvasesCanvasRun[];
 }) {
-  const [draft, setDraft] = useState("");
-  const canSend = Boolean(draft.trim()) && !sendPending;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const mentionKeyboardRef = useRef<((e: React.KeyboardEvent) => boolean) | null>(null);
+  const {
+    value,
+    setValue,
+    showDropdown,
+    filter,
+    setCursorPos,
+    insertMention,
+    getMarkdown,
+    mentions,
+    isEmpty,
+    clear,
+    snapshot,
+    restore,
+    dismiss,
+  } = useMentions();
+
+  const candidates = useMentionCandidates(nodes, runs, filter);
+  const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
-    const content = draft.trim();
+    if (isEmpty) return;
+    const content = getMarkdown().trim();
     if (!content) return;
-
-    setDraft("");
-
+    snapshot();
+    clear();
     try {
       await onSend(content);
     } catch {
-      setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : content));
+      restore();
     }
-  }, [draft, onSend]);
+  }, [isEmpty, getMarkdown, clear, onSend, snapshot, restore]);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setValue(e.target.value);
+      setCursorPos(e.target.selectionStart ?? e.target.value.length);
+    },
+    [setValue, setCursorPos],
+  );
+
+  const handleSelect = useCallback(
+    (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+      setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? 0);
+    },
+    [setCursorPos],
+  );
+
+  const handleMentionSelect = useCallback(
+    (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
+      const pos = insertMention(item);
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(pos, pos);
+        }
+      });
+    },
+    [insertMention],
+  );
+
+  const handleDismiss = useCallback(() => {
+    dismiss();
+    textareaRef.current?.focus();
+  }, [dismiss]);
+
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && backdropRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (mentionKeyboardRef.current?.(e)) return;
+      if (e.key !== "Enter") return;
+      if ("isComposing" in e.nativeEvent && e.nativeEvent.isComposing) return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      if (canSend) void handleSend();
+    },
+    [canSend, handleSend],
+  );
 
   return (
     <footer className="px-3 pb-3 pt-2">
-      <div className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15">
-        <Textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={1}
+      <div
+        ref={containerRef}
+        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15"
+      >
+        <MentionTextarea
+          value={value}
+          mentions={mentions}
+          onChange={handleChange}
+          onSelect={handleSelect}
+          onKeyDown={handleKeyDown}
+          onScroll={handleScroll}
           placeholder="Ask the agent…"
-          data-testid="agent-input"
-          className={cn(
-            "min-h-9 w-full resize-none border-0 bg-transparent px-3 py-2.5 text-sm shadow-none",
-            "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
-            "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-            "text-[rgba(10,10,10,1)] dark:bg-transparent",
-          )}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            const nativeEvent = e.nativeEvent;
-            if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
-            if (e.shiftKey) return;
-            e.preventDefault();
-            if (!canSend) return;
-            void handleSend();
-          }}
+          textareaRef={textareaRef}
+          backdropRef={backdropRef}
         />
-        <div className="flex items-center justify-between gap-2 px-2 pb-2">
-          <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <span className="truncate text-xs text-muted-foreground">{statusLabel}</span>
-            {sending && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0 rounded-full border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                onClick={onStop}
-                disabled={stopping}
-                aria-label={stopping ? "Stopping" : "Stop"}
-                title={stopping ? "Stopping..." : "Stop"}
-                data-testid="agent-stop-button"
-              >
-                {stopping ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                ) : (
-                  <Square className="size-3 fill-current" aria-hidden />
-                )}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="default"
-              size="icon"
-              className="size-7 shrink-0 rounded-full"
-              onClick={() => void handleSend()}
-              disabled={!canSend}
-              aria-label="Send message"
-              data-testid="agent-send-message-button"
-            >
-              <ArrowUp className="size-3.5" aria-hidden />
-            </Button>
-          </div>
-        </div>
+        <ComposerToolbar
+          agentMode={agentMode}
+          onModeSwitch={onModeSwitch}
+          modeDisabled={modeDisabled}
+          sending={sending}
+          stopping={stopping}
+          statusLabel={statusLabel}
+          canSend={canSend}
+          onStop={onStop}
+          onSend={() => void handleSend()}
+        />
       </div>
+      <MentionDropdown
+        items={candidates}
+        visible={showDropdown}
+        anchorEl={containerRef.current}
+        onSelect={handleMentionSelect}
+        onDismiss={handleDismiss}
+        keyboardRef={mentionKeyboardRef}
+      />
     </footer>
   );
 }
