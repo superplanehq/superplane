@@ -111,10 +111,7 @@ function VariablePreviewBlock({
                 >
                   {field.key}
                 </button>
-                <span
-                  className="min-w-0 flex-1 truncate text-[11px] text-slate-600"
-                  title={field.preview}
-                >
+                <span className="min-w-0 flex-1 truncate text-[11px] text-slate-600" title={field.preview}>
                   {field.preview}
                 </span>
               </li>
