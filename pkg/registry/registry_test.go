@@ -573,6 +573,33 @@ func TestRegistry_GetAction_RunnerJS(t *testing.T) {
 	assert.True(t, r.IsCoreBlock("runnerJS"))
 }
 
+func TestRegistry_GetAction_DottedCoreAction(t *testing.T) {
+	coreAction := impl.NewDummyAction(impl.DummyActionOptions{Name: "foo.bar"})
+	integrationAction := impl.NewDummyAction(impl.DummyActionOptions{Name: "foo.bar"})
+	integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Actions: []core.Action{integrationAction},
+	})
+
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"foo.bar": registry.NewPanicableAction(coreAction),
+		},
+		Integrations: map[string]core.Integration{
+			"foo": registry.NewPanicableIntegration(integration),
+		},
+	}
+
+	got, err := r.GetAction("foo.bar")
+	require.NoError(t, err)
+	assert.Equal(t, "foo.bar", got.Name())
+
+	_, err = r.FindConfigurableComponent("foo.bar")
+	require.NoError(t, err)
+
+	assert.True(t, r.IsCoreBlock("foo.bar"))
+	assert.False(t, r.IsCoreBlock("foo.other"))
+}
+
 func TestRegistry_ListFunctionsSortByName(t *testing.T) {
 	a := impl.NewDummyAction(impl.DummyActionOptions{Name: "zebra"})
 	b := impl.NewDummyAction(impl.DummyActionOptions{Name: "alpha"})
