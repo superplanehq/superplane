@@ -146,13 +146,16 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(runOut)
 	}
 
+	if api.RunModeForTask(task) == models.RunModeJavaScript {
+		exitCode, execOut, runErr := dockerExecJavaScript(ctx, name, task, live)
+		out.WriteString(stripLiveLogControlLines(execOut))
+		return exitCode, out.String(), runErr
+	}
+
 	singleCommandText, hasSingleCommand := dockerSingleCommandText(task)
 	startedAt := time.Now()
 	if hasSingleCommand {
 		writeLiveLogCommandStart(live, 0, singleCommandText, startedAt)
-	} else if api.RunModeForTask(task) == models.RunModeJavaScript {
-		writeLiveLogCommandStart(live, 0, "node "+javaScriptProgramName, startedAt)
-		hasSingleCommand = true
 	}
 	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
 	if hasSingleCommand {
@@ -160,6 +163,70 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 	}
 	out.WriteString(stripLiveLogControlLines(execOut))
 	return exitCode, out.String(), runErr
+}
+
+func dockerExecJavaScript(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	setup := normalizeDirectiveLines(task.SetupCommands)
+	var combined bytes.Buffer
+
+	if len(setup) > 0 {
+		exit, setupOut, err := dockerExecShellDirectives(ctx, name, task, setup, live)
+		combined.WriteString(setupOut)
+		if exit != 0 {
+			return exit, combined.String(), err
+		}
+	}
+
+	startedAt := time.Now()
+	jsIndex := len(setup)
+	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, startedAt)
+	exit, nodeOut, err := dockerExecNode(ctx, name, task, live)
+	writeLiveLogCommandEnd(live, jsIndex, exit, time.Since(startedAt))
+	combined.WriteString(nodeOut)
+	return exit, combined.String(), err
+}
+
+func dockerExecShellDirectives(ctx context.Context, name string, task *api.TaskPayload, directives []string, live io.Writer) (int, string, error) {
+	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
+	script := dockerCommandsScript(directives)
+	args := append([]string{"exec"}, envArgs...)
+	args = append(args, name, "sh", "-c", script)
+	return runDockerExec(ctx, args, live)
+}
+
+func dockerExecNode(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
+	args := append([]string{"exec"}, envArgs...)
+	args = append(args, name, "node", dockerJavaScriptProgramPath())
+	return runDockerExec(ctx, args, live)
+}
+
+func runDockerExec(ctx context.Context, args []string, live io.Writer) (int, string, error) {
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	var buf bytes.Buffer
+	if live != nil {
+		mw := io.MultiWriter(&buf, live)
+		cmd.Stdout = mw
+		cmd.Stderr = mw
+	} else {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	}
+	err := cmd.Run()
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return ee.ExitCode(), buf.String(), err
+		}
+		return 1, buf.String(), err
+	}
+	return 0, buf.String(), nil
 }
 
 // dockerExecTask runs the task inside an existing container via `docker exec`.
@@ -177,26 +244,7 @@ func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, liv
 	if err != nil {
 		return 1, "", err
 	}
-
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	var buf bytes.Buffer
-	if live != nil {
-		mw := io.MultiWriter(&buf, live)
-		cmd.Stdout = mw
-		cmd.Stderr = mw
-	} else {
-		cmd.Stdout = &buf
-		cmd.Stderr = &buf
-	}
-	err = cmd.Run()
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			return ee.ExitCode(), buf.String(), err
-		}
-		return 1, buf.String(), err
-	}
-	return 0, buf.String(), nil
+	return runDockerExec(ctx, args, live)
 }
 
 func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
@@ -205,11 +253,6 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 		return nil, err
 	}
 	var args []string
-	switch api.RunModeForTask(task) {
-	case models.RunModeJavaScript:
-		args := append([]string{"exec"}, envArgs...)
-		return append(args, name, "node", dockerJavaScriptProgramPath()), nil
-	}
 	switch {
 	case len(task.Commands) > 0:
 		directives := normalizeDirectiveLines(task.Commands)

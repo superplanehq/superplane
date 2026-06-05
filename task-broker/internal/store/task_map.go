@@ -58,6 +58,13 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		}
 		row.CommandsJSON = string(b)
 	}
+	if len(t.SetupCommands) > 0 {
+		b, err := json.Marshal(t.SetupCommands)
+		if err != nil {
+			return nil, err
+		}
+		row.SetupCommandsJSON = string(b)
+	}
 	if len(t.Environment) > 0 {
 		b, err := json.Marshal(t.Environment)
 		if err != nil {
@@ -82,6 +89,12 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 			return nil, fmt.Errorf("commands_json: %w", err)
 		}
 	}
+	var setupCmds []string
+	if strings.TrimSpace(row.SetupCommandsJSON) != "" {
+		if err := json.Unmarshal([]byte(row.SetupCommandsJSON), &setupCmds); err != nil {
+			return nil, fmt.Errorf("setup_commands_json: %w", err)
+		}
+	}
 	var env []models.EnvironmentVariable
 	if strings.TrimSpace(row.EnvironmentJSON) != "" {
 		if err := json.Unmarshal([]byte(row.EnvironmentJSON), &env); err != nil {
@@ -96,6 +109,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		MessageChainJSON:        row.MessageChainJSON,
 		Command:                 cmd,
 		Commands:                cmds,
+		SetupCommands:           setupCmds,
 		Environment:             env,
 		WebhookURL:              row.WebhookURL,
 		Status:                  models.TaskStatus(row.Status),
