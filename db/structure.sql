@@ -412,8 +412,8 @@ CREATE TABLE public.organizations (
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
     change_management_enabled boolean DEFAULT false NOT NULL,
-    allow_direct_email_invite_completion boolean DEFAULT true NOT NULL,
-    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    allow_direct_email_invite_completion boolean DEFAULT true NOT NULL
 );
 
 
@@ -2172,7 +2172,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260520171949	f
+20260605084623	f
 \.
 
 
