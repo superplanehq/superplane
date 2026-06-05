@@ -7,11 +7,7 @@ import { useEditorLifecycle } from "./useEditorLifecycle";
 import { usePendingState } from "./usePendingState";
 import { useFilesPublish } from "./useFilesPublish";
 import { useFilesTabState } from "./useFilesTabState";
-import {
-  useCatalog,
-  useRepositoryPathLists,
-  useRepositorySelectedFileQuery,
-} from "./useCatalog";
+import { useCatalog, useRepositoryPathLists, useRepositorySelectedFileQuery } from "./useCatalog";
 import type { AppFile, FilesHeaderActionsState } from "./types";
 
 type UseEditorOptions = {
