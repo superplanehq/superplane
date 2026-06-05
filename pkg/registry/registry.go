@@ -270,13 +270,15 @@ func (r *Registry) ListActions() []core.Action {
 }
 
 func (r *Registry) GetAction(name string) (core.Action, error) {
-	if action, ok := r.Actions[name]; ok {
-		return action, nil
-	}
-
 	parts := strings.SplitN(name, ".", 2)
+
 	if len(parts) == 1 {
-		return nil, fmt.Errorf("action %s not registered", name)
+		action, ok := r.Actions[name]
+		if !ok {
+			return nil, fmt.Errorf("action %s not registered", name)
+		}
+
+		return action, nil
 	}
 
 	return r.GetIntegrationAction(parts[0], name)
@@ -387,16 +389,6 @@ func (r *Registry) GetIntegrationAction(appName, actionName string) (core.Action
 }
 
 func (r *Registry) IsCoreBlock(name string) bool {
-	if _, ok := r.Actions[name]; ok {
-		return true
-	}
-	if _, ok := r.Triggers[name]; ok {
-		return true
-	}
-	if _, ok := r.Widgets[name]; ok {
-		return true
-	}
-
 	return !strings.Contains(name, ".")
 }
 
