@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client/types.gen";
 
-import { buildDashboardTriggerParameters } from "./dashboardTriggerParameters";
+import { buildDashboardTriggerParameters, resolveStartTemplate } from "./dashboardTriggerParameters";
 
 function makeStartNode(configuration: unknown): ComponentsNode {
   return {
@@ -32,7 +32,7 @@ describe("buildDashboardTriggerParameters", () => {
       component: "github",
       configuration: { templates: [{ name: "default" }] } as ComponentsNode["configuration"],
     } as ComponentsNode;
-    expect(buildDashboardTriggerParameters(node, "run")).toEqual({ template: "default", payload: {} });
+    expect(buildDashboardTriggerParameters(node, "run")).toEqual({ template: "default" });
   });
 
   it("returns empty parameters when the start node has no templates", () => {
@@ -41,7 +41,7 @@ describe("buildDashboardTriggerParameters", () => {
     expect(buildDashboardTriggerParameters(makeStartNode(undefined), "run")).toEqual({});
   });
 
-  it("returns the first template's name with its payload when present", () => {
+  it("returns the first template's name when present", () => {
     const node = makeStartNode({
       templates: [
         { name: "deploy", payload: { branch: "main", env: "prod" } },
@@ -50,7 +50,6 @@ describe("buildDashboardTriggerParameters", () => {
     });
     expect(buildDashboardTriggerParameters(node, "run")).toEqual({
       template: "deploy",
-      payload: { branch: "main", env: "prod" },
     });
   });
 
@@ -63,24 +62,64 @@ describe("buildDashboardTriggerParameters", () => {
     });
     expect(buildDashboardTriggerParameters(node, "run", "rollback")).toEqual({
       template: "rollback",
-      payload: { branch: "main" },
     });
   });
 
-  it("defaults payload to an empty object when the template payload is missing or invalid", () => {
+  it("does not depend on template payload shape", () => {
     expect(buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy" }] }), "run")).toEqual({
       template: "deploy",
-      payload: {},
     });
     expect(
       buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy", payload: null }] }), "run"),
-    ).toEqual({ template: "deploy", payload: {} });
+    ).toEqual({ template: "deploy" });
     expect(
       buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy", payload: [1, 2] }] }), "run"),
-    ).toEqual({ template: "deploy", payload: {} });
+    ).toEqual({ template: "deploy" });
   });
 
   it("returns empty parameters when the first template has no name", () => {
     expect(buildDashboardTriggerParameters(makeStartNode({ templates: [{ payload: { a: 1 } }] }), "run")).toEqual({});
+  });
+});
+
+describe("resolveStartTemplate", () => {
+  it("returns undefined when the node is missing or has no templates", () => {
+    expect(resolveStartTemplate(undefined)).toBeUndefined();
+    expect(resolveStartTemplate(makeStartNode(undefined))).toBeUndefined();
+    expect(resolveStartTemplate(makeStartNode({ templates: [] }))).toBeUndefined();
+  });
+
+  it("returns the requested template by name when present", () => {
+    const node = makeStartNode({
+      templates: [
+        { name: "deploy", payload: { a: 1 } },
+        { name: "rollback", payload: { b: 2 } },
+      ],
+    });
+    expect(resolveStartTemplate(node, "rollback")).toEqual({ name: "rollback", payload: { b: 2 } });
+  });
+
+  it("falls back to the first named template when no name is provided or the match is missing", () => {
+    const node = makeStartNode({
+      templates: [
+        { name: "deploy", payload: { a: 1 } },
+        { name: "rollback", payload: { b: 2 } },
+      ],
+    });
+    expect(resolveStartTemplate(node)).toEqual({ name: "deploy", payload: { a: 1 } });
+    expect(resolveStartTemplate(node, "unknown")).toEqual({ name: "deploy", payload: { a: 1 } });
+  });
+
+  it("exposes parameter declarations so the dialog can render the form", () => {
+    const node = makeStartNode({
+      templates: [
+        {
+          name: "manual",
+          payload: { reason: "console" },
+          parameters: [{ name: "branch", type: "string", defaultString: "main" }],
+        },
+      ],
+    });
+    expect(resolveStartTemplate(node)?.parameters).toEqual([{ name: "branch", type: "string", defaultString: "main" }]);
   });
 });

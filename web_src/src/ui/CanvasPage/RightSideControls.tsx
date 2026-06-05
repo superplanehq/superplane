@@ -1,31 +1,129 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Code2, Plus, StickyNote } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Code2, FileCode, FilePlus, Plus } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
   mode: "live" | "edit";
+  /** When true, shows canvas edit controls in the right rail. */
+  canvasEditControls?: boolean;
+  /** When true, shows console edit controls in the right rail. */
+  dashboardEditControls?: boolean;
+  /** Overlay on the canvas area (default) or embedded beside dashboard content. */
+  layout?: "overlay" | "embedded";
 
-  onSidebarOpen: () => void;
-  onAddNote: () => void | Promise<void>;
-  onYamlOpen: () => void;
+  onSidebarOpen?: () => void;
+  onAddNote?: () => void | Promise<void>;
+  onYamlOpen?: () => void;
+  onDashboardAddPanel?: () => void;
+  onDashboardOpenYaml?: () => void;
+  dashboardYamlReadOnly?: boolean;
 };
 
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
   if (props.mode === "live") return null;
+
+  const railClassName =
+    props.layout === "embedded"
+      ? "flex w-9 shrink-0 flex-col items-center gap-1.5 border-l border-slate-950/15 bg-slate-100 py-2"
+      : "absolute inset-y-0 right-0 z-10 flex w-9 flex-col items-center gap-1.5 border-l border-slate-950/15 bg-slate-100 py-2";
+
   return (
-    <div className="absolute top-4 right-4 z-10 flex flex-col gap-2.5">
-      <EditCanvasButtons {...props} />
+    <div className={railClassName}>
+      <EditModeButtons {...props} />
     </div>
   );
 });
 
-function EditCanvasButtons({ onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
+function EditModeButtons({
+  canvasEditControls,
+  dashboardEditControls,
+  onSidebarOpen,
+  onAddNote,
+  onYamlOpen,
+  onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
+}: RightSideControlsProps) {
+  if (dashboardEditControls) {
+    return (
+      <>
+        {onDashboardAddPanel ? (
+          <ControlButton
+            tooltip="Add Panel"
+            onClick={onDashboardAddPanel}
+            testId="dashboard-add-panel"
+            icon={<Plus className="h-3.5 w-3.5" />}
+          />
+        ) : null}
+        {onDashboardOpenYaml ? (
+          <ControlButton
+            tooltip={
+              dashboardYamlReadOnly
+                ? "View the console as YAML"
+                : "View, copy, download, or import this console as YAML"
+            }
+            onClick={onDashboardOpenYaml}
+            testId="dashboard-yaml-button"
+            ariaLabel={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
+            icon={<FileCode className="h-3.5 w-3.5" />}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  if (canvasEditControls) {
+    return (
+      <>
+        <ControlButton
+          tooltip="New Component"
+          onClick={() => onSidebarOpen?.()}
+          testId="canvas-add-component-button"
+          icon={<Plus className="h-3.5 w-3.5" />}
+        />
+        {onYamlOpen ? (
+          <ControlButton
+            tooltip="View, copy, download, or import this canvas as YAML"
+            onClick={onYamlOpen}
+            testId="canvas-yaml-button"
+            ariaLabel="View / Import YAML"
+            icon={<FileCode className="h-3.5 w-3.5" />}
+          />
+        ) : null}
+        <ControlButton
+          tooltip="Add Note"
+          onClick={() => onAddNote?.()}
+          testId="add-note-button"
+          icon={<FilePlus className="h-3.5 w-3.5" />}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <ControlButton tooltip="Add component" onClick={onSidebarOpen} testId="open-sidebar-button" icon={<Plus />} />
-      <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />
-      <ControlButton tooltip="YAML" onClick={onYamlOpen} testId="open-yaml-modal-button" icon={<Code2 />} />
+      <ControlButton
+        tooltip="Add component"
+        onClick={() => onSidebarOpen?.()}
+        testId="open-sidebar-button"
+        icon={<Plus className="h-3.5 w-3.5" />}
+      />
+      <ControlButton
+        tooltip="Add Note"
+        onClick={() => onAddNote?.()}
+        testId="add-note-button"
+        icon={<FilePlus className="h-3.5 w-3.5" />}
+      />
+      {onYamlOpen ? (
+        <ControlButton
+          tooltip="YAML"
+          onClick={onYamlOpen}
+          testId="open-yaml-modal-button"
+          icon={<Code2 className="h-3.5 w-3.5" />}
+        />
+      ) : null}
     </>
   );
 }
@@ -35,24 +133,30 @@ interface ControlButtonProps {
   onClick: () => void;
   testId: string;
   icon: ReactNode;
+  ariaLabel?: string;
 }
 
-function ControlButton(props: ControlButtonProps) {
+function ControlButton({ tooltip, onClick, testId, icon, ariaLabel }: ControlButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           type="button"
-          variant="outline"
-          onClick={props.onClick}
-          aria-label={props.tooltip}
-          data-testid={props.testId}
-          children={props.icon}
-        />
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClick}
+          aria-label={ariaLabel ?? tooltip}
+          data-testid={testId}
+          className={cn(
+            "h-7 w-7 shrink-0 rounded-md border-0 shadow-none text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+          )}
+        >
+          {icon}
+        </Button>
       </TooltipTrigger>
 
-      <TooltipContent side="left" sideOffset={10}>
-        {props.tooltip}
+      <TooltipContent side="left" sideOffset={10} className="max-w-xs">
+        {tooltip}
       </TooltipContent>
     </Tooltip>
   );

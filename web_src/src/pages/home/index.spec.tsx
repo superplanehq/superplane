@@ -110,6 +110,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 import { HomePage } from "./index";
+import { NewAppPage } from "./NewAppPage";
 
 function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvas {
   return {
@@ -148,7 +149,10 @@ function renderHome() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/org-123"]}>
         <Routes>
-          <Route path="/:organizationId" element={<HomePage />} />
+          <Route path="/:organizationId">
+            <Route index element={<HomePage />} />
+            <Route path="apps/new" element={<NewAppPage />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -184,7 +188,7 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the toolbar as the canvas creation entrypoint", async () => {
+  it("uses the zero-state as the canvas creation entrypoint", async () => {
     const user = userEvent.setup();
     mutationMocks.createCanvasAsync.mockResolvedValue({
       data: { canvas: { metadata: { id: "canvas-new" } } },
@@ -194,7 +198,7 @@ describe("HomePage canvas folders", () => {
 
     renderHome();
 
-    await user.click(screen.getByRole("button", { name: /new app/i }));
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(

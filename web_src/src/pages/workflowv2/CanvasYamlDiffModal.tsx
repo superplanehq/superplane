@@ -1,8 +1,8 @@
 import { MultiFileDiff, type FileContents, type FileDiffMetadata } from "@pierre/diffs/react";
-import { GitCompareArrows } from "lucide-react";
+import { FileCode, XIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export type CanvasYamlDiffModalProps = {
   open: boolean;
@@ -10,6 +10,11 @@ export type CanvasYamlDiffModalProps = {
   liveYamlText: string;
   draftYamlText: string;
   filename: string;
+  title?: string;
+  dialogTitle?: string;
+  description?: string;
+  liveLabel?: string;
+  draftLabel?: string;
 };
 
 export function CanvasYamlDiffModal({
@@ -18,6 +23,11 @@ export function CanvasYamlDiffModal({
   liveYamlText,
   draftYamlText,
   filename,
+  title = "Show Diff",
+  dialogTitle = "Canvas YAML diff",
+  description = "Side-by-side YAML comparison between live and draft canvas versions.",
+  liveLabel = "Live",
+  draftLabel = "Draft",
 }: CanvasYamlDiffModalProps) {
   const { oldFile, newFile } = useMemo(() => {
     const liveFile: FileContents = {
@@ -46,9 +56,9 @@ export function CanvasYamlDiffModal({
 
       return (
         <div className="w-full">
-          <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+              <FileCode className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
               <span className="truncate font-sans text-sm font-medium text-slate-900">{filename}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2 font-mono text-xs">
@@ -57,35 +67,38 @@ export function CanvasYamlDiffModal({
             </div>
           </div>
           <div className="grid grid-cols-2 font-mono text-xs font-semibold">
-            <div className="border-r border-slate-200 bg-red-50/70 px-4 py-1.5 text-red-700">Live</div>
-            <div className="bg-emerald-50/70 px-4 py-1.5 text-emerald-700">Draft</div>
+            <div className="border-r border-slate-200 bg-red-50/70 px-4 py-1.5 text-red-700">{liveLabel}</div>
+            <div className="bg-emerald-50/70 px-4 py-1.5 text-emerald-700">{draftLabel}</div>
           </div>
         </div>
       );
     },
-    [filename],
+    [draftLabel, filename, liveLabel],
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="large" className="flex h-[90vh] w-[94vw] max-w-[1600px] flex-col gap-0 overflow-hidden p-0">
-        <DialogTitle className="sr-only">Canvas YAML diff</DialogTitle>
-        <DialogDescription className="sr-only">
-          Side-by-side YAML comparison between live and draft canvas versions.
-        </DialogDescription>
+      <DialogContent
+        size="large"
+        className="flex h-[90vh] w-[94vw] max-w-[1600px] flex-col gap-0 overflow-hidden p-0"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
+        <DialogDescription className="sr-only">{description}</DialogDescription>
 
         <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
-          <div className="flex items-center border-b border-slate-200 bg-white px-5 py-3 pr-12">
+          <div className="relative flex items-center border-b border-slate-200 bg-white px-5 py-3 pr-12">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700">
-                <GitCompareArrows className="h-4 w-4" />
-              </span>
-              <h2 className="truncate text-sm font-semibold text-slate-900">Show Diff</h2>
+              <h2 className="truncate text-sm font-medium text-slate-900">{title}</h2>
             </div>
+            <DialogClose className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
+              <XIcon className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">
-            <div className="min-w-[980px] border border-slate-200 bg-white">
+            <div className="min-w-[980px] border-x border-b border-slate-200 bg-white">
               <MultiFileDiff
                 oldFile={oldFile}
                 newFile={newFile}
@@ -110,7 +123,7 @@ export function CanvasYamlDiffModal({
 
                     [data-diffs-header] {
                       border-bottom: 1px solid rgb(226 232 240);
-                      background: rgb(248 250 252);
+                      background: rgb(255 255 255);
                       z-index: 5;
                     }
 

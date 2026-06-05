@@ -87,7 +87,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
 
       {/* Expanded Editor Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <DialogContent size="90vw" className="flex flex-col" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <DialogTitle>{field.label || field.name}</DialogTitle>
             <DialogDescription className="sr-only">

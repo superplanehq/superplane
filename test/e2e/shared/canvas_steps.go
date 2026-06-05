@@ -2,8 +2,6 @@ package shared
 
 import (
 	"fmt"
-	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,6 +18,8 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 type CanvasSteps struct {
@@ -93,37 +93,79 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/")
-	s.session.Click(q.Text("New App"))
-	s.session.Sleep(3000)
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+	s.WorkflowID = canvas.ID
 
-	s.WorkflowID = extractCanvasIDFromURL(s.t, s.session.Page().URL())
-
-	// Rename the canvas to the desired name (instant create uses random names)
-	err := database.Conn().
+	err = database.Conn().
 		Model(&models.Canvas{}).
 		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
+
+	s.Visit()
 }
 
-func extractCanvasIDFromURL(t *testing.T, rawURL string) uuid.UUID {
-	t.Helper()
+func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
 
-	parsedURL, err := url.Parse(rawURL)
-	require.NoError(t, err)
+	startNodeID := "start-trigger"
+	outputNodeID := "noop-output"
 
-	matches := regexp.MustCompile(`/canvases/([0-9a-f-]{36})`).FindStringSubmatch(parsedURL.Path)
-	require.Len(t, matches, 2, "expected canvas ID in URL %q", rawURL)
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+		{
+			NodeID: startNodeID,
+			Name:   "Start",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"templates": []any{
+					map[string]any{
+						"name": "Hello World",
+						"payload": map[string]any{
+							"message": `{{ parameters["message"] }}`,
+						},
+						"parameters": []any{
+							map[string]any{
+								"name": "message",
+								"type": "string",
+							},
+						},
+					},
+				},
+			}),
+			Position: datatypes.NewJSONType(models.Position{X: 600, Y: 200}),
+		},
+		{
+			NodeID: outputNodeID,
+			Name:   "Output",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "noop"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+			Position:      datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
+		},
+	}, []models.Edge{
+		{SourceID: startNodeID, TargetID: outputNodeID, Channel: "default"},
+	})
+	s.WorkflowID = canvas.ID
 
-	canvasID, err := uuid.Parse(matches[1])
-	require.NoError(t, err)
+	err = database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
+	require.NoError(s.t, err)
 
-	return canvasID
+	s.Visit()
 }
 
 func (s *CanvasSteps) Visit() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.WorkflowID.String())
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.WorkflowID.String())
 }
 
 func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
@@ -132,8 +174,9 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 		return
 	}
 
-	openButton := q.TestID("open-sidebar-button").Run(s.session)
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
+	addComponentButton := q.TestID("canvas-add-component-button").Run(s.session)
+	openButton := q.TestID("open-sidebar-button").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -152,6 +195,12 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 
 		if isVisible, _ := editButton.IsVisible(); isVisible {
 			if err := editButton.Click(); err == nil {
+				s.session.Sleep(250)
+			}
+		}
+
+		if isVisible, _ := addComponentButton.IsVisible(); isVisible {
+			if err := addComponentButton.Click(); err == nil {
 				s.session.Sleep(250)
 			}
 		}
@@ -438,6 +487,17 @@ func (s *CanvasSteps) RunManualTrigger(name string) {
 	// Use the Start node's template Run button (in the default payload template) instead of the removed header Run button
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
 	s.session.Click(startTemplateRun)
+	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[string]string) {
+	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
+	s.session.Click(startTemplateRun)
+
+	for paramName, value := range parameters {
+		s.session.FillIn(q.Locator("#start-run-param-"+paramName), value)
+	}
+
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 

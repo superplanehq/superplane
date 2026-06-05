@@ -94,7 +94,7 @@ export const BashCodeBlock: Story = {
 curl -fsSL https://install.superplane.com/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 superplane connect https://app.superplane.com your-token-here
-superplane canvases list
+superplane apps list
 \`\`\`
 
 The CLI should now be ready to use.`,

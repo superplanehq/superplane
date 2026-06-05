@@ -1,6 +1,6 @@
 interface DashboardHeaderActionsConfig {
+  isEditing: boolean;
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
@@ -9,20 +9,20 @@ interface DashboardHeaderActionsConfig {
 }
 
 export function getDashboardHeaderActions({
+  isEditing,
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
   openAddPanel,
   openYaml,
 }: DashboardHeaderActionsConfig) {
-  const dashboardVisible = isDashboardMode && dashboardsFeatureEnabled;
-  const canEditDashboard = dashboardVisible && !isTemplate && canUpdateCanvas && !canvasDeletedRemotely;
+  const dashboardVisible = isDashboardMode;
+  const canEditDashboard = isEditing && dashboardVisible && !isTemplate && canUpdateCanvas && !canvasDeletedRemotely;
 
   return {
     onDashboardAddPanel: canEditDashboard ? openAddPanel : undefined,
-    onDashboardOpenYaml: dashboardVisible ? openYaml : undefined,
+    onDashboardOpenYaml: isEditing && dashboardVisible ? openYaml : undefined,
     dashboardYamlReadOnly: !canUpdateCanvas || isTemplate || canvasDeletedRemotely,
   };
 }

@@ -163,6 +163,8 @@ func (a *AWS) Actions() []core.Action {
 		&ec2.EnableImage{},
 		&ec2.EnableImageDeprecation{},
 		&ec2.GetImage{},
+		&ec2.GetInstance{},
+		&ec2.ManageInstancePower{},
 		&sns.GetTopic{},
 		&sns.GetSubscription{},
 		&sns.CreateTopic{},

@@ -19,6 +19,12 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+const (
+	agentPollInterval = 200 * time.Millisecond
+	agentWaitTimeout  = 30 * time.Second
+	agentSendTimeout  = 20 * time.Second
+)
+
 func TestAgentE2E(t *testing.T) {
 	t.Run("sends a message and renders the streamed assistant response", func(t *testing.T) {
 		steps := newAgentSteps(t)
@@ -64,7 +70,7 @@ func TestAgentE2E(t *testing.T) {
 			}
 
 			return []agents.ProviderEvent{
-				agentToolStartedEvent("tool-1", "bash", "superplane canvases get"),
+				agentToolStartedEvent("tool-1", "bash", "superplane apps canvas get"),
 				agentToolFinishedEvent("tool-1", "bash"),
 				agentAssistantMessageEvent("Tool run complete"),
 				agentTurnCompletedEvent(),
@@ -75,6 +81,7 @@ func TestAgentE2E(t *testing.T) {
 		steps.openAgent()
 		steps.sendMessage("Inspect the canvas")
 		steps.assertVisible(q.TestID("agent-tool-group"))
+		steps.expandToolGroupIfNeeded()
 		steps.assertVisible(q.TestID("agent-tool-message"))
 		steps.assertAssistantMessage("Tool run complete")
 	})
@@ -200,24 +207,42 @@ func (s *agentSteps) start() {
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent "+uuid.NewString(), s.t, s.session)
 	s.canvas.Create()
-	s.canvas.Visit()
 }
 
 func (s *agentSteps) openAgent() {
 	s.waitForToolSidebarOpen()
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`))
-	s.session.AssertVisible(q.TestID("agent-input"))
+	s.clickAgentTab()
+	s.waitForAgentInput()
 	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
 		return isAgentSystemMessage(call.Message)
 	})
 }
 
+func (s *agentSteps) clickAgentTab() {
+	tab := q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := tab.IsVisible()
+		if err != nil || !visible {
+			return false
+		}
+		return tab.Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)}) == nil
+	}, agentWaitTimeout, agentPollInterval)
+}
+
+func (s *agentSteps) waitForAgentInput() {
+	input := q.TestID("agent-input").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := input.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
+}
+
 func (s *agentSteps) waitForToolSidebarOpen() {
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(agentWaitTimeout)
 	sidebar := q.TestID("canvas-tool-sidebar").Run(s.session)
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`).Run(s.session)
+	openButton := q.TestID("canvas-tool-sidebar-toggle").Run(s.session)
 
 	for time.Now().Before(deadline) {
 		visible, err := sidebar.IsVisible()
@@ -243,12 +268,12 @@ func (s *agentSteps) waitForToolSidebarOpen() {
 
 func (s *agentSteps) switchToBuildMode() {
 	s.session.Click(q.TestID("agent-mode-builder"))
-	s.session.AssertVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
+	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
 }
 
 func (s *agentSteps) switchToAskMode() {
 	s.session.Click(q.TestID("agent-mode-operator"))
-	s.session.AssertVisible(q.Locator(`[data-testid="agent-mode-operator"][aria-pressed="true"]`))
+	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-operator"][aria-pressed="true"]`))
 }
 
 func (s *agentSteps) sendMessage(message string) {
@@ -323,7 +348,7 @@ func (s *agentSteps) waitForSendCall(matches func(support.AgentProviderSendMessa
 		}
 
 		return false
-	}, 10*time.Second, 200*time.Millisecond)
+	}, agentSendTimeout, agentPollInterval)
 
 	return matched
 }
@@ -356,19 +381,42 @@ func (s *agentSteps) assertDefineOutcomeSent() {
 }
 
 func (s *agentSteps) assertUserMessage(message string) {
-	s.assertVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-user-message"]:has-text("%s")`, message)))
+	s.assertEventuallyVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-user-message"]:has-text("%s")`, message)))
 }
 
 func (s *agentSteps) assertAssistantMessage(message string) {
-	s.assertVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-assistant-message"]:has-text("%s")`, message)))
+	s.assertEventuallyVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-assistant-message"]:has-text("%s")`, message)))
+}
+
+func (s *agentSteps) expandToolGroupIfNeeded() {
+	toolMessage := s.session.Page().GetByTestId("agent-tool-message").First()
+	visible, err := toolMessage.IsVisible()
+	require.NoError(s.t, err)
+	if visible {
+		return
+	}
+
+	s.session.Click(q.Locator(`[data-testid="agent-tool-group"] button`))
 }
 
 func (s *agentSteps) assertText(text string) {
-	s.session.AssertText(text)
+	locator := s.session.Page().Locator("text=" + text).First()
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
+}
+
+func (s *agentSteps) assertEventuallyVisible(query q.Query) {
+	locator := query.Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
 }
 
 func (s *agentSteps) assertVisible(query q.Query) {
-	s.session.AssertVisible(query)
+	s.assertEventuallyVisible(query)
 }
 
 func (s *agentSteps) assertHidden(query q.Query) {

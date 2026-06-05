@@ -158,12 +158,21 @@ export const sshMapper: ComponentBaseMapper = {
     }
 
     // Show connection retry progress
-    const retryAttempt = typeof metadata?.attempt === "number" ? metadata.attempt : 0;
-    const retryConfig = (
+    const connectionRetryAttempt = typeof metadata?.attempt === "number" ? metadata.attempt : 0;
+    const connectionRetryConfig = (
       context.node.configuration as SSHConfiguration & { connectionRetry?: { enabled?: boolean; retries?: number } }
     )?.connectionRetry;
-    if (retryConfig?.enabled && retryAttempt > 0) {
-      details["Connection retry"] = `${retryAttempt} / ${retryConfig.retries ?? "?"}`;
+    if (connectionRetryConfig?.enabled && connectionRetryAttempt > 0) {
+      details["Connection retry"] = `${connectionRetryAttempt} / ${connectionRetryConfig.retries ?? "?"}`;
+    }
+
+    // Show execution retry progress
+    const executionRetryAttempt = typeof metadata?.executionAttempt === "number" ? metadata.executionAttempt : 0;
+    const executionRetryConfig = (
+      context.node.configuration as SSHConfiguration & { executionRetry?: { enabled?: boolean; retries?: number } }
+    )?.executionRetry;
+    if (executionRetryConfig?.enabled && executionRetryAttempt > 0) {
+      details["Execution retry"] = `${executionRetryAttempt} / ${executionRetryConfig.retries ?? "?"}`;
     }
 
     const exitCode = getSSHExitCode(context.execution);

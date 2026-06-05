@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle, Rabbit } from "lucide-react";
+import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
+import { calcRelativeTimeFromDiff, cn, resolveIcon } from "@/lib/utils";
+import { CircleAlert, Rabbit } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
@@ -237,6 +238,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
    * Used for contextual dimming (e.g. runs view non-participant nodes).
    */
   dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -273,6 +275,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   paused,
   canvasMode = "live",
   dimBodyBelowHeader = false,
+  draftDiffStatus,
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -338,7 +341,12 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] ${dimBodyBelowHeader ? "bg-slate-200" : "bg-white"} ${hasError ? "!outline-orange-500" : ""}`}
+        className={cn(
+          "group relative flex flex-col rounded-md w-[23rem]",
+          getDraftDiffOutlineClassName(draftDiffStatus),
+          !draftDiffStatus && hasError && "!outline-orange-500",
+          dimBodyBelowHeader ? "bg-slate-200" : "bg-white",
+        )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
@@ -425,9 +433,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   <TooltipTrigger asChild>
                     <div
                       data-testid="node-warning-badge"
-                      className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
+                      className="absolute -top-8 left-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-orange-500"
                     >
-                      <AlertTriangle size={16} className="text-white" />
+                      <CircleAlert className="h-4 w-4 text-white" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -443,7 +451,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   <TooltipTrigger asChild>
                     <div
                       data-testid="node-paused-badge"
-                      className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
+                      className={`absolute -top-8 ${hasBadge ? "left-7" : "left-0"} bg-blue-500 rounded-md h-6 p-1 cursor-pointer`}
                     >
                       <PauseIcon className="h-4 w-4 text-white" />
                     </div>
@@ -483,7 +491,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                             value={spec.value}
                             contentType={spec.contentType || "json"}
                           >
-                            <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                            <span className="text-[13px] bg-gray-500 px-2 py-0.5 rounded-md text-white font-mono font-medium cursor-help">
                               {spec.title}
                             </span>
                           </PayloadTooltip>

@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -21,7 +20,7 @@ type CanvasEvent struct {
 	NodeID      string
 	Channel     string
 	CustomName  *string
-	Data        datatypes.JSONType[any]
+	Data        JSONValue
 	ExecutionID *uuid.UUID
 	RunID       uuid.UUID
 	State       string

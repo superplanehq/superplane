@@ -111,7 +111,7 @@ export function mapTriggerEventsToSidebarEvents(
 }
 
 export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
-  const triggerRenderer = getTriggerRenderer(node.component || "");
+  const triggerRenderer = getTriggerRenderer(getNodeComponentName(node));
   const eventInfo = buildEventInfo(event);
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: eventInfo });
   const values = triggerRenderer.getRootEventValues({ event: eventInfo });
@@ -160,12 +160,12 @@ export function mapExecutionsToSidebarEvents(
 
   return executionsToMap.map((execution) => {
     const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
-    const stateResolver = getState(currentComponentNode?.component || "");
+    const componentName = getNodeComponentName(currentComponentNode);
+    const stateResolver = getState(componentName);
     const state = stateResolver(buildExecutionInfo(execution));
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
+    const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
 
-    const componentName = currentComponentNode?.component || "";
     const componentMapper = getComponentBaseMapper(componentName);
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
@@ -215,7 +215,7 @@ export function getNextInQueueInfo(
   }
 
   const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
+  const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
 
   const { title, subtitle } = queueItem.rootEvent
     ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -241,7 +241,7 @@ export function mapQueueItemsToSidebarEvents(
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
   return queueItemsToMap.map((item) => {
     const rootTriggerNode = nodes.find((n) => n.id === item.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
+    const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
 
     const { title, subtitle } = item.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -930,7 +930,7 @@ export function buildTabData(
     if (!triggerEvent) return undefined;
 
     const tabData: TabData = {};
-    const triggerRenderer = getTriggerRenderer(node.component || "");
+    const triggerRenderer = getTriggerRenderer(getNodeComponentName(node));
     const eventValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(triggerEvent) });
 
     tabData.current = {
@@ -960,7 +960,7 @@ export function buildTabData(
 
     if (queueItem.rootEvent) {
       const rootTriggerNode = workflowNodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
+      const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
       const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(queueItem.rootEvent!) });
 
       tabData.root = Object.assign({}, rootEventValues, {
@@ -1007,7 +1007,7 @@ export function buildTabData(
   // Root tab: root event data
   if (execution.rootEvent) {
     const rootTriggerNode = workflowNodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
+    const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
     const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) });
 
     tabData.root = {
@@ -1089,11 +1089,15 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
-    componentName: node.component || "",
+    componentName: getNodeComponentName(node),
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,
   };
+}
+
+export function getNodeComponentName(node?: ({ component?: string; componentName?: string } & object) | null): string {
+  return node?.component || node?.componentName || "";
 }
 
 export function buildUserInfo(user?: SuperplaneMeUser | null): User | undefined {

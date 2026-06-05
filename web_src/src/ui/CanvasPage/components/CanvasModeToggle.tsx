@@ -1,20 +1,24 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
+  onSelectFiles?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
+  hasDashboardDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const DASHBOARD_TAB = "dashboard";
 const MEMORY_TAB = "memory";
+const FILES_TAB = "files";
 const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
@@ -22,19 +26,24 @@ export function CanvasModeToggle({
   onSelectLive,
   onSelectDashboard,
   onSelectMemory,
+  onSelectFiles,
   editing = false,
   hasDraft = false,
+  hasDashboardDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
+  const showFiles = Boolean(onSelectFiles);
   const selected =
     mode === DASHBOARD_TAB
       ? DASHBOARD_TAB
       : mode === MEMORY_TAB
         ? MEMORY_TAB
-        : mode === RUNS_MODE
-          ? RUNS_MODE
-          : CANVAS_TAB;
+        : mode === FILES_TAB
+          ? FILES_TAB
+          : mode === RUNS_MODE
+            ? RUNS_MODE
+            : CANVAS_TAB;
   const valueChangeHandledRef = useRef(false);
 
   useEffect(() => {
@@ -74,32 +83,43 @@ export function CanvasModeToggle({
             valueChangeHandledRef.current = false;
           });
           void onSelectMemory();
+          return;
+        }
+
+        if (next === FILES_TAB && selected !== FILES_TAB && onSelectFiles) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectFiles();
         }
       }}
     >
       <TabsList
         aria-label="Canvas view"
-        className="h-7 min-h-7 bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger]]:text-[13px]"
+        className={cn(
+          "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
+          editing
+            ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
+            : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
+        )}
       >
         {showDashboard ? (
           <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
-            Console
+            <span className="inline-flex items-center gap-1.5">
+              Console
+              <DraftDot show={hasDashboardDraft} testId="canvas-view-mode-dashboard-draft-dot" />
+            </span>
           </TabsTrigger>
         ) : null}
         <TabsTrigger
           value={CANVAS_TAB}
           data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
+          aria-label={editing ? "Canvas (editing)" : "Canvas"}
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/70"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
+            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
           </span>
         </TabsTrigger>
         {showMemory ? (
@@ -107,7 +127,22 @@ export function CanvasModeToggle({
             Memory
           </TabsTrigger>
         ) : null}
+        {showFiles ? (
+          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
+            Files
+          </TabsTrigger>
+        ) : null}
       </TabsList>
     </Tabs>
+  );
+}
+
+function DraftDot({ show, testId }: { show: boolean; testId: string }) {
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
   );
 }

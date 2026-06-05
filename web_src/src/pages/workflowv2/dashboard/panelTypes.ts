@@ -22,9 +22,13 @@ import type {
 } from "./widget/types";
 import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
 import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
+import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
+import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
+import { validateNumberDataSource } from "./numberDataSourceValidation";
+import { validateNumberMetrics } from "./numberMetricsValidation";
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "node", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "node", "nodes", "table", "chart", "number"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 export interface PanelTypeMeta {
@@ -47,6 +51,11 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "node",
     label: "Node",
     description: "A single canvas node with its live status and an optional manual-run button.",
+  },
+  nodes: {
+    type: "nodes",
+    label: "Key Nodes",
+    description: "Multiple canvas nodes in one card with live status and optional descriptions.",
   },
   table: {
     type: "table",
@@ -102,7 +111,24 @@ export interface ChartPanelContent {
 
 export interface NumberPanelContent {
   title?: string;
-  dataSource: NumberPanelDataSource;
+  /** Used by single/composite modes. Absent in multi-number mode. */
+  dataSource?: NumberPanelDataSource;
+  /** Used by single/composite modes. Absent in multi-number mode. */
+  render?: WidgetNumberRender;
+  /** Present (and an array) when the panel is in multi-number mode. */
+  metrics?: NumberMetric[];
+}
+
+/**
+ * One number inside a multi-number panel. Each metric has its own data
+ * source and aggregation; metrics render side-by-side in a wrapping row.
+ *
+ * Multi-number mode is disjoint from the composite-combine mode: each
+ * metric uses a simple (single-namespace) data source, not a composite
+ * memory source.
+ */
+export interface NumberMetric {
+  dataSource: TablePanelDataSource;
   render: WidgetNumberRender;
 }
 
@@ -115,6 +141,26 @@ export type ChartPanelDataSource = TablePanelDataSource;
 /** How partial aggregates from a composite memory data source are combined into a single value. */
 export type WidgetNumberCombine = "sum" | "min" | "max" | "avg";
 export const WIDGET_NUMBER_COMBINE_OPS: WidgetNumberCombine[] = ["sum", "min", "max", "avg"];
+
+/**
+ * Single source of truth for the aggregations a number render accepts. Reused
+ * by every number validator (single, composite, multi-number) and the form
+ * controls so the allowed set cannot silently drift between paths.
+ */
+export const WIDGET_NUMBER_AGGREGATIONS: WidgetNumberAggregation[] = [
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max",
+  "first",
+  "last",
+];
+
+/** Type guard for the shared number-aggregation set above. */
+export function isAllowedNumberAggregation(value: unknown): value is WidgetNumberAggregation {
+  return typeof value === "string" && (WIDGET_NUMBER_AGGREGATIONS as string[]).includes(value);
+}
 
 /** One namespace contribution inside a composite memory data source. */
 export interface MemoryNumberSource {
@@ -143,8 +189,19 @@ export function isCompositeMemoryDataSource(value: unknown): value is CompositeM
 }
 
 /** True when YAML/config intends composite mode (sources key present), including invalid shapes. */
-function hasCompositeMemorySourcesKey(obj: Record<string, unknown>): boolean {
+export function hasCompositeMemorySourcesKey(obj: Record<string, unknown>): boolean {
   return obj.kind === "memory" && Object.prototype.hasOwnProperty.call(obj, "sources");
+}
+
+/**
+ * True when the panel content is in multi-number mode (a `metrics` array is
+ * present, even if shaped invalidly). Distinct from the composite-combine
+ * mode, which carries `dataSource.sources` instead.
+ */
+export function isMultiNumberContent(content: unknown): boolean {
+  const obj = asObject(content);
+  if (!obj) return false;
+  return Array.isArray(obj.metrics);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -180,6 +237,8 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
       return { title: defaultTitle ?? "", body: "" } satisfies MarkdownPanelContent;
     case "node":
       return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
+    case "nodes":
+      return { ...templateForNodesPanel(defaultTitle) };
     case "table":
       return {
         title: defaultTitle ?? "",
@@ -216,6 +275,8 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateMarkdownContent(content);
     case "node":
       return validateNodeContent(content);
+    case "nodes":
+      return validateNodesContent(content);
     case "table":
       return validateTableContent(content);
     case "chart":
@@ -225,7 +286,7 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
   }
 }
 
-function asObject(value: unknown): Record<string, unknown> | null {
+export function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
 }
@@ -264,7 +325,7 @@ function validateNodeContent(content: unknown): string | null {
   return null;
 }
 
-function validateDataSource(value: unknown): string | null {
+export function validateDataSource(value: unknown): string | null {
   const obj = asObject(value);
   if (!obj) return "dataSource must be an object.";
   if (obj.kind === "memory") return validateMemoryDataSource(obj);
@@ -279,61 +340,6 @@ function validateMemoryDataSource(obj: Record<string, unknown>): string | null {
   }
   if (obj.fieldPath != null && typeof obj.fieldPath !== "string") {
     return "dataSource.fieldPath must be a string.";
-  }
-  return null;
-}
-
-/**
- * Number panels accept either the shared data-source shapes (memory with a
- * single namespace, executions, runs) or a composite memory variant where
- * each namespace declares its own aggregation/field and the partials are
- * merged with a configured combine operator.
- */
-function validateNumberDataSource(value: unknown): string | null {
-  const obj = asObject(value);
-  if (!obj) return "dataSource must be an object.";
-  if (hasCompositeMemorySourcesKey(obj)) {
-    return validateCompositeMemoryDataSource(obj);
-  }
-  return validateDataSource(value);
-}
-
-const ALLOWED_NUMBER_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
-
-function validateCompositeMemoryDataSource(obj: Record<string, unknown>): string | null {
-  if (!Array.isArray(obj.sources)) {
-    return "dataSource.sources must be an array.";
-  }
-  const sources = obj.sources;
-  if (sources.length === 0) {
-    return "dataSource.sources must be a non-empty array.";
-  }
-  for (let i = 0; i < sources.length; i += 1) {
-    const sourceError = validateMemoryNumberSource(sources[i], i);
-    if (sourceError) return sourceError;
-  }
-  if (typeof obj.combine !== "string" || !WIDGET_NUMBER_COMBINE_OPS.includes(obj.combine as WidgetNumberCombine)) {
-    return `dataSource.combine must be one of ${WIDGET_NUMBER_COMBINE_OPS.join(", ")}.`;
-  }
-  return null;
-}
-
-function validateMemoryNumberSource(raw: unknown, index: number): string | null {
-  const source = asObject(raw);
-  if (!source) return `dataSource.sources[${index}] must be an object.`;
-  if (typeof source.namespace !== "string" || source.namespace.trim() === "") {
-    return `dataSource.sources[${index}].namespace must be a non-empty string.`;
-  }
-  if (typeof source.aggregation !== "string" || !ALLOWED_NUMBER_AGGREGATIONS.includes(source.aggregation)) {
-    return `dataSource.sources[${index}].aggregation must be one of ${ALLOWED_NUMBER_AGGREGATIONS.join(", ")}.`;
-  }
-  if (source.aggregation !== "count") {
-    if (typeof source.field !== "string" || source.field.trim() === "") {
-      return `dataSource.sources[${index}].field is required when aggregation is "${source.aggregation}".`;
-    }
-  }
-  if (source.fieldPath != null && typeof source.fieldPath !== "string") {
-    return `dataSource.sources[${index}].fieldPath must be a string.`;
   }
   return null;
 }
@@ -360,13 +366,13 @@ function validateTableContent(content: unknown): string | null {
   const render = asObject(obj.render);
   if (!render) return "render must be an object.";
   if (render.kind !== "table") return 'render.kind must be "table".';
-  const columnsError = validateTableColumns(render.columns);
-  if (columnsError) return columnsError;
-  const whereError = validateTableWhere(render.where);
-  if (whereError) return whereError;
-  const sortError = validateSort(render.sort);
-  if (sortError) return sortError;
-  return validateTableRowActions(render.rowActions);
+  return (
+    validateTableColumns(render.columns) ??
+    validateTableWhere(render.where) ??
+    validateSort(render.sort) ??
+    validateWidgetRowStyles(render.rowStyles) ??
+    validateTableRowActions(render.rowActions)
+  );
 }
 
 function validateTableWhere(where: unknown): string | null {
@@ -401,6 +407,7 @@ export function normalizeTablePanelContent(raw: Record<string, unknown> | undefi
       filters: Array.isArray(renderRaw.filters) ? (renderRaw.filters as string[]) : undefined,
       emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
       sort: normalizeSort(renderRaw.sort),
+      rowStyles: normalizeWidgetRowStyles(renderRaw.rowStyles),
     },
   };
 }
@@ -482,9 +489,7 @@ function stringOrUndefined(value: unknown): string | undefined {
 }
 
 function validateTableColumns(columns: unknown): string | null {
-  if (!Array.isArray(columns)) {
-    return "render.columns must be an array.";
-  }
+  if (!Array.isArray(columns)) return "render.columns must be an array.";
   for (let i = 0; i < columns.length; i += 1) {
     const col = asObject(columns[i]);
     if (!col) return `render.columns[${i}] must be an object.`;
@@ -516,14 +521,18 @@ function validateChartContent(content: unknown): string | null {
   return validateChartRender(render);
 }
 
+const ALLOWED_CHART_TYPES = ["bar", "stacked-bar", "line", "area", "donut"];
+
 function validateChartRender(render: Record<string, unknown>): string | null {
   if (render.kind !== "chart") return 'render.kind must be "chart".';
-  const allowedTypes = ["bar", "stacked-bar", "line", "area", "donut"];
-  if (typeof render.type !== "string" || !allowedTypes.includes(render.type)) {
-    return `render.type must be one of ${allowedTypes.join(", ")}.`;
+  if (typeof render.type !== "string" || !ALLOWED_CHART_TYPES.includes(render.type)) {
+    return `render.type must be one of ${ALLOWED_CHART_TYPES.join(", ")}.`;
   }
   if (typeof render.xField !== "string" || render.xField.trim() === "") {
     return "render.xField must be a non-empty string.";
+  }
+  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
+    return "render.seriesField must be a string.";
   }
   if (!Array.isArray(render.series) || render.series.length === 0) {
     return "render.series must be a non-empty array.";
@@ -545,6 +554,17 @@ function validateChartLegend(legend: unknown): string | null {
   return null;
 }
 
+function validateChartSeries(raw: unknown, index: number): string | null {
+  const series = asObject(raw);
+  if (!series) return `render.series[${index}] must be an object.`;
+  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
+    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
+      return `render.series[${index}].${key} must be a string.`;
+    }
+  }
+  return null;
+}
+
 function validateSort(sort: unknown): string | null {
   if (sort === undefined || sort === null) return null;
   const obj = asObject(sort);
@@ -560,20 +580,14 @@ function validateSort(sort: unknown): string | null {
   return null;
 }
 
-function validateChartSeries(raw: unknown, index: number): string | null {
-  const series = asObject(raw);
-  if (!series) return `render.series[${index}] must be an object.`;
-  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
-    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
-      return `render.series[${index}].${key} must be a string.`;
-    }
-  }
-  return null;
-}
-
 function validateNumberContent(content: unknown): string | null {
   const obj = asObject(content);
   if (!obj) return "content must be an object.";
+  // Match the backend: presence of `metrics` selects the multi-number path,
+  // and `validateNumberMetrics` reports a clear error when it is not an array.
+  if ("metrics" in obj) {
+    return validateNumberMetrics(obj.metrics);
+  }
   const dsError = validateNumberDataSource(obj.dataSource);
   if (dsError) return dsError;
   const render = asObject(obj.render);
@@ -583,32 +597,37 @@ function validateNumberContent(content: unknown): string | null {
   if (symbolError) return symbolError;
   const dataSource = asObject(obj.dataSource);
   if (dataSource && hasCompositeMemorySourcesKey(dataSource)) {
-    if (render.aggregation !== undefined) {
-      return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
-    }
-    if (render.field !== undefined) {
-      return "render.field must not be set when dataSource.sources is used (each source defines its own field).";
-    }
-    return null;
+    return validateCompositeNumberRenderExclusions(render);
   }
-  const allowedAggregations = ["count", "sum", "avg", "min", "max", "first", "last"];
-  if (typeof render.aggregation !== "string" || !allowedAggregations.includes(render.aggregation)) {
-    return `render.aggregation must be one of ${allowedAggregations.join(", ")}.`;
+  return validateSimpleNumberRender(render);
+}
+
+function validateCompositeNumberRenderExclusions(render: Record<string, unknown>): string | null {
+  if (render.aggregation !== undefined) {
+    return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
   }
-  if (render.aggregation !== "count") {
-    if (typeof render.field !== "string" || render.field.trim() === "") {
-      return `render.field is required when aggregation is "${render.aggregation}".`;
-    }
+  if (render.field !== undefined) {
+    return "render.field must not be set when dataSource.sources is used (each source defines its own field).";
   }
   return null;
 }
 
-function validateNumberRenderSymbols(render: Record<string, unknown>): string | null {
-  if (render.prefix !== undefined && render.prefix !== null && typeof render.prefix !== "string") {
-    return "render.prefix must be a string.";
+function validateSimpleNumberRender(render: Record<string, unknown>): string | null {
+  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
+    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
   }
-  if (render.suffix !== undefined && render.suffix !== null && typeof render.suffix !== "string") {
-    return "render.suffix must be a string.";
+  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
+    return `render.field is required when aggregation is "${render.aggregation}".`;
+  }
+  return null;
+}
+
+export function validateNumberRenderSymbols(render: Record<string, unknown>): string | null {
+  for (const key of ["prefix", "suffix"] as const) {
+    const value = render[key];
+    if (value !== undefined && value !== null && typeof value !== "string") {
+      return `render.${key} must be a string.`;
+    }
   }
   return null;
 }

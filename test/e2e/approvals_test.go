@@ -277,31 +277,37 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Sleep(400)
 
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+
+	// Set type and value per approver so autosave does not persist type=user with an empty user field.
 	if err := typeSelects.Nth(0).Click(); err != nil {
 		s.t.Fatalf("clicking first approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+	s.session.Sleep(200)
+	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
+	if err := userSelect.Click(); err != nil {
+		s.t.Fatalf("opening user select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
 
 	if err := typeSelects.Nth(1).Click(); err != nil {
 		s.t.Fatalf("clicking second approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
+	s.session.Sleep(200)
+	s.session.Click(q.Locator(`button:has-text("Select role")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
 	if err := typeSelects.Nth(2).Click(); err != nil {
 		s.t.Fatalf("clicking third approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select role")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
-
+	s.session.Sleep(200)
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.session.Sleep(300)
+	// Configuration sidebar autosaves on a 1200ms safety-net timer for scripted flows.
+	s.session.Sleep(1500)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {

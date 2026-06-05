@@ -2,9 +2,9 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePermissions } from "@/contexts/usePermissions";
-import { generateCanvasName } from "@/lib/canvasNameGenerator";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { Plus, Search } from "lucide-react";
-import { useCreateApp } from "./useCreateApp";
+import { useNavigate } from "react-router-dom";
 
 interface CanvasToolbarProps {
   searchQuery: string;
@@ -12,15 +12,16 @@ interface CanvasToolbarProps {
 }
 
 export function CanvasToolbar({ searchQuery, setSearchQuery }: CanvasToolbarProps) {
+  const organizationId = useOrganizationId();
+  const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { createApp, isSaving: isCreateAppSaving } = useCreateApp();
 
   const canCreateCanvases = canAct("canvases", "create");
   const allowed = canCreateCanvases || permissionsLoading;
 
-  const handleCreateApp = () => {
-    if (!canCreateCanvases || isCreateAppSaving) return;
-    void createApp(generateCanvasName());
+  const handleNewApp = () => {
+    if (!organizationId || !canCreateCanvases) return;
+    navigate(`/${organizationId}/apps/new`);
   };
 
   return (
@@ -28,23 +29,23 @@ export function CanvasToolbar({ searchQuery, setSearchQuery }: CanvasToolbarProp
       <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases.">
         <Button
           type="button"
-          onClick={handleCreateApp}
-          disabled={!canCreateCanvases || isCreateAppSaving}
+          onClick={handleNewApp}
+          disabled={!canCreateCanvases || !organizationId}
           aria-label="Create new app"
         >
           <Plus className="h-4 w-4" />
-          {isCreateAppSaving ? "Creating..." : "New App"}
+          New App
         </Button>
       </PermissionTooltip>
 
       <div className="min-w-0 w-full sm:ml-auto sm:w-80">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <Input
             placeholder="Filter apps..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="pl-10"
+            className="pl-8"
           />
         </div>
       </div>

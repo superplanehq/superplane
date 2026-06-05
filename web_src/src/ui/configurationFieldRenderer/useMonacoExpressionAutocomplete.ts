@@ -17,6 +17,7 @@ type UseMonacoExpressionAutocompleteProps = {
   prefix?: string;
   suffix?: string;
   allowOutsideExpression?: boolean;
+  includeTopLevelGlobals?: boolean;
 };
 
 type MonacoKeyEvent = {
@@ -181,6 +182,7 @@ export const useMonacoExpressionAutocomplete = ({
   prefix = "{{ ",
   suffix = " }}",
   allowOutsideExpression = false,
+  includeTopLevelGlobals = false,
 }: UseMonacoExpressionAutocompleteProps) => {
   const modelsRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
   const previousValueRef = useRef<WeakMap<MonacoEditor.ITextModel, string>>(new WeakMap());
@@ -244,7 +246,7 @@ export const useMonacoExpressionAutocomplete = ({
               expressionContext.expressionText,
               expressionContext.expressionCursor,
               context.exampleObj ?? {},
-              { allowInStrings: allowOutsideExpression, limit: 100 },
+              { allowInStrings: allowOutsideExpression, limit: 100, includeTopLevelGlobals },
             ).sort((a, b) => {
               const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
               const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
@@ -437,7 +439,7 @@ export const useMonacoExpressionAutocomplete = ({
         modelsRef.current.delete(model);
       });
     },
-    [allowOutsideExpression, autocompleteExampleObj, languageId, prefix, startWord, suffix],
+    [allowOutsideExpression, autocompleteExampleObj, includeTopLevelGlobals, languageId, prefix, startWord, suffix],
   );
 
   return { handleEditorMount };
