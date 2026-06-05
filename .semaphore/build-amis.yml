@@ -1,0 +1,108 @@
+version: v1.0
+name: Build runner AMIs
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+
+blocks:
+  - name: Build AMIs (amd64 + arm64)
+    task:
+      secrets:
+        - name: aws-credentials
+      env_vars:
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+        - name: RUNNER_S3_BUCKET
+          value: superplane-runner
+        - name: PACKER_VERSION
+          value: "1.11.2"
+      jobs:
+        - name: packer build
+          commands:
+            - checkout
+
+            # Install Packer
+            - |
+              curl -fsSL \
+                "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip" \
+                -o /tmp/packer.zip
+              unzip -q /tmp/packer.zip -d /tmp
+              sudo mv /tmp/packer /usr/local/bin/packer
+              packer version
+
+            # Initialize Packer plugins
+            - packer init packer/runner.pkr.hcl
+
+            # Build both AMIs in parallel
+            - |
+              packer build \
+                -var "aws_region=${AWS_DEFAULT_REGION}" \
+                -var "runner_s3_uri_amd64=s3://${RUNNER_S3_BUCKET}/latest/runner-linux-amd64" \
+                -var "runner_s3_uri_arm64=s3://${RUNNER_S3_BUCKET}/latest/runner-linux-arm64" \
+                packer/runner.pkr.hcl
+
+            # Extract AMI IDs from the manifest and update SSM
+            - |
+              AMD64_AMI=$(python3 - <<'PYEOF'
+              import json
+              with open("packer/manifest.json") as f:
+                  m = json.load(f)
+              for b in m["builds"]:
+                  if "amd64" in b["name"]:
+                      print(b["artifact_id"].split(":")[-1])
+                      break
+              PYEOF
+              )
+
+              ARM64_AMI=$(python3 - <<'PYEOF'
+              import json
+              with open("packer/manifest.json") as f:
+                  m = json.load(f)
+              for b in m["builds"]:
+                  if "arm64" in b["name"]:
+                      print(b["artifact_id"].split(":")[-1])
+                      break
+              PYEOF
+              )
+
+              echo "amd64 AMI: $AMD64_AMI"
+              echo "arm64 AMI: $ARM64_AMI"
+
+              # Update SSM config with new AMI IDs
+              CONFIG=$(aws ssm get-parameter \
+                --name "/superplane/fleet-manager/config" \
+                --query 'Parameter.Value' --output text)
+
+              UPDATED=$(echo "$CONFIG" | python3 -c "
+              import sys, json
+              cfg = json.load(sys.stdin)
+              import os
+              amd64 = os.environ['AMD64_AMI']
+              arm64 = os.environ['ARM64_AMI']
+              for pool in cfg.get('pools', []):
+                  if pool.get('arch') == 'arm64':
+                      pool['ami_id'] = arm64
+                  else:
+                      pool['ami_id'] = amd64
+              print(json.dumps(cfg))
+              " AMD64_AMI="$AMD64_AMI" ARM64_AMI="$ARM64_AMI")
+
+              aws ssm put-parameter \
+                --name "/superplane/fleet-manager/config" \
+                --value "$UPDATED" \
+                --type String \
+                --overwrite
+
+              echo "SSM config updated with new AMI IDs"
+
+            # Print summary
+            - |
+              echo "Build complete. New AMIs:"
+              python3 -c "
+              import json
+              with open('packer/manifest.json') as f:
+                  m = json.load(f)
+              for b in m['builds']:
+                  print(f\"  {b['name']}: {b['artifact_id']}\")
+              "
