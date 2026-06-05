@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +15,12 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { useDashboardContext } from "./DashboardContext";
 import { useMarkdownVariables } from "./useMarkdownVariables";
-import { interpolateMarkdownTemplate, markdownTextIsLoading } from "./markdownInterpolation";
-import { MarkdownBody } from "./MarkdownBody";
+import {
+  interpolateMarkdownTemplate,
+  markdownTemplateHasExpressions,
+  markdownTextIsLoading,
+} from "./markdownInterpolation";
+import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
 import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
 
@@ -36,48 +40,37 @@ const EMPTY_VARIABLES: MarkdownVariable[] = [];
  */
 type EditFocus = "title" | "body" | null;
 
-export function MarkdownPanelCard({
-  panel,
-  readOnly,
-  onDelete,
-  onChange,
+/**
+ * Resolve the persisted variables for the read-only / display path and derive
+ * the display title plus the body loading gate.
+ *
+ * The editor re-resolves the draft variables on its own so its preview stays
+ * in lockstep with whatever the user just typed; while editing this hook is
+ * disabled (empty list, no side-load text) so the editor's hook is the single
+ * owner of the queries for this panel. Title + body are both interpolated, so
+ * the combined text drives the run-node side-load gate.
+ */
+function useMarkdownDisplay({
+  panelId,
+  body,
+  persistedTitle,
+  variables,
+  isEditing,
 }: {
-  panel: DashboardPanel;
-  readOnly: boolean;
-  onDelete: () => void;
-  onChange: (content: Record<string, unknown>) => void;
+  panelId: string;
+  body: string;
+  persistedTitle: string;
+  variables: MarkdownVariable[];
+  isEditing: boolean;
 }) {
-  const body = typeof panel.content?.body === "string" ? panel.content.body : "";
-  const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
-  const variables = useMemo(() => readVariables(panel.content), [panel.content]);
-
-  const [editFocus, setEditFocus] = useState<EditFocus>(null);
-  const isEditing = editFocus !== null;
-  const [draftBody, setDraftBody] = useState(body);
-  const [draftTitle, setDraftTitle] = useState(persistedTitle);
-  const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // Surfaced when an in-card save is blocked because the draft variables fail
-  // the shared validator (e.g. invalid name, empty namespace). Cleared as soon
-  // as the author edits the variables again.
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   const ctx = useDashboardContext();
   const canvasId = ctx?.canvasId ?? "";
-  // Resolve persisted variables for the read-only / display path. The editor
-  // re-resolves the draft variables on its own so the preview stays in lockstep
-  // with whatever the user just typed. Title + body are both interpolated, so
-  // we pass both for the run-node side-load gate. While editing we disable this
-  // hook (empty list, no side-load text) so the editor's own hook is the single
-  // owner of the queries for this panel.
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const {
-    vars: displayVars,
-    baseLoading,
-    sideloadLoading,
-  } = useMarkdownVariables(canvasId, isEditing ? EMPTY_VARIABLES : variables, isEditing ? "" : textForSideload);
+  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+    canvasId,
+    isEditing ? EMPTY_VARIABLES : variables,
+    isEditing ? "" : textForSideload,
+  );
 
   // While the backing variable queries (including the per-run execution
   // side-load behind `{{ run.$["Node"]... }}`) are still in flight, the var map
@@ -94,10 +87,50 @@ export function MarkdownPanelCard({
     // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
     // and can't be interpolated yet, so fall back to the stable panel id while
     // the variables it actually depends on load.
-    if (titleLoading) return panel.id;
-    const interpolated = interpolateMarkdownTemplate(persistedTitle, displayVars).trim();
-    return interpolated || persistedTitle.trim() || panel.id;
-  }, [titleLoading, persistedTitle, displayVars, panel.id]);
+    if (titleLoading) return panelId;
+    const interpolated = interpolateMarkdownTemplate(persistedTitle, vars).trim();
+    if (interpolated) return interpolated;
+    // A templated title that resolves to an empty string must not fall back to
+    // its raw source (that would leak the unparsed `{{ }}` syntax). Only a
+    // static title is safe to show verbatim; otherwise use the stable panel id.
+    if (markdownTemplateHasExpressions(persistedTitle)) return panelId;
+    return persistedTitle.trim() || panelId;
+  }, [titleLoading, persistedTitle, vars, panelId]);
+
+  return { canvasId, displayVars: vars, bodyLoading, displayTitle };
+}
+
+interface MarkdownPanelCardProps {
+  panel: DashboardPanel;
+  readOnly: boolean;
+  onDelete: () => void;
+  onChange: (content: Record<string, unknown>) => void;
+}
+
+export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: MarkdownPanelCardProps) {
+  const body = typeof panel.content?.body === "string" ? panel.content.body : "";
+  const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
+  const variables = useMemo(() => readVariables(panel.content), [panel.content]);
+
+  const [editFocus, setEditFocus] = useState<EditFocus>(null);
+  const isEditing = editFocus !== null;
+  const [draftBody, setDraftBody] = useState(body);
+  const [draftTitle, setDraftTitle] = useState(persistedTitle);
+  const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Surfaced when an in-card save is blocked by the shared variable validator
+  // (e.g. invalid name, empty namespace); cleared once the author edits again.
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { canvasId, displayVars, bodyLoading, displayTitle } = useMarkdownDisplay({
+    panelId: panel.id,
+    body,
+    persistedTitle,
+    variables,
+    isEditing,
+  });
 
   // Sync drafts from props when we're not editing, so external updates
   // (YAML import, websocket invalidation, etc.) flow into the rendered view.
@@ -123,9 +156,8 @@ export function MarkdownPanelCard({
     const trimmedTitle = draftTitle.trim();
     const normalizedVars = normalizeDraftVariables(draftVariables);
     // Guard the in-card save with the same validator the YAML / dialog editor
-    // and the backend use, so we never persist (and then silently fail to
-    // debounce-save) content the API would reject. Keep the editor open with
-    // the message so the author can fix the flagged variable.
+    // and the backend use, so we never persist content the API would reject.
+    // Keep the editor open with the message so the author can fix it.
     const validationError = validateMarkdownVariables(normalizedVars);
     if (validationError) {
       setSaveError(validationError);
@@ -263,21 +295,6 @@ function MarkdownPanelView({
       </div>
       <DeleteConfirmDialog open={confirmingDelete} onClose={onCancelDelete} onConfirm={onConfirmDelete} />
     </>
-  );
-}
-
-/**
- * Loading placeholder shown in place of the rendered markdown body while the
- * panel's variables (notably the per-run execution side-load behind
- * `{{ run.$["Node"]... }}`) are still resolving. Mirrors `WidgetTable`'s
- * spinner so live-data panels share a consistent loading affordance instead of
- * flashing empty interpolated fields.
- */
-function MarkdownBodyLoading() {
-  return (
-    <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="dashboard-markdown-loading">
-      <Loader2 className="size-4 animate-spin text-slate-400" />
-    </div>
   );
 }
 

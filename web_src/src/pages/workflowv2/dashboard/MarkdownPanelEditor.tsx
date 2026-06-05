@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { MarkdownBody } from "./MarkdownBody";
+import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
+import { markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import type { MarkdownVariable } from "./panelTypes";
@@ -17,7 +18,34 @@ import type { MarkdownVariable } from "./panelTypes";
  * module so the read-only render path in `MarkdownPanelCard.tsx` can stay
  * compact.
  */
-export function MarkdownPanelEditor(props: {
+/**
+ * Resolve the draft variables against live data for the editor preview, and
+ * derive the loading gate the preview shares with the read-only view.
+ *
+ * The draft title + body are passed as the side-load text so run-node
+ * executions are only fetched when either interpolates a `$[` reference (both
+ * use the same variable map). `previewLoading` mirrors `markdownTextIsLoading`
+ * so the preview shows a spinner instead of flashing empty
+ * `{{ run.$["Node"]... }}` fields while the per-run execution side-load is in
+ * flight — keeping it consistent with the saved panel.
+ */
+function useMarkdownEditorPreview(
+  canvasId: string,
+  draftTitle: string,
+  draftBody: string,
+  draftVariables: MarkdownVariable[],
+) {
+  const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
+  const { vars, errors, isLoading, baseLoading, sideloadLoading } = useMarkdownVariables(
+    canvasId,
+    draftVariables,
+    textForSideload,
+  );
+  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading);
+  return { previewVars: vars, errors, isLoading, previewLoading };
+}
+
+interface MarkdownPanelEditorProps {
   panelId: string;
   canvasId: string;
   draftTitle: string;
@@ -32,23 +60,23 @@ export function MarkdownPanelEditor(props: {
   saveError?: string | null;
   onCancel: () => void;
   onCommit: () => void;
-}) {
-  const {
-    panelId,
-    canvasId,
-    draftTitle,
-    setDraftTitle,
-    draftBody,
-    setDraftBody,
-    draftVariables,
-    setDraftVariables,
-    titleInputRef,
-    textareaRef,
-    saveError,
-    onCancel,
-    onCommit,
-  } = props;
+}
 
+export function MarkdownPanelEditor({
+  panelId,
+  canvasId,
+  draftTitle,
+  setDraftTitle,
+  draftBody,
+  setDraftBody,
+  draftVariables,
+  setDraftVariables,
+  titleInputRef,
+  textareaRef,
+  saveError,
+  onCancel,
+  onCommit,
+}: MarkdownPanelEditorProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -61,12 +89,12 @@ export function MarkdownPanelEditor(props: {
     }
   };
 
-  // Resolve the draft variables against live data so the inline preview
-  // mirrors what the saved panel will show. We pass the draft title + body so
-  // the hook only side-loads run node executions when either references `$[`
-  // (both are interpolated with the same variables).
-  const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars: previewVars, errors, isLoading } = useMarkdownVariables(canvasId, draftVariables, textForSideload);
+  const { previewVars, errors, isLoading, previewLoading } = useMarkdownEditorPreview(
+    canvasId,
+    draftTitle,
+    draftBody,
+    draftVariables,
+  );
 
   // Preview is collapsible — when collapsed the textarea reclaims the freed
   // vertical space, useful on shorter panel cards.
@@ -117,6 +145,7 @@ export function MarkdownPanelEditor(props: {
           <MarkdownLivePreview
             body={draftBody}
             vars={previewVars}
+            loading={previewLoading}
             collapsed={previewCollapsed}
             onToggle={() => setPreviewCollapsed((prev) => !prev)}
           />
@@ -169,11 +198,13 @@ export function MarkdownPanelEditor(props: {
 function MarkdownLivePreview({
   body,
   vars,
+  loading,
   collapsed,
   onToggle,
 }: {
   body: string;
   vars: Record<string, unknown>;
+  loading: boolean;
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -202,7 +233,11 @@ function MarkdownLivePreview({
       {!collapsed ? (
         <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
           {body.trim() ? (
-            <MarkdownBody body={body} vars={vars} />
+            loading ? (
+              <MarkdownBodyLoading />
+            ) : (
+              <MarkdownBody body={body} vars={vars} />
+            )
           ) : (
             <p className="text-[12px] text-slate-400">Preview will appear once you write markdown above.</p>
           )}

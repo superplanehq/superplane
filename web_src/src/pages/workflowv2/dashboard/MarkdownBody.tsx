@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -72,6 +73,22 @@ export function MarkdownBody({ body, vars }: { body: string; vars: Record<string
       >
         {normalized}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+/**
+ * Loading placeholder shown in place of the rendered markdown body while the
+ * panel's variables (notably the per-run execution side-load behind
+ * `{{ run.$["Node"]... }}`) are still resolving. Mirrors `WidgetTable`'s
+ * spinner so live-data panels share a consistent loading affordance instead of
+ * flashing empty interpolated fields. Shared between the read-only card view
+ * and the in-card editor preview so both gate on the same loading state.
+ */
+export function MarkdownBodyLoading() {
+  return (
+    <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="dashboard-markdown-loading">
+      <Loader2 className="size-4 animate-spin text-slate-400" />
     </div>
   );
 }

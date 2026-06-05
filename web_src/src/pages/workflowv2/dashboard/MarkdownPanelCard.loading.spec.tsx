@@ -144,4 +144,23 @@ describe("MarkdownPanelCard variable loading gate", () => {
     expect(screen.queryByText("panel-mixed")).toBeNull();
     expect(screen.getByTestId("dashboard-markdown-loading")).toBeTruthy();
   });
+
+  it("falls back to the panel id when a fully-loaded templated title interpolates to empty", () => {
+    // Loading is finished, but the variable the title depends on resolved to
+    // null, so interpolation yields an empty string. The raw `{{ }}` template
+    // must not leak into the header — fall back to the stable panel id.
+    mockVariables({ vars: { run: null }, isLoading: false });
+    renderCard({
+      id: "panel-empty-title",
+      type: "markdown",
+      content: {
+        title: "{{ run.nodeName }}",
+        body: "static body",
+        variables: [{ name: "run", source: { kind: "run", select: "latest" } }],
+      },
+    });
+
+    expect(screen.getByText("panel-empty-title")).toBeTruthy();
+    expect(screen.queryByText(/\{\{/)).toBeNull();
+  });
 });
