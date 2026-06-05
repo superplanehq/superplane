@@ -117,13 +117,10 @@ export function ConsoleOverlay({
     updateConsoleMutationRef.current.mutate(next);
   }, []);
 
-  const handleImportYaml = useCallback(
-    async (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
-      // Use mutateAsync so the modal can await before closing/showing toasts.
-      await updateConsoleMutationRef.current.mutateAsync(next);
-    },
-    [],
-  );
+  const handleImportYaml = useCallback(async (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
+    // Use mutateAsync so the modal can await before closing/showing toasts.
+    await updateConsoleMutationRef.current.mutateAsync(next);
+  }, []);
 
   const contextNodes = canvasNodes ?? [];
   const leftOffset = useEffectiveLeftSidebarWidth();
