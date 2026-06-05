@@ -257,11 +257,20 @@ function useAgentBootKickoff({
     const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
     if (allMessages.length > 0) return;
 
+    const bootMessage = getAgentBootMessage(canvasId);
+
+    // If no boot message (e.g. blank canvas), skip sending — static greeting only
+    if (!bootMessage) {
+      bootState.current = "sent";
+      clearAgentBootContext();
+      return;
+    }
+
     bootState.current = "sending";
     void sendMutation
       .mutateAsync({
         chatId,
-        content: createSystemMessage(getAgentBootMessage(canvasId)),
+        content: createSystemMessage(bootMessage),
         mode: agentMode,
       })
       .then(() => {
