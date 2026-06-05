@@ -20,7 +20,7 @@ INSTANCE_ID=$(curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $METADATA_TOKE
 # 
 # Packages
 #
-# Install bash, curl, docker, ca-certificates, and AWS CLI v2.
+# Install bash, curl, docker, Node.js, ca-certificates, and AWS CLI v2.
 #
 #########################################################
 
@@ -39,6 +39,11 @@ unzip -q /tmp/awscliv2.zip -d /tmp
 
 systemctl enable --now docker
 usermod -aG docker ubuntu
+
+# Node.js 22 (NodeSource) — host-mode javascript_script tasks run `node script.js`.
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+bash /tmp/nodesource_setup.sh
+apt-get install -qy nodejs
 
 #########################################################
 # 

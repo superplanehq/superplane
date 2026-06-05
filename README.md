@@ -132,7 +132,7 @@ Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISI
 
 **Dynamic scaling (optional)** — set **`EC2_PROVISION_RUNNER_HEADROOM=N`** to make fleet-manager target **`want = queued + claimed + N`** for its **`EC2_PROVISION_RUNNER_FLEET_ID`** each reconcile tick (counts pulled from task-broker via **`GET /v1/fleets/{id}/task-counts`** using **`EC2_PROVISION_TASK_BROKER_URL`** + **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**). Counting **queued** tasks (not only **claimed**) pre-warms capacity for a burst — when several tasks arrive at once, fleet-manager launches VMs in parallel instead of waiting for each one to be claimed first. Scale-down is automatic — when claimed/queued drops, want drops, and the existing oldest-first terminate logic removes excess VMs. When the broker call fails, the tick falls back to **`EC2_PROVISION_HOT_INSTANCE_COUNT`**. Leave **`EC2_PROVISION_RUNNER_HEADROOM`** unset for the previous static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
 
-Provisioner **user-data** installs **`/usr/local/bin/runner`**, runs **`superplane-runner.service`** as the **`ubuntu`** user (host tasks start in **`/home/ubuntu`**), and adds **`ubuntu`** to the **`docker`** group on **Ubuntu** AMIs.
+Provisioner **user-data** installs **`/usr/local/bin/runner`**, **Node.js 22**, runs **`superplane-runner.service`** as the **`ubuntu`** user (host tasks start in **`/home/ubuntu`**), and adds **`ubuntu`** to the **`docker`** group on **Ubuntu** AMIs.
 
 #### Runner binary via S3 (typical setup)
 
