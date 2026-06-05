@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -37,7 +38,7 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return &pb.UpdateSecretNameResponse{Secret: s}, nil
 	}
 
-	updated, err := secret.UpdateName(name)
+	updated, err := renameSecret(ctx, encryptor, secret, name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -50,4 +51,26 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return nil, err
 	}
 	return &pb.UpdateSecretNameResponse{Secret: s}, nil
+}
+
+// renameSecret updates the secret's name. For providers that encrypt data with
+// the secret name as additional authenticated data (e.g. LOCAL), the stored
+// data must be re-encrypted with the new name so that subsequent reads can
+// decrypt it.
+func renameSecret(ctx context.Context, encryptor crypto.Encryptor, secret *models.Secret, name string) (*models.Secret, error) {
+	if secret.Provider != secrets.ProviderLocal || len(secret.Data) == 0 {
+		return secret.UpdateName(name)
+	}
+
+	plaintext, err := encryptor.Decrypt(ctx, secret.Data, []byte(secret.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	reEncrypted, err := encryptor.Encrypt(ctx, plaintext, []byte(name))
+	if err != nil {
+		return nil, err
+	}
+
+	return secret.UpdateNameAndData(name, reEncrypted)
 }
