@@ -2,8 +2,8 @@ import {
   getRepositoryFileListErrorMessage,
   getRepositoryFileListLoading,
   getSelectedFileViewState,
-} from "./workflow-files-view-state";
-import type { PendingFileChange, WorkflowFile } from "../workflow-files-types";
+} from "./files-view-state";
+import type { PendingFileChange, AppFile } from "../types";
 
 type EditorViewParams = {
   catalog: {
@@ -32,7 +32,7 @@ type EditorViewParams = {
   };
   pendingChanges: PendingFileChange[];
   selection: {
-    selectedGeneratedFile?: WorkflowFile;
+    selectedGeneratedFile?: AppFile;
     selectedPathExistsInRepository: boolean;
     selectedFileQuery: Parameters<typeof getSelectedFileViewState>[0]["selectedFileQuery"];
   };
@@ -44,7 +44,7 @@ type EditorViewParams = {
   headerActionsHost: HTMLElement | null;
 };
 
-export function buildWorkflowFilesEditorResult({
+export function buildFilesEditorResult({
   catalog,
   pathLists,
   tabs,

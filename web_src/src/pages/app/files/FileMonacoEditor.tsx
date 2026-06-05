@@ -1,7 +1,7 @@
 import { Editor } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
-import { getWorkflowFileMonacoLanguage } from "./lib/workflow-monaco-language";
+import { getFileMonacoLanguage } from "./lib/monaco-language";
 
 const fileEditorOptions = {
   minimap: { enabled: false },
@@ -21,7 +21,7 @@ const fileEditorOptions = {
   renderLineHighlight: "line" as const,
 };
 
-interface WorkflowFileMonacoEditorProps {
+interface FileMonacoEditorProps {
   path: string;
   content: string;
   language?: string;
@@ -29,13 +29,7 @@ interface WorkflowFileMonacoEditorProps {
   onChange: (value: string) => void;
 }
 
-export function WorkflowFileMonacoEditor({
-  path,
-  content,
-  language,
-  readOnly,
-  onChange,
-}: WorkflowFileMonacoEditorProps) {
+export function FileMonacoEditor({ path, content, language, readOnly, onChange }: FileMonacoEditorProps) {
   const suppressNextChangeRef = useRef(false);
   const previousPathRef = useRef(path);
 
@@ -59,11 +53,11 @@ export function WorkflowFileMonacoEditor({
   );
 
   return (
-    <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
+    <div className="min-h-0 flex-1 bg-white" data-testid="file-editor">
       <Editor
         key={path}
         height="100%"
-        language={language ?? getWorkflowFileMonacoLanguage(path)}
+        language={language ?? getFileMonacoLanguage(path)}
         value={content}
         theme="vs"
         onChange={handleChange}

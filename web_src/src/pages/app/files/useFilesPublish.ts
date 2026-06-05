@@ -2,9 +2,9 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
-import { encodeRepositoryFileContent } from "./lib/canvas-repository-files";
-import { mergeLoadedContentAfterPublish } from "./lib/workflow-files-pending-state";
-import type { PendingFileChange, WorkflowFilesHeaderActionsState } from "./workflow-files-types";
+import { encodeRepositoryFileContent } from "./lib/repository-files";
+import { mergeLoadedContentAfterPublish } from "./lib/files-pending-state";
+import type { PendingFileChange, FilesHeaderActionsState } from "./types";
 
 type CommitFilesMutation = {
   mutateAsync: (request: {
@@ -15,7 +15,7 @@ type CommitFilesMutation = {
   isPending: boolean;
 };
 
-type UseWorkflowFilesPublishOptions = {
+type UseFilesPublishOptions = {
   canManageRepositoryFiles: boolean;
   canPublishFiles: boolean;
   commitPathError?: string;
@@ -24,11 +24,11 @@ type UseWorkflowFilesPublishOptions = {
   setPendingChangesByPath: (value: Record<string, PendingFileChange>) => void;
   setLoadedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
   discardAllChanges: () => void;
-  onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
+  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
   commitFiles: CommitFilesMutation;
 };
 
-export function useWorkflowFilesPublish({
+export function useFilesPublish({
   canManageRepositoryFiles,
   canPublishFiles,
   commitPathError,
@@ -39,7 +39,7 @@ export function useWorkflowFilesPublish({
   discardAllChanges,
   onHeaderActionsChange,
   commitFiles,
-}: UseWorkflowFilesPublishOptions) {
+}: UseFilesPublishOptions) {
   const publishChanges = useCallback(async () => {
     if (commitPathError) {
       showErrorToast(commitPathError);
