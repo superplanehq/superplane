@@ -1,8 +1,11 @@
 import { act, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardLayoutItem, DashboardPanel } from "@/hooks/useCanvasData";
 
+import { DashboardContextProvider } from "./DashboardContextProvider";
 import { DashboardView } from "./DashboardView";
 
 const PANEL: DashboardPanel = {
@@ -50,11 +53,32 @@ describe("DashboardView grid transitions", () => {
   });
 
   it("does not arm transitions while loading before the grid mounts", async () => {
-    const { rerender, container } = render(<DashboardView {...BASE_PROPS} isLoading errorMessage={undefined} />);
+    // The markdown panel that backs this grid issues queries through
+    // `useMarkdownVariables`, so the test tree needs the standard providers
+    // even for purely layout-focused assertions.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            {children}
+          </DashboardContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+    const { rerender, container } = render(
+      <Wrapper>
+        <DashboardView {...BASE_PROPS} isLoading errorMessage={undefined} />
+      </Wrapper>,
+    );
 
     await flushAnimationFrame();
 
-    rerender(<DashboardView {...BASE_PROPS} isLoading={false} errorMessage={undefined} />);
+    rerender(
+      <Wrapper>
+        <DashboardView {...BASE_PROPS} isLoading={false} errorMessage={undefined} />
+      </Wrapper>,
+    );
 
     const grid = container.querySelector(".dashboard-grid");
     expect(grid).not.toBeNull();

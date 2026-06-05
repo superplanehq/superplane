@@ -1,14 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -20,32 +13,24 @@ import {
 import { cn } from "@/lib/utils";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
+import { useDashboardContext } from "./DashboardContext";
+import { useMarkdownVariables } from "./useMarkdownVariables";
+import {
+  interpolateMarkdownTemplate,
+  markdownTemplateHasExpressions,
+  markdownTextIsLoading,
+} from "./markdownInterpolation";
+import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
+import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
+import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+
 /**
- * Tailwind class string used to style the rendered markdown body. We don't use
- * the official `prose` plugin so panels stay visually consistent with the rest
- * of the canvas chrome at small panel sizes.
+ * Stable empty list passed to `useMarkdownVariables` while the panel is being
+ * edited. The editor mounts its own hook over the draft variables, so the
+ * read-path hook here is disabled to avoid running the same memory / run /
+ * execution queries twice for a single panel.
  */
-const MARKDOWN_CLASSES =
-  "max-w-none text-sm text-slate-800 " +
-  "[&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:leading-tight [&_h1:first-child]:mt-0 " +
-  "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-tight [&_h2:first-child]:mt-0 " +
-  "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:leading-tight [&_h3:first-child]:mt-0 " +
-  "[&_h4]:mb-0.5 [&_h4]:mt-1 [&_h4]:text-sm [&_h4]:font-medium [&_h4]:leading-tight [&_h4:first-child]:mt-0 " +
-  "[&_p]:mb-2 [&_p]:leading-relaxed " +
-  "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal " +
-  "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
-  "[&_table]:my-2 [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_th]:px-2 [&_th]:py-1 " +
-  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1 " +
-  "[&_details]:my-3 [&_details]:rounded-md [&_details]:border [&_details]:border-slate-200 [&_details]:bg-slate-50/60 [&_details]:p-3 " +
-  "[&_details>summary]:flex [&_details>summary]:items-center [&_details>summary]:cursor-pointer [&_details>summary]:select-none [&_details>summary]:text-sm [&_details>summary]:font-semibold [&_details>summary]:text-slate-900 [&_details>summary]:list-none [&_details>summary]:marker:hidden [&_details>summary]:hover:text-sky-700 " +
-  "[&_details>summary]:before:content-['▸'] [&_details>summary]:before:mr-2 [&_details>summary]:before:text-slate-500 [&_details>summary]:before:transition-transform [&_details>summary]:before:duration-200 " +
-  "[&_details[open]>summary]:mb-3 [&_details[open]>summary]:before:rotate-90 " +
-  "[&_details>*:last-child]:mb-0";
+const EMPTY_VARIABLES: MarkdownVariable[] = [];
 
 /**
  * Which field auto-focuses when the user enters edit mode. Driven by which
@@ -55,28 +40,97 @@ const MARKDOWN_CLASSES =
  */
 type EditFocus = "title" | "body" | null;
 
-export function MarkdownPanelCard({
-  panel,
-  readOnly,
-  onDelete,
-  onChange,
+/**
+ * Resolve the persisted variables for the read-only / display path and derive
+ * the display title plus the body loading gate.
+ *
+ * The editor re-resolves the draft variables on its own so its preview stays
+ * in lockstep with whatever the user just typed; while editing this hook is
+ * disabled (empty list, no side-load text) so the editor's hook is the single
+ * owner of the queries for this panel. Title + body are both interpolated, so
+ * the combined text drives the run-node side-load gate.
+ */
+function useMarkdownDisplay({
+  panelId,
+  body,
+  persistedTitle,
+  variables,
+  isEditing,
 }: {
+  panelId: string;
+  body: string;
+  persistedTitle: string;
+  variables: MarkdownVariable[];
+  isEditing: boolean;
+}) {
+  const ctx = useDashboardContext();
+  const canvasId = ctx?.canvasId ?? "";
+  const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
+  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+    canvasId,
+    isEditing ? EMPTY_VARIABLES : variables,
+    isEditing ? "" : textForSideload,
+  );
+
+  // While the backing variable queries (including the per-run execution
+  // side-load behind `{{ run.$["Node"]... }}`) are still in flight, the var map
+  // is only partially resolved. Interpolating against it now would render those
+  // references as empty fields and then flash to the real values once the
+  // side-load settles. Mirror the table run widget, which treats execution
+  // side-load as part of initial loading, and hold a loading state instead.
+  // Gating is per-text and per-phase: text that doesn't reference a run node
+  // resolves without the execution side-load, so it isn't held on that phase.
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+
+  const displayTitle = useMemo(() => {
+    // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
+    // and can't be interpolated yet, so fall back to the stable panel id while
+    // the variables it actually depends on load.
+    if (titleLoading) return panelId;
+    const interpolated = interpolateMarkdownTemplate(persistedTitle, vars).trim();
+    if (interpolated) return interpolated;
+    // A templated title that resolves to an empty string must not fall back to
+    // its raw source (that would leak the unparsed `{{ }}` syntax). Only a
+    // static title is safe to show verbatim; otherwise use the stable panel id.
+    if (markdownTemplateHasExpressions(persistedTitle)) return panelId;
+    return persistedTitle.trim() || panelId;
+  }, [titleLoading, persistedTitle, vars, panelId]);
+
+  return { canvasId, displayVars: vars, bodyLoading, displayTitle };
+}
+
+interface MarkdownPanelCardProps {
   panel: DashboardPanel;
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
-}) {
+}
+
+export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: MarkdownPanelCardProps) {
   const body = typeof panel.content?.body === "string" ? panel.content.body : "";
   const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
-  const displayTitle = persistedTitle.trim() || panel.id;
+  const variables = useMemo(() => readVariables(panel.content), [panel.content]);
 
   const [editFocus, setEditFocus] = useState<EditFocus>(null);
   const isEditing = editFocus !== null;
   const [draftBody, setDraftBody] = useState(body);
   const [draftTitle, setDraftTitle] = useState(persistedTitle);
+  const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Surfaced when an in-card save is blocked by the shared variable validator
+  // (e.g. invalid name, empty namespace); cleared once the author edits again.
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { canvasId, displayVars, bodyLoading, displayTitle } = useMarkdownDisplay({
+    panelId: panel.id,
+    body,
+    persistedTitle,
+    variables,
+    isEditing,
+  });
 
   // Sync drafts from props when we're not editing, so external updates
   // (YAML import, websocket invalidation, etc.) flow into the rendered view.
@@ -84,8 +138,9 @@ export function MarkdownPanelCard({
     if (!isEditing) {
       setDraftBody(body);
       setDraftTitle(persistedTitle);
+      setDraftVariables(variables);
     }
-  }, [body, persistedTitle, isEditing]);
+  }, [body, persistedTitle, variables, isEditing]);
 
   useEffect(() => {
     if (editFocus === "title") {
@@ -98,38 +153,65 @@ export function MarkdownPanelCard({
 
   const commit = () => {
     if (!isEditing) return;
-    setEditFocus(null);
     const trimmedTitle = draftTitle.trim();
+    const normalizedVars = normalizeDraftVariables(draftVariables);
+    // Guard the in-card save with the same validator the YAML / dialog editor
+    // and the backend use, so we never persist content the API would reject.
+    // Keep the editor open with the message so the author can fix it.
+    const validationError = validateMarkdownVariables(normalizedVars);
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+    setSaveError(null);
+    setEditFocus(null);
     const bodyChanged = draftBody !== body;
     const titleChanged = trimmedTitle !== persistedTitle;
-    if (!bodyChanged && !titleChanged) return;
+    const varsChanged = !variablesEqual(normalizedVars, variables);
+    if (!bodyChanged && !titleChanged && !varsChanged) return;
     const nextContent: Record<string, unknown> = { ...(panel.content ?? {}), body: draftBody };
     if (trimmedTitle) nextContent.title = trimmedTitle;
     else delete nextContent.title;
+    if (normalizedVars.length > 0) nextContent.variables = normalizedVars;
+    else delete nextContent.variables;
     onChange(nextContent);
   };
 
   const cancel = () => {
     setEditFocus(null);
+    setSaveError(null);
     setDraftBody(body);
     setDraftTitle(persistedTitle);
+    setDraftVariables(variables);
   };
 
   const startEditing = (focus: EditFocus) => {
     if (readOnly || focus === null) return;
+    setSaveError(null);
     setEditFocus(focus);
+  };
+
+  // Editing the variables clears a stale save error so the blocked-save banner
+  // doesn't linger after the author addresses it.
+  const updateDraftVariables = (next: MarkdownVariable[]) => {
+    if (saveError) setSaveError(null);
+    setDraftVariables(next);
   };
 
   if (isEditing && !readOnly) {
     return (
       <MarkdownPanelEditor
         panelId={panel.id}
+        canvasId={canvasId}
         draftTitle={draftTitle}
         setDraftTitle={setDraftTitle}
         draftBody={draftBody}
         setDraftBody={setDraftBody}
+        draftVariables={draftVariables}
+        setDraftVariables={updateDraftVariables}
         titleInputRef={titleInputRef}
         textareaRef={textareaRef}
+        saveError={saveError}
         onCancel={cancel}
         onCommit={commit}
       />
@@ -137,26 +219,71 @@ export function MarkdownPanelCard({
   }
 
   return (
+    <MarkdownPanelView
+      body={body}
+      displayTitle={displayTitle}
+      displayVars={displayVars}
+      bodyLoading={bodyLoading}
+      readOnly={readOnly}
+      onEditBody={() => startEditing("body")}
+      onEditTitle={() => startEditing("title")}
+      confirmingDelete={confirmingDelete}
+      onRequestDelete={() => setConfirmingDelete(true)}
+      onCancelDelete={() => setConfirmingDelete(false)}
+      onConfirmDelete={() => {
+        setConfirmingDelete(false);
+        onDelete();
+      }}
+    />
+  );
+}
+
+function MarkdownPanelView({
+  body,
+  displayTitle,
+  displayVars,
+  bodyLoading,
+  readOnly,
+  onEditBody,
+  onEditTitle,
+  confirmingDelete,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  body: string;
+  displayTitle: string;
+  displayVars: Record<string, unknown>;
+  bodyLoading: boolean;
+  readOnly: boolean;
+  onEditBody: () => void;
+  onEditTitle: () => void;
+  confirmingDelete: boolean;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}) {
+  return (
     <>
       <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
         <MarkdownPanelHeader
           displayTitle={displayTitle}
           readOnly={readOnly}
-          onEditTitle={() => startEditing("title")}
-          onRequestDelete={() => setConfirmingDelete(true)}
+          onEditTitle={onEditTitle}
+          onRequestDelete={onRequestDelete}
         />
         {body.trim() ? (
           <div
             className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3"
-            onDoubleClick={readOnly ? undefined : () => startEditing("body")}
+            onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="dashboard-markdown-view"
           >
-            <MarkdownBody body={body} />
+            {bodyLoading ? <MarkdownBodyLoading /> : <MarkdownBody body={body} vars={displayVars} />}
           </div>
         ) : (
           <button
             type="button"
-            onClick={readOnly ? undefined : () => startEditing("body")}
+            onClick={readOnly ? undefined : onEditBody}
             disabled={readOnly}
             className="dashboard-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500"
             data-testid="dashboard-markdown-empty"
@@ -166,50 +293,8 @@ export function MarkdownPanelCard({
           </button>
         )}
       </div>
-      <DeleteConfirmDialog
-        open={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          onDelete();
-        }}
-      />
+      <DeleteConfirmDialog open={confirmingDelete} onClose={onCancelDelete} onConfirm={onConfirmDelete} />
     </>
-  );
-}
-
-/**
- * Sanitize schema allowlist for the markdown panel.
- *
- * Extends the default `rehype-sanitize` schema to permit the small set of
- * raw HTML tags we want authors to be able to use inside markdown panels —
- * currently `<details>` / `<summary>` for collapsible sections, with the
- * `open` attribute so authors can pre-expand items.
- *
- * Everything else still goes through the default allowlist, which strips
- * scripts, event handlers, inline styles, and other unsafe content.
- */
-const MARKDOWN_SANITIZE_SCHEMA = {
-  ...defaultSchema,
-  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
-  attributes: {
-    ...(defaultSchema.attributes ?? {}),
-    details: [...((defaultSchema.attributes ?? {}).details ?? []), "open"],
-  },
-};
-
-function MarkdownBody({ body }: { body: string }) {
-  const normalized = useMemo(() => body.replace(/\r\n/g, "\n").trim(), [body]);
-  if (!normalized) return null;
-  return (
-    <div className={cn(MARKDOWN_CLASSES)} data-testid="dashboard-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
-      >
-        {normalized}
-      </ReactMarkdown>
-    </div>
   );
 }
 
@@ -279,78 +364,67 @@ function MarkdownPanelHeader({
   );
 }
 
-function MarkdownPanelEditor({
-  panelId,
-  draftTitle,
-  setDraftTitle,
-  draftBody,
-  setDraftBody,
-  titleInputRef,
-  textareaRef,
-  onCancel,
-  onCommit,
-}: {
-  panelId: string;
-  draftTitle: string;
-  setDraftTitle: (value: string) => void;
-  draftBody: string;
-  setDraftBody: (value: string) => void;
-  titleInputRef: RefObject<HTMLInputElement | null>;
-  textareaRef: RefObject<HTMLTextAreaElement | null>;
-  onCancel: () => void;
-  onCommit: () => void;
-}) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onCancel();
-      return;
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      onCommit();
-    }
-  };
+/**
+ * Read the `variables` array off a panel's persisted content while filtering
+ * out malformed entries (defensive against YAML hand-edits). Returns a fresh
+ * array so callers can compare with referential identity.
+ */
+function readVariables(content: DashboardPanel["content"]): MarkdownVariable[] {
+  const raw = (content as Record<string, unknown> | undefined)?.variables;
+  if (!Array.isArray(raw)) return [];
+  const out: MarkdownVariable[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.name !== "string") continue;
+    if (!record.source || typeof record.source !== "object") continue;
+    out.push({ name: record.name, source: record.source as MarkdownVariable["source"] });
+  }
+  return out;
+}
 
-  return (
-    <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
-      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
-        <Input
-          ref={titleInputRef}
-          value={draftTitle}
-          onChange={(e) => setDraftTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={panelId}
-          aria-label="Panel title"
-          className="h-7 border-0 bg-transparent px-2 text-xs font-medium text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-          data-testid="dashboard-markdown-title-editor"
-        />
-      </div>
-      <Textarea
-        ref={textareaRef}
-        value={draftBody}
-        onChange={(e) => setDraftBody(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Write **markdown** here..."
-        className="min-h-[120px] flex-1 resize-none rounded-none border-0 bg-white font-mono text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-        data-testid="dashboard-markdown-editor"
-      />
-      <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
-        <span className="text-[11px] text-slate-500">
-          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
-          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
-        </span>
-        <div className="flex items-center gap-1">
-          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="button" size="sm" onClick={onCommit} data-testid="dashboard-markdown-save">
-            Save
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+/**
+ * Normalize a draft variables list for persistence: drop entries with an
+ * empty name, strip blank optional fields, and trim free-text inputs. This
+ * keeps persisted YAML deterministic so save/reload round-trips are stable.
+ */
+function normalizeDraftVariables(list: MarkdownVariable[]): MarkdownVariable[] {
+  const out: MarkdownVariable[] = [];
+  const seen = new Set<string>();
+  for (const variable of list) {
+    const name = variable?.name?.trim();
+    if (!name || seen.has(name) || !variable?.source) continue;
+    seen.add(name);
+    out.push({ name, source: normalizeVariableSource(variable.source) });
+  }
+  return out;
+}
+
+function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVariable["source"] {
+  if (source.kind === "memory") {
+    const namespace = source.namespace?.trim() ?? "";
+    const orderBy = source.orderBy?.trim();
+    const matches = (source.matches ?? [])
+      .map((match) => ({ field: match?.field?.trim() ?? "", value: match?.value ?? "" }))
+      .filter((match) => match.field !== "");
+    return {
+      kind: "memory",
+      namespace,
+      ...(orderBy ? { orderBy } : {}),
+      ...(source.direction ? { direction: source.direction } : {}),
+      ...(matches.length > 0 ? { matches } : {}),
+    };
+  }
+  return { kind: "run", select: source.select };
+}
+
+/**
+ * Cheap deep equality for two variables arrays — used to skip the
+ * `onChange` write on a save with no diffs. Falls back to JSON.stringify
+ * since the shape is small and entirely JSON-safe.
+ */
+function variablesEqual(a: MarkdownVariable[], b: MarkdownVariable[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function DeleteConfirmDialog({
