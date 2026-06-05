@@ -13,6 +13,8 @@ const sendMutation = {
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: { spec: { nodes: [] } } }),
+  useCanvasVersions: () => ({ data: [] }),
+  useCanvasVersion: () => ({ data: null }),
   useInfiniteCanvasRuns: () => ({ data: { pages: [] } }),
 }));
 

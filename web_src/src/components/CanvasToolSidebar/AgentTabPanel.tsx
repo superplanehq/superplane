@@ -17,7 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
-import { useCanvas, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -340,11 +340,15 @@ function useConversationHandlers({
 
       // Rubric is a spec confirmation — tell the agent to start building.
       // Always use builder mode regardless of current agentMode.
-      await send.mutateAsync({
-        chatId,
-        content: "Specs approved. Start building.",
-        mode: "builder",
-      });
+      try {
+        await send.mutateAsync({
+          chatId,
+          content: "Specs approved. Start building.",
+          mode: "builder",
+        });
+      } catch {
+        setError("Failed to start building. Please try again.");
+      }
     },
     [chatId],
   );
@@ -411,8 +415,18 @@ function ComposerWithCanvasData({
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+  const { data: versions } = useCanvasVersions(organizationId, canvasId);
+  const latestVersion = versions?.[0];
+  const isDraft = latestVersion?.state === "STATE_DRAFT";
+  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.id ?? "", isDraft);
+
+  // Use draft nodes if a draft exists, otherwise fall back to published
+  const nodes = useMemo(
+    () => (isDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
+    [isDraft, draftVersion, canvas],
+  );
+
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
-  const nodes = canvas?.spec?.nodes;
   const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
 
   return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
