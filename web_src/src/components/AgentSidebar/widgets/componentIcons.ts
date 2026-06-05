@@ -19,6 +19,7 @@ export const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
   graphql: "network",
   ssh: "terminal",
   runner: "terminal",
+  runnerJS: "code",
   timeGate: "clock",
   filter: "filter",
   wait: "clock",

@@ -394,6 +394,93 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	return messageChain, nil
 }
 
+// BuildExecutionMessageChain returns upstream node payloads keyed by canvas node name.
+// This is the $ object passed to runner JavaScript tasks.
+func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any, error) {
+	nodeIDToName, err := b.nodeIDToNameMap()
+	if err != nil {
+		return nil, err
+	}
+
+	messageChain := map[string]any{}
+	inputMap := extractInputMap(b.input)
+
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent != nil {
+		if name, ok := nodeIDToName[rootEvent.NodeID]; ok && name != "" {
+			payload := normalizeExpressionValue(rootEvent.Data.Data())
+			if rootEvent.ExecutionID != nil {
+				execution, execErr := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
+				if execErr == nil && execution != nil {
+					payload = injectConfig(payload, execution.Configuration.Data())
+				}
+			}
+			messageChain[name] = payload
+		}
+	}
+
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return nil, err
+	}
+	if len(executionsInChain) > 0 {
+		executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
+		for _, execution := range executionsInChain {
+			executionIDs = append(executionIDs, execution.ID)
+		}
+
+		events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		latestByExecution := latestEventByExecution(events, executionIDs)
+		for i := len(executionsInChain) - 1; i >= 0; i-- {
+			execution := executionsInChain[i]
+			name, ok := nodeIDToName[execution.NodeID]
+			if !ok || name == "" {
+				continue
+			}
+
+			event, ok := latestByExecution[execution.ID]
+			if !ok {
+				continue
+			}
+
+			messageChain[name] = injectConfig(normalizeExpressionValue(event.Data.Data()), execution.Configuration.Data())
+		}
+	}
+
+	for nodeID, value := range inputMap {
+		name, ok := nodeIDToName[nodeID]
+		if !ok || name == "" {
+			continue
+		}
+		messageChain[name] = value
+	}
+
+	return messageChain, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeIDToNameMap() (map[string]string, error) {
+	nodes, err := models.FindCanvasNodesInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]string, len(nodes))
+	for _, node := range nodes {
+		if node.Name == "" {
+			continue
+		}
+		out[node.NodeID] = node.Name
+	}
+	return out, nil
+}
+
 func (b *NodeConfigurationBuilder) injectConfigIntoMessageChain(
 	messageChain map[string]any,
 	refToNodeID map[string]string,

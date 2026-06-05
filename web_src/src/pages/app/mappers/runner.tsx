@@ -29,6 +29,8 @@ const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
 const MACHINE_TYPE_LABELS: Record<string, string> = {
   "aws-standard-1": "e1-large-amd64",
   "aws-arm64-1": "e1-large-arm64",
+  "e1-tiny-amd64": "e1-tiny-amd64",
+  "e1-tiny-arm64": "e1-tiny-arm64",
 };
 
 function machineTypeDisplayName(fleetID: string): string {
@@ -207,7 +209,7 @@ export const runnerMapper: ComponentBaseMapper = {
 
     const taskID = brokerTaskIDFromExecution(context.execution);
     if (taskID) {
-      details["Task ID"] = taskID;
+      details["task_id"] = taskID;
     }
 
     const payload = firstRunnerPayload(context.execution);
