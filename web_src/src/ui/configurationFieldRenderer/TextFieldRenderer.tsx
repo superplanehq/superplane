@@ -93,8 +93,12 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
 
       {/* Expanded Editor Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent size="90vw" className="flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between">
+        <DialogContent
+          size="90vw"
+          className="flex flex-col gap-0 overflow-hidden p-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-700">
             <DialogTitle>{field.label || field.name}</DialogTitle>
             <DialogDescription className="sr-only">
               Expanded text editor for {field.label || field.name}.
@@ -105,16 +109,16 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
                   e.stopPropagation();
                   copyToClipboard();
                 }}
-                className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                className="flex items-center gap-1 rounded bg-gray-50 px-3 py-1 text-sm text-gray-800 hover:bg-gray-200"
               >
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
                 Copy
               </button>
             </SimpleTooltip>
           </div>
-          <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <Editor
-              height="600px"
+              height="100%"
               defaultLanguage={language}
               value={editorValue}
               onChange={handleEditorChange}
