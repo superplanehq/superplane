@@ -93,6 +93,12 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 			if !strings.Contains(script, "s3://runner-binaries/release/runner-linux-"+tt.arch) {
 				t.Fatalf("user-data missing runner S3 URI for %s", tt.arch)
 			}
+			if !strings.Contains(script, "deb.nodesource.com/setup_22.x") {
+				t.Fatalf("user-data missing Node.js 22 install")
+			}
+			if !strings.Contains(script, "apt-get install -qy nodejs") {
+				t.Fatalf("user-data missing nodejs package install")
+			}
 		})
 	}
 }
