@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { useDashboardContext } from "./DashboardContext";
 import { useMarkdownVariables } from "./useMarkdownVariables";
-import { interpolateMarkdownTemplate } from "./markdownInterpolation";
+import { interpolateMarkdownTemplate, markdownTemplateHasExpressions } from "./markdownInterpolation";
 import { MarkdownBody } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
 import type { MarkdownVariable } from "./panelTypes";
@@ -59,11 +59,24 @@ export function MarkdownPanelCard({
   // with whatever the user just typed. Title + body are both interpolated, so
   // we pass both for the run-node side-load gate.
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars: displayVars } = useMarkdownVariables(canvasId, variables, textForSideload);
+  const { vars: displayVars, isLoading: varsLoading } = useMarkdownVariables(canvasId, variables, textForSideload);
+
+  // While the backing variable queries (including the per-run execution
+  // side-load behind `{{ run.$["Node"]... }}`) are still in flight, the var map
+  // is only partially resolved. Interpolating against it now would render those
+  // references as empty fields and then flash to the real values once the
+  // side-load settles. Mirror the table run widget, which treats execution
+  // side-load as part of initial loading, and hold a loading state instead.
+  // Only text that actually references variables needs gating — static text is
+  // stable regardless of loading.
   const displayTitle = useMemo(() => {
+    // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
+    // and can't be interpolated yet, so fall back to the stable panel id while
+    // its variables load.
+    if (varsLoading && markdownTemplateHasExpressions(persistedTitle)) return panel.id;
     const interpolated = interpolateMarkdownTemplate(persistedTitle, displayVars).trim();
     return interpolated || persistedTitle.trim() || panel.id;
-  }, [persistedTitle, displayVars, panel.id]);
+  }, [varsLoading, persistedTitle, displayVars, panel.id]);
 
   // Sync drafts from props when we're not editing, so external updates
   // (YAML import, websocket invalidation, etc.) flow into the rendered view.
@@ -137,6 +150,7 @@ export function MarkdownPanelCard({
       body={body}
       displayTitle={displayTitle}
       displayVars={displayVars}
+      bodyLoading={varsLoading && markdownTemplateHasExpressions(body)}
       readOnly={readOnly}
       onEditBody={() => startEditing("body")}
       onEditTitle={() => startEditing("title")}
@@ -155,6 +169,7 @@ function MarkdownPanelView({
   body,
   displayTitle,
   displayVars,
+  bodyLoading,
   readOnly,
   onEditBody,
   onEditTitle,
@@ -166,6 +181,7 @@ function MarkdownPanelView({
   body: string;
   displayTitle: string;
   displayVars: Record<string, unknown>;
+  bodyLoading: boolean;
   readOnly: boolean;
   onEditBody: () => void;
   onEditTitle: () => void;
@@ -189,7 +205,7 @@ function MarkdownPanelView({
             onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="dashboard-markdown-view"
           >
-            <MarkdownBody body={body} vars={displayVars} />
+            {bodyLoading ? <MarkdownBodyLoading /> : <MarkdownBody body={body} vars={displayVars} />}
           </div>
         ) : (
           <button
@@ -206,6 +222,21 @@ function MarkdownPanelView({
       </div>
       <DeleteConfirmDialog open={confirmingDelete} onClose={onCancelDelete} onConfirm={onConfirmDelete} />
     </>
+  );
+}
+
+/**
+ * Loading placeholder shown in place of the rendered markdown body while the
+ * panel's variables (notably the per-run execution side-load behind
+ * `{{ run.$["Node"]... }}`) are still resolving. Mirrors `WidgetTable`'s
+ * spinner so live-data panels share a consistent loading affordance instead of
+ * flashing empty interpolated fields.
+ */
+function MarkdownBodyLoading() {
+  return (
+    <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="dashboard-markdown-loading">
+      <Loader2 className="size-4 animate-spin text-slate-400" />
+    </div>
   );
 }
 

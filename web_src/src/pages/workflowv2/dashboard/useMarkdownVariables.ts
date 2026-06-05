@@ -155,8 +155,15 @@ export function useMarkdownVariables(
   const { vars, errors } = useMemo(() => {
     const out: Record<string, unknown> = {};
     const errs: MarkdownVariableError[] = [];
+    // Mirror `normalizeDraftVariables` (first-wins) so the preview resolves the
+    // same row that save persists. Without this, duplicate names resolve
+    // last-wins here while save keeps the first, letting authors preview one
+    // value and save a different one.
+    const seen = new Set<string>();
     for (const variable of list) {
       if (!variable?.name || !variable?.source) continue;
+      if (seen.has(variable.name)) continue;
+      seen.add(variable.name);
       const resolved = resolveVariable(variable, {
         memoryEntries,
         memoryLoading,

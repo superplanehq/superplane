@@ -183,4 +183,32 @@ describe("MarkdownPanelCard variable interpolation", () => {
     // Empty rather than a thrown error or stack trace.
     expect(view.textContent?.trim()).toBe("Service:");
   });
+
+  it("resolves the first row for duplicate variable names, matching save semantics", async () => {
+    // Two variables share the name `recipe`. `normalizeDraftVariables` keeps
+    // only the first on save, so the preview/render must resolve the first too
+    // (and not the shadowed last one) to avoid showing a value that won't
+    // survive a save.
+    const panel: DashboardPanel = {
+      id: "panel-dup",
+      type: "markdown",
+      content: {
+        body: "Service: {{ recipe.service }}",
+        variables: [
+          { name: "recipe", source: { kind: "memory", namespace: "first" } },
+          { name: "recipe", source: { kind: "memory", namespace: "second" } },
+        ],
+      },
+    };
+    renderWithVariables({
+      panel,
+      memoryEntries: [
+        { id: "row-first", namespace: "first", values: { service: "api" }, source: "node" },
+        { id: "row-second", namespace: "second", values: { service: "web" }, source: "node" },
+      ],
+    });
+    const view = await waitFor(() => screen.getByTestId("dashboard-markdown"));
+    expect(view.textContent).toMatch(/Service: api/);
+    expect(view.textContent).not.toMatch(/web/);
+  });
 });

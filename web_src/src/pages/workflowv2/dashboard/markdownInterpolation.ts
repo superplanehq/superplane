@@ -38,3 +38,17 @@ export function interpolateMarkdownTemplate(input: string | undefined, vars: Rec
   const env = buildEnv(vars);
   return evalTemplate(template, {}, env, stringifyMarkdownValue);
 }
+
+/**
+ * Whether the input contains at least one `{{ ... }}` expression segment that
+ * depends on the resolved variable map. Callers use this to decide whether a
+ * still-loading variable map (e.g. per-run executions backing `{{ run.$[...] }}`)
+ * would interpolate to empty fields — in which case they should hold a loading
+ * state instead of rendering a half-resolved string. Plain text with no
+ * templates is stable regardless of variable loading, so it returns `false`.
+ */
+export function markdownTemplateHasExpressions(input: string | undefined): boolean {
+  if (!input) return false;
+  if (!TEMPLATE_RE.test(input)) return false;
+  return compileTemplate(input).hasExpr;
+}
