@@ -58,7 +58,7 @@ import type {
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
 
 // Query Keys
 export const canvasKeys = {
@@ -1843,7 +1843,7 @@ export const useCanvasRepositoryFile = (
   return useQuery({
     queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
     queryFn: async () => {
-      const { fetchCanvasRepositoryFileContent } = await import("@/pages/workflowv2/lib/canvas-repository-files");
+      const { fetchCanvasRepositoryFileContent } = await import("@/pages/app/lib/canvas-repository-files");
       const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath);
       return {
         path: normalizedPath,

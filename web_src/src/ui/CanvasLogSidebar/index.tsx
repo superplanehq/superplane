@@ -5,8 +5,8 @@ import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as Com
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
+import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
+import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "errors" | "warnings";

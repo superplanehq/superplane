@@ -1,5 +1,5 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client/types.gen";
-import type { StartTemplate } from "@/pages/workflowv2/mappers/start/templatePayload";
+import type { StartTemplate } from "@/pages/app/mappers/start/templatePayload";
 
 /** A Start trigger template as exposed by `node.configuration.templates`. */
 export interface ConsoleTriggerTemplate {

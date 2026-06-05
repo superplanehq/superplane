@@ -162,7 +162,7 @@ const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
 
-export function WorkflowPageV2() {
+export function AppPage() {
   const {
     organizationId,
     appId,

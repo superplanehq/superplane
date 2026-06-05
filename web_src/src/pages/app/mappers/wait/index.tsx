@@ -18,7 +18,7 @@ import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
+import { PushThroughHandler } from "@/pages/app/components/PushThroughHandler";
 import { ExpressionEnvironment, ExpressionExamples, ExpressionTooltip } from "./expressionHelp";
 
 // Helper function to detect if a value contains expressions

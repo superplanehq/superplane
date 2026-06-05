@@ -56,9 +56,9 @@ import {
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
+import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -80,7 +80,7 @@ import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
-import type { TriggerActionModal } from "@/pages/workflowv2/mappers/types";
+import type { TriggerActionModal } from "@/pages/app/mappers/types";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
