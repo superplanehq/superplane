@@ -148,6 +148,8 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
 
+			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
@@ -233,6 +235,11 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
 			}
+
+			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
+				authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+			}
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})

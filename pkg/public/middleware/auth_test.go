@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	jwtLib "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,4 +195,46 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
 	})
+}
+
+func TestOrganizationAuthMiddleware_RefreshesSessionOnActivity(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	issuedAt := time.Now().Add(-2 * time.Hour)
+	oldToken := mintTestAccountToken(t, signer, r.Account.ID.String(), issuedAt, 24*time.Hour)
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/canvases", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: oldToken})
+	req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+
+	cookies := res.Result().Cookies()
+	require.Len(t, cookies, 1)
+	assert.Equal(t, "account_token", cookies[0].Name)
+	assert.NotEqual(t, oldToken, cookies[0].Value)
+}
+
+func mintTestAccountToken(t *testing.T, signer *jwt.Signer, accountID string, issuedAt time.Time, ttl time.Duration) string {
+	t.Helper()
+
+	token := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, jwtLib.MapClaims{
+		"sub": accountID,
+		"iat": issuedAt.Unix(),
+		"nbf": issuedAt.Unix(),
+		"exp": issuedAt.Add(ttl).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(signer.Secret))
+	require.NoError(t, err)
+
+	return tokenString
 }
