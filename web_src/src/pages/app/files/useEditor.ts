@@ -12,13 +12,13 @@ import {
   useRepositoryPathLists,
   useRepositorySelectedFileQuery,
 } from "./useCatalog";
-import type { CanvasFile, FilesHeaderActionsState } from "./types";
+import type { AppFile, FilesHeaderActionsState } from "./types";
 
 type UseEditorOptions = {
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
-  files: CanvasFile[];
+  files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 };

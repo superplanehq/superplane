@@ -1,14 +1,14 @@
 import { FilesView } from "./FilesView";
-import type { CanvasFile, FilesHeaderActionsState } from "./types";
+import type { AppFile, FilesHeaderActionsState } from "./types";
 
-export type { CanvasFile, FilesHeaderActionsState } from "./types";
+export type { AppFile, FilesHeaderActionsState } from "./types";
 
 interface FilesOverlayLayerProps {
   isFilesMode: boolean;
   isEditing?: boolean;
   canvasId?: string;
   canWrite?: boolean;
-  files: CanvasFile[];
+  files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 }

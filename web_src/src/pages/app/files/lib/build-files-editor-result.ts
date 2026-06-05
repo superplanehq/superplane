@@ -3,7 +3,7 @@ import {
   getRepositoryFileListLoading,
   getSelectedFileViewState,
 } from "./files-view-state";
-import type { PendingFileChange, CanvasFile } from "../types";
+import type { PendingFileChange, AppFile } from "../types";
 
 type EditorViewParams = {
   catalog: {
@@ -32,7 +32,7 @@ type EditorViewParams = {
   };
   pendingChanges: PendingFileChange[];
   selection: {
-    selectedGeneratedFile?: CanvasFile;
+    selectedGeneratedFile?: AppFile;
     selectedPathExistsInRepository: boolean;
     selectedFileQuery: Parameters<typeof getSelectedFileViewState>[0]["selectedFileQuery"];
   };

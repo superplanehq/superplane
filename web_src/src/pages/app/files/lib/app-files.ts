@@ -1,7 +1,7 @@
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
 import { consoleToYaml } from "../../console/consoleYaml";
-import type { CanvasFile } from "../types";
+import type { AppFile } from "../types";
 
 type ConsolePanelInput = {
   id?: string;
@@ -39,7 +39,7 @@ export function buildAppFiles({
   canvasName: string | undefined;
   consoleLoading: boolean;
   consoleError: unknown;
-}): CanvasFile[] {
+}): AppFile[] {
   const consoleYamlText = consoleToYaml({
     panels: normalizePanels(panels),
     layout: normalizeLayout(layout),

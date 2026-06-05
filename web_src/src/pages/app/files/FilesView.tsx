@@ -7,7 +7,7 @@ import { FileList } from "./FileList";
 import { TabBar } from "./TabBar";
 import { DiffHeaderAction, IconButton } from "./FilesUi";
 import { useEditor } from "./useEditor";
-import type { CanvasFile, FilesHeaderActionsState } from "./types";
+import type { AppFile, FilesHeaderActionsState } from "./types";
 
 const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default: module.DiffDialog })));
 
@@ -22,7 +22,7 @@ export function FilesView({
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
-  files: CanvasFile[];
+  files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 }) {

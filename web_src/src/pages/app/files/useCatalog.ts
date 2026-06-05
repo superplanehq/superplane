@@ -2,9 +2,9 @@ import { useCanvasRepository, useCanvasRepositoryFile, useCanvasRepositoryFiles 
 import { useMemo } from "react";
 
 import { buildFinalRepositoryPaths, buildRenderableTreePaths, getPathValidationError } from "./lib/files-paths";
-import type { PendingFileChange, CanvasFile } from "./types";
+import type { PendingFileChange, AppFile } from "./types";
 
-export function useCatalog(canvasId: string | undefined, files: CanvasFile[]) {
+export function useCatalog(canvasId: string | undefined, files: AppFile[]) {
   const canUseRepository = !!canvasId;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";
@@ -12,7 +12,7 @@ export function useCatalog(canvasId: string | undefined, files: CanvasFile[]) {
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
   const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
   const generatedFilesByPath = useMemo(() => {
-    const generatedFiles = new Map<string, CanvasFile>();
+    const generatedFiles = new Map<string, AppFile>();
     for (const file of files) {
       generatedFiles.set(file.path, file);
     }
@@ -80,7 +80,7 @@ export function useRepositorySelectedFileQuery(
   canvasId: string | undefined,
   selectedPath: string | null,
   repositoryPathSet: Set<string>,
-  generatedFilesByPath: Map<string, CanvasFile>,
+  generatedFilesByPath: Map<string, AppFile>,
 ) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;

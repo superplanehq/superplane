@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type CanvasFile = {
+export type AppFile = {
   path: string;
   content: string;
   language?: string;
