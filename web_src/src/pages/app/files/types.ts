@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type WorkflowFile = {
+export type CanvasFile = {
   path: string;
   content: string;
   language?: string;
@@ -24,7 +24,7 @@ export type PendingFileChange =
       path: string;
     };
 
-export type WorkflowFilesHeaderActionsState = {
+export type FilesHeaderActionsState = {
   hasPendingChanges: boolean;
   publishDisabled: boolean;
   publishDisabledTooltip?: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useWorkflowFilesTabState(initialPath: string | null, allPaths: string[], generatedPaths: string[]) {
+export function useFilesTabState(initialPath: string | null, allPaths: string[], generatedPaths: string[]) {
   const hasAutoOpenedInitialFileRef = useRef(Boolean(initialPath));
   const [openTabs, setOpenTabs] = useState<string[]>(() => (initialPath ? [initialPath] : []));
   const [selectedPath, setSelectedPath] = useState<string | null>(() => initialPath);

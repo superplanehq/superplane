@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 
-import { buildWorkflowFiles } from "./lib/canvas-files";
+import { buildCanvasFiles } from "./lib/canvas-files";
 
-type UseWorkflowFilesFromCanvasArgs = Parameters<typeof buildWorkflowFiles>[0];
+type UseFilesFromCanvasArgs = Parameters<typeof buildCanvasFiles>[0];
 
-export function useWorkflowFilesFromCanvas(args: UseWorkflowFilesFromCanvasArgs) {
+export function useFilesFromCanvas(args: UseFilesFromCanvasArgs) {
   const { canvasYamlPayload, panels, layout, canvasId, canvasName, consoleLoading, consoleError } = args;
 
   return useMemo(
     () =>
-      buildWorkflowFiles({
+      buildCanvasFiles({
         canvasYamlPayload,
         panels,
         layout,

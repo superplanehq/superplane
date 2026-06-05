@@ -88,12 +88,12 @@ import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
 import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
-import { useWorkflowFilesFromCanvas } from "./useWorkflowFilesFromCanvas";
+import { useFilesFromCanvas } from "./files/useFilesFromCanvas";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
-import { useFilesModeActions } from "./useFilesModeActions";
-import { resolveWorkflowFilesHeaderVersionActions } from "./lib/resolve-workflow-files-header-version-actions";
-import { useWorkflowFilesHeaderState } from "./useWorkflowFilesHeaderState";
+import { useFilesModeActions } from "./files/useFilesModeActions";
+import { resolveFilesHeaderVersionActions } from "./files/lib/resolve-files-header-version-actions";
+import { useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
@@ -202,8 +202,7 @@ export function AppPage() {
     handleBackToRunList,
   } = useRunsDetailState(searchParams, isRunsMode, selectedRunId);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
-  const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } =
-    useWorkflowFilesHeaderState(canvasId);
+  const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -5257,7 +5256,7 @@ export function AppPage() {
     onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const workflowFiles = useWorkflowFilesFromCanvas({
+  const appFiles = useFilesFromCanvas({
     canvasYamlPayload,
     panels: consoleQuery.data?.panels,
     layout: consoleQuery.data?.layout,
@@ -5455,7 +5454,7 @@ export function AppPage() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
-  const filesHeaderVersionActions = resolveWorkflowFilesHeaderVersionActions({
+  const filesHeaderVersionActions = resolveFilesHeaderVersionActions({
     useFilesHeaderActions: urlViewFlags.isFilesMode && isEditing,
     filesHeaderActions,
     isChangeManagementDisabled,
@@ -5510,7 +5509,7 @@ export function AppPage() {
             isEditing,
             canvasId: canvasId || undefined,
             canWrite: canActOnCanvas,
-            files: workflowFiles,
+            files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
             onHeaderActionsChange: onFilesHeaderActionsChange,
           }}

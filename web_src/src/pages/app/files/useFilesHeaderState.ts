@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
 
-import type { WorkflowFilesHeaderActionsState } from "./workflow-files-types";
+import type { FilesHeaderActionsState } from "./types";
 
-export function useWorkflowFilesHeaderState(canvasId?: string) {
-  const [filesHeaderActions, setFilesHeaderActions] = useState<WorkflowFilesHeaderActionsState | null>(null);
-  const onFilesHeaderActionsChange = useCallback((actions: WorkflowFilesHeaderActionsState | null) => {
+export function useFilesHeaderState(canvasId?: string) {
+  const [filesHeaderActions, setFilesHeaderActions] = useState<FilesHeaderActionsState | null>(null);
+  const onFilesHeaderActionsChange = useCallback((actions: FilesHeaderActionsState | null) => {
     setFilesHeaderActions((current) => {
       if (!current && !actions) {
         return current;

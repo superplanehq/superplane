@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
-import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
+import { FilesOverlayLayer } from "./FilesOverlayLayer";
 
 const repositoryFiles = [{ path: "README.md" }];
 const repositoryFileContents: Record<string, string> = {
@@ -73,7 +73,7 @@ vi.mock("@pierre/trees/react", () => ({
   },
 }));
 
-describe("WorkflowFilesOverlayLayer", () => {
+describe("FilesOverlayLayer", () => {
   beforeEach(() => {
     localStorage.clear();
     useSidebarLayoutStore.getState().hydrateFromStorage();
@@ -83,7 +83,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     const user = userEvent.setup();
 
     render(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         files={[
           {
@@ -112,7 +112,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     const user = userEvent.setup();
 
     render(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         canvasId="canvas-1"
         isEditing
@@ -141,7 +141,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     const user = userEvent.setup();
 
     render(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         canvasId="test-canvas"
         isEditing
@@ -170,7 +170,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     const slotId = "canvas-files-header-actions-test-canvas";
 
     const { rerender } = render(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         canvasId="test-canvas"
         isEditing={false}
@@ -193,7 +193,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     document.body.appendChild(host);
 
     rerender(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         canvasId="test-canvas"
         isEditing
@@ -222,7 +222,7 @@ describe("WorkflowFilesOverlayLayer", () => {
     useSidebarLayoutStore.setState({ leftWidth: 420, leftMountCount: 1 });
 
     render(
-      <WorkflowFilesOverlayLayer
+      <FilesOverlayLayer
         isFilesMode
         files={[
           {
@@ -234,7 +234,7 @@ describe("WorkflowFilesOverlayLayer", () => {
       />,
     );
 
-    const overlay = screen.getByTestId("workflow-files-overlay");
+    const overlay = screen.getByTestId("files-overlay");
     expect(overlay).toHaveStyle({ left: "420px", right: "0px" });
   });
 });

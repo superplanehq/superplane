@@ -1843,7 +1843,7 @@ export const useCanvasRepositoryFile = (
   return useQuery({
     queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
     queryFn: async () => {
-      const { fetchCanvasRepositoryFileContent } = await import("@/pages/app/lib/canvas-repository-files");
+      const { fetchCanvasRepositoryFileContent } = await import("@/pages/app/files/lib/canvas-repository-files");
       const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath);
       return {
         path: normalizedPath,

@@ -1,10 +1,10 @@
 import { lazy, Suspense } from "react";
 
-const WorkflowFileMonacoEditor = lazy(() =>
-  import("./WorkflowFileMonacoEditor").then((module) => ({ default: module.WorkflowFileMonacoEditor })),
+const FileMonacoEditor = lazy(() =>
+  import("./FileMonacoEditor").then((module) => ({ default: module.FileMonacoEditor })),
 );
 
-export function WorkflowFilesFileEditor({
+export function FileEditor({
   path,
   content,
   deleted,
@@ -51,13 +51,7 @@ export function WorkflowFilesFileEditor({
         <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">Loading editor...</div>
       }
     >
-      <WorkflowFileMonacoEditor
-        path={path}
-        content={content}
-        language={language}
-        readOnly={disabled}
-        onChange={onChange}
-      />
+      <FileMonacoEditor path={path} content={content} language={language} readOnly={disabled} onChange={onChange} />
     </Suspense>
   );
 }

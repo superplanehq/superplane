@@ -3,21 +3,16 @@ import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { useMemo } from "react";
 import type { FileContents } from "@pierre/diffs/react";
 
-import type { PendingFileChange } from "./workflow-files-types";
+import type { PendingFileChange } from "./types";
 
-interface WorkflowFilesDiffDialogProps {
+interface FilesDiffDialogProps {
   changes: PendingFileChange[];
   loadedContentByPath: Record<string, string>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function WorkflowFilesDiffDialog({
-  changes,
-  loadedContentByPath,
-  open,
-  onOpenChange,
-}: WorkflowFilesDiffDialogProps) {
+export function FilesDiffDialog({ changes, loadedContentByPath, open, onOpenChange }: FilesDiffDialogProps) {
   const diffFiles = useMemo(
     () =>
       changes.map((change) => ({

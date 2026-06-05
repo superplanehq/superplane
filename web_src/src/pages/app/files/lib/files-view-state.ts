@@ -1,6 +1,6 @@
 import { getApiErrorMessage } from "@/lib/errors";
 
-import type { PendingFileChange, WorkflowFile } from "../workflow-files-types";
+import type { PendingFileChange, CanvasFile } from "../types";
 
 type RepositoryQueryLike = {
   isLoading: boolean;
@@ -58,7 +58,7 @@ export function getRepositoryFileListErrorMessage(
 
 function resolveSelectedFileContent(
   selectedPath: string | null,
-  selectedGeneratedFile: WorkflowFile | undefined,
+  selectedGeneratedFile: CanvasFile | undefined,
   selectedChange: PendingFileChange | undefined,
   loadedContentByPath: Record<string, string>,
 ): string {
@@ -79,7 +79,7 @@ function resolveSelectedFileContent(
 
 function isSelectedFileContentLoaded(
   selectedPath: string | null,
-  selectedGeneratedFile: WorkflowFile | undefined,
+  selectedGeneratedFile: CanvasFile | undefined,
   selectedPathExistsInRepository: boolean,
   loadedContentByPath: Record<string, string>,
 ): boolean {
@@ -100,7 +100,7 @@ export function getSelectedFileViewState({
   canManageRepositoryFiles,
 }: {
   selectedPath: string | null;
-  selectedGeneratedFile?: WorkflowFile;
+  selectedGeneratedFile?: CanvasFile;
   selectedChange?: PendingFileChange;
   loadedContentByPath: Record<string, string>;
   selectedPathExistsInRepository: boolean;

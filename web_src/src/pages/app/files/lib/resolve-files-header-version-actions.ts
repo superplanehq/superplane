@@ -1,8 +1,8 @@
-import type { WorkflowFilesHeaderActionsState } from "../workflow-files-types";
+import type { FilesHeaderActionsState } from "../types";
 
-type ResolveWorkflowFilesHeaderVersionActionsArgs = {
+type ResolveFilesHeaderVersionActionsArgs = {
   useFilesHeaderActions: boolean;
-  filesHeaderActions: WorkflowFilesHeaderActionsState | null;
+  filesHeaderActions: FilesHeaderActionsState | null;
   isChangeManagementDisabled: boolean;
   handlePublishVersion: () => void;
   handleCreateChangeRequest: () => void;
@@ -14,7 +14,7 @@ type ResolveWorkflowFilesHeaderVersionActionsArgs = {
   hasUnpublishedDraftChanges: boolean;
 };
 
-export function resolveWorkflowFilesHeaderVersionActions({
+export function resolveFilesHeaderVersionActions({
   useFilesHeaderActions,
   filesHeaderActions,
   isChangeManagementDisabled,
@@ -26,7 +26,7 @@ export function resolveWorkflowFilesHeaderVersionActions({
   resetDraftDisabled,
   resetDraftDisabledTooltip,
   hasUnpublishedDraftChanges,
-}: ResolveWorkflowFilesHeaderVersionActionsArgs) {
+}: ResolveFilesHeaderVersionActionsArgs) {
   if (useFilesHeaderActions) {
     return {
       onPublishVersion: filesHeaderActions?.onPublish,

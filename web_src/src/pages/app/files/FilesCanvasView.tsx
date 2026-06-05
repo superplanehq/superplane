@@ -2,18 +2,16 @@ import { FilePlus2 } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 
-import { WorkflowFilesFileEditor } from "./WorkflowFilesFileEditor";
-import { WorkflowFilesFileList } from "./WorkflowFilesFileList";
-import { WorkflowFilesTabBar } from "./WorkflowFilesTabBar";
-import { WorkflowFilesDiffHeaderAction, WorkflowFilesIconButton } from "./WorkflowFilesUi";
-import { useWorkflowRepositoryFilesEditor } from "./useWorkflowRepositoryFilesEditor";
-import type { WorkflowFile, WorkflowFilesHeaderActionsState } from "./workflow-files-types";
+import { FileEditor } from "./FileEditor";
+import { FileList } from "./FileList";
+import { FilesTabBar } from "./FilesTabBar";
+import { FilesDiffHeaderAction, FilesIconButton } from "./FilesUi";
+import { useRepositoryFilesEditor } from "./useRepositoryFilesEditor";
+import type { CanvasFile, FilesHeaderActionsState } from "./types";
 
-const WorkflowFilesDiffDialog = lazy(() =>
-  import("./WorkflowFilesDiffDialog").then((module) => ({ default: module.WorkflowFilesDiffDialog })),
-);
+const FilesDiffDialog = lazy(() => import("./FilesDiffDialog").then((module) => ({ default: module.FilesDiffDialog })));
 
-export function WorkflowFilesCanvasView({
+export function FilesCanvasView({
   canvasId,
   isEditing,
   canWrite,
@@ -24,11 +22,11 @@ export function WorkflowFilesCanvasView({
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
-  files: WorkflowFile[];
+  files: CanvasFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
+  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 }) {
-  const editor = useWorkflowRepositoryFilesEditor({
+  const editor = useRepositoryFilesEditor({
     canvasId,
     isEditing,
     canWrite,
@@ -41,23 +39,19 @@ export function WorkflowFilesCanvasView({
     <div
       className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
       style={{ left: editor.leftOffset, right: 0 }}
-      data-testid="workflow-files-overlay"
+      data-testid="files-overlay"
     >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
         {editor.canManageRepositoryFiles ? (
           <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
             <div className="ml-auto flex shrink-0 items-center">
-              <WorkflowFilesIconButton
-                label="New file"
-                onClick={editor.startNewFile}
-                className="size-6 hover:bg-transparent"
-              >
+              <FilesIconButton label="New file" onClick={editor.startNewFile} className="size-6 hover:bg-transparent">
                 <FilePlus2 className="h-3.5 w-3.5" />
-              </WorkflowFilesIconButton>
+              </FilesIconButton>
             </div>
           </div>
         ) : null}
-        <WorkflowFilesFileList
+        <FileList
           paths={editor.visiblePaths}
           selectedPath={editor.selectedPath}
           loading={editor.fileListLoading}
@@ -74,7 +68,7 @@ export function WorkflowFilesCanvasView({
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <WorkflowFilesTabBar
+        <FilesTabBar
           openTabs={editor.openTabs}
           selectedPath={editor.selectedPath}
           pendingChangesByPath={editor.pendingChangesByPath}
@@ -82,7 +76,7 @@ export function WorkflowFilesCanvasView({
           onCloseTab={editor.closeTab}
         />
 
-        <WorkflowFilesFileEditor
+        <FileEditor
           path={editor.selectedPath}
           content={editor.selectedContent}
           deleted={editor.selectedIsDeleted}
@@ -96,7 +90,7 @@ export function WorkflowFilesCanvasView({
 
       {editor.isDiffOpen ? (
         <Suspense fallback={null}>
-          <WorkflowFilesDiffDialog
+          <FilesDiffDialog
             changes={editor.pendingChanges}
             loadedContentByPath={editor.loadedContentByPath}
             open={editor.isDiffOpen}
@@ -106,7 +100,7 @@ export function WorkflowFilesCanvasView({
       ) : null}
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
-            <WorkflowFilesDiffHeaderAction
+            <FilesDiffHeaderAction
               hasPendingChanges={editor.pendingChanges.length > 0}
               onDiffOpen={() => editor.setIsDiffOpen(true)}
             />,
