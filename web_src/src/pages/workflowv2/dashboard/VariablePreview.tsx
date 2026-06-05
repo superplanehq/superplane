@@ -25,7 +25,11 @@ export function VariablePreview({
     return <p className="text-[11px] text-slate-400">Give this variable a name to enable the preview.</p>;
   }
 
-  if (loading && value === undefined) {
+  // `useMarkdownVariables` resolves in-flight variables to `null` (not
+  // `undefined`) while their backing query loads, so gate on `== null` to cover
+  // both. A non-null value during a background refetch still renders its fields
+  // (stale-while-revalidate) instead of flashing the loading text.
+  if (loading && value == null) {
     return <p className="text-[11px] text-slate-400">Loading preview…</p>;
   }
 
