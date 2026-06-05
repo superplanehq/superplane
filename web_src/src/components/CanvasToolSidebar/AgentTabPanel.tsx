@@ -350,7 +350,7 @@ function useConversationHandlers({
         setError("Failed to start building. Please try again.");
       }
     },
-    [chatId],
+    [chatId, setError],
   );
 
   return useMemo(
@@ -417,8 +417,8 @@ function ComposerWithCanvasData({
   });
   const { data: versions } = useCanvasVersions(organizationId, canvasId);
   const latestVersion = versions?.[0];
-  const isDraft = latestVersion?.state === "STATE_DRAFT";
-  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.id ?? "", isDraft);
+  const isDraft = latestVersion?.metadata?.state === "STATE_DRAFT";
+  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.metadata?.id ?? "", isDraft);
 
   // Use draft nodes if a draft exists, otherwise fall back to published
   const nodes = useMemo(
