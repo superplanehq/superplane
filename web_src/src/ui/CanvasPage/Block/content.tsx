@@ -10,7 +10,7 @@ import {
   getSafeCompositeProps,
   getSafeTriggerProps,
 } from "./data";
-import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
+import { isRecord } from "@/pages/app/mappers/safeMappers";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
   if (isCompactView !== undefined) {

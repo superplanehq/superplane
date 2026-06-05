@@ -4,8 +4,8 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
-import { getExecutionDetails, getState, getStateMap } from "@/pages/workflowv2/mappers";
-import { buildExecutionInfo } from "@/pages/workflowv2/utils";
+import { getExecutionDetails, getState, getStateMap } from "@/pages/app/mappers";
+import { buildExecutionInfo } from "@/pages/app/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 
 export type RunNodeDetailTabKey = "details" | "payload" | "configuration";

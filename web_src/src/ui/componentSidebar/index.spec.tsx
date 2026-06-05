@@ -117,7 +117,7 @@ vi.mock("./pages", () => ({
   PageHeader: () => <div data-testid="page-header" />,
 }));
 
-vi.mock("@/pages/workflowv2/utils", () => ({
+vi.mock("@/pages/app/utils", () => ({
   mapTriggerEventToSidebarEvent: vi.fn(),
 }));
 
