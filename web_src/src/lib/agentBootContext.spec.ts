@@ -59,9 +59,9 @@ describe("agent boot context", () => {
     setAgentBootContext("canvas-1", "blank");
 
     expect(getAgentBootInitialMessage("canvas-1")).toBe(
-      "I can help design and modify this canvas. Describe the workflow you want, and I'll use the draft, console, and run panels to propose changes, apply approved updates, and explain each step.",
+      "You can describe the workflow you want to build, or click on the 'New Component' node on the canvas to get started. I'm here to help!",
     );
-    expect(getAgentBootMessage("canvas-1")).toContain("The user just created a new blank app");
+    expect(getAgentBootMessage("canvas-1")).toBe("");
   });
 
   it("stores template intro text separately from the constrained agent prompt", () => {
