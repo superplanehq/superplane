@@ -511,6 +511,10 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64
 		return "", 0, fmt.Errorf("invalid account token: %v", err)
 	}
 
+	if !authentication.IsAccountSessionWithinMaxAge(claims) {
+		return "", 0, fmt.Errorf("session exceeded maximum age")
+	}
+
 	accountClaim, exists := claims["sub"]
 	if !exists {
 		return "", 0, fmt.Errorf("account ID missing from token")

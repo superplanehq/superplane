@@ -1,24 +1,33 @@
 package authentication
 
 import (
+	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	jwtLib "github.com/golang-jwt/jwt/v4"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-const defaultAccountSessionTTL = 24 * time.Hour
-
-var (
-	accountSessionTTLOnce sync.Once
-	accountSessionTTL     time.Duration
+const (
+	defaultAccountSessionTTL    = 24 * time.Hour
+	defaultAccountSessionMaxAge = 7 * 24 * time.Hour
+	sessionStartClaim           = "ses"
 )
 
-// AccountSessionTTL returns how long account_token cookies remain valid.
-// Override with ACCOUNT_SESSION_TTL (Go duration syntax, e.g. "24h").
+var (
+	accountSessionTTLOnce    sync.Once
+	accountSessionTTL        time.Duration
+	accountSessionMaxAgeOnce sync.Once
+	accountSessionMaxAge     time.Duration
+)
+
+// AccountSessionTTL returns how long account_token cookies remain valid
+// between activity refreshes. Override with ACCOUNT_SESSION_TTL.
 func AccountSessionTTL() time.Duration {
 	accountSessionTTLOnce.Do(func() {
 		if v := os.Getenv("ACCOUNT_SESSION_TTL"); v != "" {
@@ -32,16 +41,69 @@ func AccountSessionTTL() time.Duration {
 	return accountSessionTTL
 }
 
-// ResetAccountSessionTTLForTests clears the cached session TTL.
+// AccountSessionMaxAge returns the absolute lifetime of a login session,
+// measured from the first sign-in, regardless of sliding refresh.
+// Override with ACCOUNT_SESSION_MAX_AGE.
+func AccountSessionMaxAge() time.Duration {
+	accountSessionMaxAgeOnce.Do(func() {
+		if v := os.Getenv("ACCOUNT_SESSION_MAX_AGE"); v != "" {
+			if d, err := time.ParseDuration(v); err == nil && d > 0 {
+				accountSessionMaxAge = d
+				return
+			}
+		}
+		accountSessionMaxAge = defaultAccountSessionMaxAge
+	})
+	return accountSessionMaxAge
+}
+
+// ResetAccountSessionTTLForTests clears cached session duration settings.
 func ResetAccountSessionTTLForTests() {
 	accountSessionTTLOnce = sync.Once{}
 	accountSessionTTL = 0
+	accountSessionMaxAgeOnce = sync.Once{}
+	accountSessionMaxAge = 0
 }
 
-// IssueAccountSession mints a fresh account_token and writes it to the response.
+// SessionStartFromClaims returns when the login session began from the ses
+// claim. Tokens without ses cannot be used for absolute max-age enforcement.
+func SessionStartFromClaims(claims jwtLib.MapClaims) (time.Time, bool) {
+	if ses, ok := claims[sessionStartClaim].(string); ok {
+		if unix, err := strconv.ParseInt(ses, 10, 64); err == nil {
+			return time.Unix(unix, 0), true
+		}
+	}
+
+	return time.Time{}, false
+}
+
+// IsAccountSessionWithinMaxAge reports whether the session is still within
+// its absolute lifetime cap. Tokens without ses are rejected.
+func IsAccountSessionWithinMaxAge(claims jwtLib.MapClaims) bool {
+	start, ok := SessionStartFromClaims(claims)
+	if !ok {
+		return false
+	}
+
+	return time.Since(start) <= AccountSessionMaxAge()
+}
+
+// GenerateAccountToken creates a signed account_token JWT with session tracking.
+func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration) (string, error) {
+	return jwtSigner.GenerateWithClaims(ttl, map[string]string{
+		"sub":             accountID,
+		sessionStartClaim: fmt.Sprintf("%d", sessionStart.Unix()),
+	})
+}
+
+// IssueAccountSession mints a fresh account_token for a new login session.
 func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string) error {
+	return issueAccountSession(w, r, jwtSigner, accountID, time.Now())
+}
+
+func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time) error {
 	ttl := AccountSessionTTL()
-	token, err := jwtSigner.Generate(accountID, ttl)
+	token, err := GenerateAccountToken(jwtSigner, accountID, sessionStart, ttl)
 	if err != nil {
 		return err
 	}
@@ -52,7 +114,7 @@ func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.
 
 // MaybeRefreshAccountSession extends active sessions using a sliding window.
 // Any authenticated activity reissues the token for another full TTL, except
-// when the token was just minted (login redirect + first page load).
+// when the token was just minted or the absolute session max age is reached.
 func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, account *models.Account) {
 	cookie, err := r.Cookie("account_token")
 	if err != nil {
@@ -61,6 +123,10 @@ func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigne
 
 	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
+		return
+	}
+
+	if !IsAccountSessionWithinMaxAge(claims) {
 		return
 	}
 
@@ -73,5 +139,10 @@ func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigne
 		return
 	}
 
-	_ = IssueAccountSession(w, r, jwtSigner, account.ID.String())
+	sessionStart, ok := SessionStartFromClaims(claims)
+	if !ok {
+		return
+	}
+
+	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart)
 }
