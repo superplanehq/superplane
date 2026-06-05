@@ -27,7 +27,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
-vi.mock("@/pages/workflowv2/mappers", () => ({
+vi.mock("@/pages/app/mappers", () => ({
   getExecutionDetails: () => ({
     "Workflow URL": "https://semaphore.example/workflows/123",
   }),
@@ -38,7 +38,7 @@ vi.mock("@/pages/workflowv2/mappers", () => ({
   }),
 }));
 
-vi.mock("@/pages/workflowv2/utils", () => ({
+vi.mock("@/pages/app/utils", () => ({
   buildExecutionInfo: (execution: unknown) => execution,
 }));
 

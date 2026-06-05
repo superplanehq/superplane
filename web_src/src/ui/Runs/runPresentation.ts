@@ -6,8 +6,8 @@ import type {
   CanvasesCanvasRunState,
   SuperplaneComponentsNode,
 } from "@/api-client";
-import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
-import { buildEventInfo } from "@/pages/workflowv2/utils";
+import { getTriggerRenderer } from "@/pages/app/mappers";
+import { buildEventInfo } from "@/pages/app/utils";
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, MinusCircle, type LucideIcon } from "lucide-react";
 
 export type RunResultFilter = "passed" | "failed" | "cancelled";

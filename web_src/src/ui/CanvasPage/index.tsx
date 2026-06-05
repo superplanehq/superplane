@@ -56,9 +56,9 @@ import {
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
+import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -80,7 +80,7 @@ import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
-import type { TriggerActionModal } from "@/pages/workflowv2/mappers/types";
+import type { TriggerActionModal } from "@/pages/app/mappers/types";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -182,7 +182,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -195,13 +195,13 @@ export interface CanvasPageProps {
   onSelectCanvasView?: () => void;
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
   onSelectFiles?: () => void;
-  /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
-  onDashboardOpenYaml?: () => void;
+  /** Opens the console YAML modal when `headerMode` is `console`. */
+  onConsoleOpenYaml?: () => void;
   /** DOM slot for Files mode actions owned by the files editor overlay. */
   filesHeaderActionsSlotId?: string;
   /** Opens the canvas YAML modal. */
@@ -1204,7 +1204,7 @@ function CanvasPage(props: CanvasPageProps) {
       readOnly ||
       Boolean(props.hideAddControls) ||
       !props.isEditing ||
-      props.headerMode === "dashboard" ||
+      props.headerMode === "console" ||
       props.headerMode === "memory" ||
       props.headerMode === "files" ||
       props.headerMode === "runs" ||
@@ -1292,7 +1292,7 @@ function CanvasPage(props: CanvasPageProps) {
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
         (props.headerMode === "version-live" ||
-          props.headerMode === "dashboard" ||
+          props.headerMode === "console" ||
           props.headerMode === "memory" ||
           props.headerMode === "files") &&
           "sp-canvas-live",
@@ -1332,7 +1332,7 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectDashboard={props.onSelectDashboard}
+          onSelectConsole={props.onSelectConsole}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
           filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
@@ -1367,7 +1367,7 @@ function CanvasPage(props: CanvasPageProps) {
         {props.headerMode === "runs" ||
         props.headerMode === "memory" ||
         props.headerMode === "files" ? null : props.isEditing ? (
-          props.headerMode === "dashboard" ? null : (
+          props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
               canvasEditControls
@@ -1389,7 +1389,7 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen={
               isBuildingBlocksSidebarOpen &&
               !!props.isEditing &&
-              props.headerMode !== "dashboard" &&
+              props.headerMode !== "console" &&
               props.headerMode !== "memory" &&
               props.headerMode !== "files" &&
               props.headerMode !== "runs"
@@ -1891,7 +1891,7 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onSelectDashboard,
+  onSelectConsole,
   onSelectMemory,
   onSelectFiles,
   filesHeaderActionsSlotId,
@@ -1943,7 +1943,7 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   filesHeaderActionsSlotId?: string;
@@ -1995,7 +1995,7 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      onSelectDashboard={onSelectDashboard}
+      onSelectConsole={onSelectConsole}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
       filesHeaderActionsSlotId={filesHeaderActionsSlotId}

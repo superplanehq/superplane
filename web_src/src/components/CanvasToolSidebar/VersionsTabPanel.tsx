@@ -1,7 +1,7 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
-import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
+import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 

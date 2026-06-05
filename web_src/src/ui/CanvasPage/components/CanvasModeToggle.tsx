@@ -2,21 +2,21 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-export type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
-  hasDashboardDraft?: boolean;
+  hasConsoleDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
-const DASHBOARD_TAB = "dashboard";
+const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
 const RUNS_MODE = "runs";
@@ -24,19 +24,19 @@ const RUNS_MODE = "runs";
 export function CanvasModeToggle({
   mode,
   onSelectLive,
-  onSelectDashboard,
+  onSelectConsole,
   onSelectMemory,
   onSelectFiles,
   editing = false,
   hasDraft = false,
-  hasDashboardDraft = false,
+  hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
-  const showDashboard = Boolean(onSelectDashboard);
+  const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
   const selected =
-    mode === DASHBOARD_TAB
-      ? DASHBOARD_TAB
+    mode === CONSOLE_TAB
+      ? CONSOLE_TAB
       : mode === MEMORY_TAB
         ? MEMORY_TAB
         : mode === FILES_TAB
@@ -68,12 +68,12 @@ export function CanvasModeToggle({
           return;
         }
 
-        if (next === DASHBOARD_TAB && selected !== DASHBOARD_TAB && onSelectDashboard) {
+        if (next === CONSOLE_TAB && selected !== CONSOLE_TAB && onSelectConsole) {
           valueChangeHandledRef.current = true;
           queueMicrotask(() => {
             valueChangeHandledRef.current = false;
           });
-          void onSelectDashboard();
+          void onSelectConsole();
           return;
         }
 
@@ -104,11 +104,11 @@ export function CanvasModeToggle({
             : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
         )}
       >
-        {showDashboard ? (
-          <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
+        {showConsole ? (
+          <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console">
             <span className="inline-flex items-center gap-1.5">
               Console
-              <DraftDot show={hasDashboardDraft} testId="canvas-view-mode-dashboard-draft-dot" />
+              <DraftDot show={hasConsoleDraft} testId="canvas-view-mode-console-draft-dot" />
             </span>
           </TabsTrigger>
         ) : null}

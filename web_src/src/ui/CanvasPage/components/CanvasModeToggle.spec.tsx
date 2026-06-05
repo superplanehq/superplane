@@ -8,7 +8,7 @@ describe("CanvasModeToggle", () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectDashboard={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
 
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
 
@@ -19,7 +19,7 @@ describe("CanvasModeToggle", () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectDashboard={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
 
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
@@ -35,7 +35,7 @@ describe("CanvasModeToggle", () => {
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
-        onSelectDashboard={vi.fn()}
+        onSelectConsole={vi.fn()}
         onSelectMemory={onSelectMemory}
       />,
     );
@@ -46,17 +46,15 @@ describe("CanvasModeToggle", () => {
   });
 
   it("hides the Memory tab when onSelectMemory is not provided", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} />);
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />);
 
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
 
   it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
-    render(
-      <CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} hasDashboardDraft />,
-    );
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />);
 
-    expect(screen.getByTestId("canvas-view-mode-dashboard-draft-dot")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toBeInTheDocument();
     expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
   });
 
@@ -68,7 +66,7 @@ describe("CanvasModeToggle", () => {
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
-        onSelectDashboard={vi.fn()}
+        onSelectConsole={vi.fn()}
         onSelectFiles={onSelectFiles}
       />,
     );

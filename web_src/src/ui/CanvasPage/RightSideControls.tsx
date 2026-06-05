@@ -9,16 +9,16 @@ export type RightSideControlsProps = {
   /** When true, shows canvas edit controls in the right rail. */
   canvasEditControls?: boolean;
   /** When true, shows console edit controls in the right rail. */
-  dashboardEditControls?: boolean;
-  /** Overlay on the canvas area (default) or embedded beside dashboard content. */
+  consoleEditControls?: boolean;
+  /** Overlay on the canvas area (default) or embedded beside console content. */
   layout?: "overlay" | "embedded";
 
   onSidebarOpen?: () => void;
   onAddNote?: () => void | Promise<void>;
   onYamlOpen?: () => void;
-  onDashboardAddPanel?: () => void;
-  onDashboardOpenYaml?: () => void;
-  dashboardYamlReadOnly?: boolean;
+  onConsoleAddPanel?: () => void;
+  onConsoleOpenYaml?: () => void;
+  consoleYamlReadOnly?: boolean;
 };
 
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
@@ -38,35 +38,33 @@ export const RightSideControls = memo(function RightSideControls(props: RightSid
 
 function EditModeButtons({
   canvasEditControls,
-  dashboardEditControls,
+  consoleEditControls,
   onSidebarOpen,
   onAddNote,
   onYamlOpen,
-  onDashboardAddPanel,
-  onDashboardOpenYaml,
-  dashboardYamlReadOnly,
+  onConsoleAddPanel,
+  onConsoleOpenYaml,
+  consoleYamlReadOnly,
 }: RightSideControlsProps) {
-  if (dashboardEditControls) {
+  if (consoleEditControls) {
     return (
       <>
-        {onDashboardAddPanel ? (
+        {onConsoleAddPanel ? (
           <ControlButton
             tooltip="Add Panel"
-            onClick={onDashboardAddPanel}
-            testId="dashboard-add-panel"
+            onClick={onConsoleAddPanel}
+            testId="console-add-panel"
             icon={<Plus className="h-3.5 w-3.5" />}
           />
         ) : null}
-        {onDashboardOpenYaml ? (
+        {onConsoleOpenYaml ? (
           <ControlButton
             tooltip={
-              dashboardYamlReadOnly
-                ? "View the console as YAML"
-                : "View, copy, download, or import this console as YAML"
+              consoleYamlReadOnly ? "View the console as YAML" : "View, copy, download, or import this console as YAML"
             }
-            onClick={onDashboardOpenYaml}
-            testId="dashboard-yaml-button"
-            ariaLabel={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
+            onClick={onConsoleOpenYaml}
+            testId="console-yaml-button"
+            ariaLabel={consoleYamlReadOnly ? "View YAML" : "View / Import YAML"}
             icon={<FileCode className="h-3.5 w-3.5" />}
           />
         ) : null}
