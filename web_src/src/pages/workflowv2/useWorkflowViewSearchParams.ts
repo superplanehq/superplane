@@ -7,7 +7,7 @@ import type { SetURLSearchParams } from "react-router-dom";
  * in-flight links) and silently rewritten to the canonical `console` value.
  */
 const CONSOLE_VIEW = "console";
-const LEGACY_CONSOLE_VIEW = "dashboard";
+const LEGACY_CONSOLE_VIEW = "console";
 
 function isConsoleView(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
@@ -18,11 +18,11 @@ function isConsoleView(view: string): boolean {
  */
 export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSearchParams: SetURLSearchParams) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
-  const [isDashboardMode, setIsDashboardMode] = useState(() => isConsoleView(searchParams.get("view") ?? ""));
+  const [isConsoleMode, setIsConsoleMode] = useState(() => isConsoleView(searchParams.get("view") ?? ""));
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
   const [isFilesMode, setIsFilesMode] = useState(() => searchParams.get("view") === "files");
-  const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
-  const [isDashboardYamlOpen, setIsDashboardYamlOpen] = useState(false);
+  const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
+  const [isConsoleYamlOpen, setIsConsoleYamlOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
 
   const viewParam = searchParams.get("view") ?? "";
@@ -37,7 +37,7 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
     setIsMemoryMode(viewParam === "memory");
     setIsFilesMode(viewParam === "files");
     if (consoleViewActive) {
-      setIsDashboardMode(true);
+      setIsConsoleMode(true);
       // Migrate legacy `?view=dashboard` to the canonical `?view=console`
       // in-place so the address bar and any future link sharing reflect
       // the renamed feature without breaking existing bookmarks.
@@ -55,28 +55,28 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
         );
       }
     } else {
-      setIsDashboardMode(false);
+      setIsConsoleMode(false);
     }
     setSelectedRunId(runParam || null);
     if (!consoleViewActive) {
-      setIsDashboardAddPanelOpen(false);
-      setIsDashboardYamlOpen(false);
+      setIsConsoleAddPanelOpen(false);
+      setIsConsoleYamlOpen(false);
     }
   }, [viewParam, runParam, consoleViewActive]);
 
   return {
     isRunsMode,
     setIsRunsMode,
-    isDashboardMode,
-    setIsDashboardMode,
+    isConsoleMode,
+    setIsConsoleMode,
     isMemoryMode,
     setIsMemoryMode,
     isFilesMode,
     setIsFilesMode,
-    isDashboardAddPanelOpen,
-    setIsDashboardAddPanelOpen,
-    isDashboardYamlOpen,
-    setIsDashboardYamlOpen,
+    isConsoleAddPanelOpen,
+    setIsConsoleAddPanelOpen,
+    isConsoleYamlOpen,
+    setIsConsoleYamlOpen,
     selectedRunId,
     setSelectedRunId,
   };

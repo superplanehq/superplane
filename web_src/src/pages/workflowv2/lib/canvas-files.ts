@@ -1,15 +1,15 @@
-import type { DashboardLayoutItem, DashboardPanel } from "@/hooks/useCanvasData";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { dashboardToYaml } from "../dashboard/dashboardYaml";
+import { consoleToYaml } from "../console/consoleYaml";
 import type { WorkflowFile } from "../workflow-files-types";
 
-type DashboardPanelInput = {
+type ConsolePanelInput = {
   id?: string;
   type?: string;
   content?: unknown;
 };
 
-type DashboardLayoutInput = {
+type ConsoleLayoutInput = {
   i?: string;
   x?: number;
   y?: number;
@@ -33,14 +33,14 @@ export function buildWorkflowFiles({
   consoleError,
 }: {
   canvasYamlPayload: CanvasYamlPayload;
-  panels: DashboardPanelInput[] | undefined;
-  layout: DashboardLayoutInput[] | undefined;
+  panels: ConsolePanelInput[] | undefined;
+  layout: ConsoleLayoutInput[] | undefined;
   canvasId: string | null | undefined;
   canvasName: string | undefined;
   consoleLoading: boolean;
   consoleError: unknown;
 }): WorkflowFile[] {
-  const consoleYamlText = dashboardToYaml({
+  const consoleYamlText = consoleToYaml({
     panels: normalizePanels(panels),
     layout: normalizeLayout(layout),
     canvasId: canvasId || undefined,
@@ -64,7 +64,7 @@ export function buildWorkflowFiles({
   ];
 }
 
-function normalizePanels(panels: DashboardPanelInput[] | undefined): DashboardPanel[] {
+function normalizePanels(panels: ConsolePanelInput[] | undefined): ConsolePanel[] {
   return (panels || []).map((panel) => ({
     id: panel.id || "",
     type: panel.type || "markdown",
@@ -72,7 +72,7 @@ function normalizePanels(panels: DashboardPanelInput[] | undefined): DashboardPa
   }));
 }
 
-function normalizeLayout(layout: DashboardLayoutInput[] | undefined): DashboardLayoutItem[] {
+function normalizeLayout(layout: ConsoleLayoutInput[] | undefined): ConsoleLayoutItem[] {
   return (layout || []).map((item) => ({
     i: item.i || "",
     x: item.x || 0,

@@ -30,7 +30,7 @@ const (
 )
 
 // AllowedConsolePanelTypes lists the panel `type` values accepted on import.
-// Keep this list in lockstep with `web_src/src/pages/workflowv2/dashboard/panelTypes.ts`
+// Keep this list in lockstep with `web_src/src/pages/workflowv2/console/panelTypes.ts`
 // — the frontend validators and per-type form editors rely on the same set.
 var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeMarkdown,
@@ -637,7 +637,7 @@ var allowedSortOrders = []string{"asc", "desc"}
 // validateSort enforces the shape of the optional `render.sort` widget-level
 // sort spec. `field` is a non-empty string (literal path or `{{ expr }}`),
 // `order` is an optional asc/desc enum. Mirrors the frontend `validateSort`
-// in `web_src/src/pages/workflowv2/dashboard/panelTypes.ts`.
+// in `web_src/src/pages/workflowv2/console/panelTypes.ts`.
 func validateSort(panelID string, raw any) error {
 	if raw == nil {
 		return nil
