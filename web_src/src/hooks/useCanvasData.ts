@@ -33,8 +33,8 @@ import {
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
-  canvasesGetCanvasDashboard,
-  canvasesUpdateCanvasDashboard,
+  canvasesGetConsole,
+  canvasesUpdateConsole,
   canvasesGetCanvasRepository,
   canvasesListCanvasRepositoryFiles,
   canvasesCommitCanvasRepositoryFiles,
@@ -46,7 +46,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
-  CanvasesCanvasDashboard,
+  CanvasesConsole,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -1689,13 +1689,13 @@ export const useCanvasConsole = (canvasId: string, versionId: string | undefined
   return useQuery({
     queryKey: canvasKeys.dashboard(canvasId, versionId),
     queryFn: async () => {
-      const response = await canvasesGetCanvasDashboard(
+      const response = await canvasesGetConsole(
         withOrganizationHeader({
           path: { canvasId },
           query: versionId ? { versionId } : undefined,
         }),
       );
-      return response.data?.dashboard;
+      return response.data?.console;
     },
     enabled: enabled && !!canvasId,
     staleTime: 30_000,
@@ -1706,12 +1706,12 @@ type UseUpdateCanvasConsoleOptions = {
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
-function toCanvasDashboard(
+function toCanvasConsole(
   canvasId: string,
   versionId: string | undefined,
   input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] },
-  previous?: CanvasesCanvasDashboard,
-): CanvasesCanvasDashboard {
+  previous?: CanvasesConsole,
+): CanvasesConsole {
   return {
     ...previous,
     canvasId: previous?.canvasId ?? canvasId,
@@ -1743,14 +1743,14 @@ export const useUpdateCanvasConsole = (
     onMutate: async (input) => {
       const queryKey = canvasKeys.dashboard(canvasId, versionId);
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<CanvasesCanvasDashboard>(queryKey);
-      queryClient.setQueryData(queryKey, toCanvasDashboard(canvasId, versionId, input, previous));
+      const previous = queryClient.getQueryData<CanvasesConsole>(queryKey);
+      queryClient.setQueryData(queryKey, toCanvasConsole(canvasId, versionId, input, previous));
       return { previous, queryKey };
     },
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
       const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
       try {
-        const response = await canvasesUpdateCanvasDashboard(
+        const response = await canvasesUpdateConsole(
           withOrganizationHeader({
             path: { canvasId },
             body: {
@@ -1772,7 +1772,7 @@ export const useUpdateCanvasConsole = (
             },
           }),
         );
-        return response.data?.dashboard;
+        return response.data?.console;
       } catch (error) {
         releaseCanvasVersionUpdatedEcho?.();
         throw error;
