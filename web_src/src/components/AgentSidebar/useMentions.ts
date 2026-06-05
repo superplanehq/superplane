@@ -88,15 +88,12 @@ function detectTrigger(text: string, cursorPos: number): { active: boolean; filt
 function pruneMentions(text: string, mentions: InsertedMention[]): InsertedMention[] {
   return mentions.filter((m) => {
     const expected = `@${m.label}`;
-    if (text.slice(m.startIndex, m.startIndex + expected.length) === expected) {
-      return true;
-    }
-    return false;
+    return text.slice(m.startIndex, m.startIndex + expected.length) === expected;
   });
 }
 
 export function useMentions(): UseMentionsReturn {
-  const [value, setValue_] = useState("");
+  const [value, setRawValue] = useState("");
   const [cursorPos, setCursorPos] = useState(0);
   const [mentions, setMentions] = useState<InsertedMention[]>([]);
   const [dismissed, setDismissed] = useState(false);
@@ -113,7 +110,7 @@ export function useMentions(): UseMentionsReturn {
 
   // setValue that also prunes stale mentions
   const setValue = useCallback((v: string) => {
-    setValue_(v);
+    setRawValue(v);
     setMentions((prev) => pruneMentions(v, prev));
     setDismissed(false); // Reset dismiss on any text change
   }, []);
@@ -134,7 +131,7 @@ export function useMentions(): UseMentionsReturn {
       const newValue = before + displayText + " " + after;
       const newCursorPos = before.length + displayText.length + 1;
 
-      setValue_(newValue);
+      setRawValue(newValue);
       setCursorPos(newCursorPos);
       setDismissed(false);
 
@@ -178,7 +175,7 @@ export function useMentions(): UseMentionsReturn {
 
   const restore = useCallback(() => {
     if (snapshotRef.current) {
-      setValue_(snapshotRef.current.value);
+      setRawValue(snapshotRef.current.value);
       setCursorPos(snapshotRef.current.value.length);
       setMentions(snapshotRef.current.mentions);
       snapshotRef.current = null;
@@ -186,7 +183,7 @@ export function useMentions(): UseMentionsReturn {
   }, []);
 
   const clear = useCallback(() => {
-    setValue_("");
+    setRawValue("");
     setCursorPos(0);
     setMentions([]);
     setDismissed(false);

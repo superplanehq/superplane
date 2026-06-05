@@ -204,7 +204,7 @@ function ChatConversation({
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposerWithMentions
+      <ComposerWithCanvasData
         canvasId={canvasId}
         organizationId={organizationId}
         onSend={handlers.handleSend}
@@ -414,7 +414,7 @@ function DraftActionsBar({
   );
 }
 
-function ChatComposerWithMentions({
+function ComposerWithCanvasData({
   canvasId,
   organizationId,
   ...composerProps

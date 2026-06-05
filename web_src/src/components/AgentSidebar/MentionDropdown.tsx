@@ -124,8 +124,6 @@ export function MentionDropdown({
     zIndex: 50,
   };
 
-  let globalIndex = 0;
-
   return createPortal(
     <div style={style} className="rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden">
       <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
@@ -134,8 +132,8 @@ export function MentionDropdown({
             {runs.length > 0 && (
               <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">Nodes</div>
             )}
-            {nodes.map((item) => {
-              const idx = globalIndex++;
+            {nodes.map((item, nodeIndex) => {
+              const idx = nodeIndex;
               return (
                 <button
                   key={`node-${item.id}`}
@@ -166,8 +164,8 @@ export function MentionDropdown({
                 Recent Runs
               </div>
             )}
-            {runs.map((item) => {
-              const idx = globalIndex++;
+            {runs.map((item, runIndex) => {
+              const idx = nodes.length + runIndex;
               return (
                 <button
                   key={`run-${item.id}`}
@@ -189,8 +187,8 @@ export function MentionDropdown({
                 </button>
               );
             })}
-          </>
-        )}
+          </>)
+        }
       </div>
     </div>,
     document.body,
