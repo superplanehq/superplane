@@ -32,6 +32,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
+  <LinkCard title="Monitoring • Create Alerting Policy" href="#monitoring-•-create-alerting-policy" description="Create a Cloud Monitoring alerting policy that triggers when a Compute Engine instance metric crosses a threshold" />
+  <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's threshold, state, or notifications" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
@@ -946,6 +950,220 @@ Returns the instance state after the operation completes:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.power.power_off"
+}
+```
+
+<a id="monitoring-•-create-alerting-policy"></a>
+
+## Monitoring • Create Alerting Policy
+
+**Component key:** `gcp.monitoring.createAlertingPolicy`
+
+The Create Alerting Policy component creates a Cloud Monitoring alerting policy that fires when a Compute Engine instance metric crosses a threshold for a sustained duration.
+
+### Use Cases
+
+- **Capacity management**: Alert when CPU utilization stays above a safe operating level
+- **Performance monitoring**: Detect network or disk throughput saturation
+- **Automated workflows**: React to instance metric breaches downstream
+
+### Configuration
+
+- **Display Name**: Human-readable name for the policy (required)
+- **Metric**: The Compute Engine instance metric to monitor — CPU utilization, network, or disk (required)
+- **Comparison**: Fire when the value is above or below the threshold (required)
+- **Threshold**: The numeric threshold (required). For CPU utilization this is a fraction (e.g. `0.8` = 80%)
+- **Duration**: How long the condition must hold before firing (required)
+- **Notification Channels**: Existing Cloud Monitoring notification channels to alert (optional)
+- **Enabled**: Whether the policy is active (default: true)
+- **Documentation**: Markdown shown in notifications when the policy fires (optional)
+
+### Output
+
+Returns the created policy:
+- **name**: Full resource name (`projects/<project>/alertPolicies/<id>`) for use in Get/Update/Delete
+- **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
+- **comparison**, **thresholdValue**, **duration**, **filter**: the condition that was created
+
+### Important Notes
+
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- The policy monitors the metric across **all** Compute Engine instances in the project
+- Without notification channels the policy still fires but only surfaces in the Cloud Monitoring console
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.created"
+}
+```
+
+<a id="monitoring-•-delete-alerting-policy"></a>
+
+## Monitoring • Delete Alerting Policy
+
+**Component key:** `gcp.monitoring.deleteAlertingPolicy`
+
+The Delete Alerting Policy component permanently deletes a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Cleanup**: Remove policies for decommissioned services
+- **Environment teardown**: Delete alerting as part of tearing down ephemeral environments
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the deleted policy reference:
+- **name**: The resource name that was deleted
+- **id**: The policy ID
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.deleted"
+}
+```
+
+<a id="monitoring-•-get-alerting-policy"></a>
+
+## Monitoring • Get Alerting Policy
+
+**Component key:** `gcp.monitoring.getAlertingPolicy`
+
+The Get Alerting Policy component reads the configuration and state of a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Auditing**: Inspect a policy's threshold, comparison, and enabled state
+- **Conditional workflows**: Branch on whether a policy is enabled or how it's configured
+- **Chaining**: Read a policy created upstream before updating or deleting it
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the policy:
+- **name**, **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
+- **comparison**, **thresholdValue**, **duration**, **filter**: the first condition's threshold
+- **notificationChannels**: attached channels (when any)
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask a problem
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.fetched"
+}
+```
+
+<a id="monitoring-•-update-alerting-policy"></a>
+
+## Monitoring • Update Alerting Policy
+
+**Component key:** `gcp.monitoring.updateAlertingPolicy`
+
+The Update Alerting Policy component modifies an existing Cloud Monitoring alerting policy in place. Only the fields you set are changed (sent as an update mask).
+
+### Use Cases
+
+- **Threshold tuning**: Adjust the threshold as baselines change
+- **Enable/disable**: Toggle a policy on or off during maintenance windows
+- **Notification changes**: Re-point a policy at different notification channels
+
+### Configuration
+
+- **Alerting Policy**: The policy to update (required, supports expressions)
+- **Display Name**: New name (optional)
+- **Metric / Comparison / Threshold / Duration**: Set the **Metric** to rebuild the alert condition. When changing the condition, all four are used together.
+- **Enabled**: Enable, disable, or leave unchanged
+- **Notification Channels**: Replace the policy's notification channels (optional)
+- **Documentation**: New markdown documentation (optional)
+
+### Output
+
+Returns the updated policy:
+- **name**, **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
+- **comparison**, **thresholdValue**, **duration**, **filter**: the resulting condition
+
+### Important Notes
+
+- At least one field must be provided
+- Changing the **Metric** replaces the policy's condition(s) with a single new threshold condition
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": false,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "thresholdValue": 0.9
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.updated"
 }
 ```
 
