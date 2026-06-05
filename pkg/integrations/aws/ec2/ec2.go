@@ -35,7 +35,29 @@ const (
 	ManageInstancePowerHibernatePayloadType = "aws.ec2.instance.power.hibernated"
 	UpdateInstancePayloadType               = "aws.ec2.instance.updated"
 
+	CreateLoadBalancerPayloadType = "aws.ec2.loadBalancer"
+	DeleteLoadBalancerPayloadType = "aws.ec2.loadBalancer.deleted"
+
 	instancePollInterval    = 10 * time.Second
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
+
+	loadBalancerPollInterval    = 15 * time.Second
+	maxLoadBalancerPollErrors   = 10
+	maxLoadBalancerPollAttempts = 120
+)
+
+const (
+	LoadBalancerStateProvisioning   = "provisioning"
+	LoadBalancerStateActive         = "active"
+	LoadBalancerStateActiveImpaired = "active_impaired"
+	LoadBalancerStateFailed         = "failed"
+	LoadBalancerStateDeleting       = "deleting"
+
+	LoadBalancerTypeApplication = "application"
+	LoadBalancerTypeNetwork     = "network"
+	LoadBalancerTypeGateway     = "gateway"
+
+	LoadBalancerSchemeInternetFacing = "internet-facing"
+	LoadBalancerSchemeInternal       = "internal"
 )
