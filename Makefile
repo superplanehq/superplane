@@ -3,6 +3,15 @@ DOCKER_SERVICES := fleet-manager task-broker runner
 # Local dev defaults (override on the command line)
 LOCAL_TMP ?= /tmp
 LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable
+
+# Run integration tests that require Postgres.
+# Starts a DB via docker compose, waits for it, runs tests, then tears down.
+.PHONY: test-integration
+test-integration:
+	docker compose up -d db
+	TEST_DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) go test ./task-broker/... ./runner/... ./shared/... -count=1
+	docker compose stop db
+
 LOCAL_BROKER_LISTEN ?= :8081
 LOCAL_BROKER_URL ?= http://127.0.0.1:8081
 LOCAL_STACK_AUTH_TOKEN ?= dev-local-token
