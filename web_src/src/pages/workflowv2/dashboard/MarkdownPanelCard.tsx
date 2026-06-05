@@ -56,8 +56,10 @@ export function MarkdownPanelCard({
   const canvasId = ctx?.canvasId ?? "";
   // Resolve persisted variables for the read-only / display path. The editor
   // re-resolves the draft variables on its own so the preview stays in lockstep
-  // with whatever the user just typed.
-  const { vars: displayVars } = useMarkdownVariables(canvasId, variables, body);
+  // with whatever the user just typed. Title + body are both interpolated, so
+  // we pass both for the run-node side-load gate.
+  const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
+  const { vars: displayVars } = useMarkdownVariables(canvasId, variables, textForSideload);
   const displayTitle = useMemo(() => {
     const interpolated = interpolateMarkdownTemplate(persistedTitle, displayVars).trim();
     return interpolated || persistedTitle.trim() || panel.id;

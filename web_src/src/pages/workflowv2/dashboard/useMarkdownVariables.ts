@@ -46,9 +46,10 @@ export interface MarkdownVariablesResult {
 }
 
 /**
- * Whether the (compiled) body text contains a `$["..."]` reference. Used to
- * gate the per-run execution side-load: when no body references run node
- * outputs we skip the extra round-trip per latest-run lookup.
+ * Whether the (compiled) template text contains a `$["..."]` reference. Used
+ * to gate the per-run execution side-load: when no interpolated text (title or
+ * body) references run node outputs we skip the extra round-trip per
+ * latest-run lookup.
  *
  * Mirrors `RUN_NODE_REF_RE` in `useWidgetData.ts` — we check `$[` rather than
  * a bare `$` so currency literals like `prefix: "R$"` don't trigger the
@@ -74,9 +75,10 @@ const RUN_NODE_REF_RE = /\$\s*\[/;
  *    `results` filter (or none for `latest`) and takes the first run from
  *    the first page. Run values are enriched with the same `$` map the
  *    table widget builds, so authors can write `{{ run.$["Deploy"].data.x }}`.
- *    The per-node execution side-load only happens when the resolved body
- *    actually references `$[` — pass the panel body via `bodyForRunSideload`
- *    so the hook can skip the extra request when no template needs it.
+ *    The per-node execution side-load only happens when the interpolated text
+ *    actually references `$[` — pass the panel text (title + body, since both
+ *    are interpolated) via `textForRunSideload` so the hook can skip the extra
+ *    request when no template needs it.
  *
  * The hook is intentionally hook-stable: it issues a fixed set of queries
  * (one memory query and up to three run queries, deduped by select) so it
@@ -85,7 +87,7 @@ const RUN_NODE_REF_RE = /\$\s*\[/;
 export function useMarkdownVariables(
   canvasId: string,
   variables: MarkdownVariable[] | undefined,
-  bodyForRunSideload: string | undefined,
+  textForRunSideload: string | undefined,
 ): MarkdownVariablesResult {
   const ctx = useDashboardContext();
   const list = useMemo(() => variables ?? [], [variables]);
@@ -103,9 +105,9 @@ export function useMarkdownVariables(
   const failedQuery = useInfiniteCanvasRuns(canvasId, { results: ["RESULT_FAILED"] }, wantLatestFailed);
 
   const needsRunSideload = useMemo(() => {
-    if (!bodyForRunSideload) return false;
-    return RUN_NODE_REF_RE.test(bodyForRunSideload);
-  }, [bodyForRunSideload]);
+    if (!textForRunSideload) return false;
+    return RUN_NODE_REF_RE.test(textForRunSideload);
+  }, [textForRunSideload]);
 
   const latestRunsData = latestQuery.data as RunsQueryData | undefined;
   const passedRunsData = passedQuery.data as RunsQueryData | undefined;
@@ -147,6 +149,7 @@ export function useMarkdownVariables(
   }, [runRootEventIds, runExecutionQueries]);
 
   const memoryEntries = useMemo(() => memoryQuery.data ?? [], [memoryQuery.data]);
+  const memoryLoading = hasMemoryVar && memoryQuery.isLoading;
   const nodeNameById = useMemo(() => buildNodeNameMap(ctx?.nodes), [ctx?.nodes]);
 
   const { vars, errors } = useMemo(() => {
@@ -156,6 +159,7 @@ export function useMarkdownVariables(
       if (!variable?.name || !variable?.source) continue;
       const resolved = resolveVariable(variable, {
         memoryEntries,
+        memoryLoading,
         latestQuery,
         passedQuery,
         failedQuery,
@@ -166,7 +170,16 @@ export function useMarkdownVariables(
       if (resolved.error) errs.push({ name: variable.name, message: resolved.error });
     }
     return { vars: out, errors: errs };
-  }, [list, memoryEntries, latestQuery, passedQuery, failedQuery, executionsByRootEventId, nodeNameById]);
+  }, [
+    list,
+    memoryEntries,
+    memoryLoading,
+    latestQuery,
+    passedQuery,
+    failedQuery,
+    executionsByRootEventId,
+    nodeNameById,
+  ]);
 
   const isLoading =
     (hasMemoryVar && memoryQuery.isLoading) ||
@@ -198,6 +211,7 @@ function collectFirstRunRootEventIds(candidates: Array<RunsQueryData | undefined
 
 interface ResolveContext {
   memoryEntries: CanvasMemoryEntry[];
+  memoryLoading: boolean;
   latestQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
   passedQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
   failedQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
@@ -208,7 +222,7 @@ interface ResolveContext {
 /** Resolve a single variable to a `{ value, error? }` pair. */
 function resolveVariable(variable: MarkdownVariable, ctx: ResolveContext): { value: unknown; error?: string } {
   if (variable.source.kind === "memory") {
-    return resolveMemoryVariable(ctx.memoryEntries, variable.source);
+    return resolveMemoryVariable(ctx.memoryEntries, variable.source, ctx.memoryLoading);
   }
   return resolveRunVariable(variable.source, ctx);
 }
@@ -284,10 +298,16 @@ function noRunFoundMessage(select: MarkdownRunVariableSource["select"]): string 
  * `value: null` and a human-readable error string when no row matches so the
  * editor preview can surface a clear empty state without crashing the
  * markdown render.
+ *
+ * While the canvas memory query is still in flight (`loading`) we suppress the
+ * "no rows" error and return `value: null` so the editor preview doesn't flash
+ * a false empty state before the fetch settles — mirroring how run variables
+ * wait on their query's `isLoading`.
  */
 function resolveMemoryVariable(
   entries: CanvasMemoryEntry[],
   source: MarkdownMemoryVariableSource,
+  loading: boolean,
 ): { value: unknown; error?: string } {
   const namespace = source.namespace?.trim();
   if (!namespace) {
@@ -295,6 +315,7 @@ function resolveMemoryVariable(
   }
   const filtered = entries.filter((entry) => entry.namespace === namespace);
   if (filtered.length === 0) {
+    if (loading) return { value: null };
     return { value: null, error: `No memory rows in namespace ${JSON.stringify(namespace)}.` };
   }
   const rows = filtered.map(memoryEntryToRow);

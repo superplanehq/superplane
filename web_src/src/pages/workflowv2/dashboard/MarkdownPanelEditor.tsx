@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -59,9 +59,11 @@ export function MarkdownPanelEditor(props: {
   };
 
   // Resolve the draft variables against live data so the inline preview
-  // mirrors what the saved panel will show. We pass the draft body so the
-  // hook only side-loads run node executions when the body references `$[`.
-  const { vars: previewVars, errors, isLoading } = useMarkdownVariables(canvasId, draftVariables, draftBody);
+  // mirrors what the saved panel will show. We pass the draft title + body so
+  // the hook only side-loads run node executions when either references `$[`
+  // (both are interpolated with the same variables).
+  const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
+  const { vars: previewVars, errors, isLoading } = useMarkdownVariables(canvasId, draftVariables, textForSideload);
 
   // Preview is collapsible — when collapsed the textarea reclaims the freed
   // vertical space, useful on shorter panel cards.
