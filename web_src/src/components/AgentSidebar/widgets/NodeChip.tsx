@@ -15,7 +15,7 @@ import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
  * Search "iconSlug:" under web_src/src/pages/workflowv2/mappers when adding new built-in
  * components here.
  */
-const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
+export const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
   noop: "circle-off",
   display: "monitor",
   addMemory: "database",

@@ -129,11 +129,17 @@ func TestAgentE2E(t *testing.T) {
 		})
 	})
 
-	t.Run("starts outcome-based building from a rubric response", func(t *testing.T) {
+	t.Run("starts building from a rubric response", func(t *testing.T) {
+		var approvalReceived bool
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
 			if isAgentSystemMessage(call.Message) {
 				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
+			}
+
+			if call.Message == "Specs approved. Start building." {
+				approvalReceived = true
+				return agentAssistantTurn("Building now."), nil
 			}
 
 			return agentAssistantTurn(strings.Join([]string{
@@ -145,33 +151,14 @@ func TestAgentE2E(t *testing.T) {
 				":::",
 			}, "\n")), nil
 		})
-		ctx.AgentProvider.SetDefineOutcomeEvents(
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-start-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluationStart,
-				OutcomeResult:   &agents.OutcomeEvaluation{Iteration: 1},
-			},
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-end-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluation,
-				OutcomeResult: &agents.OutcomeEvaluation{
-					Iteration:   1,
-					Result:      "satisfied",
-					Explanation: "all criteria satisfied",
-				},
-			},
-			agentTurnCompletedEvent(),
-		)
 
 		steps.start()
 		steps.openAgent()
-		steps.switchToAskMode()
 		steps.sendMessage("Create a build plan")
 		steps.assertText("E2E Build Plan")
 		steps.startBuildingFromRubric()
-		steps.assertDefineOutcomeSent()
-		steps.assertVisible(q.TestID("outcome-progress"))
-		steps.assertText("Complete")
+		steps.assertText("Building now.")
+		assert.True(t, approvalReceived, "expected 'Specs approved. Start building.' message")
 	})
 }
 

@@ -29,7 +29,7 @@ func agentModeFromProto(mode pb.AgentMode) string {
 	case pb.AgentMode_MODE_BUILDER:
 		return string(agentservice.ModeBuilder)
 	case pb.AgentMode_MODE_ARCHITECT:
-		return string(agentservice.ModeArchitect)
+		return string(agentservice.ModeOperator)
 	default:
 		return string(agentservice.ModeOperator)
 	}
