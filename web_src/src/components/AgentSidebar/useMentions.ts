@@ -101,12 +101,21 @@ export function useMentions(): UseMentionsReturn {
 
   const trigger = useMemo(() => detectTrigger(value, cursorPos), [value, cursorPos]);
 
-  // Reset dismissed state when the trigger context changes (user types more)
+  // Check if the trigger position is inside an already-inserted mention
+  const triggerIsInsertedMention = useMemo(() => {
+    if (!trigger.active) return false;
+    return mentions.some((m) => {
+      const expected = `@${m.label}`;
+      return m.startIndex === trigger.start && value.slice(m.startIndex, m.startIndex + expected.length) === expected;
+    });
+  }, [trigger.active, trigger.start, mentions, value]);
+
   const showDropdown = useMemo(() => {
     if (!trigger.active) return false;
     if (dismissed) return false;
+    if (triggerIsInsertedMention) return false;
     return true;
-  }, [trigger.active, dismissed]);
+  }, [trigger.active, dismissed, triggerIsInsertedMention]);
 
   // setValue that also prunes stale mentions
   const setValue = useCallback((v: string) => {
@@ -187,7 +196,7 @@ export function useMentions(): UseMentionsReturn {
     setCursorPos(0);
     setMentions([]);
     setDismissed(false);
-    snapshotRef.current = null;
+    // Don't null snapshotRef here — restore() needs it if send fails
   }, []);
 
   return {

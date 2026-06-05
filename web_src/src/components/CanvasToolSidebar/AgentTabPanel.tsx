@@ -27,8 +27,6 @@ import {
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
-  buildRubricText,
-  createInitialOutcomeState,
   createWebsocketCallbacks,
   isOutcomeActive,
   statusLabel,
@@ -290,7 +288,7 @@ function useConversationHandlers({
   interruptMutation,
   sendMutation,
   setError,
-  setOutcomeState,
+  setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
   chatId: string;
@@ -337,41 +335,18 @@ function useConversationHandlers({
   );
 
   const handleStartBuilding = useCallback(
-    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      const rubricText = buildRubricText(rubric);
-      const { sendMutation: send, outcomeMutation: outcome } = mutationsRef.current;
+    async (_rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
+      const { sendMutation: send } = mutationsRef.current;
 
-      // In Build mode: rubric is a spec confirmation, not an outcome.
-      // Agent already has full context — just confirm.
-      if (agentMode === "builder") {
-        await send.mutateAsync({
-          chatId,
-          content: "Specs approved. Start building.",
-          mode: "builder",
-        });
-        return;
-      }
-
-      // In Plan mode: kick off outcome with grading loop
-      setOutcomeState(createInitialOutcomeState(rubric));
-
-      try {
-        await outcome.mutateAsync({
-          chatId,
-          description: `Build a canvas based on this plan: ${rubric.title}`,
-          rubric: rubricText,
-          maxIterations: 3,
-        });
-      } catch {
-        setOutcomeState(null);
-        await send.mutateAsync({
-          chatId,
-          content: `Start building based on this plan:\n\n${rubricText}`,
-          mode: "builder",
-        });
-      }
+      // Rubric is a spec confirmation — tell the agent to start building.
+      // Always use builder mode regardless of current agentMode.
+      await send.mutateAsync({
+        chatId,
+        content: "Specs approved. Start building.",
+        mode: "builder",
+      });
     },
-    [chatId, agentMode, setOutcomeState],
+    [chatId],
   );
 
   return useMemo(
