@@ -26,6 +26,10 @@ import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowS
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 import { validateNumberDataSource } from "./numberDataSourceValidation";
 import { validateNumberMetrics } from "./numberMetricsValidation";
+import { validateMarkdownVariables, type MarkdownVariable } from "./markdownVariables";
+
+// Re-export markdown-variable types so existing import paths keep working.
+export * from "./markdownVariables";
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "node", "nodes", "table", "chart", "number"] as const;
@@ -85,6 +89,8 @@ export function isPanelType(value: unknown): value is PanelType {
 export interface MarkdownPanelContent {
   title?: string;
   body?: string;
+  /** Named variables referenced from the markdown body via `{{ name.field }}`. */
+  variables?: MarkdownVariable[];
 }
 
 export interface NodePanelContent {
@@ -234,7 +240,7 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
   switch (type) {
     case "markdown":
-      return { title: defaultTitle ?? "", body: "" } satisfies MarkdownPanelContent;
+      return { title: defaultTitle ?? "", body: "", variables: [] } satisfies MarkdownPanelContent;
     case "node":
       return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
     case "nodes":
@@ -301,7 +307,7 @@ function validateMarkdownContent(content: unknown): string | null {
   if (obj.body !== undefined && obj.body !== null && typeof obj.body !== "string") {
     return "content.body must be a string.";
   }
-  return null;
+  return validateMarkdownVariables(obj.variables);
 }
 
 function validateNodeContent(content: unknown): string | null {
