@@ -1103,6 +1103,8 @@ message CanvasMemory {
   string namespace = 2;
   google.protobuf.Value values = 3;
   Source source = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 message ListCanvasMemoriesRequest {

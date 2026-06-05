@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -250,6 +251,17 @@ func validatePanelContent(panel ConsolePanel) error {
 	return nil
 }
 
+// markdownVariableNameRe mirrors the FE regex in `panelTypes.ts`. Variable
+// names must be valid CEL identifiers because the markdown body references
+// them inside `{{ }}` expressions.
+var markdownVariableNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// AllowedMarkdownRunSelects mirrors `MARKDOWN_RUN_SELECTS` on the FE.
+var AllowedMarkdownRunSelects = []string{"latest", "latest_passed", "latest_failed"}
+
+// AllowedMarkdownVariableDirections mirrors `MARKDOWN_VARIABLE_DIRECTIONS` on the FE.
+var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
+
 func validateMarkdownContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
@@ -263,6 +275,100 @@ func validateMarkdownContent(panel ConsolePanel) error {
 		if _, ok := rawBody.(string); !ok {
 			return fmt.Errorf("panel %q content.body must be a string", panel.ID)
 		}
+	}
+	if rawVars, ok := panel.Content["variables"]; ok && rawVars != nil {
+		if err := validateMarkdownVariables(panel.ID, rawVars); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateMarkdownVariables(panelID string, raw any) error {
+	list, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q content.variables must be an array", panelID)
+	}
+	names := make(map[string]struct{}, len(list))
+	for i, item := range list {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("panel %q content.variables[%d] must be an object", panelID, i)
+		}
+		name, ok := obj["name"].(string)
+		if !ok || !markdownVariableNameRe.MatchString(name) {
+			return fmt.Errorf("panel %q content.variables[%d].name must be a valid identifier (letters, digits, underscore; not starting with a digit)", panelID, i)
+		}
+		if _, exists := names[name]; exists {
+			return fmt.Errorf("panel %q content.variables[%d].name %q is duplicated", panelID, i, name)
+		}
+		names[name] = struct{}{}
+		if err := validateMarkdownVariableSource(panelID, i, obj["source"]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateMarkdownVariableSource(panelID string, index int, raw any) error {
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("panel %q content.variables[%d].source must be an object", panelID, index)
+	}
+	switch obj["kind"] {
+	case "memory":
+		return validateMarkdownMemorySource(panelID, index, obj)
+	case "run":
+		return validateMarkdownRunSource(panelID, index, obj)
+	default:
+		return fmt.Errorf("panel %q content.variables[%d].source.kind must be \"memory\" or \"run\"", panelID, index)
+	}
+}
+
+func validateMarkdownMemorySource(panelID string, index int, source map[string]any) error {
+	namespace, ok := source["namespace"].(string)
+	if !ok || strings.TrimSpace(namespace) == "" {
+		return fmt.Errorf("panel %q content.variables[%d].source.namespace must be a non-empty string", panelID, index)
+	}
+	if raw, ok := source["orderBy"]; ok && raw != nil {
+		if _, ok := raw.(string); !ok {
+			return fmt.Errorf("panel %q content.variables[%d].source.orderBy must be a string", panelID, index)
+		}
+	}
+	if raw, ok := source["direction"]; ok && raw != nil {
+		direction, ok := raw.(string)
+		if !ok || !slices.Contains(AllowedMarkdownVariableDirections, direction) {
+			return fmt.Errorf("panel %q content.variables[%d].source.direction must be \"asc\" or \"desc\"", panelID, index)
+		}
+	}
+	if raw, ok := source["matches"]; ok && raw != nil {
+		matches, ok := raw.([]any)
+		if !ok {
+			return fmt.Errorf("panel %q content.variables[%d].source.matches must be an array", panelID, index)
+		}
+		for j, m := range matches {
+			match, ok := m.(map[string]any)
+			if !ok {
+				return fmt.Errorf("panel %q content.variables[%d].source.matches[%d] must be an object", panelID, index, j)
+			}
+			field, ok := match["field"].(string)
+			if !ok || strings.TrimSpace(field) == "" {
+				return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].field must be a non-empty string", panelID, index, j)
+			}
+			if rawValue, ok := match["value"]; ok && rawValue != nil {
+				if _, ok := rawValue.(string); !ok {
+					return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].value must be a string", panelID, index, j)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateMarkdownRunSource(panelID string, index int, source map[string]any) error {
+	selectValue, ok := source["select"].(string)
+	if !ok || !slices.Contains(AllowedMarkdownRunSelects, selectValue) {
+		return fmt.Errorf("panel %q content.variables[%d].source.select must be one of %s", panelID, index, strings.Join(AllowedMarkdownRunSelects, ", "))
 	}
 	return nil
 }

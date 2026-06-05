@@ -1244,6 +1244,10 @@ export interface CanvasMemoryEntry {
   namespace: string;
   values: unknown;
   source: CanvasMemoryEntrySource;
+  /** Server timestamp the entry was first persisted. ISO-8601 string. */
+  createdAt?: string;
+  /** Server timestamp the entry was last updated. ISO-8601 string. */
+  updatedAt?: string;
 }
 
 function normalizeCanvasMemorySource(source: string | undefined): CanvasMemoryEntrySource {
@@ -1267,6 +1271,8 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
         namespace: item.namespace || "",
         values: item.values,
         source: normalizeCanvasMemorySource(item.source),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
       }));
     },
     refetchOnWindowFocus: false,

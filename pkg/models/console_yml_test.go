@@ -181,7 +181,160 @@ spec:
 	assert.Contains(t, err.Error(), "body")
 }
 
-func TestConsoleFromYML_RejectsTooManyPanels(t *testing.T) {
+func TestValidateMarkdownVariables_AcceptsValidShapes(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"body": "hello {{ recipe.title }}",
+			"variables": []any{
+				map[string]any{
+					"name": "recipe",
+					"source": map[string]any{
+						"kind":      "memory",
+						"namespace": "recipes",
+						"orderBy":   "createdAt",
+						"direction": "desc",
+						"matches": []any{
+							map[string]any{"field": "status", "value": "approved"},
+						},
+					},
+				},
+				map[string]any{
+					"name":   "lastRun",
+					"source": map[string]any{"kind": "run", "select": "latest"},
+				},
+				map[string]any{
+					"name":   "lastFailure",
+					"source": map[string]any{"kind": "run", "select": "latest_failed"},
+				},
+			},
+		},
+	}
+	assert.NoError(t, validateMarkdownContent(panel))
+}
+
+func TestValidateMarkdownVariables_RejectsBadName(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{
+					"name":   "1invalid",
+					"source": map[string]any{"kind": "run", "select": "latest"},
+				},
+			},
+		},
+	}
+	err := validateMarkdownContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "valid identifier")
+}
+
+func TestValidateMarkdownVariables_RejectsDuplicateName(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{"name": "dup", "source": map[string]any{"kind": "run", "select": "latest"}},
+				map[string]any{"name": "dup", "source": map[string]any{"kind": "run", "select": "latest_passed"}},
+			},
+		},
+	}
+	err := validateMarkdownContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicated")
+}
+
+func TestValidateMarkdownVariables_RejectsUnknownKind(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{"name": "bad", "source": map[string]any{"kind": "executions"}},
+			},
+		},
+	}
+	err := validateMarkdownContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "memory")
+}
+
+func TestValidateMarkdownVariables_RejectsUnknownRunSelect(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{"name": "bad", "source": map[string]any{"kind": "run", "select": "first"}},
+			},
+		},
+	}
+	err := validateMarkdownContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "latest")
+}
+
+func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeMarkdown,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{"name": "bad", "source": map[string]any{"kind": "memory", "namespace": ""}},
+			},
+		},
+	}
+	err := validateMarkdownContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "namespace")
+}
+
+func TestDashboardFromYML_AcceptsMarkdownVariables(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: panel-1
+      type: markdown
+      content:
+        body: |
+          Today: {{ recipe.title }} from {{ lastRun.status }}.
+        variables:
+          - name: recipe
+            source:
+              kind: memory
+              namespace: recipes
+              orderBy: createdAt
+              direction: desc
+              matches:
+                - field: status
+                  value: approved
+          - name: lastRun
+            source:
+              kind: run
+              select: latest
+  layout:
+    - i: panel-1
+      x: 0
+      y: 0
+      w: 6
+      h: 4
+`
+	resource, err := ConsoleFromYML([]byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, resource.Spec.Panels, 1)
+	content := resource.Spec.Panels[0].Content
+	variables, ok := content["variables"].([]any)
+	require.True(t, ok)
+	require.Len(t, variables, 2)
+}
+
+func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
 	for i := 0; i < MaxConsolePanels+1; i++ {
