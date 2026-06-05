@@ -16,7 +16,7 @@ import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
-import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
+import { getComponentBaseMapper, getExecutionDetails, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
@@ -990,14 +990,20 @@ export function buildTabData(
   // Extract tab data from execution
   const tabData: TabData = {};
 
-  // Current tab: use outputs if available and non-empty, otherwise use metadata
-  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-  const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
-  const flattened = flattenObject(dataSource);
+  let currentData: Record<string, unknown> = {};
+  const componentName = typeof node.component === "string" ? node.component : undefined;
+  if (componentName) {
+    const customDetails = getExecutionDetails(componentName, execution, node, workflowNodes);
+    if (customDetails && Object.keys(customDetails).length > 0) {
+      currentData = { ...customDetails };
+    }
+  }
 
-  const currentData = {
-    ...flattened,
-  };
+  if (Object.keys(currentData).length === 0) {
+    const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+    const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
+    currentData = { ...flattenObject(dataSource) };
+  }
 
   // Filter out undefined and empty values
   tabData.current = Object.fromEntries(

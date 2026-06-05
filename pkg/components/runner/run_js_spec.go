@@ -7,10 +7,12 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// RunJSSpec is persisted runner.runJS node configuration.
+// RunJSSpec is persisted runnerJS node configuration.
 type RunJSSpec struct {
 	MachineType             string                `mapstructure:"machine_type"`
 	Script                  string                `mapstructure:"script"`
+	EnableSetupCommands     bool                  `mapstructure:"enable_setup_commands"`
+	SetupCommands           string                `mapstructure:"setup_commands"`
 	Environment             []EnvironmentVariable `mapstructure:"environment"`
 	ExecutionMode           string                `mapstructure:"execution_mode"`
 	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
@@ -25,10 +27,10 @@ func decodeRunJSSpec(raw any) (RunJSSpec, error) {
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
-		return RunJSSpec{}, fmt.Errorf("runner.runJS spec decoder: %w", err)
+		return RunJSSpec{}, fmt.Errorf("runnerJS spec decoder: %w", err)
 	}
 	if err := dec.Decode(raw); err != nil {
-		return RunJSSpec{}, fmt.Errorf("decode runner.runJS configuration: %w", err)
+		return RunJSSpec{}, fmt.Errorf("decode runnerJS configuration: %w", err)
 	}
 	applyRunJSSpecDefaults(&spec)
 	return spec, nil
@@ -68,6 +70,12 @@ func validateRunJSSpec(spec RunJSSpec) error {
 
 	if err := validateEnvironment(spec.Environment); err != nil {
 		return err
+	}
+
+	if spec.EnableSetupCommands {
+		if err := validateCommands(spec.SetupCommands); err != nil {
+			return fmt.Errorf("setup commands: %w", err)
+		}
 	}
 
 	if strings.TrimSpace(spec.MachineType) == "" {

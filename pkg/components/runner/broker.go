@@ -89,6 +89,7 @@ type brokerCreateTaskRequest struct {
 	Script                  string                      `json:"script,omitempty"`
 	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
 	Commands                []string                    `json:"commands,omitempty"`
+	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
@@ -111,6 +112,7 @@ type CreateTaskParams struct {
 	Script         string
 	MessageChain   json.RawMessage
 	Commands       []string
+	SetupCommands  []string
 	WebhookURL     string
 	Environment    []BrokerEnvironmentVariable
 	ExecutionMode  string
@@ -139,6 +141,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		Script:        strings.TrimSpace(p.Script),
 		MessageChain:  p.MessageChain,
 		Commands:      p.Commands,
+		SetupCommands: p.SetupCommands,
 		Environment:   p.Environment,
 		WebhookURL:    p.WebhookURL,
 		ExecutionMode: mode,

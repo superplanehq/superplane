@@ -37,7 +37,7 @@ var dockerImageCustomOnly = []configuration.VisibilityCondition{
 }
 
 func (c *Runner) Name() string  { return "runner" }
-func (c *Runner) Label() string { return "Runner" }
+func (c *Runner) Label() string { return "Run Shell Commands" }
 func (c *Runner) Icon() string  { return "terminal" }
 func (c *Runner) Color() string { return "blue" }
 

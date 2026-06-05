@@ -282,7 +282,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   graphql: graphqlMapper,
   ssh: sshMapper,
   runner: runnerMapper,
-  "runner.runJS": runnerMapper,
+  runnerJS: runnerMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
@@ -437,7 +437,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   graphql: GRAPHQL_STATE_REGISTRY,
   ssh: SSH_STATE_REGISTRY,
   runner: RUNNER_STATE_REGISTRY,
-  "runner.runJS": RUNNER_STATE_REGISTRY,
+  runnerJS: RUNNER_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
@@ -503,9 +503,14 @@ export function getComponentBaseMapper(name: string): ComponentBaseMapper {
  * Falls back to the default state registry if no specific registry is registered.
  */
 export function getEventStateRegistry(name: string): EventStateRegistry {
+  const direct = eventStateRegistries[name];
+  if (direct) {
+    return direct;
+  }
+
   const parts = name.split(".");
   if (parts.length === 1) {
-    return eventStateRegistries[name] || DEFAULT_STATE_REGISTRY;
+    return DEFAULT_STATE_REGISTRY;
   }
 
   const appName = parts[0];
@@ -580,13 +585,18 @@ export function getExecutionDetails(
 }
 
 function findRegisteredComponentMapper(name: string): ComponentBaseMapper | undefined {
-  const parts = name?.split(".");
-  if (!parts?.length) {
+  if (!name) {
     return undefined;
   }
 
+  const direct = componentBaseMappers[name];
+  if (direct) {
+    return direct;
+  }
+
+  const parts = name.split(".");
   if (parts.length === 1) {
-    return componentBaseMappers[name];
+    return undefined;
   }
 
   const appMapper = appMappers[parts[0]];

@@ -31,6 +31,19 @@ func TestValidateConfigurationRunJSScriptDefault(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateConfigurationRunJSSetupCommands(t *testing.T) {
+	t.Parallel()
+
+	r := &RunJS{}
+	err := configuration.ValidateConfiguration(r.Configuration(), map[string]any{
+		"machine_type":          testRunnerMachineType,
+		"script":                defaultRunJSScript,
+		"enable_setup_commands": true,
+		"setup_commands":        "npm ci",
+	})
+	require.NoError(t, err)
+}
+
 func TestValidateConfigurationRunJSDockerDefaults(t *testing.T) {
 	t.Parallel()
 

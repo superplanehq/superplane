@@ -68,8 +68,57 @@ func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
 	assert.Equal(t, RunModeJavaScript, req.RunMode)
 	assert.Contains(t, req.Script, "function main()")
 	assert.NotContains(t, string(body), `"commands"`)
+	assert.Empty(t, req.SetupCommands)
 	require.True(t, json.Valid(req.MessageChain))
 	assert.Contains(t, string(req.MessageChain), "GitHub PR")
+}
+
+func TestRunJSExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-js-setup-1"}`))},
+		},
+	}
+
+	component := &RunJS{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machine_type":          testRunnerMachineType,
+			"enable_setup_commands": true,
+			"setup_commands":        "npm ci\necho ready",
+			"script":                "function main() { return { ok: true }; }",
+		},
+		HTTP:           httpContext,
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+		Expressions:    &stubMessageChainBuilder{chain: map[string]any{}},
+	})
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+
+	assert.Equal(t, []string{"npm ci", "echo ready"}, req.SetupCommands)
+}
+
+func TestValidateRunJSSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	spec := RunJSSpec{
+		MachineType:         testRunnerMachineType,
+		Script:              "function main() { return 1; }",
+		EnableSetupCommands: true,
+		SetupCommands:       "   \n  ",
+	}
+	require.Error(t, validateRunJSSpec(spec))
 }
 
 func TestValidateRunJSSpec(t *testing.T) {

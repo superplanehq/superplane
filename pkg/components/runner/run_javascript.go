@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	RunJSComponentName       = "runner.runJS"
-	RunJSFinishedEventType   = "runner.runJS.finished"
+	RunJSComponentName       = "runnerJS"
+	RunJSFinishedEventType   = "runnerJS.finished"
 	runJSDefaultDockerPreset = "node:22-bookworm"
 	defaultRunJSScript       = "function main() {\n  const hostname = process.env.HOST;\n  return { hello: \"from \" + hostname };\n}"
 )
@@ -74,12 +74,17 @@ function main() {
 - **Container base image**: Defaults to a Node.js image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Script**: JavaScript source executed by Node.js.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
 - **Environment variables**: Optional key/value pairs available during execution.
 
 ## Output channels
 - **Passed**: The script finished with exit code **0**.
 - **Failed**: The script finished with non-zero exit code.
 `
+}
+
+var setupCommandsEnabledOnly = []configuration.VisibilityCondition{
+	{Field: "enable_setup_commands", Values: []string{"true"}},
 }
 
 func (c *RunJS) Configuration() []configuration.Field {
@@ -155,6 +160,26 @@ func (c *RunJS) Configuration() []configuration.Field {
 				String: &configuration.StringTypeOptions{
 					MaxLength: intPtr(maxDockerImageReferenceChars),
 				},
+			},
+		},
+		{
+			Name:        "enable_setup_commands",
+			Label:       "Run setup commands",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Run shell commands before the JavaScript script.",
+		},
+		{
+			Name:                 "setup_commands",
+			Label:                "Setup commands",
+			Type:                 configuration.FieldTypeText,
+			Required:             false,
+			Placeholder:          "npm ci",
+			Description:          "One shell command per line. Runs before the script with the same environment variables.",
+			VisibilityConditions: setupCommandsEnabledOnly,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "enable_setup_commands", Values: []string{"true"}},
 			},
 		},
 		{
@@ -296,11 +321,17 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
+	var setupCommands []string
+	if spec.EnableSetupCommands {
+		setupCommands = normalizeCommands(spec.SetupCommands)
+	}
+
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
 		RunMode:        RunModeJavaScript,
 		Script:         spec.Script,
 		MessageChain:   messageChain,
+		SetupCommands:  setupCommands,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,
