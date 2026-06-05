@@ -17,6 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { useCanvas, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -26,8 +27,6 @@ import {
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
-  buildRubricText,
-  createInitialOutcomeState,
   createWebsocketCallbacks,
   isOutcomeActive,
   statusLabel,
@@ -52,9 +51,6 @@ type DraftActionsBarProps = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
@@ -201,15 +197,14 @@ function ChatConversation({
         messages={messages}
         canvasId={canvasId}
         organizationId={organizationId}
-        chatId={chatId}
-        sendMutation={sendMutation}
-        agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposer
+      <ComposerWithCanvasData
+        canvasId={canvasId}
+        organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
@@ -260,11 +255,20 @@ function useAgentBootKickoff({
     const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
     if (allMessages.length > 0) return;
 
+    const bootMessage = getAgentBootMessage(canvasId);
+
+    // If no boot message (e.g. blank canvas), skip sending — static greeting only
+    if (!bootMessage) {
+      bootState.current = "sent";
+      clearAgentBootContext();
+      return;
+    }
+
     bootState.current = "sending";
     void sendMutation
       .mutateAsync({
         chatId,
-        content: createSystemMessage(getAgentBootMessage(canvasId)),
+        content: createSystemMessage(bootMessage),
         mode: agentMode,
       })
       .then(() => {
@@ -284,7 +288,7 @@ function useConversationHandlers({
   interruptMutation,
   sendMutation,
   setError,
-  setOutcomeState,
+  setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
   chatId: string;
@@ -331,41 +335,18 @@ function useConversationHandlers({
   );
 
   const handleStartBuilding = useCallback(
-    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      const rubricText = buildRubricText(rubric);
-      const { sendMutation: send, outcomeMutation: outcome } = mutationsRef.current;
+    async (_rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
+      const { sendMutation: send } = mutationsRef.current;
 
-      // In Build mode: rubric is a spec confirmation, not an outcome.
-      // Agent already has full context — just confirm.
-      if (agentMode === "builder") {
-        await send.mutateAsync({
-          chatId,
-          content: "Specs approved. Start building.",
-          mode: "builder",
-        });
-        return;
-      }
-
-      // In Plan mode: kick off outcome with grading loop
-      setOutcomeState(createInitialOutcomeState(rubric));
-
-      try {
-        await outcome.mutateAsync({
-          chatId,
-          description: `Build a canvas based on this plan: ${rubric.title}`,
-          rubric: rubricText,
-          maxIterations: 3,
-        });
-      } catch {
-        setOutcomeState(null);
-        await send.mutateAsync({
-          chatId,
-          content: `Start building based on this plan:\n\n${rubricText}`,
-          mode: "builder",
-        });
-      }
+      // Rubric is a spec confirmation — tell the agent to start building.
+      // Always use builder mode regardless of current agentMode.
+      await send.mutateAsync({
+        chatId,
+        content: "Specs approved. Start building.",
+        mode: "builder",
+      });
     },
-    [chatId, agentMode, setOutcomeState],
+    [chatId],
   );
 
   return useMemo(
@@ -378,9 +359,6 @@ function DraftActionsBar({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   isEditing,
   outcomePassed,
   onVersionPublished,
@@ -389,9 +367,6 @@ function DraftActionsBar({
     messages,
     canvasId,
     organizationId,
-    chatId,
-    sendMutation,
-    agentMode,
     outcomePassed,
     onVersionPublished,
   });
@@ -412,4 +387,33 @@ function DraftActionsBar({
       </div>
     </div>
   );
+}
+
+function ComposerWithCanvasData({
+  canvasId,
+  organizationId,
+  ...composerProps
+}: {
+  canvasId: string;
+  organizationId: string;
+  onSend: (content: string) => Promise<void>;
+  onStop: () => void;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+}) {
+  const { data: canvas } = useCanvas(organizationId, canvasId, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
+  const nodes = canvas?.spec?.nodes;
+  const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
+
+  return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }
