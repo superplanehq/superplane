@@ -53,6 +53,12 @@ func Test__CreateAlertingPolicy__Setup(t *testing.T) {
 		cfg["duration"] = "42s"
 		require.ErrorContains(t, c.Setup(core.SetupContext{Configuration: cfg, Metadata: &contexts.MetadataContext{}}), "duration")
 	})
+
+	t.Run("missing threshold", func(t *testing.T) {
+		cfg := base()
+		delete(cfg, "threshold")
+		require.ErrorContains(t, c.Setup(core.SetupContext{Configuration: cfg, Metadata: &contexts.MetadataContext{}}), "threshold is required")
+	})
 }
 
 func Test__CreateAlertingPolicy__Execute(t *testing.T) {
@@ -154,6 +160,33 @@ func Test__CreateAlertingPolicy__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, state.Passed)
 		assert.Equal(t, false, postBody["enabled"], "explicit enabled=false must be sent")
+	})
+
+	t.Run("403 -> fails with IAM hint", func(t *testing.T) {
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				return nil, &gcpcommon.GCPAPIError{StatusCode: http.StatusForbidden, Message: "Permission denied (or the resource may not exist)."}
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"displayName": "High CPU",
+				"metricType":  "compute.googleapis.com/instance/cpu/utilization",
+				"comparison":  comparisonGT,
+				"threshold":   0.8,
+				"duration":    "300s",
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "failed to create alerting policy")
+		assert.Contains(t, state.FailureMessage, "roles/monitoring.editor")
 	})
 
 	t.Run("API error -> fails execution", func(t *testing.T) {

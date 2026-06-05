@@ -109,6 +109,48 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 		require.Len(t, conds, 1)
 	})
 
+	t.Run("clears notification channels when provided empty", func(t *testing.T) {
+		var patchURL string
+		var patchBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchURL = url
+				patchBody, _ = body.(map[string]any)
+				return alertPolicyJSON(policy, "High CPU", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := u.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"alertPolicy": policy, "notificationChannels": []any{}},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Contains(t, patchURL, "notificationChannels")
+		channels, ok := patchBody["notificationChannels"].([]string)
+		require.True(t, ok, "notificationChannels must be sent as a (possibly empty) slice")
+		assert.Empty(t, channels)
+	})
+
+	t.Run("invalid enabled -> fails execution", func(t *testing.T) {
+		mc := &mockClient{projectID: "my-project"}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := u.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"alertPolicy": policy, "enabled": "maybe"},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "enabled")
+	})
+
 	t.Run("no updates -> fails execution", func(t *testing.T) {
 		mc := &mockClient{projectID: "my-project"}
 		withFactory(mc)

@@ -3,10 +3,28 @@ package monitoring
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
+
+const (
+	roleHintWrite = "roles/monitoring.editor (or roles/monitoring.alertPolicyEditor)"
+	roleHintRead  = "roles/monitoring.viewer"
+)
+
+// apiErrorMessage formats an API error for the execution state, appending an IAM
+// hint on 403 since a missing role is the most common cause of monitoring write
+// failures (reads can succeed while writes are denied).
+func apiErrorMessage(action, roleHint string, err error) string {
+	var apiErr *gcpcommon.GCPAPIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
+		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHint)
+	}
+	return fmt.Sprintf("%s: %v", action, err)
+}
 
 const (
 	comparisonGT = "COMPARISON_GT"

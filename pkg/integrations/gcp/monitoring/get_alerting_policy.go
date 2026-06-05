@@ -78,7 +78,10 @@ func (g *GetAlertingPolicy) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validateAlertPolicySelection(spec.AlertPolicy)
+	if err := validateAlertPolicySelection(spec.AlertPolicy); err != nil {
+		return err
+	}
+	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
 }
 
 func (g *GetAlertingPolicy) Execute(ctx core.ExecutionContext) error {
@@ -99,7 +102,7 @@ func (g *GetAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 
 	body, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get alerting policy: %v", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get alerting policy", roleHintRead, err))
 	}
 
 	var policy alertPolicy
@@ -182,4 +185,64 @@ func resolvePolicyName(value, project string) (string, error) {
 		)
 	}
 	return name, nil
+}
+
+// AlertPolicyNodeMetadata is stored on the node at Setup so the collapsed UI can
+// show the policy's human-readable display name instead of its numeric ID.
+type AlertPolicyNodeMetadata struct {
+	PolicyName  string `json:"policyName" mapstructure:"policyName"`
+	DisplayName string `json:"displayName" mapstructure:"displayName"`
+	ID          string `json:"id" mapstructure:"id"`
+}
+
+// resolveAlertPolicyMetadata best-effort resolves the selected policy's display
+// name via the API and stores it on the node. It falls back to the parsed ID
+// when the value is an expression or the API is unavailable, so Setup never
+// fails just because the display name could not be fetched.
+func resolveAlertPolicyMetadata(ctx core.SetupContext, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	// Expressions are resolved at execution time; store the raw value so the UI
+	// still shows something meaningful.
+	if strings.Contains(value, "{{") {
+		return ctx.Metadata.Set(AlertPolicyNodeMetadata{PolicyName: value})
+	}
+
+	urlProject, name, err := parsePolicyName(value)
+	if err != nil {
+		return err
+	}
+
+	fallback := AlertPolicyNodeMetadata{PolicyName: name, ID: lastSegment(name)}
+	if ctx.Integration == nil {
+		return ctx.Metadata.Set(fallback)
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+	if urlProject != "" && client.ProjectID() != "" && urlProject != client.ProjectID() {
+		return ctx.Metadata.Set(fallback)
+	}
+
+	body, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))
+	if err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+	var p alertPolicy
+	if err := json.Unmarshal(body, &p); err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+	display := p.DisplayName
+	if display == "" {
+		display = lastSegment(name)
+	}
+	return ctx.Metadata.Set(AlertPolicyNodeMetadata{
+		PolicyName:  name,
+		DisplayName: display,
+		ID:          lastSegment(name),
+	})
 }

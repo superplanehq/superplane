@@ -75,7 +75,10 @@ func (d *DeleteAlertingPolicy) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validateAlertPolicySelection(spec.AlertPolicy)
+	if err := validateAlertPolicySelection(spec.AlertPolicy); err != nil {
+		return err
+	}
+	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
 }
 
 func (d *DeleteAlertingPolicy) Execute(ctx core.ExecutionContext) error {
@@ -95,7 +98,7 @@ func (d *DeleteAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if _, err := client.DeleteURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name)); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete alerting policy: %v", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete alerting policy", roleHintWrite, err))
 	}
 
 	return ctx.ExecutionState.Emit(

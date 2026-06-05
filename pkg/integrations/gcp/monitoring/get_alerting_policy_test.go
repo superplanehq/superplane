@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -39,6 +40,43 @@ func Test__GetAlertingPolicy__Setup(t *testing.T) {
 			Configuration: map[string]any{"alertPolicy": "not-a-policy"},
 			Metadata:      &contexts.MetadataContext{},
 		}))
+	})
+
+	t.Run("resolves display name into node metadata", func(t *testing.T) {
+		mc := &mockClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, url string) ([]byte, error) {
+				return alertPolicyJSON("projects/my-project/alertPolicies/123", "High CPU", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		meta := &contexts.MetadataContext{}
+		err := g.Setup(core.SetupContext{
+			Configuration: map[string]any{"alertPolicy": "projects/my-project/alertPolicies/123"},
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      meta,
+		})
+		require.NoError(t, err)
+
+		var stored AlertPolicyNodeMetadata
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Equal(t, "High CPU", stored.DisplayName)
+		assert.Equal(t, "123", stored.ID)
+	})
+
+	t.Run("falls back to ID without integration", func(t *testing.T) {
+		meta := &contexts.MetadataContext{}
+		err := g.Setup(core.SetupContext{
+			Configuration: map[string]any{"alertPolicy": "projects/my-project/alertPolicies/123"},
+			Metadata:      meta,
+		})
+		require.NoError(t, err)
+
+		var stored AlertPolicyNodeMetadata
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Equal(t, "", stored.DisplayName)
+		assert.Equal(t, "123", stored.ID)
 	})
 }
 

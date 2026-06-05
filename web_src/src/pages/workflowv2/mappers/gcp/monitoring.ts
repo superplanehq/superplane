@@ -26,6 +26,14 @@ interface AlertPolicySelectorConfiguration {
   displayName?: string;
 }
 
+// Resolved at Setup time by the backend so the collapsed node can show the
+// policy's display name instead of its numeric ID.
+interface AlertPolicyNodeMetadata {
+  policyName?: string;
+  displayName?: string;
+  id?: string;
+}
+
 interface AlertingPolicyOutputData {
   name?: string;
   id?: string;
@@ -152,8 +160,10 @@ function createMetadata(node: NodeInfo): MetadataItem[] {
 function selectorMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const config = node.configuration as AlertPolicySelectorConfiguration | undefined;
-  const id = lastSegment(config?.alertPolicy);
-  if (id) metadata.push({ icon: "bell", label: id });
+  const nodeMeta = node.metadata as AlertPolicyNodeMetadata | undefined;
+  // Prefer the resolved display name; fall back to the policy ID from the value.
+  const label = nodeMeta?.displayName || nodeMeta?.id || lastSegment(config?.alertPolicy);
+  if (label) metadata.push({ icon: "bell", label });
   if (config?.displayName) metadata.push({ icon: "pencil", label: config.displayName });
   return metadata;
 }

@@ -17,10 +17,12 @@ import (
 type CreateAlertingPolicy struct{}
 
 type CreateAlertingPolicySpec struct {
-	DisplayName          string   `mapstructure:"displayName"`
-	MetricType           string   `mapstructure:"metricType"`
-	Comparison           string   `mapstructure:"comparison"`
-	Threshold            float64  `mapstructure:"threshold"`
+	DisplayName string `mapstructure:"displayName"`
+	MetricType  string `mapstructure:"metricType"`
+	Comparison  string `mapstructure:"comparison"`
+	// Threshold is a pointer so an omitted value (nil) is rejected rather than
+	// silently decoding to 0 (e.g. "CPU above 0").
+	Threshold            *float64 `mapstructure:"threshold"`
 	Duration             string   `mapstructure:"duration"`
 	NotificationChannels []string `mapstructure:"notificationChannels"`
 	// Enabled is a pointer so an omitted value (nil) can default to true,
@@ -176,13 +178,13 @@ func (c *CreateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Duration, true)
+	return validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, true)
 }
 
-// validatePolicyCondition validates the shared condition fields. When required
-// is false (the update flow) empty values are allowed, but any provided value
-// must still be valid.
-func validatePolicyCondition(displayName, metricType, comparison, duration string, requireDisplayName bool) error {
+// validatePolicyCondition validates the shared condition fields. When
+// requireDisplayName is false (the update flow) the display name may be empty,
+// but the metric/comparison/threshold/duration are validated together.
+func validatePolicyCondition(displayName, metricType, comparison string, threshold *float64, duration string, requireDisplayName bool) error {
 	if requireDisplayName && strings.TrimSpace(displayName) == "" {
 		return errors.New("displayName is required")
 	}
@@ -194,6 +196,9 @@ func validatePolicyCondition(displayName, metricType, comparison, duration strin
 	}
 	if !isValidComparison(comparison) {
 		return errors.New("comparison must be COMPARISON_GT or COMPARISON_LT")
+	}
+	if threshold == nil {
+		return errors.New("threshold is required")
 	}
 	if !isValidDuration(duration) {
 		return errors.New("invalid duration: must be one of 0s, 60s, 300s, 600s, 1800s")
@@ -207,7 +212,7 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Duration, true); err != nil {
+	if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, true); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -226,7 +231,7 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		"combiner":    "OR",
 		"enabled":     enabled,
 		"conditions": []any{
-			buildThresholdCondition(spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration),
+			buildThresholdCondition(spec.MetricType, spec.Comparison, *spec.Threshold, spec.Duration),
 		},
 	}
 	if len(spec.NotificationChannels) > 0 {
@@ -239,7 +244,7 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 	endpoint := fmt.Sprintf("%s/projects/%s/alertPolicies", monitoringBaseURL, project)
 	body, err := client.PostURL(context.Background(), endpoint, policy)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create alerting policy: %v", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create alerting policy", roleHintWrite, err))
 	}
 
 	var created alertPolicy

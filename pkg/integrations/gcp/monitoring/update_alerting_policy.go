@@ -22,7 +22,7 @@ type UpdateAlertingPolicySpec struct {
 	DisplayName          string   `mapstructure:"displayName"`
 	MetricType           string   `mapstructure:"metricType"`
 	Comparison           string   `mapstructure:"comparison"`
-	Threshold            float64  `mapstructure:"threshold"`
+	Threshold            *float64 `mapstructure:"threshold"`
 	Duration             string   `mapstructure:"duration"`
 	Enabled              string   `mapstructure:"enabled"`
 	NotificationChannels []string `mapstructure:"notificationChannels"`
@@ -208,27 +208,49 @@ func (u *UpdateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	}
 
 	if spec.MetricType != "" {
-		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Duration, false); err != nil {
+		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, false); err != nil {
 			return err
 		}
 	}
 
-	if spec.Enabled != "" && spec.Enabled != "true" && spec.Enabled != "false" {
-		return errors.New(`enabled must be "true", "false", or empty`)
+	if err := validateEnabledOption(spec.Enabled); err != nil {
+		return err
 	}
 
-	if !hasUpdates(spec) {
+	if !hasUpdates(spec, configHasKey(ctx.Configuration, "notificationChannels")) {
 		return errors.New("at least one field to update is required")
 	}
 
+	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
+}
+
+// validateEnabledOption guards the three-way enabled select. It is enforced in
+// both Setup and Execute so a mistyped value surfaces an error rather than
+// silently disabling the policy.
+func validateEnabledOption(enabled string) error {
+	if enabled != "" && enabled != "true" && enabled != "false" {
+		return errors.New(`enabled must be "true", "false", or empty`)
+	}
 	return nil
 }
 
-func hasUpdates(spec UpdateAlertingPolicySpec) bool {
+func configHasKey(cfg any, key string) bool {
+	m, ok := cfg.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = m[key]
+	return ok
+}
+
+// hasUpdates reports whether the spec carries at least one change. Notification
+// channels are tracked by key presence (channelsProvided) so an empty selection
+// can be sent to clear all channels.
+func hasUpdates(spec UpdateAlertingPolicySpec, channelsProvided bool) bool {
 	return strings.TrimSpace(spec.DisplayName) != "" ||
 		spec.MetricType != "" ||
 		spec.Enabled != "" ||
-		len(spec.NotificationChannels) > 0 ||
+		channelsProvided ||
 		strings.TrimSpace(spec.Documentation) != ""
 }
 
@@ -238,8 +260,12 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	if !hasUpdates(spec) {
+	channelsProvided := configHasKey(ctx.Configuration, "notificationChannels")
+	if !hasUpdates(spec, channelsProvided) {
 		return ctx.ExecutionState.Fail("error", "at least one field to update is required")
+	}
+	if err := validateEnabledOption(spec.Enabled); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	client, err := getClient(ctx.HTTP, ctx.Integration)
@@ -260,11 +286,11 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		mask = append(mask, "displayName")
 	}
 	if spec.MetricType != "" {
-		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Duration, false); err != nil {
+		if err := validatePolicyCondition(spec.DisplayName, spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration, false); err != nil {
 			return ctx.ExecutionState.Fail("error", err.Error())
 		}
 		policy["conditions"] = []any{
-			buildThresholdCondition(spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration),
+			buildThresholdCondition(spec.MetricType, spec.Comparison, *spec.Threshold, spec.Duration),
 		}
 		mask = append(mask, "conditions")
 	}
@@ -272,8 +298,14 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		policy["enabled"] = spec.Enabled == "true"
 		mask = append(mask, "enabled")
 	}
-	if len(spec.NotificationChannels) > 0 {
-		policy["notificationChannels"] = spec.NotificationChannels
+	if channelsProvided {
+		// nil (toggled on with no selection) must serialize as [] to clear all
+		// channels, not null.
+		channels := spec.NotificationChannels
+		if channels == nil {
+			channels = []string{}
+		}
+		policy["notificationChannels"] = channels
 		mask = append(mask, "notificationChannels")
 	}
 	if doc := strings.TrimSpace(spec.Documentation); doc != "" {
@@ -287,7 +319,7 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 
 	body, err := client.PatchURL(context.Background(), endpoint, policy)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to update alerting policy: %v", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to update alerting policy", roleHintWrite, err))
 	}
 
 	var updated alertPolicy
