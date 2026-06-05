@@ -26,19 +26,19 @@ function comparableLayout(layout: ConsoleLayoutItem[] | undefined): unknown[] {
     .sort((left, right) => left.i.localeCompare(right.i));
 }
 
-function comparableConsoleSnapshot(dashboard?: CanvasesConsole | null): string {
+function comparableConsoleSnapshot(consoleData?: CanvasesConsole | null): string {
   return JSON.stringify({
-    panels: comparablePanels(dashboard?.panels),
-    layout: comparableLayout(dashboard?.layout),
+    panels: comparablePanels(consoleData?.panels),
+    layout: comparableLayout(consoleData?.layout),
   });
 }
 
 /** True when draft console differs from live (panels and/or layout). */
 export function hasDraftVersusLiveConsoleDiff(
-  liveDashboard?: CanvasesConsole | null,
-  draftDashboard?: CanvasesConsole | null,
+  liveConsole?: CanvasesConsole | null,
+  draftConsole?: CanvasesConsole | null,
 ): boolean {
-  return comparableConsoleSnapshot(liveDashboard) !== comparableConsoleSnapshot(draftDashboard);
+  return comparableConsoleSnapshot(liveConsole) !== comparableConsoleSnapshot(draftConsole);
 }
 
 function panelSnapshot(panel: ConsolePanel | undefined): string {
@@ -69,13 +69,13 @@ function indexLayout(layout: ConsoleLayoutItem[] | undefined): Map<string, Conso
 
 /** Counts changed console items by panel/layout id for the edit-mode header badge. */
 export function getDraftConsoleDiffCounts(
-  liveDashboard?: CanvasesConsole | null,
-  draftDashboard?: CanvasesConsole | null,
+  liveConsole?: CanvasesConsole | null,
+  draftConsole?: CanvasesConsole | null,
 ): DraftConsoleDiffCounts {
-  const livePanels = indexPanels(liveDashboard?.panels);
-  const draftPanels = indexPanels(draftDashboard?.panels);
-  const liveLayout = indexLayout(liveDashboard?.layout);
-  const draftLayout = indexLayout(draftDashboard?.layout);
+  const livePanels = indexPanels(liveConsole?.panels);
+  const draftPanels = indexPanels(draftConsole?.panels);
+  const liveLayout = indexLayout(liveConsole?.layout);
+  const draftLayout = indexLayout(draftConsole?.layout);
   const ids = new Set([...livePanels.keys(), ...draftPanels.keys(), ...liveLayout.keys(), ...draftLayout.keys()]);
   const counts = { added: 0, updated: 0, removed: 0 };
 
