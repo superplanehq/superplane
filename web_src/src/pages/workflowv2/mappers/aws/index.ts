@@ -49,6 +49,8 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
+import { createLoadBalancerMapper } from "./ec2/create_load_balancer";
+import { deleteLoadBalancerMapper } from "./ec2/delete_load_balancer";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -97,6 +99,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.getImage": getEc2ImageMapper,
   "ec2.getInstance": getInstanceMapper,
   "ec2.manageInstancePower": manageInstancePowerMapper,
+  "ec2.createLoadBalancer": createLoadBalancerMapper,
+  "ec2.deleteLoadBalancer": deleteLoadBalancerMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -155,4 +159,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.getImage": buildActionStateRegistry("retrieved"),
   "ec2.getInstance": buildActionStateRegistry("retrieved"),
   "ec2.manageInstancePower": MANAGE_INSTANCE_POWER_STATE_REGISTRY,
+  "ec2.createLoadBalancer": buildActionStateRegistry("created"),
+  "ec2.deleteLoadBalancer": buildActionStateRegistry("deleted"),
 };
