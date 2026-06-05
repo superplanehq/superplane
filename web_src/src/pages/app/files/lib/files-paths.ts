@@ -1,4 +1,4 @@
-import type { PendingFileChange } from "../workflow-files-types";
+import type { PendingFileChange } from "../types";
 
 export function nextUntitledPath(paths: Set<string>): string {
   if (!paths.has("untitled.txt")) return "untitled.txt";

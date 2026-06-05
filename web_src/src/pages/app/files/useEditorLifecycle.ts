@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 
-type UseWorkflowFilesEditorLifecycleOptions = {
+type UseEditorLifecycleOptions = {
   isEditing: boolean;
   resetPendingState: () => void;
   setIsDiffOpen: (open: boolean) => void;
@@ -11,7 +11,7 @@ type UseWorkflowFilesEditorLifecycleOptions = {
   setLoadedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
 };
 
-export function useWorkflowFilesEditorLifecycle({
+export function useEditorLifecycle({
   isEditing,
   resetPendingState,
   setIsDiffOpen,
@@ -20,7 +20,7 @@ export function useWorkflowFilesEditorLifecycle({
   selectedPath,
   selectedFileData,
   setLoadedContentByPath,
-}: UseWorkflowFilesEditorLifecycleOptions) {
+}: UseEditorLifecycleOptions) {
   useEffect(() => {
     if (isEditing) return;
 

@@ -1,11 +1,11 @@
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState, type RefObject } from "react";
 
-import { applyPendingContentUpdate, applyPendingDelete } from "./lib/workflow-files-pending-state";
-import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./lib/workflow-files-paths";
-import type { PendingFileChange } from "./workflow-files-types";
+import { applyPendingContentUpdate, applyPendingDelete } from "./lib/files-pending-state";
+import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./lib/files-paths";
+import type { PendingFileChange } from "./types";
 
-type UseWorkflowFilesPendingStateOptions = {
+type UsePendingStateOptions = {
   generatedPathSet: Set<string>;
   generatedPaths: string[];
   finalRepositoryPathsRef: RefObject<string[]>;
@@ -14,14 +14,14 @@ type UseWorkflowFilesPendingStateOptions = {
   openFile: (path: string) => void;
 };
 
-export function useWorkflowFilesPendingState({
+export function usePendingState({
   generatedPathSet,
   generatedPaths,
   finalRepositoryPathsRef,
   allPathsRef,
   loadedContentByPathRef,
   openFile,
-}: UseWorkflowFilesPendingStateOptions) {
+}: UsePendingStateOptions) {
   const [pendingChangesByPath, setPendingChangesByPath] = useState<Record<string, PendingFileChange>>({});
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
 
