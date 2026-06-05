@@ -282,3 +282,41 @@ func instanceTypeResourceName(instanceType InstanceTypeInfo) string {
 
 	return fmt.Sprintf("%s (%d vCPU, %.1f GiB Memory)", instanceType.InstanceType, instanceType.VCPUs, memoryGiB)
 }
+
+func ListLoadBalancers(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	loadBalancers, err := client.ListLoadBalancers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list load balancers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+	for _, lb := range loadBalancers {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: loadBalancerResourceName(lb),
+			ID:   lb.LoadBalancerARN,
+		})
+	}
+
+	return resources, nil
+}
+
+func loadBalancerResourceName(lb LoadBalancer) string {
+	name := strings.TrimSpace(lb.Name)
+	if name == "" {
+		return lb.LoadBalancerARN
+	}
+
+	return fmt.Sprintf("%s (%s)", name, lb.Type)
+}
