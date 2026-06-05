@@ -110,6 +110,23 @@ export function MarkdownVariablesPanel({
     return map;
   }, [errors]);
 
+  // Names that appear more than once. On save `normalizeDraftVariables` keeps
+  // only the first entry per name, so we flag duplicates here to warn the
+  // author before they lose the shadowed rows' configuration.
+  const duplicateNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const variable of draftVariables) {
+      const name = variable.name?.trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    const dups = new Set<string>();
+    for (const [name, count] of counts) {
+      if (count > 1) dups.add(name);
+    }
+    return dups;
+  }, [draftVariables]);
+
   return (
     <div
       // `min-h-0 min-w-0` ensures the panel can shrink to its grid track even
@@ -139,6 +156,7 @@ export function MarkdownVariablesPanel({
               canvasId={canvasId}
               variable={variable}
               error={errorByName.get(variable.name)}
+              duplicate={duplicateNames.has(variable.name?.trim())}
               previewValue={previewVars[variable.name]}
               onChange={(next) => updateVariable(index, next)}
               onRemove={() => removeVariable(index)}
@@ -156,6 +174,7 @@ function VariableRow({
   canvasId,
   variable,
   error,
+  duplicate,
   previewValue,
   onChange,
   onRemove,
@@ -165,6 +184,7 @@ function VariableRow({
   canvasId: string;
   variable: MarkdownVariable;
   error?: string;
+  duplicate?: boolean;
   previewValue: unknown;
   onChange: (next: MarkdownVariable) => void;
   onRemove: () => void;
@@ -192,7 +212,7 @@ function VariableRow({
           aria-label="Variable name"
           className={cn(
             "h-7 min-w-0 flex-1 font-mono text-[12px]",
-            !nameIsValid && variable.name && "border-red-400 focus-visible:ring-red-300",
+            ((!nameIsValid && variable.name) || duplicate) && "border-red-400 focus-visible:ring-red-300",
           )}
           data-testid="markdown-variable-name"
         />
@@ -221,6 +241,11 @@ function VariableRow({
       </div>
       {!nameIsValid && variable.name ? (
         <p className="text-[11px] text-red-600">Use letters, digits, and underscore. Don&apos;t start with a digit.</p>
+      ) : null}
+      {nameIsValid && duplicate ? (
+        <p className="text-[11px] text-red-600">
+          Duplicate name. Only the first variable with this name is kept on save.
+        </p>
       ) : null}
 
       {variable.source?.kind === "memory" ? (
