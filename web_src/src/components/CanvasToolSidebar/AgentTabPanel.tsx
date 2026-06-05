@@ -257,10 +257,10 @@ function useAgentBootKickoff({
 
     const bootMessage = getAgentBootMessage(canvasId);
 
-    // If no boot message (e.g. blank canvas), skip sending — static greeting only
+    // If no boot message (e.g. blank canvas), skip sending — static greeting only.
+    // Don't clear the boot context so refreshes still see the blank marker and skip again.
     if (!bootMessage) {
       bootState.current = "sent";
-      clearAgentBootContext();
       return;
     }
 
