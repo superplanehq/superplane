@@ -57,7 +57,7 @@ Use this skill when working on **per-canvas dashboards**: the workflow v2 overla
 
 | `type` | Runtime | Main `content` |
 | --- | --- | --- |
-| `markdown` | GFM body | `title?`, `body?` |
+| `markdown` | GFM body with `{{ name.field }}` interpolation | `title?`, `body?`, `variables?` |
 | `node` | Status chip + optional Run | `node`, `showRun?`, `triggerName?` |
 | `table` | `WidgetTable` | `dataSource`, `render.kind: "table"` |
 | `chart` | `WidgetChart` (SVG) | `dataSource`, `render.kind: "chart"` |
@@ -112,6 +112,13 @@ Legacy fields normalized in FE: `target` → `node`, `triggerName` → `template
 **Lint:** loose equality in legacy expressions is intentional (scalar normalization). Do not add `eslint-disable` for `==` in dashboard code; refactor instead.
 
 Editor memory hints: `MemoryDiscoveryPanel.tsx`, `useMemoryCatalog.ts` (suggestions only; YAML still validated).
+
+### Markdown variables
+
+- `content.variables[]` carries named live data refs; body uses `{{ name.field }}` (or `{{ name.$["Node"].data.x }}` for runs).
+- Sources: `{ kind: "memory", namespace, orderBy?, direction?, matches? }` (first row wins; default `orderBy: createdAt desc`) or `{ kind: "run", select: latest | latest_passed | latest_failed }`.
+- Resolution lives in `useMarkdownVariables.ts`; interpolation in `markdownInterpolation.ts` (reuses `celExpr.compileTemplate`/`evalTemplate`). Validation: `markdownVariables.ts` (FE) + `validateMarkdownContent` in `canvas_dashboard_yml.go` (BE).
+- Run vars expose `status`, `nodeName`, `payload`, `durationMs`, and a `$` map of node executions (same shape as the table widget).
 
 ---
 

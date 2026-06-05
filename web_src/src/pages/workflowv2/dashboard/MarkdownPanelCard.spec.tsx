@@ -1,17 +1,45 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import type { DashboardPanel } from "@/hooks/useCanvasData";
+import { canvasKeys, type CanvasMemoryEntry, type DashboardPanel } from "@/hooks/useCanvasData";
 
+import { DashboardContextProvider } from "./DashboardContextProvider";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 
 function renderMarkdown(body: string) {
-  const panel: DashboardPanel = {
-    id: "md-test",
-    type: "markdown",
-    content: { body },
-  };
-  return render(<MarkdownPanelCard panel={panel} readOnly onDelete={() => {}} onChange={() => {}} />);
+  // The MarkdownPanelCard always issues queries through `useMarkdownVariables`,
+  // so even tests that don't touch the variable system need a QueryClient and
+  // dashboard context in the tree.
+  return renderWithVariables({
+    panel: { id: "md-test", type: "markdown", content: { body } },
+  });
+}
+
+interface RenderWithVariablesOptions {
+  panel: DashboardPanel;
+  memoryEntries?: CanvasMemoryEntry[];
+}
+
+/**
+ * Render the markdown panel inside a QueryClient + dashboard context so the
+ * `useMarkdownVariables` hook can issue (mocked) queries. Memory entries are
+ * preloaded into the React Query cache so the test environment doesn't need
+ * to mock the network layer.
+ */
+function renderWithVariables({ panel, memoryEntries = [] }: RenderWithVariablesOptions) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(canvasKeys.canvasMemoryEntries("canvas-1"), memoryEntries);
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+          <MarkdownPanelCard panel={panel} readOnly onDelete={() => {}} onChange={() => {}} />
+        </DashboardContextProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
 }
 
 describe("MarkdownPanelCard rendering", () => {
@@ -59,5 +87,100 @@ describe("MarkdownPanelCard rendering", () => {
     const anchor = view.querySelector("a");
     expect(anchor).not.toBeNull();
     expect(anchor!.getAttribute("onclick")).toBeNull();
+  });
+});
+
+describe("MarkdownPanelCard variable interpolation", () => {
+  it("interpolates a memory variable's field into the body and title", async () => {
+    const panel: DashboardPanel = {
+      id: "panel-1",
+      type: "markdown",
+      content: {
+        title: "Latest deploy of {{ recipe.service }}",
+        body: "Service: **{{ recipe.service }}**\n\nStatus: {{ recipe.status }}",
+        variables: [{ name: "recipe", source: { kind: "memory", namespace: "deploys" } }],
+      },
+    };
+    renderWithVariables({
+      panel,
+      memoryEntries: [
+        {
+          id: "row-old",
+          namespace: "deploys",
+          values: { service: "api", status: "passed" },
+          source: "node",
+          createdAt: "2026-06-01T00:00:00Z",
+        },
+        {
+          id: "row-new",
+          namespace: "deploys",
+          values: { service: "web", status: "failed" },
+          source: "node",
+          createdAt: "2026-06-04T00:00:00Z",
+        },
+      ],
+    });
+
+    const view = await waitFor(() => screen.getByTestId("dashboard-markdown"));
+    expect(view.textContent).toMatch(/Service: web/);
+    expect(view.textContent).toMatch(/Status: failed/);
+    // Picks the most recent memory row by createdAt by default.
+    expect(screen.getByText(/Latest deploy of web/)).toBeTruthy();
+  });
+
+  it("applies property-equality matches before sorting", async () => {
+    const panel: DashboardPanel = {
+      id: "panel-2",
+      type: "markdown",
+      content: {
+        body: "Approved: {{ recipe.service }}",
+        variables: [
+          {
+            name: "recipe",
+            source: {
+              kind: "memory",
+              namespace: "deploys",
+              matches: [{ field: "status", value: "passed" }],
+            },
+          },
+        ],
+      },
+    };
+    renderWithVariables({
+      panel,
+      memoryEntries: [
+        {
+          id: "row-old",
+          namespace: "deploys",
+          values: { service: "api", status: "passed" },
+          source: "node",
+          createdAt: "2026-06-01T00:00:00Z",
+        },
+        {
+          id: "row-new",
+          namespace: "deploys",
+          values: { service: "web", status: "failed" },
+          source: "node",
+          createdAt: "2026-06-04T00:00:00Z",
+        },
+      ],
+    });
+    const view = await waitFor(() => screen.getByTestId("dashboard-markdown"));
+    expect(view.textContent).toMatch(/Approved: api/);
+  });
+
+  it("renders the original markdown when a referenced variable has no data", async () => {
+    const panel: DashboardPanel = {
+      id: "panel-3",
+      type: "markdown",
+      content: {
+        body: "Service: {{ recipe.service }}",
+        variables: [{ name: "recipe", source: { kind: "memory", namespace: "missing" } }],
+      },
+    };
+    renderWithVariables({ panel, memoryEntries: [] });
+    const view = await waitFor(() => screen.getByTestId("dashboard-markdown"));
+    // Empty rather than a thrown error or stack trace.
+    expect(view.textContent?.trim()).toBe("Service:");
   });
 });
