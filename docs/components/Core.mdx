@@ -30,7 +30,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Runner" href="#runner" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -755,9 +756,9 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
-<a id="runner"></a>
+<a id="run-shell-commands"></a>
 
-## Runner
+## Run Shell Commands
 
 **Component key:** `runner`
 
@@ -798,6 +799,60 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runner.finished"
+}
+```
+
+<a id="run-java-script"></a>
+
+## Run JavaScript
+
+**Component key:** `runnerJS`
+
+Runs JavaScript on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Node.js on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Node.js image (for example **Node.js 22 (Bookworm)**) so `node` is available.
+
+### Script contract
+Your script must define `function main()`. The runner injects upstream canvas data as the global `$` object (same shape as workflow expressions). Return a JSON-serializable value from `main()`; it is emitted on the finished event as **result**.
+
+Example:
+
+```javascript
+function main() {
+  return { pr: $['GitHub PR'].data.number };
+}
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Node.js image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: JavaScript source executed by Node.js.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerJS.finished"
 }
 ```
 
