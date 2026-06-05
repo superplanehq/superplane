@@ -9,7 +9,7 @@
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
 - Integration component implementations: pkg/integrations/<integration>/
-- Workflow v2 UI component mappers: web_src/src/pages/workflowv2/mappers/<integration>/
+- UI component mappers: web_src/src/pages/app/mappers/<integration>/
 
 ## Pull Request Guidelines
 

@@ -20,7 +20,7 @@ import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/lib/colors";
 import { getTriggerRenderer, getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
+import { PushThroughHandler } from "@/pages/app/components/PushThroughHandler";
 
 import { TimeGateCountdown } from "./countdown";
 

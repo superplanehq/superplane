@@ -8,8 +8,8 @@ import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
-import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import { getComponentBaseMapper } from "@/pages/app/mappers";
+import { buildExecutionInfo, buildNodeInfo } from "@/pages/app/utils";
 import { ChainItemIcon } from "./ChainItemIcon";
 import type { ChainItemData } from "./types";
 
