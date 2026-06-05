@@ -3,9 +3,9 @@ import type { SetURLSearchParams } from "react-router-dom";
 
 interface FilesModeActionsConfig {
   setIsFilesMode: (value: boolean) => void;
-  setIsDashboardMode: (value: boolean) => void;
-  setIsDashboardAddPanelOpen: (value: boolean) => void;
-  setIsDashboardYamlOpen: (value: boolean) => void;
+  setIsConsoleMode: (value: boolean) => void;
+  setIsConsoleAddPanelOpen: (value: boolean) => void;
+  setIsConsoleYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
@@ -14,9 +14,9 @@ interface FilesModeActionsConfig {
 
 export function useFilesModeActions({
   setIsFilesMode,
-  setIsDashboardMode,
-  setIsDashboardAddPanelOpen,
-  setIsDashboardYamlOpen,
+  setIsConsoleMode,
+  setIsConsoleAddPanelOpen,
+  setIsConsoleYamlOpen,
   setIsRunsMode,
   setIsMemoryMode,
   setSelectedRunId,
@@ -24,17 +24,17 @@ export function useFilesModeActions({
 }: FilesModeActionsConfig) {
   const handleSelectFilesMode = useCallback(() => {
     setIsFilesMode(true);
-    setIsDashboardMode(false);
-    setIsDashboardAddPanelOpen(false);
-    setIsDashboardYamlOpen(false);
+    setIsConsoleMode(false);
+    setIsConsoleAddPanelOpen(false);
+    setIsConsoleYamlOpen(false);
     setIsRunsMode(false);
     setIsMemoryMode(false);
     setSelectedRunId(null);
     setSearchParams(toFilesSearchParams, { replace: true });
   }, [
-    setIsDashboardAddPanelOpen,
-    setIsDashboardMode,
-    setIsDashboardYamlOpen,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleMode,
+    setIsConsoleYamlOpen,
     setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,

@@ -172,7 +172,7 @@ export function useCanvasWebsocket(
           queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
 
           if (data.event === "canvas_version_updated") {
-            queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
+            queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
             break;
           }
 

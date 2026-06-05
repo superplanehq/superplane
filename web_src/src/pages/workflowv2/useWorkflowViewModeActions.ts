@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 
-import { getDashboardHeaderActions } from "./dashboard/dashboardHeaderActions";
+import { getConsoleHeaderActions } from "./console/consoleHeaderActions";
 
 interface WorkflowViewModeActionsConfig {
-  isDashboardMode: boolean;
+  isConsoleMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
   isRunsMode: boolean;
@@ -11,17 +11,17 @@ interface WorkflowViewModeActionsConfig {
   isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
-  handleExitDashboardMode: () => void;
+  handleExitConsoleMode: () => void;
   handleExitMemoryMode: () => void;
   handleExitFilesMode: () => void;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
-  setIsDashboardAddPanelOpen: (value: boolean) => void;
-  setIsDashboardYamlOpen: (value: boolean) => void;
+  setIsConsoleAddPanelOpen: (value: boolean) => void;
+  setIsConsoleYamlOpen: (value: boolean) => void;
 }
 
 export function useWorkflowViewModeActions({
-  isDashboardMode,
+  isConsoleMode,
   isMemoryMode,
   isFilesMode,
   isRunsMode,
@@ -29,17 +29,17 @@ export function useWorkflowViewModeActions({
   isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
-  handleExitDashboardMode,
+  handleExitConsoleMode,
   handleExitMemoryMode,
   handleExitFilesMode,
   handleExitRunsMode,
   handleToggleEditMode,
-  setIsDashboardAddPanelOpen,
-  setIsDashboardYamlOpen,
+  setIsConsoleAddPanelOpen,
+  setIsConsoleYamlOpen,
 }: WorkflowViewModeActionsConfig) {
   const handleSelectCanvasView = useCallback(() => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
+    if (isConsoleMode) {
+      handleExitConsoleMode();
       return;
     }
     if (isMemoryMode) {
@@ -54,46 +54,46 @@ export function useWorkflowViewModeActions({
       handleExitRunsMode();
     }
   }, [
-    handleExitDashboardMode,
+    handleExitConsoleMode,
     handleExitFilesMode,
     handleExitMemoryMode,
     handleExitRunsMode,
-    isDashboardMode,
+    isConsoleMode,
     isFilesMode,
     isMemoryMode,
     isRunsMode,
   ]);
 
-  const handleDashboardAddPanelRequest = useCallback(async () => {
+  const handleConsoleAddPanelRequest = useCallback(async () => {
     if (!hasEditableVersion) {
       await handleToggleEditMode();
     }
-    setIsDashboardAddPanelOpen(true);
-  }, [hasEditableVersion, handleToggleEditMode, setIsDashboardAddPanelOpen]);
+    setIsConsoleAddPanelOpen(true);
+  }, [hasEditableVersion, handleToggleEditMode, setIsConsoleAddPanelOpen]);
 
-  const handleDashboardAddPanelDialogOpenChange = useCallback(
+  const handleConsoleAddPanelDialogOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
-        void handleDashboardAddPanelRequest();
+        void handleConsoleAddPanelRequest();
         return;
       }
-      setIsDashboardAddPanelOpen(false);
+      setIsConsoleAddPanelOpen(false);
     },
-    [handleDashboardAddPanelRequest, setIsDashboardAddPanelOpen],
+    [handleConsoleAddPanelRequest, setIsConsoleAddPanelOpen],
   );
 
   return {
     handleSelectCanvasView,
-    handleDashboardAddPanelRequest,
-    handleDashboardAddPanelDialogOpenChange,
-    ...getDashboardHeaderActions({
+    handleConsoleAddPanelRequest,
+    handleConsoleAddPanelDialogOpenChange,
+    ...getConsoleHeaderActions({
       isEditing: hasEditableVersion,
-      isDashboardMode,
+      isConsoleMode,
       isTemplate,
       canUpdateCanvas,
       canvasDeletedRemotely,
-      openAddPanel: () => void handleDashboardAddPanelRequest(),
-      openYaml: () => setIsDashboardYamlOpen(true),
+      openAddPanel: () => void handleConsoleAddPanelRequest(),
+      openYaml: () => setIsConsoleYamlOpen(true),
     }),
   };
 }

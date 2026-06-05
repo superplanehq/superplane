@@ -32,7 +32,7 @@ export function SecondaryHeaderActions({
   publishVersionDisabledTooltip,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
-  const onConsoleTab = mode === "dashboard";
+  const onConsoleTab = mode === "console";
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
