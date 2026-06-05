@@ -13,7 +13,7 @@ const (
 	RunJSComponentName       = "runnerJS"
 	RunJSFinishedEventType   = "runnerJS.finished"
 	runJSDefaultDockerPreset = "node:22-bookworm"
-	defaultRunJSScript       = "function main() {\n  const hostname = process.env.HOST;\n  return { hello: \"from \" + hostname };\n}"
+	defaultRunJSScript       = "function main() {\n  console.log(\"Hello world\");\n\n  return { \"example\": \"output\" };\n}"
 )
 
 func init() {
