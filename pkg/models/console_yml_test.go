@@ -10,7 +10,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestDashboardFromYML_ParsesValidConsole(t *testing.T) {
+func TestConsoleFromYML_ParsesValidConsole(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata:
@@ -31,7 +31,7 @@ spec:
       minH: 2
 `
 
-	resource, err := DashboardFromYML([]byte(yaml))
+	resource, err := ConsoleFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Equal(t, "v1", resource.APIVersion)
 	require.Equal(t, ConsoleKind, resource.Kind)
@@ -46,7 +46,7 @@ spec:
 	assert.Equal(t, 2, *resource.Spec.Layout[0].MinW)
 }
 
-func TestDashboardFromYML_RejectsLegacyDashboardKind(t *testing.T) {
+func TestConsoleFromYML_RejectsLegacyDashboardKind(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Dashboard
 metadata: {}
@@ -54,19 +54,19 @@ spec:
   panels: []
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported kind")
 }
 
-func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
-	_, err := DashboardFromYML([]byte(""))
+func TestConsoleFromYML_RejectsEmptyInput(t *testing.T) {
+	_, err := ConsoleFromYML([]byte(""))
 	require.Error(t, err)
-	_, err = DashboardFromYML([]byte("   \n\n  "))
+	_, err = ConsoleFromYML([]byte("   \n\n  "))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsUnknownFields(t *testing.T) {
+func TestConsoleFromYML_RejectsUnknownFields(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata:
@@ -76,11 +76,11 @@ spec:
   layout: []
   extraField: nope
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsWrongKind(t *testing.T) {
+func TestConsoleFromYML_RejectsWrongKind(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Canvas
 metadata: {}
@@ -88,11 +88,11 @@ spec:
   panels: []
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsWrongAPIVersion(t *testing.T) {
+func TestConsoleFromYML_RejectsWrongAPIVersion(t *testing.T) {
 	yaml := `apiVersion: v2
 kind: Console
 metadata: {}
@@ -100,16 +100,16 @@ spec:
   panels: []
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsNonObjectRoot(t *testing.T) {
-	_, err := DashboardFromYML([]byte("- 1\n- 2\n"))
+func TestConsoleFromYML_RejectsNonObjectRoot(t *testing.T) {
+	_, err := ConsoleFromYML([]byte("- 1\n- 2\n"))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsUnsupportedPanelType(t *testing.T) {
+func TestConsoleFromYML_RejectsUnsupportedPanelType(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata: {}
@@ -120,12 +120,12 @@ spec:
       content: {}
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported type")
 }
 
-func TestDashboardFromYML_RejectsDuplicatePanelIDs(t *testing.T) {
+func TestConsoleFromYML_RejectsDuplicatePanelIDs(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata: {}
@@ -139,12 +139,12 @@ spec:
       content: {}
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate")
 }
 
-func TestDashboardFromYML_RejectsLayoutWithUnknownPanel(t *testing.T) {
+func TestConsoleFromYML_RejectsLayoutWithUnknownPanel(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata: {}
@@ -160,11 +160,11 @@ spec:
       w: 1
       h: 1
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 }
 
-func TestDashboardFromYML_RejectsNonStringBody(t *testing.T) {
+func TestConsoleFromYML_RejectsNonStringBody(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
 metadata: {}
@@ -176,15 +176,15 @@ spec:
         body: 42
   layout: []
 `
-	_, err := DashboardFromYML([]byte(yaml))
+	_, err := ConsoleFromYML([]byte(yaml))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "body")
 }
 
 func TestValidateMarkdownVariables_AcceptsValidShapes(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"body": "hello {{ recipe.title }}",
 			"variables": []any{
@@ -215,9 +215,9 @@ func TestValidateMarkdownVariables_AcceptsValidShapes(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsBadName(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"variables": []any{
 				map[string]any{
@@ -233,9 +233,9 @@ func TestValidateMarkdownVariables_RejectsBadName(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsDuplicateName(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"variables": []any{
 				map[string]any{"name": "dup", "source": map[string]any{"kind": "run", "select": "latest"}},
@@ -249,9 +249,9 @@ func TestValidateMarkdownVariables_RejectsDuplicateName(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsUnknownKind(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"variables": []any{
 				map[string]any{"name": "bad", "source": map[string]any{"kind": "executions"}},
@@ -264,9 +264,9 @@ func TestValidateMarkdownVariables_RejectsUnknownKind(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsUnknownRunSelect(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"variables": []any{
 				map[string]any{"name": "bad", "source": map[string]any{"kind": "run", "select": "first"}},
@@ -279,9 +279,9 @@ func TestValidateMarkdownVariables_RejectsUnknownRunSelect(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
-	panel := DashboardPanel{
+	panel := ConsolePanel{
 		ID:   "p1",
-		Type: DashboardPanelTypeMarkdown,
+		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
 			"variables": []any{
 				map[string]any{"name": "bad", "source": map[string]any{"kind": "memory", "namespace": ""}},
@@ -325,7 +325,7 @@ spec:
       w: 6
       h: 4
 `
-	resource, err := DashboardFromYML([]byte(yaml))
+	resource, err := ConsoleFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Len(t, resource.Spec.Panels, 1)
 	content := resource.Spec.Panels[0].Content
@@ -337,7 +337,7 @@ spec:
 func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
-	for i := 0; i < MaxDashboardPanels+1; i++ {
+	for i := 0; i < MaxConsolePanels+1; i++ {
 		b.WriteString("    - id: p")
 		b.WriteString(strings.Repeat("a", 1))
 		b.WriteString(strings.Repeat("b", i+1))
@@ -345,50 +345,52 @@ func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 	}
 	b.WriteString("  layout: []\n")
 
-	_, err := DashboardFromYML([]byte(b.String()))
+	_, err := ConsoleFromYML([]byte(b.String()))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "too many panels")
 }
 
-func TestDashboardToYML_RoundTripsEmptyDashboard(t *testing.T) {
+func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	canvasID := uuid.New()
-	dashboard := &CanvasDashboard{
-		CanvasID: canvasID,
-		Panels:   datatypes.NewJSONType([]DashboardPanel{}),
-		Layout:   datatypes.NewJSONType([]DashboardLayoutItem{}),
+	canvasVersion := &CanvasVersion{
+		WorkflowID:    canvasID,
+		Name:          "Canvas Name",
+		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{}),
+		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{}),
 	}
 
-	out, err := DashboardToYML(dashboard, "Canvas Name")
+	out, err := CanvasVersionToConsoleYML(canvasVersion)
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
 	assert.Contains(t, string(out), "kind: Console")
 	assert.Contains(t, string(out), canvasID.String())
 	assert.Contains(t, string(out), "name: Canvas Name")
 
-	parsed, err := DashboardFromYML(out)
+	parsed, err := ConsoleFromYML(out)
 	require.NoError(t, err)
 	require.Equal(t, ConsoleKind, parsed.Kind)
 	assert.Empty(t, parsed.Spec.Panels)
 	assert.Empty(t, parsed.Spec.Layout)
 }
 
-func TestDashboardToYML_RoundTripsPanelsAndLayout(t *testing.T) {
+func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 	canvasID := uuid.New()
 	minW, minH := 2, 1
-	dashboard := &CanvasDashboard{
-		CanvasID: canvasID,
-		Panels: datatypes.NewJSONType([]DashboardPanel{
+	canvasVersion := &CanvasVersion{
+		WorkflowID: canvasID,
+		Name:       "Canvas Name",
+		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
 			{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hello"}},
 		}),
-		Layout: datatypes.NewJSONType([]DashboardLayoutItem{
+		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{
 			{I: "p1", X: 0, Y: 0, W: 4, H: 2, MinW: &minW, MinH: &minH},
 		}),
 	}
 
-	out, err := DashboardToYML(dashboard, "")
+	out, err := CanvasVersionToConsoleYML(canvasVersion)
 	require.NoError(t, err)
 
-	parsed, err := DashboardFromYML(out)
+	parsed, err := ConsoleFromYML(out)
 	require.NoError(t, err)
 	require.Len(t, parsed.Spec.Panels, 1)
 	require.Equal(t, "p1", parsed.Spec.Panels[0].ID)
@@ -400,36 +402,37 @@ func TestDashboardToYML_RoundTripsPanelsAndLayout(t *testing.T) {
 	assert.Equal(t, 2, *parsed.Spec.Layout[0].MinW)
 }
 
-func TestDashboardToYML_IsDeterministic(t *testing.T) {
+func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 	canvasID := uuid.New()
-	dashboard := &CanvasDashboard{
-		CanvasID: canvasID,
-		Panels: datatypes.NewJSONType([]DashboardPanel{
+	canvasVersion := &CanvasVersion{
+		WorkflowID: canvasID,
+		Name:       "Canvas Name",
+		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
 			{ID: "a", Type: "markdown", Content: map[string]any{"body": "hi"}},
 			{ID: "b", Type: "markdown", Content: map[string]any{"body": "hey"}},
 		}),
-		Layout: datatypes.NewJSONType([]DashboardLayoutItem{
+		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{
 			{I: "a", X: 0, Y: 0, W: 1, H: 1},
 			{I: "b", X: 1, Y: 0, W: 1, H: 1},
 		}),
 	}
 
-	first, err := DashboardToYML(dashboard, "name")
+	first, err := CanvasVersionToConsoleYML(canvasVersion)
 	require.NoError(t, err)
-	second, err := DashboardToYML(dashboard, "name")
+	second, err := CanvasVersionToConsoleYML(canvasVersion)
 	require.NoError(t, err)
 	assert.Equal(t, string(first), string(second))
 }
 
-func TestValidateDashboardContent_RejectsInvalidLayout(t *testing.T) {
-	panels := []DashboardPanel{{ID: "p", Type: "markdown", Content: map[string]any{}}}
-	err := ValidateDashboardContent(panels, []DashboardLayoutItem{
+func TestValidateConsoleContent_RejectsInvalidLayout(t *testing.T) {
+	panels := []ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}}
+	err := ValidateConsoleContent(panels, []ConsoleLayoutItem{
 		{I: "p", X: -1, Y: 0, W: 1, H: 1},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "non-negative")
 
-	err = ValidateDashboardContent(panels, []DashboardLayoutItem{
+	err = ValidateConsoleContent(panels, []ConsoleLayoutItem{
 		{I: "p", X: 0, Y: 0, W: 0, H: 1},
 	})
 	require.Error(t, err)
@@ -437,10 +440,10 @@ func TestValidateDashboardContent_RejectsInvalidLayout(t *testing.T) {
 }
 
 func TestValidateDashboardContent_AcceptsDraftTablePanel(t *testing.T) {
-	panels := []DashboardPanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "table",
-			Type: DashboardPanelTypeTable,
+			Type: ConsolePanelTypeTable,
 			Content: map[string]any{
 				"dataSource": map[string]any{"kind": "memory", "namespace": ""},
 				"render":     map[string]any{"kind": "table", "columns": []any{}},
@@ -448,21 +451,21 @@ func TestValidateDashboardContent_AcceptsDraftTablePanel(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
+func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		panel    DashboardPanel
+		panel    ConsolePanel
 		contains string
 	}{
 		{
 			name: "memory source without namespace",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory"},
 					"render":     map[string]any{"kind": "table", "columns": []any{}},
@@ -472,9 +475,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "table column without field",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -487,9 +490,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "table filter with unsupported op",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -503,9 +506,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "trigger row action without node",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -519,9 +522,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with unknown tone",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -537,9 +540,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with unsupported op",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -555,9 +558,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with empty field",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "table",
-				Type: DashboardPanelTypeTable,
+				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 					"render": map[string]any{
@@ -573,9 +576,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart with unsupported type",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "chart",
-				Type: DashboardPanelTypeChart,
+				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "executions"},
 					"render": map[string]any{
@@ -590,9 +593,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "data source limit with wrong type",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "chart",
-				Type: DashboardPanelTypeChart,
+				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "executions", "limit": "many"},
 					"render": map[string]any{
@@ -607,9 +610,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "number render prefix must be string",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "runs"},
 					"render":     map[string]any{"kind": "number", "aggregation": "count", "prefix": 42},
@@ -619,9 +622,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects render.aggregation",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{
 						"kind":    "memory",
@@ -637,9 +640,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects render.field",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{
 						"kind":    "memory",
@@ -655,9 +658,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects unknown combine",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{
 						"kind":    "memory",
@@ -673,9 +676,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel requires field for non-count source",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{
 						"kind":    "memory",
@@ -691,9 +694,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects empty sources",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"dataSource": map[string]any{
 						"kind":    "memory",
@@ -707,18 +710,18 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number panel rejects empty metrics",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:      "n",
-				Type:    DashboardPanelTypeNumber,
+				Type:    ConsolePanelTypeNumber,
 				Content: map[string]any{"metrics": []any{}},
 			},
 			contains: "metrics must be a non-empty array",
 		},
 		{
 			name: "multi-number metric rejects unknown aggregation",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"metrics": []any{
 						map[string]any{
@@ -732,9 +735,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric requires field for non-count aggregation",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"metrics": []any{
 						map[string]any{
@@ -748,9 +751,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric rejects composite data source",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"metrics": []any{
 						map[string]any{
@@ -768,9 +771,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric rejects non-number render kind",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "n",
-				Type: DashboardPanelTypeNumber,
+				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
 					"metrics": []any{
 						map[string]any{
@@ -784,9 +787,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart series prefix must be a string",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "chart",
-				Type: DashboardPanelTypeChart,
+				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "executions"},
 					"render": map[string]any{
@@ -801,9 +804,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart legend mode must be auto/show/hide",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "chart",
-				Type: DashboardPanelTypeChart,
+				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "executions"},
 					"render": map[string]any{
@@ -819,9 +822,9 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart seriesField must be a string",
-			panel: DashboardPanel{
+			panel: ConsolePanel{
 				ID:   "chart",
-				Type: DashboardPanelTypeChart,
+				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
 					"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
 					"render": map[string]any{
@@ -839,18 +842,18 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateDashboardContent([]DashboardPanel{tt.panel}, nil)
+			err := ValidateConsoleContent([]ConsolePanel{tt.panel}, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.contains)
 		})
 	}
 }
 
-func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "chart",
-			Type: DashboardPanelTypeChart,
+			Type: ConsolePanelTypeChart,
 			Content: map[string]any{
 				"dataSource": map[string]any{"kind": "executions"},
 				"render": map[string]any{
@@ -866,15 +869,15 @@ func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_AcceptsTableRowStyles(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "table",
-			Type: DashboardPanelTypeTable,
+			Type: ConsolePanelTypeTable,
 			Content: map[string]any{
 				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
 				"render": map[string]any{
@@ -890,15 +893,15 @@ func TestValidateDashboardContent_AcceptsTableRowStyles(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_AcceptsWidgetSort(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsWidgetSort(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "runs",
-			Type: DashboardPanelTypeTable,
+			Type: ConsolePanelTypeTable,
 			Content: map[string]any{
 				"dataSource": map[string]any{"kind": "executions"},
 				"render": map[string]any{
@@ -910,7 +913,7 @@ func TestValidateDashboardContent_AcceptsWidgetSort(t *testing.T) {
 		},
 		{
 			ID:   "perf",
-			Type: DashboardPanelTypeChart,
+			Type: ConsolePanelTypeChart,
 			Content: map[string]any{
 				"dataSource": map[string]any{"kind": "executions"},
 				"render": map[string]any{
@@ -924,14 +927,14 @@ func TestValidateDashboardContent_AcceptsWidgetSort(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_RejectsSortWithoutField(t *testing.T) {
-	panel := DashboardPanel{
+func TestValidateConsoleContent_RejectsSortWithoutField(t *testing.T) {
+	panel := ConsolePanel{
 		ID:   "runs",
-		Type: DashboardPanelTypeTable,
+		Type: ConsolePanelTypeTable,
 		Content: map[string]any{
 			"dataSource": map[string]any{"kind": "executions"},
 			"render": map[string]any{
@@ -942,15 +945,15 @@ func TestValidateDashboardContent_RejectsSortWithoutField(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
 }
 
-func TestValidateDashboardContent_RejectsSortWithBlankField(t *testing.T) {
-	panel := DashboardPanel{
+func TestValidateConsoleContent_RejectsSortWithBlankField(t *testing.T) {
+	panel := ConsolePanel{
 		ID:   "runs",
-		Type: DashboardPanelTypeTable,
+		Type: ConsolePanelTypeTable,
 		Content: map[string]any{
 			"dataSource": map[string]any{"kind": "executions"},
 			"render": map[string]any{
@@ -961,15 +964,15 @@ func TestValidateDashboardContent_RejectsSortWithBlankField(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
 }
 
-func TestValidateDashboardContent_RejectsUnknownSortOrder(t *testing.T) {
-	panel := DashboardPanel{
+func TestValidateConsoleContent_RejectsUnknownSortOrder(t *testing.T) {
+	panel := ConsolePanel{
 		ID:   "perf",
-		Type: DashboardPanelTypeChart,
+		Type: ConsolePanelTypeChart,
 		Content: map[string]any{
 			"dataSource": map[string]any{"kind": "executions"},
 			"render": map[string]any{
@@ -982,16 +985,16 @@ func TestValidateDashboardContent_RejectsUnknownSortOrder(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.order must be one of asc/desc`)
 }
 
-func TestValidateDashboardContent_AcceptsNodesPanel(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsNodesPanel(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
-			Type: DashboardPanelTypeNodes,
+			Type: ConsolePanelTypeNodes,
 			Content: map[string]any{
 				"title": "Key Nodes",
 				"nodes": []any{
@@ -1009,28 +1012,28 @@ func TestValidateDashboardContent_AcceptsNodesPanel(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_AcceptsDraftNodesPanel(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsDraftNodesPanel(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:      "key-nodes",
-			Type:    DashboardPanelTypeNodes,
+			Type:    ConsolePanelTypeNodes,
 			Content: map[string]any{"nodes": []any{}},
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
-			Type: DashboardPanelTypeNodes,
+			Type: ConsolePanelTypeNodes,
 			Content: map[string]any{
 				"nodes": []any{
 					map[string]any{"description": "missing"},
@@ -1039,30 +1042,30 @@ func TestValidateDashboardContent_RejectsNodesPanelMissingNodeRef(t *testing.T) 
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "content.nodes[0].node must be a non-empty string")
 }
 
-func TestValidateDashboardContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:      "key-nodes",
-			Type:    DashboardPanelTypeNodes,
+			Type:    ConsolePanelTypeNodes,
 			Content: map[string]any{"nodes": map[string]any{"oops": true}},
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "content.nodes must be an array")
 }
 
-func TestValidateDashboardContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
-			Type: DashboardPanelTypeNodes,
+			Type: ConsolePanelTypeNodes,
 			Content: map[string]any{
 				"nodes": []any{
 					map[string]any{"node": "deploy-prod", "showRun": "yes"},
@@ -1071,16 +1074,16 @@ func TestValidateDashboardContent_RejectsNodesPanelWithBadShowRun(t *testing.T) 
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "content.nodes[0].showRun must be a boolean")
 }
 
-func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsCompositeNumberPanel(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "score",
-			Type: DashboardPanelTypeNumber,
+			Type: ConsolePanelTypeNumber,
 			Content: map[string]any{
 				"dataSource": map[string]any{
 					"kind":    "memory",
@@ -1095,15 +1098,15 @@ func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
 
-func TestValidateDashboardContent_AcceptsMultiNumberPanel(t *testing.T) {
-	panels := []DashboardPanel{
+func TestValidateConsoleContent_AcceptsMultiNumberPanel(t *testing.T) {
+	panels := []ConsolePanel{
 		{
 			ID:   "kpis",
-			Type: DashboardPanelTypeNumber,
+			Type: ConsolePanelTypeNumber,
 			Content: map[string]any{
 				"title": "Pipeline KPIs",
 				"metrics": []any{
@@ -1127,6 +1130,6 @@ func TestValidateDashboardContent_AcceptsMultiNumberPanel(t *testing.T) {
 		},
 	}
 
-	err := ValidateDashboardContent(panels, nil)
+	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }

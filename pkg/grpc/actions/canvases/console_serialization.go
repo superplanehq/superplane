@@ -9,18 +9,18 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// MaxDashboardPanels and MaxDashboardPayloadBytes are re-exported from the
+// MaxConsolePanels and MaxConsolePayloadBytes are re-exported from the
 // models package so existing gRPC tests/callers keep working unchanged.
 const (
-	MaxDashboardPanels       = models.MaxDashboardPanels
-	MaxDashboardPayloadBytes = models.MaxDashboardPayloadBytes
+	MaxConsolePanels       = models.MaxConsolePanels
+	MaxConsolePayloadBytes = models.MaxConsolePayloadBytes
 )
 
-func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDashboard, error) {
-	panels := dashboard.Panels.Data()
-	layout := dashboard.Layout.Data()
+func serializeConsole(version *models.CanvasVersion) (*pb.Console, error) {
+	panels := version.ConsolePanels.Data()
+	layout := version.ConsoleLayout.Data()
 
-	pbPanels := make([]*pb.DashboardPanel, 0, len(panels))
+	pbPanels := make([]*pb.Console_Panel, 0, len(panels))
 	for _, panel := range panels {
 		var content *structpb.Value
 		if panel.Content != nil {
@@ -30,16 +30,16 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 			}
 			content = value
 		}
-		pbPanels = append(pbPanels, &pb.DashboardPanel{
+		pbPanels = append(pbPanels, &pb.Console_Panel{
 			Id:      panel.ID,
 			Type:    panel.Type,
 			Content: content,
 		})
 	}
 
-	pbLayout := make([]*pb.DashboardLayoutItem, 0, len(layout))
+	pbLayout := make([]*pb.Console_LayoutItem, 0, len(layout))
 	for _, item := range layout {
-		converted := &pb.DashboardLayoutItem{
+		converted := &pb.Console_LayoutItem{
 			I: item.I,
 			X: int32(item.X),
 			Y: int32(item.Y),
@@ -57,20 +57,22 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 		pbLayout = append(pbLayout, converted)
 	}
 
-	resp := &pb.CanvasDashboard{
-		CanvasId:  dashboard.CanvasID.String(),
-		VersionId: dashboard.VersionID.String(),
+	resp := &pb.Console{
+		CanvasId:  version.WorkflowID.String(),
+		VersionId: version.ID.String(),
 		Panels:    pbPanels,
 		Layout:    pbLayout,
 	}
-	if !dashboard.UpdatedAt.IsZero() {
-		resp.UpdatedAt = timestamppb.New(dashboard.UpdatedAt)
+
+	if version.UpdatedAt != nil && !version.UpdatedAt.IsZero() {
+		resp.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
+
 	return resp, nil
 }
 
-func deserializeDashboardPanels(in []*pb.DashboardPanel) ([]models.DashboardPanel, error) {
-	out := make([]models.DashboardPanel, 0, len(in))
+func deserializeConsolePanels(in []*pb.Console_Panel) ([]models.ConsolePanel, error) {
+	out := make([]models.ConsolePanel, 0, len(in))
 	for _, panel := range in {
 		var content map[string]any
 		if panel.GetContent() != nil {
@@ -86,7 +88,7 @@ func deserializeDashboardPanels(in []*pb.DashboardPanel) ([]models.DashboardPane
 		if content == nil {
 			content = map[string]any{}
 		}
-		out = append(out, models.DashboardPanel{
+		out = append(out, models.ConsolePanel{
 			ID:      panel.GetId(),
 			Type:    panel.GetType(),
 			Content: content,
@@ -95,10 +97,10 @@ func deserializeDashboardPanels(in []*pb.DashboardPanel) ([]models.DashboardPane
 	return out, nil
 }
 
-func deserializeDashboardLayout(in []*pb.DashboardLayoutItem) []models.DashboardLayoutItem {
-	out := make([]models.DashboardLayoutItem, 0, len(in))
+func deserializeConsoleLayout(in []*pb.Console_LayoutItem) []models.ConsoleLayoutItem {
+	out := make([]models.ConsoleLayoutItem, 0, len(in))
 	for _, item := range in {
-		converted := models.DashboardLayoutItem{
+		converted := models.ConsoleLayoutItem{
 			I: item.GetI(),
 			X: int(item.GetX()),
 			Y: int(item.GetY()),
