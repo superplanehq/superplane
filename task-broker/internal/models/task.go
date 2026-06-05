@@ -11,6 +11,7 @@ type Task struct {
 	MessageChainJSON        string     `gorm:""`
 	CommandJSON             string     `gorm:"not null"`
 	CommandsJSON            string     `gorm:""`
+	SetupCommandsJSON       string     `gorm:""`
 	EnvironmentJSON         string     `gorm:""`
 	WebhookURL              string     `gorm:"not null"`
 	Status                  string     `gorm:"not null;index:idx_tasks_fleet_status_created,priority:2"`

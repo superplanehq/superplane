@@ -40,6 +40,8 @@ type CreateTaskRequest struct {
 	// a PTY and sources each directive from a tempfile, stopping at the first failing
 	// directive ($? after source). Omit when using Command.
 	Commands []string `json:"commands,omitempty"`
+	// SetupCommands are optional shell directives run before javascript_script execution.
+	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL    string                `json:"webhook_url"`
@@ -75,6 +77,7 @@ type TaskPayload struct {
 	MessageChain  json.RawMessage       `json:"message_chain,omitempty"`
 	Command       []string              `json:"command,omitempty"`
 	Commands      []string              `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
+	SetupCommands []string              `json:"setup_commands,omitempty"`
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
 	ExecutionMode string                `json:"execution_mode"`
 	DockerImage   string                `json:"docker_image,omitempty"`
@@ -101,6 +104,7 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 		Script:        t.Script,
 		Command:       t.Command,
 		Commands:      t.Commands,
+		SetupCommands: t.SetupCommands,
 		Environment:   CloneEnvironment(t.Environment),
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,

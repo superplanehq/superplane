@@ -198,6 +198,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	switch kind {
 	case models.RunModeJavaScript:
 		task.Script = script
+		task.SetupCommands = api.NormalizeCommandLines(req.SetupCommands)
 		if len(bytes.TrimSpace(req.MessageChain)) > 0 {
 			if !json.Valid(req.MessageChain) {
 				writeError(w, http.StatusBadRequest, "message_chain must be valid JSON")
@@ -489,6 +490,7 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 	kind := api.EffectiveRunMode(req)
 	hasArgv := len(req.Command) > 0
 	hasCmds := len(api.NormalizeCommandLines(req.Commands)) > 0
+	hasSetup := len(api.NormalizeCommandLines(req.SetupCommands)) > 0
 	script := strings.TrimSpace(req.Script)
 	hasScript := script != ""
 	hasChain := len(bytes.TrimSpace(req.MessageChain)) > 0
@@ -498,14 +500,14 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		if !hasCmds {
 			return "commands required for run_mode command_list"
 		}
-		if hasArgv || hasScript || hasChain {
+		if hasArgv || hasScript || hasChain || hasSetup {
 			return "only commands allowed for run_mode command_list"
 		}
 	case models.RunModeArgv:
 		if !hasArgv {
 			return "command required for run_mode argv"
 		}
-		if hasCmds || hasScript || hasChain {
+		if hasCmds || hasScript || hasChain || hasSetup {
 			return "only command allowed for run_mode argv"
 		}
 	case models.RunModeJavaScript:
@@ -513,7 +515,7 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 			return "script required for run_mode javascript_script"
 		}
 		if hasArgv || hasCmds {
-			return "only script and message_chain allowed for run_mode javascript_script"
+			return "only script, setup_commands, and message_chain allowed for run_mode javascript_script"
 		}
 		if hasChain && !json.Valid(req.MessageChain) {
 			return "message_chain must be valid JSON"

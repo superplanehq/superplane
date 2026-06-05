@@ -35,6 +35,8 @@ type Task struct {
 	Command []string
 	// Commands are shell directives when non-empty (Bash+PTY sourcing per line on workers).
 	Commands []string
+	// SetupCommands are optional shell directives run before javascript_script tasks.
+	SetupCommands []string
 	// Environment is a task-scoped process environment sent only to runners.
 	Environment   []EnvironmentVariable
 	WebhookURL    string

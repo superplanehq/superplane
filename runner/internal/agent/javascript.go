@@ -76,15 +76,25 @@ func runJavaScriptHost(
 	live io.Writer,
 	resultHostPath string,
 ) (int, string, error) {
+	setup := api.NormalizeCommandLines(task.SetupCommands)
+	var combinedOut strings.Builder
+	if len(setup) > 0 {
+		exit, setupOut, err := runHostShellDirectives(ctx, max, workDir, setup, env, live, resultHostPath)
+		combinedOut.WriteString(setupOut)
+		if exit != 0 {
+			return exit, truncateString(combinedOut.String(), max), err
+		}
+	}
+
 	node, err := exec.LookPath("node")
 	if err != nil {
-		return 1, "", fmt.Errorf("node not available on this runner: %w", err)
+		return 1, truncateString(combinedOut.String(), max), fmt.Errorf("node not available on this runner: %w", err)
 	}
 
 	scriptDir := filepath.Join(workDir, ".superplane", task.ID)
 	programPath, err := writeJavaScriptProgram(scriptDir, task.Script, task.MessageChain)
 	if err != nil {
-		return 1, "", err
+		return 1, truncateString(combinedOut.String(), max), err
 	}
 	defer os.RemoveAll(scriptDir)
 
@@ -103,9 +113,11 @@ func runJavaScriptHost(
 	}
 
 	startedAt := time.Now()
-	writeLiveLogCommandStart(live, 0, "node "+javaScriptProgramName, startedAt)
+	jsIndex := len(setup)
+	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, startedAt)
 	runErr := cmd.Run()
-	out := truncateString(buf.String(), max)
+	combinedOut.WriteString(buf.String())
+	out := truncateString(combinedOut.String(), max)
 	exit := 0
 	if runErr != nil {
 		var ee *exec.ExitError
@@ -114,10 +126,10 @@ func runJavaScriptHost(
 		} else {
 			exit = 1
 		}
-		writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
+		writeLiveLogCommandEnd(live, jsIndex, exit, time.Since(startedAt))
 		return exit, out, runErr
 	}
-	writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
+	writeLiveLogCommandEnd(live, jsIndex, exit, time.Since(startedAt))
 	return exit, out, nil
 }
 
