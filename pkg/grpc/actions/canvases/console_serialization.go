@@ -64,7 +64,7 @@ func serializeConsole(version *models.CanvasVersion) (*pb.Console, error) {
 		Layout:    pbLayout,
 	}
 
-	if !version.UpdatedAt.IsZero() {
+	if version.UpdatedAt != nil && !version.UpdatedAt.IsZero() {
 		resp.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
 
