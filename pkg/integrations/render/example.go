@@ -31,6 +31,9 @@ var exampleOutputRollbackDeployBytes []byte
 //go:embed example_output_purge_cache.json
 var exampleOutputPurgeCacheBytes []byte
 
+//go:embed example_output_scale_service.json
+var exampleOutputScaleServiceBytes []byte
+
 //go:embed example_output_update_env_var.json
 var exampleOutputUpdateEnvVarBytes []byte
 
@@ -63,6 +66,9 @@ var exampleOutputRollbackDeploy map[string]any
 
 var exampleOutputPurgeCacheOnce sync.Once
 var exampleOutputPurgeCache map[string]any
+
+var exampleOutputScaleServiceOnce sync.Once
+var exampleOutputScaleService map[string]any
 
 var exampleOutputUpdateEnvVarOnce sync.Once
 var exampleOutputUpdateEnvVar map[string]any
@@ -137,6 +143,14 @@ func (c *PurgeCache) ExampleOutput() map[string]any {
 	)
 }
 
+func (c *ScaleService) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputScaleServiceOnce,
+		exampleOutputScaleServiceBytes,
+		&exampleOutputScaleService,
+	)
+}
+
 func (c *UpdateEnvVar) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleOutputUpdateEnvVarOnce,
@@ -159,4 +173,75 @@ func (c *RemoveCustomDomain) ExampleOutput() map[string]any {
 		exampleOutputRemoveCustomDomainBytes,
 		&exampleOutputRemoveCustomDomain,
 	)
+}
+
+func (c *ListDeploys) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.deploys.listed",
+		"data": map[string]any{
+			"serviceId": "srv-cukouhrtq21c73e9scng",
+			"count":     1,
+			"deploys": []map[string]any{
+				{"deployId": "dep-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "live"},
+			},
+			"latestSuccessful": map[string]any{"deployId": "dep-cukp0k3tq21c73e9sct0", "status": "live"},
+		},
+	}
+}
+
+func (c *GetMetrics) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.metrics",
+		"data": map[string]any{
+			"resources": []string{"srv-cukouhrtq21c73e9scng"},
+			"summaries": map[string]any{
+				"cpu":    map[string]any{"latest": 72.1, "avg": 58.4, "max": 84.2, "unit": "%"},
+				"memory": map[string]any{"latest": 68.9, "avg": 61.3, "max": 79.7, "unit": "%"},
+			},
+		},
+	}
+}
+
+func (c *ListLogs) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.logs",
+		"data": map[string]any{
+			"resources":  []string{"srv-cukouhrtq21c73e9scng"},
+			"count":      1,
+			"errorCount": 1,
+			"logs": []map[string]any{
+				{"timestamp": "2026-05-30T12:00:00Z", "level": "error", "message": "upstream timeout"},
+			},
+		},
+	}
+}
+
+func (c *UpdateService) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.service.updated",
+		"data": map[string]any{"serviceId": "srv-cukouhrtq21c73e9scng", "autoDeploy": "no", "status": "updated"},
+	}
+}
+
+func (c *UpdateAutoscaling) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.autoscaling.updated",
+		"data": map[string]any{
+			"serviceId": "srv-cukouhrtq21c73e9scng", "enabled": true, "minInstances": 1, "maxInstances": 3, "cpuPercent": 70, "memoryPercent": 75, "status": "updated",
+		},
+	}
+}
+
+func (c *CreateJob) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.job.created",
+		"data": map[string]any{"jobId": "job-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "pending"},
+	}
+}
+
+func (c *GetJob) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.job",
+		"data": map[string]any{"jobId": "job-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "succeeded"},
+	}
 }

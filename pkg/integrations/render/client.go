@@ -100,7 +100,42 @@ type deployRequest struct {
 	ClearCache string `json:"clearCache"`
 }
 
+type scaleServiceRequest struct {
+	NumInstances int `json:"numInstances"`
+}
+
+type updateServiceRequest struct {
+	AutoDeploy string `json:"autoDeploy,omitempty"`
+}
+
+type autoscalingRequest struct {
+	Enabled  bool                       `json:"enabled"`
+	Min      int                        `json:"min"`
+	Max      int                        `json:"max"`
+	Criteria autoscalingRequestCriteria `json:"criteria"`
+}
+
+type autoscalingRequestCriteria struct {
+	CPU    autoscalingCriterion `json:"cpu"`
+	Memory autoscalingCriterion `json:"memory"`
+}
+
+type autoscalingCriterion struct {
+	Enabled    bool `json:"enabled"`
+	Percentage int  `json:"percentage"`
+}
+
+type createJobRequest struct {
+	StartCommand string `json:"startCommand"`
+	PlanID       string `json:"planId,omitempty"`
+}
+
 type triggerDeployResponse struct {
+	Deploy DeployResponse `json:"deploy"`
+}
+
+type deployWithCursor struct {
+	Cursor string         `json:"cursor"`
 	Deploy DeployResponse `json:"deploy"`
 }
 
@@ -140,6 +175,65 @@ type UpdateEnvVarRequest struct {
 
 type rollbackRequest struct {
 	DeployID string `json:"deployId"`
+}
+
+type MetricQuery struct {
+	Resources         []string
+	StartTime         string
+	EndTime           string
+	ResolutionSeconds int
+	AggregationMethod string
+}
+
+type MetricSeries struct {
+	Labels []MetricLabel `json:"labels"`
+	Values []MetricValue `json:"values"`
+	Unit   string        `json:"unit"`
+}
+
+type MetricLabel struct {
+	Field string `json:"field"`
+	Value string `json:"value"`
+}
+
+type MetricValue struct {
+	Timestamp string  `json:"timestamp"`
+	Value     float64 `json:"value"`
+}
+
+type LogQuery struct {
+	Resources []string
+	Levels    []string
+	Types     []string
+	Text      []string
+	Paths     []string
+	StartTime string
+	EndTime   string
+	Direction string
+	Limit     int
+}
+
+type LogsResponse struct {
+	HasMore       bool             `json:"hasMore"`
+	NextStartTime string           `json:"nextStartTime"`
+	NextEndTime   string           `json:"nextEndTime"`
+	Logs          []map[string]any `json:"logs"`
+}
+
+type JobResponse struct {
+	ID           string `json:"id"`
+	ServiceID    string `json:"serviceId"`
+	StartCommand string `json:"startCommand"`
+	PlanID       string `json:"planId"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"createdAt"`
+	StartedAt    string `json:"startedAt"`
+	FinishedAt   string `json:"finishedAt"`
+}
+
+type jobWithCursor struct {
+	Cursor string      `json:"cursor"`
+	Job    JobResponse `json:"job"`
 }
 
 type EventResponse struct {
@@ -431,6 +525,35 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (DeployRespons
 	return deployResponse, nil
 }
 
+func (c *Client) ListDeploys(serviceID string, statuses []string, limit int) ([]DeployResponse, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	for _, status := range statuses {
+		status = strings.TrimSpace(status)
+		if status != "" {
+			query.Add("status", status)
+		}
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/deploys",
+		query,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseDeploys(body)
+}
+
 func (c *Client) GetDeploy(serviceID string, deployID string) (DeployResponse, error) {
 	if serviceID == "" {
 		return DeployResponse{}, fmt.Errorf("serviceID is required")
@@ -477,6 +600,40 @@ func (c *Client) GetService(serviceID string) (Service, error) {
 	}
 
 	return service, nil
+}
+
+func (c *Client) UpdateService(serviceID string, autoDeploy string) (Service, error) {
+	if serviceID == "" {
+		return Service{}, fmt.Errorf("serviceID is required")
+	}
+
+	autoDeploy = strings.TrimSpace(autoDeploy)
+	if autoDeploy != "yes" && autoDeploy != "no" {
+		return Service{}, fmt.Errorf("autoDeploy must be yes or no")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPatch,
+		"/services/"+url.PathEscape(serviceID),
+		nil,
+		updateServiceRequest{AutoDeploy: autoDeploy},
+	)
+	if err != nil {
+		return Service{}, err
+	}
+
+	service := Service{}
+	if err := json.Unmarshal(body, &service); err == nil && service.ID != "" {
+		return service, nil
+	}
+
+	wrapper := struct {
+		Service Service `json:"service"`
+	}{}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		return Service{}, fmt.Errorf("failed to unmarshal service response: %w", err)
+	}
+	return wrapper.Service, nil
 }
 
 func (c *Client) CancelDeploy(serviceID string, deployID string) (DeployResponse, error) {
@@ -543,6 +700,235 @@ func (c *Client) PurgeCache(serviceID string) error {
 		nil,
 	)
 	return err
+}
+
+func (c *Client) ScaleService(serviceID string, numInstances int) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+	if numInstances < 1 || numInstances > 100 {
+		return fmt.Errorf("numInstances must be between 1 and 100")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/scale",
+		nil,
+		scaleServiceRequest{NumInstances: numInstances},
+	)
+	return err
+}
+
+func (c *Client) UpdateAutoscaling(serviceID string, enabled bool, minInstances, maxInstances, cpuPercent, memoryPercent int) (map[string]any, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+	if minInstances < 1 {
+		return nil, fmt.Errorf("minInstances must be greater than 0")
+	}
+	if maxInstances < minInstances {
+		return nil, fmt.Errorf("maxInstances must be greater than or equal to minInstances")
+	}
+
+	request := autoscalingRequest{
+		Enabled: enabled,
+		Min:     minInstances,
+		Max:     maxInstances,
+		Criteria: autoscalingRequestCriteria{
+			CPU: autoscalingCriterion{
+				Enabled:    cpuPercent > 0,
+				Percentage: cpuPercent,
+			},
+			Memory: autoscalingCriterion{
+				Enabled:    memoryPercent > 0,
+				Percentage: memoryPercent,
+			},
+		},
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPut,
+		"/services/"+url.PathEscape(serviceID)+"/autoscaling",
+		nil,
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	response := map[string]any{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal autoscaling response: %w", err)
+	}
+	return response, nil
+}
+
+func (c *Client) GetMetric(metricType string, query MetricQuery) ([]MetricSeries, error) {
+	path, err := metricPath(metricType)
+	if err != nil {
+		return nil, err
+	}
+
+	values := url.Values{}
+	for _, resource := range query.Resources {
+		resource = strings.TrimSpace(resource)
+		if resource != "" {
+			values.Add("resource", resource)
+		}
+	}
+	if query.StartTime != "" {
+		values.Set("startTime", query.StartTime)
+	}
+	if query.EndTime != "" {
+		values.Set("endTime", query.EndTime)
+	}
+	if query.ResolutionSeconds > 0 {
+		values.Set("resolutionSeconds", fmt.Sprintf("%d", query.ResolutionSeconds))
+	}
+	if query.AggregationMethod != "" {
+		values.Set("aggregationMethod", query.AggregationMethod)
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, path, values, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	series := []MetricSeries{}
+	if err := json.Unmarshal(body, &series); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metric response: %w", err)
+	}
+	return series, nil
+}
+
+func metricPath(metricType string) (string, error) {
+	switch strings.TrimSpace(metricType) {
+	case "cpu":
+		return "/metrics/cpu", nil
+	case "memory":
+		return "/metrics/memory", nil
+	case "http_requests":
+		return "/metrics/http-requests", nil
+	case "active_connections":
+		return "/metrics/active-connections", nil
+	case "cpu_limit":
+		return "/metrics/cpu-limit", nil
+	case "memory_limit":
+		return "/metrics/memory-limit", nil
+	case "cpu_target":
+		return "/metrics/cpu-target", nil
+	case "memory_target":
+		return "/metrics/memory-target", nil
+	default:
+		return "", fmt.Errorf("unsupported metric type: %s", metricType)
+	}
+}
+
+func (c *Client) ListLogs(workspaceID string, query LogQuery) (LogsResponse, error) {
+	if workspaceID == "" {
+		return LogsResponse{}, fmt.Errorf("workspaceID is required")
+	}
+	if len(query.Resources) == 0 {
+		return LogsResponse{}, fmt.Errorf("at least one resource is required")
+	}
+
+	values := url.Values{}
+	values.Set("ownerId", workspaceID)
+	for _, resource := range query.Resources {
+		resource = strings.TrimSpace(resource)
+		if resource != "" {
+			values.Add("resource", resource)
+		}
+	}
+	for _, level := range query.Levels {
+		level = strings.TrimSpace(level)
+		if level != "" {
+			values.Add("level", level)
+		}
+	}
+	for _, logType := range query.Types {
+		logType = strings.TrimSpace(logType)
+		if logType != "" {
+			values.Add("type", logType)
+		}
+	}
+	for _, text := range query.Text {
+		text = strings.TrimSpace(text)
+		if text != "" {
+			values.Add("text", text)
+		}
+	}
+	for _, path := range query.Paths {
+		path = strings.TrimSpace(path)
+		if path != "" {
+			values.Add("path", path)
+		}
+	}
+	if query.StartTime != "" {
+		values.Set("startTime", query.StartTime)
+	}
+	if query.EndTime != "" {
+		values.Set("endTime", query.EndTime)
+	}
+	if query.Direction != "" {
+		values.Set("direction", query.Direction)
+	}
+	if query.Limit > 0 {
+		values.Set("limit", fmt.Sprintf("%d", query.Limit))
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/logs", values, nil)
+	if err != nil {
+		return LogsResponse{}, err
+	}
+
+	response := LogsResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return LogsResponse{}, fmt.Errorf("failed to unmarshal logs response: %w", err)
+	}
+	return response, nil
+}
+
+func (c *Client) CreateJob(serviceID, startCommand, planID string) (JobResponse, error) {
+	if serviceID == "" {
+		return JobResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if strings.TrimSpace(startCommand) == "" {
+		return JobResponse{}, fmt.Errorf("startCommand is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/jobs",
+		nil,
+		createJobRequest{StartCommand: startCommand, PlanID: strings.TrimSpace(planID)},
+	)
+	if err != nil {
+		return JobResponse{}, err
+	}
+
+	return parseJob(body)
+}
+
+func (c *Client) GetJob(serviceID, jobID string) (JobResponse, error) {
+	if serviceID == "" {
+		return JobResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if jobID == "" {
+		return JobResponse{}, fmt.Errorf("jobID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/jobs/"+url.PathEscape(jobID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return JobResponse{}, err
+	}
+
+	return parseJob(body)
 }
 
 func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVarRequest) (EnvVar, error) {
@@ -836,6 +1222,48 @@ func parseServices(body []byte) ([]Service, error) {
 	}
 
 	return plainServices, nil
+}
+
+func parseDeploys(body []byte) ([]DeployResponse, error) {
+	withCursor := []deployWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		deploys := make([]DeployResponse, 0, len(withCursor))
+		for _, item := range withCursor {
+			if item.Deploy.ID != "" {
+				deploys = append(deploys, item.Deploy)
+			}
+		}
+		return deploys, nil
+	}
+
+	deploys := []DeployResponse{}
+	if err := json.Unmarshal(body, &deploys); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deploys response: %w", err)
+	}
+	return deploys, nil
+}
+
+func parseJob(body []byte) (JobResponse, error) {
+	job := JobResponse{}
+	if err := json.Unmarshal(body, &job); err == nil && job.ID != "" {
+		return job, nil
+	}
+
+	wrapped := jobWithCursor{}
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Job.ID != "" {
+		return wrapped.Job, nil
+	}
+
+	wrapper := struct {
+		Job JobResponse `json:"job"`
+	}{}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		return JobResponse{}, fmt.Errorf("failed to unmarshal job response: %w", err)
+	}
+	if wrapper.Job.ID == "" {
+		return JobResponse{}, fmt.Errorf("job id is missing in response")
+	}
+	return wrapper.Job, nil
 }
 
 func parseWebhooks(body []byte) ([]Webhook, error) {

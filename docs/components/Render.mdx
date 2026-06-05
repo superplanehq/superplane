@@ -19,9 +19,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cancel Deploy" href="#cancel-deploy" description="Cancel an in-progress deploy for a Render service and wait for it to complete" />
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
+  <LinkCard title="List Deploys" href="#list-deploys" description="List recent deploys for rollback and incident workflows" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service and its custom domains" />
+  <LinkCard title="Get Metrics" href="#get-metrics" description="Fetch Render CPU, memory, request, and connection metrics" />
+  <LinkCard title="List Logs" href="#list-logs" description="Query recent Render logs for one or more resources" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
+  <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
+  <LinkCard title="Update Service" href="#update-service" description="Freeze or thaw auto deploys for a Render service" />
+  <LinkCard title="Update Autoscaling" href="#update-autoscaling" description="Update Render autoscaling settings for a web service" />
+  <LinkCard title="Create Job" href="#create-job" description="Create a Render one-off job from an existing service" />
+  <LinkCard title="Get Job" href="#get-job" description="Retrieve a Render one-off job status" />
   <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
@@ -424,6 +432,172 @@ The Rollback Deploy component triggers a rollback deploy for a Render service an
 }
 ```
 
+<a id="scale-service"></a>
+
+## Scale Service
+
+**Component key:** `render.scaleService`
+
+The Scale Service component changes a Render service's manual scaling target.
+
+### Use Cases
+
+- **Traffic preparation**: Increase service capacity before a known launch, load test, or migration
+- **Cost cleanup**: Scale non-production services back down after a demo or scheduled test window
+- **Multi-service orchestration**: Scale a web service and background worker together from one SuperPlane workflow
+
+### Configuration
+
+- **Service**: Render service to scale
+- **Instances**: Fixed instance count to request, from 1 to 100
+
+### Output
+
+Emits a `render.service.scaled` payload with `serviceId`, `numInstances`, and `status`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "numInstances": 3,
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:20:00.000000Z",
+  "type": "render.service.scaled"
+}
+```
+
+<a id="list-deploys"></a>
+
+## List Deploys
+
+**Component key:** `render.listDeploys`
+
+Lists recent deploys for a Render service. Use this in incident workflows to find the latest successful deploy before a rollback.
+
+### Configuration
+
+- **Service**: Render service to list deploys for
+- **Statuses**: Optional deploy statuses, for example `live`
+- **Limit**: Maximum deploys to return
+
+### Output
+
+Emits `render.deploys.listed` with `serviceId`, `count`, `deploys`, and `latestSuccessful` when a live deploy is present.
+
+<a id="get-metrics"></a>
+
+## Get Metrics
+
+**Component key:** `render.getMetrics`
+
+Fetches Render metrics and emits normalized summaries plus raw series.
+
+### Configuration
+
+- **Resources**: Render service, Postgres, or Key Value resource IDs
+- **Metric Types**: `cpu`, `memory`, `http_requests`, `active_connections`, `cpu_limit`, `memory_limit`, `cpu_target`, or `memory_target`
+- **Start Time / End Time**: Optional RFC3339 time range
+- **Resolution Seconds**: Optional metric resolution, default `60`
+- **Aggregation Method**: Optional `AVG`, `MAX`, or `MIN`
+
+### Output
+
+Emits `render.metrics` with `resources`, `metrics`, and `summaries`. Each summary includes `latest`, `avg`, `max`, `count`, and `unit`.
+
+<a id="list-logs"></a>
+
+## List Logs
+
+**Component key:** `render.listLogs`
+
+Queries recent Render logs across one or more resources in the configured workspace.
+
+### Configuration
+
+- **Resources**: Render resource IDs to query
+- **Levels / Types / Text / Paths**: Optional filters
+- **Start Time / End Time**: Optional RFC3339 time range
+- **Direction**: `backward` or `forward`
+- **Limit**: Maximum logs to return
+
+### Output
+
+Emits `render.logs` with `resources`, `count`, `errorCount`, pagination fields, and `logs`.
+
+<a id="update-service"></a>
+
+## Update Service
+
+**Component key:** `render.updateService`
+
+Updates Render service settings. The current implementation supports `autoDeploy`, which is useful for freezing deploys during an incident and thawing them after recovery.
+
+### Configuration
+
+- **Service**: Render service to update
+- **Auto Deploy**: `Enabled` (`yes`) or `Disabled` (`no`)
+
+### Output
+
+Emits `render.service.updated` with `serviceId`, `autoDeploy`, and `status`.
+
+<a id="update-autoscaling"></a>
+
+## Update Autoscaling
+
+**Component key:** `render.updateAutoscaling`
+
+Updates Render autoscaling settings for a web service.
+
+### Configuration
+
+- **Service**: Render web service to update
+- **Enabled**: Whether autoscaling should be enabled
+- **Min Instances / Max Instances**: Autoscaling bounds
+- **Target CPU Percent / Target Memory Percent**: Autoscaling targets
+
+### Output
+
+Emits `render.autoscaling.updated` with the requested bounds, targets, status, and Render response.
+
+<a id="create-job"></a>
+
+## Create Job
+
+**Component key:** `render.createJob`
+
+Creates a Render one-off job from an existing service. Use this for health checks, queue drains, repair tasks, and operational runbooks.
+
+### Configuration
+
+- **Service**: Render service to run the job from
+- **Start Command**: Command to execute
+- **Plan ID**: Optional Render plan ID
+
+### Output
+
+Emits `render.job.created` with `jobId`, `serviceId`, `startCommand`, and status fields when available.
+
+<a id="get-job"></a>
+
+## Get Job
+
+**Component key:** `render.getJob`
+
+Retrieves the current status of a Render one-off job.
+
+### Configuration
+
+- **Service**: Render service that owns the job
+- **Job ID**: Render job ID
+
+### Output
+
+Emits `render.job` with `jobId`, `serviceId`, status, and timestamps when available.
+
 <a id="add-custom-domain"></a>
 
 ## Add Custom Domain
@@ -543,4 +717,3 @@ Emits a `render.envVar.updated` payload with `serviceId`, `key`, and a `valueGen
   "type": "render.envVar.updated"
 }
 ```
-
