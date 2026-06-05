@@ -8,6 +8,20 @@ import { MentionTextarea } from "./MentionTextarea";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 
+type ChatComposerProps = {
+  onSend: (content: string) => Promise<void>;
+  onStop: () => void;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+  nodes?: SuperplaneComponentsNode[];
+  runs?: CanvasesCanvasRun[];
+};
+
 export function ChatComposer({
   onSend,
   onStop,
@@ -20,19 +34,7 @@ export function ChatComposer({
   modeDisabled,
   nodes,
   runs,
-}: {
-  onSend: (content: string) => Promise<void>;
-  onStop: () => void;
-  sending: boolean;
-  sendPending: boolean;
-  stopping?: boolean;
-  statusLabel: string;
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
-  modeDisabled?: boolean;
-  nodes?: SuperplaneComponentsNode[];
-  runs?: CanvasesCanvasRun[];
-}) {
+}: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -69,21 +71,6 @@ export function ChatComposer({
     }
   }, [isEmpty, getMarkdown, clear, onSend, snapshot, restore]);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setValue(e.target.value);
-      setCursorPos(e.target.selectionStart ?? e.target.value.length);
-    },
-    [setValue, setCursorPos],
-  );
-
-  const handleSelect = useCallback(
-    (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-      setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? 0);
-    },
-    [setCursorPos],
-  );
-
   const handleMentionSelect = useCallback(
     (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
       const pos = insertMention(item);
@@ -102,13 +89,6 @@ export function ChatComposer({
     dismiss();
     textareaRef.current?.focus();
   }, [dismiss]);
-
-  const handleScroll = useCallback(() => {
-    if (textareaRef.current && backdropRef.current) {
-      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
-      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
-    }
-  }, []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -131,10 +111,9 @@ export function ChatComposer({
         <MentionTextarea
           value={value}
           mentions={mentions}
-          onChange={handleChange}
-          onSelect={handleSelect}
+          setValue={setValue}
+          setCursorPos={setCursorPos}
           onKeyDown={handleKeyDown}
-          onScroll={handleScroll}
           placeholder="Ask the agent…"
           textareaRef={textareaRef}
           backdropRef={backdropRef}

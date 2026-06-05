@@ -14,44 +14,43 @@ function timeAgo(dateStr?: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function buildNodeCandidates(nodes: SuperplaneComponentsNode[], filterLower: string): MentionCandidate[] {
+  return nodes
+    .map((node): MentionCandidate | null => {
+      const name = node.name || node.id || "";
+      if (filterLower && !name.toLowerCase().includes(filterLower)) return null;
+      return {
+        type: "node",
+        id: node.id || "",
+        label: name,
+        meta: node.component,
+        isTrigger: node.type === "TYPE_TRIGGER",
+      };
+    })
+    .filter((c): c is MentionCandidate => c !== null);
+}
+
+function buildRunCandidates(runs: CanvasesCanvasRun[], filterLower: string): MentionCandidate[] {
+  return runs
+    .slice(0, 10)
+    .map((run): MentionCandidate | null => {
+      const label = `Run #${run.id?.slice(0, 6) || "?"}`;
+      if (filterLower && !label.toLowerCase().includes(filterLower)) return null;
+      return { type: "run", id: run.id || "", label, meta: run.result || run.state, timeAgo: timeAgo(run.createdAt) };
+    })
+    .filter((c): c is MentionCandidate => c !== null);
+}
+
 export function useMentionCandidates(
   nodes: SuperplaneComponentsNode[] | undefined,
   runs: CanvasesCanvasRun[] | undefined,
   filter: string,
 ): MentionCandidate[] {
-  return useMemo((): MentionCandidate[] => {
+  return useMemo(() => {
     const filterLower = filter.toLowerCase();
-    const result: MentionCandidate[] = [];
-
-    if (nodes) {
-      for (const node of nodes) {
-        const name = node.name || node.id || "";
-        if (filterLower && !name.toLowerCase().includes(filterLower)) continue;
-        result.push({
-          type: "node",
-          id: node.id || "",
-          label: name,
-          meta: node.component,
-          isTrigger: node.type === "TYPE_TRIGGER",
-        });
-      }
-    }
-
-    if (runs) {
-      const recentRuns = runs.slice(0, 10);
-      for (const run of recentRuns) {
-        const label = `Run #${run.id?.slice(0, 6) || "?"}`;
-        if (filterLower && !label.toLowerCase().includes(filterLower)) continue;
-        result.push({
-          type: "run",
-          id: run.id || "",
-          label,
-          meta: run.result || run.state,
-          timeAgo: timeAgo(run.createdAt),
-        });
-      }
-    }
-
-    return result;
+    return [
+      ...(nodes ? buildNodeCandidates(nodes, filterLower) : []),
+      ...(runs ? buildRunCandidates(runs, filterLower) : []),
+    ];
   }, [nodes, runs, filter]);
 }

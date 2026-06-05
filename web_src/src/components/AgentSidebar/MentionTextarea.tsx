@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { BackdropContent } from "./BackdropContent";
 import type { InsertedMention } from "./useMentions";
@@ -5,10 +6,9 @@ import type { InsertedMention } from "./useMentions";
 interface MentionTextareaProps {
   value: string;
   mentions: InsertedMention[];
-  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void;
+  setValue: (v: string) => void;
+  setCursorPos: (pos: number) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onScroll: () => void;
   placeholder?: string;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   backdropRef: React.RefObject<HTMLDivElement | null>;
@@ -17,17 +17,37 @@ interface MentionTextareaProps {
 export function MentionTextarea({
   value,
   mentions,
-  onChange,
-  onSelect,
+  setValue,
+  setCursorPos,
   onKeyDown,
-  onScroll,
   placeholder,
   textareaRef,
   backdropRef,
 }: MentionTextareaProps) {
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setValue(e.target.value);
+      setCursorPos(e.target.selectionStart ?? e.target.value.length);
+    },
+    [setValue, setCursorPos],
+  );
+
+  const handleSelect = useCallback(
+    (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+      setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? 0);
+    },
+    [setCursorPos],
+  );
+
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && backdropRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  }, [textareaRef, backdropRef]);
+
   return (
     <div className="relative">
-      {/* Backdrop: renders styled text + mention chips behind transparent textarea */}
       <div
         ref={backdropRef}
         aria-hidden="true"
@@ -38,15 +58,14 @@ export function MentionTextarea({
       >
         <BackdropContent text={value} mentions={mentions} />
       </div>
-      {/* Textarea — text is transparent when mentions exist so chips show through */}
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={onChange}
-        onSelect={onSelect}
-        onKeyUp={onSelect}
-        onClick={onSelect}
-        onScroll={onScroll}
+        onChange={handleChange}
+        onSelect={handleSelect}
+        onKeyUp={handleSelect}
+        onClick={handleSelect}
+        onScroll={handleScroll}
         rows={1}
         placeholder={placeholder}
         data-testid="agent-input"
