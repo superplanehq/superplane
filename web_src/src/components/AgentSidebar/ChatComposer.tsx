@@ -1,25 +1,12 @@
-import { ArrowUp, Loader2, Square } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
-import { BackdropContent } from "./BackdropContent";
-import { ModeToggle } from "./ModeToggle";
+import { ComposerToolbar } from "./ComposerToolbar";
 import { useMentions } from "./useMentions";
-import { MentionDropdown, type MentionCandidate } from "./MentionDropdown";
+import { useMentionCandidates } from "./useMentionCandidates";
+import { MentionDropdown } from "./MentionDropdown";
+import { MentionTextarea } from "./MentionTextarea";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
-
-function timeAgo(dateStr?: string): string {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export function ChatComposer({
   onSend,
@@ -66,55 +53,15 @@ export function ChatComposer({
     dismiss,
   } = useMentions();
 
-  // Build mention candidates from nodes + runs, filtered by current input
-  const candidates = useMemo((): MentionCandidate[] => {
-    const filterLower = filter.toLowerCase();
-    const result: MentionCandidate[] = [];
-
-    // Nodes
-    if (nodes) {
-      for (const node of nodes) {
-        const name = node.name || node.id || "";
-        if (filterLower && !name.toLowerCase().includes(filterLower)) continue;
-        result.push({
-          type: "node",
-          id: node.id || "",
-          label: name,
-          meta: node.component,
-          isTrigger: node.type === "TYPE_TRIGGER",
-        });
-      }
-    }
-
-    // Runs (show recent 10)
-    if (runs) {
-      const recentRuns = runs.slice(0, 10);
-      for (const run of recentRuns) {
-        const label = `Run #${run.id?.slice(0, 6) || "?"}`;
-        if (filterLower && !label.toLowerCase().includes(filterLower)) continue;
-        result.push({
-          type: "run",
-          id: run.id || "",
-          label,
-          meta: run.result || run.state,
-          timeAgo: timeAgo(run.createdAt),
-        });
-      }
-    }
-
-    return result;
-  }, [nodes, runs, filter]);
-
+  const candidates = useMentionCandidates(nodes, runs, filter);
   const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
     if (isEmpty) return;
     const content = getMarkdown().trim();
     if (!content) return;
-
     snapshot();
     clear();
-
     try {
       await onSend(content);
     } catch {
@@ -139,13 +86,12 @@ export function ChatComposer({
 
   const handleMentionSelect = useCallback(
     (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
-      const newCursorPos = insertMention(item);
-      // Set DOM caret position after React re-renders
+      const pos = insertMention(item);
       requestAnimationFrame(() => {
         const ta = textareaRef.current;
         if (ta) {
           ta.focus();
-          ta.setSelectionRange(newCursorPos, newCursorPos);
+          ta.setSelectionRange(pos, pos);
         }
       });
     },
@@ -157,7 +103,6 @@ export function ChatComposer({
     textareaRef.current?.focus();
   }, [dismiss]);
 
-  // Sync scroll between textarea and backdrop
   const handleScroll = useCallback(() => {
     if (textareaRef.current && backdropRef.current) {
       backdropRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -165,99 +110,47 @@ export function ChatComposer({
     }
   }, []);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (mentionKeyboardRef.current?.(e)) return;
+      if (e.key !== "Enter") return;
+      if ("isComposing" in e.nativeEvent && e.nativeEvent.isComposing) return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      if (canSend) void handleSend();
+    },
+    [canSend, handleSend],
+  );
+
   return (
     <footer className="px-3 pb-3 pt-2">
       <div
         ref={containerRef}
         className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15"
       >
-        {/* Textarea wrapper with backdrop overlay */}
-        <div className="relative">
-          {/* Backdrop: renders styled text + mention chips behind transparent textarea */}
-          <div
-            ref={backdropRef}
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none absolute inset-0 whitespace-pre-wrap break-words overflow-hidden",
-              "px-3 py-2.5 text-sm",
-            )}
-          >
-            <BackdropContent text={value} mentions={mentions} />
-          </div>
-          {/* Textarea — text is transparent when mentions exist so chips show through */}
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onSelect={handleSelect}
-            onKeyUp={handleSelect}
-            onClick={handleSelect}
-            onScroll={handleScroll}
-            rows={1}
-            placeholder="Ask the agent…"
-            data-testid="agent-input"
-            className={cn(
-              "relative min-h-9 w-full resize-none border-0 bg-transparent px-3 py-2.5 text-sm shadow-none",
-              "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
-              "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-              // Always transparent — backdrop provides visual text
-              "text-transparent caret-slate-900 selection:bg-blue-200/50",
-              "dark:bg-transparent",
-            )}
-            onKeyDown={(e) => {
-              // Let MentionDropdown handle keys when visible
-              if (mentionKeyboardRef.current?.(e)) {
-                return;
-              }
-              if (e.key !== "Enter") return;
-              const nativeEvent = e.nativeEvent;
-              if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
-              if (e.shiftKey) return;
-              e.preventDefault();
-              if (!canSend) return;
-              void handleSend();
-            }}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-2 px-2 pb-2">
-          <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <span className="truncate text-xs text-muted-foreground">{statusLabel}</span>
-            {sending && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0 rounded-full border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                onClick={onStop}
-                disabled={stopping}
-                aria-label={stopping ? "Stopping" : "Stop"}
-                title={stopping ? "Stopping..." : "Stop"}
-                data-testid="agent-stop-button"
-              >
-                {stopping ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                ) : (
-                  <Square className="size-3 fill-current" aria-hidden />
-                )}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="default"
-              size="icon"
-              className="size-7 shrink-0 rounded-full"
-              onClick={() => void handleSend()}
-              disabled={!canSend}
-              aria-label="Send message"
-              data-testid="agent-send-message-button"
-            >
-              <ArrowUp className="size-3.5" aria-hidden />
-            </Button>
-          </div>
-        </div>
+        <MentionTextarea
+          value={value}
+          mentions={mentions}
+          onChange={handleChange}
+          onSelect={handleSelect}
+          onKeyDown={handleKeyDown}
+          onScroll={handleScroll}
+          placeholder="Ask the agent…"
+          textareaRef={textareaRef}
+          backdropRef={backdropRef}
+        />
+        <ComposerToolbar
+          agentMode={agentMode}
+          onModeSwitch={onModeSwitch}
+          modeDisabled={modeDisabled}
+          sending={sending}
+          stopping={stopping}
+          statusLabel={statusLabel}
+          canSend={canSend}
+          onStop={onStop}
+          onSend={() => void handleSend()}
+        />
       </div>
-
       <MentionDropdown
         items={candidates}
         visible={showDropdown}
