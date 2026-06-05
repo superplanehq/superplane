@@ -7,15 +7,21 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
+function resolveTextFieldLanguage(field: FieldRendererProps["field"]): string {
+  const language = field.typeOptions?.text?.language?.trim();
+  return language || "plaintext";
+}
+
 export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const language = resolveTextFieldLanguage(field);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
-    languageId: "plaintext",
+    languageId: language,
   });
 
-  const editorValue = coerceMonacoValue(value);
+  const editorValue = coerceMonacoValue(value ?? field.defaultValue);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editorValue);
@@ -46,7 +52,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
     contextmenu: true,
     selectOnLineNumbers: true,
     bracketPairColorization: {
-      enabled: false,
+      enabled: language !== "plaintext",
     },
     suggestOnTriggerCharacters: true,
     quickSuggestions: {
@@ -75,7 +81,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           </div>
           <Editor
             height="100%"
-            defaultLanguage="plaintext"
+            defaultLanguage={language}
             value={editorValue}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
@@ -109,7 +115,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
             <Editor
               height="600px"
-              defaultLanguage="plaintext"
+              defaultLanguage={language}
               value={editorValue}
               onChange={handleEditorChange}
               onMount={handleEditorMount}
