@@ -2,38 +2,34 @@ import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
-import { buildWorkflowFilesEditorResult } from "./lib/build-workflow-files-editor-result";
-import { useWorkflowFilesEditorLifecycle } from "./useWorkflowFilesEditorLifecycle";
-import { useWorkflowFilesPendingState } from "./useWorkflowFilesPendingState";
-import { useWorkflowFilesPublish } from "./useWorkflowFilesPublish";
-import { useWorkflowFilesTabState } from "./useWorkflowFilesTabState";
-import {
-  useWorkflowRepositoryFilesCatalog,
-  useWorkflowRepositoryPathLists,
-  useWorkflowRepositorySelectedFileQuery,
-} from "./useWorkflowRepositoryFilesCatalog";
-import type { WorkflowFile, WorkflowFilesHeaderActionsState } from "./workflow-files-types";
+import { buildFilesEditorResult } from "./lib/build-files-editor-result";
+import { useEditorLifecycle } from "./useEditorLifecycle";
+import { usePendingState } from "./usePendingState";
+import { useFilesPublish } from "./useFilesPublish";
+import { useFilesTabState } from "./useFilesTabState";
+import { useCatalog, useRepositoryPathLists, useRepositorySelectedFileQuery } from "./useCatalog";
+import type { AppFile, FilesHeaderActionsState } from "./types";
 
-type UseWorkflowRepositoryFilesEditorOptions = {
+type UseEditorOptions = {
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
-  files: WorkflowFile[];
+  files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
+  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
 };
 
-export function useWorkflowRepositoryFilesEditor({
+export function useEditor({
   canvasId,
   isEditing,
   canWrite,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
-}: UseWorkflowRepositoryFilesEditorOptions) {
+}: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
-  const catalog = useWorkflowRepositoryFilesCatalog(canvasId, files);
+  const catalog = useCatalog(canvasId, files);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
   const [isDiffOpen, setIsDiffOpen] = useState(false);
@@ -41,11 +37,11 @@ export function useWorkflowRepositoryFilesEditor({
   const loadedContentByPathRef = useRef(loadedContentByPath);
   loadedContentByPathRef.current = loadedContentByPath;
 
-  const bootstrapPaths = useWorkflowRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, []);
+  const bootstrapPaths = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, []);
   const allPathsRef = useRef(bootstrapPaths.allPaths);
   const finalRepositoryPathsRef = useRef(bootstrapPaths.finalRepositoryPaths);
   const openFileRef = useRef<(path: string) => void>(() => {});
-  const pending = useWorkflowFilesPendingState({
+  const pending = usePendingState({
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
     finalRepositoryPathsRef,
@@ -57,19 +53,19 @@ export function useWorkflowRepositoryFilesEditor({
     () => Object.values(pending.pendingChangesByPath).sort((left, right) => left.path.localeCompare(right.path)),
     [pending.pendingChangesByPath],
   );
-  const pathLists = useWorkflowRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
+  const pathLists = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
-  const tabs = useWorkflowFilesTabState(catalog.generatedPaths[0] ?? null, pathLists.allPaths, catalog.generatedPaths);
+  const tabs = useFilesTabState(catalog.generatedPaths[0] ?? null, pathLists.allPaths, catalog.generatedPaths);
   openFileRef.current = tabs.openFile;
-  const selection = useWorkflowRepositorySelectedFileQuery(
+  const selection = useRepositorySelectedFileQuery(
     canvasId,
     tabs.selectedPath,
     catalog.repositoryPathSet,
     catalog.generatedFilesByPath,
   );
 
-  useWorkflowFilesPublish({
+  useFilesPublish({
     canManageRepositoryFiles,
     canPublishFiles:
       canManageRepositoryFiles && pendingChanges.length > 0 && !pathLists.commitPathError && !commitFiles.isPending,
@@ -82,7 +78,7 @@ export function useWorkflowRepositoryFilesEditor({
     onHeaderActionsChange,
     commitFiles,
   });
-  useWorkflowFilesEditorLifecycle({
+  useEditorLifecycle({
     isEditing,
     resetPendingState: pending.resetPendingState,
     setIsDiffOpen,
@@ -93,7 +89,7 @@ export function useWorkflowRepositoryFilesEditor({
     setLoadedContentByPath,
   });
 
-  return buildWorkflowFilesEditorResult({
+  return buildFilesEditorResult({
     catalog,
     pathLists,
     tabs,

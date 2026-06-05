@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
 
-import type { PendingFileChange } from "./workflow-files-types";
+import type { PendingFileChange } from "./types";
 
-export function WorkflowFilesTabBar({
+export function TabBar({
   openTabs,
   selectedPath,
   pendingChangesByPath,

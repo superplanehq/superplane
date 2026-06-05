@@ -1,4 +1,4 @@
-import type { PendingFileChange } from "../workflow-files-types";
+import type { PendingFileChange } from "../types";
 
 export function applyPendingContentUpdate(
   current: Record<string, PendingFileChange>,

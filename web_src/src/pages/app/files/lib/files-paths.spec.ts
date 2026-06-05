@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./workflow-files-paths";
+import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./files-paths";
 
-describe("workflow-files-paths", () => {
+describe("files-paths", () => {
   it("normalizes file paths", () => {
     expect(normalizeFilePath("  foo/bar.txt  ")).toBe("foo/bar.txt");
     expect(normalizeFilePath("\\foo\\bar.txt")).toBe("foo/bar.txt");
