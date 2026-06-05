@@ -129,6 +129,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
 		FleetID:           a.Config.FleetID,
 		LeaseSeconds:      int((10 * time.Minute).Seconds()),
 		LaunchRequestedAt: a.Config.LaunchRequestedAt,
+		OneShot:           a.Config.ExitAfterEachTask,
 	}
 	writeMu.Lock()
 	helloErr := conn.WriteJSON(hello)

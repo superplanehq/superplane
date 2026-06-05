@@ -28,6 +28,10 @@ type Hello struct {
 	FleetID           string `json:"fleet_id"`
 	LeaseSeconds      int    `json:"lease_seconds"`
 	LaunchRequestedAt int64  `json:"launch_requested_at,omitempty"`
+	// OneShot instructs the broker to close the stream after delivering exactly one task.
+	// Set by runners configured with ExitAfterEachTask=true so the broker never races to
+	// claim a second task before the runner's WS close is observed.
+	OneShot bool `json:"one_shot,omitempty"`
 }
 
 // Task is server -> client after a successful claim.

@@ -114,6 +114,9 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 			if err := s.runnerStreamOneTask(conn, ctx, task, runnerID, writeMu); err != nil {
 				return
 			}
+			if hello.OneShot {
+				return
+			}
 			_ = conn.SetReadDeadline(time.Now().Add(runnerStreamReadIdle))
 			continue
 		}
