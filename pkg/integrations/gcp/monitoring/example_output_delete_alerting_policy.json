@@ -1,0 +1,8 @@
+{
+  "type": "gcp.monitoring.alertingPolicy.deleted",
+  "data": {
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "id": "1234567890123456789"
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}
