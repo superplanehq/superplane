@@ -57,9 +57,31 @@ const (
 	CreateAlarmPayloadType = "aws.ec2.alarm"
 	GetAlarmPayloadType    = "aws.ec2.alarm"
 
+	CreateLoadBalancerPayloadType = "aws.ec2.loadBalancer"
+	DeleteLoadBalancerPayloadType = "aws.ec2.loadBalancer.deleted"
+
 	instancePollInterval    = 10 * time.Second
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
+
+	loadBalancerPollInterval    = 15 * time.Second
+	maxLoadBalancerPollErrors   = 10
+	maxLoadBalancerPollAttempts = 120
+)
+
+const (
+	LoadBalancerStateProvisioning   = "provisioning"
+	LoadBalancerStateActive         = "active"
+	LoadBalancerStateActiveImpaired = "active_impaired"
+	LoadBalancerStateFailed         = "failed"
+	LoadBalancerStateDeleting       = "deleting"
+
+	LoadBalancerTypeApplication = "application"
+	LoadBalancerTypeNetwork     = "network"
+	LoadBalancerTypeGateway     = "gateway"
+
+	LoadBalancerSchemeInternetFacing = "internet-facing"
+	LoadBalancerSchemeInternal       = "internal"
 )
 
 var EC2MetricOptions = []configuration.FieldOption{
