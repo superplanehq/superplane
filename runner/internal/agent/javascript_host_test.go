@@ -20,8 +20,8 @@ func TestHostExecutorJavaScriptScript(t *testing.T) {
 
 	resultPath := filepath.Join(t.TempDir(), "result.json")
 	task := &api.TaskPayload{
-		ID:           "task-js-host",
-		RunMode:      string(models.RunModeJavaScript),
+		ID:      "task-js-host",
+		RunMode: string(models.RunModeJavaScript),
 		Script: `function main() {
   return { pr: $['GitHub PR'].data.number, ok: true };
 }`,
@@ -40,8 +40,8 @@ func TestHostExecutorJavaScriptScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	var result struct {
-		PR  int  `json:"pr"`
-		OK  bool `json:"ok"`
+		PR int  `json:"pr"`
+		OK bool `json:"ok"`
 	}
 	if err := json.Unmarshal(b, &result); err != nil {
 		t.Fatalf("result json: %v body=%s", err, b)
