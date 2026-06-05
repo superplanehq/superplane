@@ -27,9 +27,11 @@ import (
 const (
 	ec2ServiceName        = "ec2"
 	ssmServiceName        = "ssm"
+	elbServiceName        = "elasticloadbalancing"
 	cloudWatchServiceName = "monitoring"
 	ssmTargetPrefix       = "AmazonSSM."
 	ec2APIVersion         = "2016-11-15"
+	elbAPIVersion         = "2015-12-01"
 	cloudWatchAPIVersion  = "2010-08-01"
 	ResourceTypeImageOS   = "ec2.imageOS"
 	maxPublicImagesPerOS  = 200
@@ -1967,4 +1969,296 @@ func publicImageResourceName(image Image) string {
 	}
 
 	return fmt.Sprintf("%s (%s, %s)", name, image.ImageID, architecture)
+}
+
+// ────────────────────────────────────────────────────────────
+// ELBv2 types
+// ────────────────────────────────────────────────────────────
+
+type LoadBalancer struct {
+	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
+	Name            string `json:"name" mapstructure:"name"`
+	DNSName         string `json:"dnsName" mapstructure:"dnsName"`
+	Scheme          string `json:"scheme" mapstructure:"scheme"`
+	Type            string `json:"type" mapstructure:"type"`
+	State           string `json:"state" mapstructure:"state"`
+	VpcID           string `json:"vpcId" mapstructure:"vpcId"`
+	Region          string `json:"region" mapstructure:"region"`
+}
+
+type CreateLoadBalancerInput struct {
+	Name           string
+	Type           string
+	Scheme         string
+	SubnetIDs      []string
+	SecurityGroups []string
+}
+
+type CreateLoadBalancerOutput struct {
+	RequestID       string `json:"requestId" mapstructure:"requestId"`
+	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
+	Name            string `json:"name" mapstructure:"name"`
+	DNSName         string `json:"dnsName" mapstructure:"dnsName"`
+	Scheme          string `json:"scheme" mapstructure:"scheme"`
+	Type            string `json:"type" mapstructure:"type"`
+	State           string `json:"state" mapstructure:"state"`
+	VpcID           string `json:"vpcId" mapstructure:"vpcId"`
+	Region          string `json:"region" mapstructure:"region"`
+}
+
+type DeleteLoadBalancerOutput struct {
+	RequestID       string `json:"requestId" mapstructure:"requestId"`
+	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
+	Region          string `json:"region" mapstructure:"region"`
+}
+
+// XML parse helpers for ELBv2 responses
+
+type xmlLoadBalancerState struct {
+	Code string `xml:"Code"`
+}
+
+type xmlLoadBalancerMember struct {
+	LoadBalancerARN  string               `xml:"LoadBalancerArn"`
+	LoadBalancerName string               `xml:"LoadBalancerName"`
+	DNSName          string               `xml:"DNSName"`
+	Scheme           string               `xml:"Scheme"`
+	Type             string               `xml:"Type"`
+	State            xmlLoadBalancerState `xml:"State"`
+	VpcID            string               `xml:"VpcId"`
+}
+
+type xmlLoadBalancerMembers struct {
+	Members []xmlLoadBalancerMember `xml:"member"`
+}
+
+type xmlCreateLoadBalancerResult struct {
+	LoadBalancers xmlLoadBalancerMembers `xml:"LoadBalancers"`
+}
+
+type xmlCreateLoadBalancerResponse struct {
+	RequestID string                      `xml:"ResponseMetadata>RequestId"`
+	Result    xmlCreateLoadBalancerResult `xml:"CreateLoadBalancerResult"`
+}
+
+type xmlDescribeLoadBalancersResult struct {
+	LoadBalancers xmlLoadBalancerMembers `xml:"LoadBalancers"`
+}
+
+type xmlDescribeLoadBalancersResponse struct {
+	RequestID string                         `xml:"ResponseMetadata>RequestId"`
+	Result    xmlDescribeLoadBalancersResult `xml:"DescribeLoadBalancersResult"`
+}
+
+type xmlDeleteLoadBalancerResponse struct {
+	RequestID string `xml:"ResponseMetadata>RequestId"`
+}
+
+func parseELBError(body []byte) *common.Error {
+	var errResp struct {
+		Error struct {
+			Code    string `xml:"Code"`
+			Message string `xml:"Message"`
+		} `xml:"Error"`
+		RequestID string `xml:"RequestId"`
+	}
+
+	if err := xml.Unmarshal(body, &errResp); err == nil {
+		if strings.TrimSpace(errResp.Error.Code) != "" || strings.TrimSpace(errResp.Error.Message) != "" {
+			return &common.Error{
+				Code:    strings.TrimSpace(errResp.Error.Code),
+				Message: strings.TrimSpace(errResp.Error.Message),
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) postELBForm(action string, params url.Values, out any) error {
+	if params == nil {
+		params = url.Values{}
+	}
+
+	params.Set("Action", action)
+	params.Set("Version", elbAPIVersion)
+
+	body := []byte(params.Encode())
+	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", elbServiceName, c.region)
+	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("failed to build ELB request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+	if err := c.signRequest(req, body, elbServiceName); err != nil {
+		return err
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("ELB request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read ELB response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if awsErr := parseELBError(responseBody); awsErr != nil {
+			return awsErr
+		}
+		return fmt.Errorf("ELB API request failed with %d: %s", res.StatusCode, string(responseBody))
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	if err := xml.Unmarshal(responseBody, out); err != nil {
+		return fmt.Errorf("failed to decode ELB response: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) CreateLoadBalancer(input CreateLoadBalancerInput) (*CreateLoadBalancerOutput, error) {
+	params := url.Values{}
+	params.Set("Name", strings.TrimSpace(input.Name))
+	params.Set("Type", strings.TrimSpace(input.Type))
+	params.Set("Scheme", strings.TrimSpace(input.Scheme))
+
+	for i, subnetID := range input.SubnetIDs {
+		trimmed := strings.TrimSpace(subnetID)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("Subnets.member.%d", i+1), trimmed)
+	}
+
+	for i, sgID := range input.SecurityGroups {
+		trimmed := strings.TrimSpace(sgID)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("SecurityGroups.member.%d", i+1), trimmed)
+	}
+
+	response := xmlCreateLoadBalancerResponse{}
+	if err := c.postELBForm("CreateLoadBalancer", params, &response); err != nil {
+		return nil, err
+	}
+
+	members := response.Result.LoadBalancers.Members
+	if len(members) == 0 {
+		return nil, fmt.Errorf("response did not include load balancer details")
+	}
+
+	lb := members[0]
+	if strings.TrimSpace(lb.LoadBalancerARN) == "" {
+		return nil, fmt.Errorf("response did not include load balancer ARN")
+	}
+
+	return &CreateLoadBalancerOutput{
+		RequestID:       response.RequestID,
+		LoadBalancerARN: lb.LoadBalancerARN,
+		Name:            lb.LoadBalancerName,
+		DNSName:         lb.DNSName,
+		Scheme:          lb.Scheme,
+		Type:            lb.Type,
+		State:           lb.State.Code,
+		VpcID:           lb.VpcID,
+		Region:          c.region,
+	}, nil
+}
+
+func (c *Client) DeleteLoadBalancer(loadBalancerARN string) (*DeleteLoadBalancerOutput, error) {
+	params := url.Values{}
+	params.Set("LoadBalancerArn", strings.TrimSpace(loadBalancerARN))
+
+	response := xmlDeleteLoadBalancerResponse{}
+	if err := c.postELBForm("DeleteLoadBalancer", params, &response); err != nil {
+		return nil, err
+	}
+
+	return &DeleteLoadBalancerOutput{
+		RequestID:       response.RequestID,
+		LoadBalancerARN: strings.TrimSpace(loadBalancerARN),
+		Region:          c.region,
+	}, nil
+}
+
+func (c *Client) DescribeLoadBalancer(loadBalancerARN string) (*LoadBalancer, error) {
+	params := url.Values{}
+	params.Set("LoadBalancerArns.member.1", strings.TrimSpace(loadBalancerARN))
+
+	response := xmlDescribeLoadBalancersResponse{}
+	if err := c.postELBForm("DescribeLoadBalancers", params, &response); err != nil {
+		return nil, err
+	}
+
+	members := response.Result.LoadBalancers.Members
+	if len(members) == 0 {
+		return nil, &common.Error{
+			Code:    "LoadBalancerNotFound",
+			Message: fmt.Sprintf("load balancer not found: %s", loadBalancerARN),
+		}
+	}
+
+	lb := members[0]
+	return &LoadBalancer{
+		LoadBalancerARN: lb.LoadBalancerARN,
+		Name:            lb.LoadBalancerName,
+		DNSName:         lb.DNSName,
+		Scheme:          lb.Scheme,
+		Type:            lb.Type,
+		State:           lb.State.Code,
+		VpcID:           lb.VpcID,
+		Region:          c.region,
+	}, nil
+}
+
+func (c *Client) ListLoadBalancers() ([]LoadBalancer, error) {
+	loadBalancers := []LoadBalancer{}
+	marker := ""
+
+	for {
+		params := url.Values{}
+		params.Set("PageSize", "100")
+		if marker != "" {
+			params.Set("Marker", marker)
+		}
+
+		response := xmlDescribeLoadBalancersResponse{}
+		if err := c.postELBForm("DescribeLoadBalancers", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, lb := range response.Result.LoadBalancers.Members {
+			loadBalancers = append(loadBalancers, LoadBalancer{
+				LoadBalancerARN: lb.LoadBalancerARN,
+				Name:            lb.LoadBalancerName,
+				DNSName:         lb.DNSName,
+				Scheme:          lb.Scheme,
+				Type:            lb.Type,
+				State:           lb.State.Code,
+				VpcID:           lb.VpcID,
+				Region:          c.region,
+			})
+		}
+
+		// ELBv2 DescribeLoadBalancers uses a Marker for pagination
+		// The marker field lives inside <DescribeLoadBalancersResult><NextMarker>
+		// We break when there are no more results
+		break
+	}
+
+	return loadBalancers, nil
+}
+
+func IsLoadBalancerNotFound(err error) bool {
+	var awsErr *common.Error
+	return errors.As(err, &awsErr) && awsErr.Code == "LoadBalancerNotFound"
 }
