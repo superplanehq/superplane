@@ -1,7 +1,7 @@
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { consoleToYaml } from "../console/consoleYaml";
-import type { WorkflowFile } from "../workflow-files-types";
+import { consoleToYaml } from "../../console/consoleYaml";
+import type { CanvasFile } from "../types";
 
 type ConsolePanelInput = {
   id?: string;
@@ -23,7 +23,7 @@ type CanvasYamlPayload = {
   yamlText: string;
 } | null;
 
-export function buildWorkflowFiles({
+export function buildAppFiles({
   canvasYamlPayload,
   panels,
   layout,
@@ -39,7 +39,7 @@ export function buildWorkflowFiles({
   canvasName: string | undefined;
   consoleLoading: boolean;
   consoleError: unknown;
-}): WorkflowFile[] {
+}): CanvasFile[] {
   const consoleYamlText = consoleToYaml({
     panels: normalizePanels(panels),
     layout: normalizeLayout(layout),

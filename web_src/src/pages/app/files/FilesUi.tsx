@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { GitCompareArrows } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function WorkflowFilesDiffHeaderAction({
+export function DiffHeaderAction({
   hasPendingChanges,
   onDiffOpen,
 }: {
@@ -22,7 +22,7 @@ export function WorkflowFilesDiffHeaderAction({
   );
 }
 
-export function WorkflowFilesIconButton({
+export function IconButton({
   label,
   disabled,
   onClick,

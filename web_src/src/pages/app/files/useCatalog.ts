@@ -1,14 +1,10 @@
 import { useCanvasRepository, useCanvasRepositoryFile, useCanvasRepositoryFiles } from "@/hooks/useCanvasData";
 import { useMemo } from "react";
 
-import {
-  buildFinalRepositoryPaths,
-  buildRenderableTreePaths,
-  getPathValidationError,
-} from "./lib/workflow-files-paths";
-import type { PendingFileChange, WorkflowFile } from "./workflow-files-types";
+import { buildFinalRepositoryPaths, buildRenderableTreePaths, getPathValidationError } from "./lib/files-paths";
+import type { PendingFileChange, CanvasFile } from "./types";
 
-export function useWorkflowRepositoryFilesCatalog(canvasId: string | undefined, files: WorkflowFile[]) {
+export function useCatalog(canvasId: string | undefined, files: CanvasFile[]) {
   const canUseRepository = !!canvasId;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";
@@ -16,7 +12,7 @@ export function useWorkflowRepositoryFilesCatalog(canvasId: string | undefined, 
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
   const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
   const generatedFilesByPath = useMemo(() => {
-    const generatedFiles = new Map<string, WorkflowFile>();
+    const generatedFiles = new Map<string, CanvasFile>();
     for (const file of files) {
       generatedFiles.set(file.path, file);
     }
@@ -46,7 +42,7 @@ export function useWorkflowRepositoryFilesCatalog(canvasId: string | undefined, 
   };
 }
 
-export function useWorkflowRepositoryPathLists(
+export function useRepositoryPathLists(
   generatedPaths: string[],
   repositoryPaths: string[],
   pendingChanges: PendingFileChange[],
@@ -80,11 +76,11 @@ export function useWorkflowRepositoryPathLists(
   return { allPaths, visiblePaths, finalRepositoryPaths, commitPathError };
 }
 
-export function useWorkflowRepositorySelectedFileQuery(
+export function useRepositorySelectedFileQuery(
   canvasId: string | undefined,
   selectedPath: string | null,
   repositoryPathSet: Set<string>,
-  generatedFilesByPath: Map<string, WorkflowFile>,
+  generatedFilesByPath: Map<string, CanvasFile>,
 ) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
