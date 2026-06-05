@@ -40,7 +40,7 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 		return nil, status.Error(codes.InvalidArgument, "invalid provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, spec)
+	data, err := prepareSecretData(ctx, encryptor, spec, spec.Metadata.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -81,7 +81,11 @@ func secretProviderToProto(provider string) pb.Secret_Provider {
 	}
 }
 
-func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *pb.Secret) ([]byte, error) {
+// prepareSecretData encrypts the local secret payload using aadName as the
+// AES-GCM additional authenticated data. aadName must match the name the
+// secret will have in the database after the operation completes; otherwise
+// subsequent decrypts will fail.
+func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *pb.Secret, aadName string) ([]byte, error) {
 	if secret.Spec == nil {
 		return nil, fmt.Errorf("missing secret spec")
 	}
@@ -96,7 +100,7 @@ func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *
 			return nil, err
 		}
 
-		encrypted, err := encryptor.Encrypt(ctx, data, []byte(secret.Metadata.Name))
+		encrypted, err := encryptor.Encrypt(ctx, data, []byte(aadName))
 		if err != nil {
 			return nil, err
 		}

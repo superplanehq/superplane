@@ -67,6 +67,39 @@ func (s *Secret) UpdateName(name string) (*Secret, error) {
 	return s, nil
 }
 
+// UpdateNameAndData updates the secret name and encrypted data atomically.
+//
+// Local secret data is encrypted with the secret name as AES-GCM additional
+// authenticated data (AAD). Renaming a secret without re-encrypting the data
+// makes subsequent decrypts fail. Use this helper when the data must be
+// re-encrypted with the new name to keep both columns consistent.
+func (s *Secret) UpdateNameAndData(name string, data []byte) (*Secret, error) {
+	now := time.Now()
+
+	err := database.Conn().
+		Model(s).
+		Clauses(clause.Returning{}).
+		Where("id = ?", s.ID).
+		Updates(map[string]any{
+			"name":       name,
+			"data":       data,
+			"updated_at": &now,
+		}).
+		Error
+
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+		return nil, err
+	}
+
+	s.Name = name
+	s.Data = data
+	s.UpdatedAt = &now
+	return s, nil
+}
+
 func (s *Secret) Delete() error {
 	return database.Conn().Delete(s).Error
 }
