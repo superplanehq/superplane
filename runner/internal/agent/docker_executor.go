@@ -108,19 +108,27 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(pullOut)
 	}
 
-	var jsWorkDir string
-	if api.RunModeForTask(task) == models.RunModeJavaScript {
+	var scriptWorkDir string
+	switch api.RunModeForTask(task) {
+	case models.RunModeJavaScript:
 		var prepErr error
-		jsWorkDir, prepErr = prepareDockerJavaScriptWorkDir(task)
+		scriptWorkDir, prepErr = prepareDockerJavaScriptWorkDir(task)
 		if prepErr != nil {
 			return 1, "", prepErr
 		}
-		defer os.RemoveAll(jsWorkDir)
+		defer os.RemoveAll(scriptWorkDir)
+	case models.RunModePython:
+		var prepErr error
+		scriptWorkDir, prepErr = prepareDockerPythonWorkDir(task)
+		if prepErr != nil {
+			return 1, "", prepErr
+		}
+		defer os.RemoveAll(scriptWorkDir)
 	}
 
 	runArgs := []string{"run", "-d", "--name", name}
-	if jsWorkDir != "" {
-		runArgs = append(runArgs, "-v", jsWorkDir+":"+dockerJavaScriptWorkMount+":ro")
+	if scriptWorkDir != "" {
+		runArgs = append(runArgs, "-v", scriptWorkDir+":"+dockerScriptWorkMount+":ro")
 	}
 	if rp := strings.TrimSpace(resultHostPath); rp != "" {
 		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
@@ -146,8 +154,13 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(runOut)
 	}
 
-	if api.RunModeForTask(task) == models.RunModeJavaScript {
+	switch api.RunModeForTask(task) {
+	case models.RunModeJavaScript:
 		exitCode, execOut, runErr := dockerExecJavaScript(ctx, name, task, live)
+		out.WriteString(stripLiveLogControlLines(execOut))
+		return exitCode, out.String(), runErr
+	case models.RunModePython:
+		exitCode, execOut, runErr := dockerExecPython(ctx, name, task, live)
 		out.WriteString(stripLiveLogControlLines(execOut))
 		return exitCode, out.String(), runErr
 	}
@@ -204,6 +217,37 @@ func dockerExecNode(ctx context.Context, name string, task *api.TaskPayload, liv
 	}
 	args := append([]string{"exec"}, envArgs...)
 	args = append(args, name, "node", dockerJavaScriptProgramPath())
+	return runDockerExec(ctx, args, live)
+}
+
+func dockerExecPython(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	setup := normalizeDirectiveLines(task.SetupCommands)
+	var combined bytes.Buffer
+
+	if len(setup) > 0 {
+		exit, setupOut, err := dockerExecShellDirectives(ctx, name, task, setup, live)
+		combined.WriteString(setupOut)
+		if exit != 0 {
+			return exit, combined.String(), err
+		}
+	}
+
+	startedAt := time.Now()
+	pyIndex := len(setup)
+	writeLiveLogCommandStart(live, pyIndex, "python3 "+pythonProgramName, startedAt)
+	exit, pyOut, err := dockerExecPython3(ctx, name, task, live)
+	writeLiveLogCommandEnd(live, pyIndex, exit, time.Since(startedAt))
+	combined.WriteString(pyOut)
+	return exit, combined.String(), err
+}
+
+func dockerExecPython3(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
+	args := append([]string{"exec"}, envArgs...)
+	args = append(args, name, "python3", dockerPythonProgramPath())
 	return runDockerExec(ctx, args, live)
 }
 

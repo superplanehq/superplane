@@ -28,11 +28,11 @@ type EnvironmentVariable = models.EnvironmentVariable
 
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
-	// RunMode is command_list, argv, or javascript_script. Omit to infer from body fields.
+	// RunMode is command_list, argv, javascript_script, or python_script. Omit to infer from body fields.
 	RunMode string `json:"run_mode,omitempty"`
-	// Script is user JavaScript when run_mode is javascript_script.
+	// Script is user code when run_mode is javascript_script or python_script.
 	Script string `json:"script,omitempty"`
-	// MessageChain is the SuperPlane $ object for javascript_script tasks.
+	// MessageChain is the SuperPlane $ object for script tasks.
 	MessageChain json.RawMessage `json:"message_chain,omitempty"`
 	// Command is argv for one process. Omit when using Commands or Script.
 	Command []string `json:"command,omitempty"`
@@ -40,7 +40,7 @@ type CreateTaskRequest struct {
 	// a PTY and sources each directive from a tempfile, stopping at the first failing
 	// directive ($? after source). Omit when using Command.
 	Commands []string `json:"commands,omitempty"`
-	// SetupCommands are optional shell directives run before javascript_script execution.
+	// SetupCommands are optional shell directives run before script execution.
 	SetupCommands []string `json:"setup_commands,omitempty"`
 	// Environment is sent only to runners and is not returned in status/webhook payloads.
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
