@@ -3,9 +3,9 @@ import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
 import { useEffect, useRef } from "react";
 import type { ContextMenuItem, ContextMenuOpenContext } from "@pierre/trees";
 
-import { repositoryFileTreeStyle } from "./workflow-files-types";
+import { repositoryFileTreeStyle } from "./types";
 
-export function WorkflowFilesFileList({
+export function FileList({
   paths,
   selectedPath,
   loading,

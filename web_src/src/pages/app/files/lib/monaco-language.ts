@@ -22,7 +22,7 @@ const EXTENSION_TO_MONACO_LANGUAGE: Record<string, string> = {
   yml: "yaml",
 };
 
-export function getWorkflowFileMonacoLanguage(path: string): string {
+export function getFileMonacoLanguage(path: string): string {
   const normalizedPath = path.toLowerCase();
 
   if (normalizedPath.endsWith("dockerfile") || normalizedPath.includes("/dockerfile")) {
