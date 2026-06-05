@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,7 +37,7 @@ func TestAdminListOrganizations(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := signer.Generate(account.ID.String(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -684,7 +685,7 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 
 	t.Run("non-admin with impersonation cookie is ignored", func(t *testing.T) {
-		regularToken, err := signer.Generate(otherAccount.ID.String(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{

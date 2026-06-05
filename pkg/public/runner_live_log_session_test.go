@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -57,7 +58,7 @@ func runnerLiveLogSessionGET(
 		nil,
 	)
 	req.Header.Set("x-organization-id", r.Organization.ID.String())
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	rec := httptest.NewRecorder()

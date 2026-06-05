@@ -148,6 +148,8 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
 
+			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
@@ -233,6 +235,11 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
 			}
+
+			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
+				authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+			}
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
@@ -502,6 +509,10 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64
 	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
 		return "", 0, fmt.Errorf("invalid account token: %v", err)
+	}
+
+	if !authentication.IsAccountSessionWithinMaxAge(claims) {
+		return "", 0, fmt.Errorf("session exceeded maximum age")
 	}
 
 	accountClaim, exists := claims["sub"]
