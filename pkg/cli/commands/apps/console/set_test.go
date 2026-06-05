@@ -54,7 +54,7 @@ func describeCanvasCMEnabledResponse(t *testing.T, w http.ResponseWriter, _ *htt
 	_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testCanvasID + `","name":"` + testCanvasName + `"},"spec":{"changeManagement":{"enabled":true}}}}`))
 }
 
-func handleUpdateDashboard(t *testing.T, expectedVersionID string) func(*testing.T, http.ResponseWriter, *http.Request) {
+func handleUpdateConsole(t *testing.T, expectedVersionID string) func(*testing.T, http.ResponseWriter, *http.Request) {
 	return func(_ *testing.T, w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func handleUpdateDashboard(t *testing.T, expectedVersionID string) func(*testing
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
-            "dashboard": {
+            "console": {
                 "canvasId": "` + testCanvasID + `",
                 "versionId": "` + expectedVersionID + `",
                 "panels": [{"id":"notes","type":"markdown","content":{"body":"Hello world"}}],
@@ -98,8 +98,8 @@ func TestSetFromFileFlag(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 
@@ -129,8 +129,8 @@ func TestSetFromPositionalFile(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 
@@ -155,8 +155,8 @@ func TestSetFromStdin(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 
@@ -194,8 +194,8 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 
@@ -207,7 +207,7 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 		http.MethodGet + " " + testDescribeCanvas,
 		http.MethodGet + " /api/v1/canvases/" + testCanvasID + "/versions",
 		http.MethodPost + " /api/v1/canvases/" + testCanvasID + "/versions",
-		http.MethodPut + " " + testDashboardPath,
+		http.MethodPut + " " + testConsolePath,
 	})
 }
 
@@ -230,8 +230,8 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 
@@ -278,8 +278,8 @@ func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 		requestExpectation{
 			method: http.MethodPost,
@@ -324,8 +324,8 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
+			path:   testConsolePath,
+			handle: handleUpdateConsole(t, "draft-1"),
 		},
 	)
 

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func resolveDashboardVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersionID string) (uuid.UUID, error) {
+func resolveConsoleVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersionID string) (uuid.UUID, error) {
 	if requestedVersionID != "" {
 		versionUUID, err := uuid.Parse(requestedVersionID)
 		if err != nil {
@@ -32,7 +32,7 @@ func resolveDashboardVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVers
 	return liveVersion.ID, nil
 }
 
-func ensureDashboardVersionReadable(
+func ensureConsoleVersionReadable(
 	ctx context.Context,
 	tx *gorm.DB,
 	canvas *models.Canvas,

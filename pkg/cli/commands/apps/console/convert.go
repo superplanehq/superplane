@@ -2,12 +2,12 @@ package console
 
 import "github.com/superplanehq/superplane/pkg/openapi_client"
 
-// consoleYAMLFromAPI converts the API-returned dashboard payload into the
+// consoleYAMLFromAPI converts the API-returned console payload into the
 // canonical YAML shape. Empty panels/layout default to empty slices so the
 // exported YAML always has a stable form.
-func consoleYAMLFromAPI(canvasName string, dashboard openapi_client.CanvasesCanvasDashboard) ConsoleYAML {
-	panels := make([]ConsoleYAMLPanel, 0, len(dashboard.GetPanels()))
-	for _, panel := range dashboard.GetPanels() {
+func consoleYAMLFromAPI(canvasName string, console openapi_client.CanvasesConsole) ConsoleYAML {
+	panels := make([]ConsoleYAMLPanel, 0, len(console.GetPanels()))
+	for _, panel := range console.GetPanels() {
 		content := map[string]any{}
 		for k, v := range panel.GetContent() {
 			content[k] = v
@@ -19,8 +19,8 @@ func consoleYAMLFromAPI(canvasName string, dashboard openapi_client.CanvasesCanv
 		})
 	}
 
-	layout := make([]ConsoleYAMLLayoutItem, 0, len(dashboard.GetLayout()))
-	for _, item := range dashboard.GetLayout() {
+	layout := make([]ConsoleYAMLLayoutItem, 0, len(console.GetLayout()))
+	for _, item := range console.GetLayout() {
 		converted := ConsoleYAMLLayoutItem{
 			I: item.GetI(),
 			X: int(item.GetX()),
@@ -43,7 +43,7 @@ func consoleYAMLFromAPI(canvasName string, dashboard openapi_client.CanvasesCanv
 		APIVersion: ConsoleAPIVersion,
 		Kind:       ConsoleKind,
 		Metadata: ConsoleYAMLMetadata{
-			CanvasID: dashboard.GetCanvasId(),
+			CanvasID: console.GetCanvasId(),
 			Name:     canvasName,
 		},
 		Spec: ConsoleYAMLSpec{
@@ -54,12 +54,12 @@ func consoleYAMLFromAPI(canvasName string, dashboard openapi_client.CanvasesCanv
 }
 
 // apiPanelsFromYAML converts parsed YAML panels into the API request shape.
-func apiPanelsFromYAML(panels []ConsoleYAMLPanel) []openapi_client.CanvasesDashboardPanel {
-	out := make([]openapi_client.CanvasesDashboardPanel, 0, len(panels))
+func apiPanelsFromYAML(panels []ConsoleYAMLPanel) []openapi_client.ConsolePanel {
+	out := make([]openapi_client.ConsolePanel, 0, len(panels))
 	for _, panel := range panels {
 		id := panel.ID
 		panelType := panel.Type
-		converted := openapi_client.CanvasesDashboardPanel{
+		converted := openapi_client.ConsolePanel{
 			Id:   &id,
 			Type: &panelType,
 		}
@@ -73,15 +73,15 @@ func apiPanelsFromYAML(panels []ConsoleYAMLPanel) []openapi_client.CanvasesDashb
 
 // apiLayoutFromYAML converts parsed YAML layout entries into the API request
 // shape.
-func apiLayoutFromYAML(layout []ConsoleYAMLLayoutItem) []openapi_client.CanvasesDashboardLayoutItem {
-	out := make([]openapi_client.CanvasesDashboardLayoutItem, 0, len(layout))
+func apiLayoutFromYAML(layout []ConsoleYAMLLayoutItem) []openapi_client.ConsoleLayoutItem {
+	out := make([]openapi_client.ConsoleLayoutItem, 0, len(layout))
 	for _, item := range layout {
 		i := item.I
 		x := int32(item.X)
 		y := int32(item.Y)
 		w := int32(item.W)
 		h := int32(item.H)
-		converted := openapi_client.CanvasesDashboardLayoutItem{
+		converted := openapi_client.ConsoleLayoutItem{
 			I: &i,
 			X: &x,
 			Y: &y,

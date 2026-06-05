@@ -5,13 +5,13 @@ import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData"
 import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 import { dashboardToYaml } from "./dashboard/dashboardYaml";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
-import type { CanvasesCanvasDashboard } from "@/api-client";
+import type { CanvasesConsole } from "@/api-client";
 
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
 
-function dashboardYamlText(canvasId: string, dashboard?: CanvasesCanvasDashboard | null): string {
+function dashboardYamlText(canvasId: string, dashboard?: CanvasesConsole | null): string {
   return dashboardToYaml({
     panels: (dashboard?.panels ?? []).map((panel) => ({
       id: panel.id ?? "",

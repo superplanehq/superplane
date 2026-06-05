@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-client";
+import type { ConsoleLayoutItem, ConsolePanel } from "@/api-client";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 
@@ -88,7 +88,7 @@ export function DashboardOverlay({
 
   const panels: DashboardPanel[] = useMemo(
     () =>
-      (dashboardQuery.data?.panels || []).map((panel: CanvasesDashboardPanel) => ({
+      (dashboardQuery.data?.panels || []).map((panel: ConsolePanel) => ({
         id: panel.id || "",
         type: panel.type || "markdown",
         content: (panel.content as Record<string, unknown>) || {},
@@ -98,7 +98,7 @@ export function DashboardOverlay({
 
   const layout: DashboardLayoutItem[] = useMemo(
     () =>
-      (dashboardQuery.data?.layout || []).map((item: CanvasesDashboardLayoutItem) => ({
+      (dashboardQuery.data?.layout || []).map((item: ConsoleLayoutItem) => ({
         i: item.i || "",
         x: item.x || 0,
         y: item.y || 0,

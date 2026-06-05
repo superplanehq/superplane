@@ -36,14 +36,14 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"\n" +
 	"The canvases:update_version scope is limited to draft app version\n" +
 	"editing. Draft version editing includes app graph updates and console\n" +
-	"updates through the version-scoped dashboard endpoint. It does not grant\n" +
+	"updates through the version-scoped console endpoint. It does not grant\n" +
 	"permission to publish versions, delete app, or perform live-app\n" +
 	"operational actions.\n" +
 	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
 	"scope grants every read endpoint scoped to this app, including:\n" +
 	"  GET /api/v1/canvases/{canvas_id}                       describe app\n" +
-	"  GET /api/v1/canvases/{canvas_id}/dashboard             read console panels/layout\n" +
+	"  GET /api/v1/canvases/{canvas_id}/console               read console panels/layout\n" +
 	"  GET /api/v1/canvases/{canvas_id}/events                list app events\n" +
 	"  GET /api/v1/canvases/{canvas_id}/events/{id}/executions\n" +
 	"  GET /api/v1/canvases/{canvas_id}/runs\n" +
