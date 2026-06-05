@@ -183,17 +183,13 @@ const MessageRow = memo(function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? (
-          message.content
-        ) : (
-          <RichMessage
-            content={message.content}
-            onAction={onAction}
-            onStartBuilding={onStartBuilding}
-            canvasId={canvasId}
-            organizationId={organizationId}
-          />
-        )}
+        <RichMessage
+          content={message.content}
+          onAction={isUser ? undefined : onAction}
+          onStartBuilding={isUser ? undefined : onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
+        />
       </div>
       {message.createdAt ? (
         <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(message.createdAt)}</span>
