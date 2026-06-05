@@ -9,6 +9,7 @@ import {
 } from "@/hooks/useCanvasData";
 
 import { useDashboardContext } from "./DashboardContext";
+import { markdownTemplateReferencesRunNode } from "./markdownInterpolation";
 import { DOLLAR_REWRITE_IDENTIFIER } from "./widget/celExpr";
 import { memoryEntryToRow } from "./widget/memoryRow";
 import { buildDollarNodes, buildNodeNameMap } from "./widget/useWidgetData";
@@ -41,21 +42,17 @@ export interface MarkdownVariablesResult {
   vars: Record<string, unknown>;
   /** Hierarchical loading flag — `true` while any backing query hasn't settled yet. */
   isLoading: boolean;
+  /**
+   * `true` while the base memory / run queries are still loading. Excludes the
+   * per-run execution side-load so callers can gate each piece of templated
+   * text precisely (see {@link markdownTextIsLoading}).
+   */
+  baseLoading: boolean;
+  /** `true` while the per-run execution side-load (for `$["Node"]` refs) loads. */
+  sideloadLoading: boolean;
   /** Per-variable resolution errors and any global error (e.g. missing canvas). */
   errors: MarkdownVariableError[];
 }
-
-/**
- * Whether the (compiled) template text contains a `$["..."]` reference. Used
- * to gate the per-run execution side-load: when no interpolated text (title or
- * body) references run node outputs we skip the extra round-trip per
- * latest-run lookup.
- *
- * Mirrors `RUN_NODE_REF_RE` in `useWidgetData.ts` — we check `$[` rather than
- * a bare `$` so currency literals like `prefix: "R$"` don't trigger the
- * side-load.
- */
-const RUN_NODE_REF_RE = /\$\s*\[/;
 
 /**
  * Resolve a markdown panel's declared variables into a `{ name: value }` map
@@ -104,10 +101,7 @@ export function useMarkdownVariables(
   const passedQuery = useInfiniteCanvasRuns(canvasId, { results: ["RESULT_PASSED"] }, wantLatestPassed);
   const failedQuery = useInfiniteCanvasRuns(canvasId, { results: ["RESULT_FAILED"] }, wantLatestFailed);
 
-  const needsRunSideload = useMemo(() => {
-    if (!textForRunSideload) return false;
-    return RUN_NODE_REF_RE.test(textForRunSideload);
-  }, [textForRunSideload]);
+  const needsRunSideload = useMemo(() => markdownTemplateReferencesRunNode(textForRunSideload), [textForRunSideload]);
 
   const latestRunsData = latestQuery.data as RunsQueryData | undefined;
   const passedRunsData = passedQuery.data as RunsQueryData | undefined;
@@ -188,14 +182,15 @@ export function useMarkdownVariables(
     nodeNameById,
   ]);
 
-  const isLoading =
+  const baseLoading =
     (hasMemoryVar && memoryQuery.isLoading) ||
     (wantLatest && latestQuery.isLoading) ||
     (wantLatestPassed && passedQuery.isLoading) ||
-    (wantLatestFailed && failedQuery.isLoading) ||
-    (needsRunSideload && runExecutionsLoading);
+    (wantLatestFailed && failedQuery.isLoading);
+  const sideloadLoading = needsRunSideload && runExecutionsLoading;
+  const isLoading = baseLoading || sideloadLoading;
 
-  return { vars, isLoading, errors };
+  return { vars, isLoading, baseLoading, sideloadLoading, errors };
 }
 
 /**

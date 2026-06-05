@@ -8,6 +8,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 import { DashboardContextProvider } from "./DashboardContextProvider";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 import { useMarkdownVariables, type MarkdownVariablesResult } from "./useMarkdownVariables";
+import { DOLLAR_REWRITE_IDENTIFIER } from "./widget/celExpr";
 
 // Control the resolved/loading state directly so we can exercise the read
 // path's loading gate without standing up the underlying query machinery.
@@ -19,6 +20,8 @@ function mockVariables(result: Partial<MarkdownVariablesResult>) {
   vi.mocked(useMarkdownVariables).mockReturnValue({
     vars: {},
     isLoading: false,
+    baseLoading: false,
+    sideloadLoading: false,
     errors: [],
     ...result,
   });
@@ -45,7 +48,7 @@ describe("MarkdownPanelCard variable loading gate", () => {
   it("shows a loading placeholder instead of empty node fields while run executions side-load", () => {
     // The run row already resolved (so `run` is non-null) but the per-run
     // executions backing `$["Deploy"]` are still loading.
-    mockVariables({ vars: { run: { status: "passed", $: {} } }, isLoading: true });
+    mockVariables({ vars: { run: { status: "passed", $: {} } }, isLoading: true, sideloadLoading: true });
     renderCard({
       id: "panel-1",
       type: "markdown",
@@ -61,8 +64,12 @@ describe("MarkdownPanelCard variable loading gate", () => {
   });
 
   it("renders the interpolated body once variables finish loading", () => {
+    // The real hook exposes run-node outputs under both `$` and the rewritten
+    // `__runNodes__` identifier that `$["Deploy"]` compiles to, so the mock
+    // mirrors both.
+    const deployNodes = { Deploy: { data: { url: "https://example.com/run/42" } } };
     mockVariables({
-      vars: { run: { $: { Deploy: { data: { url: "https://example.com/run/42" } } } } },
+      vars: { run: { $: deployNodes, [DOLLAR_REWRITE_IDENTIFIER]: deployNodes } },
       isLoading: false,
     });
     renderCard({
@@ -79,7 +86,7 @@ describe("MarkdownPanelCard variable loading gate", () => {
   });
 
   it("falls back to the panel id for a templated title while it loads", () => {
-    mockVariables({ vars: {}, isLoading: true });
+    mockVariables({ vars: {}, isLoading: true, baseLoading: true });
     renderCard({
       id: "panel-title",
       type: "markdown",
@@ -96,7 +103,7 @@ describe("MarkdownPanelCard variable loading gate", () => {
   });
 
   it("does not gate a static body when only the title references variables", () => {
-    mockVariables({ vars: {}, isLoading: true });
+    mockVariables({ vars: {}, isLoading: true, baseLoading: true });
     renderCard({
       id: "panel-static-body",
       type: "markdown",
@@ -109,5 +116,32 @@ describe("MarkdownPanelCard variable loading gate", () => {
 
     expect(screen.queryByTestId("dashboard-markdown-loading")).toBeNull();
     expect(screen.getByTestId("dashboard-markdown").textContent).toMatch(/This body has no variables\./);
+  });
+
+  it("interpolates a title using resolved fields while only the body's run-node side-load is pending", () => {
+    // The base run query resolved `run.status`, but the per-run executions
+    // backing the body's `$["Deploy"]` reference are still loading. The title
+    // only needs the already-available `status`, so it must interpolate now
+    // instead of flashing the panel id.
+    mockVariables({
+      vars: { run: { status: "passed", $: {} } },
+      isLoading: true,
+      baseLoading: false,
+      sideloadLoading: true,
+    });
+    renderCard({
+      id: "panel-mixed",
+      type: "markdown",
+      content: {
+        title: "Run {{ run.status }}",
+        body: 'Output: {{ run.$["Deploy"].data.url }}',
+        variables: [{ name: "run", source: { kind: "run", select: "latest" } }],
+      },
+    });
+
+    // Title resolves immediately; the body waits on the execution side-load.
+    expect(screen.getByText("Run passed")).toBeTruthy();
+    expect(screen.queryByText("panel-mixed")).toBeNull();
+    expect(screen.getByTestId("dashboard-markdown-loading")).toBeTruthy();
   });
 });

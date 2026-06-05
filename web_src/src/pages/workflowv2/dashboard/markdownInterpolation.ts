@@ -7,6 +7,13 @@ import { buildEnv, compileTemplate, evalTemplate } from "./widget/celExpr";
  */
 const TEMPLATE_RE = /\{\{[\s\S]*?\}\}/;
 
+/**
+ * Matches a `$["Node"]` run-node reference (not a bare `$`, so currency
+ * literals like `"R$"` don't trip it). Mirrors `RUN_NODE_REF_RE` in
+ * `useWidgetData.ts` / `useMarkdownVariables.ts`.
+ */
+const RUN_NODE_REF_RE = /\$\s*\[/;
+
 /** Stringify a CEL-evaluated value for inline insertion into markdown. */
 function stringifyMarkdownValue(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -51,4 +58,40 @@ export function markdownTemplateHasExpressions(input: string | undefined): boole
   if (!input) return false;
   if (!TEMPLATE_RE.test(input)) return false;
   return compileTemplate(input).hasExpr;
+}
+
+/**
+ * Whether the template text references a run node's output via `$["Node"]`.
+ * Used to gate the per-run execution side-load (and the matching loading
+ * state): text without a `$[` reference resolves fully without those
+ * executions, so it should never wait on them.
+ */
+export function markdownTemplateReferencesRunNode(input: string | undefined): boolean {
+  if (!input) return false;
+  return RUN_NODE_REF_RE.test(input);
+}
+
+/**
+ * Decide whether a piece of templated markdown (a title or body) should be
+ * held in a loading state, given the two-phase loading exposed by
+ * `useMarkdownVariables`:
+ *
+ *  - `baseLoading` — the memory / run queries every variable depends on. While
+ *    these are in flight any templated text is unresolved, so gate it.
+ *  - `sideloadLoading` — the per-run execution side-load that only backs
+ *    `$["Node"]` references. Text that doesn't reference a run node resolves
+ *    fully without it, so it must NOT be gated on this phase. Otherwise a
+ *    title like `{{ run.status }}` would flash the panel id while an unrelated
+ *    body's `$[...]` executions settle.
+ *
+ * Static text (no `{{ }}` expressions) is always stable and never gated.
+ */
+export function markdownTextIsLoading(
+  input: string | undefined,
+  baseLoading: boolean,
+  sideloadLoading: boolean,
+): boolean {
+  if (!markdownTemplateHasExpressions(input)) return false;
+  if (baseLoading) return true;
+  return sideloadLoading && markdownTemplateReferencesRunNode(input);
 }

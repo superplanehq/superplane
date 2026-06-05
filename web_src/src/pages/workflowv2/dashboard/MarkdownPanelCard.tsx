@@ -15,10 +15,18 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { useDashboardContext } from "./DashboardContext";
 import { useMarkdownVariables } from "./useMarkdownVariables";
-import { interpolateMarkdownTemplate, markdownTemplateHasExpressions } from "./markdownInterpolation";
+import { interpolateMarkdownTemplate, markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownBody } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
-import type { MarkdownVariable } from "./panelTypes";
+import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+
+/**
+ * Stable empty list passed to `useMarkdownVariables` while the panel is being
+ * edited. The editor mounts its own hook over the draft variables, so the
+ * read-path hook here is disabled to avoid running the same memory / run /
+ * execution queries twice for a single panel.
+ */
+const EMPTY_VARIABLES: MarkdownVariable[] = [];
 
 /**
  * Which field auto-focuses when the user enters edit mode. Driven by which
@@ -51,15 +59,25 @@ export function MarkdownPanelCard({
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Surfaced when an in-card save is blocked because the draft variables fail
+  // the shared validator (e.g. invalid name, empty namespace). Cleared as soon
+  // as the author edits the variables again.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const ctx = useDashboardContext();
   const canvasId = ctx?.canvasId ?? "";
   // Resolve persisted variables for the read-only / display path. The editor
   // re-resolves the draft variables on its own so the preview stays in lockstep
   // with whatever the user just typed. Title + body are both interpolated, so
-  // we pass both for the run-node side-load gate.
+  // we pass both for the run-node side-load gate. While editing we disable this
+  // hook (empty list, no side-load text) so the editor's own hook is the single
+  // owner of the queries for this panel.
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars: displayVars, isLoading: varsLoading } = useMarkdownVariables(canvasId, variables, textForSideload);
+  const {
+    vars: displayVars,
+    baseLoading,
+    sideloadLoading,
+  } = useMarkdownVariables(canvasId, isEditing ? EMPTY_VARIABLES : variables, isEditing ? "" : textForSideload);
 
   // While the backing variable queries (including the per-run execution
   // side-load behind `{{ run.$["Node"]... }}`) are still in flight, the var map
@@ -67,16 +85,19 @@ export function MarkdownPanelCard({
   // references as empty fields and then flash to the real values once the
   // side-load settles. Mirror the table run widget, which treats execution
   // side-load as part of initial loading, and hold a loading state instead.
-  // Only text that actually references variables needs gating — static text is
-  // stable regardless of loading.
+  // Gating is per-text and per-phase: text that doesn't reference a run node
+  // resolves without the execution side-load, so it isn't held on that phase.
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+
   const displayTitle = useMemo(() => {
     // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
     // and can't be interpolated yet, so fall back to the stable panel id while
-    // its variables load.
-    if (varsLoading && markdownTemplateHasExpressions(persistedTitle)) return panel.id;
+    // the variables it actually depends on load.
+    if (titleLoading) return panel.id;
     const interpolated = interpolateMarkdownTemplate(persistedTitle, displayVars).trim();
     return interpolated || persistedTitle.trim() || panel.id;
-  }, [varsLoading, persistedTitle, displayVars, panel.id]);
+  }, [titleLoading, persistedTitle, displayVars, panel.id]);
 
   // Sync drafts from props when we're not editing, so external updates
   // (YAML import, websocket invalidation, etc.) flow into the rendered view.
@@ -99,9 +120,19 @@ export function MarkdownPanelCard({
 
   const commit = () => {
     if (!isEditing) return;
-    setEditFocus(null);
     const trimmedTitle = draftTitle.trim();
     const normalizedVars = normalizeDraftVariables(draftVariables);
+    // Guard the in-card save with the same validator the YAML / dialog editor
+    // and the backend use, so we never persist (and then silently fail to
+    // debounce-save) content the API would reject. Keep the editor open with
+    // the message so the author can fix the flagged variable.
+    const validationError = validateMarkdownVariables(normalizedVars);
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+    setSaveError(null);
+    setEditFocus(null);
     const bodyChanged = draftBody !== body;
     const titleChanged = trimmedTitle !== persistedTitle;
     const varsChanged = !variablesEqual(normalizedVars, variables);
@@ -116,6 +147,7 @@ export function MarkdownPanelCard({
 
   const cancel = () => {
     setEditFocus(null);
+    setSaveError(null);
     setDraftBody(body);
     setDraftTitle(persistedTitle);
     setDraftVariables(variables);
@@ -123,7 +155,15 @@ export function MarkdownPanelCard({
 
   const startEditing = (focus: EditFocus) => {
     if (readOnly || focus === null) return;
+    setSaveError(null);
     setEditFocus(focus);
+  };
+
+  // Editing the variables clears a stale save error so the blocked-save banner
+  // doesn't linger after the author addresses it.
+  const updateDraftVariables = (next: MarkdownVariable[]) => {
+    if (saveError) setSaveError(null);
+    setDraftVariables(next);
   };
 
   if (isEditing && !readOnly) {
@@ -136,9 +176,10 @@ export function MarkdownPanelCard({
         draftBody={draftBody}
         setDraftBody={setDraftBody}
         draftVariables={draftVariables}
-        setDraftVariables={setDraftVariables}
+        setDraftVariables={updateDraftVariables}
         titleInputRef={titleInputRef}
         textareaRef={textareaRef}
+        saveError={saveError}
         onCancel={cancel}
         onCommit={commit}
       />
@@ -150,7 +191,7 @@ export function MarkdownPanelCard({
       body={body}
       displayTitle={displayTitle}
       displayVars={displayVars}
-      bodyLoading={varsLoading && markdownTemplateHasExpressions(body)}
+      bodyLoading={bodyLoading}
       readOnly={readOnly}
       onEditBody={() => startEditing("body")}
       onEditTitle={() => startEditing("title")}

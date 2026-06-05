@@ -28,6 +28,8 @@ export function MarkdownPanelEditor(props: {
   setDraftVariables: (next: MarkdownVariable[]) => void;
   titleInputRef: RefObject<HTMLInputElement | null>;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
+  /** Set when the last save attempt was blocked by variable validation. */
+  saveError?: string | null;
   onCancel: () => void;
   onCommit: () => void;
 }) {
@@ -42,6 +44,7 @@ export function MarkdownPanelEditor(props: {
     setDraftVariables,
     titleInputRef,
     textareaRef,
+    saveError,
     onCancel,
     onCommit,
   } = props;
@@ -130,10 +133,16 @@ export function MarkdownPanelEditor(props: {
         />
       </div>
       <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
-        <span className="text-[11px] text-slate-500">
-          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
-          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
-        </span>
+        {saveError ? (
+          <span className="text-[11px] text-red-600" role="alert" data-testid="dashboard-markdown-save-error">
+            {saveError}
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-500">
+            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
+            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
+          </span>
+        )}
         <div className="flex items-center gap-1">
           <Button type="button" size="sm" variant="outline" onClick={onCancel}>
             Cancel
