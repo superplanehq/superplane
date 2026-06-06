@@ -1145,7 +1145,8 @@ Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **co
 ### Important Notes
 
 - At least one field must be provided
-- Providing **Conditions** replaces all existing conditions; **Auto-close/rate limit** replace the whole alert strategy together
+- Providing **Conditions** replaces all existing conditions
+- **Auto-close**, **rate limit**, **documentation content**, and **documentation subject** are each updated independently — changing one leaves the others untouched
 - Requires the `roles/monitoring.editor` IAM role
 
 ### Example Output

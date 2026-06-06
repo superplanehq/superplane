@@ -72,7 +72,8 @@ Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **co
 ## Important Notes
 
 - At least one field must be provided
-- Providing **Conditions** replaces all existing conditions; **Auto-close/rate limit** replace the whole alert strategy together
+- Providing **Conditions** replaces all existing conditions
+- **Auto-close**, **rate limit**, **documentation content**, and **documentation subject** are each updated independently — changing one leaves the others untouched
 - Requires the ` + "`roles/monitoring.editor`" + ` IAM role`
 }
 
@@ -192,6 +193,51 @@ func hasUpdates(spec UpdateAlertingPolicySpec, cfg any) bool {
 		configHasKey(cfg, "documentationSubject")
 }
 
+// buildStrategyUpdate assembles the alertStrategy patch body and its field-mask
+// paths. Each sub-field is masked independently so changing only one (e.g.
+// auto-close) does not clear the sibling (e.g. notification rate limit). A field
+// whose key is present but empty is omitted from the body, which clears it under
+// its own mask path.
+func buildStrategyUpdate(spec UpdateAlertingPolicySpec, cfg any) (map[string]any, []string) {
+	strategy := map[string]any{}
+	var paths []string
+	if configHasKey(cfg, "autoClose") {
+		if spec.AutoClose != "" {
+			strategy["autoClose"] = spec.AutoClose
+		}
+		paths = append(paths, "alertStrategy.autoClose")
+	}
+	if configHasKey(cfg, "notificationRateLimit") {
+		if spec.NotificationRateLimit != "" {
+			strategy["notificationRateLimit"] = map[string]any{"period": spec.NotificationRateLimit}
+		}
+		paths = append(paths, "alertStrategy.notificationRateLimit")
+	}
+	return strategy, paths
+}
+
+// buildDocumentationUpdate assembles the documentation patch body and its
+// field-mask paths, masking content and subject independently so updating one
+// leaves the other intact.
+func buildDocumentationUpdate(spec UpdateAlertingPolicySpec, cfg any) (map[string]any, []string) {
+	doc := map[string]any{}
+	var paths []string
+	if configHasKey(cfg, "documentation") {
+		if content := strings.TrimSpace(spec.Documentation); content != "" {
+			doc["content"] = content
+			doc["mimeType"] = "text/markdown"
+		}
+		paths = append(paths, "documentation.content")
+	}
+	if configHasKey(cfg, "documentationSubject") {
+		if subject := strings.TrimSpace(spec.DocumentationSubject); subject != "" {
+			doc["subject"] = subject
+		}
+		paths = append(paths, "documentation.subject")
+	}
+	return doc, paths
+}
+
 func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 	spec := UpdateAlertingPolicySpec{}
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
@@ -258,21 +304,13 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		policy["userLabels"] = labels
 		mask = append(mask, "userLabels")
 	}
-	if configHasKey(ctx.Configuration, "autoClose") || configHasKey(ctx.Configuration, "notificationRateLimit") {
-		strategy := buildAlertStrategy(spec.AutoClose, spec.NotificationRateLimit)
-		if strategy == nil {
-			strategy = map[string]any{}
-		}
+	if strategy, paths := buildStrategyUpdate(spec, ctx.Configuration); len(paths) > 0 {
 		policy["alertStrategy"] = strategy
-		mask = append(mask, "alertStrategy")
+		mask = append(mask, paths...)
 	}
-	if configHasKey(ctx.Configuration, "documentation") || configHasKey(ctx.Configuration, "documentationSubject") {
-		doc := buildDocumentation(spec.Documentation, spec.DocumentationSubject)
-		if doc == nil {
-			doc = map[string]any{}
-		}
+	if doc, paths := buildDocumentationUpdate(spec, ctx.Configuration); len(paths) > 0 {
 		policy["documentation"] = doc
-		mask = append(mask, "documentation")
+		mask = append(mask, paths...)
 	}
 
 	q := url.Values{}

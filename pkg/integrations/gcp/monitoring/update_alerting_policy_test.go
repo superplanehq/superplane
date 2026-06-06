@@ -130,6 +130,65 @@ func Test__UpdateAlertingPolicy__Execute(t *testing.T) {
 		assert.Empty(t, channels)
 	})
 
+	t.Run("changing only auto-close masks just that field", func(t *testing.T) {
+		var patchURL string
+		var patchBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchURL = url
+				patchBody, _ = body.(map[string]any)
+				return alertPolicyJSON(policy, "High CPU", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := u.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"alertPolicy": policy, "autoClose": "3600s"},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		// Only the auto-close sub-field is masked, leaving the rate limit intact.
+		assert.Contains(t, patchURL, "alertStrategy.autoClose")
+		assert.NotContains(t, patchURL, "alertStrategy.notificationRateLimit")
+		strategy := patchBody["alertStrategy"].(map[string]any)
+		assert.Equal(t, "3600s", strategy["autoClose"])
+		_, hasRateLimit := strategy["notificationRateLimit"]
+		assert.False(t, hasRateLimit)
+	})
+
+	t.Run("changing only documentation subject masks just the subject", func(t *testing.T) {
+		var patchURL string
+		var patchBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchURL = url
+				patchBody, _ = body.(map[string]any)
+				return alertPolicyJSON(policy, "High CPU", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := u.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"alertPolicy": policy, "documentationSubject": "Runbook"},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Contains(t, patchURL, "documentation.subject")
+		assert.NotContains(t, patchURL, "documentation.content")
+		doc := patchBody["documentation"].(map[string]any)
+		assert.Equal(t, "Runbook", doc["subject"])
+		_, hasContent := doc["content"]
+		assert.False(t, hasContent)
+	})
+
 	t.Run("invalid enabled -> fails execution", func(t *testing.T) {
 		mc := &mockClient{projectID: "my-project"}
 		withFactory(mc)

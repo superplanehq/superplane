@@ -171,6 +171,43 @@ func Test__BuildConditions(t *testing.T) {
 		_, err := buildConditions(nil)
 		require.ErrorContains(t, err, "at least one condition")
 	})
+
+	t.Run("zero / fractional / negative count triggers error", func(t *testing.T) {
+		for _, v := range []float64{0, -1, 0.5, 2.5} {
+			_, err := buildConditions([]ConditionSpec{{
+				MetricType: "compute.googleapis.com/instance/cpu/utilization",
+				Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+				TriggerType: triggerCount, TriggerValue: ptrFloat(v),
+			}})
+			require.ErrorContains(t, err, "trigger count", "value %v should be rejected", v)
+		}
+	})
+
+	t.Run("out-of-range percent trigger errors", func(t *testing.T) {
+		for _, v := range []float64{0, -5, 150} {
+			_, err := buildConditions([]ConditionSpec{{
+				MetricType: "compute.googleapis.com/instance/cpu/utilization",
+				Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+				TriggerType: triggerPercent, TriggerValue: ptrFloat(v),
+			}})
+			require.ErrorContains(t, err, "trigger percent", "value %v should be rejected", v)
+		}
+	})
+
+	t.Run("valid count and percent triggers pass", func(t *testing.T) {
+		_, err := buildConditions([]ConditionSpec{{
+			MetricType: "compute.googleapis.com/instance/cpu/utilization",
+			Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+			TriggerType: triggerCount, TriggerValue: ptrFloat(3),
+		}})
+		require.NoError(t, err)
+		_, err = buildConditions([]ConditionSpec{{
+			MetricType: "compute.googleapis.com/instance/cpu/utilization",
+			Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+			TriggerType: triggerPercent, TriggerValue: ptrFloat(100),
+		}})
+		require.NoError(t, err)
+	})
 }
 
 func Test__PolicyPayload(t *testing.T) {

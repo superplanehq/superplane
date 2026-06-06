@@ -187,6 +187,26 @@ func validateCondition(c ConditionSpec) error {
 	if c.TriggerType != "" && c.TriggerType != triggerCount && c.TriggerType != triggerPercent {
 		return fmt.Errorf("invalid triggerType %q", c.TriggerType)
 	}
+	return validateTriggerValue(c)
+}
+
+// validateTriggerValue guards the optional trigger value. A count must be a
+// positive whole number (Cloud Monitoring rejects/ignores 0 or fractional
+// counts); a percent must be within (0, 100].
+func validateTriggerValue(c ConditionSpec) error {
+	if c.TriggerValue == nil {
+		return nil
+	}
+	v := *c.TriggerValue
+	if c.TriggerType == triggerPercent {
+		if v <= 0 || v > 100 {
+			return errors.New("trigger percent must be greater than 0 and at most 100")
+		}
+		return nil
+	}
+	if v < 1 || v != float64(int64(v)) {
+		return errors.New("trigger count must be a positive whole number")
+	}
 	return nil
 }
 
