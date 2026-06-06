@@ -334,6 +334,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           return [<span key={0}>{"\u200B"}</span>];
         }
         if (previewMode) {
+          if (!exampleObj) {
+            // No runtime context available — show raw expression instead of an error
+            return tokenizeExpression(text);
+          }
           const result = evaluateExpression(text);
           if (result.error) {
             return [
@@ -364,26 +368,37 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         }
         // Add the highlighted expression with syntax coloring
         if (previewMode) {
-          // In preview mode, show evaluated value or error
-          const result = evaluateExpression(match[2]);
-          if (result.error) {
-            // Error state - show in red with error message
+          if (!exampleObj) {
+            // No runtime context available — show raw expression instead of error
             parts.push(
-              <span key={key++} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
+              <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
                 <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
-                <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
+                {tokenizeExpression(match[2])}
                 <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
               </span>,
             );
           } else {
-            // Success state - show in green
-            parts.push(
-              <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
-                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
-                <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
-                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
-              </span>,
-            );
+            // In preview mode, show evaluated value or error
+            const result = evaluateExpression(match[2]);
+            if (result.error) {
+              // Error state - show in red with error message
+              parts.push(
+                <span key={key++} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
+                  <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                  <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
+                  <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+                </span>,
+              );
+            } else {
+              // Success state - show in green
+              parts.push(
+                <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
+                  <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                  <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
+                  <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+                </span>,
+              );
+            }
           }
         } else {
           parts.push(
@@ -1241,13 +1256,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 onClick={() => setPreviewMode(!previewMode)}
                 className={twMerge([
                   "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                  previewMode
-                    ? allExpressionsValid
-                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                      : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                    : allExpressionsValid
-                      ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                      : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
+                  !exampleObj
+                    ? "text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    : previewMode
+                      ? allExpressionsValid
+                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                      : allExpressionsValid
+                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
                 ])}
               >
                 {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
