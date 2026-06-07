@@ -125,7 +125,6 @@ export function StartEditingDropdown({
               {draftCount >= 1 && continueBranchName ? (
                 <DropdownMenuItem
                   className="cursor-pointer gap-2 px-3 py-2"
-                  disabled={isSubmitting}
                   data-testid="start-editing-continue"
                   onClick={() => closeAndRun(() => onContinueDraft(continueBranchName))}
                 >
@@ -145,7 +144,6 @@ export function StartEditingDropdown({
               {draftCount >= 2 ? (
                 <DropdownMenuItem
                   className="cursor-pointer gap-2 px-3 py-2"
-                  disabled={isSubmitting}
                   data-testid="start-editing-choose-list"
                   onSelect={(event) => event.preventDefault()}
                   onClick={() => setShowList(true)}

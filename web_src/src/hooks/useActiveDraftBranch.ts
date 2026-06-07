@@ -133,6 +133,7 @@ export function useActiveDraftBranch({
   );
 
   const exitToLive = useCallback(() => {
+    ignoreMissingUrlBranchRef.current = false;
     setActiveBranch(null);
     syncBranchToUrl(null);
   }, [syncBranchToUrl]);

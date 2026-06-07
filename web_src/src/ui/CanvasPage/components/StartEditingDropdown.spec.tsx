@@ -64,6 +64,30 @@ describe("StartEditingDropdown", () => {
     expect(onContinueDraft).toHaveBeenCalledWith("drafts/user-1");
   });
 
+  it("keeps continue enabled while a new draft is being created", async () => {
+    const user = userEvent.setup();
+    const onContinueDraft = vi.fn();
+    const existingDraft = draft();
+
+    render(
+      <StartEditingDropdown
+        open
+        onOpenChange={vi.fn()}
+        drafts={[existingDraft]}
+        defaultDraft={existingDraft}
+        isSubmitting
+        onContinueDraft={onContinueDraft}
+        onCreateDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("start-editing-continue")).not.toHaveAttribute("data-disabled");
+    expect(screen.getByTestId("start-editing-create")).toHaveAttribute("data-disabled");
+
+    await user.click(screen.getByTestId("start-editing-continue"));
+    expect(onContinueDraft).toHaveBeenCalledWith("drafts/user-1");
+  });
+
   it("shows choose-from-list when multiple drafts exist", async () => {
     const user = userEvent.setup();
     const onContinueDraft = vi.fn();
