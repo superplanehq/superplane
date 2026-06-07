@@ -12,7 +12,57 @@ const (
 	testCanvasName     = "my-canvas"
 	testDescribeCanvas = "/api/v1/canvases/" + testCanvasID
 	testConsolePath    = "/api/v1/canvases/" + testCanvasID + "/console"
+	testMePath         = "/api/v1/me"
+	cliTestUserID      = "user-1"
 )
+
+func draftVersionsPath(canvasID string) string {
+	return "/api/v1/canvases/" + canvasID + "/versions"
+}
+
+func expectMe() requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   testMePath,
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"` + cliTestUserID + `"}}`))
+		},
+	}
+}
+
+func expectListUserDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","owner":{"id":"` + cliTestUserID + `"}}}]}`))
+		},
+	}
+}
+
+func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[]}`))
+		},
+	}
+}
+
+func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodPost,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
+		},
+	}
+}
 
 func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 	t.Helper()
@@ -118,16 +168,10 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
+			path:   draftVersionsPath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{
-                    "versions": [
-                        {"metadata":{"id":"pub-1","state":"STATE_PUBLISHED","owner":{"id":"user-1"}}},
-                        {"metadata":{"id":"draft-1","state":"STATE_DRAFT","owner":{"id":"user-1"}}}
-                    ],
-                    "hasNextPage": false
-                }`))
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}}]}`))
 			},
 		},
 		requestExpectation{
@@ -210,10 +254,10 @@ func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
+			path:   draftVersionsPath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"pub-1","state":"STATE_PUBLISHED","owner":{"id":"user-1"}}}],"hasNextPage":false}`))
+				_, _ = w.Write([]byte(`{"versions":[]}`))
 			},
 		},
 	)

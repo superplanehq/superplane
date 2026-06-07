@@ -51,10 +51,8 @@ func ensureConsoleVersionReadable(
 	// Drafts are user-private work-in-progress: only the draft owner can
 	// read them. Reviewers don't need to see in-flight drafts because the
 	// review surface is the change request snapshot, not the draft.
-	if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
+	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 		return nil
-	} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-		return draftErr
 	}
 
 	// Snapshot versions are exposed through a change request. Change

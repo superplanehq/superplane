@@ -48,7 +48,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("valid draft version id -> updates draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -73,7 +73,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		service := &fakeCanvasUsageService{
@@ -114,7 +114,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("invalid source output channel -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -173,7 +173,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("invalid node field type -> serialized node carries error_message", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -222,7 +222,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("integration component with enabled capability -> updates without node error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
@@ -259,7 +259,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("integration component with disabled capability -> serialized node carries error_message", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
