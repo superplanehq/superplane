@@ -78,19 +78,8 @@ func UpdateConsole(
 			return loadErr
 		}
 
-		if version.State == models.CanvasVersionStatePublished {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
-		}
-
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr != nil {
-			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
-			}
-			return draftErr
+		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+			return err
 		}
 
 		v, updateErr := models.UpdateCanvasVersionConsoleInTransaction(tx, version, modelPanels, modelLayout)
