@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient, useQueries } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -29,7 +29,9 @@ import {
   canvasesUpdateNodePause,
 } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -219,7 +221,7 @@ export function AppPage() {
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
-  const [isResetDraftPending, setIsResetDraftPending] = useState(false);
+  const [draftVersionToDelete, setDraftVersionToDelete] = useState<string | null>(null);
   const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -4839,7 +4841,7 @@ export function AppPage() {
   }, [handleCreateVersion]);
 
   const handleDeleteDraftBranch = useCallback(
-    async (versionId: string) => {
+    (versionId: string) => {
       if (!canUpdateCanvas) {
         showErrorToast("You don't have permission to edit this canvas");
         return;
@@ -4851,49 +4853,101 @@ export function AppPage() {
         return;
       }
 
-      const branchName = draftBranchName(branch);
-      const shouldDelete = window.confirm(`Delete draft "${draftDisplayName(branch)}"?`);
-      if (!shouldDelete) {
-        return;
+      setDraftVersionToDelete(versionId);
+    },
+    [canUpdateCanvas, draftBranches],
+  );
+
+  const draftVersionToDeleteName = useMemo(() => {
+    if (!draftVersionToDelete) {
+      return "";
+    }
+
+    const branch = draftBranches.find((item) => draftVersionId(item) === draftVersionToDelete);
+    return branch ? draftDisplayName(branch) : draftVersionToDelete;
+  }, [draftVersionToDelete, draftBranches]);
+
+  const confirmDeleteDraftVersion = useCallback(async () => {
+    if (!draftVersionToDelete) {
+      return;
+    }
+
+    const versionId = draftVersionToDelete;
+    const branch = draftBranches.find((item) => draftVersionId(item) === versionId);
+    const branchName = branch ? draftBranchName(branch) : "";
+    const isActiveDraft =
+      versionId === activeCanvasVersionId ||
+      (activeBranchMeta ? versionId === draftVersionId(activeBranchMeta) : false) ||
+      (!!activeBranch && branchName === activeBranch);
+
+    try {
+      if (isActiveDraft) {
+        clearPendingAutoSaveWork();
       }
 
-      try {
-        await deleteDraftBranchMutation.mutateAsync(versionId);
-        if (activeBranch === branchName) {
-          exitToLive();
-          if (liveCanvasVersionId) {
-            handleUseVersion(liveCanvasVersionId);
-          } else {
-            setActiveCanvasVersion(null);
-            setDraftCanvasSpec(null);
-            setSearchParams((current) => {
-              const next = new URLSearchParams(current);
-              next.delete("version");
-              next.delete("branch");
-              return clearComponentSidebarSearchParams(next);
-            });
-          }
+      await deleteDraftBranchMutation.mutateAsync(versionId);
+
+      if (isActiveDraft) {
+        setIsCreateChangeRequestMode(false);
+        setSelectedChangeRequestId("");
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+        setLastSavedWorkflowSnapshot(null);
+        exitToLive();
+
+        if (liveCanvasVersionId) {
+          handleUseVersion(liveCanvasVersionId);
+        } else {
+          setActiveCanvasVersion(null);
+          setDraftCanvasSpec(null);
+          setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.delete("version");
+            next.delete("branch");
+            return clearComponentSidebarSearchParams(next);
+          });
         }
-        showSuccessToast("Draft deleted");
-      } catch (error) {
-        const message =
-          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          (error as { message?: string })?.message ||
-          "Failed to delete draft branch";
-        showErrorToast(message);
+
+        if (liveCanvasVersion?.spec) {
+          queryClient.setQueryData<CanvasesCanvas | undefined>(
+            canvasKeys.detail(organizationId!, canvasId!),
+            (current) => {
+              if (!current) {
+                return current;
+              }
+
+              return {
+                ...current,
+                spec: { ...current.spec, ...liveCanvasVersion.spec },
+              };
+            },
+          );
+        }
       }
-    },
-    [
-      canUpdateCanvas,
-      draftBranches,
-      deleteDraftBranchMutation,
-      activeBranch,
-      exitToLive,
-      liveCanvasVersionId,
-      handleUseVersion,
-      setSearchParams,
-    ],
-  );
+
+      showSuccessToast("Draft branch deleted");
+      setDraftVersionToDelete(null);
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to delete draft branch"));
+    }
+  }, [
+    draftVersionToDelete,
+    draftBranches,
+    activeCanvasVersionId,
+    activeBranchMeta,
+    activeBranch,
+    clearPendingAutoSaveWork,
+    deleteDraftBranchMutation,
+    exitToLive,
+    liveCanvasVersionId,
+    handleUseVersion,
+    liveCanvasVersion,
+    queryClient,
+    organizationId,
+    canvasId,
+    setSearchParams,
+    setLastSavedWorkflowSnapshot,
+  ]);
 
   useEffect(() => {
     const activeVersionId = activeBranchMeta ? draftVersionId(activeBranchMeta) : "";
@@ -5208,7 +5262,7 @@ export function AppPage() {
     exitToLive,
   ]);
 
-  const handleResetDraftChanges = useCallback(async () => {
+  const handleResetDraftChanges = useCallback(() => {
     if (!organizationId || !canvasId) {
       return;
     }
@@ -5224,12 +5278,7 @@ export function AppPage() {
     }
 
     if (!hasEditableVersion || !activeCanvasVersionId) {
-      showErrorToast("Enable edit mode before discarding draft");
-      return;
-    }
-
-    const shouldDiscard = window.confirm("Discard this draft? You will be redirected to the live canvas.");
-    if (!shouldDiscard) {
+      showErrorToast("Enable edit mode before discarding the draft");
       return;
     }
 
@@ -5257,48 +5306,7 @@ export function AppPage() {
       return;
     }
 
-    clearPendingAutoSaveWork();
-
-    try {
-      setIsResetDraftPending(true);
-      await deleteDraftBranchMutation.mutateAsync(versionIdToDelete);
-
-      setIsCreateChangeRequestMode(false);
-      setSelectedChangeRequestId("");
-      setActiveCanvasVersion(null);
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-      setLastSavedWorkflowSnapshot(null);
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        next.delete("branch");
-        return clearComponentSidebarSearchParams(next);
-      });
-
-      if (liveCanvasVersion?.spec) {
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-          if (!current) {
-            return current;
-          }
-
-          return {
-            ...current,
-            spec: { ...current.spec, ...liveCanvasVersion.spec },
-          };
-        });
-      }
-
-      showSuccessToast("Draft discarded");
-    } catch (error) {
-      const errorMessage =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (error as { message?: string })?.message ||
-        "Failed to discard draft";
-      showErrorToast(errorMessage);
-    } finally {
-      setIsResetDraftPending(false);
-    }
+    setDraftVersionToDelete(versionIdToDelete);
   }, [
     organizationId,
     canvasId,
@@ -5309,12 +5317,6 @@ export function AppPage() {
     activeBranchMeta,
     activeBranch,
     draftBranches,
-    deleteDraftBranchMutation,
-    liveCanvasVersion,
-    queryClient,
-    setSearchParams,
-    clearPendingAutoSaveWork,
-    setLastSavedWorkflowSnapshot,
   ]);
 
   const buildYamlExportPayload = useCallback(
@@ -5657,7 +5659,7 @@ export function AppPage() {
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     deleteDraftBranchMutation.isPending ||
-    isResetDraftPending ||
+    deleteDraftBranchMutation.isPending ||
     !activeCanvasVersionId;
   const resetDraftDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -6054,6 +6056,32 @@ export function AppPage() {
           }
         }}
       />
+      <Dialog
+        open={!!draftVersionToDelete}
+        onClose={() => setDraftVersionToDelete(null)}
+        size="lg"
+        className="text-left"
+      >
+        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{draftVersionToDeleteName}"?</DialogTitle>
+        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+          This cannot be undone. Are you sure you want to continue?
+        </DialogDescription>
+        <DialogActions>
+          <LoadingButton
+            variant="destructive"
+            onClick={() => void confirmDeleteDraftVersion()}
+            loading={deleteDraftBranchMutation.isPending}
+            loadingText="Deleting..."
+            className="flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            Delete
+          </LoadingButton>
+          <Button variant="outline" onClick={() => setDraftVersionToDelete(null)}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
       <IntegrationCreateDialog
         open={!!integrationDialogName}
         onOpenChange={(open) => !open && setIntegrationDialogName(null)}
