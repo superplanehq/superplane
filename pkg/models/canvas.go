@@ -30,6 +30,7 @@ type Canvas struct {
 	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`
 	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover] `gorm:"column:change_request_approvers;->"`
 	CreatedBy               *uuid.UUID
+	NextDraftDisplayNumber  int `gorm:"column:next_draft_display_number;not null;default:1"`
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 	DeletedAt               gorm.DeletedAt `gorm:"index"`
