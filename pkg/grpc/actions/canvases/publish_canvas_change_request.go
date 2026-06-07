@@ -198,10 +198,11 @@ func PublishCanvasChangeRequest(
 		}
 
 		if request.OwnerID != nil {
-			renewedDraftVersion, err = models.SaveCanvasDraftInTransaction(
+			renewedDraftVersion, err = models.CreateDraftBranchFromLiveInTransaction(
 				tx,
 				canvasUUID,
 				*request.OwnerID,
+				"",
 				liveVersion.Nodes,
 				liveVersion.Edges,
 			)

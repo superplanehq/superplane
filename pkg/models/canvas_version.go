@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -195,11 +196,13 @@ func CountPublishedCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID
 func ListDraftBranchesForCanvasInTransaction(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
+	ownerID uuid.UUID,
 	limit int,
 	before *time.Time,
 ) ([]CanvasVersion, error) {
 	query := tx.
 		Where("workflow_id = ?", canvasID).
+		Where("owner_id = ?", ownerID).
 		Where("state = ?", CanvasVersionStateDraft).
 		Where("branch_name IS NOT NULL").
 		Order("updated_at DESC")
@@ -221,11 +224,12 @@ func ListDraftBranchesForCanvasInTransaction(
 	return versions, nil
 }
 
-func CountDraftBranchesForCanvasInTransaction(tx *gorm.DB, canvasID uuid.UUID) (int64, error) {
+func CountDraftBranchesForCanvasInTransaction(tx *gorm.DB, canvasID uuid.UUID, ownerID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&CanvasVersion{}).
 		Where("workflow_id = ?", canvasID).
+		Where("owner_id = ?", ownerID).
 		Where("state = ?", CanvasVersionStateDraft).
 		Where("branch_name IS NOT NULL").
 		Count(&count).
@@ -342,6 +346,8 @@ func newDraftBranchName() string {
 	return canvasDraftBranchNamePrefix + uuid.New().String()
 }
 
+// NextDraftDisplayNameInTransaction assigns a canvas-wide monotonic display
+// label so deleted draft numbers are never reused on the same app.
 func NextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string, error) {
 	canvas, err := lockCanvasForVersioningInTransaction(tx, canvasID)
 	if err != nil {
@@ -383,10 +389,10 @@ func CreateDraftBranchFromLiveInTransaction(
 	}
 
 	if nodes == nil {
-		nodes = append([]Node(nil), liveVersion.Nodes...)
+		nodes = slices.Clone(liveVersion.Nodes)
 	}
 	if edges == nil {
-		edges = append([]Edge(nil), liveVersion.Edges...)
+		edges = slices.Clone(liveVersion.Edges)
 	}
 
 	if displayName == "" {
@@ -420,16 +426,6 @@ func CreateDraftBranchFromLiveInTransaction(
 	}
 
 	return &version, nil
-}
-
-func SaveCanvasDraftInTransaction(
-	tx *gorm.DB,
-	workflowID uuid.UUID,
-	userID uuid.UUID,
-	nodes []Node,
-	edges []Edge,
-) (*CanvasVersion, error) {
-	return CreateDraftBranchFromLiveInTransaction(tx, workflowID, userID, "", nodes, edges)
 }
 
 func CreateCanvasSnapshotVersionInTransaction(

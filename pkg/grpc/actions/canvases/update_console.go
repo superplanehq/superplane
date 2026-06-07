@@ -78,7 +78,7 @@ func UpdateConsole(
 			return loadErr
 		}
 
-		if err := ensureVersionIsOwnedRegisteredDraftInTransaction(tx, canvas.ID, userUUID, version); err != nil {
+		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
 			return err
 		}
 

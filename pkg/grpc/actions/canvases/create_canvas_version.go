@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -50,22 +49,14 @@ func CreateCanvasVersion(
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-		if liveVersionErr != nil {
-			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "canvas live version not found")
-			}
-			return liveVersionErr
-		}
-
 		var createErr error
 		version, createErr = models.CreateDraftBranchFromLiveInTransaction(
 			tx,
 			canvasUUID,
 			userUUID,
 			strings.TrimSpace(displayName),
-			append([]models.Node(nil), liveVersion.Nodes...),
-			append([]models.Edge(nil), liveVersion.Edges...),
+			nil,
+			nil,
 		)
 		return createErr
 	})
