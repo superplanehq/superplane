@@ -32,15 +32,6 @@ func resolveConsoleVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersio
 	return liveVersion.ID, nil
 }
 
-func canReadOwnedRegisteredDraftInTransaction(
-	_ *gorm.DB,
-	_ uuid.UUID,
-	userID uuid.UUID,
-	version *models.CanvasVersion,
-) (bool, error) {
-	return models.IsUserOwnedDraftVersion(version, userID) && models.IsRegisteredDraftVersion(version), nil
-}
-
 func ensureConsoleVersionReadable(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -60,11 +51,7 @@ func ensureConsoleVersionReadable(
 	// Drafts are user-private work-in-progress: only the draft owner can
 	// read them. Reviewers don't need to see in-flight drafts because the
 	// review surface is the change request snapshot, not the draft.
-	canReadDraft, readDraftErr := canReadOwnedRegisteredDraftInTransaction(tx, canvas.ID, userUUID, version)
-	if readDraftErr != nil {
-		return readDraftErr
-	}
-	if canReadDraft {
+	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 		return nil
 	}
 
