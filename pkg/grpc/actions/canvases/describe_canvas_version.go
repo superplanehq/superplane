@@ -52,12 +52,13 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 
 	canAccess := false
 	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		// Drafts: only the owning user can describe them.
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
+		canReadDraft, readDraftErr := canReadOwnedRegisteredDraftInTransaction(tx, canvas.ID, userUUID, version)
+		if readDraftErr != nil {
+			return readDraftErr
+		}
+		if canReadDraft {
 			canAccess = true
 			return nil
-		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-			return draftErr
 		}
 
 		// Snapshots tied to a change request are visible to any

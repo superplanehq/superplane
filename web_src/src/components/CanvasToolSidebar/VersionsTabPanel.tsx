@@ -2,6 +2,8 @@ import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanva
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { DraftBranchRow, type DraftBranchEditStatus } from "./DraftBranchRow";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 
@@ -30,6 +32,12 @@ export interface VersionsTabPanelProps {
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
   changeRequestApprovalConfig?: CanvasChangeManagement;
+  draftBranches?: CanvasesCanvasVersion[];
+  activeDraftBranch?: string | null;
+  draftBranchEditStatusByBranch?: Record<string, DraftBranchEditStatus>;
+  onOpenDraftBranch?: (branchName: string) => void;
+  onDeleteDraftBranch?: (versionId: string) => void;
+  deleteDraftBranchPending?: boolean;
 }
 
 type VersionRowItem = {
@@ -61,6 +69,12 @@ export function VersionsTabPanel({
   loadMoreLiveVersionsDisabled,
   loadMoreLiveVersionsPending,
   changeRequestApprovalConfig,
+  draftBranches,
+  activeDraftBranch,
+  draftBranchEditStatusByBranch,
+  onOpenDraftBranch,
+  onDeleteDraftBranch,
+  deleteDraftBranchPending,
 }: VersionsTabPanelProps) {
   const {
     hasNoVersions,
@@ -135,6 +149,16 @@ export function VersionsTabPanel({
           canUpdateCanvas={canUpdateCanvas}
           canvasDeletedRemotely={canvasDeletedRemotely}
           isTemplate={isTemplate}
+        />
+
+        <DraftBranchesSection
+          drafts={draftBranches ?? []}
+          activeDraftBranch={activeDraftBranch}
+          draftBranchEditStatusByBranch={draftBranchEditStatusByBranch}
+          canUpdateCanvas={canUpdateCanvas}
+          deleteDraftBranchPending={deleteDraftBranchPending}
+          onOpenDraftBranch={onOpenDraftBranch}
+          onDeleteDraftBranch={onDeleteDraftBranch}
         />
 
         <section>
@@ -220,6 +244,54 @@ function useVersionsPanelData({
     rejectedVersionsExpanded,
     setRejectedVersionsExpanded,
   };
+}
+
+function DraftBranchesSection({
+  drafts,
+  activeDraftBranch,
+  draftBranchEditStatusByBranch,
+  canUpdateCanvas,
+  deleteDraftBranchPending,
+  onOpenDraftBranch,
+  onDeleteDraftBranch,
+}: {
+  drafts: CanvasesCanvasVersion[];
+  activeDraftBranch?: string | null;
+  draftBranchEditStatusByBranch?: Record<string, DraftBranchEditStatus>;
+  canUpdateCanvas: boolean;
+  deleteDraftBranchPending?: boolean;
+  onOpenDraftBranch?: (branchName: string) => void;
+  onDeleteDraftBranch?: (versionId: string) => void;
+}) {
+  if (drafts.length === 0) {
+    return (
+      <section className="border-b border-slate-200 pb-2">
+        <h3 className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Drafts</h3>
+        <p className="px-4 pb-2 text-xs text-slate-600">No draft branches yet.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border-b border-slate-200 pb-2" data-testid="canvas-drafts-section">
+      <h3 className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Drafts</h3>
+      {drafts.map((draft) => {
+        const branchName = draftBranchName(draft);
+        return (
+          <DraftBranchRow
+            key={branchName || draftVersionId(draft)}
+            draft={draft}
+            isActive={branchName === activeDraftBranch}
+            editStatus={branchName ? draftBranchEditStatusByBranch?.[branchName] : undefined}
+            canUpdateCanvas={canUpdateCanvas}
+            deletePending={deleteDraftBranchPending}
+            onOpen={(nextBranchName) => onOpenDraftBranch?.(nextBranchName)}
+            onDelete={onDeleteDraftBranch}
+          />
+        );
+      })}
+    </section>
+  );
 }
 
 function VersionsNotices({

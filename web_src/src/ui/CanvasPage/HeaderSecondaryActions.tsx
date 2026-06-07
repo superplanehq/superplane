@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
+import { StartEditingDropdown } from "./components/StartEditingDropdown";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
@@ -140,6 +141,13 @@ export function LiveModeTopHeaderActions({
   hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
 }: Pick<
   HeaderProps,
   | "onEnterEditMode"
@@ -148,7 +156,29 @@ export function LiveModeTopHeaderActions({
   | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
+  | "startEditingDrafts"
+  | "startEditingDefaultDraft"
+  | "startEditingMenuOpen"
+  | "onStartEditingMenuOpenChange"
+  | "onContinueDraftBranch"
+  | "onCreateDraftBranch"
+  | "createDraftBranchPending"
 >) {
+  if (startEditingDrafts !== undefined && onContinueDraftBranch && onCreateDraftBranch) {
+    return (
+      <StartEditingDropdown
+        open={startEditingMenuOpen}
+        onOpenChange={onStartEditingMenuOpenChange}
+        drafts={startEditingDrafts}
+        defaultDraft={startEditingDefaultDraft ?? null}
+        disabled={!!enterEditModeDisabled}
+        isSubmitting={createDraftBranchPending}
+        onContinueDraft={onContinueDraftBranch}
+        onCreateDraft={onCreateDraftBranch}
+      />
+    );
+  }
+
   if (!onEnterEditMode) {
     return null;
   }

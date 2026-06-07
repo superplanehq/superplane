@@ -11,6 +11,7 @@ import {
   canvasFoldersUpdateCanvasFolderPosition,
   canvasFoldersDeleteCanvasFolder,
   canvasesCreateCanvasVersion,
+  canvasesDeleteCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
   canvasesUpdateCanvasVersion2,
@@ -20,7 +21,6 @@ import {
   canvasesListCanvasChangeRequests,
   canvasesDescribeCanvasChangeRequest,
   canvasesDeleteCanvas,
-  canvasesDeleteCanvasVersion,
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
@@ -77,6 +77,7 @@ export const canvasKeys = {
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
+  draftBranches: (canvasId: string) => [...canvasKeys.all, "draftBranches", canvasId] as const,
   changeRequests: () => [...canvasKeys.all, "changeRequests"] as const,
   changeRequestList: (canvasId: string) => [...canvasKeys.changeRequests(), canvasId] as const,
   changeRequestHistory: (
@@ -829,30 +830,44 @@ export const useUpdateCanvasFolderMembership = (organizationId: string) => {
   });
 };
 
-export const useCreateCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useListDraftBranches = (organizationId: string, canvasId: string, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.draftBranches(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: { state: "STATE_DRAFT" },
+        }),
+      );
+      return response.data?.versions ?? [];
+    },
+    enabled: enabled && !!organizationId && !!canvasId,
+  });
+};
+
+export const useCreateDraftBranch = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (displayName?: string) => {
       return await canvasesCreateCanvasVersion(
         withOrganizationHeader({
           path: { canvasId },
-          body: {},
+          body: displayName ? { displayName } : {},
         }),
       );
     },
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      if (response?.data?.version?.metadata?.id) {
-        analytics.versionPublish(canvasId, organizationId);
-      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     },
   });
 };
 
-export const useDeleteCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useDeleteDraftBranch = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -867,6 +882,7 @@ export const useDeleteCanvasVersion = (organizationId: string, canvasId: string)
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     },
   });
 };
@@ -887,6 +903,7 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
     },
   });

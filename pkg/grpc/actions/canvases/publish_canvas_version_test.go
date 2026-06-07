@@ -97,9 +97,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		otherUser := support.CreateUser(t, r, r.Organization.ID)
 		otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
-		createResp, err := CreateCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID)
+		createResp, err := CreateCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID, "")
 		require.NoError(t, err)
-		draftVersionID := createResp.Version.Metadata.Id
+		draftVersionID := createResp.GetVersion().GetMetadata().GetId()
 
 		_, err = PublishCanvasVersion(
 			ctx,
@@ -163,9 +163,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft-in-folder")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
 		require.NoError(t, database.Conn().
 			Model(&models.CanvasVersion{}).
@@ -197,11 +195,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-cm-enabled")
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
-		_, err = UpdateCanvas(
+		_, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
 			r.Organization.ID.String(),
@@ -229,11 +225,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-canvas-cm-enabled")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
-		_, err = UpdateCanvas(
+		_, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
 			r.Organization.ID.String(),
@@ -269,9 +263,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-metadata-only")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
 		require.NoError(t, database.Conn().
 			Model(&models.CanvasVersion{}).
@@ -306,9 +298,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-console-only")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
 		draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
 		require.NoError(t, err)
@@ -357,9 +347,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			Update("name", "publish-duplicate-live").
 			Error)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String())
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvas.ID.String(), "")
 
 		require.NoError(t, database.Conn().
 			Model(&models.CanvasVersion{}).
@@ -367,7 +355,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			Update("name", "publish-duplicate-live").
 			Error)
 
-		_, err = PublishCanvasVersion(
+		_, err := PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
 			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,

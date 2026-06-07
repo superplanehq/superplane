@@ -1,7 +1,7 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQueries } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -22,7 +22,12 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
+import {
+  canvasesApplyCanvasVersionChangeset,
+  canvasesDescribeCanvasVersion,
+  canvasesReemitTriggerEvent,
+  canvasesUpdateNodePause,
+} from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
@@ -40,10 +45,11 @@ import {
   useCreateCanvas,
   useCreateCanvasChangeRequest,
   useCreateCanvasMemoryNamespace,
-  useCreateCanvasVersion,
+  useCreateDraftBranch,
+  useDeleteDraftBranch,
+  useListDraftBranches,
   useDeleteCanvasMemoryEntry,
   useUpdateCanvasMemoryNamespace,
-  useDeleteCanvasVersion,
   usePublishCanvasVersion,
   useEventExecutions,
   useInfiniteCanvasEvents,
@@ -57,6 +63,8 @@ import {
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
+import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
+import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
@@ -212,8 +220,6 @@ export function AppPage() {
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
-  const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
-  const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
   const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -241,6 +247,49 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+  const isTemplateCanvas = liveCanvas?.metadata?.isTemplate ?? false;
+  const { data: draftBranches = [] } = useListDraftBranches(organizationId!, canvasId!, !isTemplateCanvas);
+  const draftVersionQueries = useQueries({
+    queries: draftBranches
+      .map((branch) => draftVersionId(branch))
+      .filter((versionId) => !!versionId)
+      .map((versionId) => ({
+        queryKey: canvasKeys.versionDetail(canvasId!, versionId),
+        queryFn: async () => {
+          const response = await canvasesDescribeCanvasVersion(
+            withOrganizationHeader({
+              path: { canvasId: canvasId!, versionId },
+            }),
+          );
+          return response.data?.version;
+        },
+        enabled: !!organizationId && !!canvasId && !!versionId && !isTemplateCanvas,
+      })),
+  });
+  const draftVersionsFromBranches = useMemo(
+    () =>
+      draftVersionQueries.map((query) => query.data).filter((version): version is CanvasesCanvasVersion => !!version),
+    [draftVersionQueries],
+  );
+  const {
+    activeBranch,
+    activeBranchMeta,
+    activateBranch,
+    exitToLive,
+    pickDefaultDraftBranch: pickDefaultDraftBranchForCanvas,
+  } = useActiveDraftBranch({
+    canvasId,
+    searchParams,
+    setSearchParams,
+    draftBranches,
+  });
+  const [startEditingMenuOpen, setStartEditingMenuOpen] = useState(false);
+  const createDraftBranchMutation = useCreateDraftBranch(organizationId!, canvasId!);
+  const deleteDraftBranchMutation = useDeleteDraftBranch(organizationId!, canvasId!);
+  const startEditingDefaultDraft = useMemo(
+    () => pickDefaultDraftBranchForCanvas(currentUserId),
+    [pickDefaultDraftBranchForCanvas, currentUserId],
+  );
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
@@ -263,11 +312,12 @@ export function AppPage() {
     };
     canvasVersions.forEach(addVersion);
     paginatedVersions.forEach(addVersion);
+    draftVersionsFromBranches.forEach(addVersion);
     return Array.from(versionMap.values()).filter((version) => {
       if (isPublishedVersion(version)) return true;
       return version.metadata?.owner?.id === currentUserId;
     });
-  }, [canvasVersions, paginatedVersions, currentUserId]);
+  }, [canvasVersions, paginatedVersions, currentUserId, draftVersionsFromBranches]);
   const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const liveVersionChangeRequestsByVersionId = useMemo(() => {
     const publishedChangeRequests = canvasChangeRequests.filter(
@@ -371,7 +421,7 @@ export function AppPage() {
     });
     return indexedVersions;
   }, [visibleCanvasVersions, pendingApprovalVersions]);
-  const draftVersions = useMemo(() => sortDraftVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
+  const draftVersions = useMemo(() => sortDraftVersionsDesc(draftVersionsFromBranches), [draftVersionsFromBranches]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -574,7 +624,7 @@ export function AppPage() {
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
-  const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
+  const isTemplate = isTemplateCanvas;
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
@@ -1393,28 +1443,44 @@ export function AppPage() {
     }
 
     try {
-      const response = await createCanvasVersionMutation.mutateAsync();
+      const response = await createDraftBranchMutation.mutateAsync(undefined);
       const version = response?.data?.version;
-      if (!version) {
-        showErrorToast("Failed to create canvas version");
+      const branchName = version ? draftBranchName(version) : "";
+      const versionId = version ? draftVersionId(version) : "";
+      if (!branchName || !versionId) {
+        showErrorToast("Failed to create draft branch");
         return;
       }
 
-      activeCanvasVersionIdRef.current = version.metadata?.id || "";
-      activateDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, version);
+      activateBranch(branchName);
+
+      const versionResponse = await canvasesDescribeCanvasVersion(
+        withOrganizationHeader({
+          path: { canvasId: canvasId!, versionId },
+        }),
+      );
+      const loadedVersion = versionResponse.data?.version;
+      if (!loadedVersion) {
+        showErrorToast("Failed to load draft version");
+        return;
+      }
+
+      activeCanvasVersionIdRef.current = loadedVersion.metadata?.id || "";
+      activateDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, loadedVersion);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
-        if (version.metadata?.id) {
-          next.set("version", version.metadata.id);
+        if (loadedVersion.metadata?.id) {
+          next.set("version", loadedVersion.metadata.id);
         }
+        next.set("branch", branchName);
         return clearComponentSidebarSearchParams(next);
       });
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-        if (!current || !version.spec) {
+        if (!current || !loadedVersion.spec) {
           return current;
         }
 
@@ -1422,10 +1488,10 @@ export function AppPage() {
           ...current,
           metadata: {
             ...current.metadata,
-            name: version.metadata?.name ?? current.metadata?.name,
-            description: version.metadata?.description ?? current.metadata?.description,
+            name: loadedVersion.metadata?.name ?? current.metadata?.name,
+            description: loadedVersion.metadata?.description ?? current.metadata?.description,
           },
-          spec: { ...current.spec, ...version.spec },
+          spec: { ...current.spec, ...loadedVersion.spec },
         };
       });
     } catch (error) {
@@ -1442,7 +1508,8 @@ export function AppPage() {
     isTemplate,
     hasEditableVersion,
     hasUnsavedChanges,
-    createCanvasVersionMutation,
+    createDraftBranchMutation,
+    activateBranch,
     queryClient,
     setSearchParams,
     setLastSavedWorkflowSnapshot,
@@ -4231,6 +4298,10 @@ export function AppPage() {
         queryKey: canvasKeys.versionHistory(canvasId),
         refetchType: "all",
       }),
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.draftBranches(canvasId),
+        refetchType: "all",
+      }),
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId), refetchType: "all" }),
       queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId), refetchType: "all" }),
     ]);
@@ -4258,9 +4329,11 @@ export function AppPage() {
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
       activeCanvasVersionIdRef.current = "";
       clearDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionIdToPublish);
+      exitToLive();
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
+        next.delete("branch");
         return clearComponentSidebarSearchParams(next);
       });
       await refreshLatestLiveCanvasData();
@@ -4278,6 +4351,7 @@ export function AppPage() {
     publishCanvasVersionMutation,
     refreshLatestLiveCanvasData,
     setSearchParams,
+    exitToLive,
   ]);
 
   const handleActOnChangeRequest = useCallback(
@@ -4566,11 +4640,29 @@ export function AppPage() {
         const next = new URLSearchParams(current);
         if (isCurrentLive) {
           next.delete("version");
+          next.delete("branch");
         } else {
           next.set("version", versionID);
+          const matchingBranch = draftBranches.find((branch) => draftVersionId(branch) === versionID);
+          if (matchingBranch) {
+            const branchName = draftBranchName(matchingBranch);
+            if (branchName) {
+              next.set("branch", branchName);
+            }
+          }
         }
         return clearComponentSidebarSearchParams(next);
       });
+
+      if (isCurrentLive) {
+        exitToLive();
+      } else {
+        const matchingBranch = draftBranches.find((branch) => draftVersionId(branch) === versionID);
+        const matchingBranchName = matchingBranch ? draftBranchName(matchingBranch) : "";
+        if (matchingBranchName) {
+          activateBranch(matchingBranchName);
+        }
+      }
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
         if (!current) {
@@ -4637,6 +4729,9 @@ export function AppPage() {
       clearPendingAutoSaveWork,
       setLastSavedWorkflowSnapshot,
       draftCanvasSpec,
+      draftBranches,
+      activateBranch,
+      exitToLive,
     ],
   );
 
@@ -4725,6 +4820,92 @@ export function AppPage() {
     ],
   );
 
+  const handleContinueDraftBranch = useCallback(
+    (branchName: string) => {
+      const branch = draftBranches.find((item) => draftBranchName(item) === branchName);
+      const versionId = branch ? draftVersionId(branch) : "";
+      if (!versionId) {
+        showErrorToast("Draft branch not found");
+        return;
+      }
+      handleUseVersion(versionId);
+    },
+    [draftBranches, handleUseVersion],
+  );
+
+  const handleCreateDraftBranch = useCallback(async () => {
+    setStartEditingMenuOpen(false);
+    await handleCreateVersion();
+  }, [handleCreateVersion]);
+
+  const handleDeleteDraftBranch = useCallback(
+    async (versionId: string) => {
+      if (!canUpdateCanvas) {
+        showErrorToast("You don't have permission to edit this canvas");
+        return;
+      }
+
+      const branch = draftBranches.find((item) => draftVersionId(item) === versionId);
+      if (!branch) {
+        showErrorToast("Draft branch not found");
+        return;
+      }
+
+      const branchName = draftBranchName(branch);
+      const shouldDelete = window.confirm(`Delete draft "${draftDisplayName(branch)}"?`);
+      if (!shouldDelete) {
+        return;
+      }
+
+      try {
+        await deleteDraftBranchMutation.mutateAsync(versionId);
+        if (activeBranch === branchName) {
+          exitToLive();
+          if (liveCanvasVersionId) {
+            handleUseVersion(liveCanvasVersionId);
+          } else {
+            setActiveCanvasVersion(null);
+            setDraftCanvasSpec(null);
+            setSearchParams((current) => {
+              const next = new URLSearchParams(current);
+              next.delete("version");
+              next.delete("branch");
+              return clearComponentSidebarSearchParams(next);
+            });
+          }
+        }
+        showSuccessToast("Draft deleted");
+      } catch (error) {
+        const message =
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (error as { message?: string })?.message ||
+          "Failed to delete draft branch";
+        showErrorToast(message);
+      }
+    },
+    [
+      canUpdateCanvas,
+      draftBranches,
+      deleteDraftBranchMutation,
+      activeBranch,
+      exitToLive,
+      liveCanvasVersionId,
+      handleUseVersion,
+      setSearchParams,
+    ],
+  );
+
+  useEffect(() => {
+    const activeVersionId = activeBranchMeta ? draftVersionId(activeBranchMeta) : "";
+    if (!activeVersionId || activeCanvasVersionId === activeVersionId) {
+      return;
+    }
+
+    if (selectableVersionsById.has(activeVersionId)) {
+      handleUseVersion(activeVersionId);
+    }
+  }, [activeBranchMeta, activeCanvasVersionId, selectableVersionsById, handleUseVersion]);
+
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
       return;
@@ -4745,15 +4926,17 @@ export function AppPage() {
         showErrorToast("No live version available");
         return;
       }
+      exitToLive();
       handleUseVersion(liveCanvasVersionId);
       return;
     }
 
     setSuppressUnpublishedDraftDiscard(false);
 
-    const existingDraftVersionID = draftVersions[0]?.metadata?.id;
-    if (existingDraftVersionID) {
-      handleUseVersion(existingDraftVersionID);
+    const defaultDraft = startEditingDefaultDraft ?? draftBranches[0];
+    const defaultDraftVersionId = defaultDraft ? draftVersionId(defaultDraft) : "";
+    if (defaultDraftVersionId) {
+      handleUseVersion(defaultDraftVersionId);
       return;
     }
 
@@ -4765,9 +4948,11 @@ export function AppPage() {
     isTemplate,
     hasEditableVersion,
     liveCanvasVersionId,
-    draftVersions,
+    draftBranches,
+    startEditingDefaultDraft,
     handleUseVersion,
     handleCreateVersion,
+    exitToLive,
   ]);
 
   const handleSelectRun = useCallback(
@@ -4972,10 +5157,33 @@ export function AppPage() {
       return;
     }
 
-    const draftId = latestDraftVersion?.metadata?.id;
-    if (draftId) {
+    const versionIdToDelete = (() => {
+      if (activeBranchMeta) {
+        const versionId = draftVersionId(activeBranchMeta);
+        if (versionId) {
+          return versionId;
+        }
+      }
+
+      if (activeBranch) {
+        const branch = draftBranches.find((item) => draftBranchName(item) === activeBranch);
+        const versionId = branch ? draftVersionId(branch) : "";
+        if (versionId) {
+          return versionId;
+        }
+      }
+
+      const latestDraftVersionId = latestDraftVersion?.metadata?.id;
+      if (latestDraftVersionId) {
+        return latestDraftVersionId;
+      }
+
+      return "";
+    })();
+
+    if (versionIdToDelete) {
       try {
-        await deleteCanvasVersionMutation.mutateAsync(draftId);
+        await deleteDraftBranchMutation.mutateAsync(versionIdToDelete);
       } catch (error) {
         const message =
           (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -4986,8 +5194,19 @@ export function AppPage() {
       }
     }
 
+    exitToLive();
     await handleCreateVersion();
-  }, [canUpdateCanvas, isTemplate, latestDraftVersion, deleteCanvasVersionMutation, handleCreateVersion]);
+  }, [
+    canUpdateCanvas,
+    isTemplate,
+    activeBranchMeta,
+    activeBranch,
+    draftBranches,
+    latestDraftVersion,
+    deleteDraftBranchMutation,
+    handleCreateVersion,
+    exitToLive,
+  ]);
 
   const handleResetDraftChanges = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -5014,11 +5233,35 @@ export function AppPage() {
       return;
     }
 
+    const versionIdToDelete = (() => {
+      if (activeBranchMeta) {
+        const versionId = draftVersionId(activeBranchMeta);
+        if (versionId) {
+          return versionId;
+        }
+      }
+
+      if (activeBranch) {
+        const branch = draftBranches.find((item) => draftBranchName(item) === activeBranch);
+        const versionId = branch ? draftVersionId(branch) : "";
+        if (versionId) {
+          return versionId;
+        }
+      }
+
+      return activeCanvasVersionId;
+    })();
+
+    if (!versionIdToDelete) {
+      showErrorToast("Draft branch not found");
+      return;
+    }
+
     clearPendingAutoSaveWork();
 
     try {
       setIsResetDraftPending(true);
-      await deleteCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
+      await deleteDraftBranchMutation.mutateAsync(versionIdToDelete);
 
       setIsCreateChangeRequestMode(false);
       setSelectedChangeRequestId("");
@@ -5029,6 +5272,7 @@ export function AppPage() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
+        next.delete("branch");
         return clearComponentSidebarSearchParams(next);
       });
 
@@ -5062,7 +5306,10 @@ export function AppPage() {
     isTemplate,
     hasEditableVersion,
     activeCanvasVersionId,
-    deleteCanvasVersionMutation,
+    activeBranchMeta,
+    activeBranch,
+    draftBranches,
+    deleteDraftBranchMutation,
     liveCanvasVersion,
     queryClient,
     setSearchParams,
@@ -5396,7 +5643,7 @@ export function AppPage() {
   const toggleEditModeDisabled =
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
-    createCanvasVersionMutation.isPending ||
+    createDraftBranchMutation.isPending ||
     (hasEditableVersion && !liveCanvasVersionId);
   const toggleEditModeDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -5409,7 +5656,7 @@ export function AppPage() {
     !hasEditableVersion ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
-    deleteCanvasVersionMutation.isPending ||
+    deleteDraftBranchMutation.isPending ||
     isResetDraftPending ||
     !activeCanvasVersionId;
   const resetDraftDisabledTooltip = !canUpdateCanvas
@@ -5439,7 +5686,7 @@ export function AppPage() {
       isViewingCurrentLiveVersion,
     });
   const exitEditModeDisabled =
-    !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
+    !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createDraftBranchMutation.isPending;
   const exitEditModeDisabledTooltip = getExitEditModeDisabledTooltip({
     canUpdateCanvas,
     canvasDeletedRemotely,
@@ -5615,6 +5862,13 @@ export function AppPage() {
           onShowNodeDiff={onShowNodeDiff}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
+          startEditingDrafts={isTemplate ? undefined : draftBranches}
+          startEditingDefaultDraft={startEditingDefaultDraft}
+          startEditingMenuOpen={startEditingMenuOpen}
+          onStartEditingMenuOpenChange={setStartEditingMenuOpen}
+          onContinueDraftBranch={handleContinueDraftBranch}
+          onCreateDraftBranch={handleCreateDraftBranch}
+          createDraftBranchPending={createDraftBranchMutation.isPending}
           headerMode={headerMode}
           onSelectCanvasView={handleSelectCanvasView}
           onEnterEditMode={handleEnterEditModeFromHeader}
@@ -5704,6 +5958,11 @@ export function AppPage() {
                 liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
               }
               rejectedVersions={rejectedVersions}
+              draftBranches={draftBranches}
+              activeDraftBranch={activeBranch}
+              onOpenDraftBranch={handleContinueDraftBranch}
+              onDeleteDraftBranch={handleDeleteDraftBranch}
+              deleteDraftBranchPending={deleteDraftBranchMutation.isPending}
             />
           }
           focusRequest={focusRequest}

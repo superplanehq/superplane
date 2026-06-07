@@ -39,12 +39,6 @@ func writeSampleConsoleYAML(t *testing.T) string {
 	return path
 }
 
-func listVersionsWithDraft(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-	t.Helper()
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","state":"STATE_DRAFT"}}],"hasNextPage":false}`))
-}
-
 // describeCanvasCMEnabledResponse returns a canvas whose spec advertises
 // change management enabled. Used by tests that exercise the auto change
 // request flow in `console set`.
@@ -91,11 +85,8 @@ func TestSetFromFileFlag(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -122,11 +113,8 @@ func TestSetFromPositionalFile(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -148,11 +136,8 @@ func TestSetFromStdin(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -176,22 +161,9 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[],"hasNextPage":false}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1"}}}`))
-			},
-		},
+		expectMe(),
+		expectListDraftBranchesEmpty(testCanvasID),
+		expectCreateDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -205,8 +177,9 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
 	server.AssertCalls(t, []string{
 		http.MethodGet + " " + testDescribeCanvas,
-		http.MethodGet + " /api/v1/canvases/" + testCanvasID + "/versions",
-		http.MethodPost + " /api/v1/canvases/" + testCanvasID + "/versions",
+		http.MethodGet + " " + testMePath,
+		http.MethodGet + " " + draftVersionsPath(testCanvasID),
+		http.MethodPost + " " + draftVersionsPath(testCanvasID),
 		http.MethodPut + " " + testConsolePath,
 	})
 }
@@ -223,11 +196,8 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -271,11 +241,8 @@ func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasCMEnabledResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
@@ -317,11 +284,8 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasCMEnabledResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   testConsolePath,
