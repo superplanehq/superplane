@@ -695,7 +695,10 @@ CREATE TABLE public.workflow_versions (
     change_management_enabled boolean DEFAULT false NOT NULL,
     change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL
+    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    branch_name text,
+    display_name text DEFAULT ''::text NOT NULL,
+    CONSTRAINT workflow_versions_draft_branch_check CHECK (((((state)::text = 'draft'::text) AND (branch_name IS NOT NULL)) OR (((state)::text <> 'draft'::text) AND (branch_name IS NULL))))
 );
 
 
@@ -713,7 +716,8 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    folder_id uuid
+    folder_id uuid,
+    next_draft_display_number integer DEFAULT 1 NOT NULL
 );
 
 
@@ -1613,17 +1617,17 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
+-- Name: idx_workflow_versions_draft_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workflow_versions_draft_branch ON public.workflow_versions USING btree (workflow_id, branch_name) WHERE (((state)::text = 'draft'::text) AND (branch_name IS NOT NULL));
+
+
+--
 -- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
-
-
---
--- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_workflow_versions_unique_draft ON public.workflow_versions USING btree (workflow_id, owner_id) WHERE ((state)::text = 'draft'::text);
 
 
 --
@@ -2194,7 +2198,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260601220232	f
+20260607000000	f
 \.
 
 

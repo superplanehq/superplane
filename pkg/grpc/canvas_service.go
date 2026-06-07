@@ -78,14 +78,23 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	)
 }
 
-func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId)
-}
-
 func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanvasVersionsRequest) (*pb.ListCanvasVersionsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before)
+	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before, req.State)
+}
+
+func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	displayName := ""
+	if req.DisplayName != nil {
+		displayName = *req.DisplayName
+	}
+	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId, displayName)
+}
+
+func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
@@ -157,11 +166,6 @@ func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req 
 		versionID,
 		req.Changeset,
 	)
-}
-
-func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
 func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {

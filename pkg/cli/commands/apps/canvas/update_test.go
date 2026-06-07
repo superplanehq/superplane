@@ -62,6 +62,56 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	require.Len(t, s.expectations, 0, "unused request expectations")
 }
 
+const cliTestUserID = "user-1"
+
+func draftVersionsPath(canvasID string) string {
+	return "/api/v1/canvases/" + canvasID + "/versions"
+}
+
+func expectMe() requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   "/api/v1/me",
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"` + cliTestUserID + `"}}`))
+		},
+	}
+}
+
+func expectListUserDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","owner":{"id":"` + cliTestUserID + `"}}}]}`))
+		},
+	}
+}
+
+func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[]}`))
+		},
+	}
+}
+
+func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodPost,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
+		},
+	}
+}
+
 func TestUpdateWithoutFileReturnsError(t *testing.T) {
 	server := newAPITestServer(t)
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
@@ -137,14 +187,8 @@ func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
-			},
-		},
+		expectMe(),
+		expectListUserDraftBranch(canvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -166,7 +210,8 @@ func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 	})
 }
@@ -185,22 +230,9 @@ func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[]}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
-			},
-		},
+		expectMe(),
+		expectListDraftBranchesEmpty(canvasID),
+		expectCreateDraftBranch(canvasID, "ver-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -230,8 +262,9 @@ func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
-		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodPost + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 	})
@@ -251,14 +284,8 @@ func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
-			},
-		},
+		expectMe(),
+		expectListUserDraftBranch(canvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -279,7 +306,8 @@ func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 	})
 }
@@ -298,14 +326,8 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
-			},
-		},
+		expectMe(),
+		expectListUserDraftBranch(canvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -336,7 +358,8 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 	})
 }
@@ -371,24 +394,9 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		// 2. List versions (no existing draft)
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[]}`))
-			},
-		},
-		// 3. Create draft version
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
-			},
-		},
+		expectMe(),
+		expectListDraftBranchesEmpty(canvasID),
+		expectCreateDraftBranch(canvasID, "ver-1"),
 		// 4. Update draft version
 		requestExpectation{
 			method: http.MethodPut,
@@ -427,8 +435,9 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
-		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodPost + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 	})
@@ -485,14 +494,8 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
-			},
-		},
+		expectMe(),
+		expectListUserDraftBranch(canvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -521,7 +524,8 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 	})
 }
