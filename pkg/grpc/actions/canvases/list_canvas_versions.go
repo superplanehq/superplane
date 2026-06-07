@@ -28,7 +28,7 @@ func ListCanvasVersionsPaginated(
 	before *timestamppb.Timestamp,
 	state pb.CanvasVersion_State,
 ) (*pb.ListCanvasVersionsResponse, error) {
-	_, ok := authentication.GetUserIdFromMetadata(ctx)
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
@@ -49,7 +49,7 @@ func ListCanvasVersionsPaginated(
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(ctx, organizationID, canvas, limit, before)
+		return listDraftCanvasVersions(organizationID, canvas, uuid.MustParse(userID), limit, before)
 	}
 
 	limit = getCanvasVersionLimit(limit)
@@ -90,9 +90,9 @@ func ListCanvasVersionsPaginated(
 }
 
 func listDraftCanvasVersions(
-	_ context.Context,
 	organizationID string,
 	canvas *models.Canvas,
+	ownerID uuid.UUID,
 	limit uint32,
 	before *timestamppb.Timestamp,
 ) (*pb.ListCanvasVersionsResponse, error) {
@@ -102,13 +102,13 @@ func listDraftCanvasVersions(
 	var draftVersions []models.CanvasVersion
 	var draftCount int64
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, int(limit), beforeTime)
+		versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID, int(limit), beforeTime)
 		if versionsErr != nil {
 			return versionsErr
 		}
 		draftVersions = versions
 
-		count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID)
+		count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID)
 		if countErr != nil {
 			return countErr
 		}

@@ -52,11 +52,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 
 	canAccess := false
 	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		canReadDraft, readDraftErr := canReadOwnedRegisteredDraftInTransaction(tx, canvas.ID, userUUID, version)
-		if readDraftErr != nil {
-			return readDraftErr
-		}
-		if canReadDraft {
+		if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 			canAccess = true
 			return nil
 		}
