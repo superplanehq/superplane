@@ -3,7 +3,6 @@ package common
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -84,34 +83,67 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 	return *matches[0].Metadata.Id, nil
 }
 
-// FindCurrentUserDraftVersionID returns the id of the first non-published
-// app version visible to the current user, or an empty string if none
-// exists. It does not create a draft.
+func listDraftVersions(ctx core.CommandContext, appID string) ([]openapi_client.CanvasesCanvasVersion, error) {
+	response, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesListCanvasVersions(ctx.Context, appID).
+		State("STATE_DRAFT").
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	return response.GetVersions(), nil
+}
+
+func draftVersionIDForOwner(versions []openapi_client.CanvasesCanvasVersion, userID string) string {
+	trimmedUserID := strings.TrimSpace(userID)
+	for _, version := range versions {
+		if trimmedUserID != "" {
+			ownerID := ""
+			if version.Metadata != nil && version.Metadata.Owner != nil {
+				ownerID = strings.TrimSpace(version.Metadata.Owner.GetId())
+			}
+			if ownerID == "" || !strings.EqualFold(ownerID, trimmedUserID) {
+				continue
+			}
+		}
+
+		versionID := ""
+		if version.Metadata != nil {
+			versionID = strings.TrimSpace(version.Metadata.GetId())
+		}
+		if versionID != "" {
+			return versionID
+		}
+	}
+
+	return ""
+}
+
+// FindCurrentUserDraftVersionID returns the version id of the first draft
+// branch owned by the current user, or an empty string if none exists.
+// It does not create a draft.
 func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.CanvasesListCanvasVersions(ctx.Context, appID).Execute()
+	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
 	if err != nil {
 		return "", err
 	}
 
-	for _, version := range response.GetVersions() {
-		metadata := version.GetMetadata()
-		if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
-			continue
-		}
-
-		versionID := strings.TrimSpace(metadata.GetId())
-		if versionID == "" {
-			continue
-		}
-
-		return versionID, nil
+	currentUserID := strings.TrimSpace(me.User.GetId())
+	if currentUserID == "" {
+		return "", fmt.Errorf("current user id not found")
 	}
 
-	return "", nil
+	versions, err := listDraftVersions(ctx, appID)
+	if err != nil {
+		return "", err
+	}
+
+	return draftVersionIDForOwner(versions, currentUserID), nil
 }
 
-// EnsureCurrentUserDraftVersionID returns the id of the current user's draft
-// version, creating one if it does not yet exist.
+// EnsureCurrentUserDraftVersionID returns the version id of a draft branch
+// owned by the current user, creating one if it does not yet exist.
 func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
 	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
 	if err != nil {
@@ -123,7 +155,7 @@ func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (str
 
 	response, _, err := ctx.API.CanvasVersionAPI.
 		CanvasesCreateCanvasVersion(ctx.Context, appID).
-		Body(map[string]interface{}{}).
+		Body(openapi_client.CanvasesCreateCanvasVersionBody{}).
 		Execute()
 	if err != nil {
 		return "", err
@@ -140,61 +172,20 @@ func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (str
 	return versionID, nil
 }
 
-// FindOwnedDraftVersionID walks the version history (paginated) and returns
-// the id of the latest non-published version whose owner matches `userID`,
-// or an empty string when none is found.
+// FindOwnedDraftVersionID returns the version id of the first draft branch
+// owned by `userID`, or an empty string when none is found.
 func FindOwnedDraftVersionID(ctx core.CommandContext, appID string, userID string) (string, error) {
 	trimmedUserID := strings.TrimSpace(userID)
 	if trimmedUserID == "" {
 		return "", nil
 	}
 
-	var before *time.Time
-	for {
-		req := ctx.API.CanvasVersionAPI.
-			CanvasesListCanvasVersions(ctx.Context, appID).
-			Limit(50)
-		if before != nil {
-			req = req.Before(*before)
-		}
-
-		response, _, err := req.Execute()
-		if err != nil {
-			return "", err
-		}
-
-		for _, version := range response.GetVersions() {
-			metadata := version.GetMetadata()
-			if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
-				continue
-			}
-
-			ownerID := ""
-			if metadata.Owner != nil {
-				ownerID = strings.TrimSpace(metadata.Owner.GetId())
-			}
-			if ownerID == "" || !strings.EqualFold(ownerID, trimmedUserID) {
-				continue
-			}
-
-			versionID := strings.TrimSpace(metadata.GetId())
-			if versionID == "" {
-				continue
-			}
-
-			return versionID, nil
-		}
-
-		if !response.GetHasNextPage() {
-			return "", nil
-		}
-
-		last, ok := response.GetLastTimestampOk()
-		if !ok || last == nil {
-			return "", nil
-		}
-		before = last
+	versions, err := listDraftVersions(ctx, appID)
+	if err != nil {
+		return "", err
 	}
+
+	return draftVersionIDForOwner(versions, trimmedUserID), nil
 }
 
 // DescribeAppVersionByID loads a specific app version and errors when
