@@ -77,6 +77,8 @@ export interface HeaderProps {
   onContinueDraftBranch?: (branchName: string) => void;
   onCreateDraftBranch?: () => void;
   createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
@@ -108,6 +110,8 @@ export function Header(props: HeaderProps) {
         onContinueDraftBranch={props.onContinueDraftBranch}
         onCreateDraftBranch={props.onCreateDraftBranch}
         createDraftBranchPending={props.createDraftBranchPending}
+        activeDraftBranchLabel={props.activeDraftBranchLabel}
+        activeDraftBranchShortSha={props.activeDraftBranchShortSha}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
@@ -137,6 +141,8 @@ function PageHeader({
   onContinueDraftBranch,
   onCreateDraftBranch,
   createDraftBranchPending,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
@@ -160,6 +166,8 @@ function PageHeader({
   onContinueDraftBranch?: (branchName: string) => void;
   onCreateDraftBranch?: () => void;
   createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
 }) {
   const {
     workflowId,
@@ -192,7 +200,25 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {mode !== "runs" && !isEditing && onEnterEditMode ? (
+        {isEditing ? (
+          <div className="flex items-center">
+            {activeDraftBranchLabel ? (
+              <span
+                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
+                data-testid="active-draft-branch-chip"
+              >
+                Editing: {activeDraftBranchLabel}
+                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
+              </span>
+            ) : null}
+            <EditModeTopHeaderActions
+              onExitEditMode={onExitEditMode}
+              exitEditModeDisabled={exitEditModeDisabled}
+              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            />
+          </div>
+        ) : null}
+        {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -207,13 +233,6 @@ function PageHeader({
             onContinueDraftBranch={onContinueDraftBranch}
             onCreateDraftBranch={onCreateDraftBranch}
             createDraftBranchPending={createDraftBranchPending}
-          />
-        ) : null}
-        {isEditing ? (
-          <EditModeTopHeaderActions
-            onExitEditMode={onExitEditMode}
-            exitEditModeDisabled={exitEditModeDisabled}
-            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           />
         ) : null}
       </div>

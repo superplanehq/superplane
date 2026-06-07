@@ -5714,6 +5714,11 @@ export function AppPage() {
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
   });
 
+  const activeDraftBranchLabel =
+    isEditing && activeBranchMeta
+      ? draftDisplayName(activeBranchMeta) || draftBranchName(activeBranchMeta) || undefined
+      : undefined;
+
   return (
     <>
       <div className="relative h-full w-full">
@@ -5883,6 +5888,7 @@ export function AppPage() {
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+          activeDraftBranchLabel={activeDraftBranchLabel}
           {...draftChangeIndicators}
           {...filesHeaderVersionActions}
           autoLayoutOnUpdateDisabled={isReadOnly}

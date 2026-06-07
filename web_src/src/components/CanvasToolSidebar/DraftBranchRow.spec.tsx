@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { DraftBranchRow } from "./DraftBranchRow";
@@ -14,43 +15,29 @@ const draft: CanvasesCanvasVersion = {
 };
 
 describe("DraftBranchRow", () => {
-  it("shows ready to publish badge and blue background when active and ready", () => {
+  it("renders draft metadata and highlights the active row", () => {
     const { container } = render(
-      <DraftBranchRow draft={draft} isActive editStatus="ready" canUpdateCanvas onOpen={vi.fn()} />,
+      <DraftBranchRow draft={draft} isActive canUpdateCanvas onOpen={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    expect(screen.getByText("Ready to publish")).toBeInTheDocument();
+    expect(screen.getByText("Draft #1")).toBeInTheDocument();
+    expect(screen.getByText("drafts/user-1")).toBeInTheDocument();
+    expect(screen.getByText(/Ada ·/)).toBeInTheDocument();
     expect(container.firstChild).toHaveClass("bg-blue-50");
+    expect(screen.queryByText("Ready to publish")).not.toBeInTheDocument();
   });
 
-  it("shows uncommitted changes badge and orange background when active and uncommitted", () => {
-    const { container } = render(
-      <DraftBranchRow draft={draft} isActive editStatus="uncommitted" canUpdateCanvas onOpen={vi.fn()} />,
-    );
+  it("opens and deletes the draft branch", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    const onDelete = vi.fn();
 
-    expect(screen.getByText("Uncommitted changes")).toBeInTheDocument();
-    expect(container.firstChild).toHaveClass("bg-orange-50");
-  });
+    render(<DraftBranchRow draft={draft} isActive={false} canUpdateCanvas onOpen={onOpen} onDelete={onDelete} />);
 
-  it("shows gray badge and background when inactive with edit status", () => {
-    const { container } = render(
-      <DraftBranchRow draft={draft} isActive={false} editStatus="ready" canUpdateCanvas onOpen={vi.fn()} />,
-    );
+    await user.click(screen.getByText("Draft #1"));
+    await user.click(screen.getByRole("button", { name: "Delete Draft #1" }));
 
-    const badge = screen.getByText("Ready to publish");
-    expect(badge).toHaveClass("bg-slate-100");
-    expect(badge).toHaveClass("text-slate-600");
-    expect(container.firstChild).toHaveClass("bg-slate-50");
-  });
-
-  it("shows no changes badge and gray background when active with no changes", () => {
-    const { container } = render(
-      <DraftBranchRow draft={draft} isActive editStatus="no-changes" canUpdateCanvas onOpen={vi.fn()} />,
-    );
-
-    expect(screen.getByText("No changes")).toBeInTheDocument();
-    expect(container.firstChild).toHaveClass("bg-blue-50");
-    expect(screen.getByText("No changes")).toHaveClass("bg-blue-100");
-    expect(screen.getByText("No changes")).toHaveClass("text-blue-800");
+    expect(onOpen).toHaveBeenCalledWith("drafts/user-1");
+    expect(onDelete).toHaveBeenCalledWith("version-1");
   });
 });

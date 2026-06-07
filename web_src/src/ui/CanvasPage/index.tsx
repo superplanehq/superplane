@@ -220,6 +220,8 @@ export interface CanvasPageProps {
   onContinueDraftBranch?: (branchName: string) => void;
   onCreateDraftBranch?: () => void;
   createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1357,6 +1359,8 @@ function CanvasPage(props: CanvasPageProps) {
           onContinueDraftBranch={props.onContinueDraftBranch}
           onCreateDraftBranch={props.onCreateDraftBranch}
           createDraftBranchPending={props.createDraftBranchPending}
+          activeDraftBranchLabel={props.activeDraftBranchLabel}
+          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
         />
@@ -1923,6 +1927,8 @@ function CanvasContentHeader({
   onContinueDraftBranch,
   onCreateDraftBranch,
   createDraftBranchPending,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
   showCanvasSettingsMenu,
   toolSidebarState,
 }: {
@@ -1982,6 +1988,8 @@ function CanvasContentHeader({
   onContinueDraftBranch?: (branchName: string) => void;
   onCreateDraftBranch?: () => void;
   createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }) {
@@ -2041,6 +2049,8 @@ function CanvasContentHeader({
       onContinueDraftBranch={onContinueDraftBranch}
       onCreateDraftBranch={onCreateDraftBranch}
       createDraftBranchPending={createDraftBranchPending}
+      activeDraftBranchLabel={activeDraftBranchLabel}
+      activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
     />
