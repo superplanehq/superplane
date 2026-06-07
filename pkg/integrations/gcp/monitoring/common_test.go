@@ -172,6 +172,18 @@ func Test__BuildConditions(t *testing.T) {
 		require.ErrorContains(t, err, "at least one condition")
 	})
 
+	t.Run("too many conditions errors", func(t *testing.T) {
+		specs := make([]ConditionSpec, maxPolicyConditions+1)
+		for i := range specs {
+			specs[i] = ConditionSpec{
+				MetricType: "compute.googleapis.com/instance/cpu/utilization",
+				Comparison: comparisonGT, Threshold: ptrFloat(0.8), Duration: "300s",
+			}
+		}
+		_, err := buildConditions(specs)
+		require.ErrorContains(t, err, "at most")
+	})
+
 	t.Run("zero / fractional / negative count triggers error", func(t *testing.T) {
 		for _, v := range []float64{0, -1, 0.5, 2.5} {
 			_, err := buildConditions([]ConditionSpec{{

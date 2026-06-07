@@ -215,6 +215,9 @@ func buildConditions(specs []ConditionSpec) ([]any, error) {
 	if len(specs) == 0 {
 		return nil, errors.New("at least one condition is required")
 	}
+	if len(specs) > maxPolicyConditions {
+		return nil, fmt.Errorf("at most %d conditions are allowed", maxPolicyConditions)
+	}
 	out := make([]any, 0, len(specs))
 	for i, c := range specs {
 		if err := validateCondition(c); err != nil {
