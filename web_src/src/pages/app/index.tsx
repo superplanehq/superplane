@@ -1,10 +1,10 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { useQueryClient, useQueries } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
-import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -29,9 +29,7 @@ import {
   canvasesUpdateNodePause,
 } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
-import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -49,7 +47,6 @@ import {
   useCreateCanvasMemoryNamespace,
   useCreateDraftBranch,
   useDeleteDraftBranch,
-  useListDraftBranches,
   useDeleteCanvasMemoryEntry,
   useUpdateCanvasMemoryNamespace,
   usePublishCanvasVersion,
@@ -65,8 +62,12 @@ import {
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
-import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
 import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
+import { applyVersionSelectionSearchParams, resolveBranchNameForVersion } from "./canvasVersionBranchNavigation";
+import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
+import { DeleteDraftBranchDialog } from "./DeleteDraftBranchDialog";
+import { useCanvasDraftBranchActions } from "./useCanvasDraftBranchActions";
+import { useCanvasDraftBranchQueries, useResolvedActiveDraftBranch } from "./useCanvasDraftBranchData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
@@ -221,7 +222,6 @@ export function AppPage() {
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
-  const [draftVersionToDelete, setDraftVersionToDelete] = useState<string | null>(null);
   const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -250,49 +250,25 @@ export function AppPage() {
     refetchOnMount: false,
   });
   const isTemplateCanvas = liveCanvas?.metadata?.isTemplate ?? false;
-  const { data: draftBranches = [] } = useListDraftBranches(organizationId!, canvasId!, !isTemplateCanvas);
-  const draftVersionQueries = useQueries({
-    queries: draftBranches
-      .map((branch) => draftVersionId(branch))
-      .filter((versionId) => !!versionId)
-      .map((versionId) => ({
-        queryKey: canvasKeys.versionDetail(canvasId!, versionId),
-        queryFn: async () => {
-          const response = await canvasesDescribeCanvasVersion(
-            withOrganizationHeader({
-              path: { canvasId: canvasId!, versionId },
-            }),
-          );
-          return response.data?.version;
-        },
-        enabled: !!organizationId && !!canvasId && !!versionId && !isTemplateCanvas,
-      })),
-  });
-  const draftVersionsFromBranches = useMemo(
-    () =>
-      draftVersionQueries.map((query) => query.data).filter((version): version is CanvasesCanvasVersion => !!version),
-    [draftVersionQueries],
-  );
   const {
+    draftBranches,
+    draftVersionsFromBranches,
     activeBranch,
     activeBranchMeta,
     activateBranch,
     exitToLive,
-    pickDefaultDraftBranch: pickDefaultDraftBranchForCanvas,
-  } = useActiveDraftBranch({
+    startEditingDefaultDraft,
+  } = useCanvasDraftBranchQueries({
+    organizationId,
     canvasId,
+    isTemplateCanvas,
+    currentUserId,
     searchParams,
     setSearchParams,
-    draftBranches,
   });
-  const [startEditingMenuOpen, setStartEditingMenuOpen] = useState(false);
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
   const createDraftBranchMutation = useCreateDraftBranch(organizationId!, canvasId!);
   const deleteDraftBranchMutation = useDeleteDraftBranch(organizationId!, canvasId!);
-  const startEditingDefaultDraft = useMemo(
-    () => pickDefaultDraftBranchForCanvas(currentUserId),
-    [pickDefaultDraftBranchForCanvas, currentUserId],
-  );
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
@@ -575,53 +551,16 @@ export function AppPage() {
   );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
-  const resolvedActiveBranchMeta = useMemo(() => {
-    if (activeBranchMeta) {
-      return activeBranchMeta;
-    }
-
-    if (activeCanvasVersionId) {
-      const fromDraftList = draftBranches.find((branch) => draftVersionId(branch) === activeCanvasVersionId);
-      if (fromDraftList) {
-        return fromDraftList;
-      }
-    }
-
-    if (selectedCanvasVersion && isDraftVersion(selectedCanvasVersion)) {
-      return selectedCanvasVersion;
-    }
-
-    return null;
-  }, [activeBranchMeta, activeCanvasVersionId, draftBranches, selectedCanvasVersion]);
-  const resolvedActiveBranch = useMemo(() => {
-    if (activeBranch) {
-      return activeBranch;
-    }
-
-    const branchNameFromMeta = resolvedActiveBranchMeta ? draftBranchName(resolvedActiveBranchMeta) : "";
-    if (branchNameFromMeta) {
-      return branchNameFromMeta;
-    }
-
-    if (selectedCanvasVersion && isDraftVersion(selectedCanvasVersion)) {
-      return draftBranchName(selectedCanvasVersion) || null;
-    }
-
-    return null;
-  }, [activeBranch, resolvedActiveBranchMeta, selectedCanvasVersion]);
-
-  useEffect(() => {
-    if (!hasEditableVersion || !canvasId) {
-      return;
-    }
-
-    const branchName = resolvedActiveBranch;
-    if (!branchName || activeBranch === branchName) {
-      return;
-    }
-
-    activateBranch(branchName);
-  }, [hasEditableVersion, canvasId, resolvedActiveBranch, activeBranch, activateBranch]);
+  const { resolvedActiveBranchMeta, resolvedActiveBranch } = useResolvedActiveDraftBranch({
+    canvasId,
+    activeBranch,
+    activeBranchMeta,
+    draftBranches,
+    activeCanvasVersionId,
+    selectedCanvasVersion,
+    hasEditableVersion,
+    activateBranch,
+  });
 
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -1717,10 +1656,10 @@ export function AppPage() {
               : "Canvas changes saved";
 
             // Save the workflow with updated positions
-            if (!activeCanvasVersionId) {
+            const savingVersionID = activeCanvasVersionIdRef.current || activeCanvasVersionId || undefined;
+            if (!savingVersionID) {
               return;
             }
-            const savingVersionID = activeCanvasVersionId || undefined;
 
             const saveResult = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
             if (saveResult.status !== "saved") {
@@ -2459,234 +2398,16 @@ export function AppPage() {
     [canvasNodes, visibleNodeExecutionsMap, visibleNodeEventsMap, visibleNodeQueueItemsMap],
   );
 
-  const getAutocompleteExampleObj = useCallback(
-    (nodeId: string): Record<string, unknown> | null => {
-      const currentNode = canvasNodesById.get(nodeId);
-      const chainNodeIds = new Set<string>();
-
-      if (currentNode?.type === "TYPE_TRIGGER") {
-        chainNodeIds.add(nodeId);
-      }
-
-      const stack = [...(incomingNodeIdsByTargetId.get(nodeId) || [])];
-
-      while (stack.length > 0) {
-        const nextId = stack.pop();
-        if (!nextId || chainNodeIds.has(nextId)) continue;
-        chainNodeIds.add(nextId);
-        incomingNodeIdsByTargetId.get(nextId)?.forEach((sourceId) => stack.push(sourceId));
-      }
-
-      if (chainNodeIds.size === 0) {
-        return null;
-      }
-
-      const exampleObj: Record<string, unknown> = {};
-      const nodeMetadata: Record<string, { name?: string; componentType: string; description?: string }> = {};
-      const nodeNamesById: Record<string, string> = {};
-
-      chainNodeIds.forEach((chainNodeId) => {
-        const chainNode = canvasNodesById.get(chainNodeId);
-        if (!chainNode) return;
-
-        const nodeName = (chainNode.name || "").trim();
-        if (nodeName) {
-          nodeNamesById[chainNodeId] = nodeName;
-        }
-
-        if (chainNode.type === "TYPE_TRIGGER") {
-          const triggerMetadata = allTriggersByName.get(chainNode.component);
-
-          // Store node metadata with trigger info
-          nodeMetadata[chainNodeId] = {
-            name: nodeName || undefined,
-            componentType: triggerMetadata?.label || "Trigger",
-            description: triggerMetadata?.description,
-          };
-
-          const latestEvent = visibleNodeEventsMap[chainNodeId]?.[0];
-          if (latestEvent?.data) {
-            exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
-          }
-          if (exampleObj[chainNodeId]) {
-            return;
-          }
-
-          const exampleData = triggerMetadata?.exampleData;
-          if (exampleData && typeof exampleData === "object") {
-            exampleObj[chainNodeId] = Array.isArray(exampleData)
-              ? [...exampleData]
-              : ({ ...exampleData } as Record<string, unknown>);
-          }
-          return;
-        }
-
-        // For components (non-triggers)
-        const componentMetadata = allComponentsByName.get(chainNode.component);
-
-        // Store node metadata with component info
-        nodeMetadata[chainNodeId] = {
-          name: nodeName || undefined,
-          componentType: componentMetadata?.label || "Component",
-          description: componentMetadata?.description,
-        };
-
-        const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
-          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
-        );
-        if (!latestExecution?.outputs) {
-          const exampleOutput = componentMetadata?.exampleOutput;
-          if (exampleOutput && typeof exampleOutput === "object") {
-            exampleObj[chainNodeId] = Array.isArray(exampleOutput)
-              ? [...exampleOutput]
-              : ({ ...exampleOutput } as Record<string, unknown>);
-          }
-          return;
-        }
-
-        const outputData: unknown[] = Object.values(latestExecution.outputs)?.find((output) => {
-          return Array.isArray(output) && output.length > 0;
-        }) as unknown[];
-
-        if (outputData?.length > 0) {
-          exampleObj[chainNodeId] = { ...(outputData?.[0] || {}) } as Record<string, unknown>;
-          return;
-        }
-
-        const exampleOutput = componentMetadata?.exampleOutput;
-        if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
-          exampleObj[chainNodeId] = { ...exampleOutput } as Record<string, unknown>;
-        }
-      });
-
-      // Inject config key into component nodes' example objects for autocomplete
-      chainNodeIds.forEach((chainNodeId) => {
-        const chainNode = canvasNodesById.get(chainNodeId);
-        if (!chainNode || chainNode.type !== "TYPE_ACTION") return;
-
-        const obj = exampleObj[chainNodeId];
-        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
-
-        const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
-          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
-        );
-        if ("config" in (obj as Record<string, unknown>)) return;
-
-        const configData = latestExecution?.configuration || chainNode.configuration;
-        if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
-          (obj as Record<string, unknown>).config = configData;
-        }
-      });
-
-      const getIncomingNodes = (targetId: string): string[] => {
-        return incomingNodeIdsByTargetId.get(targetId) || [];
-      };
-
-      const previousByDepth: Record<string, unknown> = {};
-      let frontier = [nodeId];
-      const visited = new Set<string>([nodeId]);
-      let depth = 0;
-
-      while (frontier.length > 0) {
-        const next: string[] = [];
-        frontier.forEach((current) => {
-          getIncomingNodes(current).forEach((sourceId) => {
-            if (visited.has(sourceId)) return;
-            visited.add(sourceId);
-            next.push(sourceId);
-          });
-        });
-
-        if (next.length === 0) {
-          break;
-        }
-
-        depth += 1;
-        const firstAtDepth = next[0];
-        if (firstAtDepth && exampleObj[firstAtDepth]) {
-          previousByDepth[String(depth)] = exampleObj[firstAtDepth];
-        }
-
-        frontier = next;
-      }
-
-      const rootNodeId = canvasNodes.find((node) => {
-        if (!node.id || !chainNodeIds.has(node.id)) return false;
-        return !(incomingNodeIdsByTargetId.get(node.id) || []).some((sourceId) => chainNodeIds.has(sourceId));
-      })?.id;
-
-      if (rootNodeId && exampleObj[rootNodeId]) {
-        exampleObj.__root = exampleObj[rootNodeId];
-      }
-
-      if (Object.keys(previousByDepth).length > 0) {
-        exampleObj.__previousByDepth = previousByDepth;
-      }
-
-      // Build name -> nodeId map, keeping the FIRST (closest) node when names are duplicated
-      // chainNodeIds is ordered from closest to farthest, so the first occurrence wins
-      const nameToNodeId = new Map<string, string>();
-      for (const [nId, nodeName] of Object.entries(nodeNamesById)) {
-        if (!nodeName || nodeName === "__nodeNames") {
-          continue;
-        }
-
-        // Only add if we haven't seen this name yet (keep the closest one)
-        if (!nameToNodeId.has(nodeName)) {
-          nameToNodeId.set(nodeName, nId);
-        }
-      }
-
-      const namedExampleObj: Record<string, unknown> = {};
-      for (const [nodeName, nodeId] of nameToNodeId.entries()) {
-        if (nodeName === nodeId || namedExampleObj[nodeName] !== undefined) {
-          continue;
-        }
-
-        const value = exampleObj[nodeId];
-        if (value === undefined) {
-          continue;
-        }
-
-        namedExampleObj[nodeName] = value;
-      }
-
-      if (Object.keys(namedExampleObj).length === 0) {
-        return null;
-      }
-
-      if (exampleObj.__root) {
-        namedExampleObj.__root = exampleObj.__root;
-      }
-
-      if (exampleObj.__previousByDepth) {
-        namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
-      }
-
-      // Remove the current node from suggestions - you can't reference your own output
-      const currentNodeName = currentNode?.name?.trim();
-      const currentNodeId = currentNode?.id;
-      if (currentNodeName) {
-        delete namedExampleObj[currentNodeName];
-      }
-      if (currentNodeId) {
-        delete nodeMetadata[currentNodeId];
-      }
-
-      if (Object.keys(nodeMetadata).length > 0) {
-        namedExampleObj.__nodeNames = nodeMetadata;
-        Object.entries(nodeMetadata).forEach(([, metadata]) => {
-          const value = namedExampleObj[metadata.name ?? ""];
-          if (value && typeof value === "object" && !Array.isArray(value)) {
-            if (metadata.name) {
-              (value as Record<string, unknown>).__nodeName = metadata.name;
-            }
-          }
-        });
-      }
-
-      return namedExampleObj;
-    },
+  const autocompleteExampleContext = useMemo(
+    () => ({
+      canvasNodes,
+      canvasNodesById,
+      incomingNodeIdsByTargetId,
+      visibleNodeExecutionsMap,
+      visibleNodeEventsMap,
+      allComponentsByName,
+      allTriggersByName,
+    }),
     [
       canvasNodes,
       canvasNodesById,
@@ -2696,6 +2417,10 @@ export function AppPage() {
       allComponentsByName,
       allTriggersByName,
     ],
+  );
+  const getAutocompleteExampleObj = useCallback(
+    (nodeId: string) => buildAutocompleteExampleObj(nodeId, autocompleteExampleContext),
+    [autocompleteExampleContext],
   );
 
   const handleSaveWorkflow = useCallback(
@@ -2714,7 +2439,8 @@ export function AppPage() {
         }
         return;
       }
-      if (!activeCanvasVersionId) {
+      const savingVersionID = activeCanvasVersionIdRef.current || activeCanvasVersionId || undefined;
+      if (!savingVersionID) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
@@ -2724,7 +2450,6 @@ export function AppPage() {
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
 
       try {
-        const savingVersionID = activeCanvasVersionId || undefined;
         const result = await enqueueCanvasSave(targetWorkflow, savingVersionID);
         if (result.status !== "saved") {
           return result;
@@ -4735,42 +4460,21 @@ export function AppPage() {
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
 
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        if (isCurrentLive) {
-          next.delete("version");
-          next.delete("branch");
-        } else {
-          next.set("version", versionID);
-          const matchingBranch = draftBranches.find((branch) => draftVersionId(branch) === versionID);
-          const branchName = matchingBranch
-            ? draftBranchName(matchingBranch)
-            : isDraftVersion(version)
-              ? draftBranchName(version)
-              : "";
-          if (branchName) {
-            next.set("branch", branchName);
-          } else {
-            next.delete("branch");
-          }
-        }
-        return clearComponentSidebarSearchParams(next);
-      });
+      const branchName = resolveBranchNameForVersion(versionID, version, draftBranches);
+      setSearchParams((current) =>
+        applyVersionSelectionSearchParams(current, {
+          isCurrentLive,
+          versionID,
+          branchName,
+        }),
+      );
 
       if (isCurrentLive) {
         exitToLive();
-      } else {
-        const matchingBranch = draftBranches.find((branch) => draftVersionId(branch) === versionID);
-        const matchingBranchName = matchingBranch
-          ? draftBranchName(matchingBranch)
-          : isDraftVersion(version)
-            ? draftBranchName(version)
-            : "";
-        if (matchingBranchName) {
-          activateBranch(matchingBranchName);
-        } else if (isPublished) {
-          exitToLive();
-        }
+      } else if (branchName) {
+        activateBranch(branchName);
+      } else if (isPublished) {
+        exitToLive();
       }
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -4930,140 +4634,55 @@ export function AppPage() {
     ],
   );
 
-  const handleContinueDraftBranch = useCallback(
-    (branchName: string) => {
-      const branch = draftBranches.find((item) => draftBranchName(item) === branchName);
-      const versionId = branch ? draftVersionId(branch) : "";
-      if (!versionId) {
-        showErrorToast("Draft branch not found");
-        return;
-      }
-      handleUseVersion(versionId);
-    },
-    [draftBranches, handleUseVersion],
-  );
-
-  const handleCreateDraftBranch = useCallback(async () => {
-    setStartEditingMenuOpen(false);
-    await handleCreateVersion();
-  }, [handleCreateVersion]);
-
-  const handleDeleteDraftBranch = useCallback(
-    (versionId: string) => {
-      if (!canUpdateCanvas) {
-        showErrorToast("You don't have permission to edit this canvas");
-        return;
-      }
-
-      const branch = draftBranches.find((item) => draftVersionId(item) === versionId);
-      if (!branch) {
-        showErrorToast("Draft branch not found");
-        return;
-      }
-
-      setDraftVersionToDelete(versionId);
-    },
-    [canUpdateCanvas, draftBranches],
-  );
-
-  const draftVersionToDeleteName = useMemo(() => {
-    if (!draftVersionToDelete) {
-      return "";
-    }
-
-    const branch = draftBranches.find((item) => draftVersionId(item) === draftVersionToDelete);
-    return branch ? draftDisplayName(branch) : draftVersionToDelete;
-  }, [draftVersionToDelete, draftBranches]);
-
-  const confirmDeleteDraftVersion = useCallback(async () => {
-    if (!draftVersionToDelete) {
-      return;
-    }
-
-    const versionId = draftVersionToDelete;
-    const branch = draftBranches.find((item) => draftVersionId(item) === versionId);
-    const branchName = branch ? draftBranchName(branch) : "";
-    const isActiveDraft =
-      versionId === activeCanvasVersionId ||
-      (activeBranchMeta ? versionId === draftVersionId(activeBranchMeta) : false) ||
-      (!!activeBranch && branchName === activeBranch);
-
-    try {
-      if (isActiveDraft) {
-        clearPendingAutoSaveWork();
-      }
-
-      await deleteDraftBranchMutation.mutateAsync(versionId);
-
-      if (isActiveDraft) {
-        setIsCreateChangeRequestMode(false);
-        setSelectedChangeRequestId("");
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-        setLastSavedWorkflowSnapshot(null);
-        exitToLive();
-
-        if (liveCanvasVersionId) {
-          handleUseVersion(liveCanvasVersionId);
-        } else {
-          setActiveCanvasVersion(null);
-          setDraftCanvasSpec(null);
-          setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            next.delete("version");
-            next.delete("branch");
-            return clearComponentSidebarSearchParams(next);
-          });
-        }
-
-        if (liveCanvasVersion?.spec) {
-          queryClient.setQueryData<CanvasesCanvas | undefined>(
-            canvasKeys.detail(organizationId!, canvasId!),
-            (current) => {
-              if (!current) {
-                return current;
-              }
-
-              return {
-                ...current,
-                spec: { ...current.spec, ...liveCanvasVersion.spec },
-              };
-            },
-          );
-        }
-      }
-
-      showSuccessToast("Draft branch deleted");
-      setDraftVersionToDelete(null);
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to delete draft branch"));
-    }
-  }, [
+  const {
     draftVersionToDelete,
+    setDraftVersionToDelete,
+    draftVersionToDeleteName,
+    startEditingMenuOpen,
+    setStartEditingMenuOpen,
+    handleContinueDraftBranch,
+    handleCreateDraftBranch,
+    handleDeleteDraftBranch,
+    confirmDeleteDraftVersion,
+    requestDeleteActiveDraft,
+    discardDraftAndCreateNew,
+  } = useCanvasDraftBranchActions({
+    canUpdateCanvas,
     draftBranches,
     activeCanvasVersionId,
     activeBranchMeta,
     activeBranch,
+    liveCanvasVersionId,
+    liveCanvasVersion,
+    organizationId,
+    canvasId,
+    latestDraftVersion,
     clearPendingAutoSaveWork,
     deleteDraftBranchMutation,
     exitToLive,
-    liveCanvasVersionId,
     handleUseVersion,
-    liveCanvasVersion,
+    handleCreateVersion,
     queryClient,
-    organizationId,
-    canvasId,
     setSearchParams,
+    setIsCreateChangeRequestMode,
+    setSelectedChangeRequestId,
+    setActiveCanvasVersion,
+    setDraftCanvasSpec,
+    setHasUnsavedChanges,
+    setHasNonPositionalUnsavedChanges,
     setLastSavedWorkflowSnapshot,
-  ]);
+  });
 
   useEffect(() => {
+    if (isCreatingDraftBranch) {
+      return;
+    }
     if (!searchParams.get("branch") && !hasEditableVersion) {
       return;
     }
 
-    const activeVersionId = activeBranchMeta ? draftVersionId(activeBranchMeta) : "";
-    if (!activeVersionId || activeCanvasVersionId === activeVersionId) {
+    const branchVersionId = activeBranchMeta ? draftVersionId(activeBranchMeta) : "";
+    if (!branchVersionId || activeCanvasVersionId === branchVersionId) {
       return;
     }
 
@@ -5072,15 +4691,32 @@ export function AppPage() {
       return;
     }
 
-    if (selectableVersionsById.has(activeVersionId)) {
-      handleUseVersion(activeVersionId);
+    // When already editing a draft, prefer the active version and sync branch metadata to match.
+    if (hasEditableVersion && activeCanvasVersionId && selectableVersionsById.has(activeCanvasVersionId)) {
+      const branchName = resolveBranchNameForVersion(
+        activeCanvasVersionId,
+        selectableVersionsById.get(activeCanvasVersionId)!,
+        draftBranches,
+      );
+      if (branchName && branchName !== activeBranch) {
+        activateBranch(branchName);
+      }
+      return;
+    }
+
+    if (selectableVersionsById.has(branchVersionId)) {
+      handleUseVersion(branchVersionId);
     }
   }, [
+    isCreatingDraftBranch,
+    activeBranch,
     activeBranchMeta,
     activeCanvasVersionId,
+    draftBranches,
     hasEditableVersion,
     searchParams,
     selectableVersionsById,
+    activateBranch,
     handleUseVersion,
   ]);
 
@@ -5335,56 +4971,8 @@ export function AppPage() {
       return;
     }
 
-    const versionIdToDelete = (() => {
-      if (activeBranchMeta) {
-        const versionId = draftVersionId(activeBranchMeta);
-        if (versionId) {
-          return versionId;
-        }
-      }
-
-      if (activeBranch) {
-        const branch = draftBranches.find((item) => draftBranchName(item) === activeBranch);
-        const versionId = branch ? draftVersionId(branch) : "";
-        if (versionId) {
-          return versionId;
-        }
-      }
-
-      const latestDraftVersionId = latestDraftVersion?.metadata?.id;
-      if (latestDraftVersionId) {
-        return latestDraftVersionId;
-      }
-
-      return "";
-    })();
-
-    if (versionIdToDelete) {
-      try {
-        await deleteDraftBranchMutation.mutateAsync(versionIdToDelete);
-      } catch (error) {
-        const message =
-          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          (error as { message?: string })?.message ||
-          "Failed to discard draft";
-        showErrorToast(message);
-        return;
-      }
-    }
-
-    exitToLive();
-    await handleCreateVersion();
-  }, [
-    canUpdateCanvas,
-    isTemplate,
-    activeBranchMeta,
-    activeBranch,
-    draftBranches,
-    latestDraftVersion,
-    deleteDraftBranchMutation,
-    handleCreateVersion,
-    exitToLive,
-  ]);
+    await discardDraftAndCreateNew();
+  }, [canUpdateCanvas, isTemplate, discardDraftAndCreateNew]);
 
   const handleResetDraftChanges = useCallback(() => {
     if (!organizationId || !canvasId) {
@@ -5406,31 +4994,7 @@ export function AppPage() {
       return;
     }
 
-    const versionIdToDelete = (() => {
-      if (activeBranchMeta) {
-        const versionId = draftVersionId(activeBranchMeta);
-        if (versionId) {
-          return versionId;
-        }
-      }
-
-      if (activeBranch) {
-        const branch = draftBranches.find((item) => draftBranchName(item) === activeBranch);
-        const versionId = branch ? draftVersionId(branch) : "";
-        if (versionId) {
-          return versionId;
-        }
-      }
-
-      return activeCanvasVersionId;
-    })();
-
-    if (!versionIdToDelete) {
-      showErrorToast("Draft branch not found");
-      return;
-    }
-
-    setDraftVersionToDelete(versionIdToDelete);
+    requestDeleteActiveDraft();
   }, [
     organizationId,
     canvasId,
@@ -5438,9 +5002,7 @@ export function AppPage() {
     isTemplate,
     hasEditableVersion,
     activeCanvasVersionId,
-    activeBranchMeta,
-    activeBranch,
-    draftBranches,
+    requestDeleteActiveDraft,
   ]);
 
   const buildYamlExportPayload = useCallback(
@@ -6175,32 +5737,13 @@ export function AppPage() {
           }
         }}
       />
-      <Dialog
+      <DeleteDraftBranchDialog
         open={!!draftVersionToDelete}
+        draftName={draftVersionToDeleteName}
+        deletePending={deleteDraftBranchMutation.isPending}
+        onConfirm={() => void confirmDeleteDraftVersion()}
         onClose={() => setDraftVersionToDelete(null)}
-        size="lg"
-        className="text-left"
-      >
-        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{draftVersionToDeleteName}"?</DialogTitle>
-        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
-          This cannot be undone. Are you sure you want to continue?
-        </DialogDescription>
-        <DialogActions>
-          <LoadingButton
-            variant="destructive"
-            onClick={() => void confirmDeleteDraftVersion()}
-            loading={deleteDraftBranchMutation.isPending}
-            loadingText="Deleting..."
-            className="flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            Delete
-          </LoadingButton>
-          <Button variant="outline" onClick={() => setDraftVersionToDelete(null)}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
+      />
       <IntegrationCreateDialog
         open={!!integrationDialogName}
         onOpenChange={(open) => !open && setIntegrationDialogName(null)}

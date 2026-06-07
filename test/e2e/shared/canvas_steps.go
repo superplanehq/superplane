@@ -76,10 +76,37 @@ func (s *CanvasSteps) ExitEditMode() {
 
 // OpenVersionsSidebar opens the Versions tab in the canvas tool sidebar.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
+	s.waitForToolSidebarOpen()
 	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) waitForToolSidebarOpen() {
+	deadline := time.Now().Add(15 * time.Second)
+	sidebar := q.TestID("canvas-tool-sidebar").Run(s.session)
+	openButton := q.TestID("canvas-tool-sidebar-toggle").Run(s.session)
+
+	for time.Now().Before(deadline) {
+		visible, err := sidebar.IsVisible()
+		require.NoError(s.t, err)
+		if visible {
+			return
+		}
+
+		visible, err = openButton.IsVisible()
+		require.NoError(s.t, err)
+		if visible {
+			err = openButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)})
+			if err == nil {
+				continue
+			}
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
 }
 
 // OpenDraftBranchInSidebar selects a draft branch from the Versions sidebar by display name.

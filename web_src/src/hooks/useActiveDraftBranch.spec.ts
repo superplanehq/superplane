@@ -16,6 +16,7 @@ const canvasId = "canvas-123";
 
 function draft(branchName: string, overrides: Partial<CanvasesCanvasVersion> = {}): CanvasesCanvasVersion {
   return {
+    ...overrides,
     metadata: {
       branchName,
       displayName: branchName,
@@ -23,7 +24,6 @@ function draft(branchName: string, overrides: Partial<CanvasesCanvasVersion> = {
       updatedAt: "2026-06-03T12:00:00.000Z",
       ...overrides.metadata,
     },
-    ...overrides,
   };
 }
 

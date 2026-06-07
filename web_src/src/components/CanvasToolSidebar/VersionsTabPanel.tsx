@@ -1,13 +1,11 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
+import { useCallback, useState } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { DraftBranchRow } from "./DraftBranchRow";
-import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
+import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
-
-const persistedScrollPositions = new Map<string, number>();
 
 export interface VersionsTabPanelProps {
   scrollPersistenceKey?: string;
@@ -94,46 +92,13 @@ export function VersionsTabPanel({
     onLoadMoreLiveVersions,
     onVersionNodeDiffContextChange,
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+  const { scrollRef, handleScroll } = useVersionsTabScroll({
+    scrollPersistenceKey,
     hasMore: Boolean(onLoadMoreLiveVersions) && !loadMoreLiveVersionsDisabled,
     isLoading: loadMoreLiveVersionsPending,
     onLoadMore: onLoadMoreLiveVersions,
+    itemCount: liveItems.length + pendingItems.length + rejectedItems.length,
   });
-  const handleScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      if (scrollPersistenceKey) {
-        persistedScrollPositions.set(scrollPersistenceKey, event.currentTarget.scrollTop);
-      }
-
-      loadMoreIfNeeded(event.currentTarget);
-    },
-    [loadMoreIfNeeded, scrollPersistenceKey],
-  );
-
-  useLayoutEffect(() => {
-    const element = scrollRef.current;
-    if (!element || !scrollPersistenceKey) return;
-
-    const scrollTop = persistedScrollPositions.get(scrollPersistenceKey);
-    if (scrollTop == null) return;
-
-    element.scrollTop = scrollTop;
-  }, [scrollPersistenceKey]);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-
-    return () => {
-      if (!element || !scrollPersistenceKey) return;
-
-      persistedScrollPositions.set(scrollPersistenceKey, element.scrollTop);
-    };
-  }, [scrollPersistenceKey]);
-
-  useEffect(() => {
-    loadMoreIfNeeded(scrollRef.current);
-  }, [liveItems.length, pendingItems.length, rejectedItems.length, loadMoreIfNeeded]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
