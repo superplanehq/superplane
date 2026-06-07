@@ -759,6 +759,12 @@ export function AppPage() {
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
   const canvasRef = useRef<CanvasesCanvas | null>(canvas ?? null);
+  // Tracks which version the rendered workflow in `canvasRef` currently
+  // represents. `activeCanvasVersionIdRef` flips synchronously when switching
+  // drafts, but `canvasRef` only catches up a render later; auto-save must not
+  // persist the previous draft's graph onto the newly-active draft while they
+  // disagree.
+  const canvasContentVersionIdRef = useRef<string>(activeCanvasVersionId);
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
   const draftCreationSessionRef = useRef(0);
   const draftCanvasSpecsRef = useRef<Map<string, CanvasesCanvas["spec"] | null>>(new Map());
@@ -785,7 +791,10 @@ export function AppPage() {
   }, []);
   useEffect(() => {
     canvasRef.current = canvas ?? null;
-  }, [canvas]);
+    // `canvas` and `activeCanvasVersionId` settle together on the render that
+    // applies a draft switch, so stamp the content's version atomically here.
+    canvasContentVersionIdRef.current = activeCanvasVersionId;
+  }, [canvas, activeCanvasVersionId]);
   useEffect(() => {
     activeCanvasVersionIdRef.current = activeCanvasVersionId;
   }, [activeCanvasVersionId]);
@@ -1661,6 +1670,14 @@ export function AppPage() {
               return;
             }
 
+            // During a draft switch the active version id flips synchronously
+            // while `canvasRef`/`latestWorkflow` still holds the previous
+            // draft's graph for one render. Bail rather than persisting that
+            // stale graph onto the newly-active draft version.
+            if (canvasContentVersionIdRef.current !== savingVersionID) {
+              return;
+            }
+
             const saveResult = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
             if (saveResult.status !== "saved") {
               return;
@@ -2434,7 +2451,7 @@ export function AppPage() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }) => {
+    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean; savingVersionId?: string }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
       if (!targetWorkflow || !organizationId || !canvasId) return;
       if (!canUpdateCanvas) {
@@ -2449,11 +2466,25 @@ export function AppPage() {
         }
         return;
       }
-      const savingVersionID = activeCanvasVersionIdRef.current || activeCanvasVersionId || undefined;
+      // Callers that build the payload from a specific render (e.g. the node
+      // config panel, which can flush on unmount after a draft switch) pass the
+      // version their content belongs to. This keeps content and target version
+      // bound together instead of reading the live ref, which may already point
+      // at a different draft and would otherwise cross-write the two drafts.
+      const savingVersionID =
+        options?.savingVersionId || activeCanvasVersionIdRef.current || activeCanvasVersionId || undefined;
       if (!savingVersionID) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
+        return;
+      }
+      // When relying on the rendered workflow (no explicit payload), make sure
+      // it represents the active version. Right after a draft switch the
+      // version id flips before `canvasRef` catches up, and persisting the
+      // stale graph would overwrite the newly-active draft with the previous
+      // draft's content.
+      if (!workflowToSave && !options?.savingVersionId && canvasContentVersionIdRef.current !== savingVersionID) {
         return;
       }
       const shouldRestoreFocus = options?.showToast === false;
@@ -2825,7 +2856,12 @@ export function AppPage() {
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        // Bind the save to the version this closure's `canvas` represents.
+        // The config panel can flush a pending auto-save on unmount (e.g. when
+        // switching drafts remounts the canvas); without this, the save would
+        // target whatever draft is now active and overwrite it with this
+        // draft's graph.
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false, savingVersionId: activeCanvasVersionId });
       }
     },
     [
@@ -2834,6 +2870,7 @@ export function AppPage() {
       canvasNodesById,
       organizationId,
       canvasId,
+      activeCanvasVersionId,
       handleSaveWorkflow,
       isReadOnly,
       applyLocalWorkflowUpdate,
