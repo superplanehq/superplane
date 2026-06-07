@@ -2104,21 +2104,31 @@ export function AppPage() {
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
-      const next = new URLSearchParams(searchParams);
-      if (open) {
-        next.set("sidebar", "1");
-        if (nodeId) {
-          next.set("node", nodeId);
-        } else {
-          next.delete("node");
-        }
-      } else {
-        next.delete("sidebar");
-        next.delete("node");
-      }
-      setSearchParams(next, { replace: true });
+      // Use the functional updater so this composes with other concurrent
+      // search-param updates (e.g. switching drafts updating `branch`). Building
+      // from a stale `searchParams` snapshot would clobber those updates and, for
+      // example, re-add the previous `branch` and prevent switching drafts while
+      // the node sidebar is open.
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (open) {
+            next.set("sidebar", "1");
+            if (nodeId) {
+              next.set("node", nodeId);
+            } else {
+              next.delete("node");
+            }
+          } else {
+            next.delete("sidebar");
+            next.delete("node");
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
-    [searchParams, setSearchParams],
+    [setSearchParams],
   );
 
   const handleLogNodeSelect = useCallback(
