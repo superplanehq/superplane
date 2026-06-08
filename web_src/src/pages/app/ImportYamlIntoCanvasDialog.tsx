@@ -9,7 +9,6 @@
 import { useCallback, useRef, useState } from "react";
 import { analytics } from "@/lib/analytics";
 import { AlertCircle, FileText, Upload } from "lucide-react";
-import * as yaml from "js-yaml";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,60 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-interface ParsedCanvas {
-  apiVersion?: string;
-  kind?: string;
-  metadata?: {
-    name?: string;
-    description?: string;
-  };
-  spec?: {
-    nodes?: unknown[];
-    edges?: unknown[];
-  };
-}
-
-function validateCanvasYaml(parsed: ParsedCanvas): string | null {
-  if (parsed.apiVersion && parsed.apiVersion !== "v1") {
-    return `Unsupported apiVersion "${parsed.apiVersion}". Only "v1" is supported.`;
-  }
-
-  if (parsed.kind && parsed.kind !== "Canvas") {
-    return `Unsupported kind "${parsed.kind}". Only "Canvas" is supported.`;
-  }
-
-  if (!parsed.spec || !Array.isArray(parsed.spec.nodes)) {
-    return "YAML must contain a spec with a nodes array. Is this a valid Canvas definition?";
-  }
-
-  return null;
-}
-
-function parseCanvasYaml(text: string): { data: { nodes: unknown[]; edges: unknown[] } } | { error: string } {
-  const trimmed = text.trim();
-  if (!trimmed) return { error: "Please provide a YAML definition." };
-
-  let parsed: ParsedCanvas;
-  try {
-    parsed = yaml.load(trimmed) as ParsedCanvas;
-  } catch (error) {
-    return { error: `Invalid YAML syntax: ${error instanceof Error ? error.message : "Unknown error"}` };
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: "YAML content must be a valid object." };
-  }
-
-  const validationError = validateCanvasYaml(parsed);
-  if (validationError) return { error: validationError };
-
-  return {
-    data: {
-      nodes: (parsed.spec?.nodes as unknown[]) || [],
-      edges: (parsed.spec?.edges as unknown[]) || [],
-    },
-  };
-}
+import { parseCanvasYamlForImport } from "./lib/workflow-spec-files";
 
 export interface ImportYamlDialogProps {
   open: boolean;
@@ -175,14 +121,17 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
 
   const handleImport = useCallback(async () => {
     setParseError(null);
-    const result = parseCanvasYaml(yamlText);
-    if ("error" in result) {
+    const result = parseCanvasYamlForImport(yamlText);
+    if (!result.ok) {
       setParseError(result.error);
       return;
     }
 
     try {
-      await onImport(result.data);
+      await onImport({
+        nodes: result.spec.nodes ?? [],
+        edges: result.spec.edges ?? [],
+      });
       analytics.yamlImport();
       handleOpenChange(false);
     } catch (error) {

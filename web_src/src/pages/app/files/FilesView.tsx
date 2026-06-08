@@ -13,6 +13,7 @@ const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default
 
 export function FilesView({
   canvasId,
+  versionId,
   isEditing,
   canWrite,
   files,
@@ -20,6 +21,7 @@ export function FilesView({
   onHeaderActionsChange,
 }: {
   canvasId?: string;
+  versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
   files: AppFile[];
@@ -28,6 +30,7 @@ export function FilesView({
 }) {
   const editor = useEditor({
     canvasId,
+    versionId,
     isEditing,
     canWrite,
     files,
