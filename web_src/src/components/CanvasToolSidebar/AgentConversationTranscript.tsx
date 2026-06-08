@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
+const STICKY_USER_MESSAGE_MAX_CHARS = 240;
+const STICKY_USER_MESSAGE_MAX_LINES = 4;
+
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
   canvasId,
@@ -170,16 +173,18 @@ const MessageRow = memo(function MessageRow({
   }
 
   const isUser = message.role === "user";
+  const shouldStickUserMessage = isUser && isCompactUserMessage(message.content);
 
   return (
     <div
       className={cn(
         "flex w-full min-w-0 flex-col",
-        // User bubbles stick to the top of the scrollable transcript so the most-recent question
-        // remains visible while a long agent reply scrolls past underneath it. Older user messages
-        // also stick, but the most recent one paints on top via DOM order, so visually it's always
-        // the latest. Background is opaque to mask scrolling content behind.
-        isUser ? "sticky top-0 z-10 items-end bg-white py-1.5" : "items-start",
+        isUser && "items-end py-1.5",
+        !isUser && "items-start",
+        // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
+        // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
+        // otherwise the sticky bubble can cover the active Thinking or command rows.
+        shouldStickUserMessage && "sticky top-0 z-10 bg-white",
       )}
     >
       <div
@@ -208,6 +213,10 @@ const MessageRow = memo(function MessageRow({
 
 function shouldRenderMessage(message: AgentMessage): boolean {
   return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
+}
+
+function isCompactUserMessage(content: string): boolean {
+  return content.length <= STICKY_USER_MESSAGE_MAX_CHARS && content.split("\n").length <= STICKY_USER_MESSAGE_MAX_LINES;
 }
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {

@@ -36,6 +36,23 @@ function toolGroup(status: string): MessageGroup[] {
   ];
 }
 
+function userMessage(content: string): MessageGroup[] {
+  return [
+    {
+      type: "message",
+      message: {
+        id: "user-message",
+        role: "user",
+        content,
+        toolName: "",
+        toolCallId: "",
+        toolStatus: "",
+        createdAt: null,
+      },
+    },
+  ];
+}
+
 describe("ConversationTranscript command groups", () => {
   it("collapses completed command groups by default", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={toolGroup("finished")} />);
@@ -52,6 +69,30 @@ describe("ConversationTranscript command groups", () => {
 
     expect(screen.getByText("Running command...")).toBeInTheDocument();
     expect(screen.getByText(/SUPERPLANE_URL/)).toBeInTheDocument();
+  });
+});
+
+describe("ConversationTranscript user messages", () => {
+  it("keeps compact user messages sticky", () => {
+    render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Build a release workflow")} />);
+
+    expect(screen.getByTestId("agent-user-message").parentElement).toHaveClass("sticky");
+  });
+
+  it("does not keep long user messages sticky", () => {
+    const longPrompt = [
+      "My idea is: Create an elixir clusterautoprovisioning app with enough detail to wrap across multiple lines.",
+      "",
+      "- CI/CD deployment on push to main.",
+      "- Metric integration that provisions another node when usage gets high.",
+      "- Backup postgres too.",
+      "",
+      "Also suggest other workflows in the canvas if you find interesting ones for the hackaton.",
+    ].join("\n");
+
+    render(<ConversationTranscript {...baseProps} messageGroups={userMessage(longPrompt)} />);
+
+    expect(screen.getByTestId("agent-user-message").parentElement).not.toHaveClass("sticky");
   });
 });
 
