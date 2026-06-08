@@ -48,9 +48,9 @@ blocks:
               arm64 = os.environ['ARM64_AMI']
               for pool in cfg.get('pools', []):
                   if pool.get('arch') == 'arm64':
-                      pool['ami_id'] = arm64
+                      pool['ami'] = arm64
                   else:
-                      pool['ami_id'] = amd64
+                      pool['ami'] = amd64
               print(json.dumps(cfg))
               " AMD64_AMI="$AMD64_AMI" ARM64_AMI="$ARM64_AMI")
 
