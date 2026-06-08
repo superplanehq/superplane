@@ -9,10 +9,6 @@ import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActi
 
 export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
-export function isCanvasTabHeaderMode(mode: HeaderMode | undefined): boolean {
-  return mode === "default" || mode === "version-live" || mode === "version-edit";
-}
-
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
   canvasName: string;
