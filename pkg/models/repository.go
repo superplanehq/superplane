@@ -26,7 +26,21 @@ type Repository struct {
 	UpdatedAt      time.Time
 }
 
-func FindRepository(canvasID uuid.UUID) (*Repository, error) {
+func FindRepository(organizationID, canvasID uuid.UUID) (*Repository, error) {
+	var repository Repository
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("organization_id = ?", organizationID).
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &repository, nil
+}
+
+func FindRepositoryUnscoped(canvasID uuid.UUID) (*Repository, error) {
 	return FindRepositoryInTransaction(database.Conn(), canvasID)
 }
 

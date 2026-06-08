@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
 import type { ComponentActionsProps } from "../types/componentActions";
@@ -65,6 +66,7 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   /** When true, keep the note header strip and replace body with a neutral block (runs contextual dimming). */
   dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -81,6 +83,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   onAnnotationUpdate,
   onAnnotationBlur,
   dimBodyBelowHeader = false,
+  draftDiffStatus,
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -232,7 +235,8 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           ref={containerRef}
           style={{ width: dimensions.width, height: dimensions.height }}
           className={cn(
-            "group relative flex flex-col rounded-md outline outline-slate-950/20",
+            "group relative flex flex-col rounded-md outline",
+            getDraftDiffOutlineClassName(draftDiffStatus),
             dimBodyBelowHeader ? "bg-slate-200" : colorStyles.container,
           )}
         >

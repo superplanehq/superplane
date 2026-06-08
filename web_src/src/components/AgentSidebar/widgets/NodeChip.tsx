@@ -1,42 +1,12 @@
 import { createElement, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn, resolveIcon } from "@/lib/utils";
+import { appPath } from "@/lib/appPaths";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
-
-/**
- * Component name → fallback icon slug, mirroring what each canvas mapper resolves to when the
- * server-supplied `componentDefinition.icon` is missing. Keeping this map in sync with the
- * mappers ensures NodeChip pills render the same icon the user sees on the canvas card itself.
- *
- * Search "iconSlug:" under web_src/src/pages/workflowv2/mappers when adding new built-in
- * components here.
- */
-const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
-  noop: "circle-off",
-  display: "monitor",
-  addMemory: "database",
-  deleteMemory: "database",
-  readMemory: "database",
-  updateMemory: "database",
-  upsertMemory: "database",
-  if: "split",
-  http: "globe",
-  graphql: "network",
-  ssh: "terminal",
-  runner: "terminal",
-  timeGate: "clock",
-  filter: "filter",
-  wait: "clock",
-  approval: "hand",
-  merge: "git-merge",
-  sendEmail: "mail",
-  schedule: "calendar-clock",
-  webhook: "webhook",
-  start: "play",
-};
+import { BUILTIN_COMPONENT_ICON_SLUGS } from "./componentIcons";
 
 const TRIGGER_COMPONENTS = new Set(["start", "schedule", "webhook"]);
 
@@ -168,7 +138,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
   const edges = canvas?.spec?.edges ?? [];
 
   const handleClick = useCallback(() => {
-    navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${node?.id ?? nodeId}`);
+    navigate(appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`));
     window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
   }, [navigate, organizationId, canvasId, node?.id, nodeId]);
 

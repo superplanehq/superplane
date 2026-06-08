@@ -41,7 +41,6 @@ const (
 type BrokerClient struct {
 	httpClient core.HTTPContext
 	baseURL    string
-	fleetID    string
 	authToken  string
 }
 
@@ -49,11 +48,6 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
-	}
-
-	fleetID := os.Getenv("TASK_BROKER_FLEET_ID")
-	if fleetID == "" {
-		return nil, fmt.Errorf("TASK_BROKER_FLEET_ID is not set")
 	}
 
 	authToken := os.Getenv("TASK_BROKER_AUTH_TOKEN")
@@ -64,7 +58,6 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	return &BrokerClient{
 		httpClient: httpClient,
 		baseURL:    baseURL,
-		fleetID:    fleetID,
 		authToken:  authToken,
 	}, nil
 }
@@ -92,7 +85,11 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 type brokerCreateTaskRequest struct {
 	FleetID string `json:"fleet_id"`
 
-	Commands                []string                    `json:"commands"`
+	RunMode                 string                      `json:"run_mode,omitempty"`
+	Script                  string                      `json:"script,omitempty"`
+	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
+	Commands                []string                    `json:"commands,omitempty"`
+	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
@@ -106,9 +103,16 @@ type BrokerEnvironmentVariable struct {
 	Value string `json:"value"`
 }
 
+const RunModeJavaScript = "javascript_script"
+
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
+	MachineType    string
+	RunMode        string
+	Script         string
+	MessageChain   json.RawMessage
 	Commands       []string
+	SetupCommands  []string
 	WebhookURL     string
 	Environment    []BrokerEnvironmentVariable
 	ExecutionMode  string
@@ -126,9 +130,18 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		mode = ExecutionModeHost
 	}
 
+	fleetID, err := requireMachineType(p.MachineType)
+	if err != nil {
+		return "", err
+	}
+
 	req := brokerCreateTaskRequest{
-		FleetID:       b.fleetID,
+		FleetID:       fleetID,
+		RunMode:       strings.TrimSpace(p.RunMode),
+		Script:        strings.TrimSpace(p.Script),
+		MessageChain:  p.MessageChain,
 		Commands:      p.Commands,
+		SetupCommands: p.SetupCommands,
 		Environment:   p.Environment,
 		WebhookURL:    p.WebhookURL,
 		ExecutionMode: mode,

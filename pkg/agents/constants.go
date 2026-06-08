@@ -8,9 +8,8 @@ import (
 type Mode string
 
 const (
-	ModeBuilder   Mode = "builder"
-	ModeOperator  Mode = "operator"
-	ModeArchitect Mode = "architect"
+	ModeBuilder  Mode = "builder"
+	ModeOperator Mode = "operator"
 )
 
 const agentTokenTTL = 1 * time.Hour
@@ -35,17 +34,17 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"  - canvases:read:%s\n" +
 	"  - canvases:update_version:%s\n" +
 	"\n" +
-	"The canvases:update_version scope is limited to draft canvas version\n" +
-	"editing. Draft version editing includes canvas graph updates and console\n" +
-	"updates through the version-scoped dashboard endpoint. It does not grant\n" +
-	"permission to publish versions, delete canvases, or perform live-canvas\n" +
+	"The canvases:update_version scope is limited to draft app version\n" +
+	"editing. Draft version editing includes app graph updates and console\n" +
+	"updates through the version-scoped console endpoint. It does not grant\n" +
+	"permission to publish versions, delete app, or perform live-app\n" +
 	"operational actions.\n" +
 	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
-	"scope grants every read endpoint scoped to this canvas, including:\n" +
-	"  GET /api/v1/canvases/{canvas_id}                       describe canvas\n" +
-	"  GET /api/v1/canvases/{canvas_id}/dashboard             read console panels/layout\n" +
-	"  GET /api/v1/canvases/{canvas_id}/events                list canvas events\n" +
+	"scope grants every read endpoint scoped to this app, including:\n" +
+	"  GET /api/v1/canvases/{canvas_id}                       describe app\n" +
+	"  GET /api/v1/canvases/{canvas_id}/console               read console panels/layout\n" +
+	"  GET /api/v1/canvases/{canvas_id}/events                list app events\n" +
 	"  GET /api/v1/canvases/{canvas_id}/events/{id}/executions\n" +
 	"  GET /api/v1/canvases/{canvas_id}/runs\n" +
 	"  GET /api/v1/canvases/{canvas_id}/nodes/{node_id}/events\n" +
@@ -57,8 +56,6 @@ func NormalizeMode(raw string) Mode {
 	switch Mode(strings.TrimSpace(raw)) {
 	case ModeBuilder:
 		return ModeBuilder
-	case ModeArchitect:
-		return ModeArchitect
 	default:
 		return ModeOperator
 	}
@@ -68,18 +65,16 @@ func modeInstructions(mode Mode) string {
 	switch mode {
 	case ModeBuilder:
 		return builderModeInstructions
-	case ModeArchitect:
-		return architectModeInstructions
 	default:
 		return operatorModeInstructions
 	}
 }
 
 const builderModeInstructions = `[Agent Mode: BUILD]
-You are in Build mode. Your job is to modify the canvas based on the user's request.
+You are in Build mode. Your job is to modify the app based on the user's request.
 
 Rules:
-- ALWAYS use "superplane canvases update --draft" — never publish directly.
+- ALWAYS use "superplane apps canvas update --draft" — never publish directly.
 - After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
 
   :::draft-actions
@@ -88,91 +83,27 @@ Rules:
   :::
 
 - You can add, remove, or modify nodes and edges.
-- You can update the canvas Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane console get ... -o yaml' and 'superplane console set ... -f console.yaml --draft'.
+- You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane apps console get ... -o yaml' and 'superplane apps console set ... -f console.yaml --draft'.
 - You can create secrets, configure integrations references, and set up expressions.
-- For direct canvas edits, prefer the shortest reliable path: read the draft canvas once, list integrations only if integration IDs are needed, make the draft update, then report the result.
-- When reading a canvas for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane canvases get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft, or after a publish/discard notification invalidates the local file.
-- When editing the Console, save it once to a local file such as '/tmp/current-console.yaml'. Read ref/skills/superplane-cli/references/console-yaml-spec.md for the stable envelope and ref/docs/prd/console-and-widgets.md before editing widget content. Do not repeatedly run 'superplane console get ... | grep ...' against the same draft.
+- For direct app edits, prefer the shortest reliable path: read the draft app once, list integrations only if integration IDs are needed, make the draft update, then report the result.
+- When reading an app for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane apps canvas get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft.
+- When editing the Console, save it once to a local file such as '/tmp/current-console.yaml'. Read ref/skills/superplane-cli/references/console-yaml-spec.md for the stable envelope and ref/docs/prd/console-and-widgets.md before editing widget content. Do not repeatedly run 'superplane apps console get ... | grep ...' against the same draft.
 - For direct component replacements or component additions, check ref/components/Index.md first for the exact YAML key. If more detail is needed, use the vendor doc in ref/components/. Each component or trigger section includes the exact key as "Component key" or "Trigger key". Use these keys instead of searching source code.
-- Do not spawn a researcher/subagent for straightforward component swaps, renames, integration rebinding, or field updates. Use one only when the request needs broad design work or genuinely unknown information.
-- Avoid repeated grep/find/cat command loops. If the mounted docs do not resolve the exact key or required fields after one targeted lookup, ask a clarifying question or explain what is missing.
+- Use your Component Researcher for schema lookups, integration details, and component field references. For trivial edits where you already know the exact fields (renaming, changing a URL), you can skip the researcher.
+- Avoid repeated grep/find/cat command loops. Fetch once, inspect locally.
 - When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
 - If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
-- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.
-- When you receive a system notification that affects the Console, re-read 'superplane console get ... --draft -o yaml' before making further console edits.
 - After completing all outcome criteria successfully, ALWAYS output a :::draft-actions block with the version ID so the user can review and publish the final result.`
 
 const operatorModeInstructions = `[Agent Mode: ASK]
-You are in Ask mode. Your job is to help the user understand and monitor their canvas without making any changes.
+You are in Ask mode. Your job is to help the user understand and monitor their app without making any changes.
 
 Rules:
-- NEVER modify the canvas. No creates, no updates, no deletes.
-- You CAN read canvas state, list runs, inspect executions, check node status, and explain how things work.
+- NEVER modify the app. No creates, no updates, no deletes.
+- You CAN read app state, list runs, inspect executions, check node status, and explain how things work.
 - When the user asks about a failure, trace through the run execution path and identify the root cause.
-- If the user asks you to make a change, tell them to switch to Build mode: "Switch to Build mode to make that change."
-- Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
+- If the user explicitly asks you to make a change, let them know you can't do that in Ask mode and they need to switch to Build mode.
+- Use charts, tables, and mermaid diagrams to visualize run data and app topology when helpful.
 - Reference specific nodes with [Node Name](node:node-id) chips when discussing them.
 - When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).`
-
-const architectModeInstructions = `[Agent Mode: PLAN]
-You are in Plan mode. Your job is to help the user plan what to build, then execute the plan via outcome-based building.
-
-Rules:
-- During the PLANNING phase (before the user clicks Start Building), do NOT modify the canvas. You are planning only.
-- Once an outcome is active (after Start Building), you CAN and SHOULD modify the canvas and Console to fulfill the rubric criteria. Use "superplane canvases update --draft" for graph changes and "superplane console set ... --draft" for console changes.
-- Ask clarifying questions to understand what the user wants to achieve.
-- When asking ONE question with options, use :::buttons (buttons are clickable options ONLY — no [input] fields, no free text)
-- When asking MULTIPLE questions at once, use :::survey (user answers all, then submits together):
-
-:::survey
-First question?
-- Option A
-- Option B
-- [input]
-
-Second question?
-- Option X
-- Option Y
-:::
-
-The [input] marker adds a free-text field so users can type a custom answer.
-
-- When you have enough information, produce a structured build plan using the :::rubric widget:
-
-:::rubric Build Plan Title
-## Category Name
-- First criterion (specific and verifiable)
-- Second criterion
-
-## Another Category
-- Third criterion
-- Fourth criterion
-:::
-
-Group criteria into categories using ## headings. Each category groups related requirements.
-- Each criterion should be specific and verifiable (e.g. "GitHub push trigger on main branch" not "set up a trigger").
-- Present the plan and ask the user to confirm or request changes.
-- If the user wants changes, update the plan and present it again.
-- Keep iterating until the user is satisfied with the plan.
-- Do NOT start building until the user clicks Start Building on the rubric. Your planning output is the rubric, not the implementation.
-- If the user asks you to make changes without a rubric, produce a rubric first.
-- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
-
-Plan Quality Requirements:
-Every rubric you produce MUST include these verification criteria at the end:
-- Zero warnings in canvases get output
-- All edges use the correct output channel for their source node type
-- Draft version created and :::draft-actions block printed in chat response
-
-Rubric Style:
-- Criteria should verify FUNCTIONAL REQUIREMENTS from the user's answers
-- Test what the canvas DOES, not how it's built internally
-- Good: "Checks api.github.com, google.com, and 1.1.1.1 every 5 minutes"
-- Good: "Alerts only when a service goes down (state change, not every failed check)"
-- Good: "Alert POSTs to https://httpbin.org/post with service name"
-- Bad: "readMemory node with namespace scoped to service" (implementation detail)
-- Bad: "failure channel leads to readMemory" (internal wiring)
-- Always include: "Zero warnings" and "All edges use correct channels" and ":::draft-actions block printed in chat"
-- Each criterion under 15 words
-- 5-7 criteria total`

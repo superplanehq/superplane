@@ -1,10 +1,12 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -575,9 +577,15 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 }
 
 func (s *CanvasPageSteps) openFilesTab() {
+	s.canvas.Save()
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Click(q.TestID("canvas-view-mode-files"))
-	s.session.AssertVisible(q.TestID("workflow-files-overlay"))
+	s.session.Sleep(300)
+	filesTab := q.TestID("canvas-view-mode-files")
+	s.session.AssertVisible(filesTab)
+	s.session.Click(filesTab)
+	s.session.AssertVisible(q.TestID("files-overlay"))
+	s.session.AssertVisible(q.TestID("file-editor"))
+	s.waitForMonacoEditor()
 }
 
 func (s *CanvasPageSteps) returnToCanvasTab() {
@@ -587,9 +595,20 @@ func (s *CanvasPageSteps) returnToCanvasTab() {
 
 func (s *CanvasPageSteps) assertFileIsOpen(name string) {
 	s.session.AssertText(name)
-	s.session.AssertVisible(q.TestID("workflow-file-editor"))
+	s.session.AssertVisible(q.TestID("file-editor"))
 }
 
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
-	s.session.AssertText(text)
+	s.waitForMonacoEditor()
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="file-editor"] >> text=%s`, text)))
+}
+
+func (s *CanvasPageSteps) waitForMonacoEditor() {
+	monacoLines := q.Locator(`[data-testid="file-editor"] .view-lines`)
+	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}); err != nil {
+		s.t.Fatalf("monaco editor did not become ready: %v", err)
+	}
 }

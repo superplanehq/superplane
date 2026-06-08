@@ -42,6 +42,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Enable Image" href="#ec2-•-enable-image" description="Enable an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
+  <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
+  <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -1400,6 +1402,117 @@ The Get Image component retrieves metadata for an EC2 AMI.
   },
   "timestamp": "2026-02-18T12:00:00Z",
   "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-get-instance"></a>
+
+## EC2 • Get Instance
+
+**Component key:** `aws.ec2.getInstance`
+
+The Get Instance component describes an EC2 instance and emits its current details.
+
+### Use Cases
+
+- **State inspection**: Check whether an instance is running or stopped before taking action
+- **IP resolution**: Retrieve the public or private IP address of an instance at runtime
+- **Metadata lookup**: Fetch instance type, AMI, VPC, and tags mid-workflow
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to describe
+
+### Output
+
+Emits the instance details on the default output channel:
+- `instanceId`, `state`, `instanceType`, `imageId`
+- `publicIpAddress`, `privateIpAddress`, `publicDnsName`, `privateDnsName`
+- `subnetId`, `vpcId`, `region`, `name`, `launchTime`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "keyName": "my-key",
+    "launchTime": "2026-05-21T12:00:00.000Z",
+    "name": "my-server",
+    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "us-east-1",
+    "state": "running",
+    "subnetId": "subnet-0abc1234567890def",
+    "vpcId": "vpc-0abc1234567890def"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.instance"
+}
+```
+
+<a id="ec2-•-manage-instance-power"></a>
+
+## EC2 • Manage Instance Power
+
+**Component key:** `aws.ec2.manageInstancePower`
+
+The Manage Instance Power component performs power management operations on an EC2 instance.
+
+### Use Cases
+
+- **Scheduled workloads**: Start or stop instances on demand from a workflow
+- **Cost optimisation**: Stop or hibernate non-production instances outside business hours
+- **Maintenance workflows**: Stop an instance before resizing or patching, start it after
+- **Recovery**: Reboot an instance experiencing issues
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to manage
+- **Operation**: The power operation to perform:
+  - **Start**: Start a stopped instance and wait for it to reach running state
+  - **Stop**: Gracefully stop a running instance and wait for stopped state
+  - **Reboot**: Reboot a running instance (completes once the reboot signal is sent)
+  - **Hibernate**: Stop an instance and save RAM to disk (instance must have hibernation enabled)
+
+### Output
+
+Emits instance details on the default output channel once the operation completes:
+- `instanceId`, `state`, `region`
+- `publicIpAddress`, `privateIpAddress` (start only)
+
+### Important Notes
+
+- **Hibernate** requires the instance to have been launched with hibernation enabled
+- **Reboot** emits immediately after the reboot signal is accepted; it does not wait for the OS to come back online
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-0215d085326c25744",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "launchTime": "2026-05-28T09:41:14.000Z",
+    "name": "preview-pr-5",
+    "privateDnsName": "ip-10.0.1.25.eu-north-1.compute.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.eu-north-1.compute.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "eu-north-1",
+    "state": "running",
+    "subnetId": "subnet-0e7c8aa9b0a82aec5",
+    "vpcId": "vpc-0049650f5a479c14b"
+  },
+  "timestamp": "2026-05-28T09:41:26.29656651Z",
+  "type": "aws.ec2.instance.power.started"
 }
 ```
 

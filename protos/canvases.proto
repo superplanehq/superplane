@@ -73,6 +73,40 @@ service Canvases {
     };
   }
 
+   rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas repository";
+      description: "Returns information about the canvas git repository";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc ListCanvasRepositoryFiles(ListCanvasRepositoryFilesRequest) returns (ListCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository/files"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas repository files";
+      description: "Lists files in the git repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc CommitCanvasRepositoryFiles(CommitCanvasRepositoryFilesRequest) returns (CommitCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/repository/commits"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit canvas repository files";
+      description: "Commits file additions, updates, and deletions to the git repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -410,6 +444,30 @@ service Canvases {
     };
   }
 
+  rpc CreateCanvasMemoryNamespace(CreateCanvasMemoryNamespaceRequest) returns (CreateCanvasMemoryNamespaceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/memory/namespaces"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create manual canvas memory namespace";
+      description: "Creates a manually-managed memory namespace with the provided entries. Rejected if the namespace already has any entries.";
+      tags: "Canvas";
+    };
+  }
+
+  rpc UpdateCanvasMemoryNamespace(UpdateCanvasMemoryNamespaceRequest) returns (UpdateCanvasMemoryNamespaceResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/memory/namespaces/{namespace}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update manual canvas memory namespace";
+      description: "Replaces the entries of a manually-managed memory namespace, optionally renaming it. Rejected if the namespace is node-managed.";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
@@ -421,25 +479,25 @@ service Canvases {
     };
   }
 
-  rpc GetCanvasDashboard(GetCanvasDashboardRequest) returns (GetCanvasDashboardResponse) {
+  rpc GetConsole(GetConsoleRequest) returns (GetConsoleResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/dashboard"
+      get: "/api/v1/canvases/{canvas_id}/console"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get canvas dashboard";
-      description: "Returns the dashboard for a canvas (panels and grid layout)";
+      summary: "Get canvas console";
+      description: "Returns the console for a canvas (panels and grid layout)";
       tags: "Canvas";
     };
   }
 
-  rpc UpdateCanvasDashboard(UpdateCanvasDashboardRequest) returns (UpdateCanvasDashboardResponse) {
+  rpc UpdateConsole(UpdateConsoleRequest) returns (UpdateConsoleResponse) {
     option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/dashboard"
+      put: "/api/v1/canvases/{canvas_id}/console"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas dashboard";
-      description: "Replaces the dashboard for a canvas";
+      summary: "Update canvas console";
+      description: "Replaces the console for a canvas";
       tags: "Canvas";
     };
   }
@@ -497,6 +555,66 @@ message CanvasAutoLayout {
   Algorithm algorithm = 1;
   repeated string node_ids = 2;
   Scope scope = 3;
+}
+
+message CanvasRepository {
+  message Metadata {
+    string canvas_id = 1;
+    google.protobuf.Timestamp updated_at = 7;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_PENDING = 1;
+    STATE_READY = 2;
+    STATE_ERROR = 3;
+  }
+
+  message Status {
+    State state = 1;
+    string head_sha = 2;
+    optional string error = 3;
+  }
+
+  Metadata metadata = 1;
+  Status status = 2;
+}
+
+message GetCanvasRepositoryRequest {
+  string canvas_id = 1;
+}
+
+message GetCanvasRepositoryResponse {
+  CanvasRepository repository = 1;
+}
+
+message ListCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+}
+
+message CanvasRepositoryFile {
+  string path = 1;
+}
+
+message ListCanvasRepositoryFilesResponse {
+  repeated CanvasRepositoryFile files = 1;
+}
+
+message CanvasRepositoryFileOperation {
+  string path = 1;
+  bytes content = 2;
+  bool delete = 3;
+}
+
+message CommitCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+  string expected_head_sha = 2;
+  string message = 3;
+  repeated CanvasRepositoryFileOperation operations = 4;
+}
+
+message CommitCanvasRepositoryFilesResponse {
+  string commit_sha = 1;
 }
 
 message CreateCanvasVersionRequest {
@@ -975,9 +1093,18 @@ message ListRunsResponse {
 }
 
 message CanvasMemory {
+  enum Source {
+    SOURCE_UNKNOWN = 0;
+    SOURCE_NODE = 1;
+    SOURCE_MANUAL = 2;
+  }
+
   string id = 1;
   string namespace = 2;
   google.protobuf.Value values = 3;
+  Source source = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 message ListCanvasMemoriesRequest {
@@ -994,6 +1121,29 @@ message DeleteCanvasMemoryRequest {
 }
 
 message DeleteCanvasMemoryResponse {}
+
+message CreateCanvasMemoryNamespaceRequest {
+  string canvas_id = 1;
+  string namespace = 2;
+  repeated google.protobuf.Value entries = 3;
+}
+
+message CreateCanvasMemoryNamespaceResponse {
+  string namespace = 1;
+  repeated CanvasMemory items = 2;
+}
+
+message UpdateCanvasMemoryNamespaceRequest {
+  string canvas_id = 1;
+  string namespace = 2;
+  string new_namespace = 3;
+  repeated google.protobuf.Value entries = 4;
+}
+
+message UpdateCanvasMemoryNamespaceResponse {
+  string namespace = 1;
+  repeated CanvasMemory items = 2;
+}
 
 message CanvasEvent {
   string id = 1;
@@ -1169,46 +1319,46 @@ message NotificationEmailRequested {
   google.protobuf.Timestamp timestamp = 9;
 }
 
-message DashboardPanel {
-  string id = 1;
-  string type = 2;
-  google.protobuf.Value content = 3;
-}
+message Console {
+  message Panel {
+    string id = 1;
+    string type = 2;
+    google.protobuf.Value content = 3;
+  }
 
-message DashboardLayoutItem {
-  string i = 1;
-  int32 x = 2;
-  int32 y = 3;
-  int32 w = 4;
-  int32 h = 5;
-  optional int32 min_w = 6;
-  optional int32 min_h = 7;
-}
+  message LayoutItem {
+    string i = 1;
+    int32 x = 2;
+    int32 y = 3;
+    int32 w = 4;
+    int32 h = 5;
+    optional int32 min_w = 6;
+    optional int32 min_h = 7;
+  }
 
-message CanvasDashboard {
   string canvas_id = 1;
-  repeated DashboardPanel panels = 2;
-  repeated DashboardLayoutItem layout = 3;
+  repeated Panel panels = 2;
+  repeated LayoutItem layout = 3;
   google.protobuf.Timestamp updated_at = 4;
   string version_id = 5;
 }
 
-message GetCanvasDashboardRequest {
+message GetConsoleRequest {
   string canvas_id = 1;
   optional string version_id = 2;
 }
 
-message GetCanvasDashboardResponse {
-  CanvasDashboard dashboard = 1;
+message GetConsoleResponse {
+  Console console = 1;
 }
 
-message UpdateCanvasDashboardRequest {
+message UpdateConsoleRequest {
   string canvas_id = 1;
-  repeated DashboardPanel panels = 2;
-  repeated DashboardLayoutItem layout = 3;
+  repeated Console.Panel panels = 2;
+  repeated Console.LayoutItem layout = 3;
   optional string version_id = 4;
 }
 
-message UpdateCanvasDashboardResponse {
-  CanvasDashboard dashboard = 1;
+message UpdateConsoleResponse {
+  Console console = 1;
 }

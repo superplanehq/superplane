@@ -30,16 +30,19 @@ func TestNormalizeExecutionMode(t *testing.T) {
 	}
 }
 
+const testRunnerMachineType = "aws-standard-1"
+
 func TestValidateRunnerSpec(t *testing.T) {
 	t.Parallel()
-	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err != nil {
+	if err := validateRunnerSpec(Spec{MachineType: testRunnerMachineType, Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err != nil {
 		t.Fatalf("valid host spec: %v", err)
 	}
 	// Legacy persisted config: commands only (no execution_mode / execution_timeout_seconds keys).
-	if err := validateRunnerSpec(Spec{Commands: "echo hi"}); err != nil {
+	if err := validateRunnerSpec(Spec{MachineType: testRunnerMachineType, Commands: "echo hi"}); err != nil {
 		t.Fatalf("valid legacy host spec (empty execution_mode): %v", err)
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:       testRunnerMachineType,
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: "debian:bookworm-slim",
@@ -47,6 +50,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		t.Fatalf("valid docker quick pick: %v", err)
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:       testRunnerMachineType,
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
@@ -56,6 +60,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 	}
 	// Legacy: no preset, only docker_image
 	if err := validateRunnerSpec(Spec{
+		MachineType:   testRunnerMachineType,
 		Commands:      "echo hi",
 		ExecutionMode: ExecutionModeDocker,
 		DockerImage:   "debian:bookworm-slim",
@@ -63,6 +68,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		t.Fatalf("valid docker legacy: %v", err)
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:             testRunnerMachineType,
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: 120,
@@ -70,13 +76,17 @@ func TestValidateRunnerSpec(t *testing.T) {
 		t.Fatalf("valid timeout: %v", err)
 	}
 
-	if err := validateRunnerSpec(Spec{Commands: "", ExecutionMode: ExecutionModeHost}); err == nil {
+	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err == nil {
+		t.Fatal("expected error for missing machine type")
+	}
+	if err := validateRunnerSpec(Spec{MachineType: testRunnerMachineType, Commands: "", ExecutionMode: ExecutionModeHost}); err == nil {
 		t.Fatal("expected error for empty commands")
 	}
-	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeDocker}); err == nil {
+	if err := validateRunnerSpec(Spec{MachineType: testRunnerMachineType, Commands: "echo hi", ExecutionMode: ExecutionModeDocker}); err == nil {
 		t.Fatal("expected error for docker without image")
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:       testRunnerMachineType,
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
@@ -86,6 +96,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 	}
 	longImage := strings.Repeat("a", maxDockerImageReferenceChars+1)
 	if err := validateRunnerSpec(Spec{
+		MachineType:       testRunnerMachineType,
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
@@ -94,6 +105,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		t.Fatal("expected error for docker image reference that is too long")
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:             testRunnerMachineType,
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: -1,
@@ -101,6 +113,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		t.Fatal("expected error for negative timeout")
 	}
 	if err := validateRunnerSpec(Spec{
+		MachineType:             testRunnerMachineType,
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: maxExecutionTimeoutSecondsRequest + 1,
@@ -112,6 +125,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 func TestDecodeRunnerSpec_WeakTypes(t *testing.T) {
 	t.Parallel()
 	raw := map[string]any{
+		"machine_type":              testRunnerMachineType,
 		"commands":                  "echo x",
 		"execution_mode":            "docker",
 		"docker_image_preset":       "debian:bookworm-slim",
@@ -137,7 +151,8 @@ func TestValidateConfigurationRunnerLegacyPreExecutionFields(t *testing.T) {
 	t.Parallel()
 	r := &Runner{}
 	legacy := map[string]any{
-		"commands": "echo hi",
+		"machine_type": testRunnerMachineType,
+		"commands":     "echo hi",
 	}
 	if err := configuration.ValidateConfiguration(r.Configuration(), legacy); err != nil {
 		t.Fatalf("ValidateConfiguration legacy runner: %v", err)
@@ -161,6 +176,7 @@ func TestValidateConfigurationRunnerLegacyDockerImageOnly(t *testing.T) {
 	t.Parallel()
 	r := &Runner{}
 	err := configuration.ValidateConfiguration(r.Configuration(), map[string]any{
+		"machine_type":              testRunnerMachineType,
 		"execution_mode":            ExecutionModeDocker,
 		"commands":                  "echo hi",
 		"execution_timeout_seconds": 0,

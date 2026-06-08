@@ -101,7 +101,7 @@ func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
 
 func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettings() {
 	s.session.Click(q.TestID("canvas-settings-save-changes"))
-	canvasPath := "/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String()
+	canvasPath := "/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String()
 	s.session.WaitForBrowserPath(canvasPath)
 }
 

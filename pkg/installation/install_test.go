@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -21,12 +22,12 @@ func TestPersistInstalledConsoleNoopWhenNil(t *testing.T) {
 func TestPersistInstalledConsoleRejectsInvalidCanvasID(t *testing.T) {
 	support.Setup(t)
 
-	console := &models.DashboardYAML{
+	console := &models.ConsoleYAML{
 		APIVersion: models.DashboardAPIVersion,
 		Kind:       models.ConsoleKind,
-		Spec: models.DashboardYAMLSpec{
-			Panels: []models.DashboardPanel{
-				{ID: "p1", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{"body": "hi"}},
+		Spec: models.ConsoleYAMLSpec{
+			Panels: []models.ConsolePanel{
+				{ID: "p1", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "hi"}},
 			},
 		},
 	}
@@ -42,18 +43,18 @@ func TestPersistInstalledConsoleWritesPanelsAndLayout(t *testing.T) {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 
 	minW := 2
-	console := &models.DashboardYAML{
+	console := &models.ConsoleYAML{
 		APIVersion: models.DashboardAPIVersion,
 		Kind:       models.ConsoleKind,
-		Spec: models.DashboardYAMLSpec{
-			Panels: []models.DashboardPanel{
+		Spec: models.ConsoleYAMLSpec{
+			Panels: []models.ConsolePanel{
 				{
 					ID:      "notes",
-					Type:    models.DashboardPanelTypeMarkdown,
+					Type:    models.ConsolePanelTypeMarkdown,
 					Content: map[string]any{"title": "Notes", "body": "hello from console.yaml"},
 				},
 			},
-			Layout: []models.DashboardLayoutItem{
+			Layout: []models.ConsoleLayoutItem{
 				{I: "notes", X: 0, Y: 0, W: 4, H: 2, MinW: &minW},
 			},
 		},
@@ -61,14 +62,14 @@ func TestPersistInstalledConsoleWritesPanelsAndLayout(t *testing.T) {
 
 	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
 
-	stored, err := models.FindCanvasDashboard(canvas.ID)
+	canvasVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 	require.NoError(t, err)
-	panels := stored.Panels.Data()
-	layout := stored.Layout.Data()
+	panels := canvasVersion.ConsolePanels.Data()
+	layout := canvasVersion.ConsoleLayout.Data()
 
 	require.Len(t, panels, 1)
 	assert.Equal(t, "notes", panels[0].ID)
-	assert.Equal(t, models.DashboardPanelTypeMarkdown, panels[0].Type)
+	assert.Equal(t, models.ConsolePanelTypeMarkdown, panels[0].Type)
 	assert.Equal(t, "hello from console.yaml", panels[0].Content["body"])
 
 	require.Len(t, layout, 1)
@@ -84,25 +85,25 @@ func TestPersistInstalledConsoleIsReplaceAll(t *testing.T) {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 
 	// Seed the canvas with a different console first.
-	_, err := models.UpsertCanvasDashboard(
+	_, err := models.UpsertCanvasVersionConsole(
 		canvas.ID,
-		[]models.DashboardPanel{
-			{ID: "old", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{"body": "old"}},
+		[]models.ConsolePanel{
+			{ID: "old", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "old"}},
 		},
-		[]models.DashboardLayoutItem{
+		[]models.ConsoleLayoutItem{
 			{I: "old", X: 0, Y: 0, W: 4, H: 2},
 		},
 	)
 	require.NoError(t, err)
 
-	console := &models.DashboardYAML{
+	console := &models.ConsoleYAML{
 		APIVersion: models.DashboardAPIVersion,
 		Kind:       models.ConsoleKind,
-		Spec: models.DashboardYAMLSpec{
-			Panels: []models.DashboardPanel{
-				{ID: "new", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{"body": "new"}},
+		Spec: models.ConsoleYAMLSpec{
+			Panels: []models.ConsolePanel{
+				{ID: "new", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "new"}},
 			},
-			Layout: []models.DashboardLayoutItem{
+			Layout: []models.ConsoleLayoutItem{
 				{I: "new", X: 0, Y: 0, W: 6, H: 3},
 			},
 		},
@@ -110,9 +111,9 @@ func TestPersistInstalledConsoleIsReplaceAll(t *testing.T) {
 
 	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
 
-	stored, err := models.FindCanvasDashboard(canvas.ID)
+	canvasVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 	require.NoError(t, err)
-	panels := stored.Panels.Data()
+	panels := canvasVersion.ConsolePanels.Data()
 	require.Len(t, panels, 1)
 	assert.Equal(t, "new", panels[0].ID)
 
@@ -120,10 +121,10 @@ func TestPersistInstalledConsoleIsReplaceAll(t *testing.T) {
 	// canvas does not clobber an already-stored console.
 	require.NoError(t, persistInstalledConsole(canvas.ID.String(), nil))
 
-	stored, err = models.FindCanvasDashboard(canvas.ID)
+	canvasVersion, err = models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 	require.NoError(t, err)
-	require.Len(t, stored.Panels.Data(), 1)
-	assert.Equal(t, "new", stored.Panels.Data()[0].ID)
+	require.Len(t, canvasVersion.ConsolePanels.Data(), 1)
+	assert.Equal(t, "new", canvasVersion.ConsolePanels.Data()[0].ID)
 }
 
 func TestPersistInstalledConsoleUsesUUIDAsPrimaryKey(t *testing.T) {
@@ -131,14 +132,14 @@ func TestPersistInstalledConsoleUsesUUIDAsPrimaryKey(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 
-	console := &models.DashboardYAML{
+	console := &models.ConsoleYAML{
 		APIVersion: models.DashboardAPIVersion,
 		Kind:       models.ConsoleKind,
-		Spec: models.DashboardYAMLSpec{
-			Panels: []models.DashboardPanel{
-				{ID: "p", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{}},
+		Spec: models.ConsoleYAMLSpec{
+			Panels: []models.ConsolePanel{
+				{ID: "p", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{}},
 			},
-			Layout: []models.DashboardLayoutItem{
+			Layout: []models.ConsoleLayoutItem{
 				{I: "p", X: 0, Y: 0, W: 4, H: 2},
 			},
 		},
@@ -147,8 +148,8 @@ func TestPersistInstalledConsoleUsesUUIDAsPrimaryKey(t *testing.T) {
 	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
 
 	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	unrelated, err := models.FindCanvasDashboard(otherCanvas.ID)
+	unrelated, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), otherCanvas.ID)
 	require.NoError(t, err)
-	assert.Empty(t, unrelated.Panels.Data())
-	assert.Empty(t, unrelated.Layout.Data())
+	assert.Empty(t, unrelated.ConsolePanels.Data())
+	assert.Empty(t, unrelated.ConsoleLayout.Data())
 }

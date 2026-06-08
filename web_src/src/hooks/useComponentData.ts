@@ -26,8 +26,10 @@ export const useComponents = (organizationId: string) => {
     },
     select: (data) => {
       return (data || []).filter((action) => {
-        const isExperimental = experimentalFeatures.includes(action.name || "");
-        const isEnabled = enabledExperimentalFeatures.includes(action.name || "");
+        const name = action.name || "";
+        const featureID = name === "runner" || name === "runnerJS" ? "runner" : name;
+        const isExperimental = experimentalFeatures.includes(featureID);
+        const isEnabled = enabledExperimentalFeatures.includes(featureID);
 
         return !isExperimental || isEnabled;
       });

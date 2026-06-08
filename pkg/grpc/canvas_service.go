@@ -385,14 +385,24 @@ func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCa
 	return canvases.DeleteCanvasMemory(ctx, s.registry, organizationID, req.CanvasId, req.MemoryId)
 }
 
-func (s *CanvasService) GetCanvasDashboard(ctx context.Context, req *pb.GetCanvasDashboardRequest) (*pb.GetCanvasDashboardResponse, error) {
+func (s *CanvasService) CreateCanvasMemoryNamespace(ctx context.Context, req *pb.CreateCanvasMemoryNamespaceRequest) (*pb.CreateCanvasMemoryNamespaceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.GetCanvasDashboard(ctx, organizationID, req.CanvasId, req.GetVersionId())
+	return canvases.CreateCanvasMemoryNamespace(ctx, s.registry, organizationID, req.CanvasId, req.Namespace, req.Entries)
 }
 
-func (s *CanvasService) UpdateCanvasDashboard(ctx context.Context, req *pb.UpdateCanvasDashboardRequest) (*pb.UpdateCanvasDashboardResponse, error) {
+func (s *CanvasService) UpdateCanvasMemoryNamespace(ctx context.Context, req *pb.UpdateCanvasMemoryNamespaceRequest) (*pb.UpdateCanvasMemoryNamespaceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasDashboard(ctx, organizationID, req.CanvasId, req.GetVersionId(), req.Panels, req.Layout)
+	return canvases.UpdateCanvasMemoryNamespace(ctx, s.registry, organizationID, req.CanvasId, req.Namespace, req.NewNamespace, req.Entries)
+}
+
+func (s *CanvasService) GetConsole(ctx context.Context, req *pb.GetConsoleRequest) (*pb.GetConsoleResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetConsole(ctx, organizationID, req.CanvasId, req.GetVersionId())
+}
+
+func (s *CanvasService) UpdateConsole(ctx context.Context, req *pb.UpdateConsoleRequest) (*pb.UpdateConsoleResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateConsole(ctx, organizationID, req.CanvasId, req.GetVersionId(), req.Panels, req.Layout)
 }
 
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
@@ -445,4 +455,19 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	}
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
+}
+
+func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasRepository(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.ExpectedHeadSha, req.Message, req.Operations)
 }

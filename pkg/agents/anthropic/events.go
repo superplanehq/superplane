@@ -49,8 +49,12 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		return toolEvent(raw, agents.ProviderEventToolUseFinished), true
 	case "session.status_idle":
 		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
-	case "session.status_terminated", "session.error":
+	case "session.status_terminated":
 		return sessionFailedEvent(raw), true
+	case "session.error":
+		// Managed Agents can emit recoverable internal errors and keep the
+		// session running; only status_terminated is terminal for us.
+		return agents.ProviderEvent{}, false
 	case "span.outcome_evaluation_start":
 		return outcomeEvaluationStartEvent(raw), true
 	case "agent.thread_message_sent":

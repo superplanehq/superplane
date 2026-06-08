@@ -5,6 +5,7 @@ import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
 import { useRecentCanvasOpens } from "@/hooks/useRecentCanvasOpens";
 import { getApiErrorMessage } from "@/lib/errors";
 import { sortCanvasProjectsByRecentOpen, type CanvasProjectOption } from "@/lib/recentCanvasOpens";
+import { appPath, appSettingsPath } from "@/lib/appPaths";
 import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -100,7 +101,7 @@ export function CanvasProjectSwitcher({
       return;
     }
 
-    navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`);
+    navigate(appSettingsPath(organizationId, activeCanvasId));
   }, [activeCanvasId, navigate, organizationId]);
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -122,7 +123,7 @@ export function CanvasProjectSwitcher({
       return;
     }
 
-    navigate(`/${organizationId}/canvases/${canvasId}`);
+    navigate(appPath(organizationId, canvasId));
   };
 
   const switcherSurface = rename.isRenaming ? (
