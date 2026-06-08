@@ -1,0 +1,20 @@
+{
+  "data": {
+    "name": "my-tpu",
+    "resourceName": "projects/my-project/locations/us-central1-b/nodes/my-tpu",
+    "location": "us-central1-b",
+    "acceleratorType": "v2-8",
+    "runtimeVersion": "tpu-vm-tf-2.16.1",
+    "state": "READY",
+    "health": "HEALTHY",
+    "labels": {
+      "env": "production"
+    },
+    "ipAddresses": [
+      "10.128.0.5"
+    ],
+    "createTime": "2026-01-28T10:30:00.000Z"
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.tpu.node.created"
+}

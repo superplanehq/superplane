@@ -176,6 +176,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     pubsub: gcpPubSubIcon,
     clouddns: gcpCloudDNSIcon,
     compute: gcpComputeIcon,
+    tpu: gcpComputeIcon,
     createVM: gcpComputeIcon,
     deleteVMInstance: gcpComputeIcon,
     manageVMInstancePower: gcpComputeIcon,

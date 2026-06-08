@@ -40,6 +40,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Compute • Create TPU Node" href="#compute-•-create-tpu-node" description="Create a Cloud TPU node (TPU VM) in a Google Cloud project" />
+  <LinkCard title="Compute • Delete TPU Node" href="#compute-•-delete-tpu-node" description="Delete a Cloud TPU node from a Google Cloud project" />
+  <LinkCard title="Compute • Get TPU Node" href="#compute-•-get-tpu-node" description="Read the details and status of a Cloud TPU node" />
   <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
 
@@ -1234,6 +1237,162 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="compute-•-create-tpu-node"></a>
+
+## Compute • Create TPU Node
+
+**Component key:** `gcp.tpu.createNode`
+
+The Create Node component provisions a new Cloud TPU node (TPU VM) and waits for it to become ready before emitting.
+
+### Use Cases
+
+- **On-demand accelerators**: Spin up a TPU for a training or inference job as part of a workflow.
+- **Reproducible environments**: Pin the accelerator type and runtime version so every run uses the same hardware and software.
+
+### Configuration
+
+- **Node name**: Name for the new TPU node. Start with a letter; use lowercase letters, numbers, and hyphens.
+- **Location**: The zone to create the TPU in (e.g. `us-central1-b`).
+- **Accelerator type**: The TPU hardware type (e.g. `v2-8`, `v3-8`, `v5litepod-4`).
+- **Runtime version**: The TPU software/runtime version (e.g. `tpu-vm-tf-2.16.1`).
+- **Description**: Optional human-readable description.
+- **Network / Subnetwork**: Optional VPC network and subnetwork. Defaults to the project's `default` network.
+- **Assign external IP**: Whether to give the TPU an external IP address.
+- **Preemptible**: Create the TPU as preemptible (cheaper, can be reclaimed at any time).
+- **Labels**: Optional key-value labels (billing, environment, team).
+
+### Required IAM roles
+
+The service account must have `roles/tpu.admin` on the project.
+
+### Output
+
+Emits the created node: name, resourceName, location, acceleratorType, runtimeVersion, state, health, labels, ipAddresses, createTime.
+
+### Important Notes
+
+- The component waits for the create operation to complete before emitting, so the node is `READY` in the output.
+- The Cloud TPU API must be enabled in the project.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acceleratorType": "v2-8",
+    "createTime": "2026-01-28T10:30:00.000Z",
+    "health": "HEALTHY",
+    "ipAddresses": [
+      "10.128.0.5"
+    ],
+    "labels": {
+      "env": "production"
+    },
+    "location": "us-central1-b",
+    "name": "my-tpu",
+    "resourceName": "projects/my-project/locations/us-central1-b/nodes/my-tpu",
+    "runtimeVersion": "tpu-vm-tf-2.16.1",
+    "state": "READY"
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.tpu.node.created"
+}
+```
+
+<a id="compute-•-delete-tpu-node"></a>
+
+## Compute • Delete TPU Node
+
+**Component key:** `gcp.tpu.deleteNode`
+
+The Delete Node component deletes a Cloud TPU node and waits for the deletion to complete.
+
+### Use Cases
+
+- **Cleanup**: Tear down a TPU once a training or inference job finishes to stop incurring cost.
+- **Lifecycle automation**: Remove TPUs as part of an environment teardown workflow.
+
+### Configuration
+
+- **TPU node**: The TPU node to delete, selected from all nodes in the project.
+
+### Required IAM roles
+
+The service account must have `roles/tpu.admin` on the project.
+
+### Output
+
+Emits the deleted node's identity: name (node), location.
+
+### Important Notes
+
+- The component waits for the delete operation to complete before emitting.
+- Deleting a TPU node is irreversible.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "location": "us-central1-b",
+    "name": "my-tpu"
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.tpu.node.deleted"
+}
+```
+
+<a id="compute-•-get-tpu-node"></a>
+
+## Compute • Get TPU Node
+
+**Component key:** `gcp.tpu.getNode`
+
+The Get Node component reads the current details and status of a Cloud TPU node.
+
+### Use Cases
+
+- **Status checks**: Inspect a TPU's `state` and `health` before dispatching work to it.
+- **Chaining**: Feed a TPU's IP addresses or resource name into downstream components.
+
+### Configuration
+
+- **TPU node**: The TPU node to read, selected from all nodes in the project.
+
+### Required IAM roles
+
+The service account must have `roles/tpu.viewer` (or `roles/tpu.admin`) on the project.
+
+### Output
+
+Emits the node: name, resourceName, location, acceleratorType, runtimeVersion, state, health, labels, ipAddresses, createTime.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acceleratorType": "v2-8",
+    "createTime": "2026-01-28T10:30:00.000Z",
+    "health": "HEALTHY",
+    "ipAddresses": [
+      "10.128.0.5"
+    ],
+    "labels": {
+      "env": "production"
+    },
+    "location": "us-central1-b",
+    "name": "my-tpu",
+    "resourceName": "projects/my-project/locations/us-central1-b/nodes/my-tpu",
+    "runtimeVersion": "tpu-vm-tf-2.16.1",
+    "state": "READY"
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.tpu.node.read"
 }
 ```
 

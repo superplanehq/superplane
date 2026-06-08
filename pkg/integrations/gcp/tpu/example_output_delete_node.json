@@ -1,0 +1,8 @@
+{
+  "data": {
+    "name": "my-tpu",
+    "location": "us-central1-b"
+  },
+  "timestamp": "2026-01-28T10:30:00.000Z",
+  "type": "gcp.tpu.node.deleted"
+}

@@ -140,3 +140,7 @@ func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {
 	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
 	return c.ExecRequest(ctx, http.MethodDelete, url, nil)
 }
+
+func (c *Client) DeleteURL(ctx context.Context, fullURL string) ([]byte, error) {
+	return c.ExecRequest(ctx, http.MethodDelete, fullURL, nil)
+}
