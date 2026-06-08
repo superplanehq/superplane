@@ -400,6 +400,18 @@ func (s *CanvasSteps) AddNote() {
 	}
 
 	s.session.Click(q.TestID("add-note-button"))
+	require.Eventually(s.t, func() bool {
+		draft := s.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+		for _, node := range draft.Nodes {
+			if node.Name == "Note" {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
 }
@@ -575,25 +587,35 @@ func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
-	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)
+	edge := q.Locator(`.react-flow__edge`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		count, err := edge.Count()
+		return err == nil && count > 0
+	}, 10*time.Second, 200*time.Millisecond)
 
-	loc := targetHandle.Run(s.session)
-	box, err := loc.BoundingBox()
-	if err != nil || box == nil {
-		s.t.Fatalf("getting bounding box for edge %q: %v", loc, err)
-	}
-
-	// Click on the edge to delete it (edges now delete on click instead of requiring a separate delete button)
-	// Click a bit left (40px) from the center of the target handle to hit the edge
-
-	centerX := box.X + box.Width/2 - 40
-	centerY := box.Y + box.Height/2
-
-	if err := s.session.Page().Mouse().Click(centerX, centerY, pw.MouseClickOptions{}); err != nil {
-		s.t.Fatalf("clicking edge %q at center: %v", loc, err)
-	}
-
+	firstEdge := edge.First()
+	require.NoError(s.t, firstEdge.Hover())
 	s.session.Sleep(300)
+
+	hitArea := q.Locator(`.react-flow__renderer [data-testid="edge-delete-hit-area"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		count, err := hitArea.Count()
+		return err == nil && count > 0
+	}, 10*time.Second, 200*time.Millisecond)
+
+	require.NoError(s.t, hitArea.First().Click(pw.LocatorClickOptions{Timeout: pw.Float(10000)}))
+	s.session.Sleep(500)
+	s.waitForDraftEdgeCount(0)
+}
+
+func (s *CanvasSteps) waitForDraftEdgeCount(expected int) {
+	require.Eventually(s.t, func() bool {
+		draft := s.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+		return len(draft.Edges) == expected
+	}, 10*time.Second, 200*time.Millisecond, "draft edge count to reach %d", expected)
 }
 
 func (s *CanvasSteps) StartEditingNode(name string) {

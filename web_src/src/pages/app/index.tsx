@@ -2719,7 +2719,10 @@ export function AppPage() {
         // switching drafts remounts the canvas); without this, the save would
         // target whatever draft is now active and overwrite it with this
         // draft's graph.
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false, savingVersionId: activeCanvasVersionId });
+        //
+        // Do not await auto-save here: repository file commits round-trip through
+        // canvas.yaml and would block expression autocomplete on every keystroke.
+        void handleSaveWorkflow(updatedWorkflow, { showToast: false, savingVersionId: activeCanvasVersionId });
       }
     },
     [

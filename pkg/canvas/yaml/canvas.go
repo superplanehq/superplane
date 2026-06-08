@@ -21,6 +21,11 @@ func ParseCanvasResource(data []byte) (*pb.Canvas, error) {
 		return nil, fmt.Errorf("parse canvas yaml: %w", err)
 	}
 
+	jsonData, err = normalizeCanvasResourceJSON(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("parse canvas yaml: %w", err)
+	}
+
 	canvasJSON, err := canvasJSONFromResource(jsonData)
 	if err != nil {
 		return nil, err
@@ -73,4 +78,57 @@ func canvasJSONFromResource(jsonData []byte) ([]byte, error) {
 	}
 
 	return canvasJSON, nil
+}
+
+func normalizeCanvasResourceJSON(jsonData []byte) ([]byte, error) {
+	var resource map[string]any
+	if err := json.Unmarshal(jsonData, &resource); err != nil {
+		return nil, err
+	}
+
+	spec, ok := resource["spec"].(map[string]any)
+	if !ok {
+		return jsonData, nil
+	}
+
+	nodes, ok := spec["nodes"].([]any)
+	if !ok {
+		return jsonData, nil
+	}
+
+	for i, raw := range nodes {
+		node, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if position, ok := node["position"].(map[string]any); ok {
+			node["position"] = normalizeYAMLPositionMap(position)
+		}
+
+		nodes[i] = node
+	}
+
+	spec["nodes"] = nodes
+	resource["spec"] = spec
+
+	return json.Marshal(resource)
+}
+
+func normalizeYAMLPositionMap(position map[string]any) map[string]any {
+	normalized := make(map[string]any, len(position)+1)
+	for key, value := range position {
+		normalized[key] = value
+	}
+
+	if _, hasY := normalized["y"]; hasY {
+		return normalized
+	}
+
+	if yValue, ok := normalized["true"]; ok {
+		normalized["y"] = yValue
+		delete(normalized, "true")
+	}
+
+	return normalized
 }
