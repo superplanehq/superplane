@@ -95,6 +95,10 @@ spec:
               value: /app/oidc-keys
             - name: OTEL_ENABLED
               value: "yes"
+            - name: GIT_STORAGE_PROVIDER
+              value: supergit
+            - name: GIT_STORAGE_SUPERGIT_BASE_URL
+              value: {{ printf "http://%s:%v%s" .Values.supergit.host .Values.supergit.port .Values.supergit.apiPath | quote }}
 
           volumeMounts:
             - name: oidc-keys

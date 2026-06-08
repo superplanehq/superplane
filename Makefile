@@ -327,10 +327,16 @@ cli.build.m1:
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+VITE_ASSET_BASE_URL?=
+FRONTEND_PREBUILT?=0
 # pb.gen runs in the compose app container; run `make dev.up` first.
 image.build:
 	$(MAKE) pb.gen
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner \
+	  --build-arg BASE_URL=$(BASE_URL) \
+	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
+	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
+	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
 	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin

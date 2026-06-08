@@ -313,13 +313,13 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
 		require.NoError(t, err)
 
-		_, err = models.UpdateCanvasVersionDashboardInTransaction(
+		_, err = models.UpdateCanvasVersionConsoleInTransaction(
 			database.Conn(),
 			draftVersion,
-			[]models.DashboardPanel{
-				{ID: "notes", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{"body": "published console"}},
+			[]models.ConsolePanel{
+				{ID: "notes", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "published console"}},
 			},
-			[]models.DashboardLayoutItem{
+			[]models.ConsoleLayoutItem{
 				{I: "notes", X: 0, Y: 0, W: 4, H: 2},
 			},
 		)
@@ -333,9 +333,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		liveDashboard, err := models.FindLiveCanvasDashboard(uuid.MustParse(canvasID))
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), uuid.MustParse(canvasID))
 		require.NoError(t, err)
-		panels := liveDashboard.Panels.Data()
+		panels := liveVersion.ConsolePanels.Data()
 		require.Len(t, panels, 1)
 		assert.Equal(t, "published console", panels[0].Content["body"])
 	})

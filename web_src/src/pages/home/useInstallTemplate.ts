@@ -1,3 +1,5 @@
+import { canvasKeys } from "@/hooks/useCanvasData";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -5,6 +7,7 @@ import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
+import { appPath } from "@/lib/appPaths";
 
 interface InstallResult {
   canvasId: string;
@@ -19,6 +22,7 @@ interface TemplateAgentContext {
 export function useInstallTemplate() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isInstalling, setIsInstalling] = useState(false);
 
   const installTemplate = useCallback(
@@ -44,12 +48,13 @@ export function useInstallTemplate() {
         }
 
         const result = (await response.json()) as InstallResult;
+        await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
         localStorage.setItem("canvasAgentSidebarOpen", "true");
         localStorage.setItem("canvasSidebarOpen", "false");
         if (agentContext?.instructions || agentContext?.initialMessage) {
           setAgentBootContext(result.canvasId, agentContext);
         }
-        navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
+        navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));
         showErrorToast(message);
@@ -57,7 +62,7 @@ export function useInstallTemplate() {
         setIsInstalling(false);
       }
     },
-    [isInstalling, navigate, organizationId],
+    [isInstalling, navigate, organizationId, queryClient],
   );
 
   return { installTemplate, isInstalling };

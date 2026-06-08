@@ -110,6 +110,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 import { HomePage } from "./index";
+import { NewAppPage } from "./NewAppPage";
 
 function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvas {
   return {
@@ -148,7 +149,10 @@ function renderHome() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/org-123"]}>
         <Routes>
-          <Route path="/:organizationId" element={<HomePage />} />
+          <Route path="/:organizationId">
+            <Route index element={<HomePage />} />
+            <Route path="apps/new" element={<NewAppPage />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

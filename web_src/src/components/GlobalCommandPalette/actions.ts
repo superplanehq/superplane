@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { CanvasToolSidebarTab } from "@/components/CanvasToolSidebar/events";
 import { ADMIN_LINKS, DOCS_URL, ORGANIZATION_SETTINGS_LINKS } from "./constants";
+import { appSettingsPath } from "@/lib/appPaths";
 import type { CommandPage, PaletteAction, PalettePageAction } from "./types";
 
 type RootPageActionParams = {
@@ -49,7 +50,7 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "dashboard" | "memory" | "runs") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory" | "runs") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
@@ -194,8 +195,8 @@ export function buildCurrentCanvasActions({
       label: "Console",
       description: currentCanvasName,
       icon: PanelTop,
-      onSelect: () => goToCurrentCanvasView("dashboard"),
-      keywords: ["dashboard", "console"],
+      onSelect: () => goToCurrentCanvasView("console"),
+      keywords: ["console"],
     },
     {
       id: "current-canvas-runs",
@@ -219,7 +220,7 @@ export function buildCurrentCanvasActions({
       description: currentCanvasName,
       icon: Settings,
       disabled: !canUpdateCanvas,
-      onSelect: () => goTo(`/${organizationId}/canvases/${canvasId}/settings`),
+      onSelect: () => organizationId && canvasId && goTo(appSettingsPath(organizationId, canvasId)),
       keywords: ["canvas", "settings"],
     },
   ];
@@ -295,7 +296,7 @@ function buildOrganizationRootActions(
       description: organizationName,
       icon: Home,
       onSelect: () => goTo(`/${organizationId}`),
-      keywords: ["home", "dashboard", "canvases", "projects"],
+      keywords: ["home", "canvases", "projects"],
     },
     {
       id: "templates",

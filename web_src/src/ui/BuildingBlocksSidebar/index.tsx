@@ -159,8 +159,9 @@ function OpenBuildingBlocksSidebar({
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
-      Debugging: 1,
-      Memory: 2,
+      Runners: 1,
+      Debugging: 2,
+      Memory: 3,
     };
 
     return [...blocks].sort((a, b) => {
@@ -195,18 +196,16 @@ function OpenBuildingBlocksSidebar({
       </div>
 
       <div className="border-l-1 border-border h-full flex flex-col overflow-hidden bg-white">
-        <div className="flex items-center justify-between gap-3 px-5 py-2.5 shrink-0">
-          <div className="flex flex-col items-start gap-0.5 min-w-0">
-            <h2 className="text-sm font-medium">Select Component</h2>
-          </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
+          <h2 className="min-w-0 text-sm font-medium">Select Component</h2>
           <button
             type="button"
             onClick={() => onToggle(false)}
             data-testid="close-sidebar-button"
-            className="shrink-0 z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
+            className="shrink-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5"
             aria-label="Close sidebar"
           >
-            <X size={16} />
+            <X size={16} className="shrink-0" />
           </button>
         </div>
 

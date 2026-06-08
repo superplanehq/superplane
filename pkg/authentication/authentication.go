@@ -287,21 +287,10 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
@@ -392,24 +381,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for password login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Set cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	// Redirect
 	redirectURL := getRedirectURL(r)
@@ -498,21 +474,10 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
@@ -796,22 +761,11 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for magic code login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
