@@ -23,6 +23,10 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listAssignees(ctx)
 	case "priority":
 		return listPriorities(ctx)
+	case "resolution":
+		return listResolutions(ctx)
+	case "jsmApproval":
+		return listJSMApprovals(ctx)
 	case "serviceDesk":
 		return listServiceDesks(ctx)
 	case "serviceDeskRequestType":
@@ -317,11 +321,6 @@ func listIssueTypes(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 }
 
 func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
-		return []core.IntegrationResource{}, nil
-	}
-
 	if ctx.HTTP == nil {
 		return []core.IntegrationResource{}, nil
 	}
@@ -331,11 +330,23 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	statuses, err := client.GetProjectStatuses(projectKey)
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		statuses, err := client.GetProjectStatuses(projectKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issue statuses: %w", err)
+		}
+		return issueStatusResources(statuses), nil
+	}
+
+	statuses, err := client.ListGlobalStatuses()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list issue statuses: %w", err)
 	}
+	return issueStatusResources(statuses), nil
+}
 
+func issueStatusResources(statuses []Status) []core.IntegrationResource {
 	resources := make([]core.IntegrationResource, 0, len(statuses))
 	for _, s := range statuses {
 		resources = append(resources, core.IntegrationResource{
@@ -344,7 +355,7 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			ID:   s.Name,
 		})
 	}
-	return resources, nil
+	return resources
 }
 
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -403,6 +414,78 @@ func listPriorities(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			Type: "priority",
 			Name: p.Name,
 			ID:   p.Name,
+		})
+	}
+	return resources, nil
+}
+
+// listJSMApprovals returns the pending approvals for a JSM customer request,
+// so the Approve Workflow component can offer a picker instead of asking the
+// user to copy an approval id by hand. Non-pending approvals are filtered out
+// because they are not actionable.
+func listJSMApprovals(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	issueKey := strings.TrimSpace(ctx.Parameters["issueKey"])
+	if issueKey == "" || strings.Contains(issueKey, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	approvals, err := client.ListApprovals(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list approvals: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(approvals))
+	for _, approval := range approvals {
+		if !isPendingApproval(approval) {
+			continue
+		}
+		id := approval.ID.String()
+		if id == "" {
+			continue
+		}
+		name := strings.TrimSpace(approval.Name)
+		if name == "" {
+			name = fmt.Sprintf("Approval %s", id)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "jsmApproval",
+			Name: name,
+			ID:   id,
+		})
+	}
+	return resources, nil
+}
+
+func listResolutions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	resolutions, err := client.ListResolutions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resolutions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(resolutions))
+	for _, r := range resolutions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "resolution",
+			Name: r.Name,
+			ID:   r.Name,
 		})
 	}
 	return resources, nil
