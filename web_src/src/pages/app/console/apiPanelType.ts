@@ -15,7 +15,7 @@
 
 import type { ConsolePanelType as ApiPanelType } from "@/api-client";
 
-import { type PanelType } from "./panelTypes";
+import { isPanelType, type PanelType } from "./panelTypes";
 
 const API_TO_PANEL_TYPE: Record<Exclude<ApiPanelType, "TYPE_UNSPECIFIED">, PanelType> = {
   MARKDOWN: "markdown",
@@ -39,9 +39,17 @@ const PANEL_TYPE_TO_API: Record<PanelType, ApiPanelType> = {
  * Convert the SDK enum value to the internal lowercase form. Returns
  * `undefined` for `TYPE_UNSPECIFIED` / unknown values so the caller can
  * decide between dropping the panel and falling back to a default.
+ *
+ * Accepts both wire formats: the current SDK emits the SCREAMING_CASE proto
+ * enum (`"MARKDOWN"`), but the previous API sent the lowercase YAML form as a
+ * plain string (`"markdown"`, `"table"`, ...). The lowercase form is already a
+ * valid `PanelType`, so pass it through directly — otherwise it would fall
+ * through to `undefined` and callers would silently coerce the panel to
+ * `markdown`, discarding its real type.
  */
 export function apiPanelTypeToPanelType(value: ApiPanelType | string | undefined | null): PanelType | undefined {
   if (!value || value === "TYPE_UNSPECIFIED") return undefined;
+  if (isPanelType(value)) return value;
   return API_TO_PANEL_TYPE[value as Exclude<ApiPanelType, "TYPE_UNSPECIFIED">];
 }
 
