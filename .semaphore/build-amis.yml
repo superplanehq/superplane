@@ -42,67 +42,45 @@ blocks:
                 -var "runner_s3_uri_arm64=s3://${RUNNER_S3_BUCKET}/latest/runner-linux-arm64" \
                 packer/runner.pkr.hcl
 
-            # Extract AMI IDs from the manifest and update SSM
+            # Extract AMI IDs and store in SSM staging parameters.
+            # These are separate from the live fleet config — the release pipeline
+            # promotes them when ready.
             - |
-              AMD64_AMI=$(python3 - <<'PYEOF'
-              import json
-              with open("packer/manifest.json") as f:
-                  m = json.load(f)
-              for b in m["builds"]:
-                  if "amd64" in b["name"]:
-                      print(b["artifact_id"].split(":")[-1])
-                      break
-              PYEOF
-              )
-
-              ARM64_AMI=$(python3 - <<'PYEOF'
-              import json
-              with open("packer/manifest.json") as f:
-                  m = json.load(f)
-              for b in m["builds"]:
-                  if "arm64" in b["name"]:
-                      print(b["artifact_id"].split(":")[-1])
-                      break
-              PYEOF
-              )
-
-              echo "amd64 AMI: $AMD64_AMI"
-              echo "arm64 AMI: $ARM64_AMI"
-
-              # Update SSM config with new AMI IDs
-              CONFIG=$(aws ssm get-parameter \
-                --name "/superplane/fleet-manager/config" \
-                --query 'Parameter.Value' --output text)
-
-              UPDATED=$(echo "$CONFIG" | python3 -c "
-              import sys, json
-              cfg = json.load(sys.stdin)
-              import os
-              amd64 = os.environ['AMD64_AMI']
-              arm64 = os.environ['ARM64_AMI']
-              for pool in cfg.get('pools', []):
-                  if pool.get('arch') == 'arm64':
-                      pool['ami_id'] = arm64
-                  else:
-                      pool['ami_id'] = amd64
-              print(json.dumps(cfg))
-              " AMD64_AMI="$AMD64_AMI" ARM64_AMI="$ARM64_AMI")
-
-              aws ssm put-parameter \
-                --name "/superplane/fleet-manager/config" \
-                --value "$UPDATED" \
-                --type String \
-                --overwrite
-
-              echo "SSM config updated with new AMI IDs"
-
-            # Print summary
-            - |
-              echo "Build complete. New AMIs:"
-              python3 -c "
+              AMD64_AMI=$(python3 -c "
               import json
               with open('packer/manifest.json') as f:
                   m = json.load(f)
               for b in m['builds']:
-                  print(f\"  {b['name']}: {b['artifact_id']}\")
-              "
+                  if 'amd64' in b['name']:
+                      print(b['artifact_id'].split(':')[-1])
+                      break
+              ")
+
+              ARM64_AMI=$(python3 -c "
+              import json
+              with open('packer/manifest.json') as f:
+                  m = json.load(f)
+              for b in m['builds']:
+                  if 'arm64' in b['name']:
+                      print(b['artifact_id'].split(':')[-1])
+                      break
+              ")
+
+              echo "amd64 AMI: $AMD64_AMI"
+              echo "arm64 AMI: $ARM64_AMI"
+
+              aws ssm put-parameter \
+                --name "/superplane/fleet-manager/ami/amd64" \
+                --value "$AMD64_AMI" \
+                --type String \
+                --overwrite
+
+              aws ssm put-parameter \
+                --name "/superplane/fleet-manager/ami/arm64" \
+                --value "$ARM64_AMI" \
+                --type String \
+                --overwrite
+
+              echo "Staged AMI IDs written to SSM:"
+              echo "  /superplane/fleet-manager/ami/amd64 = $AMD64_AMI"
+              echo "  /superplane/fleet-manager/ami/arm64 = $ARM64_AMI"
