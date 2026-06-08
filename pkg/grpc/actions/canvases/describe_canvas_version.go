@@ -46,7 +46,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	userUUID := uuid.MustParse(userID)
 	if version.State == models.CanvasVersionStatePublished {
 		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersion(version, organizationID),
+			Version: SerializeCanvasVersionMetadata(version, organizationID),
 		}, nil
 	}
 
@@ -57,9 +57,6 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 			return nil
 		}
 
-		// Snapshots tied to a change request are visible to any
-		// authenticated org member, mirroring DescribeCanvasChangeRequest
-		// which already returns the snapshot's full spec to reviewers.
 		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
 			canAccess = true
 			return nil
@@ -76,6 +73,6 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersionMetadata(version, organizationID),
 	}, nil
 }

@@ -3,25 +3,38 @@ package canvases
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func CommitCanvasRepositoryFiles(
 	ctx context.Context,
 	gitProvider git.Provider,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
 	organizationID string,
 	id string,
+	versionID string,
 	expectedHeadSha string,
 	message string,
 	operations []*pb.CanvasRepositoryFileOperation,
+	autoLayout *pb.CanvasAutoLayout,
+	webhookBaseURL string,
+	authService authorization.Authorization,
 ) (*pb.CommitCanvasRepositoryFilesResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -38,6 +51,39 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
 	}
 
+	_, err = models.FindCanvas(orgID, canvasID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
+	}
+
+	resolvedAutoLayout := resolveCommitCanvasAutoLayout(autoLayout != nil, autoLayout)
+
+	specOps, gitOps := splitRepositoryFileOperations(operations)
+	if len(specOps) > 0 {
+		if err := ApplyRepositorySpecFileOperations(
+			ctx,
+			usageService,
+			encryptor,
+			registry,
+			organizationID,
+			id,
+			versionID,
+			webhookBaseURL,
+			authService,
+			resolvedAutoLayout,
+			specOps,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(gitOps) == 0 {
+		return &pb.CommitCanvasRepositoryFilesResponse{}, nil
+	}
+
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
@@ -48,8 +94,8 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
 	}
 
-	gitOperations := make([]git.FileOperation, 0, len(operations))
-	for _, operation := range operations {
+	gitOperations := make([]git.FileOperation, 0, len(gitOps))
+	for _, operation := range gitOps {
 		content := operation.GetContent()
 		var reader io.Reader
 		if !operation.GetDelete() {
