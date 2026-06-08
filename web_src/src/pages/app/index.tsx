@@ -158,6 +158,7 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+import { runPositionAutoSave } from "./runPositionAutoSave";
 import {
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
@@ -1606,158 +1607,27 @@ export function AppPage() {
   const debouncedAutoSave = useMemo(
     () =>
       debounce(
-        async () => {
-          setIsPositionAutoSaveQueued(false);
-          if (!organizationId || !canvasId) return;
-
-          const positionUpdates = new Map(pendingPositionUpdatesRef.current);
-          if (positionUpdates.size === 0) return;
-          const focusedNoteId = getActiveNoteId();
-
-          try {
-            if (isReadOnly) {
-              return;
-            }
-
-            // Check if there are unsaved structural changes
-            // If so, skip auto-save to avoid saving those changes accidentally
-            if (hasNonPositionalUnsavedChanges) {
-              return;
-            }
-
-            // Use the rendered workflow as the base so position-only drags do not need
-            // to invalidate the full workflow cache before the debounced save runs.
-            const latestWorkflow =
-              canvasRef.current ||
-              queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-
-            if (!latestWorkflow?.spec?.nodes) return;
-
-            // Apply only position updates to the current state
-            const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
-              if (!node.id) return node;
-
-              const positionUpdate = positionUpdates.get(node.id);
-              if (positionUpdate) {
-                return {
-                  ...node,
-                  position: positionUpdate,
-                };
-              }
-              return node;
-            });
-
-            const updatedWorkflow = {
-              ...latestWorkflow,
-              spec: {
-                ...latestWorkflow.spec,
-                nodes: updatedNodes,
-              },
-            };
-
-            const changeSummary = summarizeWorkflowChanges({
-              before: lastSavedWorkflowRef.current,
-              after: updatedWorkflow,
-              onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
-            });
-            const changeMessage = changeSummary.changeCount
-              ? `${changeSummary.changeCount} Canvas changes saved`
-              : "Canvas changes saved";
-
-            // Save the workflow with updated positions
-            const savingVersionID = activeCanvasVersionIdRef.current || activeCanvasVersionId || undefined;
-            if (!savingVersionID) {
-              return;
-            }
-
-            // During a draft switch the active version id flips synchronously
-            // while `canvasRef`/`latestWorkflow` still holds the previous
-            // draft's graph for one render. Bail rather than persisting that
-            // stale graph onto the newly-active draft version.
-            if (canvasContentVersionIdRef.current !== savingVersionID) {
-              return;
-            }
-
-            const saveResult = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
-            if (saveResult.status !== "saved") {
-              return;
-            }
-            if (
-              saveResult.response?.data?.version &&
-              savingVersionID &&
-              activeCanvasVersionIdRef.current === savingVersionID
-            ) {
-              setActiveCanvasVersion(saveResult.response.data.version);
-            }
-            if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-              return;
-            }
-
-            applyLocalWorkflowUpdate(updatedWorkflow);
-            if (changeSummary.detail) {
-              setLiveCanvasEntries((prev) => [
-                buildCanvasStatusLogEntry({
-                  id: `canvas-save-${Date.now()}`,
-                  message: changeMessage,
-                  type: "success",
-                  timestamp: new Date().toISOString(),
-                  detail: changeSummary.detail,
-                  searchText: changeSummary.searchText,
-                }),
-                ...prev,
-              ]);
-            }
-
-            setLastSavedWorkflowSnapshot(updatedWorkflow);
-
-            // Clear the saved position updates after successful save
-            // Keep any new updates that came in during the save
-            positionUpdates.forEach((_, nodeId) => {
-              if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
-                pendingPositionUpdatesRef.current.delete(nodeId);
-              }
-            });
-
-            // After save, merge any new pending updates into the cache
-            // This prevents the server response from overwriting newer local changes
-            const currentWorkflow = queryClient.getQueryData<CanvasesCanvas>(
-              canvasKeys.detail(organizationId, canvasId),
-            );
-
-            if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
-              const mergedNodes = currentWorkflow.spec.nodes.map((node) => {
-                if (!node.id) return node;
-
-                const pendingUpdate = pendingPositionUpdatesRef.current.get(node.id);
-                if (pendingUpdate) {
-                  return {
-                    ...node,
-                    position: pendingUpdate,
-                  };
-                }
-                return node;
-              });
-
-              applyLocalWorkflowUpdate({
-                ...currentWorkflow,
-                spec: {
-                  ...currentWorkflow.spec,
-                  nodes: mergedNodes,
-                },
-              });
-            }
-
-            // Auto-save completed silently (no toast or state changes)
-          } catch (error) {
-            console.error("Failed to auto-save", error);
-          } finally {
-            if (focusedNoteId) {
-              requestAnimationFrame(() => {
-                restoreActiveNoteFocus();
-              });
-            }
-          }
-        },
+        () =>
+          runPositionAutoSave({
+            setIsPositionAutoSaveQueued,
+            organizationId,
+            canvasId,
+            pendingPositionUpdatesRef,
+            isReadOnly,
+            hasNonPositionalUnsavedChanges,
+            canvasRef,
+            queryClient,
+            lastSavedWorkflowRef,
+            logNodeSelectRef,
+            activeCanvasVersionIdRef,
+            activeCanvasVersionId,
+            canvasContentVersionIdRef,
+            enqueueCanvasSave,
+            setActiveCanvasVersion,
+            applyLocalWorkflowUpdate,
+            setLiveCanvasEntries,
+            setLastSavedWorkflowSnapshot,
+          }),
         isReadOnly ? 2000 : 100,
       ),
     [
