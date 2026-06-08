@@ -76,6 +76,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
+import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
@@ -1263,8 +1264,9 @@ function CanvasPage(props: CanvasPageProps) {
   };
 
   const handleSidebarClose = useCallback(() => {
+    const selectedNodeId = state.componentSidebar.selectedNodeId;
     // Check if the currently open node is a pending connection
-    const currentNode = state.nodes.find((n) => n.id === state.componentSidebar.selectedNodeId);
+    const currentNode = state.nodes.find((n) => n.id === selectedNodeId);
     const isPendingConnection = currentNode?.data?.isPendingConnection;
 
     state.componentSidebar.close();
@@ -1272,8 +1274,8 @@ function CanvasPage(props: CanvasPageProps) {
     setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
-    if (isPendingConnection && state.componentSidebar.selectedNodeId) {
-      const nodeIdToRemove = state.componentSidebar.selectedNodeId;
+    if (isPendingConnection && selectedNodeId) {
+      const nodeIdToRemove = selectedNodeId;
       state.setNodes((nodes) => nodes.filter((node) => node.id !== nodeIdToRemove));
       state.setEdges(state.edges.filter((edge) => edge.source !== nodeIdToRemove && edge.target !== nodeIdToRemove));
 
@@ -1291,6 +1293,20 @@ function CanvasPage(props: CanvasPageProps) {
       })),
     );
   }, [props.canvasStateMode, state, templateNodeId]);
+
+  const previousHeaderModeForSidebarRef = useRef<CanvasPageProps["headerMode"]>(props.headerMode);
+
+  useEffect(() => {
+    const previousMode = previousHeaderModeForSidebarRef.current;
+    const currentMode = props.headerMode;
+    previousHeaderModeForSidebarRef.current = currentMode;
+
+    if (isComponentSidebarVisibleMode(previousMode) && !isComponentSidebarVisibleMode(currentMode)) {
+      if (state.componentSidebar.isOpen) {
+        handleSidebarClose();
+      }
+    }
+  }, [props.headerMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
@@ -1547,7 +1563,7 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {props.headerMode === "runs" || props.headerMode === "files" ? null : (
+            {isComponentSidebarVisibleMode(props.headerMode) ? (
               <Sidebar
                 state={state}
                 getSidebarData={props.getSidebarData}
@@ -1589,7 +1605,7 @@ function CanvasPage(props: CanvasPageProps) {
                 canCreateIntegrations={props.canCreateIntegrations}
                 canUpdateIntegrations={props.canUpdateIntegrations}
               />
-            )}
+            ) : null}
           </div>
           {props.headerMode === "runs" &&
           props.runNodeDetailRun &&
