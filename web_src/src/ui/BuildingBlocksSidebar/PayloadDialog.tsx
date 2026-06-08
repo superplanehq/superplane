@@ -1,4 +1,5 @@
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Editor from "@monaco-editor/react";
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
@@ -7,11 +8,10 @@ interface PayloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  label: string;
   payloadString: string;
 }
 
-export function PayloadDialog({ open, onOpenChange, title, label, payloadString }: PayloadDialogProps) {
+export function PayloadDialog({ open, onOpenChange, title, payloadString }: PayloadDialogProps) {
   const [copied, setCopied] = useState(false);
   const lineCount = payloadString.split("\n").length;
   const lineHeight = 19;
@@ -30,18 +30,12 @@ export function PayloadDialog({ open, onOpenChange, title, label, payloadString 
         className="w-[60vw] max-w-[60vw] h-auto max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription className="text-sm text-gray-500">{label}</DialogDescription>
-          </div>
-          <button
-            onClick={handleCopy}
-            className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
-          >
+        <div className="flex flex-col gap-2">
+          <DialogTitle>{title}</DialogTitle>
+          <Button type="button" variant="outline" size="sm" onClick={handleCopy} className="self-start gap-1">
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
         <div className="flex-1 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-md">
           <Editor
