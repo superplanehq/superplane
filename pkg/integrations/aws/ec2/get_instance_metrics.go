@@ -97,7 +97,7 @@ Returns averaged and aggregated metrics over the lookback window:
 - ` + "`totalNetworkOutBytes`" + `: Total outbound network bytes over the window
 - ` + "`avgNetworkInBytesPerSec`" + `: Average inbound bytes per second
 - ` + "`avgNetworkOutBytesPerSec`" + `: Average outbound bytes per second
-- ` + "`avgMemoryUsagePercent`" + `: Average memory utilisation (omitted when Include Memory is disabled or agent data unavailable)
+- ` + "`avgMemoryUsagePercent`" + `: Average memory utilisation (null when the CloudWatch Agent is unavailable, returns no datapoints, or the memory request fails)
 
 ## Important Notes
 
@@ -354,11 +354,7 @@ func (c *GetInstanceMetrics) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if config.IncludeMemory {
-		memoryPercent, err := memoryUsagePercent(memErr, memPoints)
-		if err != nil {
-			return err
-		}
-		payload["avgMemoryUsagePercent"] = memoryPercent
+		payload["avgMemoryUsagePercent"] = memoryUsagePercent(memErr, memPoints)
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -381,16 +377,12 @@ func averageDatapoints(points []CloudWatchDatapoint) float64 {
 	return sum / float64(len(points))
 }
 
-func memoryUsagePercent(memErr error, points []CloudWatchDatapoint) (any, error) {
-	if memErr != nil {
-		return nil, fmt.Errorf("failed to get memory metrics: %w", memErr)
+func memoryUsagePercent(memErr error, points []CloudWatchDatapoint) any {
+	if memErr != nil || len(points) == 0 {
+		return nil
 	}
 
-	if len(points) == 0 {
-		return nil, nil
-	}
-
-	return roundMetric(averageDatapoints(points), 2), nil
+	return roundMetric(averageDatapoints(points), 2)
 }
 
 func sumDatapoints(points []CloudWatchDatapoint) float64 {

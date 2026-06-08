@@ -235,22 +235,16 @@ func Test__GetInstanceMetrics__Execute(t *testing.T) {
 }
 
 func Test__memoryUsagePercent(t *testing.T) {
-	t.Run("returns error when cloudwatch request fails", func(t *testing.T) {
-		val, err := memoryUsagePercent(errors.New("access denied"), nil)
-		require.ErrorContains(t, err, "failed to get memory metrics")
-		assert.Nil(t, val)
+	t.Run("returns nil when cloudwatch request fails", func(t *testing.T) {
+		assert.Nil(t, memoryUsagePercent(errors.New("access denied"), nil))
 	})
 
 	t.Run("returns nil when no datapoints", func(t *testing.T) {
-		val, err := memoryUsagePercent(nil, nil)
-		require.NoError(t, err)
-		assert.Nil(t, val)
+		assert.Nil(t, memoryUsagePercent(nil, nil))
 	})
 
 	t.Run("returns average when datapoints exist", func(t *testing.T) {
-		val, err := memoryUsagePercent(nil, []CloudWatchDatapoint{{Average: 65.5}})
-		require.NoError(t, err)
-		assert.Equal(t, 65.5, val)
+		assert.Equal(t, 65.5, memoryUsagePercent(nil, []CloudWatchDatapoint{{Average: 65.5}}))
 	})
 }
 

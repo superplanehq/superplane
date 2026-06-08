@@ -1491,7 +1491,7 @@ Returns averaged and aggregated metrics over the lookback window:
 - `totalNetworkOutBytes`: Total outbound network bytes over the window
 - `avgNetworkInBytesPerSec`: Average inbound bytes per second
 - `avgNetworkOutBytesPerSec`: Average outbound bytes per second
-- `avgMemoryUsagePercent`: Average memory utilisation (omitted when Include Memory is disabled or agent data unavailable)
+- `avgMemoryUsagePercent`: Average memory utilisation (null when the CloudWatch Agent is unavailable, returns no datapoints, or the memory request fails)
 
 ### Important Notes
 

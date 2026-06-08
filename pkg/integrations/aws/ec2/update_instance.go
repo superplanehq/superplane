@@ -338,13 +338,13 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	if _, err := client.StopInstances(instanceID); err != nil {
-		return fmt.Errorf("failed to stop instance: %w", err)
-	}
-
 	metadata.Phase = updateInstancePhaseStopping
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
+	}
+
+	if _, err := client.StopInstances(instanceID); err != nil {
+		return fmt.Errorf("failed to stop instance: %w", err)
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
@@ -523,23 +523,36 @@ func (c *UpdateInstance) pollStarting(ctx core.ActionHookContext, instance *Inst
 }
 
 func (c *UpdateInstance) Cancel(ctx core.ExecutionContext) error {
-	var metadata UpdateInstanceExecutionMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil || metadata.InstanceID == "" {
-		return nil
-	}
-
-	// Best-effort: if we stopped the instance during the resize and the user wanted
-	// it restarted afterward, try to return it to its original running state.
-	if !metadata.WasRunning || metadata.Phase != updateInstancePhaseStopping {
-		return nil
-	}
-
 	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
-	if err != nil {
+	if err != nil || !config.RestartAfterResize {
 		return nil
 	}
 
-	if !config.RestartAfterResize {
+	instanceID, metadata := decodeUpdateInstanceCancelMetadata(ctx.Metadata.Get())
+	if instanceID == "" {
+		return nil
+	}
+
+	shouldRestart := metadata.WasRunning && metadata.Phase == updateInstancePhaseStopping
+	if !shouldRestart && metadata.Phase == "" && strings.TrimSpace(config.NewInstanceType) != "" {
+		region, regionErr := requireRegion(config.Region)
+		if regionErr != nil {
+			return nil
+		}
+
+		creds, credsErr := common.CredentialsFromInstallation(ctx.Integration)
+		if credsErr != nil {
+			return nil
+		}
+
+		client := NewClient(ctx.HTTP, creds, region)
+		instance, describeErr := client.DescribeInstance(instanceID)
+		if describeErr == nil && instance.State == InstanceStateStopping {
+			shouldRestart = true
+		}
+	}
+
+	if !shouldRestart {
 		return nil
 	}
 
@@ -554,8 +567,26 @@ func (c *UpdateInstance) Cancel(ctx core.ExecutionContext) error {
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
-	_, _ = client.StartInstances(metadata.InstanceID)
+	_, _ = client.StartInstances(instanceID)
 	return nil
+}
+
+func decodeUpdateInstanceCancelMetadata(raw any) (string, UpdateInstanceExecutionMetadata) {
+	var metadata UpdateInstanceExecutionMetadata
+	if err := mapstructure.Decode(raw, &metadata); err != nil {
+		return "", UpdateInstanceExecutionMetadata{}
+	}
+
+	if metadata.InstanceID != "" {
+		return metadata.InstanceID, metadata
+	}
+
+	var nodeMetadata UpdateInstanceNodeMetadata
+	if err := mapstructure.Decode(raw, &nodeMetadata); err != nil {
+		return "", UpdateInstanceExecutionMetadata{}
+	}
+
+	return nodeMetadata.InstanceID, metadata
 }
 
 func (c *UpdateInstance) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

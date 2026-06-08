@@ -574,6 +574,67 @@ func Test__UpdateInstance__Cancel(t *testing.T) {
 		assert.Contains(t, string(body), "StartInstances")
 	})
 
+	t.Run("restarts from node metadata when instance is stopping", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeInstanceXML("i-abc123", "stopping")),
+				okResponse(startInstancesXML("i-abc123")),
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": true,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceNodeMetadata{
+					Region:     "us-east-1",
+					InstanceID: "i-abc123",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 2)
+
+		body, readErr := io.ReadAll(httpCtx.Requests[1].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), "StartInstances")
+	})
+
+	t.Run("does not restart from node metadata when instance is already stopped", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeInstanceXML("i-abc123", "stopped")),
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": true,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceNodeMetadata{
+					Region:     "us-east-1",
+					InstanceID: "i-abc123",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, httpCtx.Requests, 1)
+	})
+
 	t.Run("does not restart during starting phase", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{}
 
