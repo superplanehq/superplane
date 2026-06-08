@@ -1325,8 +1325,18 @@ message NotificationEmailRequested {
 
 message Console {
   message Panel {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      MARKDOWN = 1;
+      NODE = 2;
+      NODES = 3;
+      TABLE = 4;
+      CHART = 5;
+      NUMBER = 6;
+    }
+
     string id = 1;
-    string type = 2;
+    Type type = 2;
     google.protobuf.Value content = 3;
   }
 

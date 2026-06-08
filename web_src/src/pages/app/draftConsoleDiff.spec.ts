@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { CanvasesConsole } from "@/api-client";
+
 import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 
 describe("hasDraftVersusLiveConsoleDiff", () => {
@@ -9,9 +11,9 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
   });
 
   it("returns true when draft adds a panel", () => {
-    const live = { panels: [], layout: [] };
-    const draft = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "hello" } }],
+    const live: CanvasesConsole = { panels: [], layout: [] };
+    const draft: CanvasesConsole = {
+      panels: [{ id: "p1", type: "MARKDOWN", content: { body: "hello" } }],
       layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
     };
 
@@ -19,12 +21,12 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
   });
 
   it("returns true when panel content changes", () => {
-    const live = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "before" } }],
+    const live: CanvasesConsole = {
+      panels: [{ id: "p1", type: "MARKDOWN", content: { body: "before" } }],
       layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
     };
-    const draft = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "after" } }],
+    const draft: CanvasesConsole = {
+      panels: [{ id: "p1", type: "MARKDOWN", content: { body: "after" } }],
       layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
     };
 
@@ -32,8 +34,8 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
   });
 
   it("returns false when consoles match", () => {
-    const console = {
-      panels: [{ id: "p1", type: "markdown", content: { body: "same" } }],
+    const console: CanvasesConsole = {
+      panels: [{ id: "p1", type: "MARKDOWN", content: { body: "same" } }],
       layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
     };
 
@@ -43,20 +45,20 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
 
 describe("getDraftConsoleDiffCounts", () => {
   it("counts added, updated, and removed console items", () => {
-    const live = {
+    const live: CanvasesConsole = {
       panels: [
-        { id: "updated", type: "markdown", content: { body: "before" } },
-        { id: "removed", type: "markdown", content: { body: "remove me" } },
+        { id: "updated", type: "MARKDOWN", content: { body: "before" } },
+        { id: "removed", type: "MARKDOWN", content: { body: "remove me" } },
       ],
       layout: [
         { i: "updated", x: 0, y: 0, w: 4, h: 2 },
         { i: "removed", x: 0, y: 2, w: 4, h: 2 },
       ],
     };
-    const draft = {
+    const draft: CanvasesConsole = {
       panels: [
-        { id: "updated", type: "markdown", content: { body: "after" } },
-        { id: "added", type: "markdown", content: { body: "add me" } },
+        { id: "updated", type: "MARKDOWN", content: { body: "after" } },
+        { id: "added", type: "MARKDOWN", content: { body: "add me" } },
       ],
       layout: [
         { i: "updated", x: 0, y: 0, w: 4, h: 3 },
