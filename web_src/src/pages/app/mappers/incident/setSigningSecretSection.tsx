@@ -3,9 +3,8 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesDescribeCanvasVersion,
+  canvasesCommitCanvasRepositoryFiles,
   canvasesInvokeNodeTriggerHook,
-  canvasesUpdateCanvasVersion,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
 } from "@/api-client";
@@ -17,6 +16,10 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
+import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
+import { fetchCanvasVersionWithSpec } from "../../lib/repository-spec-files";
+import { materializeCanvasSpec } from "../../lib/workflow-spec-files";
+import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 
 /** Applies signingSecretConfigured to the given node on a canvas copy. Does not mutate. */
 function applySigningSecretConfigured(
@@ -60,12 +63,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
 
       const freshVersion = await queryClient.fetchQuery({
         queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: async () => {
-          const response = await canvasesDescribeCanvasVersion(
-            withOrganizationHeader({ path: { canvasId, versionId } }),
-          );
-          return response.data?.version;
-        },
+        queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
       });
 
       if (!freshVersion) {
@@ -85,17 +83,23 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
           return;
         }
 
-        await canvasesUpdateCanvasVersion(
+        const canvasYaml = materializeCanvasSpec({
+          ...liveCanvas,
+          spec: updatedVersion.spec,
+        });
+
+        await canvasesCommitCanvasRepositoryFiles(
           withOrganizationHeader({
-            path: { canvasId, versionId },
+            path: { canvasId },
             body: {
-              canvas: {
-                metadata: {
-                  name: liveCanvas.metadata.name,
-                  description: liveCanvas.metadata.description,
+              versionId,
+              message: "Update canvas.yaml",
+              operations: [
+                {
+                  path: CANVAS_YAML_PATH,
+                  content: encodeRepositoryFileContent(canvasYaml),
                 },
-                spec: { nodes: updatedVersion.spec?.nodes, edges: updatedVersion.spec?.edges },
-              },
+              ],
             },
           }),
         );
