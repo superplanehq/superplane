@@ -301,6 +301,45 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
 	})
 
+	t.Run("console-only draft changes -> publishes console to live", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-console-only")
+		disableChangeManagementForCanvas(t, r, canvasID)
+
+		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, err)
+		draftVersionID := createVersionResponse.Version.Metadata.Id
+
+		draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+		require.NoError(t, err)
+
+		_, err = models.UpdateCanvasVersionConsoleInTransaction(
+			database.Conn(),
+			draftVersion,
+			[]models.ConsolePanel{
+				{ID: "notes", Type: models.ConsolePanelTypeMarkdown, Content: map[string]any{"body": "published console"}},
+			},
+			[]models.ConsoleLayoutItem{
+				{I: "notes", X: 0, Y: 0, W: 4, H: 2},
+			},
+		)
+		require.NoError(t, err)
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), uuid.MustParse(canvasID))
+		require.NoError(t, err)
+		panels := liveVersion.ConsolePanels.Data()
+		require.Len(t, panels, 1)
+		assert.Equal(t, "published console", panels[0].Content["body"])
+	})
+
 	t.Run("draft version with duplicate name -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		disableOrganizationChangeManagement(t, r)

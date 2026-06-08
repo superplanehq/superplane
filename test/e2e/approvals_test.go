@@ -11,7 +11,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestApprovals(t *testing.T) {
@@ -278,63 +277,46 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Sleep(400)
 
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+
+	// Set type and value per approver so autosave does not persist type=user with an empty user field.
 	if err := typeSelects.Nth(0).Click(); err != nil {
 		s.t.Fatalf("clicking first approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+	s.session.Sleep(200)
+	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
+	if err := userSelect.Click(); err != nil {
+		s.t.Fatalf("opening user select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
 
 	if err := typeSelects.Nth(1).Click(); err != nil {
 		s.t.Fatalf("clicking second approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
+	s.session.Sleep(200)
+	s.session.Click(q.Locator(`button:has-text("Select role")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
 	if err := typeSelects.Nth(2).Click(); err != nil {
 		s.t.Fatalf("clicking third approver type select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select user")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select role")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
-
+	s.session.Sleep(200)
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.session.Sleep(300)
+	// Configuration sidebar autosaves on a 1200ms safety-net timer for scripted flows.
+	s.session.Sleep(1500)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
-	// Under full-suite load, publishing and websocket sync can lag enough that the
-	// first trigger click is occasionally ignored. Retry several times before failing.
-	for attempt := 0; attempt < 4; attempt++ {
-		s.canvas.RunManualTrigger("Start")
-		if s.waitForApprovalExecution(45 * time.Second) {
-			return
-		}
-		s.session.Sleep(500)
-	}
-
-	// Last-resort fallback: emit a trigger event directly if UI clicks were missed.
-	s.emitManualTriggerFallback()
-	if s.waitForApprovalExecution(45 * time.Second) {
+	s.canvas.EmitManualTrigger("Start")
+	if s.waitForApprovalExecution(90 * time.Second) {
 		return
 	}
 
-	s.t.Fatalf("timed out waiting for execution of node Approval after retrying manual trigger")
-}
-
-func (s *ApprovalSteps) emitManualTriggerFallback() {
-	startNode := s.canvas.GetNodeFromDB("Start")
-	support.EmitCanvasEventForNodeWithData(
-		s.t,
-		s.canvas.WorkflowID,
-		startNode.NodeID,
-		"default",
-		nil,
-		map[string]any{"message": "Hello, World!"},
-	)
+	s.t.Fatalf("timed out waiting for execution of node Approval after emitting manual trigger")
 }
 
 func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {

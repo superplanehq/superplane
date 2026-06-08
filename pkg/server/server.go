@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -31,11 +34,50 @@ import (
 
 var _ = registryimports.Loaded
 
+var agentProviderOverride = struct {
+	sync.Mutex
+	provider agents.Provider
+}{}
+
+func SetAgentProviderForTests(provider agents.Provider) func() {
+	agentProviderOverride.Lock()
+	previous := agentProviderOverride.provider
+	agentProviderOverride.provider = provider
+	agentProviderOverride.Unlock()
+
+	return func() {
+		agentProviderOverride.Lock()
+		agentProviderOverride.provider = previous
+		agentProviderOverride.Unlock()
+	}
+}
+
+func getAgentProviderOverride() agents.Provider {
+	agentProviderOverride.Lock()
+	defer agentProviderOverride.Unlock()
+	return agentProviderOverride.provider
+}
+
 func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+	if provider := getAgentProviderOverride(); provider != nil {
+		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
+		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+	}
+
 	cfg := config.LoadAnthropicAgentConfig()
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
 		return nil, nil
+	}
+
+	if err := anthropic.SyncDefaultAgentPrompt(context.Background(), anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	}); err != nil {
+		log.WithError(err).Warn("failed to sync Anthropic managed agent prompt; continuing with provider prompt")
+	} else {
+		log.Info("Anthropic managed agent prompt synced")
 	}
 
 	fileResources, err := anthropic.LoadDefaultSessionResources(context.Background(), anthropic.Config{
@@ -64,7 +106,15 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 	return provider, service
 }
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization, agentProvider agents.Provider) {
+func startWorkers(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	gitProvider gitprovider.Provider,
+	baseURL string,
+	authService authorization.Authorization,
+	agentProvider agents.Provider,
+) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -142,14 +192,20 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(agentProvider)
+		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
+		log.Println("Starting Repository Provisioner")
+		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(agentProvider)
+		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -217,6 +273,7 @@ func startInternalAPI(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
 ) {
 	log.Println("Starting Internal API")
@@ -230,12 +287,21 @@ func startInternalAPI(
 		authService,
 		registry,
 		oidcProvider,
+		gitProvider,
 		agentService,
 		lookupInternalAPIPort(),
 	)
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(
+	baseURL, basePath string,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcProvider oidc.Provider,
+	authService authorization.Authorization,
+	gitProvider gitprovider.Provider,
+) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -252,6 +318,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		registry,
 		jwtSigner,
 		oidcProvider,
+		gitProvider,
 		basePath,
 		baseURL,
 		webhooksBaseURL,
@@ -419,6 +486,12 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
+	log.Println("Creating Git Provider")
+	gitProvider, err := git.NewProvider()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create git provider: %v", err))
+	}
+
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
 		AppEnv:    appEnv,
@@ -459,14 +532,42 @@ func Start() {
 	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		go startPublicAPI(
+			baseURL,
+			basePath,
+			encryptorInstance,
+			registry,
+			jwtSigner,
+			oidcProvider,
+			authService,
+			gitProvider,
+		)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider, agentService)
+		go startInternalAPI(
+			baseURL,
+			webhooksBaseURL,
+			basePath,
+			encryptorInstance,
+			jwtSigner,
+			authService,
+			registry,
+			oidcProvider,
+			gitProvider,
+			agentService,
+		)
 	}
 
-	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService, agentProvider)
+	startWorkers(
+		encryptorInstance,
+		registry,
+		oidcProvider,
+		gitProvider,
+		baseURL,
+		authService,
+		agentProvider,
+	)
 
 	log.Println("SuperPlane is UP.")
 

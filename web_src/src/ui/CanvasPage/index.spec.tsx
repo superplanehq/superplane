@@ -202,8 +202,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -260,8 +258,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -299,13 +295,12 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
+          headerMode="version-live"
           nodes={[]}
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -313,7 +308,7 @@ describe("CanvasPage connection drop", () => {
     );
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId("open-sidebar-button"));
+      fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
     expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
@@ -324,6 +319,34 @@ describe("CanvasPage connection drop", () => {
     });
     expect(payload?.sourceNodeId).toBeUndefined();
     expect(payload?.sourceHandleId).toBeUndefined();
+  });
+
+  it("opens the canvas YAML modal without switching to the Files tab", async () => {
+    const onYamlOpen = vi.fn();
+    const onSelectFiles = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onYamlOpen={onYamlOpen}
+          onSelectFiles={onSelectFiles}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("canvas-yaml-button"));
+    });
+
+    expect(onYamlOpen).toHaveBeenCalledTimes(1);
+    expect(onSelectFiles).not.toHaveBeenCalled();
   });
 
   it("loads node run data only while the component sidebar is open in live mode", async () => {
@@ -361,8 +384,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -395,8 +416,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -436,8 +455,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -477,8 +494,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -489,5 +504,41 @@ describe("CanvasPage connection drop", () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+
+  it("closes the run node detail pane when the canvas background is clicked in runs mode", () => {
+    const onRunNodeDetailClose = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="runs"
+          runNodeDetailNodeId="run-node-1"
+          onRunNodeDetailClose={onRunNodeDetailClose}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onPaneClick?.();
+    });
+
+    expect(onRunNodeDetailClose).toHaveBeenCalledTimes(1);
   });
 });

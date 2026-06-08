@@ -2,11 +2,11 @@ import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanva
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Ellipsis } from "lucide-react";
+import { Diff } from "lucide-react";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { getChangeRequestReviewPhase } from "@/pages/workflowv2/changeRequestReviewActions";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/workflowv2/lib/canvas-versions";
+import { getChangeRequestReviewPhase } from "@/pages/app/changeRequestReviewActions";
+import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
 
 type ActiveReviewPhase = Exclude<ReturnType<typeof getChangeRequestReviewPhase>, { kind: "none" }>;
 
@@ -72,7 +72,6 @@ export function VersionRow({
       data-testid={rowTestId}
       className={versionRowClassName({
         isActive,
-        isCurrentLive,
         variant,
         activeReviewPhase: viewModel.activeReviewPhase,
       })}
@@ -84,7 +83,7 @@ export function VersionRow({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900">{viewModel.versionLabel}</p>
+          <p className="truncate text-[13px] font-medium text-slate-900">{viewModel.versionLabel}</p>
           <VersionSubtitle
             isCurrentLive={isCurrentLive}
             variant={variant}
@@ -122,15 +121,12 @@ function buildVersionRowViewModel({
   const changeRequestTitle = changeRequest?.metadata?.title?.trim();
   const reviewPhase = getChangeRequestReviewPhase(changeRequest, changeRequestApprovalConfig);
   return {
-    versionLabel: isFirstCanvasVersion ? "v1" : changeRequestTitle || formatVersionLabel(version),
-    versionSubtitle: formatVersionSubtitle(version, ownerName),
+    versionLabel: isFirstCanvasVersion
+      ? "v1"
+      : changeRequestTitle || formatVersionTimestamp(version) || formatVersionLabel(version),
+    versionSubtitle: ownerName,
     activeReviewPhase: resolveActiveReviewPhase(reviewPhase, variant, isCurrentLive),
   };
-}
-
-function formatVersionSubtitle(version: CanvasesCanvasVersion, ownerName: string): string {
-  const versionTimestamp = formatVersionTimestamp(version);
-  return versionTimestamp ? `${ownerName} on ${versionTimestamp}` : ownerName;
 }
 
 function resolveActiveReviewPhase(
@@ -150,21 +146,16 @@ function isActivationKey(key: string): boolean {
 
 function versionRowClassName({
   isActive,
-  isCurrentLive,
   variant,
   activeReviewPhase,
 }: {
   isActive: boolean;
-  isCurrentLive: boolean;
   variant: "default" | "rejected";
   activeReviewPhase: ActiveReviewPhase | null;
 }): string {
-  const baseClassName = "w-full cursor-pointer rounded-md px-2.5 py-2 text-left transition";
+  const baseClassName = "w-full cursor-pointer border-b border-b-slate-950/10 px-4 py-2 text-left transition";
   if (!isActive) {
     return `${baseClassName} bg-white hover:bg-slate-100`;
-  }
-  if (isCurrentLive) {
-    return `${baseClassName} bg-green-100`;
   }
   if (variant === "rejected") {
     return `${baseClassName} bg-red-50`;
@@ -204,7 +195,7 @@ function buildStatusIndicator(
   activeReviewPhase: ActiveReviewPhase | null,
 ) {
   if (isCurrentLive) {
-    return { label: "Live", labelClassName: "font-medium text-green-600" };
+    return { label: "Current Version", labelClassName: "font-medium text-sky-700" };
   }
   if (variant === "rejected") {
     return { label: "Rejected", labelClassName: "font-medium text-red-600" };
@@ -264,13 +255,13 @@ function VersionDetailsButton({
               size="icon-sm"
               className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
               onClick={handleClick}
-              aria-label="View details"
+              aria-label="View Diff"
             >
-              <Ellipsis className="h-4 w-4" />
+              <Diff className="size-3.5" />
             </Button>
           </span>
         </TooltipTrigger>
-        <TooltipContent side="top">View details</TooltipContent>
+        <TooltipContent side="top">View Diff</TooltipContent>
       </Tooltip>
     </div>
   );

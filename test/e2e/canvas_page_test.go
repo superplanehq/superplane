@@ -1,10 +1,12 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -143,24 +145,25 @@ func TestCanvasPage(t *testing.T) {
 }
 
 func TestCanvasPageYamlViewer(t *testing.T) {
-	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
+	t.Run("Files tab shows canvas YAML definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("YamlTestNode")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
+		steps.assertFileIsOpen("canvas.yaml")
 		steps.assertYamlContentVisible("YamlTestNode")
 		steps.assertYamlContentVisible("metadata:")
 	})
 
-	t.Run("YAML preview modal can be closed to return to canvas", func(t *testing.T) {
+	t.Run("Files tab can return to canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("SwitchTest")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
 		steps.assertYamlContentVisible("SwitchTest")
-		steps.closeYamlPreviewModal()
+		steps.returnToCanvasTab()
 		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
@@ -257,10 +260,16 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 }
 
 func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
-	nodeHeader := q.TestID("node", nodeName, "header")
-	s.session.HoverOver(nodeHeader)
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	node := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`)
+	toggleButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-toggle-view"]`,
+	)
+
+	s.session.HoverOver(node)
 	s.session.Sleep(100)
-	s.session.Click(q.TestID("node-action-toggle-view"))
+	s.session.Click(toggleButton)
 	s.session.Sleep(300)
 }
 
@@ -318,18 +327,93 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
 	s.canvas.Publish()
-
-	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-start-header"]) [data-testid="start-template-run"]`)
-	emitEvent := q.TestID("emit-event-submit-button")
+	s.t.Cleanup(func() {
+		s.cleanupQueuedWaitWork("Wait")
+	})
 
 	for i := 0; i < itemsAmount; i++ {
-		s.session.Click(startTemplateRun)
-		s.session.Click(emitEvent)
+		s.canvas.EmitManualTrigger("Start")
 		s.session.Sleep(100)
 	}
 
 	// wait for the first item to start processing
 	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) cleanupQueuedWaitWork(nodeName string) {
+	if s.canvas == nil {
+		return
+	}
+
+	node, err := s.findNodeByName(nodeName)
+	if err != nil {
+		s.t.Logf("cleanup queued wait work: find node %q: %v", nodeName, err)
+		return
+	}
+	if node == nil {
+		s.t.Logf("cleanup queued wait work: node %q not found", nodeName)
+		return
+	}
+
+	activeStates := []string{
+		models.CanvasNodeExecutionStatePending,
+		models.CanvasNodeExecutionStateStarted,
+	}
+
+	var executions []models.CanvasNodeExecution
+	err = database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state IN ?", activeStates).
+		Find(&executions).
+		Error
+	if err != nil {
+		s.t.Logf("cleanup queued wait work: find executions: %v", err)
+		return
+	}
+
+	for i := range executions {
+		if err := executions[i].Cancel(nil); err != nil {
+			s.t.Logf("cleanup queued wait work: cancel execution %s: %v", executions[i].ID, err)
+		}
+	}
+
+	if err := database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Delete(&models.CanvasNodeQueueItem{}).
+		Error; err != nil {
+		s.t.Logf("cleanup queued wait work: delete queue items: %v", err)
+	}
+
+	if err := database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state = ?", models.NodeExecutionRequestStatePending).
+		Delete(&models.CanvasNodeRequest{}).
+		Error; err != nil {
+		s.t.Logf("cleanup queued wait work: delete node requests: %v", err)
+	}
+}
+
+func (s *CanvasPageSteps) findNodeByName(nodeName string) (*models.CanvasNode, error) {
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, err := models.FindCanvasNodes(canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range nodes {
+		if nodes[i].Name == nodeName {
+			return &nodes[i], nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (s *CanvasPageSteps) openSidebarForNode(node string) {
@@ -492,18 +576,39 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) openYamlPreviewModal() {
-	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
-	// the floating YAML control (same corner as the sidebar) is clickable.
+func (s *CanvasPageSteps) openFilesTab() {
+	s.canvas.Save()
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Click(q.TestID("open-yaml-modal-button"))
+	s.session.Sleep(300)
+	filesTab := q.TestID("canvas-view-mode-files")
+	s.session.AssertVisible(filesTab)
+	s.session.Click(filesTab)
+	s.session.AssertVisible(q.TestID("files-overlay"))
+	s.session.AssertVisible(q.TestID("file-editor"))
+	s.waitForMonacoEditor()
 }
 
-func (s *CanvasPageSteps) closeYamlPreviewModal() {
-	s.session.PressKey("Escape")
+func (s *CanvasPageSteps) returnToCanvasTab() {
+	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Sleep(500)
 }
 
+func (s *CanvasPageSteps) assertFileIsOpen(name string) {
+	s.session.AssertText(name)
+	s.session.AssertVisible(q.TestID("file-editor"))
+}
+
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
-	s.session.AssertText(text)
+	s.waitForMonacoEditor()
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="file-editor"] >> text=%s`, text)))
+}
+
+func (s *CanvasPageSteps) waitForMonacoEditor() {
+	monacoLines := q.Locator(`[data-testid="file-editor"] .view-lines`)
+	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}); err != nil {
+		s.t.Fatalf("monaco editor did not become ready: %v", err)
+	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -32,6 +33,7 @@ func CreateCanvas(
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
+	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
 	pbCanvas *pb.Canvas,
@@ -164,6 +166,15 @@ func CreateCanvas(
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
+			return err
+		}
+
+		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+			OrganizationID: organizationID,
+			CanvasID:       canvasID,
+		}))
+
+		if err != nil {
 			return err
 		}
 

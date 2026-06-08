@@ -1,14 +1,14 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, GitBranch } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
+import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 
-const INITIAL_VISIBLE_LIVE_VERSIONS = 5;
-const LOAD_OLDER_LIVE_VERSIONS_STEP = 5;
+const persistedScrollPositions = new Map<string, number>();
 
 export interface VersionsTabPanelProps {
+  scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   pendingApprovalVersions?: Array<{
@@ -45,6 +45,7 @@ type VersionRowItem = {
 };
 
 export function VersionsTabPanel({
+  scrollPersistenceKey,
   liveCanvasVersionId,
   selectedCanvasVersion,
   pendingApprovalVersions,
@@ -63,17 +64,13 @@ export function VersionsTabPanel({
 }: VersionsTabPanelProps) {
   const {
     hasNoVersions,
-    handleLoadOlderVersions,
     handleViewDiff,
     liveItems,
-    loadOlderVersionsDisabled,
-    loadOlderVersionsPending,
     pendingItems,
     rejectedItems,
     rejectedList,
     rejectedVersionsExpanded,
     setRejectedVersionsExpanded,
-    showLoadOlderVersions,
   } = useVersionsPanelData({
     liveCanvasVersionId,
     selectedCanvasVersion,
@@ -82,38 +79,71 @@ export function VersionsTabPanel({
     liveVersions,
     liveVersionChangeRequestsByVersionId,
     loadMoreLiveVersionsDisabled,
-    loadMoreLiveVersionsPending,
     onLoadMoreLiveVersions,
     onVersionNodeDiffContextChange,
   });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+    hasMore: Boolean(onLoadMoreLiveVersions) && !loadMoreLiveVersionsDisabled,
+    isLoading: loadMoreLiveVersionsPending,
+    onLoadMore: onLoadMoreLiveVersions,
+  });
+  const handleScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      if (scrollPersistenceKey) {
+        persistedScrollPositions.set(scrollPersistenceKey, event.currentTarget.scrollTop);
+      }
+
+      loadMoreIfNeeded(event.currentTarget);
+    },
+    [loadMoreIfNeeded, scrollPersistenceKey],
+  );
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !scrollPersistenceKey) return;
+
+    const scrollTop = persistedScrollPositions.get(scrollPersistenceKey);
+    if (scrollTop == null) return;
+
+    element.scrollTop = scrollTop;
+  }, [scrollPersistenceKey]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+
+    return () => {
+      if (!element || !scrollPersistenceKey) return;
+
+      persistedScrollPositions.set(scrollPersistenceKey, element.scrollTop);
+    };
+  }, [scrollPersistenceKey]);
+
+  useEffect(() => {
+    loadMoreIfNeeded(scrollRef.current);
+  }, [liveItems.length, pendingItems.length, rejectedItems.length, loadMoreIfNeeded]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
-          <GitBranch className="h-4 w-4" />
-          Versions
-        </span>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-auto"
+        data-testid="versions-sidebar-scroll"
+        onScroll={handleScroll}
+      >
         <VersionsNotices
           canUpdateCanvas={canUpdateCanvas}
           canvasDeletedRemotely={canvasDeletedRemotely}
           isTemplate={isTemplate}
         />
 
-        <section className="mt-3 rounded-md">
+        <section>
           {hasNoVersions ? (
-            <p className="mt-2 text-xs text-slate-600">No published history yet.</p>
+            <p className="px-4 py-2 text-xs text-slate-600">No published history yet.</p>
           ) : (
             <VersionHistorySection
               items={[...pendingItems, ...liveItems]}
               changeRequestApprovalConfig={changeRequestApprovalConfig}
-              showLoadOlderVersions={showLoadOlderVersions}
-              loadOlderVersionsPending={loadOlderVersionsPending}
-              loadOlderVersionsDisabled={loadOlderVersionsDisabled}
-              onLoadOlderVersions={handleLoadOlderVersions}
               onUseVersion={onUseVersion}
               onViewDiff={handleViewDiff}
             />
@@ -141,7 +171,6 @@ function useVersionsPanelData({
   liveVersions,
   liveVersionChangeRequestsByVersionId,
   loadMoreLiveVersionsDisabled,
-  loadMoreLiveVersionsPending,
   onLoadMoreLiveVersions,
   onVersionNodeDiffContextChange,
 }: Pick<
@@ -153,25 +182,12 @@ function useVersionsPanelData({
   | "liveVersions"
   | "liveVersionChangeRequestsByVersionId"
   | "loadMoreLiveVersionsDisabled"
-  | "loadMoreLiveVersionsPending"
   | "onLoadMoreLiveVersions"
   | "onVersionNodeDiffContextChange"
 >) {
   const rejectedList = rejectedVersions ?? [];
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
   const [rejectedVersionsExpanded, setRejectedVersionsExpanded] = useState(false);
-  const {
-    displayedLiveVersions,
-    handleLoadOlderVersions,
-    loadOlderVersionsDisabled,
-    loadOlderVersionsPending,
-    showLoadOlderVersions,
-  } = useVisibleLiveVersions({
-    liveVersions,
-    loadMoreLiveVersionsDisabled,
-    loadMoreLiveVersionsPending,
-    onLoadMoreLiveVersions,
-  });
   const handleViewDiff = useCallback(
     (
       version: CanvasesCanvasVersion,
@@ -184,7 +200,6 @@ function useVersionsPanelData({
   );
   const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, liveVersions[0]);
   const liveItems = buildLiveItems({
-    displayedLiveVersions,
     liveCanvasVersionId,
     liveVersions,
     loadMoreLiveVersionsDisabled,
@@ -197,54 +212,13 @@ function useVersionsPanelData({
 
   return {
     hasNoVersions,
-    handleLoadOlderVersions,
     handleViewDiff,
     liveItems,
-    loadOlderVersionsDisabled,
-    loadOlderVersionsPending,
     pendingItems,
     rejectedItems,
     rejectedList,
     rejectedVersionsExpanded,
     setRejectedVersionsExpanded,
-    showLoadOlderVersions,
-  };
-}
-
-function useVisibleLiveVersions({
-  liveVersions,
-  loadMoreLiveVersionsDisabled,
-  loadMoreLiveVersionsPending,
-  onLoadMoreLiveVersions,
-}: Pick<
-  VersionsTabPanelProps,
-  "liveVersions" | "loadMoreLiveVersionsDisabled" | "loadMoreLiveVersionsPending" | "onLoadMoreLiveVersions"
->) {
-  const [visibleLiveVersionCount, setVisibleLiveVersionCount] = useState(INITIAL_VISIBLE_LIVE_VERSIONS);
-  const headLiveVersionId = liveVersions[0]?.metadata?.id ?? "";
-
-  useEffect(() => {
-    setVisibleLiveVersionCount(INITIAL_VISIBLE_LIVE_VERSIONS);
-  }, [headLiveVersionId]);
-
-  const displayedLiveVersions = liveVersions.slice(0, visibleLiveVersionCount);
-  const canExpandLocal = visibleLiveVersionCount < liveVersions.length;
-  const showLoadOlderVersions = canExpandLocal || !!onLoadMoreLiveVersions;
-
-  const handleLoadOlderVersions = useCallback(() => {
-    if (canExpandLocal) {
-      setVisibleLiveVersionCount((prev) => Math.min(prev + LOAD_OLDER_LIVE_VERSIONS_STEP, liveVersions.length));
-      return;
-    }
-    onLoadMoreLiveVersions?.();
-  }, [canExpandLocal, liveVersions.length, onLoadMoreLiveVersions]);
-
-  return {
-    displayedLiveVersions,
-    handleLoadOlderVersions,
-    loadOlderVersionsDisabled: !canExpandLocal && (loadMoreLiveVersionsDisabled ?? !onLoadMoreLiveVersions),
-    loadOlderVersionsPending: !canExpandLocal && !!loadMoreLiveVersionsPending,
-    showLoadOlderVersions,
   };
 }
 
@@ -260,12 +234,12 @@ function VersionsNotices({
   return (
     <>
       {!canUpdateCanvas && !canvasDeletedRemotely ? (
-        <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+        <p className="px-4 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
       ) : null}
       {canvasDeletedRemotely ? (
-        <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
+        <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
-      {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
+      {isTemplate ? <p className="px-4 py-2 text-xs text-slate-600">Template canvases are read-only.</p> : null}
     </>
   );
 }
@@ -273,19 +247,11 @@ function VersionsNotices({
 function VersionHistorySection({
   items,
   changeRequestApprovalConfig,
-  showLoadOlderVersions,
-  loadOlderVersionsPending,
-  loadOlderVersionsDisabled,
-  onLoadOlderVersions,
   onUseVersion,
   onViewDiff,
 }: {
   items: VersionRowItem[];
   changeRequestApprovalConfig?: CanvasChangeManagement;
-  showLoadOlderVersions: boolean;
-  loadOlderVersionsPending: boolean;
-  loadOlderVersionsDisabled: boolean;
-  onLoadOlderVersions: () => void;
   onUseVersion: (versionID: string) => void;
   onViewDiff: (
     version: CanvasesCanvasVersion,
@@ -294,22 +260,12 @@ function VersionHistorySection({
   ) => void;
 }) {
   return (
-    <>
-      <div className="-mt-4 space-y-1">
-        <VersionRowList
-          items={items}
-          changeRequestApprovalConfig={changeRequestApprovalConfig}
-          onUseVersion={onUseVersion}
-          onViewDiff={onViewDiff}
-        />
-      </div>
-      <LoadOlderVersionsButton
-        show={showLoadOlderVersions}
-        pending={loadOlderVersionsPending}
-        disabled={loadOlderVersionsDisabled}
-        onClick={onLoadOlderVersions}
-      />
-    </>
+    <VersionRowList
+      items={items}
+      changeRequestApprovalConfig={changeRequestApprovalConfig}
+      onUseVersion={onUseVersion}
+      onViewDiff={onViewDiff}
+    />
   );
 }
 
@@ -346,26 +302,6 @@ function VersionRowList({
   ));
 }
 
-function LoadOlderVersionsButton({
-  show,
-  pending,
-  disabled,
-  onClick,
-}: {
-  show: boolean;
-  pending: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  if (!show) return null;
-
-  return (
-    <Button variant="outline" size="sm" className="mt-2 w-fit self-start" onClick={onClick} disabled={disabled}>
-      {pending ? "Loading..." : "Load older versions"}
-    </Button>
-  );
-}
-
 function RejectedVersionsSection({
   count,
   expanded,
@@ -390,10 +326,10 @@ function RejectedVersionsSection({
   if (count === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-slate-200 pt-3">
+    <div className="border-t border-slate-200">
       <button
         type="button"
-        className="flex w-full items-center gap-1 rounded-md py-1.5 text-left text-xs font-medium text-slate-500"
+        className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-slate-500"
         onClick={onToggleExpanded}
         aria-expanded={expanded}
       >
@@ -405,14 +341,12 @@ function RejectedVersionsSection({
         <span>Rejected ({count})</span>
       </button>
       {expanded ? (
-        <div className="mt-1 space-y-1">
-          <VersionRowList
-            items={items}
-            changeRequestApprovalConfig={changeRequestApprovalConfig}
-            onUseVersion={onUseVersion}
-            onViewDiff={onViewDiff}
-          />
-        </div>
+        <VersionRowList
+          items={items}
+          changeRequestApprovalConfig={changeRequestApprovalConfig}
+          onUseVersion={onUseVersion}
+          onViewDiff={onViewDiff}
+        />
       ) : null}
     </div>
   );
@@ -438,7 +372,6 @@ function buildPendingItems(
 }
 
 function buildLiveItems({
-  displayedLiveVersions,
   liveCanvasVersionId,
   liveVersions,
   loadMoreLiveVersionsDisabled,
@@ -446,7 +379,6 @@ function buildLiveItems({
   onLoadMoreLiveVersions,
   selectedVersionId,
 }: {
-  displayedLiveVersions: CanvasesCanvasVersion[];
   liveCanvasVersionId?: string;
   liveVersions: CanvasesCanvasVersion[];
   loadMoreLiveVersionsDisabled?: boolean;
@@ -454,12 +386,13 @@ function buildLiveItems({
   onLoadMoreLiveVersions?: () => void;
   selectedVersionId: string;
 }): VersionRowItem[] {
-  return displayedLiveVersions.map((version, index) => {
+  return liveVersions.map((version, index) => {
     const versionID = version.metadata?.id || "";
     const isFirstCanvasVersion =
       index === liveVersions.length - 1 && (onLoadMoreLiveVersions ? !!loadMoreLiveVersionsDisabled : true);
     return {
       key: versionID,
+      rowTestId: "canvas-live-version-row",
       version,
       changeRequest: versionID ? liveVersionChangeRequestsByVersionId?.get(versionID) : undefined,
       isActive: versionID === selectedVersionId,

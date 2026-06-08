@@ -1,5 +1,6 @@
 import React from "react";
 import { ComponentBase, type EventSection, type EventState } from "../componentBase";
+import type { DraftDiffStatus } from "@/lib/draftDiff";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { type MetadataItem } from "../metadataList";
 
@@ -66,6 +67,7 @@ export interface CompositeProps extends ComponentActionsProps {
 
   onViewMoreEvents?: () => void;
   dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -90,6 +92,7 @@ export const Composite: React.FC<CompositeProps> = ({
   warning,
   paused,
   dimBodyBelowHeader,
+  draftDiffStatus,
   runDisabled,
   runDisabledTooltip,
   onEdit,
@@ -222,6 +225,7 @@ export const Composite: React.FC<CompositeProps> = ({
       warning={warning}
       paused={paused}
       dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={draftDiffStatus}
     />
   );
 };

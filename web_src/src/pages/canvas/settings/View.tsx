@@ -160,11 +160,11 @@ export function SettingsView({
             type="button"
             variant="ghost"
             size="sm"
-            className="-ml-2 gap-1 px-2 text-slate-600 hover:text-slate-900"
+            className="-ml-2 gap-1 px-2 text-slate-600 hover:bg-slate-950/5 hover:text-slate-900"
             onClick={onBackToCanvas}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-            Back to canvas
+            Back to app
           </Button>
         ) : null}
         <IdentityFields

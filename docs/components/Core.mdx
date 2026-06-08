@@ -30,7 +30,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Runner" href="#runner" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -42,6 +43,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <a id="schedule"></a>
 
 ## Schedule
+
+**Trigger key:** `schedule`
 
 The Schedule trigger starts workflow executions automatically based on a configured schedule.
 
@@ -109,6 +112,8 @@ Each scheduled execution includes calendar information:
 
 ## Manual Run
 
+**Trigger key:** `start`
+
 The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
 
 ### Use Cases
@@ -121,20 +126,23 @@ The Manual Run trigger allows you to start workflow executions manually from the
 ### How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Configure one or more templates, each with a name and a default payload
+2. Configure one or more templates, each with a name, default payload, and optional parameters
 3. Click the "Run" button in the workflow UI, or invoke the `run` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. The workflow begins immediately with the configured payload for the selected template
 
 ### Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - `name` (required): a label used as the run target (and the event channel)
-- `payload` (required): a default JSON object emitted when the template is used
+- `parameters` (optional): a list of typed parameters exposed to payload expressions as `parameters["name"]` and used by the run form
+- `payload` (required): a default JSON object emitted when the template is used. Supports expressions such as `{{ now() }}` and `{{ parameters["my parameter"] }}` in JSON values.
+
+Each parameter has a `name` (plain text), required `type` (`string`, `number`, `boolean`, or `select`), an optional `title` for the run form label (defaults to `name` when unset), and an optional default (`defaultString`, `defaultNumber`, or `defaultBoolean`) whose editor matches the selected type. Select parameters also require an `options` list of `label` / `value` pairs; run-time values use the option `value` strings.
 
 ### Event Data
 
-Manual runs emit an event with type `manual.run`. The data is either the template's saved payload or the override passed in the run request.
+Manual runs emit an event with type `manual.run`. The data is the selected template's payload after expression resolution.
 
 ### Example Data
 
@@ -151,6 +159,8 @@ Manual runs emit an event with type `manual.run`. The data is either the templat
 <a id="webhook"></a>
 
 ## Webhook
+
+**Trigger key:** `webhook`
 
 The Webhook trigger starts a new workflow execution when an HTTP request is received at the generated webhook URL.
 
@@ -215,7 +225,9 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ## Add Memory
 
-The Add Memory component appends a new item to canvas-level memory storage.
+**Component key:** `addMemory`
+
+The Add Memory component appends one or more items to canvas-level memory storage.
 
 ### Use Cases
 
@@ -228,6 +240,14 @@ The Add Memory component appends a new item to canvas-level memory storage.
 1. Reads `namespace` and value fields from configuration
 2. Appends a new memory row for the current canvas
 3. Emits `memory.added` with the saved payload
+
+### List Mode
+
+Enable "Input is a list" to add one memory row per element of a list expression.
+Configure `listSource` (the expression that yields the list) and `itemVariable`
+(the name to reference each element in field-value expressions, defaults to `item`).
+
+A single `memory.added` event is emitted with all written rows and the total `count`.
 
 ### Example Output
 
@@ -251,6 +271,8 @@ The Add Memory component appends a new item to canvas-level memory storage.
 <a id="approval"></a>
 
 ## Approval
+
+**Component key:** `approval`
 
 The Approval component pauses workflow execution and waits for manual approval from specified users, groups, or roles before continuing.
 
@@ -320,6 +342,8 @@ The Approval component pauses workflow execution and waits for manual approval f
 
 ## Delete Memory
 
+**Component key:** `deleteMemory`
+
 The Delete Memory component removes memory rows from canvas-level memory storage.
 
 ### Use Cases
@@ -368,6 +392,8 @@ The Delete Memory component removes memory rows from canvas-level memory storage
 
 ## Display
 
+**Component key:** `display`
+
 The Display component displays a debug message from the latest execution.
 
 ### Use Cases
@@ -391,6 +417,8 @@ The Display component displays a debug message from the latest execution.
 <a id="filter"></a>
 
 ## Filter
+
+**Component key:** `filter`
 
 The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
 
@@ -433,6 +461,8 @@ The expression has access to:
 <a id="graph-ql-request"></a>
 
 ## GraphQL Request
+
+**Component key:** `graphql`
 
 The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
 
@@ -477,6 +507,8 @@ The GraphQL component runs a GraphQL document against a URL using the standard *
 <a id="http-request"></a>
 
 ## HTTP Request
+
+**Component key:** `http`
 
 The HTTP component allows you to make HTTP requests to external APIs and services as part of your workflow.
 
@@ -540,6 +572,8 @@ The component emits the response with:
 
 ## If
 
+**Component key:** `if`
+
 The If component evaluates a boolean expression and routes events to different output channels based on the result.
 
 ### Use Cases
@@ -586,6 +620,8 @@ The expression has access to:
 <a id="merge"></a>
 
 ## Merge
+
+**Component key:** `merge`
 
 The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
 
@@ -645,6 +681,8 @@ The Merge component waits for events from all upstream nodes before forwarding a
 
 ## No Operation
 
+**Component key:** `noop`
+
 The No Operation component is a pass-through component that forwards events to downstream nodes without any modification or processing.
 
 ### Use Cases
@@ -670,6 +708,8 @@ When executed, the No Operation component immediately emits the incoming event d
 <a id="read-memory"></a>
 
 ## Read Memory
+
+**Component key:** `readMemory`
 
 The Read Memory component looks up values from canvas-level memory storage.
 
@@ -716,9 +756,11 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
-<a id="runner"></a>
+<a id="run-shell-commands"></a>
 
-## Runner
+## Run Shell Commands
+
+**Component key:** `runner`
 
 Runs shell commands on a fleet runner.
 
@@ -727,10 +769,11 @@ Runs shell commands on a fleet runner.
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
 
 ### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
-- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the broker default.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
@@ -759,9 +802,65 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 }
 ```
 
+<a id="run-java-script"></a>
+
+## Run JavaScript
+
+**Component key:** `runnerJS`
+
+Runs JavaScript on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Node.js on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Node.js image (for example **Node.js 22 (Bookworm)**) so `node` is available.
+
+### Script contract
+Your script must define `function main()`. The runner injects upstream canvas data as the global `$` object (same shape as workflow expressions). Return a JSON-serializable value from `main()`; it is emitted on the finished event as **result**.
+
+Example:
+
+```javascript
+function main() {
+  return { pr: $['GitHub PR'].data.number };
+}
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Node.js image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: JavaScript source executed by Node.js.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerJS.finished"
+}
+```
+
 <a id="send-email-notification"></a>
 
 ## Send Email Notification
+
+**Component key:** `sendEmail`
 
 The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
 
@@ -808,6 +907,8 @@ Emits the list of recipients and the subject to the default output channel.
 
 ## SSH Command
 
+**Component key:** `ssh`
+
 Run one or more commands on a remote host via SSH.
 
 ### Authentication
@@ -825,6 +926,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
 - **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
+- **Execution retry** (optional): Enable to retry running the command when the exit status is not 0. Set number of retries and interval between attempts.
 
 ### Output
 
@@ -848,6 +950,8 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 <a id="time-gate"></a>
 
 ## Time Gate
+
+**Component key:** `timeGate`
 
 The Time Gate component delays event processing until the next valid day and time window, with optional excluded dates.
 
@@ -886,6 +990,8 @@ The Time Gate component delays event processing until the next valid day and tim
 
 ## Update Memory
 
+**Component key:** `updateMemory`
+
 The Update Memory component updates matching rows in canvas-level memory storage.
 
 ### Use Cases
@@ -904,6 +1010,13 @@ The Update Memory component updates matching rows in canvas-level memory storage
 
 - **Found**: At least one matching memory row was updated
 - **Not Found**: No matching memory rows were updated
+
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one update per element.
+The `matchList` is evaluated once (same matches for every iteration), while each
+`valueList` field value is evaluated per element with the iteration variable in scope
+(defaults to `item`). All resulting updates are reported in a single `memory.updated` event.
 
 ### Example Output
 
@@ -941,6 +1054,8 @@ The Update Memory component updates matching rows in canvas-level memory storage
 
 ## Upsert Memory
 
+**Component key:** `upsertMemory`
+
 The Upsert Memory component updates matching rows in canvas-level memory storage, and creates a new row when no matches are found.
 
 ### Use Cases
@@ -964,6 +1079,17 @@ This lets you store just one field (for example `value`) without extra marker fi
 ### Output
 
 Always emits to the default channel. Check `data.operation` to know whether the component updated existing rows or created a new row.
+
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one upsert per element.
+The `matchList` is evaluated once (same matches for every iteration), while each
+`valueList` field value is evaluated per element with the iteration variable in scope
+(defaults to `item`). All upserts are reported in a single `memory.upserted` event with per-item operation results.
+
+Note: when a non-empty `matchList` is configured in list mode, each iteration attempts to
+update the same matched rows. List mode is most useful for inserting multiple rows
+(empty `matchList`) or when each item's values are meant to overwrite the matched rows.
 
 ### Example Output
 
@@ -1000,6 +1126,8 @@ Always emits to the default channel. Check `data.operation` to know whether the 
 <a id="wait"></a>
 
 ## Wait
+
+**Component key:** `wait`
 
 The Wait component pauses workflow execution for a specified duration or until a specific time is reached.
 

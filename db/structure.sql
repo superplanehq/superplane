@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -230,18 +230,6 @@ CREATE TABLE public.blueprints (
 
 
 --
--- Name: canvas_dashboards; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvas_dashboards (
-    canvas_id uuid NOT NULL,
-    panels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    layout jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -267,7 +255,8 @@ CREATE TABLE public.canvas_memories (
     "values" jsonb NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source text DEFAULT 'node'::text NOT NULL
 );
 
 
@@ -413,6 +402,22 @@ CREATE TABLE public.organizations (
     usage_limits_synced_at timestamp with time zone,
     change_management_enabled boolean DEFAULT false NOT NULL,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+);
+
+
+--
+-- Name: repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repositories (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    repo_id text NOT NULL,
+    status character varying(64) DEFAULT 'pending'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -688,7 +693,9 @@ CREATE TABLE public.workflow_versions (
     name character varying(128) DEFAULT ''::character varying NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     change_management_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL
+    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -854,14 +861,6 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvas_dashboards canvas_dashboards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_dashboards
-    ADD CONSTRAINT canvas_dashboards_pkey PRIMARY KEY (canvas_id);
-
-
---
 -- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -979,6 +978,22 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repositories repositories_canvas_id_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_canvas_id_provider_repo_id_key UNIQUE (canvas_id, provider, repo_id);
+
+
+--
+-- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
 
 
 --
@@ -1357,6 +1372,13 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
+
+
+--
+-- Name: idx_repositories_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
 
 
 --
@@ -1741,14 +1763,6 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: canvas_dashboards canvas_dashboards_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_dashboards
-    ADD CONSTRAINT canvas_dashboards_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1834,6 +1848,22 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repositories repositories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -2145,7 +2175,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2164,7 +2194,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260520171949	f
+20260601220232	f
 \.
 
 
@@ -2181,7 +2211,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
