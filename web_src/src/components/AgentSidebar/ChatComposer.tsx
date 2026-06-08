@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
 import { ComposerToolbar } from "./ComposerToolbar";
 import { useMentions } from "./useMentions";
@@ -89,12 +89,6 @@ export function ChatComposer({
     dismiss();
     textareaRef.current?.focus();
   }, [dismiss]);
-
-  useEffect(() => {
-    if (!showDropdown) {
-      mentionKeyboardRef.current = null;
-    }
-  }, [showDropdown]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
