@@ -24,6 +24,7 @@ import { deleteVMInstanceMapper } from "./delete_vm_instance";
 import { manageVMInstancePowerMapper, MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY } from "./manage_vm_instance_power";
 import { updateVMInstanceTypeMapper } from "./update_vm_instance_type";
 import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } from "./get_vm_instance_metrics";
+import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: computeBaseMapper,
@@ -48,6 +49,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "tpu.createNode": tpuMapper,
   "tpu.getNode": tpuMapper,
   "tpu.deleteNode": tpuMapper,
+  "compute.createStaticIP": createStaticIPMapper,
+  "compute.deleteStaticIP": deleteStaticIPMapper,
+  "compute.manageStaticIP": manageStaticIPMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -81,6 +85,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "tpu.createNode": buildActionStateRegistry("completed"),
   "tpu.getNode": buildActionStateRegistry("completed"),
   "tpu.deleteNode": buildActionStateRegistry("completed"),
+  "compute.createStaticIP": buildActionStateRegistry("completed"),
+  "compute.deleteStaticIP": buildActionStateRegistry("completed"),
+  "compute.manageStaticIP": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

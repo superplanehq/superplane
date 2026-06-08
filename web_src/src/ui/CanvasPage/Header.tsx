@@ -1,4 +1,5 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { useParams } from "react-router-dom";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
@@ -69,6 +70,15 @@ export interface HeaderProps {
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
@@ -93,6 +103,15 @@ export function Header(props: HeaderProps) {
         enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
         onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+        startEditingDrafts={props.startEditingDrafts}
+        startEditingDefaultDraft={props.startEditingDefaultDraft}
+        startEditingMenuOpen={props.startEditingMenuOpen}
+        onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
+        onContinueDraftBranch={props.onContinueDraftBranch}
+        onCreateDraftBranch={props.onCreateDraftBranch}
+        createDraftBranchPending={props.createDraftBranchPending}
+        activeDraftBranchLabel={props.activeDraftBranchLabel}
+        activeDraftBranchShortSha={props.activeDraftBranchShortSha}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
@@ -115,6 +134,15 @@ function PageHeader({
   enterEditModeDisabledTooltip,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
@@ -131,6 +159,15 @@ function PageHeader({
   enterEditModeDisabledTooltip?: string;
   onDiscardDraftAndStartEdit?: () => void;
   unpublishedDraftUpdatedAt?: string;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
 }) {
   const {
     workflowId,
@@ -163,7 +200,25 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {mode !== "runs" && !isEditing && onEnterEditMode ? (
+        {isEditing ? (
+          <div className="flex items-center">
+            {activeDraftBranchLabel ? (
+              <span
+                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
+                data-testid="active-draft-branch-chip"
+              >
+                Editing: {activeDraftBranchLabel}
+                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
+              </span>
+            ) : null}
+            <EditModeTopHeaderActions
+              onExitEditMode={onExitEditMode}
+              exitEditModeDisabled={exitEditModeDisabled}
+              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            />
+          </div>
+        ) : null}
+        {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -171,13 +226,13 @@ function PageHeader({
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
             unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-          />
-        ) : null}
-        {isEditing ? (
-          <EditModeTopHeaderActions
-            onExitEditMode={onExitEditMode}
-            exitEditModeDisabled={exitEditModeDisabled}
-            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            startEditingDrafts={startEditingDrafts}
+            startEditingDefaultDraft={startEditingDefaultDraft}
+            startEditingMenuOpen={startEditingMenuOpen}
+            onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
+            onContinueDraftBranch={onContinueDraftBranch}
+            onCreateDraftBranch={onCreateDraftBranch}
+            createDraftBranchPending={createDraftBranchPending}
           />
         ) : null}
       </div>

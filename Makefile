@@ -6,7 +6,11 @@ DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
 
-export BUILDKIT_PROGRESS ?= plain
+ifeq ($(DEBUG),1)
+export BUILDKIT_PROGRESS := plain
+else
+export BUILDKIT_PROGRESS := quiet
+endif
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...

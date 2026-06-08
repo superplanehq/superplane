@@ -356,10 +356,11 @@ func createCanvasDraftVersionFromLive(t *testing.T, canvasID uuid.UUID, liveVers
 	liveVersion, err := models.FindCanvasVersion(canvasID, liveVersionID)
 	require.NoError(t, err)
 
-	draftVersion, err := models.SaveCanvasDraftInTransaction(
+	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(
 		database.Conn(),
 		canvasID,
 		userID,
+		"",
 		liveVersion.Nodes,
 		liveVersion.Edges,
 	)
