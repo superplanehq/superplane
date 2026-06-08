@@ -60,3 +60,10 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		},
 	}
 }
+
+func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string) *pb.CanvasVersion {
+	full := SerializeCanvasVersion(version, organizationID)
+	return &pb.CanvasVersion{
+		Metadata: full.GetMetadata(),
+	}
+}

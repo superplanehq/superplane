@@ -75,7 +75,7 @@ export function resolveFilesHeaderVersionActions({
       hasUnpublishedDraftChanges: !!filesHeaderActions?.hasPendingChanges,
       discardVersionDisabled: !filesHeaderActions || filesHeaderActions.discardDisabled,
       discardVersionDisabledTooltip: undefined,
-      publishVersionLabel: "Publish",
+      publishVersionLabel: "Save",
     };
   }
 
