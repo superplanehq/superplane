@@ -12,7 +12,7 @@ func TestDecodeRunBashSpecDefaults(t *testing.T) {
 
 	spec, err := decodeRunBashSpec(map[string]any{
 		"machine_type": testRunnerMachineType,
-		"script":       "main() { echo ok; }",
+		"script":       `echo ok > "$SUPERPLANE_RESULT_FILE"`,
 	})
 	require.NoError(t, err)
 	require.Equal(t, ExecutionModeHost, spec.ExecutionMode)
@@ -51,7 +51,7 @@ func TestValidateConfigurationRunBashDockerDefaults(t *testing.T) {
 	err := configuration.ValidateConfiguration(r.Configuration(), map[string]any{
 		"machine_type":              testRunnerMachineType,
 		"execution_mode":            ExecutionModeDocker,
-		"script":                    "main() { echo ok; }",
+		"script":                    `echo ok > "$SUPERPLANE_RESULT_FILE"`,
 		"execution_timeout_seconds": 0,
 	})
 	require.NoError(t, err)

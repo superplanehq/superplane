@@ -41,7 +41,7 @@ describe("getExecutionDetails", () => {
         isCollapsed: false,
         configuration: {
           machine_type: "aws-standard-1",
-          script: "main() { echo '{\"ok\":true}'; }",
+          script: 'echo \'{"ok":true}\' > "$SUPERPLANE_RESULT_FILE"',
         },
         metadata: {},
       },
@@ -49,7 +49,7 @@ describe("getExecutionDetails", () => {
       componentDefinition: {
         name: "runner-bash",
         label: "Run Bash",
-        description: "Runs a Bash script on a fleet runner",
+        description: "Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE",
         icon: "code",
         color: "blue",
       },

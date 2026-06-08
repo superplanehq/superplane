@@ -13,7 +13,7 @@ const (
 	RunBashComponentName       = "runner-bash"
 	RunBashFinishedEventType   = "runner-bash.finished"
 	runBashDefaultDockerPreset = "debian:bookworm-slim"
-	defaultRunBashScript       = "main() {\n  echo \"Hello world\"\n  echo '{\"example\":\"output\"}'\n}"
+	defaultRunBashScript       = "#!/usr/bin/env bash\nset -euo pipefail\n\necho \"Hello world\"\necho '{\"example\":\"output\"}' > \"$SUPERPLANE_RESULT_FILE\"\n"
 )
 
 func init() {
@@ -47,7 +47,7 @@ func (c *RunBash) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *RunBash) Description() string {
-	return "Runs a Bash script on a fleet runner with upstream node data passed to main(payload)"
+	return "Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE"
 }
 
 func (c *RunBash) Documentation() string {
@@ -58,15 +58,22 @@ func (c *RunBash) Documentation() string {
 - **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**).
 
 ## Script contract
-Your script must define ` + "`main()`" + ` that accepts the upstream canvas data as its first argument (` + "`$1`" + `), a JSON string with the same shape as workflow expressions. Echo a JSON-serializable value from ` + "`main`" + `; stdout is emitted on the finished event as **result**.
+Your script runs as-is. The runner sets:
+
+- ` + "`SUPERPLANE_PAYLOAD_FILE`" + ` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
+- ` + "`SUPERPLANE_RESULT_FILE`" + ` — path where your script must write a JSON-serializable **result**
+
+Stdout and stderr (for example ` + "`echo`" + `) stream to **View logs**. Write the structured **result** to ` + "`SUPERPLANE_RESULT_FILE`" + `; it is emitted on the finished event as **result**.
 
 Example:
 
 ` + "```bash" + `
-main() {
-  local payload="$1"
-  echo '{"pr": 42}'
-}
+#!/usr/bin/env bash
+set -euo pipefail
+
+num=$(jq -r '."GitHub PR".data.number' "$SUPERPLANE_PAYLOAD_FILE")
+echo "Processing PR #$num"
+printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ` + "```" + `
 
 ## Configuration
@@ -183,7 +190,7 @@ func (c *RunBash) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Default:     defaultRunBashScript,
-			Description: "Bash executed by the runner. Define main() and echo a JSON-serializable result.",
+			Description: "Bash executed by the runner. Write JSON to SUPERPLANE_RESULT_FILE; read upstream data from SUPERPLANE_PAYLOAD_FILE.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
 					Language: "shell",
