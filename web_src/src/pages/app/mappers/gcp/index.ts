@@ -24,6 +24,12 @@ import { getVMInstanceMapper } from "./get_vm_instance";
 import { manageVMInstancePowerMapper, MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY } from "./manage_vm_instance_power";
 import { updateVMInstanceTypeMapper } from "./update_vm_instance_type";
 import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } from "./get_vm_instance_metrics";
+import {
+  createAlertingPolicyMapper,
+  getAlertingPolicyMapper,
+  deleteAlertingPolicyMapper,
+  updateAlertingPolicyMapper,
+} from "./monitoring";
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
 import { deleteImageMapper } from "./delete_image";
@@ -53,6 +59,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "clouddns.createRecord": cloudDNSMapper,
   "clouddns.deleteRecord": cloudDNSMapper,
   "clouddns.updateRecord": cloudDNSMapper,
+  "monitoring.createAlertingPolicy": createAlertingPolicyMapper,
+  "monitoring.getAlertingPolicy": getAlertingPolicyMapper,
+  "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
+  "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
   "compute.createStaticIP": createStaticIPMapper,
   "compute.deleteStaticIP": deleteStaticIPMapper,
   "compute.manageStaticIP": manageStaticIPMapper,
@@ -90,6 +100,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "clouddns.createRecord": buildActionStateRegistry("completed"),
   "clouddns.deleteRecord": buildActionStateRegistry("completed"),
   "clouddns.updateRecord": buildActionStateRegistry("completed"),
+  "monitoring.createAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.getAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.deleteAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.updateAlertingPolicy": buildActionStateRegistry("completed"),
   "compute.createStaticIP": buildActionStateRegistry("completed"),
   "compute.deleteStaticIP": buildActionStateRegistry("completed"),
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
