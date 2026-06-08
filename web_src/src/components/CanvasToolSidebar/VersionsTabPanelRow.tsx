@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import { Diff } from "lucide-react";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { getChangeRequestReviewPhase } from "@/pages/workflowv2/changeRequestReviewActions";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/workflowv2/lib/canvas-versions";
+import { getChangeRequestReviewPhase } from "@/pages/app/changeRequestReviewActions";
+import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
 
 type ActiveReviewPhase = Exclude<ReturnType<typeof getChangeRequestReviewPhase>, { kind: "none" }>;
 
@@ -153,7 +153,7 @@ function versionRowClassName({
   variant: "default" | "rejected";
   activeReviewPhase: ActiveReviewPhase | null;
 }): string {
-  const baseClassName = "w-full cursor-pointer border-b border-slate-100 px-4 py-2 text-left transition";
+  const baseClassName = "w-full cursor-pointer border-b border-b-slate-950/10 px-4 py-2 text-left transition";
   if (!isActive) {
     return `${baseClassName} bg-white hover:bg-slate-100`;
   }

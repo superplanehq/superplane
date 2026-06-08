@@ -204,7 +204,7 @@ function usePaletteNavigation(
   );
 
   const goToCurrentCanvasView = useCallback(
-    (view?: "dashboard" | "memory" | "runs") => {
+    (view?: "console" | "memory" | "runs") => {
       if (!organizationId || !canvasId) return;
       goTo(appPath(organizationId, canvasId, view ? `?view=${view}` : ""));
     },

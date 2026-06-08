@@ -42,7 +42,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	request := ctx.API.CanvasAPI.CanvasesGetCanvasDashboard(ctx.Context, canvasID)
+	request := ctx.API.CanvasAPI.CanvasesGetConsole(ctx.Context, canvasID)
 	if versionID != "" {
 		request = request.VersionId(versionID)
 	}
@@ -51,12 +51,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if response.Dashboard == nil {
-		return fmt.Errorf("app %q has no dashboard", canvasID)
+	if response.Console == nil {
+		return fmt.Errorf("app %q has no console", canvasID)
 	}
 
-	dashboard := *response.Dashboard
-	resource := consoleYAMLFromAPI(canvasName, dashboard)
+	console := *response.Console
+	resource := consoleYAMLFromAPI(canvasName, console)
 
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(resource)
@@ -70,7 +70,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID := strings.TrimSpace(dashboard.GetVersionId()); versionID != "" {
+		if versionID := strings.TrimSpace(console.GetVersionId()); versionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
 		}
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(resource.Spec.Panels))

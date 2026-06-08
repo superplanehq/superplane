@@ -139,7 +139,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 // upsert fails, the canvas already exists; the user can re-import the console
 // from the UI. We accept that trade-off to avoid changing CreateCanvas's
 // signature just for this side-effect.
-func persistInstalledConsole(canvasID string, console *models.DashboardYAML) error {
+func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error {
 	if console == nil {
 		return nil
 	}
@@ -155,7 +155,7 @@ func persistInstalledConsole(canvasID string, console *models.DashboardYAML) err
 			return findErr
 		}
 
-		_, err := models.UpdateCanvasVersionDashboardInTransaction(
+		_, err := models.UpdateCanvasVersionConsoleInTransaction(
 			tx,
 			version,
 			console.Spec.Panels,

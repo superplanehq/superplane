@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -63,6 +64,8 @@ func canvasMemoryToProto(record models.CanvasMemory) (*pb.CanvasMemory, error) {
 		Namespace: record.Namespace,
 		Values:    values,
 		Source:    canvasMemorySourceToProto(record.Source),
+		CreatedAt: timestamppb.New(record.CreatedAt),
+		UpdatedAt: timestamppb.New(record.UpdatedAt),
 	}, nil
 }
 

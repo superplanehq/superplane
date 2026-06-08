@@ -13,7 +13,7 @@ import type {
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
 import type { ChildExecution } from "@/ui/chainItem";
-import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import { getExecutionDetails } from "@/pages/app/mappers";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { analytics } from "@/lib/analytics";
 

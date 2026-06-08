@@ -26,7 +26,7 @@ import type {
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
-import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 import { analytics } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */

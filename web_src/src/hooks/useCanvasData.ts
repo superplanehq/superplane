@@ -33,8 +33,8 @@ import {
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
-  canvasesGetCanvasDashboard,
-  canvasesUpdateCanvasDashboard,
+  canvasesGetConsole,
+  canvasesUpdateConsole,
   canvasesGetCanvasRepository,
   canvasesListCanvasRepositoryFiles,
   canvasesCommitCanvasRepositoryFiles,
@@ -46,7 +46,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
-  CanvasesCanvasDashboard,
+  CanvasesConsole,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -58,7 +58,7 @@ import type {
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
 
 // Query Keys
 export const canvasKeys = {
@@ -135,22 +135,22 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
-  dashboard: (canvasId: string, versionId?: string) =>
-    [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
-  dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
+  console: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.all, "console", canvasId, versionId ?? "live"] as const,
+  consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
   repositoryFile: (canvasId: string, path: string, ref?: string) =>
     [...canvasKeys.repository(canvasId), "file", path, ref ?? ""] as const,
 };
 
-export interface DashboardPanel {
+export interface ConsolePanel {
   id: string;
   type: string;
   content: Record<string, unknown>;
 }
 
-export interface DashboardLayoutItem {
+export interface ConsoleLayoutItem {
   i: string;
   x: number;
   y: number;
@@ -887,7 +887,7 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
     },
   });
 };
@@ -1244,6 +1244,10 @@ export interface CanvasMemoryEntry {
   namespace: string;
   values: unknown;
   source: CanvasMemoryEntrySource;
+  /** Server timestamp the entry was first persisted. ISO-8601 string. */
+  createdAt?: string;
+  /** Server timestamp the entry was last updated. ISO-8601 string. */
+  updatedAt?: string;
 }
 
 function normalizeCanvasMemorySource(source: string | undefined): CanvasMemoryEntrySource {
@@ -1267,6 +1271,8 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
         namespace: item.namespace || "",
         values: item.values,
         source: normalizeCanvasMemorySource(item.source),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
       }));
     },
     refetchOnWindowFocus: false,
@@ -1687,15 +1693,15 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
 
 export const useCanvasConsole = (canvasId: string, versionId: string | undefined, enabled: boolean = true) => {
   return useQuery({
-    queryKey: canvasKeys.dashboard(canvasId, versionId),
+    queryKey: canvasKeys.console(canvasId, versionId),
     queryFn: async () => {
-      const response = await canvasesGetCanvasDashboard(
+      const response = await canvasesGetConsole(
         withOrganizationHeader({
           path: { canvasId },
           query: versionId ? { versionId } : undefined,
         }),
       );
-      return response.data?.dashboard;
+      return response.data?.console;
     },
     enabled: enabled && !!canvasId,
     staleTime: 30_000,
@@ -1706,12 +1712,12 @@ type UseUpdateCanvasConsoleOptions = {
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
-function toCanvasDashboard(
+function toCanvasConsole(
   canvasId: string,
   versionId: string | undefined,
-  input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] },
-  previous?: CanvasesCanvasDashboard,
-): CanvasesCanvasDashboard {
+  input: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] },
+  previous?: CanvasesConsole,
+): CanvasesConsole {
   return {
     ...previous,
     canvasId: previous?.canvasId ?? canvasId,
@@ -1741,16 +1747,16 @@ export const useUpdateCanvasConsole = (
   const queryClient = useQueryClient();
   return useMutation({
     onMutate: async (input) => {
-      const queryKey = canvasKeys.dashboard(canvasId, versionId);
+      const queryKey = canvasKeys.console(canvasId, versionId);
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<CanvasesCanvasDashboard>(queryKey);
-      queryClient.setQueryData(queryKey, toCanvasDashboard(canvasId, versionId, input, previous));
+      const previous = queryClient.getQueryData<CanvasesConsole>(queryKey);
+      queryClient.setQueryData(queryKey, toCanvasConsole(canvasId, versionId, input, previous));
       return { previous, queryKey };
     },
-    mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
+    mutationFn: async (input: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
       const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
       try {
-        const response = await canvasesUpdateCanvasDashboard(
+        const response = await canvasesUpdateConsole(
           withOrganizationHeader({
             path: { canvasId },
             body: {
@@ -1772,7 +1778,7 @@ export const useUpdateCanvasConsole = (
             },
           }),
         );
-        return response.data?.dashboard;
+        return response.data?.console;
       } catch (error) {
         releaseCanvasVersionUpdatedEcho?.();
         throw error;
@@ -1783,13 +1789,32 @@ export const useUpdateCanvasConsole = (
       queryClient.setQueryData(context.queryKey, context.previous);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
+      queryClient.setQueryData(canvasKeys.console(canvasId, versionId), data);
     },
   });
 };
 
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
+
+function buildRepositoryFileUrl(canvasId: string, path: string): string {
+  const params = new URLSearchParams({ path });
+  return `/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params.toString()}`;
+}
+
+async function fetchRepositoryFileContent(canvasId: string, path: string): Promise<string> {
+  const response = await fetch(buildRepositoryFileUrl(canvasId, path), {
+    credentials: "include",
+    headers: withOrganizationHeader().headers,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to load ${path}`);
+  }
+
+  return response.text();
+}
 
 export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
   return useQuery({
@@ -1837,8 +1862,7 @@ export const useCanvasRepositoryFile = (
   return useQuery({
     queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
     queryFn: async () => {
-      const { fetchCanvasRepositoryFileContent } = await import("@/pages/workflowv2/lib/canvas-repository-files");
-      const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath);
+      const content = await fetchRepositoryFileContent(canvasId, normalizedPath);
       return {
         path: normalizedPath,
         content,
