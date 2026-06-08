@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const envSuperplaneResultFile = "SUPERPLANE_RESULT_FILE"
+const (
+	envSuperplaneResultFile  = "SUPERPLANE_RESULT_FILE"
+	envSuperplanePayloadFile = "SUPERPLANE_PAYLOAD_FILE"
+)
 
 // applyCmdEnv sets task environment first, then SUPERPLANE_RESULT_FILE when hostPath is set.
 func applyCmdEnv(cmd *exec.Cmd, env []string, hostPath string) {
@@ -23,10 +26,18 @@ func applyCmdEnv(cmd *exec.Cmd, env []string, hostPath string) {
 }
 
 func setResultEnv(cmd *exec.Cmd, hostPath string) {
+	setProcessEnv(cmd, envSuperplaneResultFile, hostPath)
+}
+
+func setPayloadEnv(cmd *exec.Cmd, hostPath string) {
+	setProcessEnv(cmd, envSuperplanePayloadFile, hostPath)
+}
+
+func setProcessEnv(cmd *exec.Cmd, name, hostPath string) {
 	if cmd == nil || strings.TrimSpace(hostPath) == "" {
 		return
 	}
-	pair := envSuperplaneResultFile + "=" + strings.TrimSpace(hostPath)
+	pair := name + "=" + strings.TrimSpace(hostPath)
 	if len(cmd.Env) > 0 {
 		cmd.Env = append(cmd.Env, pair)
 		return
