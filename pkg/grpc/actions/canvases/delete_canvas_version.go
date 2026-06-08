@@ -16,13 +16,22 @@ import (
 	"gorm.io/gorm"
 )
 
-func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID string, versionID string) (*pb.DeleteCanvasVersionResponse, error) {
+func DeleteCanvasVersion(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+) (*pb.DeleteCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	orgUUID := uuid.MustParse(organizationID)
+	orgUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+	}
+
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
@@ -36,6 +45,9 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+	}
+	if canvas.IsTemplate {
+		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -53,13 +65,16 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			return status.Error(codes.FailedPrecondition, "only draft versions can be discarded")
 		}
 
+		if !models.IsRegisteredDraftVersion(version) {
+			return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+		}
+
 		if version.OwnerID == nil || *version.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
 		return tx.Delete(version).Error
 	})
-
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
 			return nil, err

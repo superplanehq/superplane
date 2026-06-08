@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import { baseMapper, cloudBuildBaseMapper } from "./base";
+import { cloudBuildBaseMapper, computeBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
@@ -29,9 +29,10 @@ import {
   deleteAlertingPolicyMapper,
   updateAlertingPolicyMapper,
 } from "./monitoring";
+import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  createVM: baseMapper,
+  createVM: computeBaseMapper,
   deleteVMInstance: deleteVMInstanceMapper,
   manageVMInstancePower: manageVMInstancePowerMapper,
   updateVMInstanceType: updateVMInstanceTypeMapper,
@@ -54,6 +55,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "monitoring.getAlertingPolicy": getAlertingPolicyMapper,
   "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
   "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
+  "compute.createStaticIP": createStaticIPMapper,
+  "compute.deleteStaticIP": deleteStaticIPMapper,
+  "compute.manageStaticIP": manageStaticIPMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -88,6 +92,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "monitoring.getAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.deleteAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.updateAlertingPolicy": buildActionStateRegistry("completed"),
+  "compute.createStaticIP": buildActionStateRegistry("completed"),
+  "compute.deleteStaticIP": buildActionStateRegistry("completed"),
+  "compute.manageStaticIP": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

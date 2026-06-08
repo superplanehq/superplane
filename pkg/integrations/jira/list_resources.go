@@ -3,10 +3,13 @@ package jira
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+const opsAlertLabelMaxRunes = 80
 
 func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
@@ -34,6 +37,8 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listHeartbeats(ctx)
 	case "issue":
 		return listIssues(ctx)
+	case "alert":
+		return listAlerts(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -343,8 +348,8 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 }
 
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
+	projectKey := assigneeProjectKey(ctx)
+	if projectKey == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -432,6 +437,35 @@ func listRequestTypeFieldResources(resourceType, fieldLabel string, ctx core.Lis
 	}
 
 	return requestTypeFieldResources(client, field, resourceType, projectKey, fieldLabel)
+}
+
+func listAlerts(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	rows, err := client.ListOpsAlerts(cloudID, 100)
+	if err != nil {
+		return nil, fmt.Errorf("list Ops alerts: %w", err)
+	}
+	out := make([]core.IntegrationResource, 0, len(rows))
+	for _, row := range rows {
+		rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
+		if rawID == "" {
+			continue
+		}
+		name := opsAlertIntegrationResourceLabel(row, rawID)
+		out = append(out, core.IntegrationResource{
+			Type: "alert",
+			Name: name,
+			ID:   rawID,
+		})
+	}
+	return out, nil
 }
 
 func findRequestTypeFieldID(fields []RequestTypeField, fieldLabel string) string {
@@ -595,4 +629,53 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 		}
 	}
 	return ""
+}
+
+func assigneeProjectKey(ctx core.ListResourcesContext) string {
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		return projectKey
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return ""
+	}
+	for _, p := range metadata.Projects {
+		if k := strings.TrimSpace(p.Key); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
+func truncateOpsAlertLabelMessage(msg string) string {
+	if utf8.RuneCountInString(msg) <= opsAlertLabelMaxRunes {
+		return msg
+	}
+	runes := []rune(msg)
+	keep := opsAlertLabelMaxRunes - utf8.RuneCountInString("...")
+	if keep < 0 {
+		keep = 0
+	}
+	return string(runes[:keep]) + "..."
+}
+
+func opsAlertIntegrationResourceLabel(row map[string]any, alertID string) string {
+	msg := strings.TrimSpace(opsAlertStringField(row, "message"))
+	if msg != "" {
+		msg = truncateOpsAlertLabelMessage(msg)
+	}
+	tiny := strings.TrimSpace(opsAlertStringField(row, "tinyId"))
+
+	switch {
+	case msg != "" && tiny != "":
+		return fmt.Sprintf("%s #%s", msg, tiny)
+	case msg != "":
+		return msg
+	case tiny != "":
+		return fmt.Sprintf("#%s", tiny)
+	default:
+		return alertID
+	}
 }

@@ -46,6 +46,10 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	if version.UpdatedAt != nil {
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
+	if version.BranchName != nil {
+		metadata.BranchName = *version.BranchName
+	}
+	metadata.DisplayName = version.DisplayName
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,

@@ -58,6 +58,28 @@ describe("CanvasModeToggle", () => {
     expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
   });
 
+  it("uses blue tab styling in edit mode and shows blue draft dots", () => {
+    render(
+      <CanvasModeToggle
+        mode="version-live"
+        onSelectLive={vi.fn()}
+        onSelectConsole={vi.fn()}
+        editing
+        hasDraft
+        hasConsoleDraft
+      />,
+    );
+
+    const tabList = screen.getByRole("tablist", { name: "Canvas view" });
+    expect(tabList.className).toContain("bg-blue-50");
+    expect(tabList.className).toContain("text-blue-800/80");
+    expect(tabList.className).not.toContain("bg-slate-100");
+    expect(tabList.className).not.toContain("purple");
+
+    expect(screen.getByTestId("canvas-view-mode-live-draft-dot")).toHaveClass("bg-blue-500");
+    expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toHaveClass("bg-blue-500");
+  });
+
   it("invokes onSelectFiles when clicking the Files tab", async () => {
     const user = userEvent.setup();
     const onSelectFiles = vi.fn();
