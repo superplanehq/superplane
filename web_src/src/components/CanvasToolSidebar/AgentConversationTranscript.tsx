@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
+const STICKY_USER_MESSAGE_MAX_CHARS = 240;
+const STICKY_USER_MESSAGE_MAX_LINES = 4;
+
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
   canvasId,
@@ -34,7 +37,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   // next user message). Each turn is its own block so the sticky user bubble inside is bounded by
   // its turn — when the turn scrolls past, the bubble scrolls with it and the next turn's bubble
   // pushes up to take its place. No two stickies ever overlap.
-  const turns = useMemo(() => chunkIntoTurns(messageGroups), [messageGroups]);
+  const turns = useMemo(() => chunkIntoTurns(messageGroups.filter(isRenderableGroup)), [messageGroups]);
 
   return (
     <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
@@ -85,6 +88,14 @@ function chunkIntoTurns(groups: MessageGroup[]): MessageGroup[][] {
 
   if (current.length > 0) turns.push(current);
   return turns;
+}
+
+function isRenderableGroup(group: MessageGroup): boolean {
+  if (group.type !== "message") {
+    return true;
+  }
+
+  return shouldRenderMessage(group.message);
 }
 
 function turnKey(turn: MessageGroup[]): string {
@@ -157,21 +168,23 @@ const MessageRow = memo(function MessageRow({
     return <ToolMessageRow message={message} />;
   }
 
-  if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
+  if (!shouldRenderMessage(message)) {
     return null;
   }
 
   const isUser = message.role === "user";
+  const shouldStickUserMessage = isUser && isCompactUserMessage(message.content);
 
   return (
     <div
       className={cn(
         "flex w-full min-w-0 flex-col",
-        // User bubbles stick to the top of the scrollable transcript so the most-recent question
-        // remains visible while a long agent reply scrolls past underneath it. Older user messages
-        // also stick, but the most recent one paints on top via DOM order, so visually it's always
-        // the latest. Background is opaque to mask scrolling content behind.
-        isUser ? "sticky top-0 z-10 items-end bg-white py-1.5" : "items-start",
+        isUser && "items-end py-1.5",
+        !isUser && "items-start",
+        // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
+        // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
+        // otherwise the sticky bubble can cover the active Thinking or command rows.
+        shouldStickUserMessage && "sticky top-0 z-10 bg-white",
       )}
     >
       <div
@@ -197,6 +210,14 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+function shouldRenderMessage(message: AgentMessage): boolean {
+  return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
+}
+
+function isCompactUserMessage(content: string): boolean {
+  return content.length <= STICKY_USER_MESSAGE_MAX_CHARS && content.split("\n").length <= STICKY_USER_MESSAGE_MAX_LINES;
+}
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {
   const [expanded, setExpanded] = useState(false);
