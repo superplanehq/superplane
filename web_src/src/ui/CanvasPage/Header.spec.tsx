@@ -41,6 +41,7 @@ function renderHeader(
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
     onExitEditMode?: () => void;
+    canvasName?: string;
   },
 ) {
   render(
@@ -50,7 +51,7 @@ function renderHeader(
           path="/org/:organizationId/app/:appId"
           element={
             <Header
-              canvasName="Test Canvas"
+              canvasName={options && "canvasName" in options ? options.canvasName : "Test Canvas"}
               mode={mode}
               isEditing={options?.isEditing}
               activeDraftBranchLabel={options?.activeDraftBranchLabel}
@@ -76,6 +77,10 @@ describe("Header", () => {
     renderHeader("version-live");
 
     expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
+  });
+
+  it("renders without crashing when canvasName is undefined", () => {
+    expect(() => renderHeader("version-live", { canvasName: undefined })).not.toThrow();
   });
 
   it("shows the active draft label and exit control in edit mode", () => {

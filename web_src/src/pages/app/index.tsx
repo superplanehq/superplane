@@ -1986,18 +1986,29 @@ export function AppPage() {
       // the node sidebar is open.
       setSearchParams(
         (current) => {
-          const next = new URLSearchParams(current);
+          const hasSidebar = current.get("sidebar") === "1";
+          const currentNode = current.get("node");
           if (open) {
+            if (hasSidebar && currentNode === (nodeId ?? null)) {
+              return current;
+            }
+            const next = new URLSearchParams(current);
             next.set("sidebar", "1");
             if (nodeId) {
               next.set("node", nodeId);
             } else {
               next.delete("node");
             }
-          } else {
-            next.delete("sidebar");
-            next.delete("node");
+            return next;
           }
+
+          if (!hasSidebar && !currentNode) {
+            return current;
+          }
+
+          const next = new URLSearchParams(current);
+          next.delete("sidebar");
+          next.delete("node");
           return next;
         },
         { replace: true },

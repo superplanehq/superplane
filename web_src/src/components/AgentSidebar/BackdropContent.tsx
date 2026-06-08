@@ -1,7 +1,5 @@
 /**
- * Renders the text with @mentions styled as inline chips.
- * Non-mention text is rendered transparent (invisible — shows through from textarea caret).
- * Mention spans are styled as visible pills.
+ * Renders the text with @mentions highlighted behind a transparent textarea.
  */
 export function BackdropContent({
   text,
@@ -43,7 +41,7 @@ export function BackdropContent({
     <>
       {segments.map((seg, i) =>
         seg.isMention ? (
-          <span key={i} className="rounded bg-blue-100 px-0.5 text-sm font-medium text-blue-700">
+          <span key={i} className="rounded bg-blue-100 text-blue-700">
             {seg.text}
           </span>
         ) : (
