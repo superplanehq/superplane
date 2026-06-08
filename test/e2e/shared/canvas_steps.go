@@ -587,23 +587,49 @@ func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
+	sourceNodeID := s.waitForDraftNodeID(sourceName)
+	targetNodeID := s.waitForDraftNodeID(targetName)
+
 	edge := q.Locator(`.react-flow__edge`).Run(s.session)
 	require.Eventually(s.t, func() bool {
 		count, err := edge.Count()
 		return err == nil && count > 0
 	}, 10*time.Second, 200*time.Millisecond)
 
-	firstEdge := edge.First()
-	require.NoError(s.t, firstEdge.Hover())
-	s.session.Sleep(300)
+	// The edge midpoint lies on the source node's right handle and the target
+	// node's left handle line. Computing it from the handle positions gives a
+	// point that is reliably on the (mostly horizontal) edge path. Playwright's
+	// Locator.Hover()/Click() target an element's bounding-box center, which is
+	// unreliable for an SVG path: the geometric center of the bounding box can
+	// fall off the actual stroke, so the action never lands on the edge.
+	sourceHandle := q.Locator(`.react-flow__node[data-id="` + sourceNodeID + `"] .react-flow__handle-right`).Run(s.session)
+	targetHandle := q.Locator(`.react-flow__node[data-id="` + targetNodeID + `"] .react-flow__handle-left`).Run(s.session)
 
+	sourceBox, err := sourceHandle.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, sourceBox)
+	targetBox, err := targetHandle.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, targetBox)
+
+	midX := (sourceBox.X + sourceBox.Width/2 + targetBox.X + targetBox.Width/2) / 2
+	midY := (sourceBox.Y + sourceBox.Height/2 + targetBox.Y + targetBox.Height/2) / 2
+
+	// In edit mode the wide transparent delete hit-area path is always present
+	// (canDelete = isEditMode && !isReadOnly), so a hover is not required to
+	// reveal it. Move the mouse onto the edge to set the hovered state, then
+	// dispatch a raw click at the same on-edge point. Using raw mouse events
+	// avoids the unreliable element-center actionability checks.
 	hitArea := q.Locator(`.react-flow__renderer [data-testid="edge-delete-hit-area"]`).Run(s.session)
 	require.Eventually(s.t, func() bool {
 		count, err := hitArea.Count()
 		return err == nil && count > 0
 	}, 10*time.Second, 200*time.Millisecond)
 
-	require.NoError(s.t, hitArea.First().Click(pw.LocatorClickOptions{Timeout: pw.Float(10000)}))
+	mouse := s.session.Page().Mouse()
+	require.NoError(s.t, mouse.Move(midX, midY))
+	s.session.Sleep(300)
+	require.NoError(s.t, mouse.Click(midX, midY))
 	s.session.Sleep(500)
 	s.waitForDraftEdgeCount(0)
 }
