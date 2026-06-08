@@ -258,7 +258,13 @@ func (c *ApproveWorkflow) resolveApprovalID(client *Client, issueKey string, spe
 }
 
 func isPendingApproval(approval Approval) bool {
-	return strings.EqualFold(strings.TrimSpace(approval.FinalDecision), "PENDING")
+	// JSM marks open approvals with finalDecision "pending", but for some
+	// workflows it leaves the field empty until a decision is made. A completed
+	// approval always carries a concrete decision (approved/declined), so treat
+	// both "pending" and an empty decision as still pending — otherwise open
+	// approvals are skipped and resolution reports "no pending approval".
+	decision := strings.TrimSpace(approval.FinalDecision)
+	return decision == "" || strings.EqualFold(decision, "PENDING")
 }
 
 // latestPendingApprovalID returns the most recently created pending approval.

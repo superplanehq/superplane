@@ -79,6 +79,17 @@ func TestLatestPendingApprovalID(t *testing.T) {
 		})
 		assert.False(t, ok)
 	})
+
+	t.Run("treats empty finalDecision as pending", func(t *testing.T) {
+		// JSM leaves finalDecision empty for some open approvals; they must
+		// still be selectable rather than skipped as if already decided.
+		id, ok := latestPendingApprovalID([]Approval{
+			{ID: "1", FinalDecision: "approved"},
+			{ID: "2", FinalDecision: ""},
+		})
+		require.True(t, ok)
+		assert.Equal(t, "2", id)
+	})
 }
 
 func Test__ApproveWorkflow__Execute(t *testing.T) {
