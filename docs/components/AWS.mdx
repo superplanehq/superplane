@@ -43,7 +43,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
+  <LinkCard title="EC2 • Get Instance Metrics" href="#ec2-•-get-instance-metrics" description="Fetch CPU, network, and optional memory metrics for an EC2 instance via CloudWatch" />
   <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
+  <LinkCard title="EC2 • Update Instance" href="#ec2-•-update-instance" description="Resize an EC2 instance or update its security groups" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -1456,6 +1458,68 @@ Emits the instance details on the default output channel:
 }
 ```
 
+<a id="ec2-•-get-instance-metrics"></a>
+
+## EC2 • Get Instance Metrics
+
+**Component key:** `aws.ec2.getInstanceMetrics`
+
+The Get Instance Metrics component retrieves CloudWatch metrics for an EC2 instance over a configurable lookback window.
+
+> **Note:** CPU and network metrics are available for all instances. Memory metrics require the **CloudWatch Agent** to be installed and running on the instance.
+
+### Use Cases
+
+- **Performance monitoring**: Sample CPU and network utilisation before making scaling decisions
+- **Incident investigation**: Pull recent metrics when responding to an alert
+- **Capacity planning**: Gather trend data to inform right-sizing
+- **Automated scaling**: Use metric outputs to conditionally trigger resize or power operations
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to query metrics for
+- **Lookback Period**: How far back to retrieve metrics — 1h, 6h, 24h, 7d, or 14d
+- **Include Memory**: Fetch memory usage (requires the CloudWatch Agent on the instance)
+
+### Output
+
+Returns averaged and aggregated metrics over the lookback window:
+- `instanceId`, `region`, `lookbackPeriod`, `start`, `end`
+- `avgCpuUsagePercent`: Average CPU utilisation percentage (null when CloudWatch returns no datapoints for the window)
+- `totalNetworkInBytes`: Total inbound network bytes over the window
+- `totalNetworkOutBytes`: Total outbound network bytes over the window
+- `avgNetworkInBytesPerSec`: Average inbound bytes per second
+- `avgNetworkOutBytesPerSec`: Average outbound bytes per second
+- `avgMemoryUsagePercent`: Average memory utilisation (null when the CloudWatch Agent is unavailable, returns no datapoints, or the memory request fails)
+
+### Important Notes
+
+- CPU and network metrics use **basic monitoring** (5-minute resolution) by default; enable **detailed monitoring** on the instance for 1-minute resolution
+- Memory metrics require the [CloudWatch Agent](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html) to be installed on the instance
+- All metric values are rounded to two decimal places
+
+### Example Output
+
+```json
+{
+  "data": {
+    "avgCpuUsagePercent": 0.18,
+    "avgNetworkInBytesPerSec": 107.25,
+    "avgNetworkOutBytesPerSec": 11.63,
+    "end": "2026-05-29T08:50:49Z",
+    "instanceId": "i-0abc1234567890def",
+    "lookbackPeriod": "7d",
+    "region": "eu-north-1",
+    "start": "2026-05-22T08:50:49Z",
+    "totalNetworkInBytes": 64866070,
+    "totalNetworkOutBytes": 7032351
+  },
+  "timestamp": "2026-05-29T08:50:50.657831534Z",
+  "type": "aws.ec2.instance.metrics"
+}
+```
+
 <a id="ec2-•-manage-instance-power"></a>
 
 ## EC2 • Manage Instance Power
@@ -1513,6 +1577,66 @@ Emits instance details on the default output channel once the operation complete
   },
   "timestamp": "2026-05-28T09:41:26.29656651Z",
   "type": "aws.ec2.instance.power.started"
+}
+```
+
+<a id="ec2-•-update-instance"></a>
+
+## EC2 • Update Instance
+
+**Component key:** `aws.ec2.updateInstance`
+
+The Update Instance component resizes an EC2 instance to a new instance type and/or updates its security groups.
+
+### Use Cases
+
+- **Right-sizing**: Scale an instance up or down based on observed utilisation
+- **Automated resizing**: Use the output of Get Instance Metrics to conditionally resize
+- **Security posture updates**: Replace the security groups attached to a running instance
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to update
+- **New Instance Type**: Target instance type (e.g. `t3.medium`). The instance is stopped automatically, resized, and restarted. At least one of this field or Security Groups must be set.
+- **Security Group**: Replace the instance's security group. Takes effect immediately for VPC instances; does not require a stop/start cycle.
+- **Restart After Resize**: Whether to start the instance after changing its type (default true). If unchecked the instance remains stopped after the type change.
+
+### Instance Type Change Lifecycle
+
+1. The component records the current state of the instance.
+2. If the instance is running it is stopped automatically.
+3. Once stopped, `ModifyInstanceAttribute` is called with the new instance type.
+4. If the instance was originally running and **Restart After Resize** is enabled, the instance is started again and the component waits for it to reach `running` state.
+
+### Output
+
+Emits updated instance details on the default output channel:
+- `instanceId`, `instanceType`, `state`, `region`
+- `publicIpAddress`, `privateIpAddress`, `name`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-0215d085326c25744",
+    "instanceId": "i-03976dc68f19ba526",
+    "instanceType": "t3.micro",
+    "keyName": "my-key",
+    "launchTime": "2026-05-29T08:52:02.000Z",
+    "name": "ephemeral-builder",
+    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "eu-north-1",
+    "state": "running",
+    "subnetId": "subnet-0e7c8aa9b0a82aec5",
+    "vpcId": "vpc-0049650f5a479c14b"
+  },
+  "timestamp": "2026-05-29T08:52:13.71956816Z",
+  "type": "aws.ec2.instance.updated"
 }
 ```
 
