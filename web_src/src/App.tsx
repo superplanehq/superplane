@@ -23,7 +23,7 @@ import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { WorkflowPageV2 } from "./pages/workflowv2";
+import { AppPage } from "./pages/app";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -112,12 +112,12 @@ function AppRouter() {
                     path=":appId/settings"
                     element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
                   />
-                  <Route path=":appId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                  <Route path=":appId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-                <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="templates/:canvasId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
