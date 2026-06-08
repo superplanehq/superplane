@@ -576,11 +576,24 @@ func (c *Client) GetWorkflowSchemeForProject(projectID string) (*WorkflowSchemeD
 
 	for _, assignment := range resp.Values {
 		schemeID := strings.TrimSpace(assignment.WorkflowScheme.ID.String())
-		if schemeID == "" {
-			continue
+		if schemeID != "" {
+			// Resolve the full scheme details (the inlined version omits issueTypeMappings).
+			return c.GetWorkflowScheme(schemeID)
 		}
-		// Resolve the full scheme details (the inlined version omits issueTypeMappings).
-		return c.GetWorkflowScheme(schemeID)
+		// Jira omits the scheme id for the built-in Default Workflow Scheme
+		// (common for company-managed projects that never customized it). The
+		// inlined object still carries the default workflow, so fall back to it
+		// instead of dropping the workflow entirely. Per-issue-type mappings
+		// aren't retrievable without an id, but the default workflow applies to
+		// every issue type that isn't explicitly remapped.
+		if defaultWorkflow := strings.TrimSpace(assignment.WorkflowScheme.DefaultWorkflow); defaultWorkflow != "" {
+			return &WorkflowSchemeDetail{
+				ID:                assignment.WorkflowScheme.ID,
+				Name:              assignment.WorkflowScheme.Name,
+				DefaultWorkflow:   defaultWorkflow,
+				IssueTypeMappings: map[string]string{},
+			}, nil
+		}
 	}
 
 	return nil, nil

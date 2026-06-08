@@ -407,6 +407,86 @@ func Test__Client__GetProjectIssueTypes(t *testing.T) {
 	})
 }
 
+func Test__Client__GetWorkflowSchemeForProject(t *testing.T) {
+	t.Run("custom scheme with id resolves full details", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF"}}
+						]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF",
+						"issueTypeMappings":{"10001":"Bug WF"}
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Custom Scheme", scheme.Name)
+		assert.Equal(t, "Bug WF", scheme.IssueTypeMappings["10001"])
+		// Both endpoints were hit: project assignment, then full scheme by id.
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/rest/api/3/workflowscheme/42")
+	})
+
+	t.Run("default scheme without id falls back to inlined default workflow", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"name":"Default Workflow Scheme","defaultWorkflow":"jira"}}
+						]
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Default Workflow Scheme", scheme.Name)
+		assert.Equal(t, "jira", scheme.DefaultWorkflow)
+		assert.NotNil(t, scheme.IssueTypeMappings)
+		// No id means no second request to resolve full details.
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("team-managed project with empty list returns nil", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		assert.Nil(t, scheme)
+	})
+}
+
 func Test__WrapInADF(t *testing.T) {
 	t.Run("wraps text in ADF format", func(t *testing.T) {
 		result := WrapInADF("Hello world")
