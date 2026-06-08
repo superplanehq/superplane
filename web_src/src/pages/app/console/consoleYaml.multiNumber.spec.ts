@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { ConsolePanel } from "@/hooks/useCanvasData";
+
 import { consoleToYaml, parseConsoleYaml } from "./consoleYaml";
 
 describe("consoleToYaml / parseConsoleYaml — multi-number panels", () => {
   it("round-trips a multi-number panel with independently-configured metrics", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       {
         id: "kpis",
         type: "number",
