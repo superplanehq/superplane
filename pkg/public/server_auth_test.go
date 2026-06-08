@@ -10,6 +10,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -28,7 +29,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	server.RegisterWebRoutes("")

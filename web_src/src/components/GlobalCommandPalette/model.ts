@@ -7,6 +7,7 @@ import { useCanvases, useCreateCanvas } from "@/hooks/useCanvasData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
+import { appPath } from "@/lib/appPaths";
 import { isUsagePageForced } from "@/lib/env";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -203,9 +204,9 @@ function usePaletteNavigation(
   );
 
   const goToCurrentCanvasView = useCallback(
-    (view?: "dashboard" | "memory" | "runs") => {
+    (view?: "console" | "memory" | "runs") => {
       if (!organizationId || !canvasId) return;
-      goTo(`/${organizationId}/canvases/${canvasId}${view ? `?view=${view}` : ""}`);
+      goTo(appPath(organizationId, canvasId, view ? `?view=${view}` : ""));
     },
     [canvasId, goTo, organizationId],
   );
@@ -214,7 +215,7 @@ function usePaletteNavigation(
     (tab: CanvasToolSidebarTab) => {
       if (!organizationId || !canvasId) return;
       closePalette();
-      navigate(`/${organizationId}/canvases/${canvasId}`);
+      navigate(appPath(organizationId, canvasId));
       window.setTimeout(() => openCanvasToolSidebarTab(tab), 0);
     },
     [canvasId, closePalette, navigate, organizationId],
@@ -237,7 +238,7 @@ function useCreateCanvasCommand(
       const nextCanvasId = result?.data?.canvas?.metadata?.id;
       if (!nextCanvasId) return;
       closePalette();
-      navigate(`/${organizationId}/canvases/${nextCanvasId}`);
+      navigate(appPath(organizationId, nextCanvasId));
     } catch (error) {
       showErrorToast(getUsageLimitToastMessage(error, "Failed to create canvas"));
     }

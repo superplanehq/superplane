@@ -11,7 +11,7 @@ const (
 	testCanvasID       = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	testCanvasName     = "my-canvas"
 	testDescribeCanvas = "/api/v1/canvases/" + testCanvasID
-	testDashboardPath  = "/api/v1/canvases/" + testCanvasID + "/dashboard"
+	testConsolePath    = "/api/v1/canvases/" + testCanvasID + "/console"
 )
 
 func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request) {
@@ -20,12 +20,12 @@ func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request
 	_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testCanvasID + `","name":"` + testCanvasName + `"},"spec":{"nodes":[],"edges":[]}}}`))
 }
 
-func liveDashboardResponse(t *testing.T, w http.ResponseWriter, r *http.Request) {
+func liveConsoleResponse(t *testing.T, w http.ResponseWriter, r *http.Request) {
 	t.Helper()
 	require.Empty(t, r.URL.Query().Get("versionId"))
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{
-        "dashboard": {
+        "console": {
             "canvasId": "` + testCanvasID + `",
             "versionId": "live-version-1",
             "panels": [{"id": "notes", "type": "markdown", "content": {"body": "Hello"}}],
@@ -44,8 +44,8 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testDashboardPath,
-			handle: liveDashboardResponse,
+			path:   testConsolePath,
+			handle: liveConsoleResponse,
 		},
 	)
 
@@ -67,7 +67,7 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " " + testDescribeCanvas,
-		http.MethodGet + " " + testDashboardPath,
+		http.MethodGet + " " + testConsolePath,
 	})
 }
 
@@ -81,8 +81,8 @@ func TestGetTextOutputSummary(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testDashboardPath,
-			handle: liveDashboardResponse,
+			path:   testConsolePath,
+			handle: liveConsoleResponse,
 		},
 	)
 
@@ -132,11 +132,11 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testDashboardPath,
+			path:   testConsolePath,
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "draft-1", r.URL.Query().Get("versionId"))
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"dashboard":{"canvasId":"` + testCanvasID + `","versionId":"draft-1","panels":[],"layout":[]}}`))
+				_, _ = w.Write([]byte(`{"console":{"canvasId":"` + testCanvasID + `","versionId":"draft-1","panels":[],"layout":[]}}`))
 			},
 		},
 	)
@@ -162,8 +162,8 @@ func TestGetUsesActiveCanvasWhenNoArg(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testDashboardPath,
-			handle: liveDashboardResponse,
+			path:   testConsolePath,
+			handle: liveConsoleResponse,
 		},
 	)
 

@@ -26,7 +26,6 @@ const PAGE_SIZE = 50;
 const agentModeToApiMode = {
   builder: "MODE_BUILDER",
   operator: "MODE_OPERATOR",
-  architect: "MODE_ARCHITECT",
 } as const;
 
 export function useCanvasAgentChat(

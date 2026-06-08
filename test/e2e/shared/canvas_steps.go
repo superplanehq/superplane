@@ -165,7 +165,7 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 }
 
 func (s *CanvasSteps) Visit() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.WorkflowID.String())
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.WorkflowID.String())
 }
 
 func (s *CanvasSteps) OpenBuildingBlocksSidebar() {

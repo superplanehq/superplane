@@ -9,7 +9,7 @@
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
 - Integration component implementations: pkg/integrations/<integration>/
-- Workflow v2 UI component mappers: web_src/src/pages/workflowv2/mappers/<integration>/
+- UI component mappers: web_src/src/pages/app/mappers/<integration>/
 
 ## Pull Request Guidelines
 
@@ -43,6 +43,7 @@
 
 ## Coding Style & Naming Conventions
 
+- Always write clean code: work test-first by default, then keep names clear, functions focused, side effects explicit, control flow shallow, and error handling useful.
 - Tests end with \_test.go
 - Always prefer early returns over else blocks when possible
 - GoLang: prefer `any` over `interface{}` types
