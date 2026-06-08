@@ -46,6 +46,8 @@ A few concrete things teams build with SuperPlane:
 
 ## Quick start
 
+**Prerequisites:** Docker installed on your system.
+
 Run the latest demo container:
 
 ```
