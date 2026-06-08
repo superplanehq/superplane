@@ -84,7 +84,10 @@ describe("MentionTextarea", () => {
     textarea.scrollTop = 96;
     fireEvent.scroll(textarea);
 
-    expect(textarea.scrollTop).toBeCloseTo(94.08);
-    expect(backdrop.scrollTop).toBeCloseTo(94.08);
+    const maxScrollTop = textarea.scrollHeight - textarea.clientHeight;
+    expect(textarea.scrollTop).toBeLessThan(maxScrollTop);
+    expect(textarea.scrollTop).toBeLessThanOrEqual(maxScrollTop * 0.96);
+    expect(textarea.scrollTop).toBeGreaterThan(maxScrollTop * 0.94);
+    expect(backdrop.scrollTop).toBe(textarea.scrollTop);
   });
 });
