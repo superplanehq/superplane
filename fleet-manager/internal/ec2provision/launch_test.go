@@ -49,23 +49,11 @@ func TestConfigFromEnvRejectsInvalidArchitecture(t *testing.T) {
 
 func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 	tests := []struct {
-		name           string
-		arch           string
-		wantAWSCLI     string
-		wantCloudWatch string
+		name string
+		arch string
 	}{
-		{
-			name:           "amd64",
-			arch:           "amd64",
-			wantAWSCLI:     "awscli-exe-linux-x86_64.zip",
-			wantCloudWatch: "amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb",
-		},
-		{
-			name:           "arm64",
-			arch:           "arm64",
-			wantAWSCLI:     "awscli-exe-linux-aarch64.zip",
-			wantCloudWatch: "amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb",
-		},
+		{name: "amd64", arch: "amd64"},
+		{name: "arm64", arch: "arm64"},
 	}
 
 	for _, tt := range tests {
@@ -84,20 +72,15 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(script, tt.wantAWSCLI) {
-				t.Fatalf("user-data missing AWS CLI package %q", tt.wantAWSCLI)
-			}
-			if !strings.Contains(script, tt.wantCloudWatch) {
-				t.Fatalf("user-data missing CloudWatch agent package %q", tt.wantCloudWatch)
-			}
+			// Slim AMI userdata: downloads runner binary from S3 and starts pre-installed service.
 			if !strings.Contains(script, "s3://runner-binaries/release/runner-linux-"+tt.arch) {
 				t.Fatalf("user-data missing runner S3 URI for %s", tt.arch)
 			}
-			if !strings.Contains(script, "deb.nodesource.com/setup_22.x") {
-				t.Fatalf("user-data missing Node.js 22 install")
+			if !strings.Contains(script, "systemctl start superplane-runner.service") {
+				t.Fatalf("user-data missing systemctl start")
 			}
-			if !strings.Contains(script, "apt-get install -qy nodejs") {
-				t.Fatalf("user-data missing nodejs package install")
+			if !strings.Contains(script, "RUNNER_FLEET_ID") {
+				t.Fatalf("user-data missing RUNNER_FLEET_ID env")
 			}
 		})
 	}
