@@ -65,7 +65,9 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"",
 			"abc123",
 			"commit message",
-			nil,
+			[]*pb.CanvasRepositoryFileOperation{
+				{Path: "README.md", Content: []byte("hello")},
+			},
 		)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
