@@ -1,5 +1,6 @@
 import { getApiErrorMessage } from "@/lib/errors";
 
+import { isWorkflowSpecPath } from "../../lib/workflow-spec-paths";
 import type { PendingFileChange, AppFile } from "../types";
 
 type RepositoryQueryLike = {
@@ -62,12 +63,12 @@ function resolveSelectedFileContent(
   selectedChange: PendingFileChange | undefined,
   loadedContentByPath: Record<string, string>,
 ): string {
-  if (selectedGeneratedFile) {
-    return selectedGeneratedFile.content;
-  }
-
   if (selectedChange?.type === "added" || selectedChange?.type === "modified") {
     return selectedChange.content;
+  }
+
+  if (selectedGeneratedFile) {
+    return selectedGeneratedFile.content;
   }
 
   if (!selectedPath) {
@@ -126,12 +127,14 @@ export function getSelectedFileViewState({
   const editorErrorMessage =
     selectedGeneratedFile?.errorMessage ||
     (selectedFileQuery.error ? getApiErrorMessage(selectedFileQuery.error, "Failed to load file.") : undefined);
+  const isEditableSpecFile = !!selectedPath && isWorkflowSpecPath(selectedPath);
   const editorDisabled =
-    !!selectedGeneratedFile ||
+    !!selectedGeneratedFile?.loading ||
     !canManageRepositoryFiles ||
     !selectedPath ||
     selectedIsDeleted ||
-    !selectedContentLoaded;
+    !selectedContentLoaded ||
+    (!!selectedGeneratedFile && !isEditableSpecFile);
 
   return {
     selectedContent,

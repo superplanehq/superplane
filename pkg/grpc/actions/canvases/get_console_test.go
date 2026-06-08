@@ -42,15 +42,15 @@ func Test__GetConsole(t *testing.T) {
 
 	t.Run("empty console when none stored", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		resp, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
+		yamlText, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
 		require.NoError(t, err)
-		require.NotNil(t, resp.GetConsole())
-		assert.Equal(t, canvas.ID.String(), resp.GetConsole().GetCanvasId())
-		assert.Empty(t, resp.GetConsole().GetPanels())
-		assert.Empty(t, resp.GetConsole().GetLayout())
+		doc, err := models.ConsoleFromYML([]byte(yamlText))
+		require.NoError(t, err)
+		assert.Empty(t, doc.Spec.Panels)
+		assert.Empty(t, doc.Spec.Layout)
 	})
 
-	t.Run("returns stored panels and layout", func(t *testing.T) {
+	t.Run("returns stored panels and layout as console yaml", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		minW, minH := 2, 1
 
@@ -62,20 +62,20 @@ func Test__GetConsole(t *testing.T) {
 
 		require.NoError(t, err)
 
-		resp, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
+		yamlText, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
 		require.NoError(t, err)
-		d := resp.GetConsole()
-		require.Len(t, d.GetPanels(), 1)
-		assert.Equal(t, "p1", d.GetPanels()[0].GetId())
-		assert.Equal(t, "markdown", d.GetPanels()[0].GetType())
-		require.NotNil(t, d.GetPanels()[0].GetContent())
-		require.Len(t, d.GetLayout(), 1)
-		assert.Equal(t, "p1", d.GetLayout()[0].GetI())
-		assert.EqualValues(t, 4, d.GetLayout()[0].GetW())
-		require.NotNil(t, d.GetLayout()[0].MinW)
-		require.NotNil(t, d.GetLayout()[0].MinH)
-		assert.EqualValues(t, 2, *d.GetLayout()[0].MinW)
-		assert.EqualValues(t, 1, *d.GetLayout()[0].MinH)
-		require.NotNil(t, d.GetUpdatedAt())
+		doc, err := models.ConsoleFromYML([]byte(yamlText))
+		require.NoError(t, err)
+		require.Len(t, doc.Spec.Panels, 1)
+		assert.Equal(t, "p1", doc.Spec.Panels[0].ID)
+		assert.Equal(t, "markdown", doc.Spec.Panels[0].Type)
+		require.NotNil(t, doc.Spec.Panels[0].Content)
+		require.Len(t, doc.Spec.Layout, 1)
+		assert.Equal(t, "p1", doc.Spec.Layout[0].I)
+		assert.EqualValues(t, 4, doc.Spec.Layout[0].W)
+		require.NotNil(t, doc.Spec.Layout[0].MinW)
+		require.NotNil(t, doc.Spec.Layout[0].MinH)
+		assert.EqualValues(t, 2, *doc.Spec.Layout[0].MinW)
+		assert.EqualValues(t, 1, *doc.Spec.Layout[0].MinH)
 	})
 }
