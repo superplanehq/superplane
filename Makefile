@@ -302,7 +302,8 @@ openapi.spec.gen: dev.test.is.running
 # supported panel kinds. Lives as a separate target so callers can re-run
 # the injection without regenerating the swagger.
 openapi.spec.inject.console.schema: dev.test.is.running
-	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm -s run generate:console-schema && cd .. && node scripts/inject-console-panel-content-schema.mjs"
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm -s run generate:console-schema"
+	@$(COMPOSE) exec app node scripts/inject-console-panel-content-schema.mjs
 
 openapi.client.gen: dev.test.is.running
 	@rm -rf pkg/openapi_client
