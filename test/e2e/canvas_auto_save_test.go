@@ -239,6 +239,10 @@ func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
 	}
 }
 
-// waitForSaved polls the canvas save status indicator until it reports "saved".
+// waitForSaved waits until the current draft version reflects the latest save.
 func (s *canvasAutoSaveSteps) waitForSaved() {
+	require.Eventually(s.t, func() bool {
+		return s.canvas.FindCurrentDraft() != nil
+	}, 10*time.Second, 200*time.Millisecond)
+	s.session.Sleep(500)
 }
