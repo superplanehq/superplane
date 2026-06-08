@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import { baseMapper, cloudBuildBaseMapper } from "./base";
+import { cloudBuildBaseMapper, computeBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
@@ -26,9 +26,10 @@ import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } fr
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
 import { deleteImageMapper } from "./delete_image";
+import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  createVM: baseMapper,
+  createVM: computeBaseMapper,
   deleteVMInstance: deleteVMInstanceMapper,
   manageVMInstancePower: manageVMInstancePowerMapper,
   updateVMInstanceType: updateVMInstanceTypeMapper,
@@ -50,6 +51,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "clouddns.createRecord": cloudDNSMapper,
   "clouddns.deleteRecord": cloudDNSMapper,
   "clouddns.updateRecord": cloudDNSMapper,
+  "compute.createStaticIP": createStaticIPMapper,
+  "compute.deleteStaticIP": deleteStaticIPMapper,
+  "compute.manageStaticIP": manageStaticIPMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -83,6 +87,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "clouddns.createRecord": buildActionStateRegistry("completed"),
   "clouddns.deleteRecord": buildActionStateRegistry("completed"),
   "clouddns.updateRecord": buildActionStateRegistry("completed"),
+  "compute.createStaticIP": buildActionStateRegistry("completed"),
+  "compute.deleteStaticIP": buildActionStateRegistry("completed"),
+  "compute.manageStaticIP": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

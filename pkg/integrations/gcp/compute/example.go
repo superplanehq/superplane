@@ -34,6 +34,15 @@ var exampleOutputUpdateImageBytes []byte
 //go:embed example_output_delete_image.json
 var exampleOutputDeleteImageBytes []byte
 
+//go:embed example_output_create_static_ip.json
+var exampleOutputCreateStaticIPBytes []byte
+
+//go:embed example_output_delete_static_ip.json
+var exampleOutputDeleteStaticIPBytes []byte
+
+//go:embed example_output_manage_static_ip.json
+var exampleOutputManageStaticIPBytes []byte
+
 var (
 	exampleOutputCreateVMOnce sync.Once
 	exampleOutputCreateVM     map[string]any
@@ -61,6 +70,15 @@ var (
 
 	exampleOutputDeleteImageOnce sync.Once
 	exampleOutputDeleteImage     map[string]any
+
+	exampleOutputCreateStaticIPOnce sync.Once
+	exampleOutputCreateStaticIP     map[string]any
+
+	exampleOutputDeleteStaticIPOnce sync.Once
+	exampleOutputDeleteStaticIP     map[string]any
+
+	exampleOutputManageStaticIPOnce sync.Once
+	exampleOutputManageStaticIP     map[string]any
 )
 
 func (c *CreateVM) ExampleOutput() map[string]any {
@@ -97,4 +115,16 @@ func (u *UpdateImage) ExampleOutput() map[string]any {
 
 func (d *DeleteImage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteImageOnce, exampleOutputDeleteImageBytes, &exampleOutputDeleteImage)
+}
+
+func (c *CreateStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateStaticIPOnce, exampleOutputCreateStaticIPBytes, &exampleOutputCreateStaticIP)
+}
+
+func (d *DeleteStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteStaticIPOnce, exampleOutputDeleteStaticIPBytes, &exampleOutputDeleteStaticIP)
+}
+
+func (m *ManageStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageStaticIPOnce, exampleOutputManageStaticIPBytes, &exampleOutputManageStaticIP)
 }
