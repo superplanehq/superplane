@@ -66,6 +66,18 @@ type Field struct {
 	Sensitive bool `json:"sensitive"`
 
 	/*
+	 * PromptField marks fields whose resolved value is sent to an LLM as user prompt content.
+	 * Used by the guardrail interceptor to determine which fields to scan.
+	 */
+	PromptField bool `json:"promptField,omitempty"`
+
+	/*
+	 * SystemPromptField marks fields whose resolved value is sent as the LLM system/instruction prompt.
+	 * System prompts are authored by the workflow builder (trusted), so injection rules are relaxed.
+	 */
+	SystemPromptField bool `json:"systemPromptField,omitempty"`
+
+	/*
 	 * Type-specific options for fields.
 	 * The structure depends on the field type.
 	 */

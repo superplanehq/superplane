@@ -164,12 +164,11 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
-	// Start Webhook Provisioner when internal API runs so integration webhooks (e.g. GCP On VM Created) get provisioned.
-	// Can be disabled by setting START_WEBHOOK_PROVISIONER=no.
-	if os.Getenv("START_WEBHOOK_PROVISIONER") != "no" {
-		if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
-			log.Println("Starting Webhook Provisioner")
-		}
+	// Legacy provisioner — opt-in only. Required only for integrations whose handlers
+	// have not yet adopted the ScopeKeyer interface. Once all integrations are migrated
+	// (via RUN_WEBHOOK_LEGACY_MIGRATION_JOB) this block can be removed entirely.
+	if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
+		log.Println("Starting Webhook Provisioner")
 		webhookBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewWebhookProvisioner(webhookBaseURL, encryptor, registry)
 		go w.Start(context.Background())
@@ -180,6 +179,50 @@ func startWorkers(
 
 		w := workers.NewWebhookCleanupWorker(encryptor, registry, baseURL)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WEBHOOK_SHADOW_RECONCILER") == "yes" {
+		log.Println("Starting Webhook Shadow Reconciler")
+
+		w := workers.NewWebhookShadowReconciler(registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WEBHOOK_RECONCILER") == "yes" {
+		log.Println("Starting Webhook Reconciler")
+
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewWebhookReconciler(registry, encryptor, webhookBaseURL)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WEBHOOK_OPS_PROVISIONER") == "yes" {
+		log.Println("Starting Webhook Ops Provisioner")
+
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewWebhookOpsProvisioner(webhookBaseURL, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("RUN_WEBHOOK_LEGACY_MIGRATION_JOB") == "yes" {
+		log.Println("Running Webhook Legacy Migration Job")
+		if err := workers.NewWebhookLegacyMigrationJob(registry).Run(); err != nil {
+			log.Fatalf("Webhook legacy migration job failed: %v", err)
+		}
+	}
+
+	if os.Getenv("RUN_WEBHOOK_BACKFILL_JOB") == "yes" {
+		log.Println("Running Webhook Backfill Job")
+		if err := workers.NewWebhookBackfillJob(registry).Run(); err != nil {
+			log.Fatalf("Webhook backfill job failed: %v", err)
+		}
+	}
+
+	if os.Getenv("RUN_WEBHOOK_DEDUPE_JOB") == "yes" {
+		log.Println("Running Webhook Dedupe Job")
+		if err := workers.NewWebhookDedupeJob().Run(); err != nil {
+			log.Fatalf("Webhook dedupe job failed: %v", err)
+		}
 	}
 
 	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
@@ -206,6 +249,18 @@ func startWorkers(
 		log.Println("Starting Organization Cleanup Worker")
 
 		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_GUARDRAIL_GUARDIAN_WORKER") == "yes" {
+		log.Println("Starting Guardrail Guardian Worker")
+		w := workers.NewGuardrailGuardianWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_CLASSIFIER_WORKER") == "yes" {
+		log.Println("Starting Classifier Worker")
+		w := workers.NewClassifierWorkerFromEnv()
 		go w.Start(context.Background())
 	}
 

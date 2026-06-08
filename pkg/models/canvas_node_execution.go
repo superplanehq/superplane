@@ -13,17 +13,20 @@ import (
 )
 
 const (
-	CanvasNodeExecutionStatePending  = "pending"
-	CanvasNodeExecutionStateStarted  = "started"
-	CanvasNodeExecutionStateFinished = "finished"
+	CanvasNodeExecutionStatePending         = "pending"
+	CanvasNodeExecutionStateStarted         = "started"
+	CanvasNodeExecutionStateFinished        = "finished"
+	CanvasNodeExecutionStateGuardrailBlocked = "guardrail_blocked"
 
 	CanvasNodeExecutionResultPassed    = "passed"
 	CanvasNodeExecutionResultFailed    = "failed"
 	CanvasNodeExecutionResultCancelled = "cancelled"
 
-	CanvasNodeExecutionResultReasonOk            = "ok"
-	CanvasNodeExecutionResultReasonError         = "error"
-	CanvasNodeExecutionResultReasonErrorResolved = "error_resolved"
+	CanvasNodeExecutionResultReasonOk                  = "ok"
+	CanvasNodeExecutionResultReasonError               = "error"
+	CanvasNodeExecutionResultReasonErrorResolved       = "error_resolved"
+	CanvasNodeExecutionResultReasonGuardrailHardBlock  = "guardrail_hard_block"
+	CanvasNodeExecutionResultReasonGuardrailTimeout    = "guardrail_override_timeout"
 )
 
 type CanvasNodeExecution struct {
@@ -85,6 +88,13 @@ type CanvasNodeExecution struct {
 	// Only new executions will use the new node configuration.
 	//
 	Configuration datatypes.JSONType[map[string]any]
+
+	//
+	// Guardrail fields: scan result reference and blocked-at timestamp.
+	// Set when a guardrail interceptor scans or blocks this execution.
+	//
+	GuardrailScanID    *uuid.UUID
+	GuardrailBlockedAt *time.Time
 }
 
 func (e *CanvasNodeExecution) TableName() string {
@@ -435,6 +445,90 @@ func (e *CanvasNodeExecution) GetParentExecutionID() string {
 	}
 
 	return e.ParentExecutionID.String()
+}
+
+func (e *CanvasNodeExecution) WarnForGuardrail(scanResultID uuid.UUID, riskScore, findingsCount int) error {
+	return e.WarnForGuardrailInTransaction(database.Conn(), scanResultID, riskScore, findingsCount)
+}
+
+func (e *CanvasNodeExecution) WarnForGuardrailInTransaction(tx *gorm.DB, scanResultID uuid.UUID, riskScore, findingsCount int) error {
+	meta := e.Metadata.Data()
+	if meta == nil {
+		meta = make(map[string]any)
+	}
+	meta["guardrail_warning"] = map[string]any{
+		"scan_result_id": scanResultID.String(),
+		"risk_score":     riskScore,
+		"findings_count": findingsCount,
+	}
+	now := time.Now()
+	e.Metadata = datatypes.NewJSONType(meta)
+	e.UpdatedAt = &now
+	return tx.Model(e).Updates(map[string]any{
+		"metadata":   e.Metadata,
+		"updated_at": now,
+	}).Error
+}
+
+func (e *CanvasNodeExecution) ResetGuardrailBlock() error {
+	return e.ResetGuardrailBlockInTransaction(database.Conn())
+}
+
+func (e *CanvasNodeExecution) ResetGuardrailBlockInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	e.State = CanvasNodeExecutionStatePending
+	e.UpdatedAt = &now
+	return tx.Model(e).Updates(map[string]any{
+		"state":      CanvasNodeExecutionStatePending,
+		"updated_at": now,
+	}).Error
+}
+
+func ListGuardrailBlockedExecutions() ([]CanvasNodeExecution, error) {
+	return ListGuardrailBlockedExecutionsInTransaction(database.Conn())
+}
+
+func ListGuardrailBlockedExecutionsInTransaction(tx *gorm.DB) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("state = ?", CanvasNodeExecutionStateGuardrailBlocked).
+		Order("guardrail_blocked_at ASC").
+		Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+	return executions, nil
+}
+
+func LockGuardrailBlockedExecutionInTransaction(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ? AND state = ?", id, CanvasNodeExecutionStateGuardrailBlocked).
+		First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
+func (e *CanvasNodeExecution) BlockForGuardrail(scanResultID uuid.UUID) error {
+	return e.BlockForGuardrailInTransaction(database.Conn(), scanResultID)
+}
+
+func (e *CanvasNodeExecution) BlockForGuardrailInTransaction(tx *gorm.DB, scanResultID uuid.UUID) error {
+	now := time.Now()
+	e.State = CanvasNodeExecutionStateGuardrailBlocked
+	e.GuardrailScanID = &scanResultID
+	e.GuardrailBlockedAt = &now
+	e.UpdatedAt = &now
+
+	return tx.Model(e).Updates(map[string]any{
+		"state":               CanvasNodeExecutionStateGuardrailBlocked,
+		"guardrail_scan_id":   &scanResultID,
+		"guardrail_blocked_at": &now,
+		"updated_at":          &now,
+	}).Error
 }
 
 func (e *CanvasNodeExecution) Start() error {
