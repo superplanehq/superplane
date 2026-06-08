@@ -10,8 +10,8 @@ import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActi
 export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 export interface HeaderProps {
-  /** Shown centered in the top bar (canvas or template display name). */
-  canvasName: string;
+  /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
+  canvasName?: string;
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
@@ -85,7 +85,7 @@ export interface HeaderProps {
 }
 
 export function Header(props: HeaderProps) {
-  const headerTitle = props.canvasName.trim() || "Canvas";
+  const headerTitle = (props.canvasName ?? "").trim() || "Canvas";
 
   return (
     <header>
