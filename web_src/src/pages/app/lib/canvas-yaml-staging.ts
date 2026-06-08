@@ -53,10 +53,30 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
   }
 
   return {
-    nodes: parsed.spec.nodes ?? [],
+    nodes: (parsed.spec.nodes ?? []).map(normalizeCanvasYamlNode),
     edges: parsed.spec.edges ?? [],
     changeManagement: parsed.spec.changeManagement,
   };
+}
+
+function normalizeCanvasYamlNode(node: ComponentsNode): ComponentsNode {
+  const componentName =
+    typeof node.component === "string"
+      ? node.component
+      : typeof (node as { componentName?: string }).componentName === "string"
+        ? (node as { componentName?: string }).componentName
+        : undefined;
+
+  const normalized: ComponentsNode = {
+    ...node,
+    ...(componentName ? { component: componentName } : {}),
+  };
+
+  if (!normalized.type && componentName) {
+    normalized.type = "TYPE_ACTION";
+  }
+
+  return normalized;
 }
 
 export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
