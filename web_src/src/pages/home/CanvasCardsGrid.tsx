@@ -85,7 +85,7 @@ function CanvasCard({
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="mb-0 line-clamp-2 !text-lg font-medium text-gray-800 transition-colors !leading-6"
+                className="mb-0 line-clamp-2 !text-base font-medium text-gray-800 transition-colors !leading-6"
               >
                 <span className="truncate">{canvas.name}</span>
               </Heading>

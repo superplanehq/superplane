@@ -3,6 +3,7 @@ import Editor from "@monaco-editor/react";
 import type { FieldRendererProps } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { resolveIcon } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
@@ -229,16 +230,19 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                 Expanded JSON editor for {field.label || field.name}.
               </DialogDescription>
               <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyToClipboard();
                   }}
-                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
                 >
                   {React.createElement(resolveIcon("copy"), { size: 14 })}
                   Copy
-                </button>
+                </Button>
               </SimpleTooltip>
             </div>
             <div className="flex-1 overflow-auto rounded-md p-2 relative border border-gray-300 dark:border-gray-700">
