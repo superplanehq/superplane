@@ -427,28 +427,20 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 		return nil, err
 	}
 	if len(executionsInChain) > 0 {
-		executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-		for _, execution := range executionsInChain {
-			executionIDs = append(executionIDs, execution.ID)
-		}
-
 		linearExecutions, err := b.listLinearExecutionsInChain()
 		if err != nil {
 			return nil, err
 		}
 
-		events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+		branchEvents, err := loadExecutionBranchEvents(
+			b.tx,
+			linearExecutions,
+			executionIDsFromExecutions(executionsInChain),
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		branchEventIDByParent := branchEventIDByParentExecution(linearExecutions)
-		events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParent)
-		if err != nil {
-			return nil, err
-		}
-
-		eventsByID := indexEventsByID(events)
 		for i := len(executionsInChain) - 1; i >= 0; i-- {
 			execution := executionsInChain[i]
 			name, ok := nodeIDToName[execution.NodeID]
@@ -456,7 +448,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 				continue
 			}
 
-			event, found, err := eventForExecution(execution.ID, events, eventsByID, branchEventIDByParent)
+			event, found, err := branchEvents.eventFor(execution.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -810,34 +802,22 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		return err
 	}
 
-	executionIDSet := make(map[uuid.UUID]struct{}, len(executionIDByRef)+len(chainExecutions))
+	referencedExecutionIDs := make([]uuid.UUID, 0, len(executionIDByRef))
 	for _, executionID := range executionIDByRef {
-		executionIDSet[executionID] = struct{}{}
-	}
-	for _, execution := range chainExecutions {
-		executionIDSet[execution.ID] = struct{}{}
+		referencedExecutionIDs = append(referencedExecutionIDs, executionID)
 	}
 
-	allExecutionIDs := make([]uuid.UUID, 0, len(executionIDSet))
-	for executionID := range executionIDSet {
-		allExecutionIDs = append(allExecutionIDs, executionID)
-	}
-
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, allExecutionIDs)
+	branchEvents, err := loadExecutionBranchEvents(
+		b.tx,
+		chainExecutions,
+		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+	)
 	if err != nil {
 		return err
 	}
-
-	events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParentExecution(chainExecutions))
-	if err != nil {
-		return err
-	}
-
-	eventsByID := indexEventsByID(events)
-	branchEventIDByParent := branchEventIDByParentExecution(chainExecutions)
 
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok, err := eventForExecution(executionID, events, eventsByID, branchEventIDByParent)
+		event, ok, err := branchEvents.eventFor(executionID)
 		if err != nil {
 			return fmt.Errorf("node %s: %w", nodeRef, err)
 		}
@@ -849,88 +829,6 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	}
 
 	return nil
-}
-
-// branchEventIDByParentExecution maps each parent execution to the canvas event that
-// routed into the child on the current branch (from child.EventID when
-// child.PreviousExecutionID is set).
-func branchEventIDByParentExecution(executions []models.CanvasNodeExecution) map[uuid.UUID]uuid.UUID {
-	branchEventIDByParent := make(map[uuid.UUID]uuid.UUID, len(executions))
-	for _, execution := range executions {
-		if execution.PreviousExecutionID == nil || execution.EventID == uuid.Nil {
-			continue
-		}
-		branchEventIDByParent[*execution.PreviousExecutionID] = execution.EventID
-	}
-	return branchEventIDByParent
-}
-
-func indexEventsByID(events []models.CanvasEvent) map[uuid.UUID]models.CanvasEvent {
-	byID := make(map[uuid.UUID]models.CanvasEvent, len(events))
-	for _, event := range events {
-		byID[event.ID] = event
-	}
-	return byID
-}
-
-func loadMissingBranchEvents(
-	tx *gorm.DB,
-	events []models.CanvasEvent,
-	branchEventIDByParent map[uuid.UUID]uuid.UUID,
-) ([]models.CanvasEvent, error) {
-	byID := indexEventsByID(events)
-	for _, eventID := range branchEventIDByParent {
-		if eventID == uuid.Nil {
-			continue
-		}
-		if _, ok := byID[eventID]; ok {
-			continue
-		}
-
-		event, err := models.FindCanvasEventInTransaction(tx, eventID)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, *event)
-		byID[eventID] = *event
-	}
-	return events, nil
-}
-
-// eventForExecution picks the canvas event whose payload should represent an upstream
-// execution on the current branch. When branchEventIDByParent has an entry, it uses the
-// child's incoming event ID; otherwise it uses the sole event on that execution.
-func eventForExecution(
-	executionID uuid.UUID,
-	events []models.CanvasEvent,
-	eventsByID map[uuid.UUID]models.CanvasEvent,
-	branchEventIDByParent map[uuid.UUID]uuid.UUID,
-) (models.CanvasEvent, bool, error) {
-	if eventID, ok := branchEventIDByParent[executionID]; ok && eventID != uuid.Nil {
-		if event, found := eventsByID[eventID]; found {
-			return event, true, nil
-		}
-	}
-
-	var matched []models.CanvasEvent
-	for _, event := range events {
-		if event.ExecutionID != nil && *event.ExecutionID == executionID {
-			matched = append(matched, event)
-		}
-	}
-
-	switch len(matched) {
-	case 0:
-		return models.CanvasEvent{}, false, nil
-	case 1:
-		return matched[0], true, nil
-	default:
-		return models.CanvasEvent{}, false, fmt.Errorf(
-			"execution %s has ambiguous outputs (%d events)",
-			executionID,
-			len(matched),
-		)
-	}
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
@@ -1041,30 +939,22 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		startIndex = 1
 	}
 
-	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-	for _, execution := range executionsInChain {
-		executionIDs = append(executionIDs, execution.ID)
-	}
-
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	branchEvents, err := loadExecutionBranchEvents(
+		b.tx,
+		executionsInChain,
+		executionIDsFromExecutions(executionsInChain),
+	)
 	if err != nil {
 		return step, nil, err
 	}
 
-	branchEventIDByParent := branchEventIDByParentExecution(executionsInChain)
-	events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParent)
-	if err != nil {
-		return step, nil, err
-	}
-
-	eventsByID := indexEventsByID(events)
 	for _, execution := range executionsInChain[startIndex:] {
 		step++
 		if step < depth {
 			continue
 		}
 
-		event, ok, err := eventForExecution(execution.ID, events, eventsByID, branchEventIDByParent)
+		event, ok, err := branchEvents.eventFor(execution.ID)
 		if err != nil {
 			return step, nil, err
 		}

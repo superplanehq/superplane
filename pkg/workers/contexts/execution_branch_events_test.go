@@ -87,3 +87,17 @@ func Test_eventForExecution_ambiguousWithoutBranchLink(t *testing.T) {
 	assert.Contains(t, err.Error(), "ambiguous outputs")
 	assert.False(t, ok)
 }
+
+func Test_unionExecutionIDs(t *testing.T) {
+	first := uuid.New()
+	second := uuid.New()
+	shared := uuid.New()
+
+	result := unionExecutionIDs(
+		[]uuid.UUID{first, shared},
+		[]uuid.UUID{second, shared},
+	)
+
+	assert.Len(t, result, 3)
+	assert.ElementsMatch(t, []uuid.UUID{first, second, shared}, result)
+}
