@@ -2,7 +2,6 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
-import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,12 +21,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import {
-  canvasesApplyCanvasVersionChangeset,
-  canvasesDescribeCanvasVersion,
-  canvasesReemitTriggerEvent,
-  canvasesUpdateNodePause,
-} from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
@@ -99,7 +93,6 @@ import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
 import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
-import { useAppFiles } from "./files/useAppFiles";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
@@ -127,6 +120,8 @@ import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
+import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
+import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
@@ -1327,10 +1322,7 @@ export function AppPage() {
       try {
         const response = await updateCanvasVersionMutation.mutateAsync({
           versionId: request.savingVersionId,
-          name: request.workflow.metadata?.name ?? "",
-          description: request.workflow.metadata?.description,
-          nodes: request.workflow.spec?.nodes,
-          edges: request.workflow.spec?.edges,
+          canvasYaml: materializeCanvasSpec(request.workflow),
           preserveLocalCanvasState: true,
           invalidateRelatedQueries: false,
         });
@@ -1479,17 +1471,13 @@ export function AppPage() {
 
       activateBranch(branchName);
 
-      const versionResponse = await canvasesDescribeCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId: canvasId!, versionId },
-        }),
-      );
+      const versionResponse = await fetchCanvasVersionWithSpec(canvasId!, versionId);
       if (session !== draftCreationSessionRef.current) {
         return;
       }
 
-      const loadedVersion = versionResponse.data?.version;
-      if (!loadedVersion) {
+      const loadedVersion = versionResponse;
+      if (!loadedVersion?.spec) {
         showErrorToast("Failed to load draft version");
         return;
       }
@@ -4923,55 +4911,8 @@ export function AppPage() {
   ]);
 
   const buildYamlExportPayload = useCallback(
-    (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) => {
-      if (!workflow) return null;
-
-      const updatedNodes =
-        workflow.spec?.nodes?.map((node) => {
-          const canvasNode = canvasNodes?.find((cn) => cn.id === node.id);
-          if (canvasNode) {
-            const componentType = (canvasNode?.data?.type as string) || "";
-            return {
-              ...node,
-              position: {
-                x: Math.round(canvasNode.position.x),
-                y: Math.round(canvasNode.position.y),
-              },
-              isCollapsed: (canvasNode.data[componentType] as { collapsed: boolean })?.collapsed || false,
-            };
-          }
-          return node;
-        }) || [];
-
-      const exportWorkflow = {
-        apiVersion: "v1",
-        kind: "Canvas",
-        metadata: {
-          id: workflow.metadata?.id || "",
-          name: workflow.metadata?.name || "Canvas",
-          description: workflow.metadata?.description || "",
-          isTemplate: workflow.metadata?.isTemplate ?? false,
-        },
-        spec: {
-          nodes: updatedNodes,
-          edges: workflow.spec?.edges || [],
-        },
-      };
-
-      const yamlText = yaml.dump(exportWorkflow, {
-        forceQuotes: true,
-        quotingType: '"',
-        lineWidth: 0,
-      });
-
-      const safeName = (workflow.metadata?.name || "canvas")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-      const filename = `${safeName || "canvas"}.yaml`;
-
-      return { yamlText, filename };
-    },
+    (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) =>
+      buildCanvasYamlExportPayload(workflow, canvasNodes),
     [],
   );
 
@@ -5093,7 +5034,7 @@ export function AppPage() {
     [canvasNodesById],
   );
 
-  const { yamlPayload: canvasYamlPayload, modalProps: canvasYamlModalProps } = useCanvasYaml({
+  const { modalProps: canvasYamlModalProps } = useCanvasYaml({
     canvasId: canvasId!,
     organizationId: organizationId!,
     open: isYamlViewModalOpen,
@@ -5107,15 +5048,7 @@ export function AppPage() {
     onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const appFiles = useAppFiles({
-    canvasYamlPayload,
-    panels: consoleQuery.data?.panels,
-    layout: consoleQuery.data?.layout,
-    canvasId,
-    canvasName: canvas?.metadata?.name,
-    consoleLoading: consoleQuery.isLoading,
-    consoleError: consoleQuery.error,
-  });
+  const appFiles = useMemo(() => [], []);
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
@@ -5359,6 +5292,7 @@ export function AppPage() {
           files={{
             isEditing,
             canvasId: canvasId || undefined,
+            versionId: activeCanvasVersionId || undefined,
             canWrite: canActOnCanvas,
             files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,

@@ -1,13 +1,15 @@
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState, type RefObject } from "react";
 
+import { isWorkflowSpecPath } from "../lib/workflow-spec-paths";
 import { applyPendingContentUpdate, applyPendingDelete } from "./lib/files-pending-state";
 import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./lib/files-paths";
-import type { PendingFileChange } from "./types";
+import type { AppFile, PendingFileChange } from "./types";
 
 type UsePendingStateOptions = {
   generatedPathSet: Set<string>;
   generatedPaths: string[];
+  generatedFilesByPath: Map<string, AppFile>;
   finalRepositoryPathsRef: RefObject<string[]>;
   allPathsRef: RefObject<string[]>;
   loadedContentByPathRef: RefObject<Record<string, string>>;
@@ -17,6 +19,7 @@ type UsePendingStateOptions = {
 export function usePendingState({
   generatedPathSet,
   generatedPaths,
+  generatedFilesByPath,
   finalRepositoryPathsRef,
   allPathsRef,
   loadedContentByPathRef,
@@ -58,13 +61,18 @@ export function usePendingState({
 
   const updateSelectedContent = useCallback(
     (selectedPath: string | null, value: string) => {
-      if (!selectedPath || generatedPathSet.has(selectedPath)) return;
+      if (!selectedPath) return;
 
-      setPendingChangesByPath((current) =>
-        applyPendingContentUpdate(current, selectedPath, value, loadedContentByPathRef.current[selectedPath]),
-      );
+      const isSpecPath = isWorkflowSpecPath(selectedPath);
+      if (!isSpecPath && generatedPathSet.has(selectedPath)) return;
+
+      const originalContent = isSpecPath
+        ? generatedFilesByPath.get(selectedPath)?.content
+        : loadedContentByPathRef.current[selectedPath];
+
+      setPendingChangesByPath((current) => applyPendingContentUpdate(current, selectedPath, value, originalContent));
     },
-    [generatedPathSet, loadedContentByPathRef],
+    [generatedFilesByPath, generatedPathSet, loadedContentByPathRef],
   );
 
   const deleteFile = useCallback(
