@@ -448,7 +448,7 @@ func Test__Client__GetWorkflowSchemeForProject(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
 						"values": [
-							{"projectIds":["10000"],"workflowScheme":{"name":"Default Workflow Scheme","defaultWorkflow":"jira"}}
+							{"projectIds":["10000"],"workflowScheme":{"name":"Default Workflow Scheme","defaultWorkflow":"jira","issueTypeMappings":{"10001":"Bug WF"}}}
 						]
 					}`)),
 				},
@@ -463,7 +463,9 @@ func Test__Client__GetWorkflowSchemeForProject(t *testing.T) {
 		require.NotNil(t, scheme)
 		assert.Equal(t, "Default Workflow Scheme", scheme.Name)
 		assert.Equal(t, "jira", scheme.DefaultWorkflow)
-		assert.NotNil(t, scheme.IssueTypeMappings)
+		// Per-issue-type mappings inlined in the project response are preserved,
+		// not discarded in favour of the default workflow.
+		assert.Equal(t, "Bug WF", scheme.IssueTypeMappings["10001"])
 		// No id means no second request to resolve full details.
 		assert.Len(t, httpContext.Requests, 1)
 	})

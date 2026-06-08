@@ -546,9 +546,10 @@ func (c *Client) GetWorkflowScheme(schemeID string) (*WorkflowSchemeDetail, erro
 type projectWorkflowSchemeAssignment struct {
 	ProjectIDs     []string `json:"projectIds"`
 	WorkflowScheme struct {
-		ID              FlexibleString `json:"id"`
-		Name            string         `json:"name"`
-		DefaultWorkflow string         `json:"defaultWorkflow,omitempty"`
+		ID                FlexibleString    `json:"id"`
+		Name              string            `json:"name"`
+		DefaultWorkflow   string            `json:"defaultWorkflow,omitempty"`
+		IssueTypeMappings map[string]string `json:"issueTypeMappings,omitempty"`
 	} `json:"workflowScheme"`
 }
 
@@ -582,16 +583,18 @@ func (c *Client) GetWorkflowSchemeForProject(projectID string) (*WorkflowSchemeD
 		}
 		// Jira omits the scheme id for the built-in Default Workflow Scheme
 		// (common for company-managed projects that never customized it). The
-		// inlined object still carries the default workflow, so fall back to it
-		// instead of dropping the workflow entirely. Per-issue-type mappings
-		// aren't retrievable without an id, but the default workflow applies to
-		// every issue type that isn't explicitly remapped.
+		// inlined object still carries the default workflow and any per-issue-type
+		// mappings, so fall back to it instead of dropping the workflow entirely.
 		if defaultWorkflow := strings.TrimSpace(assignment.WorkflowScheme.DefaultWorkflow); defaultWorkflow != "" {
+			mappings := assignment.WorkflowScheme.IssueTypeMappings
+			if mappings == nil {
+				mappings = map[string]string{}
+			}
 			return &WorkflowSchemeDetail{
 				ID:                assignment.WorkflowScheme.ID,
 				Name:              assignment.WorkflowScheme.Name,
 				DefaultWorkflow:   defaultWorkflow,
-				IssueTypeMappings: map[string]string{},
+				IssueTypeMappings: mappings,
 			}, nil
 		}
 	}
