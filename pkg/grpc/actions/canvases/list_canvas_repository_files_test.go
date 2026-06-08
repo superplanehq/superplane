@@ -22,13 +22,14 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
-	t.Run("repository missing -> error", func(t *testing.T) {
+	t.Run("repository missing -> returns virtual spec files", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
-		s, ok := status.FromError(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.Len(t, response.Files, 2)
+		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[0].Path)
+		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[1].Path)
 	})
 
 	t.Run("list files fails -> error", func(t *testing.T) {
@@ -45,8 +46,10 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 
 		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
-		require.Len(t, response.Files, 1)
+		require.Len(t, response.Files, 3)
 		assert.Equal(t, "README.md", response.Files[0].Path)
+		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[1].Path)
+		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[2].Path)
 	})
 
 	t.Run("canvas from different organization -> not found", func(t *testing.T) {

@@ -1,6 +1,8 @@
+import type { CanvasesCanvas } from "@/api-client";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { consoleToYaml } from "../../console/consoleYaml";
+import { materializeCanvasSpec, materializeConsoleSpec } from "../../lib/workflow-spec-files";
+import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../../lib/workflow-spec-paths";
 import type { AppFile } from "../types";
 
 type ConsolePanelInput = {
@@ -19,12 +21,9 @@ type ConsoleLayoutInput = {
   minH?: number;
 };
 
-type CanvasYamlPayload = {
-  yamlText: string;
-} | null;
-
 export function buildAppFiles({
-  canvasYamlPayload,
+  canvas,
+  canvasNodes,
   panels,
   layout,
   canvasId,
@@ -32,7 +31,8 @@ export function buildAppFiles({
   consoleLoading,
   consoleError,
 }: {
-  canvasYamlPayload: CanvasYamlPayload;
+  canvas: CanvasesCanvas | null | undefined;
+  canvasNodes?: Parameters<typeof materializeCanvasSpec>[1];
   panels: ConsolePanelInput[] | undefined;
   layout: ConsoleLayoutInput[] | undefined;
   canvasId: string | null | undefined;
@@ -40,7 +40,8 @@ export function buildAppFiles({
   consoleLoading: boolean;
   consoleError: unknown;
 }): AppFile[] {
-  const consoleYamlText = consoleToYaml({
+  const canvasYamlText = canvas ? materializeCanvasSpec(canvas, canvasNodes) : "";
+  const consoleYamlText = materializeConsoleSpec({
     panels: normalizePanels(panels),
     layout: normalizeLayout(layout),
     canvasId: canvasId || undefined,
@@ -49,13 +50,13 @@ export function buildAppFiles({
 
   return [
     {
-      path: "canvas.yaml",
-      content: canvasYamlPayload?.yamlText || "",
+      path: CANVAS_YAML_PATH,
+      content: canvasYamlText,
       language: "yaml",
-      loading: !canvasYamlPayload,
+      loading: !canvas,
     },
     {
-      path: "console.yaml",
+      path: CONSOLE_YAML_PATH,
       content: consoleYamlText,
       language: "yaml",
       loading: consoleLoading,
