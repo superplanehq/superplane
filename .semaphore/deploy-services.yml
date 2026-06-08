@@ -15,7 +15,7 @@ global_job_config:
 
 blocks:
   - name: Deploy task-broker
-    dependencies: ["Deploy task-broker"]
+    dependencies: []
     task:
       jobs:
         - name: ECS deploy task-broker
