@@ -33,6 +33,8 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	switch api.RunModeForTask(task) {
 	case models.RunModeJavaScript:
 		return runJavaScriptHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
+	case models.RunModePython:
+		return runPythonHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
 	}
 	if len(task.Commands) > 0 {
 		return runHostShellDirectives(ctx, max, h.TaskWorkDir, task.Commands, env, live, resultHostPath)

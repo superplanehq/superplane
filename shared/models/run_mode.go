@@ -10,6 +10,8 @@ const (
 	RunModeArgv RunMode = "argv"
 	// RunModeJavaScript runs Script with node; global $ is the message chain.
 	RunModeJavaScript RunMode = "javascript_script"
+	// RunModePython runs Script with python3; main(payload) receives the message chain.
+	RunModePython RunMode = "python_script"
 )
 
 // InferRunMode maps legacy task fields when RunMode is unset.

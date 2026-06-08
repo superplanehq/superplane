@@ -21,6 +21,19 @@ func TestValidateCreateTaskPayload_setupCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("python_script allows setup_commands", func(t *testing.T) {
+		req := &api.CreateTaskRequest{
+			RunMode:       string(models.RunModePython),
+			Script:        "def main(payload):\n    return {'ok': True}",
+			SetupCommands: []string{"pip install requests"},
+			WebhookURL:    "https://x/h",
+			ExecutionMode: "host",
+		}
+		if got := validateCreateTaskPayload(req); got != "" {
+			t.Fatalf("got %q", got)
+		}
+	})
+
 	t.Run("command_list rejects setup_commands", func(t *testing.T) {
 		req := &api.CreateTaskRequest{
 			RunMode:       string(models.RunModeCommandList),
