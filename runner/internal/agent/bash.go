@@ -16,68 +16,42 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-const bashProgramName = "script.sh"
+const (
+	bashProgramName = "script.sh"
+	bashPayloadName = "payload.json"
+)
 
-// buildBashProgram wraps user script and calls main(payload) with the message chain.
-func buildBashProgram(userScript string, messageChain json.RawMessage) ([]byte, error) {
-	userScript = strings.TrimSpace(stripUserShebang(userScript))
-	if userScript == "" {
-		return nil, errors.New("empty script")
+type bashTaskFiles struct {
+	scriptPath  string
+	payloadPath string
+}
+
+// writeBashTaskFiles stores the user script unchanged and message_chain in payload.json.
+// Users read SUPERPLANE_PAYLOAD_FILE and write JSON to SUPERPLANE_RESULT_FILE.
+func writeBashTaskFiles(dir, userScript string, messageChain json.RawMessage) (bashTaskFiles, error) {
+	if strings.TrimSpace(userScript) == "" {
+		return bashTaskFiles{}, errors.New("empty script")
 	}
 	chain := bytes.TrimSpace(messageChain)
 	if len(chain) == 0 {
 		chain = []byte("{}")
 	}
 	if !json.Valid(chain) {
-		return nil, errors.New("invalid message_chain JSON")
+		return bashTaskFiles{}, errors.New("invalid message_chain JSON")
 	}
 
-	var buf bytes.Buffer
-	buf.WriteString("#!/usr/bin/env bash\n")
-	buf.WriteString("set -euo pipefail\n\n")
-	buf.WriteString("payload=")
-	buf.WriteString(bashSingleQuoted(string(chain)))
-	buf.WriteString("\n\n")
-	buf.WriteString(userScript)
-	buf.WriteString("\n\n")
-	buf.WriteString(`if ! declare -f main >/dev/null 2>&1; then
-  echo "main(payload) is required" >&2
-  exit 1
-fi
-result="$(main "$payload")"
-printf '%s' "$result" > "${SUPERPLANE_RESULT_FILE:?SUPERPLANE_RESULT_FILE is required}"
-`)
-	return buf.Bytes(), nil
-}
-
-func stripUserShebang(script string) string {
-	script = strings.TrimSpace(script)
-	if !strings.HasPrefix(script, "#!") {
-		return script
-	}
-	if idx := strings.IndexByte(script, '\n'); idx >= 0 {
-		return strings.TrimSpace(script[idx+1:])
-	}
-	return ""
-}
-
-func bashSingleQuoted(s string) string {
-	return `'` + strings.ReplaceAll(s, `'`, `'\''`) + `'`
-}
-
-func writeBashProgram(dir, userScript string, messageChain json.RawMessage) (string, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return "", err
+		return bashTaskFiles{}, err
 	}
-	program, err := buildBashProgram(userScript, messageChain)
-	if err != nil {
-		return "", err
+	scriptPath := filepath.Join(dir, bashProgramName)
+	payloadPath := filepath.Join(dir, bashPayloadName)
+	if err := os.WriteFile(scriptPath, []byte(userScript), 0700); err != nil {
+		return bashTaskFiles{}, err
 	}
-	path := filepath.Join(dir, bashProgramName)
-	if err := os.WriteFile(path, program, 0700); err != nil {
-		return "", err
+	if err := os.WriteFile(payloadPath, chain, 0600); err != nil {
+		return bashTaskFiles{}, err
 	}
-	return path, nil
+	return bashTaskFiles{scriptPath: scriptPath, payloadPath: payloadPath}, nil
 }
 
 func runBashHost(
@@ -105,15 +79,16 @@ func runBashHost(
 	}
 
 	scriptDir := filepath.Join(workDir, ".superplane", task.ID)
-	programPath, err := writeBashProgram(scriptDir, task.Script, task.MessageChain)
+	files, err := writeBashTaskFiles(scriptDir, task.Script, task.MessageChain)
 	if err != nil {
 		return 1, truncateString(combinedOut.String(), max), err
 	}
 	defer os.RemoveAll(scriptDir)
 
-	cmd := exec.CommandContext(ctx, bash, programPath)
+	cmd := exec.CommandContext(ctx, bash, files.scriptPath)
 	cmd.Dir = workDir
 	applyCmdEnv(cmd, env, resultHostPath)
+	setPayloadEnv(cmd, files.payloadPath)
 
 	var buf bytes.Buffer
 	if live != nil {
@@ -151,7 +126,7 @@ func prepareDockerBashWorkDir(task *api.TaskPayload) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if _, err := writeBashProgram(dir, task.Script, task.MessageChain); err != nil {
+	if _, err := writeBashTaskFiles(dir, task.Script, task.MessageChain); err != nil {
 		os.RemoveAll(dir)
 		return "", err
 	}
@@ -160,4 +135,8 @@ func prepareDockerBashWorkDir(task *api.TaskPayload) (string, error) {
 
 func dockerBashProgramPath() string {
 	return dockerScriptWorkMount + "/" + bashProgramName
+}
+
+func dockerBashPayloadPath() string {
+	return dockerScriptWorkMount + "/" + bashPayloadName
 }

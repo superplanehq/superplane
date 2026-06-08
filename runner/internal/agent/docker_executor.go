@@ -289,6 +289,9 @@ func dockerExecBashScript(ctx context.Context, name string, task *api.TaskPayloa
 		return 1, "", err
 	}
 	args := append([]string{"exec"}, envArgs...)
+	args = append(args,
+		"--env", envSuperplanePayloadFile+"="+dockerBashPayloadPath(),
+	)
 	args = append(args, name, "bash", dockerBashProgramPath())
 	return runDockerExec(ctx, args, live)
 }

@@ -12,7 +12,7 @@ const (
 	RunModeJavaScript RunMode = "javascript_script"
 	// RunModePython runs Script with python3; main(payload) receives the message chain.
 	RunModePython RunMode = "python_script"
-	// RunModeBash runs Script with bash; main(payload) receives the message chain.
+	// RunModeBash runs Script with bash; message_chain is written to SUPERPLANE_PAYLOAD_FILE.
 	RunModeBash RunMode = "bash_script"
 )
 

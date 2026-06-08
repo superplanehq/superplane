@@ -37,7 +37,7 @@ func TestValidateCreateTaskPayload_setupCommands(t *testing.T) {
 	t.Run("bash_script allows setup_commands", func(t *testing.T) {
 		req := &api.CreateTaskRequest{
 			RunMode:       string(models.RunModeBash),
-			Script:        "main() { echo '{\"ok\":true}'; }",
+			Script:        "printf '{\"ok\":true}\\n' > \"$SUPERPLANE_RESULT_FILE\"",
 			SetupCommands: []string{"npm ci"},
 			WebhookURL:    "https://x/h",
 			ExecutionMode: "host",

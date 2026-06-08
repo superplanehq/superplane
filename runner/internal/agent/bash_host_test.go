@@ -27,11 +27,10 @@ func TestHostExecutorBashWithSetupCommands(t *testing.T) {
 		SetupCommands: []string{
 			`echo setup-ran > setup-marker.txt`,
 		},
-		Script: `main() {
-  local marker
-  marker=$(tr -d '\n' < setup-marker.txt)
-  echo "{\"marker\": \"$marker\"}"
-}`,
+		Script: `set -euo pipefail
+marker=$(tr -d '\n' < setup-marker.txt)
+printf '{"marker":"%s"}\n' "$marker" > "$SUPERPLANE_RESULT_FILE"
+`,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -68,9 +67,8 @@ func TestHostExecutorBashSetupFailureSkipsScript(t *testing.T) {
 		SetupCommands: []string{
 			"false",
 		},
-		Script: `main() {
-  echo '{"should":"not-run"}'
-}`,
+		Script: `echo '{"should":"not-run"}' > "$SUPERPLANE_RESULT_FILE"
+`,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -91,12 +89,9 @@ func TestHostExecutorBashScript(t *testing.T) {
 	task := &api.TaskPayload{
 		ID:      "task-bash-host",
 		RunMode: string(models.RunModeBash),
-		Script: `main() {
-  local payload="$1"
-  local num
-  num=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["GitHub PR"]["data"]["number"])' "$payload")
-  echo "{\"pr\": $num, \"ok\": true}"
-}`,
+		Script: `num=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["GitHub PR"]["data"]["number"])' "$SUPERPLANE_PAYLOAD_FILE")
+printf '{"pr":%s,"ok":true}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
+`,
 		MessageChain: json.RawMessage(`{"GitHub PR":{"data":{"number":99}}}`),
 	}
 	workDir := t.TempDir()
@@ -120,5 +115,26 @@ func TestHostExecutorBashScript(t *testing.T) {
 	}
 	if result.PR != 99 || !result.OK {
 		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestHostExecutorBashSetsPayloadFileEnv(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not on PATH: %v", err)
+	}
+
+	resultPath := filepath.Join(t.TempDir(), "result.json")
+	task := &api.TaskPayload{
+		ID:      "task-bash-payload-env",
+		RunMode: string(models.RunModeBash),
+		Script:  `test -f "$SUPERPLANE_PAYLOAD_FILE" && echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`,
+	}
+	workDir := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	exit, out, err := (&HostExecutor{TaskWorkDir: workDir}).Execute(ctx, task, nil, resultPath)
+	if err != nil || exit != 0 {
+		t.Fatalf("bash host: exit=%d err=%v out=%q", exit, err, out)
 	}
 }
