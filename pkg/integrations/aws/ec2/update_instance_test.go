@@ -355,6 +355,38 @@ func Test__UpdateInstance__Poll_StoppedThenModifyAndStart(t *testing.T) {
 	})
 }
 
+func Test__UpdateInstance__Poll_StartingUsesSeparateAttemptBudget(t *testing.T) {
+	component := &UpdateInstance{}
+	requests := &contexts.RequestContext{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:          "poll",
+		Configuration: map[string]any{"region": "us-east-1"},
+		HTTP: &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeInstanceXML("i-abc123", "pending")),
+			},
+		},
+		Integration: updateIntegration(),
+		Metadata: &contexts.MetadataContext{
+			Metadata: UpdateInstanceExecutionMetadata{
+				InstanceID:        "i-abc123",
+				NewInstanceType:   "t3.large",
+				WasRunning:        true,
+				Phase:             updateInstancePhaseStarting,
+				StopPollAttempts:  maxInstancePollAttempts,
+				StartPollAttempts: 1,
+			},
+		},
+		Requests:       requests,
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "poll", requests.Action)
+}
+
 func Test__UpdateInstance__Poll_RunningEmitsPayload(t *testing.T) {
 	component := &UpdateInstance{}
 	execState := &contexts.ExecutionStateContext{}

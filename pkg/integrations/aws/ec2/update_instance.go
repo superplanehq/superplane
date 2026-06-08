@@ -35,12 +35,13 @@ type UpdateInstanceNodeMetadata struct {
 }
 
 type UpdateInstanceExecutionMetadata struct {
-	InstanceID      string `json:"instanceId" mapstructure:"instanceId"`
-	NewInstanceType string `json:"newInstanceType" mapstructure:"newInstanceType"`
-	WasRunning      bool   `json:"wasRunning" mapstructure:"wasRunning"`
-	Phase           string `json:"phase" mapstructure:"phase"`
-	PollErrors      int    `json:"pollErrors" mapstructure:"pollErrors"`
-	PollAttempts    int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	InstanceID        string `json:"instanceId" mapstructure:"instanceId"`
+	NewInstanceType   string `json:"newInstanceType" mapstructure:"newInstanceType"`
+	WasRunning        bool   `json:"wasRunning" mapstructure:"wasRunning"`
+	Phase             string `json:"phase" mapstructure:"phase"`
+	PollErrors        int    `json:"pollErrors" mapstructure:"pollErrors"`
+	StopPollAttempts  int    `json:"stopPollAttempts" mapstructure:"stopPollAttempts"`
+	StartPollAttempts int    `json:"startPollAttempts" mapstructure:"startPollAttempts"`
 }
 
 func (c *UpdateInstance) Name() string {
@@ -441,7 +442,12 @@ func (c *UpdateInstance) poll(ctx core.ActionHookContext) error {
 	}
 
 	metadata.PollErrors = 0
-	metadata.PollAttempts++
+	switch metadata.Phase {
+	case updateInstancePhaseStopping:
+		metadata.StopPollAttempts++
+	case updateInstancePhaseStarting:
+		metadata.StartPollAttempts++
+	}
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
@@ -490,8 +496,8 @@ func (c *UpdateInstance) pollStopping(ctx core.ActionHookContext, client *Client
 		return fmt.Errorf("instance %s entered state %q unexpectedly while stopping for resize", instance.InstanceID, instance.State)
 	}
 
-	if metadata.PollAttempts >= maxInstancePollAttempts {
-		return fmt.Errorf("timed out waiting for instance %s to stop after %d poll attempts (state: %s)", instance.InstanceID, metadata.PollAttempts, instance.State)
+	if metadata.StopPollAttempts >= maxInstancePollAttempts {
+		return fmt.Errorf("timed out waiting for instance %s to stop after %d poll attempts (state: %s)", instance.InstanceID, metadata.StopPollAttempts, instance.State)
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
@@ -509,8 +515,8 @@ func (c *UpdateInstance) pollStarting(ctx core.ActionHookContext, instance *Inst
 		return fmt.Errorf("instance %s entered state %q and will not reach running without intervention", instance.InstanceID, instance.State)
 	}
 
-	if metadata.PollAttempts >= maxInstancePollAttempts {
-		return fmt.Errorf("timed out waiting for instance %s to reach running state after %d poll attempts (state: %s)", instance.InstanceID, metadata.PollAttempts, instance.State)
+	if metadata.StartPollAttempts >= maxInstancePollAttempts {
+		return fmt.Errorf("timed out waiting for instance %s to reach running state after %d poll attempts (state: %s)", instance.InstanceID, metadata.StartPollAttempts, instance.State)
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
