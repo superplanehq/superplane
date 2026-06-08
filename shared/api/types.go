@@ -28,9 +28,9 @@ type EnvironmentVariable = models.EnvironmentVariable
 
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
-	// RunMode is command_list, argv, javascript_script, or python_script. Omit to infer from body fields.
+	// RunMode is command_list, argv, javascript_script, python_script, or bash_script. Omit to infer from body fields.
 	RunMode string `json:"run_mode,omitempty"`
-	// Script is user code when run_mode is javascript_script or python_script.
+	// Script is user code when run_mode is a script mode.
 	Script string `json:"script,omitempty"`
 	// MessageChain is the SuperPlane $ object for script tasks.
 	MessageChain json.RawMessage `json:"message_chain,omitempty"`
