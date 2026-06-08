@@ -80,6 +80,86 @@ func cloudIDFromIntegration(integration core.IntegrationContext) (string, error)
 	return meta.CloudID, nil
 }
 
+// applyStatus moves an issue to the requested status. It looks up available
+// transitions from the issue's current state and executes the one whose target
+// status name matches. Returns an error if no such transition exists.
+func applyStatus(client *Client, issueKey, status string) error {
+	return applyStatusWithOptions(client, issueKey, status, DoTransitionOptions{})
+}
+
+// applyStatusWithOptions looks up the transitions reachable from the issue's
+// current state, picks the best one whose target status matches, and runs it.
+//
+// When a Resolution is requested, the picker prefers a transition whose
+// screen actually exposes the resolution field. Jira returns
+//
+//	{"errors":{"resolution":"Field 'resolution' cannot be set. It is not on the appropriate screen, or unknown."}}
+//
+// when you set `fields.resolution` on a transition whose screen has no
+// resolution field. Pre-filtering against transition.Fields avoids that 400.
+// If no matching transition has resolution on its screen, return a clear
+// error so the user can either drop the resolution or configure the
+// workflow's transition screen.
+func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTransitionOptions) error {
+	transitions, err := client.GetIssueTransitions(issueKey)
+	if err != nil {
+		return fmt.Errorf("failed to fetch transitions: %v", err)
+	}
+
+	var matches []Transition
+	for _, t := range transitions {
+		if strings.EqualFold(t.To.Name, status) {
+			matches = append(matches, t)
+		}
+	}
+
+	if len(matches) == 0 {
+		available := make([]string, 0, len(transitions))
+		for _, t := range transitions {
+			available = append(available, t.To.Name)
+		}
+		return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
+	}
+
+	// Resolution and comment differ in how strictly Jira gates them:
+	//   - Resolution is sent via `fields`, which Jira rejects outright unless
+	//     the field is on the transition's screen — so it's a hard requirement.
+	//   - A comment is sent via `update.comment`, which Jira generally accepts
+	//     even when the screen metadata doesn't list a comment field — so it's
+	//     only a soft preference; requiring it would block otherwise-valid moves.
+	wantsResolution := strings.TrimSpace(opts.Resolution) != ""
+	wantsComment := strings.TrimSpace(opts.Comment) != ""
+
+	// First choice: a transition whose screen exposes everything we want to set,
+	// so the comment lands atomically with the transition when possible.
+	for _, t := range matches {
+		if (!wantsResolution || t.HasField("resolution")) && (!wantsComment || t.HasField("comment")) {
+			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
+		}
+	}
+
+	// Otherwise fall back to any transition that accepts the resolution (the
+	// hard requirement); the comment is still attached and Jira usually accepts
+	// it even without a dedicated comment field on the screen.
+	for _, t := range matches {
+		if !wantsResolution || t.HasField("resolution") {
+			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
+		}
+	}
+
+	// No matching transition exposes the resolution field. Surface a clear
+	// error instead of letting Jira's confusing "not on the appropriate screen"
+	// message bubble up.
+	names := make([]string, 0, len(matches))
+	for _, t := range matches {
+		names = append(names, t.Name)
+	}
+	return fmt.Errorf(
+		"transition to %q does not allow setting a resolution; configure the resolution field on the transition screen for %v in Jira, or leave Resolution empty",
+		status, names,
+	)
+}
+
 // resolveCloudID returns the Atlassian cloud id from integration metadata, or fetches it from
 // the site tenant_info endpoint when metadata was not populated (e.g. integrations connected
 // before cloud id was stored during sync).

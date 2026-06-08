@@ -103,7 +103,10 @@ type BrokerEnvironmentVariable struct {
 	Value string `json:"value"`
 }
 
-const RunModeJavaScript = "javascript_script"
+const (
+	RunModeJavaScript = "javascript_script"
+	RunModePython     = "python_script"
+)
 
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {

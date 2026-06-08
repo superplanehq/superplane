@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Approve Workflow" href="#approve-workflow" description="Approve or decline a Jira Service Management request approval" />
   <LinkCard title="Create Alert" href="#create-alert" description="Create a Jira Service Management Ops alert via the Alerts API" />
   <LinkCard title="Create Heartbeat" href="#create-heartbeat" description="Create a Jira Service Management Operations heartbeat monitor" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
@@ -20,7 +21,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Alert" href="#get-alert" description="Fetch a Jira Service Management Ops alert by alert id" />
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
+  <LinkCard title="Get Workflow" href="#get-workflow" description="Get the Jira workflow bound to an issue, including its current status and reachable transitions" />
   <LinkCard title="Ping Heartbeat" href="#ping-heartbeat" description="Send a ping to a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Transition Issue" href="#transition-issue" description="Move a Jira issue to a reachable workflow status" />
   <LinkCard title="Update Alert" href="#update-alert" description="Update, assign, add a note to, acknowledge, or close a Jira Service Management Ops alert" />
   <LinkCard title="Update Heartbeat" href="#update-heartbeat" description="Update a Jira Service Management Operations heartbeat" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
@@ -35,6 +38,65 @@ To connect Jira to SuperPlane:
 3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
 4. Paste the Atlassian account **Email** that owns the API token.
 5. Paste the generated **API Token**.
+
+<a id="approve-workflow"></a>
+
+## Approve Workflow
+
+**Component key:** `jira.approveWorkflow`
+
+The Approve Workflow component approves or declines a Jira Service Management request approval.
+
+### Use Cases
+
+- **Automated approval routing**: submit a JSM approval decision after external checks pass
+- **Escalation handling**: decline requests when a SuperPlane workflow detects a failed precondition
+- **Audit context**: add a customer request comment before submitting the approval decision
+
+### Configuration
+
+- **Issue Key**: JSM request issue key, for example `ITSM-123`.
+- **Decision**: Approve or decline.
+- **Approval Selector**: Choose the latest pending approval or pick a specific one from the list.
+- **Approval**: The pending approval to decide. Required when picking a specific approval.
+- **Comment**: Optional public customer request comment posted before the approval decision.
+
+### Output
+
+Returns the updated approval payload from Jira Service Management.
+
+### Notes
+
+- Requires the API token's user to be in the approver list.
+- This component only works on Jira Service Management customer requests, not standard Jira issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "approvers": [
+      {
+        "approver": {
+          "accountId": "5b10a2844c20165700ede21g",
+          "displayName": "Alice Example",
+          "emailAddress": "alice@example.com"
+        },
+        "approverDecision": "approved"
+      }
+    ],
+    "completedDate": {
+      "iso8601": "2026-01-19T13:15:00+0000",
+      "jira": "2026-01-19T13:15:00.000+0000"
+    },
+    "finalDecision": "approved",
+    "id": "1",
+    "name": "Manager approval"
+  },
+  "timestamp": "2026-01-19T13:15:00Z",
+  "type": "jira.approval"
+}
+```
 
 <a id="create-alert"></a>
 
@@ -605,6 +667,90 @@ Returns the Jira issue object including `id`, `key`, `self` and the full `fields
 }
 ```
 
+<a id="get-workflow"></a>
+
+## Get Workflow
+
+**Component key:** `jira.getWorkflow`
+
+The Get Workflow component returns the Jira workflow that governs a given issue.
+
+### Use Cases
+
+- **State-machine introspection**: see every status in the workflow plus where the issue is right now
+- **Routing decisions**: branch on which transitions are currently reachable before running `transitionIssue`
+- **Operator dashboards**: render the workflow as a graph next to the issue
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to.
+- **Issue Key**: Jira issue key, for example `PROJ-123`.
+
+### Output
+
+Returns:
+
+- `workflowName` and `workflowSchemeName` — the workflow scheme assigned to the project and the workflow it routes the issue's type to.
+- `currentStatus` / `currentStatusId` — where the issue is now.
+- `statuses` — every status the workflow defines (with `isCurrent` set on the current one).
+- `availableTransitions` — transitions reachable from the issue's current state, each with the transition id, name, and target status.
+
+### Notes
+
+- Resolving the bound workflow goes `issue → project + issue type → workflow scheme → workflow`. Team-managed (next-gen) projects don't expose a workflow scheme; in that case `workflowName` and `statuses` are empty but `currentStatus` and `availableTransitions` are still populated.
+- The `availableTransitions` list reflects workflow rules, conditions, and the calling user's permissions — it is exactly what Jira would offer in the issue view.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availableTransitions": [
+      {
+        "id": "21",
+        "name": "Stop progress",
+        "toStatus": "To Do",
+        "toStatusId": "10001"
+      },
+      {
+        "id": "31",
+        "name": "Resolve",
+        "toStatus": "Done",
+        "toStatusId": "10003"
+      }
+    ],
+    "currentStatus": "In Progress",
+    "currentStatusId": "10002",
+    "issueKey": "PROJ-123",
+    "issueType": "Task",
+    "projectKey": "PROJ",
+    "statuses": [
+      {
+        "category": "TODO",
+        "id": "10001",
+        "name": "To Do"
+      },
+      {
+        "category": "IN_PROGRESS",
+        "id": "10002",
+        "isCurrent": true,
+        "name": "In Progress"
+      },
+      {
+        "category": "DONE",
+        "id": "10003",
+        "name": "Done"
+      }
+    ],
+    "workflowName": "Software Simplified Workflow",
+    "workflowSchemeId": "101010",
+    "workflowSchemeName": "Default workflow scheme"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.workflow"
+}
+```
+
 <a id="ping-heartbeat"></a>
 
 ## Ping Heartbeat
@@ -642,6 +788,70 @@ Returns the API **message** (for example "PONG - Heartbeat received").
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.heartbeat.pinged"
+}
+```
+
+<a id="transition-issue"></a>
+
+## Transition Issue
+
+**Component key:** `jira.transitionIssue`
+
+The Transition Issue component moves a Jira issue through its workflow.
+
+### Use Cases
+
+- **Automated triage**: move issues into the next workflow status after a SuperPlane event
+- **Cross-tool state sync**: mirror status changes from incident or deployment systems
+- **Resolution automation**: close issues with a transition-scoped resolution and comment
+
+### Configuration
+
+- **Project**: Optional Jira project used to narrow the status picker.
+- **Issue Key**: Jira issue key, for example `PROJ-123`.
+- **Target Status**: Status to move the issue to. It must be reachable from the issue's current status.
+- **Comment**: Optional transition comment.
+- **Resolution**: Optional Jira resolution name to set during the transition.
+
+### Output
+
+Returns the refreshed Jira issue after the transition.
+
+### Notes
+
+- Jira does not allow direct status writes. This component finds an available transition whose target status matches the requested status.
+- Workflow conditions and validators still apply.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "resolution": {
+        "name": "Done"
+      },
+      "status": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done",
+          "name": "Done"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T13:00:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T13:00:00Z",
+  "type": "jira.issue"
 }
 ```
 

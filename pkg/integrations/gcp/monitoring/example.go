@@ -1,0 +1,50 @@
+package monitoring
+
+import (
+	_ "embed"
+	"sync"
+
+	"github.com/superplanehq/superplane/pkg/utils"
+)
+
+//go:embed example_output_create_alerting_policy.json
+var exampleOutputCreateAlertingPolicyBytes []byte
+
+//go:embed example_output_get_alerting_policy.json
+var exampleOutputGetAlertingPolicyBytes []byte
+
+//go:embed example_output_delete_alerting_policy.json
+var exampleOutputDeleteAlertingPolicyBytes []byte
+
+//go:embed example_output_update_alerting_policy.json
+var exampleOutputUpdateAlertingPolicyBytes []byte
+
+var (
+	exampleOutputCreateAlertingPolicyOnce sync.Once
+	exampleOutputCreateAlertingPolicy     map[string]any
+
+	exampleOutputGetAlertingPolicyOnce sync.Once
+	exampleOutputGetAlertingPolicy     map[string]any
+
+	exampleOutputDeleteAlertingPolicyOnce sync.Once
+	exampleOutputDeleteAlertingPolicy     map[string]any
+
+	exampleOutputUpdateAlertingPolicyOnce sync.Once
+	exampleOutputUpdateAlertingPolicy     map[string]any
+)
+
+func (c *CreateAlertingPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertingPolicyOnce, exampleOutputCreateAlertingPolicyBytes, &exampleOutputCreateAlertingPolicy)
+}
+
+func (g *GetAlertingPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertingPolicyOnce, exampleOutputGetAlertingPolicyBytes, &exampleOutputGetAlertingPolicy)
+}
+
+func (d *DeleteAlertingPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertingPolicyOnce, exampleOutputDeleteAlertingPolicyBytes, &exampleOutputDeleteAlertingPolicy)
+}
+
+func (u *UpdateAlertingPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertingPolicyOnce, exampleOutputUpdateAlertingPolicyBytes, &exampleOutputUpdateAlertingPolicy)
+}

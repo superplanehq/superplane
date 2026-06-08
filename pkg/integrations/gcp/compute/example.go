@@ -16,6 +16,9 @@ var exampleOutputDeleteVMInstanceBytes []byte
 //go:embed example_data_on_vm_instance.json
 var exampleDataOnVMInstanceBytes []byte
 
+//go:embed example_output_get_vm_instance.json
+var exampleOutputGetVMInstanceBytes []byte
+
 //go:embed example_output_manage_vm_instance_power.json
 var exampleOutputManageVMInstancePowerBytes []byte
 
@@ -24,6 +27,15 @@ var exampleOutputUpdateVMInstanceTypeBytes []byte
 
 //go:embed example_output_get_vm_instance_metrics.json
 var exampleOutputGetVMInstanceMetricsBytes []byte
+
+//go:embed example_output_create_image.json
+var exampleOutputCreateImageBytes []byte
+
+//go:embed example_output_update_image.json
+var exampleOutputUpdateImageBytes []byte
+
+//go:embed example_output_delete_image.json
+var exampleOutputDeleteImageBytes []byte
 
 //go:embed example_output_create_static_ip.json
 var exampleOutputCreateStaticIPBytes []byte
@@ -44,6 +56,9 @@ var (
 	exampleDataOnVMInstanceOnce sync.Once
 	exampleDataOnVMInstance     map[string]any
 
+	exampleOutputGetVMInstanceOnce sync.Once
+	exampleOutputGetVMInstance     map[string]any
+
 	exampleOutputManageVMInstancePowerOnce sync.Once
 	exampleOutputManageVMInstancePower     map[string]any
 
@@ -52,6 +67,15 @@ var (
 
 	exampleOutputGetVMInstanceMetricsOnce sync.Once
 	exampleOutputGetVMInstanceMetrics     map[string]any
+
+	exampleOutputCreateImageOnce sync.Once
+	exampleOutputCreateImage     map[string]any
+
+	exampleOutputUpdateImageOnce sync.Once
+	exampleOutputUpdateImage     map[string]any
+
+	exampleOutputDeleteImageOnce sync.Once
+	exampleOutputDeleteImage     map[string]any
 
 	exampleOutputCreateStaticIPOnce sync.Once
 	exampleOutputCreateStaticIP     map[string]any
@@ -71,6 +95,10 @@ func (d *DeleteVMInstance) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVMInstanceOnce, exampleOutputDeleteVMInstanceBytes, &exampleOutputDeleteVMInstance)
 }
 
+func (g *GetVMInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceOnce, exampleOutputGetVMInstanceBytes, &exampleOutputGetVMInstance)
+}
+
 func (t *OnVMInstance) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMInstanceOnce, exampleDataOnVMInstanceBytes, &exampleDataOnVMInstance)
 }
@@ -85,6 +113,18 @@ func (u *UpdateVMInstanceType) ExampleOutput() map[string]any {
 
 func (g *GetVMInstanceMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceMetricsOnce, exampleOutputGetVMInstanceMetricsBytes, &exampleOutputGetVMInstanceMetrics)
+}
+
+func (c *CreateImage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateImageOnce, exampleOutputCreateImageBytes, &exampleOutputCreateImage)
+}
+
+func (u *UpdateImage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateImageOnce, exampleOutputUpdateImageBytes, &exampleOutputUpdateImage)
+}
+
+func (d *DeleteImage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteImageOnce, exampleOutputDeleteImageBytes, &exampleOutputDeleteImage)
 }
 
 func (c *CreateStaticIP) ExampleOutput() map[string]any {
