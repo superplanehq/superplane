@@ -14,19 +14,10 @@ func Test_FindSecretValue(t *testing.T) {
 	secrets := []core.IntegrationSecret{
 		{Name: "other", Value: []byte("x")},
 		{Name: SecretNameAccessToken, Value: []byte("my-token")},
-		{Name: SecretNameServiceAccountKey, Value: []byte("key-json")},
 	}
 	assert.Nil(t, FindSecretValue(secrets, "missing"))
 	assert.Equal(t, []byte("my-token"), FindSecretValue(secrets, SecretNameAccessToken))
-	assert.Equal(t, []byte("key-json"), FindSecretValue(secrets, SecretNameServiceAccountKey))
 	assert.Nil(t, FindSecretValue(nil, SecretNameAccessToken))
-}
-
-func Test_AuthMethodFromMetadata(t *testing.T) {
-	assert.Equal(t, AuthMethodServiceAccountKey, AuthMethodFromMetadata(nil))
-	assert.Equal(t, AuthMethodServiceAccountKey, AuthMethodFromMetadata(map[string]any{}))
-	assert.Equal(t, AuthMethodServiceAccountKey, AuthMethodFromMetadata(map[string]any{"authMethod": "other"}))
-	assert.Equal(t, AuthMethodWIF, AuthMethodFromMetadata(map[string]any{"authMethod": AuthMethodWIF}))
 }
 
 func Test_TokenSourceFromIntegration(t *testing.T) {
@@ -35,6 +26,41 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 		_, err := TokenSourceFromIntegration(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no GCP credentials found")
+	})
+
+	t.Run("WIF with access token in setup-provider storage returns token source", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			Metadata:     map[string]any{"authMethod": AuthMethodWIF},
+		}
+		require.NoError(t, ctx.Secrets().Create(core.IntegrationSecretDefinition{
+			Name:        SecretNameAccessToken,
+			Label:       "token",
+			Description: "test",
+			Value:       "wif-access-token",
+			Editable:    false,
+		}))
+		ts, err := TokenSourceFromIntegration(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, ts)
+		tok, err := ts.Token()
+		require.NoError(t, err)
+		assert.Equal(t, "wif-access-token", tok.AccessToken)
+		assert.Equal(t, "Bearer", tok.TokenType)
+	})
+
+	t.Run("WIF access token used when metadata omits authMethod", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretNameAccessToken: {Name: SecretNameAccessToken, Value: []byte("wif-access-token")},
+			},
+			Metadata: map[string]any{"projectId": "p1"},
+		}
+		ts, err := TokenSourceFromIntegration(ctx)
+		require.NoError(t, err)
+		tok, err := ts.Token()
+		require.NoError(t, err)
+		assert.Equal(t, "wif-access-token", tok.AccessToken)
 	})
 
 	t.Run("WIF with access token returns token source", func(t *testing.T) {
@@ -67,18 +93,6 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 		_, err := TokenSourceFromIntegration(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "access token expired")
-	})
-
-	t.Run("service account key with invalid JSON returns error", func(t *testing.T) {
-		ctx := &contexts.IntegrationContext{
-			CurrentSecrets: map[string]core.IntegrationSecret{
-				SecretNameServiceAccountKey: {Name: SecretNameServiceAccountKey, Value: []byte(`{invalid`)},
-			},
-			Metadata: map[string]any{"authMethod": AuthMethodServiceAccountKey},
-		}
-		_, err := TokenSourceFromIntegration(ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to create credentials from service account key")
 	})
 }
 
