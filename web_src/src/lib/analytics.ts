@@ -10,6 +10,22 @@ export const analytics = {
     posthog.capture("settings:member_accept", { organization_id: organizationId });
   },
 
+  commandPaletteOpen: (organizationId: string) => {
+    posthog.capture("command_palette:open", { organization_id: organizationId });
+  },
+
+  commandPaletteAction: (
+    actionId: string,
+    group: "navigation" | "canvas" | "action" | "account",
+    organizationId: string,
+  ) => {
+    posthog.capture("command_palette:action", {
+      action_id: actionId,
+      group,
+      organization_id: organizationId,
+    });
+  },
+
   canvasCreate: (
     canvasId: string,
     organizationId: string,

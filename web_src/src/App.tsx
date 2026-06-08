@@ -32,6 +32,8 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { CommandPalette } from "./components/CommandPalette";
+import { useCommandPaletteShortcut } from "./hooks/useCommandPaletteShortcut";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -132,8 +134,10 @@ function AppRouter() {
 }
 
 function OrganizationScope() {
+  const { open, setOpen } = useCommandPaletteShortcut();
   return (
     <PermissionsProvider>
+      <CommandPalette open={open} onOpenChange={setOpen} />
       <Outlet />
     </PermissionsProvider>
   );
