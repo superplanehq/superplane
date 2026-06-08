@@ -337,6 +337,7 @@ func (p *TestAgentProvider) DefineOutcome(
 func (p *TestAgentProvider) StreamEvents(
 	ctx context.Context,
 	providerSessionID string,
+	afterOpen func(context.Context) error,
 	onEvent func(agents.ProviderEvent) error,
 ) error {
 	p.mu.Lock()
@@ -350,6 +351,12 @@ func (p *TestAgentProvider) StreamEvents(
 
 	if err != nil {
 		return err
+	}
+
+	if afterOpen != nil {
+		if err := afterOpen(ctx); err != nil {
+			return err
+		}
 	}
 
 	for {

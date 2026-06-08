@@ -42,7 +42,7 @@ func (p *cleanupProvider) DefineOutcome(context.Context, string, agents.DefineOu
 	return errors.New("not used")
 }
 
-func (p *cleanupProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
+func (p *cleanupProvider) StreamEvents(context.Context, string, func(context.Context) error, func(agents.ProviderEvent) error) error {
 	return errors.New("not used")
 }
 

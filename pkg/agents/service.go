@@ -149,7 +149,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
 	}
-	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+	if err := s.enqueueStream(sessionID, organizationID, userID, uuid.Nil, ModeBuilder); err != nil {
 		log.WithError(err).Warn("failed to enqueue stream after define outcome")
 	}
 	return nil
@@ -160,7 +160,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
+	_, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,16 +168,6 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	agentMode := ModeOperator
 	if len(mode) > 0 {
 		agentMode = NormalizeMode(mode[0])
-	}
-
-	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
-	if err != nil {
-		return nil, fmt.Errorf("build preamble: %w", err)
-	}
-
-	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		return nil, fmt.Errorf("forward to provider: %w", err)
 	}
 
 	messageRole := models.AgentMessageRoleUser
@@ -197,10 +187,33 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		log.WithError(err).Warn("failed to mark agent session as streaming")
 	}
 
-	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+	if err := s.enqueueStream(sessionID, organizationID, userID, persisted.ID, agentMode); err != nil {
 		return nil, err
 	}
 	return persisted, nil
+}
+
+func (s *Service) SendPersistedMessage(ctx context.Context, session *models.AgentSession, messageID uuid.UUID, mode string) error {
+	message, err := models.FindAgentSessionMessage(session.ID, messageID)
+	if err != nil {
+		return fmt.Errorf("load queued user message: %w", err)
+	}
+
+	if message.Role != models.AgentMessageRoleUser && message.Role != models.AgentMessageRoleSystem {
+		return fmt.Errorf("queued message has unsupported role: %s", message.Role)
+	}
+
+	agentMode := NormalizeMode(mode)
+	preamble, err := s.buildPreamble(session, session.OrganizationID, session.UserID, agentMode)
+	if err != nil {
+		return fmt.Errorf("build preamble: %w", err)
+	}
+
+	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, message.Content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+		return fmt.Errorf("forward to provider: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode Mode) (string, error) {
@@ -222,12 +235,18 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
-func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
-	err := messages.PublishAgentStreamRequested(messages.AgentStreamRequest{
+func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID, userMessageID uuid.UUID, mode Mode) error {
+	req := messages.AgentStreamRequest{
 		SessionID:      sessionID.String(),
 		OrganizationID: organizationID.String(),
 		UserID:         userID.String(),
-	})
+		Mode:           string(mode),
+	}
+	if userMessageID != uuid.Nil {
+		req.UserMessageID = userMessageID.String()
+	}
+
+	err := messages.PublishAgentStreamRequested(req)
 	if err == nil {
 		return nil
 	}

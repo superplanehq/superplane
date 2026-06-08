@@ -32,7 +32,7 @@ func TestAgentProviderCreatesSessionAndStreamsQueuedEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	var events []agents.ProviderEvent
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(event agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(event agents.ProviderEvent) error {
 		events = append(events, event)
 		return nil
 	})
@@ -74,7 +74,7 @@ func TestAgentProviderSendMessageRecordsCallAndQueuesConfiguredEvents(t *testing
 	require.NoError(t, err)
 
 	var events []agents.ProviderEvent
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(event agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(event agents.ProviderEvent) error {
 		events = append(events, event)
 		return nil
 	})
@@ -106,7 +106,7 @@ func TestAgentProviderSendMessageHandlerCanBuildDynamicEvents(t *testing.T) {
 	require.NoError(t, provider.SendMessage(context.Background(), result.ProviderSessionID, "echo me", agents.SendMessageOptions{}))
 
 	var events []agents.ProviderEvent
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(event agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(event agents.ProviderEvent) error {
 		events = append(events, event)
 		return nil
 	})
@@ -139,7 +139,7 @@ func TestAgentProviderDefineOutcomeRecordsCallAndQueuesConfiguredEvents(t *testi
 	require.NoError(t, provider.DefineOutcome(context.Background(), result.ProviderSessionID, options))
 
 	var events []agents.ProviderEvent
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(event agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(event agents.ProviderEvent) error {
 		events = append(events, event)
 		return nil
 	})
@@ -168,7 +168,7 @@ func TestAgentProviderStreamReturnsCallbackAndQueuedErrors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(agents.ProviderEvent) error {
 		return callbackErr
 	})
 	require.ErrorIs(t, err, callbackErr)
@@ -176,10 +176,46 @@ func TestAgentProviderStreamReturnsCallbackAndQueuedErrors(t *testing.T) {
 	queuedErr := errors.New("stream failed")
 	require.NoError(t, provider.QueueError(result.ProviderSessionID, queuedErr))
 
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(agents.ProviderEvent) error {
 		return nil
 	})
 	require.ErrorIs(t, err, queuedErr)
+}
+
+func TestAgentProviderStreamRunsAfterOpenBeforeEvents(t *testing.T) {
+	provider := NewAgentProvider()
+	provider.SetSessionIDProvider(func() string { return "session-1" })
+
+	result, err := provider.CreateSession(context.Background(), agents.CreateSessionOptions{})
+	require.NoError(t, err)
+	require.NoError(t, provider.QueueEvents(
+		result.ProviderSessionID,
+		agents.ProviderEvent{ProviderEventID: "event-1", Type: agents.ProviderEventAssistantMessage, Text: "hello"},
+		agents.ProviderEvent{ProviderEventID: "event-2", Type: agents.ProviderEventTurnCompleted},
+	))
+
+	afterOpenRan := false
+	eventCountWhenAfterOpenRan := 0
+	eventCount := 0
+
+	err = provider.StreamEvents(
+		context.Background(),
+		result.ProviderSessionID,
+		func(context.Context) error {
+			afterOpenRan = true
+			eventCountWhenAfterOpenRan = eventCount
+			return nil
+		},
+		func(agents.ProviderEvent) error {
+			eventCount++
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	require.True(t, afterOpenRan)
+	require.Equal(t, 0, eventCountWhenAfterOpenRan)
+	require.Equal(t, 2, eventCount)
 }
 
 func TestAgentProviderInterruptAndDeleteUpdateSessionState(t *testing.T) {
@@ -199,7 +235,7 @@ func TestAgentProviderInterruptAndDeleteUpdateSessionState(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, session.Deleted)
 
-	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, func(agents.ProviderEvent) error {
+	err = provider.StreamEvents(context.Background(), result.ProviderSessionID, nil, func(agents.ProviderEvent) error {
 		return nil
 	})
 	require.NoError(t, err)

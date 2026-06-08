@@ -41,7 +41,7 @@ func (b *blockingProvider) DefineOutcome(_ context.Context, _ string, _ agents.D
 	return nil
 }
 
-func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
+func (b *blockingProvider) StreamEvents(context.Context, string, func(context.Context) error, func(agents.ProviderEvent) error) error {
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (f *fakeProvider) DefineOutcome(_ context.Context, _ string, opts agents.De
 	return nil
 }
 
-func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.ProviderEvent) error) error {
+func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(context.Context) error, _ func(agents.ProviderEvent) error) error {
 	return nil
 }
 
@@ -249,9 +249,10 @@ func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
 	require.NotNil(t, persisted)
 	require.NotEqual(t, uuid.Nil, persisted.ID)
 	assert.Equal(t, "hello", persisted.Content)
+	assert.Equal(t, 0, provider.sendCalled, "provider send happens after the stream worker subscribes")
 }
 
-func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
+func TestService_SendPersistedMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -262,7 +263,9 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
-	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
+	first, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
+	require.NoError(t, err)
+	err = svc.SendPersistedMessage(context.Background(), session, first.ID, string(agents.ModeOperator))
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "api_token:")
@@ -275,13 +278,15 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 
 	provider.lastPreamble = "<sentinel>"
-	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
+	second, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
+	require.NoError(t, err)
+	err = svc.SendPersistedMessage(context.Background(), session, second.ID, string(agents.ModeOperator))
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, "api_token:",
 		"a fresh api_token must be re-injected on every turn so the session never expires mid-conversation")
 }
 
-func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
+func TestService_SendPersistedMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -292,12 +297,16 @@ func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing
 	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
-	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
+	first, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
+	require.NoError(t, err)
+	err = svc.SendPersistedMessage(context.Background(), session, first.ID, string(agents.ModeOperator))
 	require.Error(t, err)
 
 	provider.sendErr = nil
 	provider.lastPreamble = "<sentinel>"
-	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry")
+	retry, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry")
+	require.NoError(t, err)
+	err = svc.SendPersistedMessage(context.Background(), session, retry.ID, string(agents.ModeOperator))
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, "api_token:",
 		"preamble must still be injected after the previous attempt failed at the provider")

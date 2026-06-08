@@ -147,7 +147,12 @@ func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, 
 	return nil
 }
 
-func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
+func (p *Provider) StreamEvents(
+	ctx context.Context,
+	providerSessionID string,
+	afterOpen func(context.Context) error,
+	onEvent func(agents.ProviderEvent) error,
+) error {
 	if providerSessionID == "" {
 		return fmt.Errorf("anthropic: provider session id is required")
 	}
@@ -157,6 +162,13 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 		return fmt.Errorf("anthropic: open stream: %w", err)
 	}
 	defer body.Close()
+
+	if afterOpen != nil {
+		if err := afterOpen(ctx); err != nil {
+			return err
+		}
+	}
+
 	return forwardSSE(ctx, body, onEvent)
 }
 
@@ -182,12 +194,13 @@ func withPreamble(message, preamble string) string {
 func forwardSSE(ctx context.Context, body io.Reader, onEvent func(agents.ProviderEvent) error) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	mapper := newStreamEventMapper()
 
 	for scanner.Scan() {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		event, ok := parseSSEData(scanner.Text())
+		event, ok := parseSSEData(scanner.Text(), mapper)
 		if !ok {
 			continue
 		}
@@ -204,7 +217,7 @@ func forwardSSE(ctx context.Context, body io.Reader, onEvent func(agents.Provide
 	return nil
 }
 
-func parseSSEData(line string) (agents.ProviderEvent, bool) {
+func parseSSEData(line string, mapper *streamEventMapper) (agents.ProviderEvent, bool) {
 	if !strings.HasPrefix(line, "data: ") {
 		return agents.ProviderEvent{}, false
 	}
@@ -217,7 +230,7 @@ func parseSSEData(line string) (agents.ProviderEvent, bool) {
 		log.WithError(err).Debug("anthropic: skipping malformed sse event")
 		return agents.ProviderEvent{}, false
 	}
-	return mapEvent(raw)
+	return mapper.mapEvent(raw)
 }
 
 func isTerminalEvent(t agents.ProviderEventType) bool {
