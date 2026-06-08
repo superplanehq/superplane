@@ -7,7 +7,7 @@ import { canvasKeys, useListDraftBranches } from "@/hooks/useCanvasData";
 import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { isDraftVersion } from "./lib/canvas-versions";
+import { isDraftVersion, sortDraftVersionsDesc } from "./lib/canvas-versions";
 
 type UseCanvasDraftBranchQueriesOptions = {
   organizationId?: string;
@@ -26,7 +26,8 @@ export function useCanvasDraftBranchQueries({
   searchParams,
   setSearchParams,
 }: UseCanvasDraftBranchQueriesOptions) {
-  const { data: draftBranches = [] } = useListDraftBranches(organizationId!, canvasId!, !isTemplateCanvas);
+  const { data: draftBranchesRaw = [] } = useListDraftBranches(organizationId!, canvasId!, !isTemplateCanvas);
+  const draftBranches = useMemo(() => sortDraftVersionsDesc(draftBranchesRaw), [draftBranchesRaw]);
   const draftVersionQueries = useQueries({
     queries: draftBranches
       .map((branch) => draftVersionId(branch))

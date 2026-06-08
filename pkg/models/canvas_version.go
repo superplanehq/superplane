@@ -205,7 +205,7 @@ func ListDraftBranchesForCanvasInTransaction(
 		Where("owner_id = ?", ownerID).
 		Where("state = ?", CanvasVersionStateDraft).
 		Where("branch_name IS NOT NULL").
-		Order("updated_at DESC")
+		Order("updated_at DESC, created_at DESC, id DESC")
 
 	if before != nil {
 		query = query.Where("updated_at < ?", *before)
@@ -267,7 +267,7 @@ func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*C
 		Where("workflow_id = ?", workflowID).
 		Where("owner_id = ?", userID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Order("updated_at DESC").
+		Order("updated_at DESC, created_at DESC, id DESC").
 		First(&version).
 		Error
 

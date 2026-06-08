@@ -53,7 +53,7 @@ func TestListDraftCanvasVersions(t *testing.T) {
 		assert.Empty(t, response.GetVersions())
 	})
 
-	t.Run("lists created draft branches", func(t *testing.T) {
+	t.Run("lists created draft branches newest first", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-list")
 
 		first, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "First draft")
@@ -64,13 +64,8 @@ func TestListDraftCanvasVersions(t *testing.T) {
 		response, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), canvasID, 0, nil, pb.CanvasVersion_STATE_DRAFT)
 		require.NoError(t, err)
 		require.Len(t, response.GetVersions(), 2)
-
-		displayNames := []string{
-			response.GetVersions()[0].GetMetadata().GetDisplayName(),
-			response.GetVersions()[1].GetMetadata().GetDisplayName(),
-		}
-		assert.Contains(t, displayNames, first.GetVersion().GetMetadata().GetDisplayName())
-		assert.Contains(t, displayNames, second.GetVersion().GetMetadata().GetDisplayName())
+		assert.Equal(t, second.GetVersion().GetMetadata().GetDisplayName(), response.GetVersions()[0].GetMetadata().GetDisplayName())
+		assert.Equal(t, first.GetVersion().GetMetadata().GetDisplayName(), response.GetVersions()[1].GetMetadata().GetDisplayName())
 	})
 
 	t.Run("lists only drafts owned by the current user", func(t *testing.T) {
