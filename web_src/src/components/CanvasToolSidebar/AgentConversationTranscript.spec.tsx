@@ -1,6 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import type { MessageGroup } from "./agentMessageGroups";
 
@@ -51,5 +52,59 @@ describe("ConversationTranscript command groups", () => {
 
     expect(screen.getByText("Running command...")).toBeInTheDocument();
     expect(screen.getByText(/SUPERPLANE_URL/)).toBeInTheDocument();
+  });
+});
+
+describe("ConversationTranscript hidden messages", () => {
+  it("does not render an empty turn above the thinking row", () => {
+    render(
+      <ConversationTranscript
+        {...baseProps}
+        messageGroups={[
+          {
+            type: "message",
+            message: {
+              id: "system-notification",
+              role: "user",
+              content: createSystemMessage("Canvas changed"),
+              toolName: "",
+              toolCallId: "",
+              toolStatus: "",
+              createdAt: null,
+            },
+          },
+        ]}
+        showThinking
+      />,
+    );
+
+    const transcriptBody = screen.getByTestId("agent-thinking").parentElement;
+    expect(transcriptBody?.firstElementChild).toBe(screen.getByTestId("agent-thinking"));
+  });
+
+  it("does not render an empty turn above command groups", () => {
+    render(
+      <ConversationTranscript
+        {...baseProps}
+        messageGroups={[
+          {
+            type: "message",
+            message: {
+              id: "system-message",
+              role: "system",
+              content: "Internal event",
+              toolName: "",
+              toolCallId: "",
+              toolStatus: "",
+              createdAt: null,
+            },
+          },
+          ...toolGroup("started"),
+        ]}
+      />,
+    );
+
+    const transcriptBody = screen.getByTestId("agent-tool-group").parentElement;
+    expect(transcriptBody?.firstElementChild).toBe(screen.getByTestId("agent-tool-group"));
   });
 });
