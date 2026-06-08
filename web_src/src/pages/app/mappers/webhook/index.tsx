@@ -160,31 +160,33 @@ export const webhookTriggerRenderer: TriggerRenderer = {
 /**
  * Custom field renderer for webhook component configuration
  */
-export const webhookCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo) => {
-    const metadata = node.metadata as WebhookMetadata | undefined;
-    const config = node.configuration as WebhookConfiguration | undefined;
-    const authMethod = config?.authentication || "none";
-    const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
-    const signatureHeaderName = config?.signatureHeader?.trim() || DEFAULT_SIGNATURE_HEADER;
-    const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
+function WebhookCustomFieldContent({
+  nodeId,
+  metadata,
+  config,
+}: {
+  nodeId: string;
+  metadata?: WebhookMetadata;
+  config?: WebhookConfiguration;
+}) {
+  const authMethod = config?.authentication || "none";
+  const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
+  const signatureHeaderName = config?.signatureHeader?.trim() || DEFAULT_SIGNATURE_HEADER;
+  const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
+  const [currentSecret, setCurrentSecret] = useState<string | null>(null);
 
-    // State to track the currently displayed secret
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [currentSecret, setCurrentSecret] = useState<string | null>(null);
+  const generateCode = (secret?: string) => {
+    let description: string;
+    let code: string;
+    let title: string;
+    let signatureKey: string;
 
-    const generateCode = (secret?: string) => {
-      let description: string;
-      let code: string;
-      let title: string;
-      let signatureKey: string;
-
-      switch (authMethod) {
-        case "signature":
-          title = "HMAC Signature Authentication";
-          description = "Use HMAC SHA-256 signature to authenticate your webhook requests.";
-          signatureKey = secret || "<your-signature-key>";
-          code = `export SIGNATURE_KEY="${signatureKey}"
+    switch (authMethod) {
+      case "signature":
+        title = "HMAC Signature Authentication";
+        description = "Use HMAC SHA-256 signature to authenticate your webhook requests.";
+        signatureKey = secret || "<your-signature-key>";
+        code = `export SIGNATURE_KEY="${signatureKey}"
 export PAYLOAD='{"hello":"world"}'
 
 export SIGNATURE=$(echo -n "$PAYLOAD" \\
@@ -196,13 +198,13 @@ curl -X POST \\
   -H "Content-Type: application/json" \\
   --data-binary "$PAYLOAD" \\
   ${webhookUrl}`;
-          break;
+        break;
 
-        case "bearer":
-          title = "Bearer Token Authentication";
-          description = "Use bearer token to authenticate your webhook requests.";
-          signatureKey = secret || "<your-bearer-token>";
-          code = `export BEARER_TOKEN="${signatureKey}"
+      case "bearer":
+        title = "Bearer Token Authentication";
+        description = "Use bearer token to authenticate your webhook requests.";
+        signatureKey = secret || "<your-bearer-token>";
+        code = `export BEARER_TOKEN="${signatureKey}"
 export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
@@ -210,13 +212,13 @@ curl -X POST \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;
-          break;
+        break;
 
-        case "header_token":
-          title = "Header Token Authentication";
-          description = `Use a raw token in the ${headerName} header to authenticate webhook requests.`;
-          signatureKey = secret || "<your-header-token>";
-          code = `export HEADER_TOKEN="${signatureKey}"
+      case "header_token":
+        title = "Header Token Authentication";
+        description = `Use a raw token in the ${headerName} header to authenticate webhook requests.`;
+        signatureKey = secret || "<your-header-token>";
+        code = `export HEADER_TOKEN="${signatureKey}"
 export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
@@ -224,82 +226,87 @@ curl -X POST \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;
-          break;
+        break;
 
-        default:
-          title = "No Authentication";
-          description = "Send webhook requests without authentication.";
-          code = `export PAYLOAD='{"hello":"world"}'
+      default:
+        title = "No Authentication";
+        description = "Send webhook requests without authentication.";
+        code = `export PAYLOAD='{"hello":"world"}'
 
 curl -X POST \\
   -H "Content-Type: application/json" \\
   --data "$PAYLOAD" \\
   ${webhookUrl}`;
-          break;
-      }
+        break;
+    }
 
-      return { title, description, code };
-    };
+    return { title, description, code };
+  };
 
-    const { title, description, code } = generateCode(currentSecret as string);
+  const { title, description, code } = generateCode(currentSecret as string);
 
-    return (
-      <div className="border-t-1 border-gray-200 pt-4">
-        <div className="space-y-3">
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+  return (
+    <div className="border-t-1 border-gray-200 pt-4">
+      <div className="space-y-3">
+        <div>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
 
-            {/* Webhook URL Copy Field */}
-            <div className="mt-3">
-              <label
-                htmlFor="webhook-url-input"
-                className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
-              >
-                Webhook URL
-              </label>
-              <div className="relative group mt-1">
-                <input
-                  id="webhook-url-input"
-                  type="text"
-                  value={webhookUrl}
-                  readOnly
-                  className="w-full text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono"
-                />
-                <CopyCodeButton code={webhookUrl} />
-              </div>
-            </div>
-
-            <div className="relative group mt-3">
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                Code Example
-              </p>
-              <div className="relative group mt-1">
-                <pre className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre overflow-x-auto">
-                  {code}
-                </pre>
-                <CopyCodeButton code={code} />
-              </div>
-            </div>
-            {metadata?.url ? (
-              <ResetAuthButton
-                nodeId={node.id!}
-                authMethod={authMethod}
-                onSuccess={(newSecret) => {
-                  // Update the displayed code with the new secret
-                  setCurrentSecret(newSecret);
-                  // Auto-hide the secret from the code after 30 seconds for security
-                  setTimeout(() => setCurrentSecret(null), 30000);
-                }}
+          {/* Webhook URL Copy Field */}
+          <div className="mt-3">
+            <label
+              htmlFor="webhook-url-input"
+              className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
+            >
+              Webhook URL
+            </label>
+            <div className="relative group mt-1">
+              <input
+                id="webhook-url-input"
+                type="text"
+                value={webhookUrl}
+                readOnly
+                className="w-full text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono"
               />
-            ) : (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Save the canvas to generate a webhook URL and to be able of generating authentication secrets
-              </p>
-            )}
+              <CopyCodeButton code={webhookUrl} />
+            </div>
           </div>
+
+          <div className="relative group mt-3">
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Code Example</p>
+            <div className="relative group mt-1">
+              <pre className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre overflow-x-auto">
+                {code}
+              </pre>
+              <CopyCodeButton code={code} />
+            </div>
+          </div>
+          {metadata?.url ? (
+            <ResetAuthButton
+              nodeId={nodeId}
+              authMethod={authMethod}
+              onSuccess={(newSecret) => {
+                // Update the displayed code with the new secret
+                setCurrentSecret(newSecret);
+                // Auto-hide the secret from the code after 30 seconds for security
+                setTimeout(() => setCurrentSecret(null), 30000);
+              }}
+            />
+          ) : (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Save the canvas to generate a webhook URL and to be able of generating authentication secrets
+            </p>
+          )}
         </div>
       </div>
-    );
+    </div>
+  );
+}
+
+export const webhookCustomFieldRenderer: CustomFieldRenderer = {
+  render: (node: NodeInfo) => {
+    const metadata = node.metadata as WebhookMetadata | undefined;
+    const config = node.configuration as WebhookConfiguration | undefined;
+    return <WebhookCustomFieldContent nodeId={node.id || ""} metadata={metadata} config={config} />;
   },
 };

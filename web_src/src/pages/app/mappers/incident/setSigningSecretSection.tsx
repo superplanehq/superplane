@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesDescribeCanvasVersion,
+  canvasesCommitCanvasRepositoryFiles,
   canvasesInvokeNodeTriggerHook,
-  canvasesUpdateCanvasVersion,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
 } from "@/api-client";
@@ -17,6 +16,10 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
+import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
+import { fetchCanvasVersionWithSpec } from "../../lib/repository-spec-files";
+import { materializeCanvasSpec } from "../../lib/workflow-spec-files";
+import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 
 /** Applies signingSecretConfigured to the given node on a canvas copy. Does not mutate. */
 function applySigningSecretConfigured(
@@ -29,6 +32,49 @@ function applySigningSecretConfigured(
     n.id === nodeId ? { ...n, configuration: { ...n.configuration, signingSecretConfigured: configured } } : n,
   );
   return { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
+}
+
+async function commitUpdatedCanvasVersionYaml(params: {
+  canvasId: string;
+  organizationId: string;
+  versionId: string;
+  updatedVersion: CanvasesCanvasVersion;
+  queryClient: QueryClient;
+}): Promise<boolean> {
+  let liveCanvas = params.queryClient.getQueryData<CanvasesCanvas>(
+    canvasKeys.detail(params.organizationId, params.canvasId),
+  );
+  if (!liveCanvas) {
+    const canvasResponse = await canvasesDescribeCanvas(withOrganizationHeader({ path: { id: params.canvasId } }));
+    liveCanvas = canvasResponse.data?.canvas;
+  }
+  if (!liveCanvas?.metadata?.name) {
+    showErrorToast("Could not load canvas metadata for version update.");
+    return false;
+  }
+
+  const canvasYaml = materializeCanvasSpec({
+    ...liveCanvas,
+    spec: params.updatedVersion.spec,
+  });
+
+  await canvasesCommitCanvasRepositoryFiles(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId },
+      body: {
+        versionId: params.versionId,
+        message: "Update canvas.yaml",
+        operations: [
+          {
+            path: CANVAS_YAML_PATH,
+            content: encodeRepositoryFileContent(canvasYaml),
+          },
+        ],
+      },
+    }),
+  );
+  params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);
+  return true;
 }
 
 export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
@@ -60,12 +106,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
 
       const freshVersion = await queryClient.fetchQuery({
         queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: async () => {
-          const response = await canvasesDescribeCanvasVersion(
-            withOrganizationHeader({ path: { canvasId, versionId } }),
-          );
-          return response.data?.version;
-        },
+        queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
       });
 
       if (!freshVersion) {
@@ -74,40 +115,27 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
       }
 
       const updatedVersion = applySigningSecretConfigured(freshVersion, nodeId, configured);
-      if (updatedVersion) {
-        let liveCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-        if (!liveCanvas) {
-          const canvasResponse = await canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } }));
-          liveCanvas = canvasResponse.data?.canvas;
-        }
-        if (!liveCanvas?.metadata?.name) {
-          showErrorToast("Could not load canvas metadata for version update.");
-          return;
-        }
-
-        await canvasesUpdateCanvasVersion(
-          withOrganizationHeader({
-            path: { canvasId, versionId },
-            body: {
-              canvas: {
-                metadata: {
-                  name: liveCanvas.metadata.name,
-                  description: liveCanvas.metadata.description,
-                },
-                spec: { nodes: updatedVersion.spec?.nodes, edges: updatedVersion.spec?.edges },
-              },
-            },
-          }),
-        );
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), updatedVersion);
-        setSuccess(true);
-        setSecret("");
-        showSuccessToast(
-          configured ? "Signing secret set and version saved" : "Signing secret cleared and version saved",
-        );
-      } else {
+      if (!updatedVersion) {
         showErrorToast("Could not update version (invalid canvas structure).");
+        return;
       }
+
+      const committed = await commitUpdatedCanvasVersionYaml({
+        canvasId,
+        organizationId,
+        versionId,
+        updatedVersion,
+        queryClient,
+      });
+      if (!committed) {
+        return;
+      }
+
+      setSuccess(true);
+      setSecret("");
+      showSuccessToast(
+        configured ? "Signing secret set and version saved" : "Signing secret cleared and version saved",
+      );
     } catch {
       showErrorToast("Failed to set signing secret or save version");
     } finally {
