@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -9,6 +10,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, organizationID string, id string) (*pb.ListCanvasRepositoryFilesResponse, error) {
@@ -22,18 +24,29 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
 	}
 
+	_, err = models.FindCanvas(orgID, canvasID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
+	}
+
+	repositoryPaths := []string{}
 	repository, err := models.FindRepository(orgID, canvasID)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+	if err == nil {
+		files, listErr := gitProvider.ListFiles(ctx, repository.RepoID)
+		if listErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", listErr)
+		}
+		repositoryPaths = files
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, status.Errorf(codes.Internal, "failed to load repository: %v", err)
 	}
 
-	files, err := gitProvider.ListFiles(ctx, repository.RepoID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", err)
-	}
-
-	paths := make([]*pb.CanvasRepositoryFile, 0, len(files))
-	for _, path := range files {
+	pathStrings := AppendRepositorySpecFilePaths(repositoryPaths)
+	paths := make([]*pb.CanvasRepositoryFile, 0, len(pathStrings))
+	for _, path := range pathStrings {
 		paths = append(paths, &pb.CanvasRepositoryFile{
 			Path: path,
 		})
