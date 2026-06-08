@@ -40,8 +40,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := ParseConsoleYAML(yamlBytes)
-	if err != nil {
+	if _, err := ParseConsoleYAML(yamlBytes); err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
@@ -60,23 +59,28 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	body := openapi_client.CanvasesUpdateConsoleBody{}
-	body.SetVersionId(versionID)
-	body.SetPanels(apiPanelsFromYAML(resource.Spec.Panels))
-	body.SetLayout(apiLayoutFromYAML(resource.Spec.Layout))
-
-	response, _, err := ctx.API.CanvasAPI.
-		CanvasesUpdateConsole(ctx.Context, canvasID).
-		Body(body).
-		Execute()
-	if err != nil {
+	if err := common.CommitRepositorySpecFile(
+		ctx,
+		canvasID,
+		versionID,
+		common.ConsoleYAMLRepositoryPath,
+		yamlBytes,
+		"Update console.yaml",
+		nil,
+		false,
+	); err != nil {
 		return err
 	}
-	if response.Console == nil {
-		return fmt.Errorf("update succeeded but server did not return a console")
+
+	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	if err != nil {
+		return fmt.Errorf("console draft updated but failed to read console.yaml: %w", err)
 	}
 
-	console := *response.Console
+	updatedResource, err := ParseConsoleYAML(updatedYAML)
+	if err != nil {
+		return fmt.Errorf("invalid console yaml from server: %w", err)
+	}
 
 	// When change management is enabled, drafts are not visible from the
 	// UI on their own; the user can only see/approve them via a change
@@ -91,14 +95,14 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(consoleYAMLFromAPI(resource.Metadata.Name, console))
+		return ctx.Renderer.Render(updatedResource)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", strings.TrimSpace(console.GetVersionId()))
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.GetPanels()))
-		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(console.GetLayout()))
+		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
+		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
 		if createdChangeRequestID != "" {
 			_, err := fmt.Fprintf(stdout, "Change request: %s (open)\n", createdChangeRequestID)
 			return err

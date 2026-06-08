@@ -292,6 +292,10 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
+		if edge.Channel == "" {
+			edge.Channel = "default"
+		}
+
 		if !nodeIDs[edge.SourceId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
 		}
