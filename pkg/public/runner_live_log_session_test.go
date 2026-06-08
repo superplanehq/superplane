@@ -206,6 +206,21 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "not configured")
 	})
 
+	t.Run("returns stream session for runnerBash", func(t *testing.T) {
+		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
+
+		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerBash", "runner-runbash-1", map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: "task-runbash-ok",
+		})
+		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var session runneraction.LiveLogSession
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+		assert.Equal(t, "https://broker.example/v1/tasks/task-runbash-ok/live-logs", session.StreamURL)
+	})
+
 	t.Run("returns stream session for runnerJS", func(t *testing.T) {
 		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
