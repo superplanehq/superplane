@@ -21,6 +21,20 @@ const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
 const RUNS_MODE = "runs";
 
+const EDITING_TAB_TRIGGER_ACTIVE =
+  "[&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-sm";
+const EDITING_TAB_TRIGGER_BASE =
+  "[&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent";
+
+function editingTabListClassName(): string {
+  return cn(
+    "rounded-full bg-blue-50",
+    EDITING_TAB_TRIGGER_BASE,
+    "[&_[data-slot=tabs-trigger][data-state=inactive]]:text-blue-800/80 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-blue-900",
+    EDITING_TAB_TRIGGER_ACTIVE,
+  );
+}
+
 export function CanvasModeToggle({
   mode,
   onSelectLive,
@@ -100,7 +114,7 @@ export function CanvasModeToggle({
         className={cn(
           "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
           editing
-            ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
+            ? editingTabListClassName()
             : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
         )}
       >
@@ -108,7 +122,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console">
             <span className="inline-flex items-center gap-1.5">
               Console
-              <DraftDot show={hasConsoleDraft} testId="canvas-view-mode-console-draft-dot" />
+              <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
             </span>
           </TabsTrigger>
         ) : null}
@@ -119,7 +133,7 @@ export function CanvasModeToggle({
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
+            <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
           </span>
         </TabsTrigger>
         {showMemory ? (
@@ -137,12 +151,16 @@ export function CanvasModeToggle({
   );
 }
 
-function DraftDot({ show, testId }: { show: boolean; testId: string }) {
+function DraftDot({ show, editing, testId }: { show: boolean; editing: boolean; testId: string }) {
   if (!show) {
     return null;
   }
 
   return (
-    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
+    <span
+      className={cn("inline-flex size-1.5 shrink-0 rounded-full", editing ? "bg-blue-500" : "bg-slate-400")}
+      aria-hidden="true"
+      data-testid={testId}
+    />
   );
 }
