@@ -9,6 +9,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -29,7 +30,11 @@ func quoteYAMLPositionYKeys(text string) string {
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
 	protoVersion := SerializeCanvasVersion(version, organizationID)
 
-	specJSON, err := json.Marshal(protoVersion.GetSpec())
+	// Use protojson (not encoding/json) so proto enums such as node.type are
+	// emitted as their canonical names (e.g. "TYPE_TRIGGER") instead of their
+	// numeric values. ParseCanvasResource reads canvas.yaml back with protojson,
+	// and the UI relies on the string enum names, so serialization must match.
+	specJSON, err := protojson.Marshal(protoVersion.GetSpec())
 	if err != nil {
 		return "", err
 	}
