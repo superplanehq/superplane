@@ -54,22 +54,57 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
 
   return {
     nodes: (parsed.spec.nodes ?? []).map(normalizeCanvasYamlNode),
-    edges: parsed.spec.edges ?? [],
+    edges: (parsed.spec.edges ?? []).map(normalizeCanvasYamlEdge),
     changeManagement: parsed.spec.changeManagement,
   };
 }
 
+function normalizeCanvasYamlEdge(edge: ComponentsEdge): ComponentsEdge {
+  const raw = edge as ComponentsEdge & { source_id?: string; target_id?: string };
+  const { source_id: sourceIdSnake, target_id: targetIdSnake, ...rest } = raw;
+  return {
+    ...rest,
+    sourceId: edge.sourceId || sourceIdSnake || "",
+    targetId: edge.targetId || targetIdSnake || "",
+    channel: edge.channel || "default",
+  };
+}
+
+function normalizeCanvasYamlPosition(position: ComponentsNode["position"]): ComponentsNode["position"] {
+  if (!position || typeof position !== "object") {
+    return position;
+  }
+
+  const raw = position as Record<string, unknown> & { true?: number };
+  const x = typeof raw.x === "number" ? raw.x : undefined;
+  const y = typeof raw.y === "number" ? raw.y : typeof raw.true === "number" ? raw.true : undefined;
+  if (x === undefined || y === undefined) {
+    return position;
+  }
+
+  return { x, y };
+}
+
 function normalizeCanvasYamlNode(node: ComponentsNode): ComponentsNode {
+  const raw = node as ComponentsNode & { componentName?: string; is_collapsed?: boolean };
+  const { componentName: componentNameLegacy, is_collapsed: isCollapsedSnake, ...rest } = raw;
+
   const componentName =
-    typeof node.component === "string"
-      ? node.component
-      : typeof (node as { componentName?: string }).componentName === "string"
-        ? (node as { componentName?: string }).componentName
+    typeof rest.component === "string"
+      ? rest.component
+      : typeof componentNameLegacy === "string"
+        ? componentNameLegacy
         : undefined;
 
   const normalized: ComponentsNode = {
-    ...node,
+    ...rest,
     ...(componentName ? { component: componentName } : {}),
+    ...(rest.position ? { position: normalizeCanvasYamlPosition(rest.position) } : {}),
+    ...(typeof rest.isCollapsed === "boolean"
+      ? { isCollapsed: rest.isCollapsed }
+      : typeof isCollapsedSnake === "boolean"
+        ? { isCollapsed: isCollapsedSnake }
+        : {}),
   };
 
   if (!normalized.type && componentName) {
@@ -77,6 +112,10 @@ function normalizeCanvasYamlNode(node: ComponentsNode): ComponentsNode {
   }
 
   return normalized;
+}
+
+function quoteYamlPositionYKeys(text: string): string {
+  return text.replace(/^(\s+)y: /gm, '$1"y": ');
 }
 
 export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
@@ -90,11 +129,11 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
       isTemplate: workflow.metadata?.isTemplate ?? false,
     },
     spec: {
-      nodes: workflow.spec?.nodes ?? [],
-      edges: workflow.spec?.edges ?? [],
+      nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
+      edges: (workflow.spec?.edges ?? []).map(normalizeCanvasYamlEdge),
       ...(workflow.spec?.changeManagement ? { changeManagement: workflow.spec.changeManagement } : {}),
     },
   };
 
-  return yaml.dump(document, { lineWidth: -1, noRefs: true });
+  return quoteYamlPositionYKeys(yaml.dump(document, { lineWidth: -1, noRefs: true }));
 }

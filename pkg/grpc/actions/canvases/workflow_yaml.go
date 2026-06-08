@@ -14,6 +14,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func quoteYAMLPositionYKeys(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " \t")
+		if strings.HasPrefix(trimmed, "y:") {
+			indent := line[:len(line)-len(trimmed)]
+			lines[i] = indent + `"y"` + trimmed[1:]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
 	protoVersion := SerializeCanvasVersion(version, organizationID)
 
@@ -34,6 +46,7 @@ func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion,
 		spec["edges"] = []any{}
 	}
 	ensureCanvasYAMLNodeDefaults(spec)
+	ensureCanvasYAMLEdgeDefaults(spec)
 
 	resource := map[string]any{
 		"apiVersion": canvasyaml.CanvasAPIVersion,
@@ -57,7 +70,7 @@ func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion,
 		return "", err
 	}
 
-	return buf.String(), nil
+	return quoteYAMLPositionYKeys(buf.String()), nil
 }
 
 func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
@@ -89,6 +102,29 @@ func ensureCanvasYAMLNodeDefaults(spec map[string]any) {
 	}
 
 	spec["nodes"] = nodes
+}
+
+func ensureCanvasYAMLEdgeDefaults(spec map[string]any) {
+	edges, ok := spec["edges"].([]any)
+	if !ok {
+		return
+	}
+
+	for i, raw := range edges {
+		edge, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		channel, _ := edge["channel"].(string)
+		if channel == "" {
+			edge["channel"] = "default"
+		}
+
+		edges[i] = edge
+	}
+
+	spec["edges"] = edges
 }
 
 func canvasFromYAMLText(text string) (*pb.Canvas, error) {
