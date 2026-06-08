@@ -16,6 +16,9 @@ var exampleOutputDeleteVMInstanceBytes []byte
 //go:embed example_data_on_vm_instance.json
 var exampleDataOnVMInstanceBytes []byte
 
+//go:embed example_output_get_vm_instance.json
+var exampleOutputGetVMInstanceBytes []byte
+
 //go:embed example_output_manage_vm_instance_power.json
 var exampleOutputManageVMInstancePowerBytes []byte
 
@@ -35,6 +38,9 @@ var (
 	exampleDataOnVMInstanceOnce sync.Once
 	exampleDataOnVMInstance     map[string]any
 
+	exampleOutputGetVMInstanceOnce sync.Once
+	exampleOutputGetVMInstance     map[string]any
+
 	exampleOutputManageVMInstancePowerOnce sync.Once
 	exampleOutputManageVMInstancePower     map[string]any
 
@@ -51,6 +57,10 @@ func (c *CreateVM) ExampleOutput() map[string]any {
 
 func (d *DeleteVMInstance) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVMInstanceOnce, exampleOutputDeleteVMInstanceBytes, &exampleOutputDeleteVMInstance)
+}
+
+func (g *GetVMInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceOnce, exampleOutputGetVMInstanceBytes, &exampleOutputGetVMInstance)
 }
 
 func (t *OnVMInstance) ExampleData() map[string]any {
