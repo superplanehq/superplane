@@ -53,6 +53,29 @@ describe("parseCanvasYamlToSpec / buildCanvasYamlFromWorkflow", () => {
     expect(parseCanvasYamlToSpec("kind: Workflow\nspec:\n  nodes: []")).toBeNull();
   });
 
+  it("defaults missing action node type when component is present", () => {
+    const yamlText = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Wait
+spec:
+  nodes:
+    - id: wait-1
+      name: Wait
+      component: wait
+      configuration:
+        mode: interval
+  edges: []
+`;
+
+    expect(parseCanvasYamlToSpec(yamlText)?.nodes?.[0]).toMatchObject({
+      id: "wait-1",
+      name: "Wait",
+      component: "wait",
+      type: "TYPE_ACTION",
+    });
+  });
+
   it("defaults missing node and edge lists to empty arrays", () => {
     const yamlText = `apiVersion: v1
 kind: Canvas
