@@ -9,7 +9,7 @@ import (
 	"text/template"
 )
 
-//go:embed userdata-ami.sh.tmpl
+//go:embed userdata.sh.tmpl
 var userDataTemplateSrc string
 
 var userDataTemplate = template.Must(template.New("userdata").Funcs(template.FuncMap{
