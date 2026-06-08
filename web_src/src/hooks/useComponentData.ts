@@ -27,7 +27,8 @@ export const useComponents = (organizationId: string) => {
     select: (data) => {
       return (data || []).filter((action) => {
         const name = action.name || "";
-        const featureID = name === "runner" || name === "runnerJS" || name === "runner-bash" ? "runner" : name;
+        const featureID =
+          name === "runner" || name === "runnerJS" || name === "runnerPython" || name === "runner-bash" ? "runner" : name;
         const isExperimental = experimentalFeatures.includes(featureID);
         const isEnabled = enabledExperimentalFeatures.includes(featureID);
 

@@ -105,6 +105,7 @@ type BrokerEnvironmentVariable struct {
 
 const (
 	RunModeJavaScript = "javascript_script"
+	RunModePython     = "python_script"
 	RunModeBash       = "bash_script"
 )
 

@@ -94,4 +94,36 @@ describe("getExecutionDetails", () => {
     expect(props.customField).toBeDefined();
     expect(getStateMap("runnerJS")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
+
+  it("resolves runnerPython mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerPython");
+    const props = mapper.props({
+      node: {
+        id: "node-runpy-1",
+        name: "Run Python",
+        componentName: "runnerPython",
+        isCollapsed: false,
+        configuration: {
+          machine_type: "aws-standard-1",
+          script: 'def main(payload):\n    return {"ok": True}',
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerPython",
+        label: "Run Python",
+        description: "Runs Python on a fleet runner",
+        icon: "code",
+        color: "blue",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerPython")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
 });

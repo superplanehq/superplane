@@ -9,6 +9,7 @@ describe("buildBuildingBlockCategories", () => {
         { name: "deploy", label: "Deploy" },
         { name: "runnerJS", label: "Run JavaScript" },
         { name: "runner-bash", label: "Run Bash" },
+        { name: "runnerPython", label: "Run Python" },
         { name: "runner", label: "Run Shell Commands" },
         { name: "display", label: "Display" },
         { name: "addmemory", label: "Add Memory" },
@@ -21,6 +22,7 @@ describe("buildBuildingBlockCategories", () => {
       "runner",
       "runnerJS",
       "runner-bash",
+      "runnerPython",
     ]);
     expect(categories.find((category) => category.name === "Core")?.blocks.map((block) => block.name)).toEqual([
       "deploy",
