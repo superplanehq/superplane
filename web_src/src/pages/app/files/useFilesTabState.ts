@@ -8,13 +8,13 @@ export function useFilesTabState(initialPath: string | null, allPaths: string[],
   useEffect(() => {
     if (hasAutoOpenedInitialFileRef.current) return;
 
-    const nextInitialPath = generatedPaths[0];
+    const nextInitialPath = generatedPaths[0] ?? allPaths[0];
     if (!nextInitialPath) return;
 
     hasAutoOpenedInitialFileRef.current = true;
     setOpenTabs([nextInitialPath]);
     setSelectedPath(nextInitialPath);
-  }, [generatedPaths]);
+  }, [allPaths, generatedPaths]);
 
   useEffect(() => {
     const allPathSet = new Set(allPaths);
