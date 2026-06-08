@@ -1024,12 +1024,32 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
             return current;
           }
 
+          const currentNodeMetadataById = new Map(
+            (current.spec?.nodes ?? [])
+              .filter((node) => Boolean(node.id) && node.metadata !== undefined && node.metadata !== null)
+              .map((node) => [node.id as string, node.metadata] as const),
+          );
+
+          const mergeServerNodeWithLocalMetadata = (serverNode: SuperplaneComponentsNode): SuperplaneComponentsNode => {
+            if (!serverNode.id) {
+              return serverNode;
+            }
+
+            const localMetadata = currentNodeMetadataById.get(serverNode.id);
+            if (localMetadata === undefined || localMetadata === null || serverNode.metadata !== undefined) {
+              return serverNode;
+            }
+
+            return { ...serverNode, metadata: localMetadata };
+          };
+
           // When the server computed a new layout (autoLayout), accept the
           // server positions as authoritative. Otherwise preserve current
           // local node positions to avoid overwriting positions that changed
           // while the save was in flight.
           if (variables.autoLayout) {
-            return { ...current, spec: { ...current.spec, ...version.spec } };
+            const mergedNodes = (version.spec?.nodes ?? []).map(mergeServerNodeWithLocalMetadata);
+            return { ...current, spec: { ...current.spec, ...version.spec, nodes: mergedNodes } };
           }
 
           const currentPositionsByNodeId = new Map(
@@ -1038,7 +1058,8 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
               .map((node) => [node.id, node.position] as const),
           );
 
-          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
+          const mergedNodes = (version.spec?.nodes ?? []).map((rawServerNode) => {
+            const serverNode = mergeServerNodeWithLocalMetadata(rawServerNode);
             if (!serverNode.id) {
               return serverNode;
             }
