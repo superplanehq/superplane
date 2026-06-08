@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func Test_preferredEventIDByExecution(t *testing.T) {
+func Test_branchEventIDByParentExecution(t *testing.T) {
 	parentID := uuid.New()
 	childID := uuid.New()
 	childEventID := uuid.New()
@@ -24,11 +24,11 @@ func Test_preferredEventIDByExecution(t *testing.T) {
 		},
 	}
 
-	preferred := preferredEventIDByExecution(executions)
-	assert.Equal(t, childEventID, preferred[parentID])
+	branchEventIDByParent := branchEventIDByParentExecution(executions)
+	assert.Equal(t, childEventID, branchEventIDByParent[parentID])
 }
 
-func Test_eventForExecution_prefersBranchEvent(t *testing.T) {
+func Test_eventForExecution_usesBranchRoutingEvent(t *testing.T) {
 	parentExecutionID := uuid.New()
 	branchEventID := uuid.New()
 	otherEventID := uuid.New()
@@ -50,15 +50,15 @@ func Test_eventForExecution_prefersBranchEvent(t *testing.T) {
 	}
 
 	eventsByID := indexEventsByID(events)
-	preferred := map[uuid.UUID]uuid.UUID{parentExecutionID: branchEventID}
+	branchEventIDByParent := map[uuid.UUID]uuid.UUID{parentExecutionID: branchEventID}
 
-	event, ok, err := eventForExecution(parentExecutionID, events, eventsByID, preferred)
+	event, ok, err := eventForExecution(parentExecutionID, events, eventsByID, branchEventIDByParent)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, branchEventID, event.ID)
 }
 
-func Test_eventForExecution_singleEventWithoutPreferred(t *testing.T) {
+func Test_eventForExecution_singleEventWithoutBranchLink(t *testing.T) {
 	executionID := uuid.New()
 	eventID := uuid.New()
 	now := time.Now()

@@ -442,8 +442,8 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 			return nil, err
 		}
 
-		preferredEventID := preferredEventIDByExecution(linearExecutions)
-		events, err = appendPreferredBranchEvents(b.tx, events, preferredEventID)
+		branchEventIDByParent := branchEventIDByParentExecution(linearExecutions)
+		events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParent)
 		if err != nil {
 			return nil, err
 		}
@@ -456,7 +456,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 				continue
 			}
 
-			event, found, err := eventForExecution(execution.ID, events, eventsByID, preferredEventID)
+			event, found, err := eventForExecution(execution.ID, events, eventsByID, branchEventIDByParent)
 			if err != nil {
 				return nil, err
 			}
@@ -828,16 +828,16 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		return err
 	}
 
-	events, err = appendPreferredBranchEvents(b.tx, events, preferredEventIDByExecution(chainExecutions))
+	events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParentExecution(chainExecutions))
 	if err != nil {
 		return err
 	}
 
 	eventsByID := indexEventsByID(events)
-	preferredEventID := preferredEventIDByExecution(chainExecutions)
+	branchEventIDByParent := branchEventIDByParentExecution(chainExecutions)
 
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok, err := eventForExecution(executionID, events, eventsByID, preferredEventID)
+		event, ok, err := eventForExecution(executionID, events, eventsByID, branchEventIDByParent)
 		if err != nil {
 			return fmt.Errorf("node %s: %w", nodeRef, err)
 		}
@@ -851,17 +851,18 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	return nil
 }
 
-// preferredEventIDByExecution maps a parent execution to the canvas event that routed
-// into the child on this branch (from child.EventID when child.PreviousExecutionID is set).
-func preferredEventIDByExecution(executions []models.CanvasNodeExecution) map[uuid.UUID]uuid.UUID {
-	preferred := make(map[uuid.UUID]uuid.UUID, len(executions))
+// branchEventIDByParentExecution maps each parent execution to the canvas event that
+// routed into the child on the current branch (from child.EventID when
+// child.PreviousExecutionID is set).
+func branchEventIDByParentExecution(executions []models.CanvasNodeExecution) map[uuid.UUID]uuid.UUID {
+	branchEventIDByParent := make(map[uuid.UUID]uuid.UUID, len(executions))
 	for _, execution := range executions {
 		if execution.PreviousExecutionID == nil || execution.EventID == uuid.Nil {
 			continue
 		}
-		preferred[*execution.PreviousExecutionID] = execution.EventID
+		branchEventIDByParent[*execution.PreviousExecutionID] = execution.EventID
 	}
-	return preferred
+	return branchEventIDByParent
 }
 
 func indexEventsByID(events []models.CanvasEvent) map[uuid.UUID]models.CanvasEvent {
@@ -872,13 +873,13 @@ func indexEventsByID(events []models.CanvasEvent) map[uuid.UUID]models.CanvasEve
 	return byID
 }
 
-func appendPreferredBranchEvents(
+func loadMissingBranchEvents(
 	tx *gorm.DB,
 	events []models.CanvasEvent,
-	preferredEventID map[uuid.UUID]uuid.UUID,
+	branchEventIDByParent map[uuid.UUID]uuid.UUID,
 ) ([]models.CanvasEvent, error) {
 	byID := indexEventsByID(events)
-	for _, eventID := range preferredEventID {
+	for _, eventID := range branchEventIDByParent {
 		if eventID == uuid.Nil {
 			continue
 		}
@@ -897,15 +898,15 @@ func appendPreferredBranchEvents(
 }
 
 // eventForExecution picks the canvas event whose payload should represent an upstream
-// execution on the current branch. It prefers the child's incoming event ID from the
-// linear execution chain; otherwise it uses the sole event on that execution.
+// execution on the current branch. When branchEventIDByParent has an entry, it uses the
+// child's incoming event ID; otherwise it uses the sole event on that execution.
 func eventForExecution(
 	executionID uuid.UUID,
 	events []models.CanvasEvent,
 	eventsByID map[uuid.UUID]models.CanvasEvent,
-	preferredEventID map[uuid.UUID]uuid.UUID,
+	branchEventIDByParent map[uuid.UUID]uuid.UUID,
 ) (models.CanvasEvent, bool, error) {
-	if eventID, ok := preferredEventID[executionID]; ok && eventID != uuid.Nil {
+	if eventID, ok := branchEventIDByParent[executionID]; ok && eventID != uuid.Nil {
 		if event, found := eventsByID[eventID]; found {
 			return event, true, nil
 		}
@@ -1050,8 +1051,8 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		return step, nil, err
 	}
 
-	preferredEventID := preferredEventIDByExecution(executionsInChain)
-	events, err = appendPreferredBranchEvents(b.tx, events, preferredEventID)
+	branchEventIDByParent := branchEventIDByParentExecution(executionsInChain)
+	events, err = loadMissingBranchEvents(b.tx, events, branchEventIDByParent)
 	if err != nil {
 		return step, nil, err
 	}
@@ -1063,7 +1064,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 			continue
 		}
 
-		event, ok, err := eventForExecution(execution.ID, events, eventsByID, preferredEventID)
+		event, ok, err := eventForExecution(execution.ID, events, eventsByID, branchEventIDByParent)
 		if err != nil {
 			return step, nil, err
 		}

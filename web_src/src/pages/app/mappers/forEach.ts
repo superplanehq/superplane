@@ -13,7 +13,7 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import type React from "react";
-import { getBackgroundColorClass } from "@/lib/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
@@ -94,7 +94,8 @@ export const forEachMapper: ComponentBaseMapper = {
       : undefined;
 
     return {
-      iconSlug: "repeat",
+      iconSlug: context.componentDefinition.icon ?? "repeat",
+      iconColor: getColorClass(context.componentDefinition.color ?? "blue"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "For Each",
