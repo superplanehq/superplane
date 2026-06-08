@@ -106,8 +106,6 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 		return fmt.Errorf("failed to fetch transitions: %v", err)
 	}
 
-	wantsResolution := strings.TrimSpace(opts.Resolution) != ""
-
 	var matches []Transition
 	for _, t := range transitions {
 		if strings.EqualFold(t.To.Name, status) {
@@ -123,26 +121,49 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 		return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
 	}
 
-	if wantsResolution {
-		for _, t := range matches {
-			if t.HasField("resolution") {
-				return client.DoTransitionWithOptions(issueKey, t.ID, opts)
-			}
-		}
-		// Resolution requested but no matching transition's screen accepts it.
-		// Surface a clear error instead of letting Jira's confusing "not on the
-		// appropriate screen" message bubble up.
-		names := make([]string, 0, len(matches))
-		for _, t := range matches {
-			names = append(names, t.Name)
-		}
-		return fmt.Errorf(
-			"transition to %q does not allow setting a resolution; configure the resolution field on the transition screen for %v in Jira, or leave Resolution empty",
-			status, names,
-		)
+	// Resolution and comment are both applied as transition-scoped fields, so
+	// each must be present on the chosen transition's screen — otherwise Jira
+	// rejects the whole request with a generic "not on the appropriate screen"
+	// error. Collect the fields the caller actually wants to set and pick a
+	// transition whose screen exposes all of them.
+	var requiredFields []string
+	if strings.TrimSpace(opts.Resolution) != "" {
+		requiredFields = append(requiredFields, "resolution")
+	}
+	if strings.TrimSpace(opts.Comment) != "" {
+		requiredFields = append(requiredFields, "comment")
 	}
 
-	return client.DoTransitionWithOptions(issueKey, matches[0].ID, opts)
+	for _, t := range matches {
+		if transitionHasFields(t, requiredFields) {
+			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
+		}
+	}
+
+	// No matching transition's screen accepts every requested field. Surface a
+	// clear error instead of letting Jira's confusing "not on the appropriate
+	// screen" message bubble up.
+	names := make([]string, 0, len(matches))
+	for _, t := range matches {
+		names = append(names, t.Name)
+	}
+	fields := strings.Join(requiredFields, " and ")
+	return fmt.Errorf(
+		"transition to %q does not allow setting %s on its screen; configure %s on the transition screen for %v in Jira, or leave those inputs empty",
+		status, fields, fields, names,
+	)
+}
+
+// transitionHasFields reports whether the transition's screen exposes every one
+// of the given Jira field ids. An empty list is trivially satisfied, so a
+// transition with no extra fields is still usable for a plain status change.
+func transitionHasFields(t Transition, fieldIDs []string) bool {
+	for _, id := range fieldIDs {
+		if !t.HasField(id) {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveCloudID returns the Atlassian cloud id from integration metadata, or fetches it from

@@ -67,7 +67,7 @@ func Test__TransitionIssue__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"31","name":"Resolve","to":{"id":"10003","name":"Done"},"fields":{"resolution":{"required":false}}}]}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"31","name":"Resolve","to":{"id":"10003","name":"Done"},"fields":{"resolution":{"required":false},"comment":{"required":false}}}]}`)),
 				},
 				{
 					StatusCode: http.StatusNoContent,

@@ -18,7 +18,7 @@ func Test__applyStatusWithOptions(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"31","name":"Resolve","to":{"id":"10003","name":"Done"},"fields":{"resolution":{"required":false}}}]}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"31","name":"Resolve","to":{"id":"10003","name":"Done"},"fields":{"resolution":{"required":false},"comment":{"required":false}}}]}`)),
 				},
 				{
 					StatusCode: http.StatusNoContent,
@@ -93,13 +93,64 @@ func Test__applyStatusWithOptions(t *testing.T) {
 		err = applyStatusWithOptions(client, "TEST-1", "Done", DoTransitionOptions{Resolution: "Done"})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "transition to \"Done\" does not allow setting a resolution")
+		assert.Contains(t, err.Error(), "transition to \"Done\" does not allow setting resolution")
 		assert.Contains(t, err.Error(), "Close")
 		// Important: we did not call POST /transitions when the precheck fails — only the GET.
 		require.Len(t, httpContext.Requests, 1)
 	})
 
-	t.Run("uses the first matching transition when no resolution is requested", func(t *testing.T) {
+	t.Run("prefers a transition whose screen exposes comment when several reach the same status", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"transitions":[
+						{"id":"41","name":"Close","to":{"id":"10003","name":"Done"}},
+						{"id":"42","name":"Comment & Close","to":{"id":"10003","name":"Done"},"fields":{"comment":{"required":false}}}
+					]}`)),
+				},
+				{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = applyStatusWithOptions(client, "TEST-1", "Done", DoTransitionOptions{Comment: "Closing"})
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 2)
+		body, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.Equal(t, "42", payload["transition"].(map[string]any)["id"])
+		assert.Contains(t, payload["update"].(map[string]any), "comment")
+	})
+
+	t.Run("returns a clear error when a comment is requested but no transition exposes it", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"31","name":"Close","to":{"id":"10003","name":"Done"},"fields":{"summary":{"required":false}}}]}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		err = applyStatusWithOptions(client, "TEST-1", "Done", DoTransitionOptions{Comment: "Closing"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "transition to \"Done\" does not allow setting comment")
+		// Precheck failed, so only the GET happened — no POST with a comment Jira would reject.
+		require.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("uses the first matching transition when no fields are requested", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -115,7 +166,7 @@ func Test__applyStatusWithOptions(t *testing.T) {
 		client, err := NewClient(httpContext, newAuthorizedIntegration())
 		require.NoError(t, err)
 
-		err = applyStatusWithOptions(client, "TEST-1", "Done", DoTransitionOptions{Comment: "Closing"})
+		err = applyStatusWithOptions(client, "TEST-1", "Done", DoTransitionOptions{})
 		require.NoError(t, err)
 	})
 
