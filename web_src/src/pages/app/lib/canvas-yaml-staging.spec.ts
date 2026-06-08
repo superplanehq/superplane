@@ -53,6 +53,23 @@ describe("parseCanvasYamlToSpec / buildCanvasYamlFromWorkflow", () => {
     expect(parseCanvasYamlToSpec("kind: Workflow\nspec:\n  nodes: []")).toBeNull();
   });
 
+  it("defaults missing node and edge lists to empty arrays", () => {
+    const yamlText = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Empty
+spec:
+  changeManagement:
+    enabled: true
+`;
+
+    expect(parseCanvasYamlToSpec(yamlText)).toEqual({
+      nodes: [],
+      edges: [],
+      changeManagement: { enabled: true },
+    });
+  });
+
   it("preserves changeManagement when present", () => {
     const workflow: CanvasesCanvas = {
       ...sampleWorkflow,

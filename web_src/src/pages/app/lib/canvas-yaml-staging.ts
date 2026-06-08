@@ -44,12 +44,16 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
     return null;
   }
 
-  if (!parsed.spec || !Array.isArray(parsed.spec.nodes)) {
+  if (!parsed.spec || typeof parsed.spec !== "object") {
+    return null;
+  }
+
+  if (parsed.spec.nodes !== undefined && !Array.isArray(parsed.spec.nodes)) {
     return null;
   }
 
   return {
-    nodes: parsed.spec.nodes,
+    nodes: parsed.spec.nodes ?? [],
     edges: parsed.spec.edges ?? [],
     changeManagement: parsed.spec.changeManagement,
   };
