@@ -3,6 +3,18 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { getState, getTriggerRenderer } from "..";
 import type { ExecutionInfo, NodeInfo } from "../types";
 
+// parseInstancePath extracts the zone and name from a VM instance value of the
+// form `zones/<zone>/instances/<name>` (or a full selfLink). Returns null for
+// empty values or unresolved expressions. Shared by the VM mapper components.
+export function parseInstancePath(value: string | undefined): { zone: string; name: string } | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("{{")) return null;
+  const match = trimmed.match(/zones\/([^/]+)\/instances\/([^/?#]+)/);
+  if (!match) return null;
+  return { zone: match[1], name: match[2] };
+}
+
 // baseEventSections builds the single event section shown on an action node from
 // its most recent execution, deriving the title/subtitle from the root trigger.
 // Pass eventStateOverride when a component resolves a custom event state (e.g.

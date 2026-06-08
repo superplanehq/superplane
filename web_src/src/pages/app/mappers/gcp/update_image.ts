@@ -10,35 +10,42 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.compute.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections, parseInstancePath } from "./event_helpers";
+import { baseEventSections } from "./event_helpers";
+import { type ImageNodeMetadata, imageNameFromValue } from "./image_helpers";
 
-interface VMInstanceNodeMetadata {
-  instanceName?: string;
-  zone?: string;
+interface UpdateImageConfiguration {
+  image?: string;
+  deprecationState?: string;
 }
 
-interface DeleteVMInstanceConfiguration {
-  instance?: string;
+interface UpdateImageOutputData {
+  name?: string;
+  family?: string;
+  status?: string;
+  deprecationState?: string;
+  replacement?: string;
 }
 
-interface DeleteVMInstanceOutputData {
-  instanceName?: string;
-  zone?: string;
-}
+const deprecationLabels: Record<string, string> = {
+  ACTIVE: "Active",
+  DEPRECATED: "Deprecated",
+  OBSOLETE: "Obsolete",
+  DELETED: "Deleted",
+};
 
-export const deleteVMInstanceMapper: ComponentBaseMapper = {
+export const updateImageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "gcp";
 
     return {
       iconSrc: gcpIcon,
-      iconSlug: context.componentDefinition?.icon ?? "trash-2",
+      iconSlug: context.componentDefinition?.icon ?? "image",
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition?.label || "Delete VM Instance",
+      title: context.node.name || context.componentDefinition?.label || "Update Image",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
@@ -54,16 +61,15 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as DeleteVMInstanceOutputData | undefined;
+    const result = outputs?.default?.[0]?.data as UpdateImageOutputData | undefined;
     if (!result) return details;
 
-    if (result.instanceName) {
-      details["Instance Name"] = result.instanceName;
+    if (result.name) details["Image Name"] = result.name;
+    if (result.family) details["Family"] = result.family;
+    if (result.deprecationState) {
+      details["Deprecation State"] = deprecationLabels[result.deprecationState] || result.deprecationState;
     }
-    if (result.zone) {
-      details["Zone"] = result.zone;
-    }
-    details["Status"] = "Deleted";
+    if (result.replacement) details["Replacement"] = result.replacement;
 
     return details;
   },
@@ -76,18 +82,18 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as VMInstanceNodeMetadata | undefined;
-  const configuration = node.configuration as DeleteVMInstanceConfiguration | undefined;
+  const nodeMetadata = node.metadata as ImageNodeMetadata | undefined;
+  const configuration = node.configuration as UpdateImageConfiguration | undefined;
 
-  const parsed = parseInstancePath(configuration?.instance);
-  const instanceName = nodeMetadata?.instanceName || parsed?.name || configuration?.instance;
-  const zone = nodeMetadata?.zone || parsed?.zone;
-
-  if (instanceName) {
-    metadata.push({ icon: "trash-2", label: instanceName });
+  const imageName = nodeMetadata?.imageName || imageNameFromValue(configuration?.image);
+  if (imageName) {
+    metadata.push({ icon: "image", label: imageName });
   }
-  if (zone) {
-    metadata.push({ icon: "map-pin", label: zone });
+  if (configuration?.deprecationState && configuration.deprecationState !== "NO_CHANGE") {
+    metadata.push({
+      icon: "archive",
+      label: deprecationLabels[configuration.deprecationState] || configuration.deprecationState,
+    });
   }
 
   return metadata;
