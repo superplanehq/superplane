@@ -5,6 +5,10 @@ agent:
     type: e1-standard-2
     os_image: ubuntu2004
 
+promotions:
+  - name: Release runner AMIs
+    pipeline_file: release-amis.yml
+
 blocks:
   - name: Build AMIs (amd64 + arm64)
     task:

@@ -18,8 +18,6 @@ promotions:
       when: "result = 'passed' and branch = 'main'"
   - name: Build runner AMIs
     pipeline_file: build-amis.yml
-    auto_promote:
-      when: "result = 'passed' and branch = 'main'"
   - name: Release runner AMIs
     pipeline_file: release-amis.yml
 
