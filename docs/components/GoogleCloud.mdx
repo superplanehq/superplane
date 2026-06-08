@@ -31,7 +31,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Delete Image" href="#compute-•-delete-image" description="Permanently delete a Google Compute Engine custom image" />
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Instance" href="#compute-•-get-vm-instance" description="Fetch the current state of a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
@@ -41,6 +43,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Compute • Update Image" href="#compute-•-update-image" description="Update a Google Compute Engine image: deprecate or obsolete it, and update its labels" />
   <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
 
@@ -899,6 +902,68 @@ Returns the instance state after the operation:
 }
 ```
 
+<a id="compute-•-create-image"></a>
+
+## Compute • Create Image
+
+**Component key:** `gcp.createImage`
+
+The Create Image component creates a custom Compute Engine image.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable, reusable images from validated disks
+- **Backup workflows**: Capture disk state as a restorable image before changes
+- **Release automation**: Produce versioned images as part of CI/CD
+
+### Configuration
+
+- **Image Name**: Name for the new image (lowercase, numbers, hyphens; 1–63 chars).
+- **Source**: Where the image is created from:
+  - **Disk**: A persistent disk (pick the region, zone, then the disk).
+  - **Snapshot**: A disk snapshot.
+  - **Image**: Another custom image in the project.
+- **Image family**: Optional family to group related images (e.g. `my-app`).
+- **Description**: Optional human-readable description.
+- **Labels**: Optional key-value labels (billing, environment, team).
+- **Storage location**: Optional single region or multi-region to store the image (e.g. `us` or `europe-west1`). Defaults to the source's region.
+- **Force create**: When the source is a disk attached to a running instance, create the image anyway (may produce an inconsistent image).
+
+### Output
+
+Emits the created image: name, selfLink, family, status, diskSizeGb, sourceDisk, labels, deprecationState, creationTimestamp.
+
+### Important Notes
+
+- Creating an image from a disk attached to a running VM is not recommended unless **Force create** is enabled.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "ACTIVE",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production"
+    },
+    "name": "my-app-2026-06-02",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "sourceDisk": "my-disk",
+    "status": "READY",
+    "storageLocations": [
+      "us"
+    ]
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.created"
+}
+```
+
 <a id="compute-•-create-virtual-machine"></a>
 
 ## Compute • Create Virtual Machine
@@ -937,6 +1002,46 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.createVM.completed"
+}
+```
+
+<a id="compute-•-delete-image"></a>
+
+## Compute • Delete Image
+
+**Component key:** `gcp.deleteImage`
+
+The Delete Image component permanently deletes a Compute Engine custom image.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test images after use
+- **Cost optimization**: Delete unused images to reduce storage costs
+- **Lifecycle automation**: Remove obsolete images as part of release pipelines
+
+### Configuration
+
+- **Image**: The custom image to delete. Pick from the list of images in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createImage`).
+
+### Output
+
+Returns the name of the deleted image.
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone.
+- If the image is not found, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup.
+- Deleting an image does not affect VM instances or disks already created from it.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageName": "my-app-2026-06-02"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.deleted"
 }
 ```
 
@@ -1290,6 +1395,66 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="compute-•-update-image"></a>
+
+## Compute • Update Image
+
+**Component key:** `gcp.updateImage`
+
+The Update Image component updates an existing Compute Engine custom image. It can change the image's deprecation status (including marking it deprecated or obsolete) and update its labels.
+
+### Use Cases
+
+- **Release lifecycle**: Mark older images deprecated or obsolete as newer ones ship
+- **Pointing consumers forward**: Set a replacement image so users are guided to the current version
+- **Inventory hygiene**: Keep image labels accurate for billing, environment, and ownership
+
+### Configuration
+
+- **Image**: The custom image to update.
+- **Deprecation state**: Optionally change the image lifecycle state:
+  - **No change**: Leave the current deprecation state untouched.
+  - **Active**: Clear any deprecation (make the image fully usable again).
+  - **Deprecated**: Mark the image deprecated (still usable; warns on use).
+  - **Obsolete**: Mark the image obsolete (cannot be used to create new resources).
+  - **Deleted**: Mark the image as logically deleted.
+- **Replacement image**: Optional image to recommend in place of this one (name or URL). Applies when setting a deprecation state.
+- **Labels**: Optional key-value labels to add or update on the image. Labels you provide are merged with the image's existing labels; existing labels you don't list are left unchanged.
+
+### Output
+
+Emits the updated image: name, selfLink, family, status, diskSizeGb, labels, deprecationState, replacement, creationTimestamp.
+
+### Important Notes
+
+- Setting the deprecation state to **Active** clears an existing deprecation.
+- Updating labels merges with the image's existing labels; labels you don't list are preserved.
+- The component waits for each underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "DEPRECATED",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production",
+      "team": "platform"
+    },
+    "name": "my-app-2026-06-02",
+    "replacement": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-v2",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "status": "READY"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.updated"
 }
 ```
 

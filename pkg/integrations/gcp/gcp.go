@@ -167,6 +167,9 @@ func (g *GCP) Actions() []core.Action {
 		&compute.ManageVMInstancePower{},
 		&compute.UpdateVMInstanceType{},
 		&compute.GetVMInstanceMetrics{},
+		&compute.CreateImage{},
+		&compute.UpdateImage{},
+		&compute.DeleteImage{},
 		&compute.CreateStaticIP{},
 		&compute.DeleteStaticIP{},
 		&compute.ManageStaticIP{},
@@ -929,6 +932,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListPublicImageResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeCustomImages:
 		return compute.ListCustomImageResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeImageStorageLocation:
+		return compute.ListImageStorageLocationResources(reqCtx, client)
 	case compute.ResourceTypeSnapshots:
 		return compute.ListSnapshotResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeDisks:
