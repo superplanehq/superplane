@@ -121,49 +121,43 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 		return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
 	}
 
-	// Resolution and comment are both applied as transition-scoped fields, so
-	// each must be present on the chosen transition's screen — otherwise Jira
-	// rejects the whole request with a generic "not on the appropriate screen"
-	// error. Collect the fields the caller actually wants to set and pick a
-	// transition whose screen exposes all of them.
-	var requiredFields []string
-	if strings.TrimSpace(opts.Resolution) != "" {
-		requiredFields = append(requiredFields, "resolution")
-	}
-	if strings.TrimSpace(opts.Comment) != "" {
-		requiredFields = append(requiredFields, "comment")
-	}
+	// Resolution and comment differ in how strictly Jira gates them:
+	//   - Resolution is sent via `fields`, which Jira rejects outright unless
+	//     the field is on the transition's screen — so it's a hard requirement.
+	//   - A comment is sent via `update.comment`, which Jira generally accepts
+	//     even when the screen metadata doesn't list a comment field — so it's
+	//     only a soft preference; requiring it would block otherwise-valid moves.
+	wantsResolution := strings.TrimSpace(opts.Resolution) != ""
+	wantsComment := strings.TrimSpace(opts.Comment) != ""
 
+	// First choice: a transition whose screen exposes everything we want to set,
+	// so the comment lands atomically with the transition when possible.
 	for _, t := range matches {
-		if transitionHasFields(t, requiredFields) {
+		if (!wantsResolution || t.HasField("resolution")) && (!wantsComment || t.HasField("comment")) {
 			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
 		}
 	}
 
-	// No matching transition's screen accepts every requested field. Surface a
-	// clear error instead of letting Jira's confusing "not on the appropriate
-	// screen" message bubble up.
+	// Otherwise fall back to any transition that accepts the resolution (the
+	// hard requirement); the comment is still attached and Jira usually accepts
+	// it even without a dedicated comment field on the screen.
+	for _, t := range matches {
+		if !wantsResolution || t.HasField("resolution") {
+			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
+		}
+	}
+
+	// No matching transition exposes the resolution field. Surface a clear
+	// error instead of letting Jira's confusing "not on the appropriate screen"
+	// message bubble up.
 	names := make([]string, 0, len(matches))
 	for _, t := range matches {
 		names = append(names, t.Name)
 	}
-	fields := strings.Join(requiredFields, " and ")
 	return fmt.Errorf(
-		"transition to %q does not allow setting %s on its screen; configure %s on the transition screen for %v in Jira, or leave those inputs empty",
-		status, fields, fields, names,
+		"transition to %q does not allow setting a resolution; configure the resolution field on the transition screen for %v in Jira, or leave Resolution empty",
+		status, names,
 	)
-}
-
-// transitionHasFields reports whether the transition's screen exposes every one
-// of the given Jira field ids. An empty list is trivially satisfied, so a
-// transition with no extra fields is still usable for a plain status change.
-func transitionHasFields(t Transition, fieldIDs []string) bool {
-	for _, id := range fieldIDs {
-		if !t.HasField(id) {
-			return false
-		}
-	}
-	return true
 }
 
 // resolveCloudID returns the Atlassian cloud id from integration metadata, or fetches it from
