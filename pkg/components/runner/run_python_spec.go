@@ -1,0 +1,102 @@
+package runner
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
+)
+
+// RunPythonSpec is persisted runnerPython node configuration.
+type RunPythonSpec struct {
+	MachineType             string                `mapstructure:"machine_type"`
+	Script                  string                `mapstructure:"script"`
+	EnableSetupCommands     bool                  `mapstructure:"enable_setup_commands"`
+	SetupCommands           string                `mapstructure:"setup_commands"`
+	Environment             []EnvironmentVariable `mapstructure:"environment"`
+	ExecutionMode           string                `mapstructure:"execution_mode"`
+	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
+	DockerImage             string                `mapstructure:"docker_image"`
+	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
+}
+
+func decodeRunPythonSpec(raw any) (RunPythonSpec, error) {
+	var spec RunPythonSpec
+	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &spec,
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return RunPythonSpec{}, fmt.Errorf("runnerPython spec decoder: %w", err)
+	}
+	if err := dec.Decode(raw); err != nil {
+		return RunPythonSpec{}, fmt.Errorf("decode runnerPython configuration: %w", err)
+	}
+	applyRunPythonSpecDefaults(&spec)
+	return spec, nil
+}
+
+func applyRunPythonSpecDefaults(spec *RunPythonSpec) {
+	if strings.TrimSpace(spec.ExecutionMode) == "" {
+		spec.ExecutionMode = ExecutionModeHost
+	}
+	if spec.ExecutionTimeoutSeconds <= 0 {
+		spec.ExecutionTimeoutSeconds = DefaultExecutionTimeoutSeconds
+	}
+	if strings.TrimSpace(spec.DockerImagePreset) == "" {
+		spec.DockerImagePreset = runPythonDefaultDockerPreset
+	}
+}
+
+func resolvedRunPythonDockerImageRef(spec RunPythonSpec) string {
+	if normalizeExecutionMode(spec.ExecutionMode) != ExecutionModeDocker {
+		return ""
+	}
+	preset := strings.TrimSpace(spec.DockerImagePreset)
+	custom := strings.TrimSpace(spec.DockerImage)
+	if preset == "" {
+		return custom
+	}
+	if preset == DockerImagePresetCustom {
+		return custom
+	}
+	return preset
+}
+
+func validateRunPythonSpec(spec RunPythonSpec) error {
+	if err := validateScript(spec.Script); err != nil {
+		return err
+	}
+
+	if err := validateEnvironment(spec.Environment); err != nil {
+		return err
+	}
+
+	if spec.EnableSetupCommands {
+		if err := validateCommands(spec.SetupCommands); err != nil {
+			return fmt.Errorf("setup commands: %w", err)
+		}
+	}
+
+	if strings.TrimSpace(spec.MachineType) == "" {
+		return fmt.Errorf("machine type is required")
+	}
+
+	ref := strings.TrimSpace(resolvedRunPythonDockerImageRef(spec))
+	mode := normalizeExecutionMode(spec.ExecutionMode)
+
+	if ref != "" && len(ref) > maxDockerImageReferenceChars {
+		return fmt.Errorf("container image reference must be at most %d characters", maxDockerImageReferenceChars)
+	}
+	if mode == ExecutionModeDocker && ref == "" {
+		return fmt.Errorf("container image is required when execution mode is Docker")
+	}
+
+	if spec.ExecutionTimeoutSeconds != 0 {
+		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > maxExecutionTimeoutSecondsRequest {
+			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", maxExecutionTimeoutSecondsRequest, DefaultExecutionTimeoutSeconds)
+		}
+	}
+
+	return nil
+}
