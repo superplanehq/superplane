@@ -407,6 +407,86 @@ func Test__Client__GetProjectIssueTypes(t *testing.T) {
 	})
 }
 
+func Test__Client__GetWorkflowSchemeForProject(t *testing.T) {
+	t.Run("custom scheme with id resolves full details", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF"}}
+						]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF",
+						"issueTypeMappings":{"10001":"Bug WF"}
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Custom Scheme", scheme.Name)
+		assert.Equal(t, "Bug WF", scheme.IssueTypeMappings["10001"])
+		// Both endpoints were hit: project assignment, then full scheme by id.
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/rest/api/3/workflowscheme/42")
+	})
+
+	t.Run("default scheme without id falls back to inlined default workflow", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"name":"Default Workflow Scheme","defaultWorkflow":"jira"}}
+						]
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Default Workflow Scheme", scheme.Name)
+		assert.Equal(t, "jira", scheme.DefaultWorkflow)
+		assert.NotNil(t, scheme.IssueTypeMappings)
+		// No id means no second request to resolve full details.
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("team-managed project with empty list returns nil", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		assert.Nil(t, scheme)
+	})
+}
+
 func Test__WrapInADF(t *testing.T) {
 	t.Run("wraps text in ADF format", func(t *testing.T) {
 		result := WrapInADF("Hello world")
@@ -885,5 +965,56 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 		id, err := client.ResolveNumericIssueID("ITSM-1")
 		require.NoError(t, err)
 		assert.Equal(t, "999", id)
+	})
+}
+
+func Test__GetWorkflowStatusesByName(t *testing.T) {
+	t.Run("returns statuses for an exact-name match", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[{"id":{"name":"task-workflow"},"statuses":[
+						{"id":"10001","name":"To Do","statusCategory":"TODO"},
+						{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
+						{"id":"10003","name":"Done","statusCategory":"DONE"}
+					]}]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		statuses, err := client.GetWorkflowStatusesByName("task-workflow")
+		require.NoError(t, err)
+		require.Len(t, statuses, 3)
+		assert.Equal(t, Status{ID: "10001", Name: "To Do", Category: "TODO"}, statuses[0])
+		assert.Equal(t, Status{ID: "10002", Name: "In Progress", Category: "IN_PROGRESS"}, statuses[1])
+		assert.Equal(t, Status{ID: "10003", Name: "Done", Category: "DONE"}, statuses[2])
+	})
+
+	t.Run("filters out workflows whose name does not match exactly", func(t *testing.T) {
+		// Jira's workflow/search does a prefix match, so a query for
+		// "task" can return "task-workflow-old" too. We must not return
+		// that one's statuses as if they belonged to the requested
+		// workflow.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[{"id":{"name":"task-workflow-old"},"statuses":[
+						{"id":"99","name":"Stale","statusCategory":"TODO"}
+					]}]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.GetWorkflowStatusesByName("task-workflow")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `workflow "task-workflow" not found`)
 	})
 }
