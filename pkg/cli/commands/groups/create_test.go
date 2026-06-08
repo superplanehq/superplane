@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,16 @@ type createBody struct {
 		} `json:"spec"`
 	} `json:"group"`
 }
+
+const groupFileYAML = `apiVersion: v1
+kind: Group
+metadata:
+  name: engineers
+spec:
+  displayName: Engineers
+  description: Engineering team
+  role: org_viewer
+`
 
 func newCreateServer(t *testing.T, seen *createBody) *httptest.Server {
 	t.Helper()
@@ -94,6 +105,29 @@ func TestCreateFromFileOverridesPositional(t *testing.T) {
 	require.NoError(t, cmd.Execute(ctx))
 	require.Equal(t, "from-file", seen.Group.Metadata.Name)
 	require.Equal(t, "FromFile", seen.Group.Spec.DisplayName)
+}
+
+func TestCreateFromStdin(t *testing.T) {
+	var seen createBody
+	server := newCreateServer(t, &seen)
+	ctx, stdout := newTestContext(t, server, "text")
+	ctx.Cmd.SetIn(strings.NewReader(groupFileYAML))
+
+	file := "-"
+	empty := ""
+	cmd := &createCommand{
+		file:        &file,
+		displayName: &empty,
+		description: &empty,
+		role:        &empty,
+	}
+
+	require.NoError(t, cmd.Execute(ctx))
+	require.Equal(t, "engineers", seen.Group.Metadata.Name)
+	require.Equal(t, "Engineers", seen.Group.Spec.DisplayName)
+	require.Equal(t, "Engineering team", seen.Group.Spec.Description)
+	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
+	require.Contains(t, stdout.String(), "Name: engineers")
 }
 
 func newMeOnlyServer(t *testing.T) *httptest.Server {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -82,6 +83,33 @@ func TestCreateRoleFromFile(t *testing.T) {
 	require.Contains(t, stdout.String(), "Name: release_manager")
 }
 
+func TestCreateRoleFromStdin(t *testing.T) {
+	var seen rolePayload
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v1/me":
+			writeMeResponse(w)
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/roles":
+			body, _ := io.ReadAll(r.Body)
+			require.NoError(t, json.Unmarshal(body, &seen))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"role":{"metadata":{"name":"release_manager"},"spec":{"displayName":"Release Manager"}}}`))
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	file := "-"
+	ctx, stdout := newTestContext(t, server, "text")
+	ctx.Cmd.SetIn(strings.NewReader(roleFileYAML))
+	require.NoError(t, (&createCommand{file: &file}).Execute(ctx))
+
+	require.Equal(t, "release_manager", seen.Role.Metadata.Name)
+	require.Equal(t, "Release Manager", seen.Role.Spec.DisplayName)
+	require.Contains(t, stdout.String(), "Name: release_manager")
+}
+
 func TestCreateRoleRequiresFile(t *testing.T) {
 	ctx, _ := newTestContext(t, nil, "text")
 	empty := ""
@@ -155,6 +183,33 @@ func TestUpdateRoleFromFile(t *testing.T) {
 	ctx, _ := newTestContext(t, server, "text")
 	require.NoError(t, (&updateCommand{file: &path}).Execute(ctx))
 	require.Equal(t, "release_manager", seen.Role.Metadata.Name)
+}
+
+func TestUpdateRoleFromStdin(t *testing.T) {
+	var seen rolePayload
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v1/me":
+			writeMeResponse(w)
+		case r.URL.Path == "/api/v1/roles/release_manager":
+			require.Equal(t, http.MethodPut, r.Method)
+			body, _ := io.ReadAll(r.Body)
+			require.NoError(t, json.Unmarshal(body, &seen))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"role":{"metadata":{"name":"release_manager"},"spec":{"displayName":"Release Manager"}}}`))
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	file := "-"
+	ctx, _ := newTestContext(t, server, "text")
+	ctx.Cmd.SetIn(strings.NewReader(roleFileYAML))
+	require.NoError(t, (&updateCommand{file: &file}).Execute(ctx))
+
+	require.Equal(t, "release_manager", seen.Role.Metadata.Name)
+	require.Equal(t, "Release Manager", seen.Role.Spec.DisplayName)
 }
 
 func TestUpdateRoleRejectsPositional(t *testing.T) {

@@ -26,7 +26,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := parseRoleFile(filePath)
+	resource, err := parseRoleInput(filePath, ctx.Cmd.InOrStdin())
 	if err != nil {
 		return err
 	}
