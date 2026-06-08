@@ -2,6 +2,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { appPath } from "@/lib/appPaths";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -83,7 +84,7 @@ export function useInstallApp({
 
         const result = (await response.json()) as InstallResult;
         await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
-        navigate(`/${result.organizationId}/canvases/${result.canvasId}`);
+        navigate(appPath(result.organizationId, result.canvasId));
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install app"));
         showErrorToast(message);

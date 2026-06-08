@@ -1,6 +1,7 @@
 import { Heading } from "@/components/Heading/heading";
 import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Link } from "react-router-dom";
+import { appPath } from "@/lib/appPaths";
 import { CanvasActionsMenu } from "./CanvasActionsMenu";
 import { CanvasCardDescription } from "./CanvasCardDescription";
 import type { CanvasCardData, CanvasFolderData } from "./types";
@@ -71,7 +72,7 @@ function CanvasCard({
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasCardProps) {
-  const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
+  const canvasHref = appPath(organizationId, canvas.id);
   const previewNodes = canvas.nodes || [];
   const previewEdges = canvas.edges || [];
 

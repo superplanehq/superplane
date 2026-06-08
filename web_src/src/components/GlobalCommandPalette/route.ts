@@ -1,4 +1,5 @@
 import { PUBLIC_TOP_LEVEL_SEGMENTS } from "./constants";
+import { isAppRouteId } from "@/lib/appPaths";
 import type { CommandPage } from "./types";
 
 export function getRouteContext(pathname: string): {
@@ -9,8 +10,12 @@ export function getRouteContext(pathname: string): {
   const segments = pathname.split("/").filter(Boolean);
   const firstSegment = segments[0] || "";
   const organizationId = PUBLIC_TOP_LEVEL_SEGMENTS.has(firstSegment) ? null : firstSegment;
-  const canvasSegmentIndex = segments.findIndex((segment) => segment === "canvases" || segment === "templates");
-  const canvasId = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex + 1] || null : null;
+  const canvasSegmentIndex = segments.findIndex(
+    (segment) => segment === "apps" || segment === "canvases" || segment === "templates",
+  );
+  const parentSegment = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex] : null;
+  const rawCanvasId = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex + 1] || null : null;
+  const canvasId = parentSegment === "apps" ? (isAppRouteId(rawCanvasId) ? rawCanvasId : null) : rawCanvasId;
   const isTemplateRoute = canvasSegmentIndex >= 0 && segments[canvasSegmentIndex] === "templates";
   return { organizationId, canvasId, isTemplateRoute };
 }

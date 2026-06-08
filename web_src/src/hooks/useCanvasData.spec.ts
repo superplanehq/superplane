@@ -4,10 +4,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesUpdateCanvasDashboard } = vi.hoisted(() => ({
+const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesUpdateConsole } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
-  canvasesUpdateCanvasDashboard: vi.fn(),
+  canvasesUpdateConsole: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -16,7 +16,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
-    canvasesUpdateCanvasDashboard,
+    canvasesUpdateConsole,
   };
 });
 
@@ -286,9 +286,9 @@ describe("useUpdateCanvasConsole", () => {
   it("registers a canvas version websocket echo before saving dashboard changes", async () => {
     const queryClient = createQueryClient();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
-    canvasesUpdateCanvasDashboard.mockResolvedValue({
+    canvasesUpdateConsole.mockResolvedValue({
       data: {
-        dashboard: {
+        console: {
           panels: [],
           layout: [],
         },
@@ -306,14 +306,14 @@ describe("useUpdateCanvasConsole", () => {
     await result.current.mutateAsync({ panels: [], layout: [] });
 
     expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
-    expect(canvasesUpdateCanvasDashboard).toHaveBeenCalledOnce();
+    expect(canvasesUpdateConsole).toHaveBeenCalledOnce();
   });
 
   it("releases the ignored canvas version echo when dashboard save fails", async () => {
     const queryClient = createQueryClient();
     const releaseCanvasVersionUpdatedEcho = vi.fn();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
-    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+    canvasesUpdateConsole.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(
       () =>
@@ -331,7 +331,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
     let resolveSave: (value: unknown) => void = () => {};
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
@@ -342,7 +342,7 @@ describe("useUpdateCanvasConsole", () => {
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
     });
-    canvasesUpdateCanvasDashboard.mockReturnValue(savePromise);
+    canvasesUpdateConsole.mockReturnValue(savePromise);
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -363,7 +363,7 @@ describe("useUpdateCanvasConsole", () => {
 
     resolveSave({
       data: {
-        dashboard: {
+        console: {
           canvasId: "canvas-1",
           versionId: "version-1",
           panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
@@ -377,14 +377,14 @@ describe("useUpdateCanvasConsole", () => {
 
   it("rolls back the dashboard cache when console save fails", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
     });
-    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+    canvasesUpdateConsole.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),

@@ -182,7 +182,7 @@ describe("useCanvasWebsocket", () => {
         queryKey: canvasKeys.versionList(testCanvasId),
       });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-        queryKey: canvasKeys.dashboardAll(testCanvasId),
+        queryKey: canvasKeys.consoleAll(testCanvasId),
       });
     });
   });

@@ -12,7 +12,7 @@ const TAB_AGENT = "agent",
   TAB_RUNS = "runs",
   TAB_VERSIONS = "versions";
 
-type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 export interface CanvasToolSidebarProps {
   toolSidebarState: CanvasToolSidebarState;
