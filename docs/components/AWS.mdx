@@ -12,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="CodePipeline • On Pipeline" href="#code-pipeline-•-on-pipeline" description="Listen to AWS CodePipeline pipeline execution state change events" />
+  <LinkCard title="EC2 • On Alarm" href="#ec2-•-on-alarm" description="Listen to CloudWatch alarm state change events for a specific EC2 instance" />
   <LinkCard title="EC2 • On Image" href="#ec2-•-on-image" description="Listen to AWS EC2 AMI state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
@@ -33,6 +34,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
+  <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
   <LinkCard title="EC2 • Delete Instance" href="#ec2-•-delete-instance" description="Terminate an EC2 instance and wait for termination" />
@@ -41,6 +43,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Disable Image Deprecation" href="#ec2-•-disable-image-deprecation" description="Disable deprecation for an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image" href="#ec2-•-enable-image" description="Enable an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
+  <LinkCard title="EC2 • Get Alarm" href="#ec2-•-get-alarm" description="Fetch the current state and details of a CloudWatch alarm for an EC2 instance" />
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
   <LinkCard title="EC2 • Get Instance Metrics" href="#ec2-•-get-instance-metrics" description="Fetch CPU, network, and optional memory metrics for an EC2 instance via CloudWatch" />
@@ -250,6 +253,92 @@ Each event includes:
   },
   "timestamp": "2026-02-24T15:21:52.212Z",
   "type": "aws.codepipeline.pipeline"
+}
+```
+
+<a id="ec2-•-on-alarm"></a>
+
+## EC2 • On Alarm
+
+**Trigger key:** `aws.ec2.onAlarm`
+
+The On Alarm trigger starts a workflow execution when a CloudWatch alarm attached to a specific EC2 instance transitions to the configured state.
+
+### Use Cases
+
+- **Incident response**: Trigger remediation workflows when a CPU, network, or status-check alarm fires
+- **Auto-scaling**: React to alarms on individual instances without polling
+- **Audit**: Record alarm state transitions for specific instances over time
+
+### Configuration
+
+- **Region**: AWS region where the instance and alarms reside
+- **Instance**: EC2 instance whose alarms to monitor (required)
+- **Alarm State**: Only trigger for a specific state: ALARM, OK, or INSUFFICIENT_DATA (required)
+- **Alarm**: Optionally restrict to a single alarm selected from the alarms attached to the chosen instance; leave empty to trigger on any alarm for that instance
+
+### Event Data
+
+Each matched event includes the full EventBridge payload:
+- **detail.alarmName**: CloudWatch alarm name
+- **detail.state.value**: Current alarm state (ALARM / OK / INSUFFICIENT_DATA)
+- **detail.previousState.value**: Previous alarm state
+- **detail.configuration**: Full alarm configuration including metric, threshold, and dimensions
+- **region**, **account**, **time**: Event envelope fields
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "alarmName": "high cpu usage",
+      "configuration": {
+        "description": "The alarm",
+        "metrics": [
+          {
+            "id": "56cf46e9-e800-a52b-b55b-7f3c770c24ef",
+            "metricStat": {
+              "metric": {
+                "dimensions": {
+                  "InstanceId": "i-1234567890abcdef0"
+                },
+                "name": "CPUUtilization",
+                "namespace": "AWS/EC2"
+              },
+              "period": 30,
+              "stat": "Average"
+            },
+            "returnData": true
+          }
+        ]
+      },
+      "previousState": {
+        "reason": "Threshold Crossed: 1 datapoint [0.3166666666666666 (03/06/26 14:15:00)] was not greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T14:15:45.660+0000\",\"startDate\":\"2026-06-03T14:15:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[0.3166666666666666],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T14:15:00.000+0000\",\"sampleCount\":1.0,\"value\":0.3166666666666666}]}",
+        "timestamp": "2026-06-03T14:15:45.663+0000",
+        "value": "OK"
+      },
+      "state": {
+        "reason": "Threshold Crossed: 1 datapoint [31.3283485070315 (03/06/26 15:45:00)] was greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T15:46:15.660+0000\",\"startDate\":\"2026-06-03T15:45:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[31.3283485070315],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T15:45:00.000+0000\",\"sampleCount\":2.0,\"value\":31.3283485070315}]}",
+        "timestamp": "2026-06-03T15:46:15.662+0000",
+        "value": "ALARM"
+      }
+    },
+    "detail-type": "CloudWatch Alarm State Change",
+    "id": "ccc0350a-524d-2f57-068b-1cebb2a4b6c0",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:high cpu usage"
+    ],
+    "source": "aws.cloudwatch",
+    "time": "2026-06-03T15:46:15Z",
+    "version": "0"
+  },
+  "timestamp": "2026-06-03T15:46:16.233981639Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
@@ -1036,6 +1125,74 @@ The Copy Image component copies an AMI to another AWS region.
 }
 ```
 
+<a id="ec2-•-create-alarm"></a>
+
+## EC2 • Create Alarm
+
+**Component key:** `aws.ec2.createAlarm`
+
+The Create Alarm component creates a CloudWatch metric alarm targeting a specific EC2 instance.
+
+### Use Cases
+
+- **Proactive monitoring**: Set up CPU or network alarms as part of an instance provisioning workflow
+- **Auto-remediation**: Create alarms that trigger downstream workflows when thresholds are crossed
+- **Compliance**: Ensure every new instance has required alarms configured automatically
+
+### Configuration
+
+- **Region**: AWS region where the EC2 instance and alarm reside
+- **Instance**: EC2 instance to monitor
+- **Alarm Name**: Unique name for the CloudWatch alarm
+- **Metric Name**: EC2 CloudWatch metric to monitor (CPU, disk, network, status checks)
+- **Statistic**: Aggregation function applied over the evaluation period (Average, Sum, Min, Max, SampleCount)
+- **Comparison Operator**: How the metric is compared to the threshold (e.g. GreaterThanThreshold)
+- **Threshold**: Numeric value to compare the metric against
+- **Period**: Evaluation window in seconds (default: 300)
+- **Evaluation Periods**: Number of consecutive periods that must breach the threshold before the alarm fires (default: 1)
+- **Alarm Description**: Optional free-text description
+- **Treat Missing Data**: How to treat missing data points (missing, ignore, breaching, notBreaching)
+- **Alarm Action** *(toggleable)*: EC2 automation action to execute when the alarm enters ALARM state — Recover, Reboot, Stop, or Terminate
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to publish a notification to when the alarm enters ALARM state
+
+### Output
+
+Emits the created alarm details on the default output channel:
+- `alarmName`, `alarmArn`, `namespace`, `metricName`
+- `statistic`, `threshold`, `comparisonOperator`, `stateValue`
+- `period`, `evaluationPeriods`, `dimensions`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.ec2.alarm"
+}
+```
+
 <a id="ec2-•-create-image"></a>
 
 ## EC2 • Create Image
@@ -1359,6 +1516,63 @@ The Enable Image Deprecation component sets a deprecation time for an AMI.
   },
   "timestamp": "2026-02-19T09:40:00Z",
   "type": "aws.ec2.image.deprecationEnabled"
+}
+```
+
+<a id="ec2-•-get-alarm"></a>
+
+## EC2 • Get Alarm
+
+**Component key:** `aws.ec2.getAlarm`
+
+The Get Alarm component describes a CloudWatch alarm and emits its current details.
+
+### Use Cases
+
+- **State inspection**: Check whether an alarm is in ALARM, OK, or INSUFFICIENT_DATA state before taking action
+- **Alarm metadata lookup**: Retrieve threshold, metric, and dimension details mid-workflow
+- **Audit**: Record alarm configuration at a point in time
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to describe, selected from all alarms in the chosen region (`ec2.alarm` resource picker)
+
+### Output
+
+Emits the alarm details on the default output channel:
+- `alarmName`, `alarmArn`, `namespace`, `metricName`
+- `statistic`, `threshold`, `comparisonOperator`, `stateValue`
+- `period`, `evaluationPeriods`, `dimensions`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:37:20.636935245Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
