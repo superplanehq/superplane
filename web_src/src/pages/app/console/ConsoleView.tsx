@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
-import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, CodeXml, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ConsolePanel, ConsoleLayoutItem } from "@/hooks/useCanvasData";
 
+import { HtmlPanelCard } from "./HtmlPanelCard";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 import { NodePanelCard } from "./NodePanelCard";
 import { NodesPanelCard } from "./NodesPanelCard";
@@ -256,6 +257,7 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
 
 const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   markdown: FileText,
+  html: CodeXml,
   node: Workflow,
   nodes: Network,
   table: Table2,
@@ -285,6 +287,8 @@ function PanelCardRouter({
       return <ChartPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
     case "number":
       return <NumberPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
+    case "html":
+      return <HtmlPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
     case "markdown":
     default:
       return <MarkdownPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;

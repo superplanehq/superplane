@@ -61,6 +61,25 @@ function asObject(value: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * Validate the body / title / variables shape used by both markdown and html
+ * panels. Returns `null` when valid, a human-readable error otherwise. The
+ * two panel types share this validator because their stored content is
+ * identical; only the renderer differs.
+ */
+export function validateMarkdownContent(content: unknown): string | null {
+  if (content === undefined || content === null) return null;
+  const obj = asObject(content);
+  if (!obj) return "content must be an object.";
+  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
+    return "content.title must be a string.";
+  }
+  if (obj.body !== undefined && obj.body !== null && typeof obj.body !== "string") {
+    return "content.body must be a string.";
+  }
+  return validateMarkdownVariables(obj.variables);
+}
+
+/**
  * Validate the `variables` array on a markdown panel's content. Returns
  * `null` when valid (or unset) and a human-readable error otherwise. Kept
  * permissive: each individual variable is validated independently so an
