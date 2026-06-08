@@ -400,4 +400,3 @@ func truncateString(s string, max int) string {
 	}
 	return s[:max] + "\n…(truncated)"
 }
-
