@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -28,7 +29,7 @@ func newAuthorizedIntegration() *contexts.IntegrationContext {
 			"email":    testEmail,
 			"apiToken": testAPIToken,
 		},
-		Metadata: Metadata{},
+		Metadata: Metadata{CloudID: "cloud-123"},
 	}
 }
 
@@ -886,6 +887,125 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "999", id)
 	})
+}
+
+func Test__NewClient__OAuth(t *testing.T) {
+	t.Run("missing access token -> error", func(t *testing.T) {
+		_, err := NewClient(&contexts.HTTPContext{}, &contexts.IntegrationContext{
+			Metadata: Metadata{AuthType: AuthTypeOAuth, CloudID: "cloud-123"},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "OAuth accessToken not found")
+	})
+
+	t.Run("missing cloud ID -> error", func(t *testing.T) {
+		_, err := NewClient(&contexts.HTTPContext{}, &contexts.IntegrationContext{
+			Metadata: Metadata{AuthType: AuthTypeOAuth},
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("access-token")},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cloud ID is missing")
+	})
+
+	t.Run("successful oauth client creation", func(t *testing.T) {
+		client, err := NewClient(&contexts.HTTPContext{}, oauthIntegrationContext())
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.atlassian.com/ex/jira/cloud-123", client.BaseURL)
+		assert.Equal(t, AuthTypeOAuth, client.AuthType)
+		assert.Equal(t, "access-token", client.Token)
+	})
+}
+
+func Test__Client__ListWebhooks(t *testing.T) {
+	t.Run("paginated list collects all values", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				response(http.StatusOK, `{"isLast":false,"values":[{"id":1},{"id":2}]}`),
+				response(http.StatusOK, `{"isLast":true,"values":[{"id":3}]}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, oauthIntegrationContext())
+		require.NoError(t, err)
+
+		webhooks, err := client.ListWebhooks()
+
+		require.NoError(t, err)
+		require.Len(t, webhooks, 3)
+		assert.Equal(t, int64(1), webhooks[0].ID)
+		assert.Equal(t, int64(3), webhooks[2].ID)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "startAt=0")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "startAt=2")
+	})
+
+	t.Run("empty response stops pagination", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				response(http.StatusOK, `{"isLast":false,"values":[]}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, oauthIntegrationContext())
+		require.NoError(t, err)
+
+		webhooks, err := client.ListWebhooks()
+
+		require.NoError(t, err)
+		assert.Empty(t, webhooks)
+	})
+}
+
+func Test__Client__RefreshWebhooks(t *testing.T) {
+	t.Run("empty IDs -> noop", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		client, err := NewClient(httpContext, oauthIntegrationContext())
+		require.NoError(t, err)
+
+		response, err := client.RefreshWebhooks(nil)
+		require.NoError(t, err)
+		assert.Nil(t, response)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("sends webhook IDs and parses response", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				response(http.StatusOK, `{"expirationDate":"2030-02-01T00:00:00.000+0000"}`),
+			},
+		}
+
+		client, err := NewClient(httpContext, oauthIntegrationContext())
+		require.NoError(t, err)
+
+		response, err := client.RefreshWebhooks([]int64{111, 222})
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, "2030-02-01T00:00:00.000+0000", response.ExpirationDate)
+
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, http.MethodPut, req.Method)
+		assert.Contains(t, req.URL.String(), "/rest/api/3/webhook/refresh")
+	})
+}
+
+func oauthIntegrationContext() *contexts.IntegrationContext {
+	return &contexts.IntegrationContext{
+		Metadata: Metadata{
+			AuthType: AuthTypeOAuth,
+			CloudID:  "cloud-123",
+		},
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("access-token")},
+		},
+	}
 }
 
 func Test__Client__OpsAlertsAPI(t *testing.T) {

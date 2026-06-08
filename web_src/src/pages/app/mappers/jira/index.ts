@@ -7,6 +7,7 @@ import { updateIssueMapper } from "./update_issue";
 import { createIncidentMapper } from "./create_incident";
 import { getIncidentMapper } from "./get_incident";
 import { deleteIncidentMapper } from "./delete_incident";
+import { onIssueTriggerRenderer } from "./on_issue";
 import { createHeartbeatMapper } from "./create_heartbeat";
 import { pingHeartbeatMapper } from "./ping_heartbeat";
 import { updateHeartbeatMapper } from "./update_heartbeat";
@@ -34,7 +35,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateAlert: updateAlertMapper,
 };
 
-export const triggerRenderers: Record<string, TriggerRenderer> = {};
+export const triggerRenderers: Record<string, TriggerRenderer> = {
+  onIssue: onIssueTriggerRenderer,
+};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createIssue: buildActionStateRegistry("created"),
