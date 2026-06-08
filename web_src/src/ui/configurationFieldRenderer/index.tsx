@@ -32,6 +32,9 @@ import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSu
 import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 
+const REQUIRED_FIELD_BADGE_CLASS =
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
   domainId?: string;
@@ -469,7 +472,7 @@ export const ConfigurationFieldRenderer = ({
                   validationErrors &&
                   isRequired &&
                   (value === undefined || value === null || value === ""))) && (
-                <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
               )}
           </Label>
         </div>
@@ -514,7 +517,7 @@ export const ConfigurationFieldRenderer = ({
                   validationErrors &&
                   isRequired &&
                   (value === undefined || value === null || value === ""))) && (
-                <span className="text-red-500 text-xs ml-2">Required</span>
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
               )}
           </Label>
         </div>
@@ -553,7 +556,7 @@ export const ConfigurationFieldRenderer = ({
                 validationErrors &&
                 isRequired &&
                 (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
+              <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
             )}
         </Label>
         <div ref={labelRightRef} className="ml-auto shrink-0" />
