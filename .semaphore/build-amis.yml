@@ -3,7 +3,7 @@ name: Build runner AMIs
 agent:
   machine:
     type: f1-standard-2
-    os_image: ubuntu2004
+    os_image: ubuntu2404
 
 promotions:
   - name: Release runner AMIs
