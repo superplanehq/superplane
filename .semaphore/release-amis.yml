@@ -1,0 +1,65 @@
+version: v1.0
+name: Release runner AMIs
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+
+# This pipeline promotes the staged AMI IDs (written by build-amis.yml) into
+# the live fleet-manager SSM config, making them active for new instances.
+# Run this manually (or trigger it) after validating the built AMIs.
+
+blocks:
+  - name: Promote AMIs to fleet config
+    task:
+      secrets:
+        - name: aws-credentials
+      env_vars:
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+      jobs:
+        - name: update SSM fleet config
+          commands:
+            - checkout
+
+            # Read staged AMI IDs
+            - |
+              AMD64_AMI=$(aws ssm get-parameter \
+                --name "/superplane/fleet-manager/ami/amd64" \
+                --query 'Parameter.Value' --output text)
+
+              ARM64_AMI=$(aws ssm get-parameter \
+                --name "/superplane/fleet-manager/ami/arm64" \
+                --query 'Parameter.Value' --output text)
+
+              echo "Promoting AMIs:"
+              echo "  amd64: $AMD64_AMI"
+              echo "  arm64: $ARM64_AMI"
+
+              # Update fleet config with new AMI IDs
+              CONFIG=$(aws ssm get-parameter \
+                --name "/superplane/fleet-manager/config" \
+                --query 'Parameter.Value' --output text)
+
+              UPDATED=$(echo "$CONFIG" | python3 -c "
+              import sys, json, os
+              cfg = json.load(sys.stdin)
+              amd64 = os.environ['AMD64_AMI']
+              arm64 = os.environ['ARM64_AMI']
+              for pool in cfg.get('pools', []):
+                  if pool.get('arch') == 'arm64':
+                      pool['ami'] = arm64
+                  else:
+                      pool['ami'] = amd64
+              print(json.dumps(cfg))
+              " AMD64_AMI="$AMD64_AMI" ARM64_AMI="$ARM64_AMI")
+
+              aws ssm put-parameter \
+                --name "/superplane/fleet-manager/config" \
+                --value "$UPDATED" \
+                --type String \
+                --overwrite
+
+              echo "Fleet config updated. New instances will use:"
+              echo "  amd64 pools -> $AMD64_AMI"
+              echo "  arm64 pools -> $ARM64_AMI"
