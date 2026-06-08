@@ -342,11 +342,9 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasID string, nodeName string) string {
 	t.Helper()
 
-	createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-	require.NoError(t, err)
-	versionID := createVersionResponse.Version.Metadata.Id
+	versionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
-	_, err = UpdateCanvasVersion(
+	_, err := UpdateCanvasVersion(
 		ctx,
 		r.Encryptor,
 		r.Registry,

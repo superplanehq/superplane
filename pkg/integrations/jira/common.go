@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -113,6 +114,17 @@ type CreateIncidentNodeMetadata struct {
 	UrgencyFieldID  string `json:"urgencyFieldId,omitempty"`
 }
 
+// OpsAlertPickerMetadata summarizes the Ops alert referenced on picker-driven components.
+type OpsAlertPickerMetadata struct {
+	AlertLabel string `json:"alertLabel,omitempty"`
+}
+
+// UpdateAlertNodeMetadata summarizes configured update operations for workflow cards.
+type UpdateAlertNodeMetadata struct {
+	AlertLabel      string   `json:"alertLabel,omitempty"`
+	UpdateSummaries []string `json:"updateSummaries,omitempty"`
+}
+
 func cloudIDFromIntegration(integration core.IntegrationContext) (string, error) {
 	meta := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &meta); err != nil {
@@ -172,4 +184,26 @@ func heartbeatAlertPriorityForAPI(priority string) string {
 		return ""
 	}
 	return p
+}
+
+// ConfigurationAsSliceMap returns slice-style configuration as map[string]any if possible.
+func ConfigurationAsSliceMap(cfg any) map[string]any {
+	if cfg == nil {
+		return map[string]any{}
+	}
+	if m, ok := cfg.(map[string]any); ok {
+		return m
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return map[string]any{}
+	}
+	var out map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		return map[string]any{}
+	}
+	if out == nil {
+		return map[string]any{}
+	}
+	return out
 }

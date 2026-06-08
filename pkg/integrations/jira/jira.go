@@ -124,6 +124,10 @@ func (j *Jira) Actions() []core.Action {
 		&PingHeartbeat{},
 		&UpdateHeartbeat{},
 		&DeleteHeartbeat{},
+		&CreateAlert{},
+		&GetAlert{},
+		&DeleteAlert{},
+		&UpdateAlert{},
 	}
 }
 
