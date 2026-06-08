@@ -11,7 +11,7 @@ source /app/spinner.sh
 # ===========================================================================
 
 # Ensure /app/data exists and has proper permissions for persistent storage
-mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs
+mkdir -p /app/data/postgres /app/data/rabbitmq/mnesia /app/data/rabbitmq/logs /app/data/supergit/repos
 chown -R postgres:postgres /app/data/postgres || true
 
 # ===========================================================================
@@ -49,6 +49,32 @@ mkdir -p "${RABBITMQ_LOG_BASE}" "${RABBITMQ_MNESIA_BASE}"
 rabbitmq-server -detached
 for i in {1..30}; do
   if rabbitmq-diagnostics -q ping >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+stop_spinner
+
+# ===========================================================================
+# Starting SuperGit
+# ===========================================================================
+
+start_spinner "Starting SuperGit"
+
+SUPERGIT_ROOT="${SUPERGIT_ROOT:-/app/data/supergit/repos}"
+SUPERGIT_PORT="${SUPERGIT_PORT:-8080}"
+mkdir -p "${SUPERGIT_ROOT}"
+
+SUPERGIT_ROOT="${SUPERGIT_ROOT}" \
+SUPERGIT_PORT="${SUPERGIT_PORT}" \
+SUPERGIT_DEFAULT_BRANCH="${SUPERGIT_DEFAULT_BRANCH:-main}" \
+SUPERGIT_MAX_FILE_BYTES="${SUPERGIT_MAX_FILE_BYTES:-10485760}" \
+SUPERGIT_MAX_COMMIT_BYTES="${SUPERGIT_MAX_COMMIT_BYTES:-26214400}" \
+/app/supergit >/dev/null 2>&1 &
+
+for i in {1..30}; do
+  if curl -fsS "http://127.0.0.1:${SUPERGIT_PORT}/health" >/dev/null 2>&1; then
     break
   fi
   sleep 1

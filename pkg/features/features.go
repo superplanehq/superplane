@@ -15,9 +15,14 @@ type Feature struct {
 // per-organization basis until the integration is generally available.
 const FeatureClaudeManagedAgents = "claude_managed_agents"
 
+func released() *bool {
+	v := true
+	return &v
+}
+
 var registry = []Feature{
 	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
-	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
+	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 }
 
 func All() []Feature {

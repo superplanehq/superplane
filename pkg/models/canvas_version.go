@@ -31,8 +31,8 @@ type CanvasVersion struct {
 	PublishedAt             *time.Time
 	Nodes                   datatypes.JSONSlice[Node]
 	Edges                   datatypes.JSONSlice[Edge]
-	ConsolePanels           datatypes.JSONType[[]DashboardPanel]
-	ConsoleLayout           datatypes.JSONType[[]DashboardLayoutItem]
+	ConsolePanels           datatypes.JSONType[[]ConsolePanel]
+	ConsoleLayout           datatypes.JSONType[[]ConsoleLayoutItem]
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 }

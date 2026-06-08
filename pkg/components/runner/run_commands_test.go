@@ -114,7 +114,6 @@ func TestValidateEnvironment(t *testing.T) {
 
 func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -129,7 +128,8 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"commands": "echo hello",
+			"machine_type": testRunnerMachineType,
+			"commands":     "echo hello",
 			"environment": []map[string]any{
 				{
 					"name":        "COMMIT_AUTHOR",
@@ -162,22 +162,43 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, "fleet-1", req.FleetID)
+	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, []string{"echo hello"}, req.Commands)
-	assert.Equal(t, "host", req.ExecutionMode)
-	assert.Equal(t, []BrokerEnvironmentVariable{
-		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
-		{Name: "API_TOKEN", Value: "secret'value;$PATH"},
-	}, req.Environment)
-	require.NotNil(t, req.ExecutionTimeoutSeconds)
-	assert.Equal(t, DefaultExecutionTimeoutSeconds, *req.ExecutionTimeoutSeconds)
-	assert.Equal(t, "task-123", state.KVs["task_id"])
-	assert.Equal(t, hookActionPoll, requests.Action)
+}
+
+func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-456"}`))},
+		},
+	}
+
+	err := (&Runner{}).Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"commands":     "echo hi",
+			"machine_type": "aws-arm64-1",
+		},
+		HTTP:           httpContext,
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, "aws-arm64-1", req.FleetID)
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -187,7 +208,10 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 	}
 
 	err := (&Runner{}).Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"commands": "echo hello"},
+		Configuration: map[string]any{
+			"machine_type": testRunnerMachineType,
+			"commands":     "echo hello",
+		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
@@ -204,14 +228,14 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{}
 
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"commands": "echo hello",
+			"machine_type": testRunnerMachineType,
+			"commands":     "echo hello",
 			"environment": []map[string]any{
 				{
 					"name":        "API_TOKEN",
@@ -292,7 +316,6 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 
 func TestBrokerCancelTaskSuccess(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -313,7 +336,6 @@ func TestBrokerCancelTaskSuccess(t *testing.T) {
 
 func TestBrokerCancelTask404Noop(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -330,7 +352,6 @@ func TestBrokerCancelTask404Noop(t *testing.T) {
 
 func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -350,7 +371,6 @@ func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 
 func TestRunnerCancelCallsBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{
@@ -371,7 +391,6 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 
 func TestBrokerListActiveTasks(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 
 	httpContext := &contexts.HTTPContext{

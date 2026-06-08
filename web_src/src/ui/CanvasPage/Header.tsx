@@ -6,7 +6,7 @@ import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -50,11 +50,13 @@ export interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
   onSelectFiles?: () => void;
+  /** DOM slot for Files mode actions owned by the files editor overlay. */
+  filesHeaderActionsSlotId?: string;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -130,8 +132,16 @@ function PageHeader({
   onDiscardDraftAndStartEdit?: () => void;
   unpublishedDraftUpdatedAt?: string;
 }) {
-  const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
-  const activeCanvasId = canvasIdParam || workflowId;
+  const {
+    workflowId,
+    canvasId: canvasIdParam,
+    appId,
+  } = useParams<{
+    workflowId?: string;
+    canvasId?: string;
+    appId?: string;
+  }>();
+  const activeCanvasId = appId || canvasIdParam || workflowId;
 
   return (
     <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3">
@@ -190,12 +200,12 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onSelectCanvasView}
-              onSelectDashboard={props.onSelectDashboard}
+              onSelectConsole={props.onSelectConsole}
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
               hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
-              hasDashboardDraft={!!props.hasUnpublishedConsoleDraftChanges}
+              hasConsoleDraft={!!props.hasUnpublishedConsoleDraftChanges}
             />
           ) : null}
         </div>
@@ -207,7 +217,7 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (!props.onSelectDashboard && !props.onSelectMemory && !props.onSelectFiles) {
+  if (!props.onSelectConsole && !props.onSelectMemory && !props.onSelectFiles) {
     return false;
   }
 
@@ -215,11 +225,18 @@ function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
 }
 
 function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
-  return mode === "version-live" || mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files";
+  return (
+    mode === "version-live" ||
+    mode === "version-edit" ||
+    mode === "runs" ||
+    mode === "console" ||
+    mode === "memory" ||
+    mode === "files"
+  );
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files") {
+  if (mode === "runs" || mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 

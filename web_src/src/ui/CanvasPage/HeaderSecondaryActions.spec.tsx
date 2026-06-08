@@ -9,7 +9,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="dashboard"
+        mode="console"
         isEditing
         hasUnpublishedDraftChanges
         hasUnpublishedConsoleDraftChanges

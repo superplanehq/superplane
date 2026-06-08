@@ -1,0 +1,228 @@
+package canvas
+
+import (
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
+	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/layout"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
+)
+
+type updateCommand struct {
+	file            *string
+	draft           *bool
+	autoLayout      *string
+	autoLayoutScope *string
+	autoLayoutNodes *[]string
+}
+
+func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
+	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
+	if err != nil {
+		return "", openapi_client.CanvasesCanvas{}, err
+	}
+
+	if resource.Metadata == nil {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
+	}
+
+	fileID := ""
+	if resource.Metadata.Id != nil {
+		fileID = strings.TrimSpace(resource.Metadata.GetId())
+	}
+
+	if fileID == "" {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required in the YAML file")
+	}
+
+	canvas := models.CanvasFromCanvas(*resource)
+	return fileID, canvas, nil
+}
+
+func (c *updateCommand) Execute(ctx core.CommandContext) error {
+	filePath := ""
+	if c.file != nil {
+		filePath = *c.file
+	}
+
+	autoLayoutValue := ""
+	if c.autoLayout != nil {
+		autoLayoutValue = strings.TrimSpace(*c.autoLayout)
+	}
+	autoLayoutScopeValue := ""
+	if c.autoLayoutScope != nil {
+		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
+	}
+	autoLayoutNodeIDs := []string{}
+	if c.autoLayoutNodes != nil {
+		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
+	}
+	draftMode := c.draft != nil && *c.draft
+
+	canvasID, canvas, err := resolveCanvasForFileUpdate(filePath)
+	if err != nil {
+		return err
+	}
+
+	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
+	if err != nil {
+		return err
+	}
+
+	if changeManagementEnabled && !draftMode {
+		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
+	}
+
+	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	if err != nil {
+		return err
+	}
+
+	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
+	body.SetCanvas(canvas)
+	body.SetVersionId(targetVersionID)
+
+	if layout.HasFlags(ctx) {
+		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		if parseErr != nil {
+			return parseErr
+		}
+		if autoLayout != nil {
+			body.SetAutoLayout(*autoLayout)
+		}
+	} else {
+		body.SetAutoLayout(layout.DefaultAutoLayout())
+	}
+
+	response, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
+		Body(body).
+		Execute()
+	if err != nil {
+		return err
+	}
+
+	version := response.GetVersion()
+	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
+		return fmt.Errorf("%s", errText)
+	}
+
+	// When not in draft mode, auto-publish the updated draft version.
+	if !draftMode {
+		_, _, publishErr := ctx.API.CanvasVersionAPI.
+			CanvasesPublishCanvasVersion(ctx.Context, canvasID, targetVersionID).
+			Body(map[string]any{}).
+			Execute()
+		if publishErr != nil {
+			return fmt.Errorf("draft was updated but publish failed: %w", publishErr)
+		}
+	}
+
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(version)
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		metadata := version.GetMetadata()
+		spec := version.GetSpec()
+
+		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
+		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
+		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+
+		integrations := make(map[string]struct{})
+		for _, node := range spec.GetNodes() {
+			if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
+				if id := ref.GetId(); id != "" {
+					integrations[id] = struct{}{}
+				}
+			}
+		}
+		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+		if err != nil {
+			return err
+		}
+		if warnText := formatNodeSpecWarningsForCLI(version); warnText != "" {
+			_, err = fmt.Fprint(stdout, warnText)
+		}
+		return err
+	})
+}
+
+// formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).
+func formatNodeSpecErrorsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasErrorMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetErrorMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("canvas was saved but the following nodes have configuration errors (error_message on each node):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func formatNodeSpecWarningsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasWarningMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetWarningMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\nNode warnings (warning_message):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}

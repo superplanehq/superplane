@@ -57,6 +57,26 @@ func Test__GetCanvasRepository(t *testing.T) {
 		assert.Equal(t, codes.Internal, s.Code())
 	})
 
+	t.Run("repository in pending state -> returns metadata without head sha", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusPending, false)
+		response, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Repository)
+		assert.Equal(t, canvas.ID.String(), response.Repository.Metadata.CanvasId)
+		assert.Equal(t, pb.CanvasRepository_STATE_PENDING, response.Repository.Status.State)
+		assert.Empty(t, response.Repository.Status.HeadSha)
+	})
+
+	t.Run("repository in error state -> returns metadata without head sha", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusError, false)
+		response, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Repository)
+		assert.Equal(t, canvas.ID.String(), response.Repository.Metadata.CanvasId)
+		assert.Equal(t, pb.CanvasRepository_STATE_ERROR, response.Repository.Status.State)
+		assert.Empty(t, response.Repository.Status.HeadSha)
+	})
+
 	t.Run("returns repository metadata and status", func(t *testing.T) {
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		response, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())

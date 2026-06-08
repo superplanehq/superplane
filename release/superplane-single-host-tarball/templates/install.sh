@@ -98,6 +98,9 @@ POSTGRES_PASSWORD=${DB_PASSWORD}
 
 RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
 
+GIT_STORAGE_PROVIDER=supergit
+GIT_STORAGE_SUPERGIT_BASE_URL=http://supergit:8080/api
+
 SWAGGER_BASE_PATH=/app/api/swagger
 RBAC_MODEL_PATH=/app/rbac/rbac_model.conf
 RBAC_ORG_POLICY_PATH=/app/rbac/rbac_org_policy.csv

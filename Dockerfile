@@ -62,6 +62,8 @@ CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 FROM dev-base AS builder
 
 ARG BASE_URL=https://app.superplane.com
+ARG VITE_ASSET_BASE_URL=
+ARG FRONTEND_PREBUILT=0
 
 WORKDIR /app
 COPY pkg /app/pkg
@@ -79,8 +81,16 @@ COPY templates /app/templates
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
-RUN npm install
-RUN VITE_BASE_URL=$BASE_URL npm run build
+RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
+      echo "Using prebuilt frontend assets from build context"; \
+    else \
+      npm install && \
+      if [ -n "$VITE_ASSET_BASE_URL" ]; then \
+        VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
+      else \
+        VITE_BASE_URL=$BASE_URL npm run build; \
+      fi; \
+    fi
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Demo runner: single-container image with embedded Postgres and RabbitMQ.
@@ -104,7 +114,8 @@ RUN apt-get update && \
   postgresql-contrib \
   rabbitmq-server \
   ca-certificates \
-  curl && \
+  curl \
+  git && \
   ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
   rm -rf /var/lib/apt/lists/*
 
@@ -128,6 +139,10 @@ COPY --from=builder /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
+
+# SuperGit binary is downloaded by release/superplane-demo-image/download-supergit.sh before build.
+COPY build/superplane-demo-supergit/supergit /app/supergit
+RUN chmod +x /app/supergit
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh

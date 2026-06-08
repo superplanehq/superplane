@@ -10,6 +10,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Check Run" href="#on-check-run" description="Listen to GitHub Checks API check run events" />
+  <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
@@ -35,10 +37,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
+  <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
@@ -102,6 +107,187 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.branchCreated"
+}
+```
+
+<a id="on-check-run"></a>
+
+## On Check Run
+
+**Trigger key:** `github.onCheckRun`
+
+The On Check Run trigger starts a workflow execution when a GitHub Checks API check run changes.
+
+GitHub check runs are created by GitHub Apps and power many pull request checks such as Cloudflare Pages, DCO, Sourcery, and GitHub Actions check runs. They are separate from legacy Commit Statuses API statuses. Use On Commit Status for legacy commit status events.
+
+### Use Cases
+
+- **Pull request automation**: React when Checks API checks complete or fail
+- **Quality gates**: Continue workflows only after a specific check run reaches the expected state
+- **Notifications**: Notify teams when app-provided checks fail or require action
+- **Merge orchestration**: Combine this trigger with List Check Runs For Ref to decide whether all checks are green
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Statuses**: Select check run statuses to listen for (queued, in_progress, completed, requested, waiting, pending)
+- **Conclusions** *(optional)*: Filter completed check runs by conclusion
+- **Names** *(optional)*: Filter check run names using predicates, e.g. equals "DCO" or matches "Cloudflare.*"
+- **Branches** *(optional)*: Filter check suite head branches using predicates
+- **Pull requests only**: Emit only check runs that GitHub associates with at least one pull request
+
+### Event Data
+
+Each event includes:
+- **action**: The check_run webhook action
+- **check_run**: Check run details, including name, status, conclusion, head SHA, app, pull requests, and URLs
+- **repository**: Repository information
+- **sender**: User or app actor associated with the webhook event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Notes
+
+GitHub may return an empty pull_requests array for check runs created from forked repository pushes. When Pull requests only is enabled, those fork-originated check runs may be filtered out because GitHub does not include PR metadata in the webhook payload.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "check_run": {
+      "app": {
+        "name": "DCO"
+      },
+      "check_suite": {
+        "head_branch": "feature/snake-updates",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      },
+      "completed_at": "2026-06-01T12:02:00Z",
+      "conclusion": "success",
+      "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "id": 123456789,
+      "name": "DCO",
+      "pull_requests": [
+        {
+          "base": {
+            "ref": "main"
+          },
+          "head": {
+            "ref": "feature/snake-updates",
+            "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+          },
+          "html_url": "https://github.com/acme/snaketoy/pull/42",
+          "number": 42
+        }
+      ],
+      "started_at": "2026-06-01T12:00:00Z",
+      "status": "completed"
+    },
+    "repository": {
+      "full_name": "acme/snaketoy",
+      "html_url": "https://github.com/acme/snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-06-01T12:02:01Z",
+  "type": "github.checkRun"
+}
+```
+
+<a id="on-commit-status"></a>
+
+## On Commit Status
+
+**Trigger key:** `github.onCommitStatus`
+
+The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. This trigger does not receive those check-run events. For GitHub Actions workflows, use the On Workflow Run trigger instead.
+
+### Use Cases
+
+- **Merge automation**: Re-evaluate pull request merge criteria when required status checks change
+- **CI/CD orchestration**: React to status updates from external CI systems
+- **Quality gates**: Route workflows based on commit status context and state
+- **Notifications**: Notify teams when important status checks fail or recover
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **States**: Select which commit status states to listen for (error, failure, pending, success)
+- **Contexts** *(optional)*: Configure which status contexts to listen for using predicates (e.g., equals "ci/build", matches "deploy/.*")
+- **Branches** *(optional)*: Configure which branch names to listen for using predicates. GitHub includes branches that contain the status SHA.
+
+### Event Data
+
+Each status event includes:
+- **state**: The new commit status state (error, failure, pending, success)
+- **context**: The status context, such as "ci/build"
+- **sha**: Commit SHA for the status
+- **description**: Optional status description
+- **target_url**: Optional link added to the status
+- **branches**: Branches containing the status SHA
+- **commit**: Commit information
+- **repository**: Repository information
+- **sender**: User who created the status event. This is not necessarily the commit author
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "branches": [
+      {
+        "commit": {
+          "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+        },
+        "name": "main",
+        "protected": true
+      }
+    ],
+    "commit": {
+      "commit": {
+        "message": "Add checkout validation"
+      },
+      "html_url": "https://github.com/acme-labs/snaketoy/commit/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+    },
+    "context": "ci/build",
+    "created_at": "2026-01-16T17:56:16Z",
+    "description": "Build completed successfully",
+    "id": 15384176893,
+    "repository": {
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 101,
+      "name": "snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 583231,
+      "login": "octocat"
+    },
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "success",
+    "target_url": "https://github.com/acme-labs/snaketoy/actions/runs/123456789",
+    "updated_at": "2026-01-16T17:57:20Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.status"
 }
 ```
 
@@ -2258,6 +2444,74 @@ Returns confirmation of the deletion.
 }
 ```
 
+<a id="get-combined-commit-status"></a>
+
+## Get Combined Commit Status
+
+**Component key:** `github.getCombinedCommitStatus`
+
+The Get Combined Commit Status component reads GitHub's combined commit status for a commit, branch, or tag.
+
+This component uses the Commit Statuses API. It summarizes legacy commit statuses, such as statuses posted by external CI systems through GitHub's statuses endpoint. It does not include GitHub Checks API check runs.
+
+### Use Cases
+
+- **Status gates**: Check whether all commit status contexts are green before continuing
+- **Pull request automation**: Pair with On Commit Status to re-evaluate a PR when one status changes
+- **Branch protection helpers**: Inspect the aggregate status for a branch head or merge commit
+- **Notifications**: Send concise status summaries when a commit is blocked by failed or pending statuses
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch name, or tag name to inspect. Expressions are supported.
+
+### Output
+
+Emits a combined commit status object on the default output channel. The payload includes the combined **state**, **sha**, **total_count**, and the latest status for each status context in **statuses**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit_url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "repository_url": "https://api.github.com/repos/acme-labs/snaketoy",
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "failure",
+    "statuses": [
+      {
+        "context": "ci/build",
+        "created_at": "2026-01-16T17:45:00Z",
+        "description": "Build passed",
+        "state": "success",
+        "target_url": "https://ci.example.com/builds/123",
+        "updated_at": "2026-01-16T17:45:10Z"
+      },
+      {
+        "context": "ci/lint",
+        "created_at": "2026-01-16T17:45:20Z",
+        "description": "Lint failed",
+        "state": "failure",
+        "target_url": "https://ci.example.com/builds/124",
+        "updated_at": "2026-01-16T17:46:00Z"
+      },
+      {
+        "context": "deploy/preview",
+        "created_at": "2026-01-16T17:46:10Z",
+        "description": "Deployment pending",
+        "state": "pending",
+        "target_url": "https://deploy.example.com/previews/42",
+        "updated_at": "2026-01-16T17:46:10Z"
+      }
+    ],
+    "total_count": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.combinedCommitStatus"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -2491,6 +2745,125 @@ The component stores repository information in node metadata:
   },
   "timestamp": "2026-02-17T20:00:00Z",
   "type": "github.workflowUsage"
+}
+```
+
+<a id="list-check-runs-for-ref"></a>
+
+## List Check Runs For Ref
+
+**Component key:** `github.listCheckRunsForRef`
+
+The List Check Runs For Ref component retrieves GitHub Checks API check runs for a commit SHA, branch, or tag.
+
+Use it after On Check Run or other GitHub triggers to inspect the full set of Checks API results for the same ref before deciding whether to continue.
+
+### Use Cases
+
+- **PR quality gates**: Continue only when all check runs for a PR commit are complete and green
+- **Check aggregation**: Inspect the full Checks API state after one check run changes
+- **Notifications**: Build summaries for failed or pending check runs
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch, or tag ref
+- **Check Name** *(optional)*: Return only check runs with this name
+- **Status** *(optional)*: Return only check runs with this status
+- **Filter**: Use latest to return the latest run per check suite, or all to include all matching runs
+
+### Output
+
+Returns GitHub's check run list response, including total_count and check_runs. Each check run includes its name, status, conclusion, URLs, app metadata, associated pull requests, and timestamps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "check_runs": [
+      {
+        "app": {
+          "name": "DCO"
+        },
+        "conclusion": "success",
+        "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "id": 123456789,
+        "name": "DCO",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      },
+      {
+        "app": {
+          "name": "Cloudflare Pages"
+        },
+        "conclusion": "success",
+        "details_url": "https://dash.cloudflare.com/example",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/987654321",
+        "id": 987654321,
+        "name": "Cloudflare Pages",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "total_count": 2
+  },
+  "timestamp": "2026-06-01T12:02:02Z",
+  "type": "github.checkRuns"
+}
+```
+
+<a id="merge-pull-request"></a>
+
+## Merge Pull Request
+
+**Component key:** `github.mergePullRequest`
+
+The Merge Pull Request component merges an open pull request in a GitHub repository.
+
+### Use Cases
+
+- **Automated PR merge gates**: Merge a pull request after status checks or check runs pass
+- **Release automation**: Merge approved promotion branches into a release branch
+- **Queue workflows**: Merge pull requests from a controlled SuperPlane workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to merge. Expressions are supported.
+- **Merge Method**: Merge strategy to use. Defaults to "merge".
+- **Expected SHA**: Optional head SHA guard. GitHub rejects the merge if the pull request head has changed.
+- **Commit Title**: Optional title for the merge commit, squash commit, or rebase commit.
+- **Commit Message**: Optional commit message for the merge commit or squash commit.
+
+### Output
+
+Returns GitHub's merge result, including whether the pull request was merged, the resulting commit SHA, and GitHub's message.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "merged": true,
+    "message": "Pull Request successfully merged",
+    "sha": "0e98bc41ab56cee9ff17883607b56f96e7814c98"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequestMerge"
 }
 ```
 

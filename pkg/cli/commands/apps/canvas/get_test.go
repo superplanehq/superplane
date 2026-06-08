@@ -1,0 +1,95 @@
+package canvas
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/test/support/cli"
+)
+
+const testGetCanvasID = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+func newCanvasGetServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/canvases/"+testGetCanvasID, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testGetCanvasID + `","name":"my-canvas","organizationId":"org-uuid"},"spec":{"nodes":[],"edges":[]}}}`))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestGetCommandPrintsCanvasOnSuccess(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
+	ctx.Args = []string{testGetCanvasID}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
+	require.Contains(t, stdout.String(), "Name: my-canvas")
+	require.Contains(t, stdout.String(), "Nodes: 0")
+	require.Contains(t, stdout.String(), "Edges: 0")
+	require.NotContains(t, stdout.String(), "App URL:")
+}
+
+func TestGetCommandPrintsURLFromResponseOrgID(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
+		URL: "https://app.superplane.com",
+	})
+	ctx.Args = []string{testGetCanvasID}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
+	require.Contains(t, stdout.String(), "Name: my-canvas")
+	require.Contains(t, stdout.String(), "App URL: https://app.superplane.com/org-uuid/apps/"+testGetCanvasID)
+	require.Contains(t, stdout.String(), "Nodes: 0")
+	require.Contains(t, stdout.String(), "Edges: 0")
+}
+
+func TestGetCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testGetCanvasID + `","name":"my-canvas"},"spec":{"nodes":[],"edges":[]}}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
+		URL: "https://app.superplane.com",
+	})
+	ctx.Args = []string{testGetCanvasID}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
+	require.Contains(t, stdout.String(), "Name: my-canvas")
+	require.NotContains(t, stdout.String(), "App URL:")
+}
+
+func TestGetUsesActiveAppWhenNoArg(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
+		ActiveApp: testGetCanvasID,
+	})
+	ctx.Args = []string{}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
+}
+
+func TestGetErrorsWhenNoAppAndNoActive(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+	ctx.Args = []string{}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "app-name-or-id")
+}
