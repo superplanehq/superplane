@@ -7,7 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// RunBashSpec is persisted runner-bash node configuration.
+// RunBashSpec is persisted runnerBash node configuration.
 type RunBashSpec struct {
 	MachineType             string                `mapstructure:"machine_type"`
 	Script                  string                `mapstructure:"script"`
@@ -27,10 +27,10 @@ func decodeRunBashSpec(raw any) (RunBashSpec, error) {
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
-		return RunBashSpec{}, fmt.Errorf("runner-bash spec decoder: %w", err)
+		return RunBashSpec{}, fmt.Errorf("runnerBash spec decoder: %w", err)
 	}
 	if err := dec.Decode(raw); err != nil {
-		return RunBashSpec{}, fmt.Errorf("decode runner-bash configuration: %w", err)
+		return RunBashSpec{}, fmt.Errorf("decode runnerBash configuration: %w", err)
 	}
 	applyRunBashSpecDefaults(&spec)
 	return spec, nil
