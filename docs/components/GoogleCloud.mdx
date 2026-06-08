@@ -33,6 +33,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Get VM Instance" href="#compute-•-get-vm-instance" description="Fetch the current state of a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
@@ -981,6 +982,61 @@ Returns information about the deleted instance:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.deleted"
+}
+```
+
+<a id="compute-•-get-vm-instance"></a>
+
+## Compute • Get VM Instance
+
+**Component key:** `gcp.getVMInstance`
+
+The Get VM Instance component reads the current state of a Compute Engine VM
+instance and emits its details on the default output channel.
+
+### Use Cases
+
+- **Status checks**: Verify a VM is in the expected state (e.g. `RUNNING`) before
+  proceeding with downstream work.
+- **Detail lookup**: Fetch IPs, machine type, or selfLink for use in later workflow steps.
+- **Health gates**: Pair with a condition to branch a workflow based on instance status.
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained
+  from an upstream node (e.g. `selfLink` from `gcp.createVM`). The
+  selection encodes both the zone and the instance name.
+
+### Output
+
+The emitted payload contains the full instance summary:
+
+- **instanceId**, **selfLink**, **status**, **zone**, **name**, **machineType**
+- **internalIP**, **externalIP** (when present)
+
+### Important Notes
+
+- If the instance is not found at the resolved zone/name, the action fails so that
+  misconfigured or stale expressions do not silently mask a missing resource.
+- The integration's bound project is authoritative; a chained `selfLink` pointing
+  at a different project is rejected rather than silently rewritten.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.fetched"
 }
 ```
 

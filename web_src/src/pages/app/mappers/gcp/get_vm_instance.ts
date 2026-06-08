@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.compute.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections, parseInstancePath } from "./event_helpers";
 
@@ -19,26 +19,32 @@ interface VMInstanceNodeMetadata {
   zone?: string;
 }
 
-interface DeleteVMInstanceConfiguration {
+interface GetVMInstanceConfiguration {
   instance?: string;
 }
 
-interface DeleteVMInstanceOutputData {
-  instanceName?: string;
+interface GetVMInstanceOutputData {
+  instanceId?: string;
+  selfLink?: string;
+  status?: string;
   zone?: string;
+  name?: string;
+  machineType?: string;
+  internalIP?: string;
+  externalIP?: string;
 }
 
-export const deleteVMInstanceMapper: ComponentBaseMapper = {
+export const getVMInstanceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "gcp";
 
     return {
       iconSrc: gcpIcon,
-      iconSlug: context.componentDefinition?.icon ?? "trash-2",
+      iconSlug: context.componentDefinition?.icon ?? "search",
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition?.label || "Delete VM Instance",
+      title: context.node.name || context.componentDefinition?.label || "Get VM Instance",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
@@ -54,16 +60,16 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as DeleteVMInstanceOutputData | undefined;
+    const result = outputs?.default?.[0]?.data as GetVMInstanceOutputData | undefined;
     if (!result) return details;
 
-    if (result.instanceName) {
-      details["Instance Name"] = result.instanceName;
-    }
-    if (result.zone) {
-      details["Zone"] = result.zone;
-    }
-    details["Status"] = "Deleted";
+    if (result.name) details["Instance Name"] = result.name;
+    if (result.zone) details["Zone"] = result.zone;
+    if (result.status) details["Status"] = result.status;
+    if (result.machineType) details["Machine Type"] = result.machineType;
+    if (result.internalIP) details["Internal IP"] = result.internalIP;
+    if (result.externalIP) details["External IP"] = result.externalIP;
+    if (result.selfLink) details["Self Link"] = result.selfLink;
 
     return details;
   },
@@ -77,14 +83,14 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as VMInstanceNodeMetadata | undefined;
-  const configuration = node.configuration as DeleteVMInstanceConfiguration | undefined;
+  const configuration = node.configuration as GetVMInstanceConfiguration | undefined;
 
   const parsed = parseInstancePath(configuration?.instance);
   const instanceName = nodeMetadata?.instanceName || parsed?.name || configuration?.instance;
   const zone = nodeMetadata?.zone || parsed?.zone;
 
   if (instanceName) {
-    metadata.push({ icon: "trash-2", label: instanceName });
+    metadata.push({ icon: "search", label: instanceName });
   }
   if (zone) {
     metadata.push({ icon: "map-pin", label: zone });
