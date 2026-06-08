@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import { BackdropContent } from "./BackdropContent";
 import type { InsertedMention } from "./useMentions";
 
+const composerTextMetrics = "px-3 py-2.5 text-sm leading-5 font-normal tracking-normal";
+
 interface MentionTextareaProps {
   value: string;
   mentions: InsertedMention[];
@@ -53,7 +55,7 @@ export function MentionTextarea({
         aria-hidden="true"
         className={cn(
           "pointer-events-none absolute inset-0 whitespace-pre-wrap break-words overflow-hidden",
-          "px-3 py-2.5 text-sm",
+          composerTextMetrics,
         )}
       >
         <BackdropContent text={value} mentions={mentions} />
@@ -70,7 +72,8 @@ export function MentionTextarea({
         placeholder={placeholder}
         data-testid="agent-input"
         className={cn(
-          "relative min-h-9 w-full resize-none border-0 bg-transparent px-3 py-2.5 text-sm shadow-none",
+          "relative min-h-9 w-full resize-none border-0 bg-transparent shadow-none",
+          composerTextMetrics,
           "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
           "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           "text-transparent caret-slate-900 selection:bg-blue-200/50",
