@@ -28,9 +28,8 @@ func TestRunBashExecuteSendsBashPayloadToBroker(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"script": `main() {
-  echo '{"pr": 42}'
-}`,
+			"script": `num=$(jq -r '."GitHub PR".data.number' "$SUPERPLANE_PAYLOAD_FILE")
+printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -53,7 +52,9 @@ func TestRunBashExecuteSendsBashPayloadToBroker(t *testing.T) {
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, RunModeBash, req.RunMode)
-	assert.Contains(t, req.Script, "main()")
+	assert.Contains(t, req.Script, "jq")
+	assert.Contains(t, req.Script, "SUPERPLANE_PAYLOAD_FILE")
+	assert.Contains(t, req.Script, "SUPERPLANE_RESULT_FILE")
 	assert.NotContains(t, string(body), `"commands"`)
 	assert.Empty(t, req.SetupCommands)
 	require.True(t, json.Valid(req.MessageChain))
@@ -76,7 +77,7 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 			"machine_type":          testRunnerMachineType,
 			"enable_setup_commands": true,
 			"setup_commands":        "apt-get update\necho ready",
-			"script":                "main() { echo '{\"ok\":true}'; }",
+			"script":                `echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`,
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -101,7 +102,7 @@ func TestValidateRunBashSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {
 
 	spec := RunBashSpec{
 		MachineType:         testRunnerMachineType,
-		Script:              "main() { echo ok; }",
+		Script:              `echo ok > "$SUPERPLANE_RESULT_FILE"`,
 		EnableSetupCommands: true,
 		SetupCommands:       "   \n  ",
 	}
@@ -113,7 +114,7 @@ func TestValidateRunBashSpec(t *testing.T) {
 
 	spec := RunBashSpec{
 		MachineType: testRunnerMachineType,
-		Script:      "main() { echo ok; }",
+		Script:      `echo ok > "$SUPERPLANE_RESULT_FILE"`,
 	}
 	require.NoError(t, validateRunBashSpec(spec))
 

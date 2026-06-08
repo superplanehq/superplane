@@ -20,8 +20,8 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.map((category) => category.name)).toEqual(["Core", "Runners", "Debugging", "Memory"]);
     expect(categories.find((category) => category.name === "Runners")?.blocks.map((block) => block.name)).toEqual([
       "runner",
-      "runnerJS",
       "runner-bash",
+      "runnerJS",
       "runnerPython",
     ]);
     expect(categories.find((category) => category.name === "Core")?.blocks.map((block) => block.name)).toEqual([

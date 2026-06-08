@@ -144,8 +144,8 @@ function isDebuggingBlock(component: { name?: string }): boolean {
 
 const RUNNER_BLOCK_ORDER: Record<string, number> = {
   runner: 0,
-  runnerJS: 1,
-  "runner-bash": 2,
+  "runner-bash": 1,
+  runnerJS: 2,
   runnerPython: 3,
 };
 
