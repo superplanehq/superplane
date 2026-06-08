@@ -1,0 +1,859 @@
+{
+  "$ref": "#/definitions/ConsolePanelContent",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ChartPanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/ChartPanelDataSource"
+        },
+        "render": {
+          "$ref": "#/definitions/WidgetChartRender"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataSource",
+        "render"
+      ],
+      "type": "object"
+    },
+    "ChartPanelDataSource": {
+      "$ref": "#/definitions/TablePanelDataSource"
+    },
+    "CompositeMemoryNumberDataSource": {
+      "additionalProperties": false,
+      "properties": {
+        "combine": {
+          "$ref": "#/definitions/WidgetNumberCombine"
+        },
+        "kind": {
+          "const": "memory",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/definitions/MemoryNumberSource"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "sources",
+        "combine"
+      ],
+      "type": "object"
+    },
+    "ConsolePanelContent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/MarkdownPanelContent"
+        },
+        {
+          "$ref": "#/definitions/NodePanelContent"
+        },
+        {
+          "$ref": "#/definitions/NodesPanelContent"
+        },
+        {
+          "$ref": "#/definitions/TablePanelContent"
+        },
+        {
+          "$ref": "#/definitions/ChartPanelContent"
+        },
+        {
+          "$ref": "#/definitions/NumberPanelContent"
+        }
+      ]
+    },
+    "MarkdownMemoryVariableSource": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "$ref": "#/definitions/MarkdownVariableDirection",
+          "description": "Sort direction when `orderBy` is set. Defaults to `desc` (newest first)."
+        },
+        "kind": {
+          "const": "memory",
+          "type": "string"
+        },
+        "matches": {
+          "description": "Optional property-equality filter applied before sorting.",
+          "items": {
+            "$ref": "#/definitions/MarkdownVariableMatch"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Required: the memory namespace to read from.",
+          "type": "string"
+        },
+        "orderBy": {
+          "description": "Optional field name to sort the namespace by before taking the first row.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "namespace"
+      ],
+      "type": "object"
+    },
+    "MarkdownPanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "variables": {
+          "description": "Named variables referenced from the markdown body via `{{ name.field }}`.",
+          "items": {
+            "$ref": "#/definitions/MarkdownVariable"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "MarkdownRunSelect": {
+      "enum": [
+        "latest",
+        "latest_passed",
+        "latest_failed"
+      ],
+      "type": "string"
+    },
+    "MarkdownRunVariableSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "run",
+          "type": "string"
+        },
+        "select": {
+          "$ref": "#/definitions/MarkdownRunSelect",
+          "description": "Which run to pick:  - `latest` — the most recent run regardless of result  - `latest_passed` — the most recent `RESULT_PASSED` run  - `latest_failed` — the most recent `RESULT_FAILED` run"
+        }
+      },
+      "required": [
+        "kind",
+        "select"
+      ],
+      "type": "object"
+    },
+    "MarkdownVariable": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Identifier used in the markdown body as `{{ name.field }}`.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/MarkdownVariableSource"
+        }
+      },
+      "required": [
+        "name",
+        "source"
+      ],
+      "type": "object"
+    },
+    "MarkdownVariableDirection": {
+      "enum": [
+        "asc",
+        "desc"
+      ],
+      "type": "string"
+    },
+    "MarkdownVariableMatch": {
+      "additionalProperties": false,
+      "description": "One property-equality match clause for memory variable selection.",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "type": "object"
+    },
+    "MarkdownVariableSource": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/MarkdownMemoryVariableSource"
+        },
+        {
+          "$ref": "#/definitions/MarkdownRunVariableSource"
+        }
+      ]
+    },
+    "MemoryNumberSource": {
+      "additionalProperties": false,
+      "description": "One namespace contribution inside a composite memory data source.",
+      "properties": {
+        "aggregation": {
+          "$ref": "#/definitions/WidgetNumberAggregation"
+        },
+        "field": {
+          "type": "string"
+        },
+        "fieldPath": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "aggregation"
+      ],
+      "type": "object"
+    },
+    "NodePanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "description": "Canvas node id or name. Required.",
+          "type": "string"
+        },
+        "showRun": {
+          "description": "When true and the viewer has run permission, render a manual-run button.",
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        },
+        "triggerName": {
+          "description": "Optional override for the trigger template name (for nodes with multiple triggers).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "NodesPanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "description": "Configured nodes to render in this panel. A newly added panel may have an empty array; the card body renders a \"configure me\" hint until the author adds at least one entry through the form.",
+          "items": {
+            "$ref": "#/definitions/NodesPanelNode"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "NodesPanelNode": {
+      "additionalProperties": false,
+      "description": "One entry in a  {@link  NodesPanelContent }  list. The minimum required field is `node` (canvas node id or name); the optional `label` overrides the resolved node name in the rendered row, and `description` shows a short supporting line (the node's purpose in this workflow).",
+      "properties": {
+        "description": {
+          "description": "Optional short purpose line rendered under the node label.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Optional override for the row label. Falls back to the resolved node name.",
+          "type": "string"
+        },
+        "node": {
+          "description": "Canvas node id or name. Required.",
+          "type": "string"
+        },
+        "showRun": {
+          "description": "When true and the viewer has run permission, render a manual-run button.",
+          "type": "boolean"
+        },
+        "triggerName": {
+          "description": "Optional override for the trigger template name (for nodes with multiple triggers).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "NumberMetric": {
+      "additionalProperties": false,
+      "description": "One number inside a multi-number panel. Each metric has its own data source and aggregation; metrics render side-by-side in a wrapping row.\n\nMulti-number mode is disjoint from the composite-combine mode: each metric uses a simple (single-namespace) data source, not a composite memory source.",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/TablePanelDataSource"
+        },
+        "render": {
+          "$ref": "#/definitions/WidgetNumberRender"
+        }
+      },
+      "required": [
+        "dataSource",
+        "render"
+      ],
+      "type": "object"
+    },
+    "NumberPanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/NumberPanelDataSource",
+          "description": "Used by single/composite modes. Absent in multi-number mode."
+        },
+        "metrics": {
+          "description": "Present (and an array) when the panel is in multi-number mode.",
+          "items": {
+            "$ref": "#/definitions/NumberMetric"
+          },
+          "type": "array"
+        },
+        "render": {
+          "$ref": "#/definitions/WidgetNumberRender",
+          "description": "Used by single/composite modes. Absent in multi-number mode."
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "NumberPanelDataSource": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TablePanelDataSource"
+        },
+        {
+          "$ref": "#/definitions/CompositeMemoryNumberDataSource"
+        }
+      ],
+      "description": "Number panels accept the shared table/chart data sources plus a composite memory variant where each namespace carries its own aggregation and field."
+    },
+    "TablePanelContent": {
+      "additionalProperties": false,
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/TablePanelDataSource"
+        },
+        "render": {
+          "$ref": "#/definitions/WidgetTableRender"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataSource",
+        "render"
+      ],
+      "type": "object"
+    },
+    "TablePanelDataSource": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fieldPath": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "memory",
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "namespace"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "executions",
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "node": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "runs",
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WidgetChartKind": {
+      "enum": [
+        "bar",
+        "stacked-bar",
+        "line",
+        "area",
+        "donut"
+      ],
+      "type": "string"
+    },
+    "WidgetChartLegendMode": {
+      "enum": [
+        "auto",
+        "show",
+        "hide"
+      ],
+      "type": "string"
+    },
+    "WidgetChartRender": {
+      "additionalProperties": false,
+      "properties": {
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "chart",
+          "type": "string"
+        },
+        "legend": {
+          "$ref": "#/definitions/WidgetChartLegendMode",
+          "description": "Legend visibility. Defaults to \"auto\" — visible for donut charts or when 2+ series exist."
+        },
+        "limit": {
+          "type": "number"
+        },
+        "series": {
+          "items": {
+            "$ref": "#/definitions/WidgetChartSeries"
+          },
+          "type": "array"
+        },
+        "seriesField": {
+          "description": "Optional field whose distinct values pivot long-format rows into one series per value (e.g. one stack segment per service). When set, the chart uses the numeric `field` of the first configured series for values and ignores additional series entries.",
+          "type": "string"
+        },
+        "sort": {
+          "$ref": "#/definitions/WidgetSort",
+          "description": "Optional widget-level row sort applied after filters, before chart binning."
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/WidgetChartKind"
+        },
+        "xField": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "type",
+        "xField",
+        "series"
+      ],
+      "type": "object"
+    },
+    "WidgetChartSeries": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/WidgetColumnFormat",
+          "description": "Optional value format applied in tooltips (and in donut value rows)."
+        },
+        "label": {
+          "type": "string"
+        },
+        "prefix": {
+          "description": "Optional display string prepended to the formatted value (e.g. \"$\").",
+          "type": "string"
+        },
+        "suffix": {
+          "description": "Optional display string appended to the formatted value (e.g. \" MWh\").",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WidgetColumnFormat": {
+      "enum": [
+        "text",
+        "number",
+        "percent",
+        "date",
+        "datetime",
+        "relative",
+        "duration",
+        "status",
+        "badge",
+        "code",
+        "link"
+      ],
+      "type": "string"
+    },
+    "WidgetFilterOp": {
+      "enum": [
+        "eq",
+        "neq",
+        "contains",
+        "not_contains",
+        "gt",
+        "lt",
+        "exists",
+        "not_exists"
+      ],
+      "type": "string"
+    },
+    "WidgetNumberAggregation": {
+      "enum": [
+        "count",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "first",
+        "last"
+      ],
+      "type": "string"
+    },
+    "WidgetNumberCombine": {
+      "description": "How partial aggregates from a composite memory data source are combined into a single value.",
+      "enum": [
+        "sum",
+        "min",
+        "max",
+        "avg"
+      ],
+      "type": "string"
+    },
+    "WidgetNumberRender": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregation": {
+          "$ref": "#/definitions/WidgetNumberAggregation",
+          "description": "Required for simple data sources. Composite memory sources carry their own per-source aggregation."
+        },
+        "field": {
+          "type": "string"
+        },
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "format": {
+          "$ref": "#/definitions/WidgetColumnFormat"
+        },
+        "kind": {
+          "const": "number",
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "prefix": {
+          "description": "Optional display string rendered before the formatted value (e.g. \"R$\").",
+          "type": "string"
+        },
+        "sparklineField": {
+          "type": "string"
+        },
+        "suffix": {
+          "description": "Optional display string rendered after the formatted value (e.g. \" MWh\").",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "WidgetRowAction": {
+      "$ref": "#/definitions/WidgetTriggerRowAction"
+    },
+    "WidgetRowActionIcon": {
+      "enum": [
+        "play",
+        "stop",
+        "trash",
+        "refresh",
+        "external-link"
+      ],
+      "type": "string"
+    },
+    "WidgetRowActionVariant": {
+      "enum": [
+        "default",
+        "primary",
+        "danger"
+      ],
+      "type": "string"
+    },
+    "WidgetRowStyle": {
+      "additionalProperties": false,
+      "description": "One row-background rule. Same condition shape as `WidgetTableFilter`.",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/definitions/WidgetFilterOp"
+        },
+        "tone": {
+          "$ref": "#/definitions/WidgetRowStyleTone"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "op",
+        "tone"
+      ],
+      "type": "object"
+    },
+    "WidgetRowStyleTone": {
+      "description": "Curated palette of Tailwind background tones authors can pick from. The tone enum is the persisted value; the actual class is resolved through `ROW_STYLE_CLASS` in `widget/rowStyles.ts` so the YAML stays stable even if we later swap the underlying utility classes.",
+      "enum": [
+        "dimmed",
+        "yellow",
+        "yellow-soft",
+        "orange",
+        "orange-soft",
+        "red",
+        "red-soft",
+        "blue",
+        "blue-soft",
+        "green",
+        "green-soft"
+      ],
+      "type": "string"
+    },
+    "WidgetSort": {
+      "additionalProperties": false,
+      "description": "Widget-level row sort. `field` accepts the same surface as chart/table fields: a literal dot path (e.g. `createdAt`) or a full `{{ cel }}` expression (e.g. `{{ formatDate(createdAt, \"yyyy-MM-dd\") }}`).\n\nNull / undefined values always sort to the end so empty rows don't poison the visible ordering regardless of direction.",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "order": {
+          "$ref": "#/definitions/WidgetSortOrder"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "type": "object"
+    },
+    "WidgetSortOrder": {
+      "description": "Sort direction. Defaults to `\"asc\"` when omitted on a `WidgetSort`.",
+      "enum": [
+        "asc",
+        "desc"
+      ],
+      "type": "string"
+    },
+    "WidgetTableColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/WidgetColumnFormat"
+        },
+        "href": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "show": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "type": "object"
+    },
+    "WidgetTableFilter": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/definitions/WidgetFilterOp"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "op"
+      ],
+      "type": "object"
+    },
+    "WidgetTableRender": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/definitions/WidgetTableColumn"
+          },
+          "type": "array"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "filters": {
+          "description": "Legacy string filters — still supported for backwards compatibility.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "table",
+          "type": "string"
+        },
+        "rowActions": {
+          "items": {
+            "$ref": "#/definitions/WidgetRowAction"
+          },
+          "type": "array"
+        },
+        "rowStyles": {
+          "description": "Optional per-row background tints. Each rule is one field/op/value condition (same shape and semantics as `where[i]`) mapped to a tone from the curated palette. Evaluated first-match-wins per row.",
+          "items": {
+            "$ref": "#/definitions/WidgetRowStyle"
+          },
+          "type": "array"
+        },
+        "sort": {
+          "$ref": "#/definitions/WidgetSort",
+          "description": "Optional widget-level row sort applied after filters."
+        },
+        "where": {
+          "description": "Structured filters (ANDed). Preferred for tables.",
+          "items": {
+            "$ref": "#/definitions/WidgetTableFilter"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "columns"
+      ],
+      "type": "object"
+    },
+    "WidgetTriggerRowAction": {
+      "additionalProperties": false,
+      "properties": {
+        "confirm": {
+          "type": "string"
+        },
+        "hook": {
+          "description": "Trigger hook name (default `run`).",
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/WidgetRowActionIcon"
+        },
+        "kind": {
+          "const": "trigger",
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "node": {
+          "description": "Canvas trigger node id or name.",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Dot-path → template string merged into the hook payload.",
+          "type": "object"
+        },
+        "show": {
+          "type": "string"
+        },
+        "target": {
+          "deprecated": "Use `node` — legacy row-action field.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Start template name when applicable.",
+          "type": "string"
+        },
+        "triggerName": {
+          "deprecated": "Use `template` — legacy alias.",
+          "type": "string"
+        },
+        "variant": {
+          "$ref": "#/definitions/WidgetRowActionVariant"
+        }
+      },
+      "required": [
+        "kind",
+        "node"
+      ],
+      "type": "object"
+    }
+  }
+}

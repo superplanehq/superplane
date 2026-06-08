@@ -16,6 +16,60 @@ const (
 	MaxConsolePayloadBytes = models.MaxConsolePayloadBytes
 )
 
+// panelTypeFromModel maps the storage/YAML-level lowercase panel type string
+// (the source of truth defined in `pkg/models/console_yml.go`) to its proto
+// enum representation. Used only at the wire boundary; the rest of the
+// backend continues to work with the string form.
+//
+// Returns an error when the stored string is not a known panel type. That
+// case shouldn't happen in practice because `ValidateConsoleContent` rejects
+// unknown types on import, but we surface the mismatch rather than silently
+// shipping `TYPE_UNSPECIFIED`.
+func panelTypeFromModel(modelType string) (pb.Console_Panel_Type, error) {
+	switch modelType {
+	case models.ConsolePanelTypeMarkdown:
+		return pb.Console_Panel_MARKDOWN, nil
+	case models.ConsolePanelTypeNode:
+		return pb.Console_Panel_NODE, nil
+	case models.ConsolePanelTypeNodes:
+		return pb.Console_Panel_NODES, nil
+	case models.ConsolePanelTypeTable:
+		return pb.Console_Panel_TABLE, nil
+	case models.ConsolePanelTypeChart:
+		return pb.Console_Panel_CHART, nil
+	case models.ConsolePanelTypeNumber:
+		return pb.Console_Panel_NUMBER, nil
+	default:
+		return pb.Console_Panel_TYPE_UNSPECIFIED, fmt.Errorf("unknown panel type %q", modelType)
+	}
+}
+
+// panelTypeToModel is the inverse of `panelTypeFromModel`. It is fail-closed:
+// `TYPE_UNSPECIFIED` and any unknown enum value (including future values an
+// older server might receive from a newer client) return an error so the
+// caller can reject the request with `InvalidArgument` instead of silently
+// dropping the panel into an unvalidated state.
+func panelTypeToModel(protoType pb.Console_Panel_Type) (string, error) {
+	switch protoType {
+	case pb.Console_Panel_MARKDOWN:
+		return models.ConsolePanelTypeMarkdown, nil
+	case pb.Console_Panel_NODE:
+		return models.ConsolePanelTypeNode, nil
+	case pb.Console_Panel_NODES:
+		return models.ConsolePanelTypeNodes, nil
+	case pb.Console_Panel_TABLE:
+		return models.ConsolePanelTypeTable, nil
+	case pb.Console_Panel_CHART:
+		return models.ConsolePanelTypeChart, nil
+	case pb.Console_Panel_NUMBER:
+		return models.ConsolePanelTypeNumber, nil
+	case pb.Console_Panel_TYPE_UNSPECIFIED:
+		return "", fmt.Errorf("panel type is required")
+	default:
+		return "", fmt.Errorf("unsupported panel type %d", protoType)
+	}
+}
+
 func serializeConsole(version *models.CanvasVersion) (*pb.Console, error) {
 	panels := version.ConsolePanels.Data()
 	layout := version.ConsoleLayout.Data()
@@ -30,9 +84,13 @@ func serializeConsole(version *models.CanvasVersion) (*pb.Console, error) {
 			}
 			content = value
 		}
+		panelType, err := panelTypeFromModel(panel.Type)
+		if err != nil {
+			return nil, fmt.Errorf("invalid type for panel %q: %w", panel.ID, err)
+		}
 		pbPanels = append(pbPanels, &pb.Console_Panel{
 			Id:      panel.ID,
-			Type:    panel.Type,
+			Type:    panelType,
 			Content: content,
 		})
 	}
@@ -88,9 +146,13 @@ func deserializeConsolePanels(in []*pb.Console_Panel) ([]models.ConsolePanel, er
 		if content == nil {
 			content = map[string]any{}
 		}
+		panelType, err := panelTypeToModel(panel.GetType())
+		if err != nil {
+			return nil, fmt.Errorf("panel %q: %w", panel.GetId(), err)
+		}
 		out = append(out, models.ConsolePanel{
 			ID:      panel.GetId(),
-			Type:    panel.GetType(),
+			Type:    panelType,
 			Content: content,
 		})
 	}
