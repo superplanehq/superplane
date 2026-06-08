@@ -51,106 +51,22 @@
     "ConsolePanelContent": {
       "anyOf": [
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/MarkdownPanelContent"
-            },
-            "type": {
-              "const": "markdown",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/MarkdownPanelContent"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/NodePanelContent"
-            },
-            "type": {
-              "const": "node",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/NodePanelContent"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/NodesPanelContent"
-            },
-            "type": {
-              "const": "nodes",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/NodesPanelContent"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/TablePanelContent"
-            },
-            "type": {
-              "const": "table",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/TablePanelContent"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/ChartPanelContent"
-            },
-            "type": {
-              "const": "chart",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/ChartPanelContent"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/NumberPanelContent"
-            },
-            "type": {
-              "const": "number",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "content"
-          ],
-          "type": "object"
+          "$ref": "#/definitions/NumberPanelContent"
         }
       ]
     },

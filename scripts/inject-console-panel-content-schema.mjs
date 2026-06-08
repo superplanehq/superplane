@@ -30,7 +30,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 
 const SWAGGER_PATH = resolve(REPO_ROOT, "api/swagger/superplane.swagger.json");
-const SCHEMA_PATH = resolve(REPO_ROOT, "api/schemas/console-panel-content.schema.json");
+const SCHEMA_PATH = resolve(
+  REPO_ROOT,
+  "api/schemas/console-panel-content.schema.json",
+);
 // The protoc-gen-openapiv2 generator derives definition names from the
 // fully-qualified proto message name. After bullet 1 the `Console.Panel`
 // renders as `ConsolePanel`; we only target that one.
@@ -65,7 +68,9 @@ if (!panel) {
 }
 
 if (!panel.properties || !panel.properties.content) {
-  die(`definition '${TARGET_DEFINITION}' has no 'content' property to replace.`);
+  die(
+    `definition '${TARGET_DEFINITION}' has no 'content' property to replace.`,
+  );
 }
 
 // Approach:
@@ -87,8 +92,9 @@ if (!panel.properties || !panel.properties.content) {
 // to validate panel content against the documented shape.
 panel.properties.content = {
   description:
-    "Polymorphic panel content. Shape is driven by `Panel.type`. The full discriminated " +
-    "union of supported panel kinds lives in `api/schemas/console-panel-content.schema.json` " +
+    "Polymorphic panel content payload. Shape is selected by the sibling `Panel.type` field; " +
+    "the `type` discriminator is NOT part of `content`. The union of supported content shapes " +
+    "lives in `api/schemas/console-panel-content.schema.json` " +
     "(generated from `web_src/src/pages/app/console/schema/panelContent.ts`); the same " +
     "JSON Schema is mirrored as `x-content-schema` on this definition for tools that prefer " +
     "to read it inline.",
@@ -98,7 +104,9 @@ panel["x-content-schema-ref"] = "api/schemas/console-panel-content.schema.json";
 panel["x-content-schema"] = JSON.stringify(schema);
 
 writeFileSync(SWAGGER_PATH, JSON.stringify(swagger, null, 2) + "\n");
-const variantCount = Array.isArray(schema?.definitions?.ConsolePanelContent?.anyOf)
+const variantCount = Array.isArray(
+  schema?.definitions?.ConsolePanelContent?.anyOf,
+)
   ? schema.definitions.ConsolePanelContent.anyOf.length
   : 0;
 console.log(
