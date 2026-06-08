@@ -2,7 +2,7 @@ version: v1.0
 name: Release runner AMIs
 agent:
   machine:
-    type: e1-standard-2
+    type: f1-standard-2
     os_image: ubuntu2004
 
 # This pipeline promotes the staged AMI IDs (written by build-amis.yml) into

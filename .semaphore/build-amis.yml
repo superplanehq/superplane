@@ -2,7 +2,7 @@ version: v1.0
 name: Build runner AMIs
 agent:
   machine:
-    type: e1-standard-2
+    type: f1-standard-2
     os_image: ubuntu2004
 
 promotions:
