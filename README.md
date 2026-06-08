@@ -6,6 +6,19 @@ use such as Git, CI/CD, observability, incident response, infra, and notificatio
 
 ![SuperPlane screenshot](./screenshot.png)
 
+## Table of Contents
+
+- [Project Status](#project-status)
+- [What It Does](#what-it-does)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Supported Integrations](#supported-integrations)
+- [For Developers](#for-developers)
+- [Production Installation](#production-installation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Community](#community)
+
 ## Project status
 
 <p>
@@ -171,6 +184,35 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/launchdarkly/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/launchdarkly.svg" alt="LaunchDarkly"/><br/>LaunchDarkly</a></td>
 </tr>
 </table>
+
+## For Developers
+
+Want to contribute to SuperPlane or build it locally? Here's what you need to know:
+
+### Local Development
+
+Get started in just a few minutes:
+
+1. **Prerequisites**: MacOS or Linux, [Make](https://www.gnu.org/software/make/), and [Docker](https://www.docker.com/)
+2. **Setup**: Run `make dev.setup` to install dependencies and create the database
+3. **Start**: Run `make dev.start` to launch the development server
+4. **Access**: Open [http://localhost:8000](http://localhost:8000)
+
+For detailed instructions, see [Getting Started Guide](docs/GETTING_STARTED.md).
+
+### Learning Resources
+
+- **[Architecture Overview](docs/contributing/architecture.md)** - System design and core components
+- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Understanding the codebase layout
+- **[Contributing Guide](CONTRIBUTING.md)** - How to make contributions
+- **[Component Implementation](docs/contributing/component-implementations.md)** - Building new components
+- **[Building Integrations](docs/contributing/building-an-integration.md)** - Adding third-party integrations
+
+### Project Guidelines
+
+- PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/) with prefixes: `feat:`, `fix:`, `chore:`, `docs:`
+- See [AGENTS.md](AGENTS.md) for coding standards and best practices
+- Join our [Discord](https://discord.gg/KC78eCNsnw) to discuss ideas before starting major work
 
 ## Production installation
 
