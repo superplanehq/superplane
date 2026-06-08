@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/monitoring"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -39,6 +40,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -183,6 +187,10 @@ func (g *GCP) Actions() []core.Action {
 		&clouddns.CreateRecord{},
 		&clouddns.DeleteRecord{},
 		&clouddns.UpdateRecord{},
+		&monitoring.CreateAlertingPolicy{},
+		&monitoring.GetAlertingPolicy{},
+		&monitoring.DeleteAlertingPolicy{},
+		&monitoring.UpdateAlertingPolicy{},
 	}
 }
 
@@ -950,6 +958,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
 		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
+	case monitoring.ResourceTypeAlertPolicy:
+		return monitoring.ListAlertingPolicyResources(reqCtx, client)
+	case monitoring.ResourceTypeNotificationChannel:
+		return monitoring.ListNotificationChannelResources(reqCtx, client)
 	case cloudbuild.ResourceTypeTrigger:
 		return cloudbuild.ListTriggerResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeBuild:
