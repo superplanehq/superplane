@@ -74,4 +74,17 @@ describe("MentionTextarea", () => {
     expect(textarea.style.overflowY).toBe("auto");
     expect(backdrop.scrollTop).toBe(56);
   });
+
+  it("clamps bottom scroll before syncing the backdrop", () => {
+    const { textarea, backdrop } = renderTextarea("@New Component\none\ntwo\nthree\nfour\nfive\nsix");
+    setReadonlyNumber(textarea, "scrollHeight", 240);
+    setReadonlyNumber(textarea, "clientHeight", 144);
+
+    fireEvent.change(textarea, { target: { value: `${textarea.value}\nseven` } });
+    textarea.scrollTop = 96;
+    fireEvent.scroll(textarea);
+
+    expect(textarea.scrollTop).toBeCloseTo(94.08);
+    expect(backdrop.scrollTop).toBeCloseTo(94.08);
+  });
 });

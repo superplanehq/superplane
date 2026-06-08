@@ -5,6 +5,7 @@ import type { InsertedMention } from "./useMentions";
 
 const composerTextMetrics = "px-3 py-2.5 text-sm leading-5 font-normal tracking-normal";
 const maxTextareaHeight = 144;
+const maxScrollRatio = 0.98;
 
 interface MentionTextareaProps {
   value: string;
@@ -33,7 +34,12 @@ export function MentionTextarea({
         return;
       }
 
-      backdropRef.current.scrollTop = textarea.scrollTop;
+      const scrollTop = clampScrollTop(textarea);
+      if (textarea.scrollTop !== scrollTop) {
+        textarea.scrollTop = scrollTop;
+      }
+
+      backdropRef.current.scrollTop = scrollTop;
       backdropRef.current.scrollLeft = textarea.scrollLeft;
     },
     [backdropRef],
@@ -119,4 +125,11 @@ export function MentionTextarea({
       />
     </div>
   );
+}
+
+function clampScrollTop(textarea: HTMLTextAreaElement): number {
+  const maxScrollTop = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+  const maxAllowedScrollTop = maxScrollTop * maxScrollRatio;
+
+  return Math.min(textarea.scrollTop, maxAllowedScrollTop);
 }
