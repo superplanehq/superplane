@@ -35,22 +35,24 @@ type IndexableValue = Record<string, unknown> | null | undefined;
 
 function getActiveStickyHeaderHeight(container: HTMLElement, item: HTMLElement) {
   const containerRect = container.getBoundingClientRect();
+  const containerTop = containerRect.top;
   const headers = container.querySelectorAll("[data-suggestion-section-header]");
 
-  let sectionHeader: HTMLElement | null = null;
+  let stackedHeight = 0;
   for (const header of headers) {
-    if (header.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING) {
-      sectionHeader = header as HTMLElement;
+    if (!(header.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      continue;
+    }
+
+    const headerRect = header.getBoundingClientRect();
+    const stackTop = containerTop + stackedHeight;
+    const isStuck = headerRect.top <= stackTop + 1 && headerRect.bottom > stackTop;
+    if (isStuck) {
+      stackedHeight += headerRect.height;
     }
   }
 
-  if (!sectionHeader) {
-    return 0;
-  }
-
-  const headerRect = sectionHeader.getBoundingClientRect();
-  const isStuck = headerRect.top <= containerRect.top + 1 && headerRect.bottom > containerRect.top;
-  return isStuck ? headerRect.height : 0;
+  return stackedHeight;
 }
 
 // Keep in sync with suggestion section header (`h-7`) and item row (`h-9`) classes.

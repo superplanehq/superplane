@@ -76,7 +76,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
-import { isCanvasTabHeaderMode } from "./canvasTabHeaderMode";
+import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
@@ -1294,10 +1294,18 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [props.canvasStateMode, state, templateNodeId]);
 
+  const previousHeaderModeForSidebarRef = useRef<CanvasPageProps["headerMode"]>(props.headerMode);
+
   useEffect(() => {
-    if (isCanvasTabHeaderMode(props.headerMode)) return;
-    if (!state.componentSidebar.isOpen) return;
-    handleSidebarClose();
+    const previousMode = previousHeaderModeForSidebarRef.current;
+    const currentMode = props.headerMode;
+    previousHeaderModeForSidebarRef.current = currentMode;
+
+    if (isComponentSidebarVisibleMode(previousMode) && !isComponentSidebarVisibleMode(currentMode)) {
+      if (state.componentSidebar.isOpen) {
+        handleSidebarClose();
+      }
+    }
   }, [props.headerMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
@@ -1555,7 +1563,7 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {isCanvasTabHeaderMode(props.headerMode) ? (
+            {isComponentSidebarVisibleMode(props.headerMode) ? (
               <Sidebar
                 state={state}
                 getSidebarData={props.getSidebarData}
