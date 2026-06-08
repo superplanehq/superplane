@@ -116,6 +116,16 @@ Console data is stored as arbitrary JSON content plus a layout:
 
 The panel `content` object is intentionally flexible, but every known panel type has a typed shape in `panelTypes.ts` and matching backend validation in `canvas_dashboard_yml.go`.
 
+### Generated type contracts
+
+The console API contract is documented in three regenerated artifacts that must stay in lockstep:
+
+1. **Proto enum for `Console.Panel.type`** — `protos/canvases.proto` defines `Console.Panel.Type` (`MARKDOWN`, `NODE`, `NODES`, `TABLE`, `CHART`, `NUMBER`). The wire boundary is fail-closed: `panelTypeToModel` in `pkg/grpc/actions/canvases/console_serialization.go` rejects `TYPE_UNSPECIFIED` and unknown values with `InvalidArgument`. The Go model and the persisted JSONB still use the lowercase string form, so the YAML import path and the storage layer are unchanged.
+2. **JSON Schema for `Console.Panel.content`** — `web_src/src/pages/app/console/schema/panelContent.ts` declares a TypeScript union over the existing per-type content interfaces. It models the **content payload only** (what travels in `Console.Panel.content`), not a `{ type, content }` wrapper — the `type` discriminator is a sibling field on the panel, so wrapping it here would reject every valid `content` payload. `npm run generate:console-schema` emits `api/schemas/console-panel-content.schema.json`; `scripts/inject-console-panel-content-schema.mjs` then attaches it to the `ConsolePanel` definition in `api/swagger/superplane.swagger.json` as a stringified `x-content-schema` vendor extension (the format must be a vendor extension because Swagger 2.0 lacks `anyOf`/`oneOf` support).
+3. **Adapters at the SDK boundary** — the TS SDK emits the enum as SCREAMING_CASE (`"MARKDOWN"`) while the FE schema is lowercase. `apiPanelTypeToPanelType` / `panelTypeToApi` in `web_src/src/pages/app/console/panelTypes.ts` are the only allowed translation points; the Go SDK gets equivalent adapters in `pkg/cli/commands/apps/console/convert.go`.
+
+`make pb.gen` runs all of the above end-to-end. Adding a new panel kind requires extending **every** mirror in the same change: the proto enum, the Go constants, the wire-boundary switch, the FE union (`PANEL_TYPES`), the API↔FE adapters, the CLI tables, and the TS schema source so the generated JSON Schema documents the new content shape.
+
 ## Panel Types
 
 | Type | Purpose | Main content fields |

@@ -273,28 +273,45 @@ function parsePanels(raw: unknown): { ok: true; data: ConsolePanel[] } | { ok: f
 
   const panels: ConsolePanel[] = [];
   for (let i = 0; i < raw.length; i += 1) {
-    const value = raw[i];
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return { ok: false, error: `spec.panels[${i}] must be an object.` };
-    }
-    const entry = value as Record<string, unknown>;
-    const unknownKeys = Object.keys(entry).filter((key) => !["id", "type", "content"].includes(key));
-    if (unknownKeys.length > 0) {
-      return { ok: false, error: `Unknown field(s) on panel ${i}: ${unknownKeys.join(", ")}` };
-    }
-    if (typeof entry.id !== "string") return { ok: false, error: `spec.panels[${i}].id must be a string.` };
-    if (typeof entry.type !== "string") return { ok: false, error: `spec.panels[${i}].type must be a string.` };
-
-    let content: Record<string, unknown> = {};
-    if (entry.content !== undefined && entry.content !== null) {
-      if (typeof entry.content !== "object" || Array.isArray(entry.content)) {
-        return { ok: false, error: `spec.panels[${i}].content must be an object.` };
-      }
-      content = entry.content as Record<string, unknown>;
-    }
-    panels.push({ id: entry.id, type: entry.type, content });
+    const parsed = parsePanelEntry(raw[i], i);
+    if (!parsed.ok) return parsed;
+    panels.push(parsed.data);
   }
   return { ok: true, data: panels };
+}
+
+// Factored out of parsePanels to keep that function's cyclomatic complexity
+// under the lint budget. Validates one panel object from the YAML payload
+// and narrows the `type` field to the FE `PanelType` union.
+function parsePanelEntry(value: unknown, i: number): ParseResult<ConsolePanel> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, error: `spec.panels[${i}] must be an object.` };
+  }
+  const entry = value as Record<string, unknown>;
+  const unknownKeys = Object.keys(entry).filter((key) => !["id", "type", "content"].includes(key));
+  if (unknownKeys.length > 0) {
+    return { ok: false, error: `Unknown field(s) on panel ${i}: ${unknownKeys.join(", ")}` };
+  }
+  if (typeof entry.id !== "string") return { ok: false, error: `spec.panels[${i}].id must be a string.` };
+  if (typeof entry.type !== "string") return { ok: false, error: `spec.panels[${i}].type must be a string.` };
+  // ConsolePanel.type is the lowercase FE union; narrow at parse time so
+  // downstream consumers don't have to revalidate every read. The deeper
+  // structural check in `validatePanels` still runs afterwards.
+  if (!isPanelType(entry.type)) {
+    return {
+      ok: false,
+      error: `Panel ${JSON.stringify(entry.id)} has unsupported type ${JSON.stringify(entry.type)}.`,
+    };
+  }
+
+  let content: Record<string, unknown> = {};
+  if (entry.content !== undefined && entry.content !== null) {
+    if (typeof entry.content !== "object" || Array.isArray(entry.content)) {
+      return { ok: false, error: `spec.panels[${i}].content must be an object.` };
+    }
+    content = entry.content as Record<string, unknown>;
+  }
+  return { ok: true, data: { id: entry.id, type: entry.type, content } };
 }
 
 function parseLayout(raw: unknown): { ok: true; data: ConsoleLayoutItem[] } | { ok: false; error: string } {

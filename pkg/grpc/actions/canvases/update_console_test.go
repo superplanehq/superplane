@@ -51,7 +51,7 @@ func Test__UpdateConsole(t *testing.T) {
 			Update("is_template", true).Error)
 
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "a", Type: "markdown"},
+			{Id: "a", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{{I: "a", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -63,7 +63,7 @@ func Test__UpdateConsole(t *testing.T) {
 		strVal, err := structpb.NewValue("not-an-object")
 		require.NoError(t, err)
 		_, err = UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "x", Type: "markdown", Content: strVal},
+			{Id: "x", Type: pb.Console_Panel_MARKDOWN, Content: strVal},
 		}, []*pb.Console_LayoutItem{{I: "x", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -73,28 +73,33 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: panel id required", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "", Type: "markdown"},
+			{Id: "", Type: pb.Console_Panel_MARKDOWN},
 		}, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
-	t.Run("validation: panel type required", func(t *testing.T) {
+	t.Run("validation: panel type unspecified is rejected fail-closed", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		// TYPE_UNSPECIFIED is the proto3 zero value. The wire boundary
+		// helper `panelTypeToModel` must surface it as a clear
+		// `InvalidArgument` instead of silently defaulting the panel to
+		// markdown — that's the whole point of the fail-closed mapping.
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: ""},
+			{Id: "p", Type: pb.Console_Panel_TYPE_UNSPECIFIED},
 		}, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "panel type is required")
 	})
 
 	t.Run("validation: duplicate panel id", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "dup", Type: "markdown"},
-			{Id: "dup", Type: "markdown"},
+			{Id: "dup", Type: pb.Console_Panel_MARKDOWN},
+			{Id: "dup", Type: pb.Console_Panel_MARKDOWN},
 		}, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -104,7 +109,7 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: layout i required", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown"},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{{I: "", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -114,7 +119,7 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: duplicate layout id", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown"},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{
 			{I: "p", X: 0, Y: 0, W: 1, H: 1},
 			{I: "p", X: 1, Y: 0, W: 1, H: 1},
@@ -127,7 +132,7 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: layout references unknown panel", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown"},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{{I: "other", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -137,7 +142,7 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: layout w/h must be positive", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown"},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 0, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -147,7 +152,7 @@ func Test__UpdateConsole(t *testing.T) {
 	t.Run("validation: layout x/y must be non-negative", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown"},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{{I: "p", X: -1, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -160,7 +165,7 @@ func Test__UpdateConsole(t *testing.T) {
 		layout := make([]*pb.Console_LayoutItem, 0, MaxConsolePanels+1)
 		for i := range MaxConsolePanels + 1 {
 			id := uuid.New().String()
-			panels = append(panels, &pb.Console_Panel{Id: id, Type: "markdown"})
+			panels = append(panels, &pb.Console_Panel{Id: id, Type: pb.Console_Panel_MARKDOWN})
 			layout = append(layout, &pb.Console_LayoutItem{I: id, X: int32(i), Y: 0, W: 1, H: 1})
 		}
 		_, err := UpdateConsole(ctx, orgID, canvas.ID.String(), "", panels, layout)
@@ -175,7 +180,7 @@ func Test__UpdateConsole(t *testing.T) {
 		content, err := structpb.NewValue(map[string]any{"body": huge})
 		require.NoError(t, err)
 		_, err = UpdateConsole(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "p", Type: "markdown", Content: content},
+			{Id: "p", Type: pb.Console_Panel_MARKDOWN, Content: content},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -188,8 +193,8 @@ func Test__UpdateConsole(t *testing.T) {
 		content, err := structpb.NewValue(map[string]any{"body": "hello"})
 		require.NoError(t, err)
 		resp, err := UpdateConsole(ctx, orgID, canvas.ID.String(), versionID, []*pb.Console_Panel{
-			{Id: "a", Type: "markdown", Content: content},
-			{Id: "b", Type: "markdown"},
+			{Id: "a", Type: pb.Console_Panel_MARKDOWN, Content: content},
+			{Id: "b", Type: pb.Console_Panel_MARKDOWN},
 		}, []*pb.Console_LayoutItem{
 			{I: "a", X: 0, Y: 0, W: 2, H: 2},
 			{I: "b", X: 2, Y: 0, W: 2, H: 2},
@@ -199,6 +204,9 @@ func Test__UpdateConsole(t *testing.T) {
 		require.Len(t, d.GetPanels(), 2)
 		assert.NotNil(t, d.GetPanels()[0].GetContent())
 		assert.NotNil(t, d.GetPanels()[1].GetContent())
+		// Round-trip: the enum survives serialize -> persist -> deserialize.
+		assert.Equal(t, pb.Console_Panel_MARKDOWN, d.GetPanels()[0].GetType())
+		assert.Equal(t, pb.Console_Panel_MARKDOWN, d.GetPanels()[1].GetType())
 		require.Len(t, d.GetLayout(), 2)
 		assert.Equal(t, versionID, d.GetVersionId())
 
@@ -206,6 +214,7 @@ func Test__UpdateConsole(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, got.GetConsole().GetPanels(), 2)
 		assert.Len(t, got.GetConsole().GetLayout(), 2)
+		assert.Equal(t, pb.Console_Panel_MARKDOWN, got.GetConsole().GetPanels()[0].GetType())
 
 		live, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
 		require.NoError(t, err)

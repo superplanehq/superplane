@@ -3,6 +3,7 @@ import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useStat
 import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
 import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
+import { apiPanelTypeToPanelType } from "./console/apiPanelType";
 import { consoleToYaml } from "./console/consoleYaml";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
 import type { CanvasesConsole } from "@/api-client";
@@ -15,7 +16,7 @@ function consoleYamlText(canvasId: string, consoleData?: CanvasesConsole | null)
   return consoleToYaml({
     panels: (consoleData?.panels ?? []).map((panel) => ({
       id: panel.id ?? "",
-      type: panel.type ?? "markdown",
+      type: apiPanelTypeToPanelType(panel.type) ?? "markdown",
       content: (panel.content as Record<string, unknown>) ?? {},
     })),
     layout: (consoleData?.layout ?? []).map((item) => ({

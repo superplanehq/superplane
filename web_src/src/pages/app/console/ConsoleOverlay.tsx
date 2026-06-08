@@ -18,6 +18,7 @@ import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
 import type { ConsoleContextValue, ConsoleNodeStatus } from "./ConsoleContext";
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
+import { apiPanelTypeToPanelType } from "./apiPanelType";
 
 export type ConsoleOverlayProps = {
   /**
@@ -93,7 +94,12 @@ export function ConsoleOverlay({
     () =>
       (consoleQuery.data?.panels || []).map((panel: ApiConsolePanel) => ({
         id: panel.id || "",
-        type: panel.type || "markdown",
+        // The SDK exposes the proto enum as a SCREAMING_CASE union
+        // (`MARKDOWN`, `NODE`, ...). Map it back to the lowercase form the
+        // rest of the FE uses; fall back to `markdown` for unknown / unset
+        // values so the panel still renders and authors can fix the type
+        // through the editor.
+        type: apiPanelTypeToPanelType(panel.type) ?? "markdown",
         content: (panel.content as Record<string, unknown>) || {},
       })),
     [consoleQuery.data?.panels],
