@@ -33,6 +33,7 @@ func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion,
 	if _, ok := spec["edges"]; !ok {
 		spec["edges"] = []any{}
 	}
+	ensureCanvasYAMLNodeDefaults(spec)
 
 	resource := map[string]any{
 		"apiVersion": canvasyaml.CanvasAPIVersion,
@@ -65,6 +66,29 @@ func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
 		return "", err
 	}
 	return string(raw), nil
+}
+
+func ensureCanvasYAMLNodeDefaults(spec map[string]any) {
+	nodes, ok := spec["nodes"].([]any)
+	if !ok {
+		return
+	}
+
+	for i, raw := range nodes {
+		node, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if _, hasType := node["type"]; !hasType {
+			// Proto JSON omits TYPE_ACTION (enum value 0); the UI needs an explicit type.
+			node["type"] = "TYPE_ACTION"
+		}
+
+		nodes[i] = node
+	}
+
+	spec["nodes"] = nodes
 }
 
 func canvasFromYAMLText(text string) (*pb.Canvas, error) {
