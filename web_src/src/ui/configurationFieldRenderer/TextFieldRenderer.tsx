@@ -6,6 +6,7 @@ import { coerceMonacoValue } from "@/lib/monaco";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
+import { getMonacoOverflowWidgetsNode } from "@/lib/monacoOverflowWidgets";
 
 function resolveTextFieldLanguage(field: FieldRendererProps["field"]): string {
   const language = field.typeOptions?.text?.language?.trim();
@@ -37,6 +38,8 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
   const editorOptions = {
     minimap: { enabled: false },
     fontSize: 13,
+    fixedOverflowWidgets: true,
+    overflowWidgetsDomNode: getMonacoOverflowWidgetsNode(),
     lineNumbers: "on" as const,
     wordWrap: "on" as const,
     folding: false,
