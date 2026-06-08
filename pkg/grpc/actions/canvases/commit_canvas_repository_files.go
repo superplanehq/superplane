@@ -3,6 +3,7 @@ package canvases
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"github.com/google/uuid"
@@ -43,6 +44,10 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
+	if repository.Status != models.RepositoryStatusReady {
+		return nil, status.Errorf(codes.FailedPrecondition, "repository is not ready (status: %s)", repository.Status)
+	}
+
 	user, err := models.FindActiveUserByID(organizationID, userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
@@ -77,10 +82,27 @@ func CommitCanvasRepositoryFiles(
 	})
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+		return nil, commitErrorToStatus(err)
 	}
 
 	return &pb.CommitCanvasRepositoryFilesResponse{
 		CommitSha: newCommitSha,
 	}, nil
+}
+
+// commitErrorToStatus maps errors returned by the git provider during a commit
+// to appropriate gRPC status codes. User-caused errors (invalid input, stale
+// head SHA, reserved paths) are mapped to 4xx codes so that they are not
+// surfaced to Sentry as 5xx server errors.
+func commitErrorToStatus(err error) error {
+	switch {
+	case errors.Is(err, git.ErrExpectedHeadMismatch):
+		return status.Errorf(codes.FailedPrecondition, "expected head sha does not match current branch head")
+	case errors.Is(err, git.ErrInvalidCommit),
+		errors.Is(err, git.ErrInvalidPath),
+		errors.Is(err, git.ErrReservedPath):
+		return status.Errorf(codes.InvalidArgument, "%v", err)
+	default:
+		return status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+	}
 }

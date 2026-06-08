@@ -26,9 +26,12 @@ func TestProviderRepositoryLifecycle(t *testing.T) {
 	headSHA, err := p.Head(ctx, repoID)
 	require.NoError(t, err)
 
+	author := provider.CommitAuthor{Name: "tester", Email: "tester@example.com"}
+
 	commitSHA, err := p.Commit(ctx, repoID, provider.CommitOptions{
 		ExpectedHeadSHA: headSHA,
 		Message:         "add docs",
+		Author:          author,
 		Operations: []provider.FileOperation{
 			{
 				Path:      "docs/guide.md",
@@ -51,9 +54,17 @@ func TestProviderRepositoryLifecycle(t *testing.T) {
 	require.NoError(t, reader.Close())
 	assert.Equal(t, "guide", string(content))
 
-	commitSHA, err = p.Commit(ctx, repoID, provider.CommitOptions{
+	_, err = p.Commit(ctx, repoID, provider.CommitOptions{
 		ExpectedHeadSHA: headSHA,
 		Message:         "stale head",
+		Author:          author,
+		Operations: []provider.FileOperation{
+			{
+				Path:      "docs/other.md",
+				Content:   bytes.NewReader([]byte("other")),
+				SizeBytes: 5,
+			},
+		},
 	})
 	require.ErrorIs(t, err, provider.ErrExpectedHeadMismatch)
 

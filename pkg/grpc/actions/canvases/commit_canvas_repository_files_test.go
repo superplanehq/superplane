@@ -69,7 +69,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
-	t.Run("commit fails -> propagates error", func(t *testing.T) {
+	t.Run("stale head sha -> failed precondition", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 
@@ -87,8 +87,72 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 
 		s, ok := status.FromError(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
-		assert.Contains(t, s.Message(), "failed to commit repository files")
+		assert.Equal(t, codes.FailedPrecondition, s.Code())
+	})
+
+	t.Run("empty operations -> invalid argument", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		require.NoError(t, err)
+
+		_, err = CommitCanvasRepositoryFiles(
+			ctx,
+			r.GitProvider,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			headSHA,
+			"commit message",
+			nil,
+		)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
+	t.Run("reserved path -> invalid argument", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		require.NoError(t, err)
+
+		_, err = CommitCanvasRepositoryFiles(
+			ctx,
+			r.GitProvider,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			headSHA,
+			"commit message",
+			[]*pb.CanvasRepositoryFileOperation{
+				{Path: ".superplane/secret", Content: []byte("data")},
+			},
+		)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
+	t.Run("repository not ready -> failed precondition", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusPending, false)
+
+		_, err := CommitCanvasRepositoryFiles(
+			ctx,
+			r.GitProvider,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			"abc123",
+			"commit message",
+			[]*pb.CanvasRepositoryFileOperation{
+				{Path: "README.md", Content: []byte("hello")},
+			},
+		)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, s.Code())
 	})
 
 	t.Run("canvas from different organization -> not found", func(t *testing.T) {

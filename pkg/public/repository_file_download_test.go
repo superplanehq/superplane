@@ -134,6 +134,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, git.CommitOptions{
 			ExpectedHeadSHA: headSHA,
 			Message:         "seed readme",
+			Author:          git.CommitAuthor{Name: "tester", Email: "tester@example.com"},
 			Operations: []git.FileOperation{
 				{
 					Path:      "README.md",
