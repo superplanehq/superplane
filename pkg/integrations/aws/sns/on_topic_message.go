@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -32,7 +33,10 @@ type OnTopicMessageMetadata struct {
 	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
 }
 
-type OnTopicMessage struct{}
+type OnTopicMessage struct {
+	certCache      map[string]*x509.Certificate
+	certCacheMutex sync.RWMutex
+}
 
 func (t *OnTopicMessage) Name() string {
 	return "aws.sns.onTopicMessage"
@@ -298,9 +302,9 @@ func (t *OnTopicMessage) verifyMessageSignature(ctx core.WebhookRequestContext, 
 	}
 
 	//
-	// TODO: it would be good to not fetch the certificate every time.
+	// Fetch the certificate (using cache if available)
 	//
-	cert, err := t.fetchSigningCertificate(ctx, message.SigningCertURL)
+	cert, err := t.getCertificate(ctx, message.SigningCertURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch signing certificate: %w", err)
 	}
@@ -320,6 +324,37 @@ func (t *OnTopicMessage) verifyMessageSignature(ctx core.WebhookRequestContext, 
 	}
 
 	return nil
+}
+
+func (t *OnTopicMessage) getCertificate(ctx core.WebhookRequestContext, signingCertURL string) (*x509.Certificate, error) {
+	// 1. Fast path: check with read lock
+	t.certCacheMutex.RLock()
+	cert, ok := t.certCache[signingCertURL]
+	t.certCacheMutex.RUnlock()
+	if ok {
+		return cert, nil
+	}
+
+	// 2. Slow path: fetch and update cache with write lock
+	t.certCacheMutex.Lock()
+	defer t.certCacheMutex.Unlock()
+
+	// Double check - another goroutine might have fetched it
+	if cert, ok := t.certCache[signingCertURL]; ok {
+		return cert, nil
+	}
+
+	cert, err := t.fetchSigningCertificate(ctx, signingCertURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if t.certCache == nil {
+		t.certCache = make(map[string]*x509.Certificate)
+	}
+	t.certCache[signingCertURL] = cert
+
+	return cert, nil
 }
 
 type SignableField struct {
