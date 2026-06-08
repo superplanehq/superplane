@@ -841,12 +841,6 @@ function CanvasPage(props: CanvasPageProps) {
     if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
   }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
 
-  useEffect(() => {
-    if (isCanvasTabHeaderMode(props.headerMode)) return;
-    if (!state.componentSidebar.isOpen) return;
-    state.componentSidebar.close();
-  }, [props.headerMode, state.componentSidebar.isOpen, state.componentSidebar.close]);
-
   const handleSelectRuns = () => {
     openToolSidebar();
     props.onSelectRuns?.();
@@ -1269,8 +1263,9 @@ function CanvasPage(props: CanvasPageProps) {
   };
 
   const handleSidebarClose = useCallback(() => {
+    const selectedNodeId = state.componentSidebar.selectedNodeId;
     // Check if the currently open node is a pending connection
-    const currentNode = state.nodes.find((n) => n.id === state.componentSidebar.selectedNodeId);
+    const currentNode = state.nodes.find((n) => n.id === selectedNodeId);
     const isPendingConnection = currentNode?.data?.isPendingConnection;
 
     state.componentSidebar.close();
@@ -1278,8 +1273,8 @@ function CanvasPage(props: CanvasPageProps) {
     setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
-    if (isPendingConnection && state.componentSidebar.selectedNodeId) {
-      const nodeIdToRemove = state.componentSidebar.selectedNodeId;
+    if (isPendingConnection && selectedNodeId) {
+      const nodeIdToRemove = selectedNodeId;
       state.setNodes((nodes) => nodes.filter((node) => node.id !== nodeIdToRemove));
       state.setEdges(state.edges.filter((edge) => edge.source !== nodeIdToRemove && edge.target !== nodeIdToRemove));
 
@@ -1297,6 +1292,12 @@ function CanvasPage(props: CanvasPageProps) {
       })),
     );
   }, [props.canvasStateMode, state, templateNodeId]);
+
+  useEffect(() => {
+    if (isCanvasTabHeaderMode(props.headerMode)) return;
+    if (!state.componentSidebar.isOpen) return;
+    handleSidebarClose();
+  }, [props.headerMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
