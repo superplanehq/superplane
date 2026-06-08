@@ -1,9 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect } from "react";
 import { cn } from "@/lib/utils";
 import { BackdropContent } from "./BackdropContent";
 import type { InsertedMention } from "./useMentions";
 
 const composerTextMetrics = "px-3 py-2.5 text-sm leading-5 font-normal tracking-normal";
+const maxTextareaHeight = 144;
 
 interface MentionTextareaProps {
   value: string;
@@ -26,12 +27,48 @@ export function MentionTextarea({
   textareaRef,
   backdropRef,
 }: MentionTextareaProps) {
+  const syncBackdropScroll = useCallback(
+    (textarea: HTMLTextAreaElement) => {
+      if (!backdropRef.current) {
+        return;
+      }
+
+      backdropRef.current.scrollTop = textarea.scrollTop;
+      backdropRef.current.scrollLeft = textarea.scrollLeft;
+    },
+    [backdropRef],
+  );
+
+  const syncTextareaLayout = useCallback(
+    (textarea: HTMLTextAreaElement) => {
+      textarea.style.height = "auto";
+      const nextHeight = Math.min(textarea.scrollHeight, maxTextareaHeight);
+
+      if (nextHeight > 0) {
+        textarea.style.height = `${nextHeight}px`;
+      }
+
+      textarea.style.overflowY = textarea.scrollHeight > maxTextareaHeight ? "auto" : "hidden";
+      syncBackdropScroll(textarea);
+    },
+    [syncBackdropScroll],
+  );
+
+  useLayoutEffect(() => {
+    if (!textareaRef.current) {
+      return;
+    }
+
+    syncTextareaLayout(textareaRef.current);
+  }, [syncTextareaLayout, textareaRef, value]);
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setValue(e.target.value);
       setCursorPos(e.target.selectionStart ?? e.target.value.length);
+      syncTextareaLayout(e.target);
     },
-    [setValue, setCursorPos],
+    [setValue, setCursorPos, syncTextareaLayout],
   );
 
   const handleSelect = useCallback(
@@ -42,11 +79,10 @@ export function MentionTextarea({
   );
 
   const handleScroll = useCallback(() => {
-    if (textareaRef.current && backdropRef.current) {
-      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
-      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    if (textareaRef.current) {
+      syncBackdropScroll(textareaRef.current);
     }
-  }, [textareaRef, backdropRef]);
+  }, [textareaRef, syncBackdropScroll]);
 
   return (
     <div className="relative">
