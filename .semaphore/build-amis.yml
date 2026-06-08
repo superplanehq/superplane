@@ -13,8 +13,6 @@ blocks:
       env_vars:
         - name: AWS_DEFAULT_REGION
           value: us-east-1
-        - name: RUNNER_S3_BUCKET
-          value: superplane-runner
         - name: PACKER_VERSION
           value: "1.11.2"
       jobs:
@@ -38,8 +36,6 @@ blocks:
             - |
               packer build \
                 -var "aws_region=${AWS_DEFAULT_REGION}" \
-                -var "runner_s3_uri_amd64=s3://${RUNNER_S3_BUCKET}/latest/runner-linux-amd64" \
-                -var "runner_s3_uri_arm64=s3://${RUNNER_S3_BUCKET}/latest/runner-linux-arm64" \
                 packer/runner.pkr.hcl
 
             # Extract AMI IDs and store in SSM staging parameters.

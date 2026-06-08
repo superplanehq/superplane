@@ -17,14 +17,6 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "runner_s3_uri_amd64" {
-  description = "S3 URI of the amd64 runner binary, e.g. s3://superplane-runner/latest/runner-linux-amd64"
-}
-
-variable "runner_s3_uri_arm64" {
-  description = "S3 URI of the arm64 runner binary, e.g. s3://superplane-runner/latest/runner-linux-arm64"
-}
-
 variable "build_instance_type_amd64" {
   description = "Instance type used for the amd64 build (does not need to match prod)."
   default     = "t3.medium"
@@ -120,10 +112,9 @@ build {
   sources = ["source.amazon-ebs.ubuntu_amd64"]
 
   provisioner "shell" {
-    script           = "packer/scripts/install.sh"
-    environment_vars = ["RUNNER_S3_URI=${var.runner_s3_uri_amd64}"]
-    execute_command  = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
-    pause_before     = "15s"
+    script          = "packer/scripts/install.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+    pause_before    = "15s"
   }
 
   post-processor "manifest" {
@@ -137,10 +128,9 @@ build {
   sources = ["source.amazon-ebs.ubuntu_arm64"]
 
   provisioner "shell" {
-    script           = "packer/scripts/install.sh"
-    environment_vars = ["RUNNER_S3_URI=${var.runner_s3_uri_arm64}"]
-    execute_command  = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
-    pause_before     = "15s"
+    script          = "packer/scripts/install.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+    pause_before    = "15s"
   }
 
   post-processor "manifest" {

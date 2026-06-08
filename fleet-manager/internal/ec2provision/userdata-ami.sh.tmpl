@@ -16,6 +16,16 @@ INSTANCE_ID=$(curl -sf --max-time 3 \
   "$INSTANCE_METADATA_URL/latest/meta-data/instance-id")
 
 #########################################################
+# Runner binary (installed at launch, not baked into the AMI)
+#########################################################
+
+export AWS_DEFAULT_REGION={{shellQuote .RunnerInstallAWSRegion}}
+RUNNER_S3_URI={{shellQuote .RunnerS3URI}}
+
+aws s3 cp "$RUNNER_S3_URI" /usr/local/bin/runner
+chmod 755 /usr/local/bin/runner
+
+#########################################################
 # Per-instance environment
 #########################################################
 
