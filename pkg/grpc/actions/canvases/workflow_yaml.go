@@ -27,6 +27,13 @@ func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion,
 		return "", err
 	}
 
+	if _, ok := spec["nodes"]; !ok {
+		spec["nodes"] = []any{}
+	}
+	if _, ok := spec["edges"]; !ok {
+		spec["edges"] = []any{}
+	}
+
 	resource := map[string]any{
 		"apiVersion": canvasyaml.CanvasAPIVersion,
 		"kind":       canvasyaml.CanvasKind,
