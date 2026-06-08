@@ -3,16 +3,16 @@ import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useStat
 import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
 import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
-import { consoleToYaml } from "./console/consoleYaml";
+import { materializeConsoleSpec } from "./lib/workflow-spec-files";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
-import type { CanvasesConsole } from "@/api-client";
+import type { CanvasConsoleData } from "@/hooks/useCanvasData";
 
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
 
-function consoleYamlText(canvasId: string, consoleData?: CanvasesConsole | null): string {
-  return consoleToYaml({
+function consoleYamlText(canvasId: string, consoleData?: CanvasConsoleData | null): string {
+  return materializeConsoleSpec({
     panels: (consoleData?.panels ?? []).map((panel) => ({
       id: panel.id ?? "",
       type: panel.type ?? "markdown",
