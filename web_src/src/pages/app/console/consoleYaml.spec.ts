@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { ConsolePanel } from "@/hooks/useCanvasData";
+
 import { consoleToYaml, parseConsoleYaml, validateConsoleContent, MAX_CONSOLE_PANELS } from "./consoleYaml";
 
 describe("consoleToYaml / parseConsoleYaml", () => {
@@ -46,7 +48,7 @@ spec:
   });
 
   it("round-trips all typed panel kinds", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       { id: "doc", type: "markdown", content: { title: "Intro", body: "# Hi" } },
       { id: "deploy", type: "node", content: { node: "deploy-prod", showRun: true } },
       {
@@ -332,7 +334,7 @@ spec:
   });
 
   it("round-trips a number panel with prefix and suffix symbols", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       {
         id: "spend",
         type: "number",
@@ -358,7 +360,7 @@ spec:
   });
 
   it("round-trips a composite memory number panel with heterogeneous sources", () => {
-    const panels = [
+    const panels: ConsolePanel[] = [
       {
         id: "score",
         type: "number",
@@ -488,7 +490,7 @@ spec:
 
 describe("validateConsoleContent", () => {
   it("flags too many panels", () => {
-    const panels = Array.from({ length: MAX_CONSOLE_PANELS + 1 }, (_, i) => ({
+    const panels: ConsolePanel[] = Array.from({ length: MAX_CONSOLE_PANELS + 1 }, (_, i) => ({
       id: `p${i}`,
       type: "markdown",
       content: {},

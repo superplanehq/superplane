@@ -62,7 +62,11 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 
 	body := openapi_client.CanvasesUpdateConsoleBody{}
 	body.SetVersionId(versionID)
-	body.SetPanels(apiPanelsFromYAML(resource.Spec.Panels))
+	panels, err := apiPanelsFromYAML(resource.Spec.Panels)
+	if err != nil {
+		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
+	}
+	body.SetPanels(panels)
 	body.SetLayout(apiLayoutFromYAML(resource.Spec.Layout))
 
 	response, _, err := ctx.API.CanvasAPI.
