@@ -5,12 +5,13 @@ import { buildAppFiles } from "./lib/app-files";
 type UseAppFilesArgs = Parameters<typeof buildAppFiles>[0];
 
 export function useAppFiles(args: UseAppFilesArgs) {
-  const { canvasYamlPayload, panels, layout, canvasId, canvasName, consoleLoading, consoleError } = args;
+  const { canvas, canvasNodes, panels, layout, canvasId, canvasName, consoleLoading, consoleError } = args;
 
   return useMemo(
     () =>
       buildAppFiles({
-        canvasYamlPayload,
+        canvas,
+        canvasNodes,
         panels,
         layout,
         canvasId,
@@ -18,6 +19,6 @@ export function useAppFiles(args: UseAppFilesArgs) {
         consoleLoading,
         consoleError,
       }),
-    [canvasName, canvasId, canvasYamlPayload, consoleError, consoleLoading, layout, panels],
+    [canvas, canvasName, canvasId, canvasNodes, consoleError, consoleLoading, layout, panels],
   );
 }

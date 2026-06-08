@@ -288,10 +288,10 @@ describe("useUpdateCanvasConsole", () => {
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
     canvasesUpdateConsole.mockResolvedValue({
       data: {
-        console: {
-          panels: [],
-          layout: [],
-        },
+        consoleYaml:
+          "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels: []\n  layout: []\n",
+        canvasId: "canvas-1",
+        versionId: "version-1",
       },
     });
 
@@ -341,6 +341,8 @@ describe("useUpdateCanvasConsole", () => {
       versionId: "version-1",
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      consoleYaml:
+        "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels: []\n  layout: []\n",
     });
     canvasesUpdateConsole.mockReturnValue(savePromise);
 
@@ -363,12 +365,10 @@ describe("useUpdateCanvasConsole", () => {
 
     resolveSave({
       data: {
-        console: {
-          canvasId: "canvas-1",
-          versionId: "version-1",
-          panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
-        },
+        consoleYaml:
+          "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n",
+        canvasId: "canvas-1",
+        versionId: "version-1",
       },
     });
 
