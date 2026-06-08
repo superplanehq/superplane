@@ -10,9 +10,9 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.compute.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections } from "./event_helpers";
+import { baseEventSections, parseInstancePath } from "./event_helpers";
 
 interface VMInstanceNodeMetadata {
   instanceName?: string;
@@ -26,15 +26,6 @@ interface DeleteVMInstanceConfiguration {
 interface DeleteVMInstanceOutputData {
   instanceName?: string;
   zone?: string;
-}
-
-function parseInstancePath(value: string | undefined): { zone: string; name: string } | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.includes("{{")) return null;
-  const match = trimmed.match(/zones\/([^/]+)\/instances\/([^/?#]+)/);
-  if (!match) return null;
-  return { zone: match[1], name: match[2] };
 }
 
 export const deleteVMInstanceMapper: ComponentBaseMapper = {

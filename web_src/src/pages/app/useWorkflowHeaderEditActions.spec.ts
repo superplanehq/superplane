@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { SetURLSearchParams } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -56,5 +56,40 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setRunDetailNodeId).toHaveBeenCalledWith(null);
     expect(config.setSearchParams).toHaveBeenCalledTimes(1);
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto edit mode removes only the edit param from the current URL", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("edit=1&version=draft-version&branch=drafts%2Fabc");
+
+    renderHook(() =>
+      useWorkflowHeaderEditActions({
+        isRunsMode: false,
+        handleExitRunsMode: vi.fn(),
+        handleToggleEditMode,
+        setIsRunsMode: vi.fn(),
+        setSelectedRunId: vi.fn(),
+        setRunDetailNodeId: vi.fn(),
+        setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+        startup: {
+          hasEditableVersion: false,
+          canUpdateCanvas: true,
+          canvas: { metadata: { id: "canvas-1" }, spec: {} },
+          searchParams,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const next = updater(new URLSearchParams("edit=1&version=draft-version&branch=drafts%2Fabc"));
+
+    expect(next.get("edit")).toBeNull();
+    expect(next.get("version")).toBe("draft-version");
+    expect(next.get("branch")).toBe("drafts/abc");
   });
 });
