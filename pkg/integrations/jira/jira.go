@@ -88,10 +88,17 @@ func (j *Jira) Actions() []core.Action {
 		&CreateIncident{},
 		&GetIncident{},
 		&DeleteIncident{},
+		&GetWorkflow{},
+		&TransitionIssue{},
+		&ApproveWorkflow{},
 		&CreateHeartbeat{},
 		&PingHeartbeat{},
 		&UpdateHeartbeat{},
 		&DeleteHeartbeat{},
+		&CreateAlert{},
+		&GetAlert{},
+		&DeleteAlert{},
+		&UpdateAlert{},
 	}
 }
 

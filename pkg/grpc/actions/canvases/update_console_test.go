@@ -226,7 +226,7 @@ func Test__UpdateConsole(t *testing.T) {
 func consoleDraftVersionID(t *testing.T, canvasID, userID uuid.UUID) string {
 	t.Helper()
 
-	draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvasID, userID, nil, nil)
+	draft, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvasID, userID, "", nil, nil)
 	require.NoError(t, err)
 	return draft.ID.String()
 }

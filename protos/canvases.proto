@@ -114,7 +114,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create canvas version";
-      description: "Creates a user-owned canvas version from the current live canvas";
+      description: "Creates a new draft canvas version from the live canvas";
       tags: "CanvasVersion";
     };
   }
@@ -619,6 +619,7 @@ message CommitCanvasRepositoryFilesResponse {
 
 message CreateCanvasVersionRequest {
   string canvas_id = 1;
+  optional string display_name = 2;
 }
 
 message CreateCanvasVersionResponse {
@@ -629,6 +630,7 @@ message ListCanvasVersionsRequest {
   string canvas_id = 1;
   uint32 limit = 2;
   google.protobuf.Timestamp before = 3;
+  CanvasVersion.State state = 4;
 }
 
 message ListCanvasVersionsResponse {
@@ -838,6 +840,8 @@ message CanvasVersion {
     google.protobuf.Timestamp updated_at = 7;
     string name = 8;
     string description = 9;
+    string branch_name = 10;
+    string display_name = 11;
   }
 
   Metadata metadata = 1;

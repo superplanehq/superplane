@@ -201,7 +201,20 @@ These are built-in — no integration needed. For vendor components, ask your re
 |-----------|--------|
 | webhook | authentication ("none"\|"signature"), signatureHeader, customName |
 | schedule | type ("cron"\|"minutes"\|"hours"\|"days"\|"weeks"), cron, minutesInterval, timezone ("0" for UTC) |
-| start | {} |
+| start | `templates` (required): at least one `{name, payload}`; optional `parameters` list |
+
+**Manual Run (`start`)** — never use `configuration: {}`. The UI Run button and the `run` hook both require templates:
+
+```yaml
+configuration:
+  templates:
+    - name: default
+      payload:
+        message: "Hello, World!"
+      parameters: []
+```
+
+For parameterized runs, add `parameters` (`name`, `type`, optional `defaultString` / `defaultNumber` / `defaultBoolean`) and reference them in `payload` with `{{ parameters["name"] }}`.
 
 ### Actions (TYPE_ACTION)
 
@@ -271,6 +284,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` section 6
 | `timezone: "UTC"` | `timezone: "0"` | Must be numeric offset, not IANA name |
 | Missing `metadata.id` | Always include `metadata.id: <app-id>` | Required for updates — get from app context |
 | Using integration without ID | Add `integration: {id: "..."}` | Check `integrations list` |
+| `start` with `configuration: {}` | `templates: [{name, payload, parameters?}]` | Manual Run needs templates for the UI Run button and hook execution |
 
 ## Error Handling
 

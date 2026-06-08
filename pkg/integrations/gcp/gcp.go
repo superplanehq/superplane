@@ -163,9 +163,16 @@ func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
 		&compute.DeleteVMInstance{},
+		&compute.GetVMInstance{},
 		&compute.ManageVMInstancePower{},
 		&compute.UpdateVMInstanceType{},
 		&compute.GetVMInstanceMetrics{},
+		&compute.CreateImage{},
+		&compute.UpdateImage{},
+		&compute.DeleteImage{},
+		&compute.CreateStaticIP{},
+		&compute.DeleteStaticIP{},
+		&compute.ManageStaticIP{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -925,6 +932,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListPublicImageResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeCustomImages:
 		return compute.ListCustomImageResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeImageStorageLocation:
+		return compute.ListImageStorageLocationResources(reqCtx, client)
 	case compute.ResourceTypeSnapshots:
 		return compute.ListSnapshotResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeDisks:
@@ -939,6 +948,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListSubnetworkResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeAddress:
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
+	case compute.ResourceTypeStaticIP:
+		return compute.ListStaticIPResources(reqCtx, client, p["project"], p["instance"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:

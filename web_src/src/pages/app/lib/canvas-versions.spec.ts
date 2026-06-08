@@ -3,6 +3,7 @@ import {
   formatVersionLabel,
   formatVersionLabelWithTimestamp,
   formatVersionTimestamp,
+  sortDraftVersionsDesc,
   versionSortValue,
 } from "./canvas-versions";
 
@@ -64,6 +65,50 @@ describe("formatVersionLabelWithTimestamp", () => {
 
   it("returns only the label when no valid timestamp exists", () => {
     expect(formatVersionLabelWithTimestamp({ metadata: { state: "STATE_PUBLISHED" } })).toBe("Published version");
+  });
+});
+
+describe("sortDraftVersionsDesc", () => {
+  it("sorts drafts by updatedAt descending", () => {
+    const sorted = sortDraftVersionsDesc([
+      {
+        metadata: {
+          state: "STATE_DRAFT",
+          branchName: "drafts/older",
+          updatedAt: "2026-06-01T12:00:00.000Z",
+        },
+      },
+      {
+        metadata: {
+          state: "STATE_DRAFT",
+          branchName: "drafts/newer",
+          updatedAt: "2026-06-03T12:00:00.000Z",
+        },
+      },
+    ]);
+
+    expect(sorted.map((version) => version.metadata?.branchName)).toEqual(["drafts/newer", "drafts/older"]);
+  });
+
+  it("falls back to createdAt when updatedAt is missing", () => {
+    const sorted = sortDraftVersionsDesc([
+      {
+        metadata: {
+          state: "STATE_DRAFT",
+          branchName: "drafts/bbb",
+          createdAt: "2026-06-01T12:00:00.000Z",
+        },
+      },
+      {
+        metadata: {
+          state: "STATE_DRAFT",
+          branchName: "drafts/aaa",
+          createdAt: "2026-06-03T12:00:00.000Z",
+        },
+      },
+    ]);
+
+    expect(sorted.map((version) => version.metadata?.branchName)).toEqual(["drafts/aaa", "drafts/bbb"]);
   });
 });
 

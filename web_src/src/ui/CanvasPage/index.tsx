@@ -42,6 +42,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
+  CanvasesCanvasVersion,
   SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -212,6 +213,15 @@ export interface CanvasPageProps {
   hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1342,6 +1352,15 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
+          startEditingDrafts={props.startEditingDrafts}
+          startEditingDefaultDraft={props.startEditingDefaultDraft}
+          startEditingMenuOpen={props.startEditingMenuOpen}
+          onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
+          onContinueDraftBranch={props.onContinueDraftBranch}
+          onCreateDraftBranch={props.onCreateDraftBranch}
+          createDraftBranchPending={props.createDraftBranchPending}
+          activeDraftBranchLabel={props.activeDraftBranchLabel}
+          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
         />
@@ -1901,6 +1920,15 @@ function CanvasContentHeader({
   hasUnpublishedConsoleDraftChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
   showCanvasSettingsMenu,
   toolSidebarState,
 }: {
@@ -1953,6 +1981,15 @@ function CanvasContentHeader({
   hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }) {
@@ -2005,6 +2042,15 @@ function CanvasContentHeader({
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+      startEditingDrafts={startEditingDrafts}
+      startEditingDefaultDraft={startEditingDefaultDraft}
+      startEditingMenuOpen={startEditingMenuOpen}
+      onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
+      onContinueDraftBranch={onContinueDraftBranch}
+      onCreateDraftBranch={onCreateDraftBranch}
+      createDraftBranchPending={createDraftBranchPending}
+      activeDraftBranchLabel={activeDraftBranchLabel}
+      activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
     />
