@@ -60,8 +60,8 @@ spec:
 
 	exported, err := ReadRepositorySpecFile(ctx, r.Organization.ID.String(), canvas.ID.String(), draftVersion.ID.String(), CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
-	require.Contains(t, exported, "source_id")
-	require.Contains(t, exported, "target_id")
+	require.Contains(t, exported, "sourceId")
+	require.Contains(t, exported, "targetId")
 	require.Contains(t, exported, "channel: default")
 
 	spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), draftVersion.ID.String())
