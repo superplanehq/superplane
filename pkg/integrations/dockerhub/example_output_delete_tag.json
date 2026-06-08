@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.deletedTag",
+  "data": {
+    "namespace": "superplane",
+    "repository": "demo",
+    "tag": "v1.2.3-rc1"
+  }
+}
