@@ -1,0 +1,23 @@
+{
+    "type": "jira.approval",
+    "data": {
+        "id": "1",
+        "name": "Manager approval",
+        "finalDecision": "approved",
+        "approvers": [
+            {
+                "approver": {
+                    "accountId": "5b10a2844c20165700ede21g",
+                    "displayName": "Alice Example",
+                    "emailAddress": "alice@example.com"
+                },
+                "approverDecision": "approved"
+            }
+        ],
+        "completedDate": {
+            "iso8601": "2026-01-19T13:15:00+0000",
+            "jira": "2026-01-19T13:15:00.000+0000"
+        }
+    },
+    "timestamp": "2026-01-19T13:15:00Z"
+}
