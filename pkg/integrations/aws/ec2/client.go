@@ -25,14 +25,16 @@ import (
 )
 
 const (
-	ec2ServiceName       = "ec2"
-	ssmServiceName       = "ssm"
-	ssmTargetPrefix      = "AmazonSSM."
-	ec2APIVersion        = "2016-11-15"
-	ResourceTypeImageOS  = "ec2.imageOS"
-	maxPublicImagesPerOS = 200
-	defaultUbuntuImages  = 12
-	defaultDebianImages  = 8
+	ec2ServiceName        = "ec2"
+	ssmServiceName        = "ssm"
+	cloudWatchServiceName = "monitoring"
+	ssmTargetPrefix       = "AmazonSSM."
+	ec2APIVersion         = "2016-11-15"
+	cloudWatchAPIVersion  = "2010-08-01"
+	ResourceTypeImageOS   = "ec2.imageOS"
+	maxPublicImagesPerOS  = 200
+	defaultUbuntuImages   = 12
+	defaultDebianImages   = 8
 )
 
 type Client struct {
@@ -110,6 +112,22 @@ type InstanceTypeInfo struct {
 	InstanceType string `json:"instanceType" mapstructure:"instanceType"`
 	VCPUs        int    `json:"vcpus" mapstructure:"vcpus"`
 	MemoryMiB    int    `json:"memoryMiB" mapstructure:"memoryMiB"`
+}
+
+type GetMetricStatisticsInput struct {
+	Namespace  string
+	MetricName string
+	InstanceID string
+	StartTime  time.Time
+	EndTime    time.Time
+	Period     int
+	Statistic  string
+}
+
+type CloudWatchDatapoint struct {
+	Timestamp string
+	Average   float64
+	Sum       float64
 }
 
 type RunInstancesOutput struct {
@@ -580,6 +598,83 @@ func (c *Client) RebootInstances(instanceID string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) ModifyInstanceType(instanceID, instanceType string) error {
+	params := url.Values{}
+	params.Set("InstanceId", strings.TrimSpace(instanceID))
+	params.Set("InstanceType.Value", strings.TrimSpace(instanceType))
+
+	response := modifyInstanceAttributeResponse{}
+	if err := c.postForm("ModifyInstanceAttribute", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ModifyInstanceAttribute returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) ModifySecurityGroups(instanceID string, groupIDs []string) error {
+	params := url.Values{}
+	params.Set("InstanceId", strings.TrimSpace(instanceID))
+
+	index := 1
+	for _, id := range groupIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("GroupId.%d", index), trimmed)
+		index++
+	}
+
+	response := modifyInstanceAttributeResponse{}
+	if err := c.postForm("ModifyInstanceAttribute", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ModifyInstanceAttribute for security groups returned false")
+	}
+
+	return nil
+}
+
+// GetMetricStatistics retrieves CloudWatch metric data points for an EC2 instance.
+// Statistic should be "Average" for CPU/memory metrics, "Sum" for network metrics.
+func (c *Client) GetMetricStatistics(input GetMetricStatisticsInput) ([]CloudWatchDatapoint, error) {
+	params := url.Values{}
+	params.Set("Namespace", input.Namespace)
+	params.Set("MetricName", input.MetricName)
+	params.Set("Dimensions.member.1.Name", "InstanceId")
+	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
+	params.Set("StartTime", input.StartTime.UTC().Format(time.RFC3339))
+	params.Set("EndTime", input.EndTime.UTC().Format(time.RFC3339))
+	params.Set("Period", fmt.Sprintf("%d", input.Period))
+	params.Set("Statistics.member.1", input.Statistic)
+
+	response := getMetricStatisticsResponse{}
+	if err := c.postCloudWatchForm("GetMetricStatistics", params, &response); err != nil {
+		return nil, err
+	}
+
+	points := make([]CloudWatchDatapoint, 0, len(response.Datapoints))
+	for _, dp := range response.Datapoints {
+		points = append(points, CloudWatchDatapoint{
+			Timestamp: dp.Timestamp,
+			Average:   dp.Average,
+			Sum:       dp.Sum,
+		})
+	}
+
+	return points, nil
+}
+
+func (c *Client) postCloudWatchForm(action string, params url.Values, out any) error {
+	return c.postSignedForm(cloudWatchServiceName, cloudWatchAPIVersion, action, params, out)
 }
 
 func (c *Client) StartInstances(instanceID string) (*StartInstancesOutput, error) {
@@ -1561,6 +1656,21 @@ type createSecurityGroupResponse struct {
 type authorizeSecurityGroupIngressResponse struct {
 	RequestID string `xml:"requestId"`
 	Return    bool   `xml:"return"`
+}
+
+type modifyInstanceAttributeResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type getMetricStatisticsResponse struct {
+	Datapoints []xmlCloudWatchDatapoint `xml:"GetMetricStatisticsResult>Datapoints>member"`
+}
+
+type xmlCloudWatchDatapoint struct {
+	Timestamp string  `xml:"Timestamp"`
+	Average   float64 `xml:"Average"`
+	Sum       float64 `xml:"Sum"`
 }
 
 type describeKeyPairsResponse struct {
