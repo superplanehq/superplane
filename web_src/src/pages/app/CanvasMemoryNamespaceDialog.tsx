@@ -117,12 +117,12 @@ export function CanvasMemoryNamespaceDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="large" className="flex h-[80vh] w-[90vw] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        <div className="flex flex-col gap-1 border-b border-slate-950/10 px-6 py-4">
+        <div className="flex flex-col gap-1 border-b border-slate-950/10 px-4 py-4">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="memory-namespace-name">Namespace</Label>
             <Input
@@ -164,8 +164,8 @@ export function CanvasMemoryNamespaceDialog({
           ) : null}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-950/10 px-6 py-3">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+        <div className="flex justify-end gap-2 border-t border-slate-950/10 px-4 py-3">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>

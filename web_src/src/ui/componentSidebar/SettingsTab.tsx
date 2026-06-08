@@ -23,6 +23,9 @@ import {
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
+const REQUIRED_FIELD_BADGE_CLASS =
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+
 interface SettingsTabProps {
   mode: "create" | "edit";
   nodeId?: string;
@@ -472,7 +475,7 @@ export function SettingsTab({
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
-            {hasNodeNameError && <span className="text-red-500 text-xs ml-2">Required</span>}
+            {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
           </Label>
           <Input
             data-testid="node-name-input"
@@ -556,7 +559,7 @@ export function SettingsTab({
                     Integration
                     <span className="text-gray-800 ml-1">*</span>
                     {showValidation && validationErrors.has("integration") && (
-                      <span className="text-red-500 text-xs ml-2">Required</span>
+                      <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
                     )}
                   </Label>
                   <p className="text-xs text-gray-500">Instance</p>

@@ -423,6 +423,59 @@ describe("CanvasPage connection drop", () => {
     await waitFor(() => expect(loadSidebarData).toHaveBeenCalledWith("node-1"));
   });
 
+  it("hides and closes the component sidebar when leaving the canvas tab", async () => {
+    const loadSidebarData = vi.fn();
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+    const onSidebarChange = vi.fn();
+    const baseProps = {
+      title: "Canvas",
+      nodes: [
+        {
+          id: "node-1",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "Node",
+            state: "pending",
+            type: "component",
+          },
+        },
+      ],
+      edges: [],
+      buildingBlocks: [],
+      isEditing: false,
+      activeCanvasVersionId: "live-version",
+      initialSidebar: { isOpen: true, nodeId: "node-1" },
+      getSidebarData,
+      loadSidebarData,
+      onSidebarChange,
+      workflowNodes: [{ id: "node-1", type: "TYPE_ACTION", name: "Node" }],
+    };
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage {...baseProps} headerMode="version-live" canvasStateMode="default" />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage {...baseProps} headerMode="memory" canvasStateMode="default" />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument());
+    expect(onSidebarChange).toHaveBeenCalledWith(false, null);
+  });
+
   it("does not re-run fit all when only run canvas nodes change", () => {
     vi.useFakeTimers();
     const hasFitToViewRef = { current: true };

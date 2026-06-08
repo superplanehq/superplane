@@ -75,7 +75,7 @@ import { RunNodeDetailPane } from "../Runs/RunNodeDetailPane";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
-import { Header } from "./Header";
+import { Header, isCanvasTabHeaderMode } from "./Header";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
@@ -841,6 +841,12 @@ function CanvasPage(props: CanvasPageProps) {
     if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
   }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
 
+  useEffect(() => {
+    if (isCanvasTabHeaderMode(props.headerMode)) return;
+    if (!state.componentSidebar.isOpen) return;
+    state.componentSidebar.close();
+  }, [props.headerMode, state.componentSidebar.isOpen, state.componentSidebar.close]);
+
   const handleSelectRuns = () => {
     openToolSidebar();
     props.onSelectRuns?.();
@@ -1547,7 +1553,7 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {props.headerMode === "runs" || props.headerMode === "files" ? null : (
+            {isCanvasTabHeaderMode(props.headerMode) ? (
               <Sidebar
                 state={state}
                 getSidebarData={props.getSidebarData}
@@ -1589,7 +1595,7 @@ function CanvasPage(props: CanvasPageProps) {
                 canCreateIntegrations={props.canCreateIntegrations}
                 canUpdateIntegrations={props.canUpdateIntegrations}
               />
-            )}
+            ) : null}
           </div>
           {props.headerMode === "runs" &&
           props.runNodeDetailRun &&
