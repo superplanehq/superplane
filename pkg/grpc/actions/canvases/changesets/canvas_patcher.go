@@ -70,6 +70,8 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		PublishedAt:             p.originalVersion.PublishedAt,
 		ConsolePanels:           p.originalVersion.ConsolePanels,
 		ConsoleLayout:           p.originalVersion.ConsoleLayout,
+		BranchName:              p.originalVersion.BranchName,
+		DisplayName:             p.originalVersion.DisplayName,
 		CreatedAt:               p.originalVersion.CreatedAt,
 		UpdatedAt:               p.originalVersion.UpdatedAt,
 	}
