@@ -163,7 +163,7 @@ export function MentionDropdown({
       keyboardRef.current = null;
       return;
     }
-    keyboardRef.current = (e: React.KeyboardEvent): boolean => {
+    const handleKeyboard = (e: React.KeyboardEvent): boolean => {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHighlightedIndex((i) => (i < items.length - 1 ? i + 1 : 0));
@@ -185,6 +185,13 @@ export function MentionDropdown({
         return true;
       }
       return false;
+    };
+
+    keyboardRef.current = handleKeyboard;
+    return () => {
+      if (keyboardRef.current === handleKeyboard) {
+        keyboardRef.current = null;
+      }
     };
   }, [visible, items, highlightedIndex, onSelect, onDismiss, keyboardRef]);
 
