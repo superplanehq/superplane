@@ -23,7 +23,7 @@ blocks:
             - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
             - export IMAGE="ghcr.io/superplanehq/runner/task-broker:${IMAGE_TAG}"
             - >-
-              TASK_DEF=$(aws ecs describe-task-definition --task-definition task-broker-v2 --query 'taskDefinition' --output json)
+              TASK_DEF=$(aws ecs describe-task-definition --task-definition default-task-broker --query 'taskDefinition' --output json)
             - >-
               NEW_TASK_DEF=$(echo "$TASK_DEF" | jq --arg IMAGE "$IMAGE"
               'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
@@ -49,7 +49,8 @@ blocks:
               echo "task-broker deployed successfully"
 
   - name: Deploy fleet-manager
-    dependencies: []
+    dependencies:
+      - Deploy task-broker
     task:
       jobs:
         - name: ECS deploy fleet-manager
@@ -57,7 +58,7 @@ blocks:
             - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
             - export IMAGE="ghcr.io/superplanehq/runner/fleet-manager:${IMAGE_TAG}"
             - >-
-              TASK_DEF=$(aws ecs describe-task-definition --task-definition fleet-manager --query 'taskDefinition' --output json)
+              TASK_DEF=$(aws ecs describe-task-definition --task-definition default-fleet-manager --query 'taskDefinition' --output json)
             - >-
               NEW_TASK_DEF=$(echo "$TASK_DEF" | jq --arg IMAGE "$IMAGE"
               'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)

@@ -16,6 +16,8 @@ promotions:
     pipeline_file: runner-binary-s3.yml
     auto_promote:
       when: "result = 'passed' and branch = 'main'"
+  - name: Build runner AMIs
+    pipeline_file: build-amis.yml
 
 blocks:
   - name: Build and test
