@@ -3,6 +3,8 @@ import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
+import { CANVAS_YAML_PATH } from "../lib/workflow-spec-paths";
+import { canPublishPendingFileChanges } from "./useFilesPublish";
 import { useEditorLifecycle } from "./useEditorLifecycle";
 import { usePendingState } from "./usePendingState";
 import { useFilesPublish } from "./useFilesPublish";
@@ -12,6 +14,7 @@ import type { AppFile, FilesHeaderActionsState } from "./types";
 
 type UseEditorOptions = {
   canvasId?: string;
+  versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
   files: AppFile[];
@@ -21,6 +24,7 @@ type UseEditorOptions = {
 
 export function useEditor({
   canvasId,
+  versionId,
   isEditing,
   canWrite,
   files,
@@ -44,6 +48,7 @@ export function useEditor({
   const pending = usePendingState({
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
+    generatedFilesByPath: catalog.generatedFilesByPath,
     finalRepositoryPathsRef,
     allPathsRef,
     loadedContentByPathRef,
@@ -56,21 +61,28 @@ export function useEditor({
   const pathLists = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
-  const tabs = useFilesTabState(catalog.generatedPaths[0] ?? null, pathLists.allPaths, catalog.generatedPaths);
+  const initialPath = pathLists.allPaths.includes(CANVAS_YAML_PATH)
+    ? CANVAS_YAML_PATH
+    : (catalog.generatedPaths[0] ?? null);
+  const tabs = useFilesTabState(initialPath, pathLists.allPaths, catalog.generatedPaths);
   openFileRef.current = tabs.openFile;
   const selection = useRepositorySelectedFileQuery(
     canvasId,
     tabs.selectedPath,
     catalog.repositoryPathSet,
     catalog.generatedFilesByPath,
+    versionId,
   );
 
   useFilesPublish({
     canManageRepositoryFiles,
     canPublishFiles:
-      canManageRepositoryFiles && pendingChanges.length > 0 && !pathLists.commitPathError && !commitFiles.isPending,
+      canManageRepositoryFiles &&
+      canPublishPendingFileChanges(pendingChanges, pathLists.commitPathError) &&
+      !commitFiles.isPending,
     commitPathError: pathLists.commitPathError,
     headSha: catalog.headSha,
+    versionId,
     pendingChanges,
     setPendingChangesByPath: pending.setPendingChangesByPath,
     setLoadedContentByPath,

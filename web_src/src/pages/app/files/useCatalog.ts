@@ -7,8 +7,7 @@ import type { PendingFileChange, AppFile } from "./types";
 export function useCatalog(canvasId: string | undefined, files: AppFile[]) {
   const canUseRepository = !!canvasId;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
-  const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";
-  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository && repositoryReady);
+  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository);
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
   const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
   const generatedFilesByPath = useMemo(() => {
@@ -31,7 +30,7 @@ export function useCatalog(canvasId: string | undefined, files: AppFile[]) {
   return {
     canUseRepository,
     repositoryQuery,
-    repositoryReady,
+    repositoryReady: repositoryQuery.data?.status?.state === "STATE_READY",
     filesQuery,
     headSha: repositoryQuery.data?.status?.headSha,
     generatedPaths,
@@ -81,6 +80,7 @@ export function useRepositorySelectedFileQuery(
   selectedPath: string | null,
   repositoryPathSet: Set<string>,
   generatedFilesByPath: Map<string, AppFile>,
+  versionId?: string,
 ) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
@@ -88,6 +88,7 @@ export function useRepositorySelectedFileQuery(
     canvasId ?? "",
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
+    versionId,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };
