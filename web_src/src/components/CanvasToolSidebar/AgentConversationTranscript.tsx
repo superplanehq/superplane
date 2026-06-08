@@ -34,7 +34,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   // next user message). Each turn is its own block so the sticky user bubble inside is bounded by
   // its turn — when the turn scrolls past, the bubble scrolls with it and the next turn's bubble
   // pushes up to take its place. No two stickies ever overlap.
-  const turns = useMemo(() => chunkIntoTurns(messageGroups), [messageGroups]);
+  const turns = useMemo(() => chunkIntoTurns(messageGroups.filter(isRenderableGroup)), [messageGroups]);
 
   return (
     <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
@@ -85,6 +85,14 @@ function chunkIntoTurns(groups: MessageGroup[]): MessageGroup[][] {
 
   if (current.length > 0) turns.push(current);
   return turns;
+}
+
+function isRenderableGroup(group: MessageGroup): boolean {
+  if (group.type !== "message") {
+    return true;
+  }
+
+  return shouldRenderMessage(group.message);
 }
 
 function turnKey(turn: MessageGroup[]): string {
@@ -157,7 +165,7 @@ const MessageRow = memo(function MessageRow({
     return <ToolMessageRow message={message} />;
   }
 
-  if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
+  if (!shouldRenderMessage(message)) {
     return null;
   }
 
@@ -197,6 +205,10 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+function shouldRenderMessage(message: AgentMessage): boolean {
+  return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
+}
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {
   const [expanded, setExpanded] = useState(false);
