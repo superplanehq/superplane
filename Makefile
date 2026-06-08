@@ -288,6 +288,17 @@ pb.gen.gateway:
 
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	$(MAKE) openapi.spec.inject.console.schema
+
+# The Console.Panel.content field is a `google.protobuf.Value`, so protoc
+# emits an empty `{}` schema. We generate a JSON Schema from the FE source
+# of truth (`web_src/src/pages/app/console/schema/panelContent.ts`) and
+# inject it into the panel definition's `content` so the OpenAPI document
+# (and any Go/TS SDKs derived from it) carries the discriminated union of
+# supported panel kinds. Lives as a separate target so callers can re-run
+# the injection without regenerating the swagger.
+openapi.spec.inject.console.schema: dev.test.is.running
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm -s run generate:console-schema && cd .. && node scripts/inject-console-panel-content-schema.mjs"
 
 openapi.client.gen: dev.test.is.running
 	@rm -rf pkg/openapi_client

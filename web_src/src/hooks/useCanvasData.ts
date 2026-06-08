@@ -59,6 +59,8 @@ import type {
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
+import { panelTypeToApi } from "../pages/app/console/apiPanelType";
+import { type PanelType } from "../pages/app/console/panelTypes";
 
 // Query Keys
 export const canvasKeys = {
@@ -146,7 +148,12 @@ export const canvasKeys = {
 
 export interface ConsolePanel {
   id: string;
-  type: string;
+  /**
+   * The internal lowercase panel type that matches the YAML contract and the
+   * FE validators in `panelTypes.ts`. Adapters in the SDK boundary convert
+   * to/from the SCREAMING_CASE proto enum value the wire carries.
+   */
+  type: PanelType;
   content: Record<string, unknown>;
 }
 
@@ -1724,7 +1731,10 @@ function toCanvasConsole(
     ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
     panels: input.panels.map((panel) => ({
       id: panel.id,
-      type: panel.type,
+      // Optimistic cache mirrors the wire shape so the next refetch is a
+      // no-op diff; this means upcasting the internal lowercase type to the
+      // SDK's SCREAMING_CASE enum value.
+      type: panelTypeToApi(panel.type),
       content: panel.content,
     })),
     layout: input.layout.map((item) => ({
@@ -1763,7 +1773,7 @@ export const useUpdateCanvasConsole = (
               versionId,
               panels: input.panels.map((p) => ({
                 id: p.id,
-                type: p.type,
+                type: panelTypeToApi(p.type),
                 content: p.content,
               })),
               layout: input.layout.map((l) => ({

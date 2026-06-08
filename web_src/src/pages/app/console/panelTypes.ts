@@ -82,6 +82,10 @@ export function isPanelType(value: unknown): value is PanelType {
   return typeof value === "string" && (PANEL_TYPES as readonly string[]).includes(value);
 }
 
+// The API <-> internal `type` adapter lives in `./apiPanelType.ts` to keep
+// this file under the `max-lines` lint budget. New panel kinds need a row in
+// both `PANEL_TYPES` (above) and the two mapping tables in that module.
+
 // ────────────────────────────────────────────────────────────────────────────
 // Per-type content shapes
 // ────────────────────────────────────────────────────────────────────────────

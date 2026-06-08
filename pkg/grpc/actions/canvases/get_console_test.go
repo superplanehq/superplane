@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -67,7 +68,8 @@ func Test__GetConsole(t *testing.T) {
 		d := resp.GetConsole()
 		require.Len(t, d.GetPanels(), 1)
 		assert.Equal(t, "p1", d.GetPanels()[0].GetId())
-		assert.Equal(t, "markdown", d.GetPanels()[0].GetType())
+		// The string stored in the model maps to the proto enum on the wire.
+		assert.Equal(t, pb.Console_Panel_MARKDOWN, d.GetPanels()[0].GetType())
 		require.NotNil(t, d.GetPanels()[0].GetContent())
 		require.Len(t, d.GetLayout(), 1)
 		assert.Equal(t, "p1", d.GetLayout()[0].GetI())

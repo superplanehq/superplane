@@ -1,10 +1,17 @@
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
 import { consoleToYaml } from "../../console/consoleYaml";
+import { apiPanelTypeToPanelType } from "../../console/apiPanelType";
 import type { AppFile } from "../types";
 
 type ConsolePanelInput = {
   id?: string;
+  /**
+   * The raw `type` value as it arrives from the SDK. The SDK now emits the
+   * SCREAMING_CASE proto enum union (`"MARKDOWN"`, …) but we accept any
+   * string for forward-compat: `apiPanelTypeToPanelType` maps the known
+   * cases and falls back to `"markdown"` for unknown / unset values.
+   */
   type?: string;
   content?: unknown;
 };
@@ -67,7 +74,7 @@ export function buildAppFiles({
 function normalizePanels(panels: ConsolePanelInput[] | undefined): ConsolePanel[] {
   return (panels || []).map((panel) => ({
     id: panel.id || "",
-    type: panel.type || "markdown",
+    type: apiPanelTypeToPanelType(panel.type) ?? "markdown",
     content: (panel.content as Record<string, unknown>) || {},
   }));
 }
