@@ -21,6 +21,7 @@ export const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
   runner: "terminal",
   runnerJS: "code",
   runnerPython: "code",
+  "runner-bash": "code",
   timeGate: "clock",
   filter: "filter",
   wait: "clock",
