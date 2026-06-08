@@ -83,10 +83,11 @@ func Test__NewCanvasPublisher(t *testing.T) {
 		nil,
 	)
 
-	draft, err := models.SaveCanvasDraftInTransaction(
+	draft, err := models.CreateDraftBranchFromLiveInTransaction(
 		database.Conn(),
 		canvas.ID,
 		r.User,
+		"",
 		[]models.Node{
 			componentNode("node-a", "Node A", "noop", map[string]any{"before": "value"}),
 		},
@@ -119,10 +120,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			},
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A Updated", "noop", map[string]any{"value": "after"}),
 				componentNode("node-c", "Node C", "noop", map[string]any{"value": "new"}),
@@ -195,10 +197,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode("node-broken", "Node Broken", "missingcomponent", map[string]any{}),
@@ -247,10 +250,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			"authentication": "signature",
 		}
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				{
@@ -292,10 +296,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				{
 					ID:            "approval-node",
@@ -344,10 +349,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				triggerNode("schedule-trigger", "Schedule Trigger", "schedule", map[string]any{
 					"type":            "minutes",
@@ -388,10 +394,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		existingError := "invalid configuration from previous validation"
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				{
@@ -445,10 +452,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		existingError := "node has invalid setup data"
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				{
 					ID:            "node-a",
@@ -509,10 +517,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode(conflictingID, "Node Conflict", "noop", map[string]any{"value": "new"}),
@@ -575,10 +584,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				triggerNode(conflictingID, "PR Opened", "schedule", map[string]any{
@@ -639,10 +649,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode(conflictingID, "Node Conflict Broken", "missingcomponent", map[string]any{}),
@@ -711,10 +722,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		// Intentionally keep an invalid edge in draft to assert publisher-side sanitization.
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateDraftBranchFromLiveInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 			},

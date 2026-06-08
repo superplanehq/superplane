@@ -78,6 +78,18 @@ When working with database transactions, follow these rules to ensure data consi
 
 **Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
 
+### Model file layout (`pkg/models`)
+
+Order declarations in each model file as follows:
+
+1. **Struct** — package constants used by the model, then the struct type
+2. **Constructors** — `New…` functions that build values for the model (including name/ID helpers)
+3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors)
+4. **Conn wrappers** — functions that call `…InTransaction(database.Conn(), …)` (or start a transaction with `database.Conn().Transaction` when the whole operation must be atomic)
+5. **InTransaction methods** — functions whose first parameter is `tx *gorm.DB`
+
+List all conn wrappers before all `…InTransaction` methods (sections 4 then 5). Place private helpers after the public API in the file.
+
 ## Cursor Cloud specific instructions
 
 ### Environment overview
