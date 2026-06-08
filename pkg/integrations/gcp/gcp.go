@@ -194,6 +194,12 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 		return fmt.Errorf("Project ID is required for Workload Identity Federation")
 	}
 	serviceAccountEmail := strings.TrimSpace(config.WorkloadIdentityServiceAccountEmail)
+	if serviceAccountEmail == "" {
+		// Impersonation is mandatory: a bare federated token cannot call most
+		// GCP APIs, so completing the STS exchange without it would store a weak
+		// token that fails later on real requests. Fail loudly instead.
+		return fmt.Errorf("Service account email is required for Workload Identity Federation. Set the service account SuperPlane should impersonate, then sync again")
+	}
 
 	subject := fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, provider, nil)
@@ -206,11 +212,9 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	if err != nil {
 		return fmt.Errorf("Workload Identity Federation token exchange failed. Ensure your SuperPlane instance URL is set as the OIDC issuer in GCP, the audience matches the provider resource name, and the URL is reachable by Google: %w", err)
 	}
-	if serviceAccountEmail != "" {
-		accessToken, expiresIn, err = GenerateServiceAccountAccessToken(callCtx, ctx.HTTP, accessToken, serviceAccountEmail, gcpcommon.ScopeCloudPlatform)
-		if err != nil {
-			return fmt.Errorf("service account impersonation failed. Ensure the IAM Service Account Credentials API is enabled and grant roles/iam.workloadIdentityUser on %s to principal subject %s: %w", serviceAccountEmail, subject, err)
-		}
+	accessToken, expiresIn, err = GenerateServiceAccountAccessToken(callCtx, ctx.HTTP, accessToken, serviceAccountEmail, gcpcommon.ScopeCloudPlatform)
+	if err != nil {
+		return fmt.Errorf("service account impersonation failed. Ensure the IAM Service Account Credentials API is enabled and grant roles/iam.workloadIdentityUser on %s to principal subject %s: %w", serviceAccountEmail, subject, err)
 	}
 
 	if err := putIntegrationSecret(ctx.Integration, gcpcommon.SecretNameAccessToken, "GCP access token", "OAuth access token for Workload Identity Federation (rotated when the integration syncs).", accessToken); err != nil {
