@@ -1,13 +1,13 @@
-import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { memo, useCallback, useEffect, useState, type RefObject } from "react";
-import { formatSystemNotification, isSystemNotification } from "@/components/AgentSidebar/systemMessages";
+import { Bot, ChevronRight, Loader2, Terminal } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+import { isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
-export function ConversationTranscript({
+export const ConversationTranscript = memo(function ConversationTranscript({
   error,
   canvasId,
   organizationId,
@@ -30,29 +30,66 @@ export function ConversationTranscript({
   scrollRef: RefObject<HTMLDivElement | null>;
   showThinking: boolean;
 }) {
+  // Slice the flat group list into "turns" (user message + everything that follows it until the
+  // next user message). Each turn is its own block so the sticky user bubble inside is bounded by
+  // its turn — when the turn scrolls past, the bubble scrolls with it and the next turn's bubble
+  // pushes up to take its place. No two stickies ever overlap.
+  const turns = useMemo(() => chunkIntoTurns(messageGroups), [messageGroups]);
+
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3" data-testid="agent-chat-messages">
-      {isLoading ? (
-        <LoadingState label="Loading…" />
-      ) : (
-        <>
-          {isLoadingMore ? <LoadingOlderMessages /> : null}
-          {messageGroups.map((group) => (
-            <ConversationGroup
-              key={group.type === "message" ? group.message.id : group.messages[0].id}
-              group={group}
-              canvasId={canvasId}
-              organizationId={organizationId}
-              onAction={onAction}
-              onStartBuilding={onStartBuilding}
-            />
-          ))}
-        </>
-      )}
-      {showThinking ? <ThinkingRow /> : null}
-      {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
+    <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
+      <div className="mx-auto w-full max-w-[800px] py-3">
+        {isLoading ? (
+          <LoadingState label="Loading…" />
+        ) : (
+          <>
+            {isLoadingMore ? <LoadingOlderMessages /> : null}
+            {turns.map((turn) => (
+              <div key={turnKey(turn)} className="space-y-2 [&+&]:mt-2">
+                {turn.map((group) => (
+                  <ConversationGroup
+                    key={group.type === "message" ? group.message.id : group.messages[0].id}
+                    group={group}
+                    canvasId={canvasId}
+                    organizationId={organizationId}
+                    onAction={onAction}
+                    onStartBuilding={onStartBuilding}
+                  />
+                ))}
+              </div>
+            ))}
+          </>
+        )}
+        {showThinking ? <ThinkingRow /> : null}
+        {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
+      </div>
     </div>
   );
+});
+
+function chunkIntoTurns(groups: MessageGroup[]): MessageGroup[][] {
+  const turns: MessageGroup[][] = [];
+  let current: MessageGroup[] = [];
+
+  for (const group of groups) {
+    const startsNewTurn =
+      group.type === "message" && group.message.role === "user" && !isSystemNotification(group.message.content);
+
+    if (startsNewTurn && current.length > 0) {
+      turns.push(current);
+      current = [];
+    }
+
+    current.push(group);
+  }
+
+  if (current.length > 0) turns.push(current);
+  return turns;
+}
+
+function turnKey(turn: MessageGroup[]): string {
+  const head = turn[0];
+  return head.type === "message" ? head.message.id : head.messages[0].id;
 }
 
 function ConversationGroup({
@@ -121,39 +158,41 @@ const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
-    const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
-    return (
-      <div className="flex justify-center">
-        <span className="px-2 text-[11px] italic text-slate-400">{text}</span>
-      </div>
-    );
+    return null;
   }
 
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+    <div
+      className={cn(
+        "flex w-full min-w-0 flex-col",
+        // User bubbles stick to the top of the scrollable transcript so the most-recent question
+        // remains visible while a long agent reply scrolls past underneath it. Older user messages
+        // also stick, but the most recent one paints on top via DOM order, so visually it's always
+        // the latest. Background is opaque to mask scrolling content behind.
+        isUser ? "sticky top-0 z-10 items-end bg-white py-1.5" : "items-start",
+      )}
+    >
       <div
         className={cn(
-          "max-w-[85%] break-words rounded-lg px-3 py-2 text-sm",
-          isUser ? "bg-violet-600 text-white whitespace-pre-wrap" : "bg-slate-100 text-slate-900",
+          "min-w-0 break-words text-sm",
+          isUser
+            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900"
+            : "w-full max-w-[720px] text-slate-900",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? (
-          message.content
-        ) : (
-          <RichMessage
-            content={message.content}
-            onAction={onAction}
-            onStartBuilding={onStartBuilding}
-            canvasId={canvasId}
-            organizationId={organizationId}
-          />
-        )}
+        <RichMessage
+          content={message.content}
+          onAction={isUser ? undefined : onAction}
+          onStartBuilding={isUser ? undefined : onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
+        />
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+        <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(message.createdAt)}</span>
       ) : null}
     </div>
   );
@@ -220,23 +259,32 @@ function truncateQuestion(question: string): string {
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
-  const [expanded, setExpanded] = useState(true);
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const [expanded, setExpanded] = useState(hasRunning);
   const count = messages.length;
   const label = hasRunning
     ? `Running command${count > 1 ? ` (${count})` : ""}...`
     : `Ran ${count} command${count !== 1 ? "s" : ""}`;
 
+  useEffect(() => {
+    setExpanded(hasRunning);
+  }, [hasRunning]);
+
   return (
-    <div className={cn("py-1 text-sm", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
+    <div className={cn("py-1 text-xs", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
+        className="group flex cursor-pointer items-center gap-2"
       >
-        <SquareTerminal className="size-4 shrink-0" />
-        <span>{label}</span>
-        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
+        <span className="text-slate-500 group-hover:text-slate-800">{label}</span>
+        <ChevronRight
+          className={cn(
+            "size-3 text-slate-500 transition-transform group-hover:text-slate-800",
+            expanded && "rotate-90",
+          )}
+        />
       </button>
       {expanded ? (
         <div className="mt-2 space-y-1">

@@ -1,93 +1,143 @@
-import { Loader2, Send } from "lucide-react";
-import { useCallback, useState } from "react";
-// import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
-import { ModeToggle } from "./ModeToggle";
+import { ComposerToolbar } from "./ComposerToolbar";
+import { useMentions } from "./useMentions";
+import { useMentionCandidates } from "./useMentionCandidates";
+import { MentionDropdown } from "./MentionDropdown";
+import { MentionTextarea } from "./MentionTextarea";
+import type { SuperplaneComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun } from "@/api-client";
 
-export function ChatComposer({
-  onSend,
-  onStop,
-  sending,
-  stopping,
-  statusLabel: _statusLabel,
-  agentMode,
-  onModeSwitch,
-  modeDisabled,
-}: {
+type ChatComposerProps = {
   onSend: (content: string) => Promise<void>;
   onStop: () => void;
   sending: boolean;
+  sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   modeDisabled?: boolean;
-}) {
-  const [draft, setDraft] = useState("");
+  nodes?: SuperplaneComponentsNode[];
+  runs?: CanvasesCanvasRun[];
+};
+
+export function ChatComposer({
+  onSend,
+  onStop,
+  sending,
+  sendPending,
+  stopping,
+  statusLabel,
+  agentMode,
+  onModeSwitch,
+  modeDisabled,
+  nodes,
+  runs,
+}: ChatComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const mentionKeyboardRef = useRef<((e: React.KeyboardEvent) => boolean) | null>(null);
+  const {
+    value,
+    setValue,
+    showDropdown,
+    filter,
+    setCursorPos,
+    insertMention,
+    getMarkdown,
+    mentions,
+    isEmpty,
+    clear,
+    snapshot,
+    restore,
+    dismiss,
+  } = useMentions();
+
+  const candidates = useMentionCandidates(nodes, runs, filter);
+  const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
-    const content = draft.trim();
-    if (!content || sending) return;
-
-    setDraft("");
-
+    if (isEmpty) return;
+    const content = getMarkdown().trim();
+    if (!content) return;
+    snapshot();
+    clear();
     try {
       await onSend(content);
     } catch {
-      setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : content));
+      restore();
     }
-  }, [draft, onSend, sending]);
+  }, [isEmpty, getMarkdown, clear, onSend, snapshot, restore]);
+
+  const handleMentionSelect = useCallback(
+    (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
+      const pos = insertMention(item);
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(pos, pos);
+        }
+      });
+    },
+    [insertMention],
+  );
+
+  const handleDismiss = useCallback(() => {
+    dismiss();
+    textareaRef.current?.focus();
+  }, [dismiss]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (mentionKeyboardRef.current?.(e)) return;
+      if (e.key !== "Enter") return;
+      if ("isComposing" in e.nativeEvent && e.nativeEvent.isComposing) return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      if (canSend) void handleSend();
+    },
+    [canSend, handleSend],
+  );
 
   return (
-    <footer className="border-t border-border p-3 flex flex-col gap-2">
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={3}
-        placeholder="Ask the agent…"
-        data-testid="agent-input"
-        className="resize-none"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            if (!sending) {
-              void handleSend();
-            }
-          }
-        }}
-      />
-      <div className="flex items-center justify-between">
-        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-        {sending ? (
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onStop}
-            disabled={stopping}
-            data-testid="agent-stop-button"
-            className="gap-1"
-          >
-            {stopping ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <div className="size-3 rounded-sm bg-white animate-pulse" />
-            )}
-            {stopping ? "Stopping..." : "Stop"}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={!draft.trim()}
-            data-testid="agent-send-message-button"
-          >
-            <Send className="size-4" />
-            Send
-          </Button>
-        )}
+    <footer className="px-3 pb-3 pt-2">
+      <div
+        ref={containerRef}
+        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15"
+      >
+        <MentionTextarea
+          value={value}
+          mentions={mentions}
+          setValue={setValue}
+          setCursorPos={setCursorPos}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask the agent…"
+          textareaRef={textareaRef}
+          backdropRef={backdropRef}
+        />
+        <ComposerToolbar
+          agentMode={agentMode}
+          onModeSwitch={onModeSwitch}
+          modeDisabled={modeDisabled}
+          sending={sending}
+          stopping={stopping}
+          statusLabel={statusLabel}
+          canSend={canSend}
+          onStop={onStop}
+          onSend={() => void handleSend()}
+        />
       </div>
+      <MentionDropdown
+        items={candidates}
+        visible={showDropdown}
+        anchorEl={containerRef.current}
+        onSelect={handleMentionSelect}
+        onDismiss={handleDismiss}
+        keyboardRef={mentionKeyboardRef}
+      />
     </footer>
   );
 }

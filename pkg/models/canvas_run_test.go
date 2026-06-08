@@ -140,9 +140,13 @@ func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
 
 func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string) *models.CanvasRun {
 	now := time.Now()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+	require.NoError(t, err)
+
 	run := models.CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: workflowID,
+		VersionID:  liveVersion.ID,
 		State:      state,
 		Result:     result,
 		CreatedAt:  &now,

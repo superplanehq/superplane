@@ -146,6 +146,9 @@ type NumberTypeOptions struct {
 type StringTypeOptions struct {
 	MinLength *int `json:"minLength,omitempty"`
 	MaxLength *int `json:"maxLength,omitempty"`
+
+	// When false, the field is edited as a plain string without expression placeholders.
+	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 
 type ExpressionTypeOptions struct {
@@ -156,6 +159,8 @@ type ExpressionTypeOptions struct {
 type TextTypeOptions struct {
 	MinLength *int `json:"minLength,omitempty"`
 	MaxLength *int `json:"maxLength,omitempty"`
+	// Language is the Monaco editor language id (e.g. "javascript", "python").
+	Language string `json:"language,omitempty"`
 }
 
 /*
@@ -201,6 +206,12 @@ type ListTypeOptions struct {
 	ItemDefinition *ListItemDefinition `json:"itemDefinition"`
 	ItemLabel      string              `json:"itemLabel,omitempty"`
 	MaxItems       *int                `json:"maxItems,omitempty"`
+
+	// When true, list items render in a single-expand accordion instead of stacked cards.
+	Accordion bool `json:"accordion,omitempty"`
+
+	// When true, list items can be reordered with move up/down controls.
+	Reorderable bool `json:"reorderable,omitempty"`
 }
 
 /*

@@ -1,13 +1,13 @@
-import type { ComponentProps, ReactNode } from "react";
+import { memo, useMemo, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { BannerWidget } from "./BannerWidget";
 import { ButtonsWidget } from "./ButtonsWidget";
 import { ChartWidget } from "./ChartWidget";
-import { CodeBlockWidget } from "./CodeBlockWidget";
 import { CollapseWidget } from "./CollapseWidget";
 import { ConfirmWidget } from "./ConfirmWidget";
+import { MarkdownCode } from "./MarkdownCode";
 import { RubricWidget } from "./RubricWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { NodeChipFromLink } from "./NodeChip";
@@ -22,6 +22,8 @@ const MARKDOWN_CLASSES =
   "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
   "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
   "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
+  "[&_strong]:font-semibold [&_b]:font-semibold " +
+  "[&_hr]:my-5 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-slate-200 " +
   "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-0.5 " +
   "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
   "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
@@ -33,7 +35,7 @@ const MARKDOWN_CLASSES =
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
   "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
-  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-violet-50/50";
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
 
 type StartBuildingRubric = {
   title: string;
@@ -49,11 +51,20 @@ interface RichMessageProps {
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
-  const segments = parseAgentContent(content);
+export const RichMessage = memo(function RichMessage({
+  content,
+  onAction,
+  onStartBuilding,
+  canvasId,
+  organizationId,
+}: RichMessageProps) {
+  // `parseAgentContent` + the downstream ReactMarkdown render are the most
+  // expensive work in the sidebar. Memoize by content so parent re-renders
+  // (canvas pan/zoom, WebSocket status ticks, etc.) don't redo it.
+  const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       {segments.map((segment, i) => (
         <SegmentRenderer
           key={i}
@@ -66,7 +77,7 @@ export function RichMessage({ content, onAction, onStartBuilding, canvasId, orga
       ))}
     </div>
   );
-}
+});
 
 function SegmentRenderer({
   segment,
@@ -106,6 +117,8 @@ function SegmentRenderer({
           categories={segment.categories}
           onAction={onAction}
           onStartBuilding={onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
       );
     case "success":
@@ -128,7 +141,7 @@ function MarkdownSegment({
   organizationId?: string;
 }) {
   return (
-    <div className={MARKDOWN_CLASSES}>
+    <div className={`min-w-0 ${MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
@@ -141,7 +154,7 @@ function MarkdownSegment({
           code: MarkdownCode,
           pre: ({ children }) => <>{children}</>,
           table: ({ children, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-violet-200 bg-white shadow-sm">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
               <table {...props}>{children}</table>
             </div>
           ),
@@ -200,21 +213,6 @@ function renderSpecialLink(href: string | undefined, children: ReactNode, canvas
   }
 
   return null;
-}
-
-function MarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
-
-  if (match) {
-    return <CodeBlockWidget code={code} language={match[1]} />;
-  }
-
-  return (
-    <code className={className} {...props}>
-      {children}
-    </code>
-  );
 }
 
 function isAgentLink(url: string): boolean {

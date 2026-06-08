@@ -1,3 +1,9 @@
+.sp-canvas {
+  --sp-handle-border: #c9d5e1;
+  --sp-handle-border-hover: #94a3b8;
+  --sp-handle-highlight-border: #a1aec0;
+}
+
 .sp-canvas .react-flow__node {
   background: none !important;
   border: none !important;
@@ -71,10 +77,11 @@
 }
 
 .sp-canvas .react-flow__handle {
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition: border-color 0.2s ease-in-out;
+  border-color: var(--sp-handle-border) !important;
 }
 
-.sp-canvas.sp-canvas-live .react-flow__handle {
+.sp-canvas.sp-canvas-live:not(.sp-canvas-editing) .react-flow__handle {
   cursor: default !important;
   transition: none !important;
 }
@@ -90,45 +97,47 @@
   pointer-events: auto;
 }
 
-.sp-canvas .react-flow__handle.sp-append-source-hitbox::before {
-  left: 0;
-  width: var(--sp-append-source-hitbox-width, 78px);
-  height: 30px;
-  transform: translateY(-50%);
-}
-
-.sp-canvas.sp-canvas-live .react-flow__handle::before {
+.sp-canvas.sp-canvas-live:not(.sp-canvas-editing) .react-flow__handle::before {
   pointer-events: none;
 }
 
-.sp-canvas .react-flow__handle:hover {
-  box-shadow: 0 0 0 3px #A1AEC0;
-  border-color: #F1F5F9 !important;
+.sp-canvas .react-flow__handle:not(.sp-append-source-hitbox):hover,
+.sp-canvas .react-flow__handle.sp-append-source-hitbox:hover {
+  border-color: var(--sp-handle-border-hover) !important;
   z-index: 10;
 }
 
-.sp-canvas.sp-canvas-live .react-flow__handle:hover {
-  box-shadow: none;
-  border-color: #C9D5E1 !important;
+.sp-canvas .react-flow__handle.sp-append-source-hitbox.plus-hovered {
+  z-index: auto;
+}
+
+.sp-canvas.sp-canvas-live:not(.sp-canvas-editing) .react-flow__handle:hover {
+  border-color: var(--sp-handle-border) !important;
   z-index: auto;
 }
 
 .sp-canvas .react-flow__handle.highlighted {
-  border-color: #A1AEC0 !important;
+  border-color: var(--sp-handle-highlight-border) !important;
+}
+
+.sp-canvas .sp-append-source-handle {
+  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.sp-canvas .sp-append-source-handle:hover {
+  border-color: var(--sp-handle-border-hover) !important;
 }
 
 .sp-canvas .sp-append-source-preview {
   opacity: 0;
   pointer-events: none;
+  --sp-append-preview-connector-offset-y: 1px;
   transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.sp-canvas .sp-append-source-handle:hover + .sp-append-source-preview {
+.sp-canvas .react-flow__handle.sp-append-source-hitbox.plus-hovered + .sp-append-source-preview {
   opacity: 1;
-}
-
-.sp-canvas .react-flow__handle.sp-append-source-hitbox:hover + .sp-append-source-preview {
-  opacity: 1;
+  --sp-append-preview-offset-y: -1px;
 }
 
 .sp-canvas .edge-label {

@@ -1,7 +1,24 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunsTabPanel } from "./RunsTabPanel";
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useEventExecutions: () => ({
+    data: { executions: [] },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/components/TimeAgo", () => ({
+  TimeAgo: () => <span>time ago</span>,
+  renderTimeAgo: () => "time ago",
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn() },
+}));
 
 function makeRun(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun {
   return {
@@ -37,10 +54,16 @@ const nodes: SuperplaneComponentsNode[] = [
 ];
 
 describe("RunsTabPanel", () => {
-  it("shows an empty state when there are no runs", () => {
-    render(<RunsTabPanel runs={[]} selectedRunId={null} onSelectRun={() => {}} workflowNodes={nodes} />);
+  const baseProps = {
+    canvasId: "canvas-1",
+    onSelectRun: () => {},
+    workflowNodes: nodes,
+  };
 
-    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+  it("shows an empty state when there are no runs", () => {
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />);
+
+    expect(screen.getByText("No Runs")).toBeInTheDocument();
   });
 
   it("pins running runs above completed runs", () => {
@@ -56,17 +79,16 @@ describe("RunsTabPanel", () => {
           }),
         ]}
         selectedRunId={null}
-        onSelectRun={() => {}}
-        workflowNodes={nodes}
+        {...baseProps}
       />,
     );
 
-    const rows = screen.getAllByRole("button").filter((button) => within(button).queryByText(/run$/i));
+    const rows = screen.getAllByTestId("runs-sidebar-row");
     expect(within(rows[0]).getByText("Running run")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Completed run")).toBeInTheDocument();
   });
 
-  it("filters runs by search text and status", () => {
+  it("filters runs by status", () => {
     render(
       <RunsTabPanel
         runs={[
@@ -82,16 +104,10 @@ describe("RunsTabPanel", () => {
           }),
         ]}
         selectedRunId={null}
-        onSelectRun={() => {}}
-        workflowNodes={nodes}
+        {...baseProps}
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Search runs..."), { target: { value: "broken" } });
-    expect(screen.getByText("Broken deploy")).toBeInTheDocument();
-    expect(screen.queryByText("Healthy deploy")).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText("Search runs..."), { target: { value: "" } });
     fireEvent.click(screen.getByLabelText("Filter runs"));
     expect(screen.getByText("Passed")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Failed"));
@@ -101,5 +117,115 @@ describe("RunsTabPanel", () => {
 
     expect(screen.getByText("Broken deploy")).toBeInTheDocument();
     expect(screen.queryByText("Healthy deploy")).not.toBeInTheDocument();
+  });
+
+  it("loads more runs when the sidebar scroll reaches the end", () => {
+    const onLoadMore = vi.fn();
+    const runs = Array.from({ length: 25 }, (_, index) =>
+      makeRun({
+        id: `run-${index}`,
+        rootEvent: { ...makeRun().rootEvent, customName: `Deploy ${index}` },
+      }),
+    );
+
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    const scroller = screen.getByTestId("runs-sidebar-scroll");
+
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+
+    rerender(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId={null}
+        {...baseProps}
+        hasNextPage={true}
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(onLoadMore).not.toHaveBeenCalled();
+
+    scroller.scrollTop = 860;
+    fireEvent.scroll(scroller);
+
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens run detail on initial deep link", () => {
+    render(<RunsTabPanel runs={[makeRun()]} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
+
+    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+  });
+
+  it("returns to the run list when back is clicked", async () => {
+    const user = userEvent.setup();
+    const onBackToRunList = vi.fn();
+
+    render(
+      <RunsTabPanel
+        runs={[makeRun()]}
+        selectedRunId="run-1"
+        initialOpenDetail
+        onBackToRunList={onBackToRunList}
+        {...baseProps}
+      />,
+    );
+
+    await user.click(screen.getByTestId("run-detail-back"));
+    expect(onBackToRunList).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+  });
+
+  it("opens run detail when initialOpenDetail arrives after mount", () => {
+    const runs = [makeRun()];
+
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
+
+    expect(screen.getByText("Deploy main")).toBeInTheDocument();
+  });
+
+  it("opens run detail when the selected run changes from the URL", () => {
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
+    ];
+
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />);
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
+    expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
+    expect(screen.getByText("Second run")).toBeInTheDocument();
+  });
+
+  it("stays on the list when URL navigation returns to a dismissed run", () => {
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
+    ];
+
+    const { rerender } = render(
+      <RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />,
+    );
+
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
+    expect(screen.getByText("Second run")).toBeInTheDocument();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 });

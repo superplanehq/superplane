@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
@@ -140,7 +141,7 @@ func (s *TestSession) resetDatabase() {
 func (s *TestSession) Login() {
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
-	token, err := signer.Generate(s.Account.ID.String(), 24*time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, s.Account.ID.String(), time.Now(), 24*time.Hour)
 	if err != nil {
 		s.t.Fatalf("jwt: %v", err)
 	}
@@ -229,10 +230,13 @@ func (s *TestSession) ClickWithControlOrMeta(q queries.Query) {
 func (s *TestSession) FillIn(q queries.Query, value string) {
 	s.t.Logf("Filling in %q with %q", q.Describe(), value)
 
-	if el := q.Run(s); el != nil {
-		if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
-			return
-		}
+	el := q.Run(s)
+	if el == nil {
+		s.t.Fatalf("fill in %q: query returned no element", q.Describe())
+	}
+
+	if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("fill in %q with %q: %v", q.Describe(), value, err)
 	}
 }
 
@@ -382,7 +386,7 @@ func (s *TestSession) AssertURLContains(part string) {
 
 // WaitForBrowserPath polls until the URL path (ignoring query and fragment) equals expectedPath
 // after normalizing trailing slashes. expectedPath is typically an app pathname such as
-// "/<orgID>/canvases/<canvasID>" (not including the origin or query string).
+// "/<orgID>/apps/<appID>" (not including the origin or query string).
 func (s *TestSession) WaitForBrowserPath(expectedPath string) {
 	want := normalizeE2EBrowserPath(expectedPath)
 	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)

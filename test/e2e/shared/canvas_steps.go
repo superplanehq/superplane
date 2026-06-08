@@ -11,10 +11,15 @@ import (
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 
+	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 type CanvasSteps struct {
@@ -88,18 +93,79 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
-	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
-	s.session.Click(q.TestID("create-canvas-button"))
-	s.session.Sleep(500)
-
-	wf, err := models.FindCanvasByName(s.CanvasName, s.session.OrgID)
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
-	s.WorkflowID = wf.ID
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+	s.WorkflowID = canvas.ID
+
+	err = database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
+	require.NoError(s.t, err)
+
+	s.Visit()
+}
+
+func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+
+	startNodeID := "start-trigger"
+	outputNodeID := "noop-output"
+
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+		{
+			NodeID: startNodeID,
+			Name:   "Start",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"templates": []any{
+					map[string]any{
+						"name": "Hello World",
+						"payload": map[string]any{
+							"message": `{{ parameters["message"] }}`,
+						},
+						"parameters": []any{
+							map[string]any{
+								"name": "message",
+								"type": "string",
+							},
+						},
+					},
+				},
+			}),
+			Position: datatypes.NewJSONType(models.Position{X: 600, Y: 200}),
+		},
+		{
+			NodeID: outputNodeID,
+			Name:   "Output",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "noop"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+			Position:      datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
+		},
+	}, []models.Edge{
+		{SourceID: startNodeID, TargetID: outputNodeID, Channel: "default"},
+	})
+	s.WorkflowID = canvas.ID
+
+	err = database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
+	require.NoError(s.t, err)
+
+	s.Visit()
 }
 
 func (s *CanvasSteps) Visit() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.WorkflowID.String())
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.WorkflowID.String())
 }
 
 func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
@@ -108,8 +174,9 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 		return
 	}
 
-	openButton := q.TestID("open-sidebar-button").Run(s.session)
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
+	addComponentButton := q.TestID("canvas-add-component-button").Run(s.session)
+	openButton := q.TestID("open-sidebar-button").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -128,6 +195,12 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 
 		if isVisible, _ := editButton.IsVisible(); isVisible {
 			if err := editButton.Click(); err == nil {
+				s.session.Sleep(250)
+			}
+		}
+
+		if isVisible, _ := addComponentButton.IsVisible(); isVisible {
+			if err := addComponentButton.Click(); err == nil {
 				s.session.Sleep(250)
 			}
 		}
@@ -187,13 +260,13 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
 
+	s.selectLatestNoopNode()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) AddNote() {
@@ -215,10 +288,10 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
+
+	s.selectLatestNoopNode()
 
 	// Get the auto-generated name from the input field
 	nameInput := q.TestID("node-name-input")
@@ -249,9 +322,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -269,9 +340,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	startSource := q.TestID("building-block-start")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(startSource, pos)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
 }
@@ -280,9 +349,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-wait")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
@@ -304,9 +371,7 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-filter")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
@@ -317,9 +382,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-timeGate")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -329,9 +392,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-timeGate")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -344,12 +405,53 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Sleep(300)
 }
 
+func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
+}
+
+func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Position) {
+	target := q.TestID("rf__wrapper")
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+}
+
+func (s *CanvasSteps) selectLatestNoopNode() {
+	headers := s.session.Page().Locator(`.react-flow__node [data-testid^="node-noop"][data-testid$="-header"]`)
+	count, err := headers.Count()
+	require.NoError(s.t, err)
+	require.Greater(s.t, count, 0, "expected at least one noop node after adding a noop block")
+
+	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(150)
+}
+
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
-	sourceHandle := q.Locator(`.react-flow__node:has-text("` + sourceName + `") .react-flow__handle-right`)
-	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)
+	sourceNodeID := s.waitForDraftNodeID(sourceName)
+	targetNodeID := s.waitForDraftNodeID(targetName)
+
+	sourceHandle := q.Locator(`.react-flow__node[data-id="` + sourceNodeID + `"] .react-flow__handle-right`)
+	targetHandle := q.Locator(`.react-flow__node[data-id="` + targetNodeID + `"] .react-flow__handle-left`)
 
 	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		draft := s.FindCurrentDraft()
+		if draft != nil {
+			for _, node := range draft.Nodes {
+				if node.Name == nodeName {
+					return node.ID
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	s.t.Fatalf("node %q not found in draft", nodeName)
+	return ""
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
@@ -386,6 +488,28 @@ func (s *CanvasSteps) RunManualTrigger(name string) {
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
 	s.session.Click(startTemplateRun)
 	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[string]string) {
+	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
+	s.session.Click(startTemplateRun)
+
+	for paramName, value := range parameters {
+		s.session.FillIn(q.Locator("#start-run-param-"+paramName), value)
+	}
+
+	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *CanvasSteps) EmitManualTrigger(name string) {
+	node := s.GetNodeFromDB(name)
+	context := contexts.NewEventContext(database.Conn(), node, func(events []models.CanvasEvent) {
+		for i := range events {
+			require.NoError(s.t, messages.PublishCanvasEventCreatedMessage(&events[i]))
+		}
+	})
+
+	require.NoError(s.t, context.Emit("manual.run", map[string]any{"message": "Hello, World!"}))
 }
 
 func (s *CanvasSteps) RenameNode(name string, newName string) {

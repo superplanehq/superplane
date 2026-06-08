@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeQueueItems } from "./useCanvasData";
 import type { SuperplaneComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
-import { mapQueueItemsToSidebarEvents } from "@/pages/workflowv2/utils";
+import { mapQueueItemsToSidebarEvents } from "@/pages/app/utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 interface UseQueueHistoryProps {

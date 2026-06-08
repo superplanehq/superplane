@@ -1,108 +1,148 @@
-import type React from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
+  onSelectMemory?: () => void;
+  onSelectFiles?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
+  hasConsoleDraft?: boolean;
 }
+
+const CANVAS_TAB = "canvas";
+const CONSOLE_TAB = "console";
+const MEMORY_TAB = "memory";
+const FILES_TAB = "files";
+const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
   mode,
   onSelectLive,
-  onSelectDashboard,
+  onSelectConsole,
+  onSelectMemory,
+  onSelectFiles,
   editing = false,
   hasDraft = false,
+  hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
-  const showDashboard = !!onSelectDashboard;
-  const baseTrigger =
-    "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
-  const canvasActiveClassName =
-    editing || hasDraft
-      ? "bg-amber-50 text-amber-800 shadow-none ring-1 ring-inset ring-amber-200"
-      : "bg-sky-50 text-sky-700 shadow-none";
-  const canvasShapeClassName = getCanvasShapeClassName(showDashboard);
+  const showConsole = Boolean(onSelectConsole);
+  const showMemory = Boolean(onSelectMemory);
+  const showFiles = Boolean(onSelectFiles);
+  const selected =
+    mode === CONSOLE_TAB
+      ? CONSOLE_TAB
+      : mode === MEMORY_TAB
+        ? MEMORY_TAB
+        : mode === FILES_TAB
+          ? FILES_TAB
+          : mode === RUNS_MODE
+            ? RUNS_MODE
+            : CANVAS_TAB;
+  const valueChangeHandledRef = useRef(false);
+
+  useEffect(() => {
+    valueChangeHandledRef.current = false;
+  }, [mode]);
 
   return (
-    <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
-      <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
-        {showDashboard && onSelectDashboard ? (
-          <DashboardModeTab mode={mode} onSelectDashboard={onSelectDashboard} baseTrigger={baseTrigger} />
+    <Tabs
+      value={selected}
+      onValueChange={(next) => {
+        // Radix Tabs may emit more than one `onValueChange` per click when `value` is controlled and the parent
+        // doesn't update it synchronously. We only want to suppress duplicates from the same user interaction,
+        // not block subsequent clicks.
+        if (valueChangeHandledRef.current) return;
+
+        if (next === CANVAS_TAB && selected !== CANVAS_TAB) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectLive();
+          return;
+        }
+
+        if (next === CONSOLE_TAB && selected !== CONSOLE_TAB && onSelectConsole) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectConsole();
+          return;
+        }
+
+        if (next === MEMORY_TAB && selected !== MEMORY_TAB && onSelectMemory) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectMemory();
+          return;
+        }
+
+        if (next === FILES_TAB && selected !== FILES_TAB && onSelectFiles) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectFiles();
+        }
+      }}
+    >
+      <TabsList
+        aria-label="Canvas view"
+        className={cn(
+          "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
+          editing
+            ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
+            : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
+        )}
+      >
+        {showConsole ? (
+          <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console">
+            <span className="inline-flex items-center gap-1.5">
+              Console
+              <DraftDot show={hasConsoleDraft} testId="canvas-view-mode-console-draft-dot" />
+            </span>
+          </TabsTrigger>
         ) : null}
-        <ModeButton
-          isActive={mode === "version-live" || mode === "version-edit"}
-          activeClassName={canvasActiveClassName}
+        <TabsTrigger
+          value={CANVAS_TAB}
           data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
-          onClick={() => {
-            if (mode !== "version-live" && mode !== "version-edit") void onSelectLive();
-          }}
-          className={cn(baseTrigger, canvasShapeClassName)}
+          aria-label={editing ? "Canvas (editing)" : "Canvas"}
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex h-1.5 w-1.5 rounded-full bg-orange-500"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
+            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
           </span>
-        </ModeButton>
-      </div>
-    </div>
+        </TabsTrigger>
+        {showMemory ? (
+          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
+            Memory
+          </TabsTrigger>
+        ) : null}
+        {showFiles ? (
+          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
+            Files
+          </TabsTrigger>
+        ) : null}
+      </TabsList>
+    </Tabs>
   );
 }
 
-function getCanvasShapeClassName(showDashboard: boolean) {
-  if (showDashboard) return "rounded-l-none rounded-r-sm";
-  return "rounded-sm";
-}
+function DraftDot({ show, testId }: { show: boolean; testId: string }) {
+  if (!show) {
+    return null;
+  }
 
-function DashboardModeTab({
-  mode,
-  onSelectDashboard,
-  baseTrigger,
-}: {
-  mode: CanvasMode;
-  onSelectDashboard: () => void;
-  baseTrigger: string;
-}) {
   return (
-    <>
-      <ModeButton
-        isActive={mode === "dashboard"}
-        data-testid="canvas-view-mode-dashboard"
-        aria-label="Dashboard"
-        onClick={() => {
-          if (mode !== "dashboard") void onSelectDashboard();
-        }}
-        className={cn(baseTrigger, "rounded-l-sm rounded-r-none")}
-      >
-        Dashboard
-      </ModeButton>
-      <div className="h-full w-px bg-slate-300" />
-    </>
-  );
-}
-
-interface ModeButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  isActive: boolean;
-  activeClassName?: string;
-}
-
-function ModeButton({
-  isActive,
-  activeClassName = "bg-sky-50 text-sky-700 shadow-none",
-  className,
-  ...props
-}: ModeButtonProps) {
-  return (
-    <button type="button" aria-pressed={isActive} className={cn(isActive && activeClassName, className)} {...props} />
+    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
   );
 }

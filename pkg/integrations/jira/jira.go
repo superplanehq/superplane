@@ -120,6 +120,10 @@ func (j *Jira) Actions() []core.Action {
 		&CreateIncident{},
 		&GetIncident{},
 		&DeleteIncident{},
+		&CreateHeartbeat{},
+		&PingHeartbeat{},
+		&UpdateHeartbeat{},
+		&DeleteHeartbeat{},
 	}
 }
 

@@ -1,7 +1,9 @@
 junit-report.xml
+junit-e2e.xml
 pkg/web/assets/dist
 tmp
 build/
+node_modules/
 design/node_modules/
 # macOS Finder metadata
 .DS_Store
@@ -16,7 +18,9 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 .worktrees/
 coverage-go.out
 
@@ -26,3 +30,4 @@ coverage-go.out
 /web_src/src/api-client/
 /api/swagger/*
 !/api/swagger/swagger-ui.html
+server

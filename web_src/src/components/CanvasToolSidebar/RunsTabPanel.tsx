@@ -1,13 +1,23 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
-import { RunsList } from "./RunsList";
-import { RunsToolbar } from "./RunsToolbar";
+import { RunDetailPanel } from "./RunDetailPanel";
+import { RunsTabListView } from "./RunsTabListView";
+import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { useRunFilters } from "./useRunFilters";
 
+export type RunsSidebarView = "list" | "detail";
+
 export interface RunsTabPanelProps {
+  canvasId: string;
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onBackToRunList?: () => void;
+  initialOpenDetail?: boolean;
+  detailDismissedForRunId?: string | null;
+  selectedNodeId?: string | null;
+  onSelectNode?: (nodeId: string) => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
@@ -16,14 +26,19 @@ export interface RunsTabPanelProps {
   onRetry?: () => void;
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  totalCount?: number;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
 export function RunsTabPanel({
+  canvasId,
   runs,
   selectedRunId,
   onSelectRun,
+  onBackToRunList,
+  initialOpenDetail = false,
+  detailDismissedForRunId = null,
+  selectedNodeId = null,
+  onSelectNode,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -32,74 +47,110 @@ export function RunsTabPanel({
   onRetry,
   workflowNodes = [],
   componentIconMap = {},
-  totalCount,
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
-  const {
-    search,
-    setSearch,
-    selectedStatuses,
-    selectedTriggerIds,
-    triggerOptions,
-    filteredRuns,
-    orderedRuns,
-    hasAnyFilter,
-    clearFilters,
-    toggleStatus,
-    toggleTrigger,
-    clearStatuses,
-    clearTriggers,
-  } = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const [sidebarView, setSidebarView] = useState<RunsSidebarView>(() =>
+    initialOpenDetail && selectedRunId ? "detail" : "list",
+  );
+
+  const selectedRun = useMemo(() => runs.find((run) => run.id === selectedRunId) || null, [runs, selectedRunId]);
+
+  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const previousSelectedRunIdRef = useRef<string | null>(selectedRunId);
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+    hasMore: hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore,
+  });
+  const handleScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      loadMoreIfNeeded(event.currentTarget);
+    },
+    [loadMoreIfNeeded],
+  );
+
+  useEffect(() => {
+    if (!selectedRunId) {
+      setSidebarView("list");
+      previousSelectedRunIdRef.current = null;
+      return;
+    }
+
+    const previousRunId = previousSelectedRunIdRef.current;
+    const runIdChanged = previousRunId !== selectedRunId;
+
+    if (initialOpenDetail && selectedRunId !== detailDismissedForRunId) {
+      setSidebarView("detail");
+    } else if (previousRunId !== null && runIdChanged && selectedRunId !== detailDismissedForRunId) {
+      setSidebarView("detail");
+    }
+
+    previousSelectedRunIdRef.current = selectedRunId;
+  }, [detailDismissedForRunId, initialOpenDetail, selectedRunId]);
+
+  useEffect(() => {
+    loadMoreIfNeeded(scrollRef.current);
+  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
+
+  const handleRunSelect = useCallback(
+    (runId: string) => {
+      onSelectRun(runId);
+      setSidebarView("detail");
+    },
+    [onSelectRun],
+  );
+
+  const handleBack = useCallback(() => {
+    setSidebarView("list");
+    onBackToRunList?.();
+  }, [onBackToRunList]);
+
+  const isDetailView = sidebarView === "detail" && !!selectedRun;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="text-sm font-medium text-gray-700">Runs</span>
-        {totalCount != null && totalCount > 0 ? (
-          <span className="ml-1.5 text-xs text-gray-400">({totalCount})</span>
-        ) : null}
-      </div>
-
-      <RunsToolbar
-        search={search}
-        onSearchChange={setSearch}
-        selectedStatuses={selectedStatuses}
-        selectedTriggerIds={selectedTriggerIds}
-        triggerOptions={triggerOptions}
-        onToggleStatus={toggleStatus}
-        onClearStatuses={clearStatuses}
-        onToggleTrigger={toggleTrigger}
-        onClearTriggers={clearTriggers}
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      <RunsTabListView
+        isActive={!isDetailView}
+        scrollRef={scrollRef}
+        onScroll={handleScroll}
+        runs={runs}
+        filteredRuns={filterState.filteredRuns}
+        orderedRuns={filterState.orderedRuns}
+        selectedRunId={selectedRunId}
+        onSelectRun={handleRunSelect}
+        componentIconMap={componentIconMap}
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={onRetry}
+        onClearFilters={filterState.clearFilters}
+        hasAnyFilter={filterState.hasAnyFilter}
+        selectedStatuses={filterState.selectedStatuses}
+        selectedTriggerIds={filterState.selectedTriggerIds}
+        triggerOptions={filterState.triggerOptions}
+        onToggleStatus={filterState.toggleStatus}
+        onClearStatuses={filterState.clearStatuses}
+        onToggleTrigger={filterState.toggleTrigger}
+        onClearTriggers={filterState.clearTriggers}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <RunsList
-          runs={runs}
-          filteredRuns={filteredRuns}
-          orderedRuns={orderedRuns}
-          selectedRunId={selectedRunId}
-          onSelectRun={onSelectRun}
-          componentIconMap={componentIconMap}
-          isLoading={isLoading}
-          isError={isError}
-          onRetry={onRetry}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={onLoadMore}
-          onClearFilters={clearFilters}
-        />
+      <div
+        className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
+          isDetailView ? "translate-x-0" : "translate-x-full"
+        } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+      >
+        {selectedRun ? (
+          <RunDetailPanel
+            canvasId={canvasId}
+            run={selectedRun}
+            workflowNodes={workflowNodes}
+            componentIconMap={componentIconMap}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={onSelectNode ?? (() => {})}
+            onBack={handleBack}
+          />
+        ) : null}
       </div>
-
-      {hasAnyFilter && runs.length > 0 ? (
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-gray-500">
-          <span>
-            Showing {filteredRuns.length} of {runs.length} loaded
-          </span>
-          <button type="button" onClick={clearFilters} className="shrink-0 text-sky-600 hover:text-sky-800">
-            Clear filters
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

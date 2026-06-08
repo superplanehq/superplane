@@ -67,10 +67,7 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
 
   return (
     <>
-      <div
-        className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
-        data-testid="outcome-progress"
-      >
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white" data-testid="outcome-progress">
         <OutcomeHeader
           title={state.title}
           phase={state.phase}
@@ -152,7 +149,7 @@ function RubricSummary({
       <button
         type="button"
         onClick={onOpenRubric}
-        className="text-[10px] font-medium text-violet-600 hover:text-violet-800"
+        className="text-[10px] font-medium text-slate-600 hover:text-slate-800"
       >
         View rubric
       </button>
@@ -233,7 +230,7 @@ function RubricModal({ open, state, onClose }: { open: boolean; state: OutcomeSt
     <CenteredModal
       title={state.title}
       onClose={onClose}
-      titleIcon={<ClipboardList size={16} className="text-violet-600" />}
+      titleIcon={<ClipboardList size={16} className="text-slate-600" />}
     >
       {state.categories && state.categories.length > 0 ? (
         <CategorizedCriteriaList categories={state.categories} />
@@ -303,11 +300,11 @@ function CategorizedCriteriaList({ categories }: { categories: RubricCategory[] 
     <div className="space-y-3">
       {categories.map((category, categoryIndex) => (
         <div key={categoryIndex}>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-600">{category.heading}</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{category.heading}</p>
           {category.criteria.map((criterion, criterionIndex) => (
             <CriteriaRow
               key={criterionIndex}
-              prefix={<span className="mt-0.5 shrink-0 text-xs text-violet-400">✦</span>}
+              prefix={<span className="mt-0.5 shrink-0 text-xs text-slate-400">✦</span>}
             >
               <span className="text-sm text-slate-700">{criterion.text}</span>
             </CriteriaRow>
@@ -325,7 +322,7 @@ function FlatCriteriaList({ criteria }: { criteria: OutcomeState["criteria"] }) 
         <CriteriaRow
           key={index}
           bordered
-          prefix={<span className="mt-0.5 shrink-0 text-sm font-medium text-violet-500">{index + 1}.</span>}
+          prefix={<span className="mt-0.5 shrink-0 text-sm font-medium text-slate-500">{index + 1}.</span>}
         >
           <span className="text-sm text-slate-700">{criterion.text}</span>
         </CriteriaRow>

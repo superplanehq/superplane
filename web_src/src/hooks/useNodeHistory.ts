@@ -6,7 +6,7 @@ import type {
   CanvasesListNodeEventsResponse,
   CanvasesListNodeExecutionsResponse,
 } from "@/api-client";
-import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
+import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/app/utils";
 
 interface UseNodeHistoryProps {
   canvasId: string;
