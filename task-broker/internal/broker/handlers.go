@@ -196,7 +196,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		Environment:   api.CloneEnvironment(req.Environment),
 	}
 	switch kind {
-	case models.RunModeJavaScript, models.RunModePython:
+	case models.RunModeJavaScript, models.RunModePython, models.RunModeBash:
 		task.Script = script
 		task.SetupCommands = api.NormalizeCommandLines(req.SetupCommands)
 		if len(bytes.TrimSpace(req.MessageChain)) > 0 {
@@ -526,6 +526,16 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		}
 		if hasArgv || hasCmds {
 			return "only script, setup_commands, and message_chain allowed for run_mode python_script"
+		}
+		if hasChain && !json.Valid(req.MessageChain) {
+			return "message_chain must be valid JSON"
+		}
+	case models.RunModeBash:
+		if !hasScript {
+			return "script required for run_mode bash_script"
+		}
+		if hasArgv || hasCmds {
+			return "only script, setup_commands, and message_chain allowed for run_mode bash_script"
 		}
 		if hasChain && !json.Valid(req.MessageChain) {
 			return "message_chain must be valid JSON"

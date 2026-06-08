@@ -34,6 +34,19 @@ func TestValidateCreateTaskPayload_setupCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("bash_script allows setup_commands", func(t *testing.T) {
+		req := &api.CreateTaskRequest{
+			RunMode:       string(models.RunModeBash),
+			Script:        "main() { echo '{\"ok\":true}'; }",
+			SetupCommands: []string{"npm ci"},
+			WebhookURL:    "https://x/h",
+			ExecutionMode: "host",
+		}
+		if got := validateCreateTaskPayload(req); got != "" {
+			t.Fatalf("got %q", got)
+		}
+	})
+
 	t.Run("command_list rejects setup_commands", func(t *testing.T) {
 		req := &api.CreateTaskRequest{
 			RunMode:       string(models.RunModeCommandList),

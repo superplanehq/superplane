@@ -124,6 +124,13 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 			return 1, "", prepErr
 		}
 		defer os.RemoveAll(scriptWorkDir)
+	case models.RunModeBash:
+		var prepErr error
+		scriptWorkDir, prepErr = prepareDockerBashWorkDir(task)
+		if prepErr != nil {
+			return 1, "", prepErr
+		}
+		defer os.RemoveAll(scriptWorkDir)
 	}
 
 	runArgs := []string{"run", "-d", "--name", name}
@@ -161,6 +168,10 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		return exitCode, out.String(), runErr
 	case models.RunModePython:
 		exitCode, execOut, runErr := dockerExecPython(ctx, name, task, live)
+		out.WriteString(stripLiveLogControlLines(execOut))
+		return exitCode, out.String(), runErr
+	case models.RunModeBash:
+		exitCode, execOut, runErr := dockerExecBash(ctx, name, task, live)
 		out.WriteString(stripLiveLogControlLines(execOut))
 		return exitCode, out.String(), runErr
 	}
@@ -248,6 +259,37 @@ func dockerExecPython3(ctx context.Context, name string, task *api.TaskPayload, 
 	}
 	args := append([]string{"exec"}, envArgs...)
 	args = append(args, name, "python3", dockerPythonProgramPath())
+	return runDockerExec(ctx, args, live)
+}
+
+func dockerExecBash(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	setup := normalizeDirectiveLines(task.SetupCommands)
+	var combined bytes.Buffer
+
+	if len(setup) > 0 {
+		exit, setupOut, err := dockerExecShellDirectives(ctx, name, task, setup, live)
+		combined.WriteString(setupOut)
+		if exit != 0 {
+			return exit, combined.String(), err
+		}
+	}
+
+	startedAt := time.Now()
+	bashIndex := len(setup)
+	writeLiveLogCommandStart(live, bashIndex, "bash "+bashProgramName, startedAt)
+	exit, bashOut, err := dockerExecBashScript(ctx, name, task, live)
+	writeLiveLogCommandEnd(live, bashIndex, exit, time.Since(startedAt))
+	combined.WriteString(bashOut)
+	return exit, combined.String(), err
+}
+
+func dockerExecBashScript(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
+	args := append([]string{"exec"}, envArgs...)
+	args = append(args, name, "bash", dockerBashProgramPath())
 	return runDockerExec(ctx, args, live)
 }
 

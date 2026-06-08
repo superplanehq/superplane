@@ -12,6 +12,8 @@ const (
 	RunModeJavaScript RunMode = "javascript_script"
 	// RunModePython runs Script with python3; main(payload) receives the message chain.
 	RunModePython RunMode = "python_script"
+	// RunModeBash runs Script with bash; main(payload) receives the message chain.
+	RunModeBash RunMode = "bash_script"
 )
 
 // InferRunMode maps legacy task fields when RunMode is unset.

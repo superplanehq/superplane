@@ -25,7 +25,7 @@ const (
 type Task struct {
 	ID      string
 	FleetID string
-	// RunMode selects command_list, argv, javascript_script, or python_script. Empty means infer from fields.
+	// RunMode selects command_list, argv, or a script mode. Empty means infer from fields.
 	RunMode RunMode
 	// Script is user code (main() or main(payload) entrypoint) when RunMode is a script mode.
 	Script string
