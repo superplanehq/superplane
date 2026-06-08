@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import type { CanvasPageProps } from ".";
 import { useCanvasState } from "./useCanvasState";
@@ -91,5 +91,82 @@ describe("useCanvasState", () => {
     });
 
     expect(result.current.edges).toBe(edgesBeforeDrag);
+  });
+
+  it("does not re-push sidebar params when onSidebarChange identity changes", () => {
+    const onSidebarChange = vi.fn();
+    const props = {
+      ...makeProps([makeNode("a", 0, 0)]),
+      initialSidebar: { isOpen: true, nodeId: "a" },
+      onSidebarChange,
+    } as unknown as CanvasPageProps;
+
+    const { rerender } = renderHook(({ hookProps }) => useCanvasState(hookProps), {
+      initialProps: { hookProps: props },
+    });
+
+    onSidebarChange.mockClear();
+
+    const nextOnSidebarChange = vi.fn();
+    rerender({
+      hookProps: {
+        ...props,
+        onSidebarChange: nextOnSidebarChange,
+      } as unknown as CanvasPageProps,
+    });
+
+    expect(nextOnSidebarChange).not.toHaveBeenCalled();
+  });
+
+  it("does not notify onSidebarChange on mount when the sidebar opens from initial state", () => {
+    const onSidebarChange = vi.fn();
+    const props = {
+      ...makeProps([makeNode("a", 0, 0)]),
+      initialSidebar: { isOpen: true, nodeId: "a" },
+      onSidebarChange,
+    } as unknown as CanvasPageProps;
+
+    renderHook(() => useCanvasState(props));
+
+    expect(onSidebarChange).not.toHaveBeenCalled();
+  });
+
+  it("does not echo externally-applied sidebar selection back to onSidebarChange", () => {
+    const onSidebarChange = vi.fn();
+    const baseProps = {
+      ...makeProps([makeNode("a", 0, 0)]),
+      onSidebarChange,
+    };
+
+    const { rerender } = renderHook(({ hookProps }) => useCanvasState(hookProps), {
+      initialProps: {
+        hookProps: { ...baseProps, initialSidebar: { isOpen: true, nodeId: "a" } } as unknown as CanvasPageProps,
+      },
+    });
+
+    onSidebarChange.mockClear();
+
+    rerender({
+      hookProps: { ...baseProps, initialSidebar: { isOpen: true, nodeId: "b" } } as unknown as CanvasPageProps,
+    });
+
+    expect(onSidebarChange).not.toHaveBeenCalled();
+  });
+
+  it("notifies onSidebarChange when the user opens a node", () => {
+    const onSidebarChange = vi.fn();
+    const props = {
+      ...makeProps([makeNode("a", 0, 0)]),
+      initialSidebar: { isOpen: false, nodeId: null },
+      onSidebarChange,
+    } as unknown as CanvasPageProps;
+
+    const { result } = renderHook(() => useCanvasState(props));
+
+    act(() => {
+      result.current.componentSidebar.open("a");
+    });
+
+    expect(onSidebarChange).toHaveBeenCalledWith(true, "a");
   });
 });

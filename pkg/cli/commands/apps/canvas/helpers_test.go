@@ -9,15 +9,23 @@ import (
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
-func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
+func TestFindCurrentUserDraftVersionIDSkipsOtherOwners(t *testing.T) {
 	server := newAPITestServer(
 		t,
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   "/api/v1/me",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"pub-1","state":"STATE_PUBLISHED"}},{"metadata":{"id":"draft-1","state":"STATE_DRAFT"}}]}`))
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   draftVersionsPath("canvas-123"),
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-other","owner":{"id":"user-2"}}},{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}}]}`))
 			},
 		},
 	)
@@ -34,7 +42,15 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		t,
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   draftVersionsPath("canvas-123"),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"versions":[]}`))
@@ -42,7 +58,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPost,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   draftVersionsPath("canvas-123"),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1"}}}`))
@@ -57,8 +73,9 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 	require.Equal(t, "draft-1", versionID)
 
 	server.AssertCalls(t, []string{
-		http.MethodGet + " /api/v1/canvases/canvas-123/versions",
-		http.MethodPost + " /api/v1/canvases/canvas-123/versions",
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " " + draftVersionsPath("canvas-123"),
+		http.MethodPost + " " + draftVersionsPath("canvas-123"),
 	})
 }
 
