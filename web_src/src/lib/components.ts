@@ -44,22 +44,25 @@ function validateCronExpression(cronExpression: string): string | null {
 
     const num = parseInt(part);
     if (!isNaN(num)) {
-      // Basic range validation with early exit
-      switch (i) {
-        case 0: // second (for 6-field format)
-        case 1: // minute
+      const fieldIndex = parts.length === 5 ? i + 1 : i;
+
+      // Basic range validation with early exit. Use 6-field positions internally:
+      // second, minute, hour, day, month, dayofweek.
+      switch (fieldIndex) {
+        case 0:
+        case 1:
           if (num < 0 || num > 59) return "Invalid minute/second value";
           break;
-        case 2: // hour
+        case 2:
           if (num < 0 || num > 23) return "Invalid hour value";
           break;
-        case 3: // day
+        case 3:
           if (num < 1 || num > 31) return "Invalid day value";
           break;
-        case 4: // month
+        case 4:
           if (num < 1 || num > 12) return "Invalid month value";
           break;
-        case 5: // dayofweek
+        case 5:
           if (num < 0 || num > 6) return "Invalid day of week value";
           break;
       }
