@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/prometheus"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
@@ -175,6 +176,10 @@ func (a *AWS) Actions() []core.Action {
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
+		&prometheus.CreateWorkspace{},
+		&prometheus.GetWorkspace{},
+		&prometheus.UpdateWorkspace{},
+		&prometheus.DeleteWorkspace{},
 		&lambda.RunFunction{},
 		&sqs.SendMessage{},
 		&sqs.GetQueue{},
