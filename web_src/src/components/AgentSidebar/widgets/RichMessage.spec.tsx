@@ -42,7 +42,7 @@ describe("RichMessage", () => {
     );
 
     // When ids are available, `run:` links should render as RunChip buttons (not external anchors).
-    expect(screen.getByRole("button", { name: "run link" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "run link" })).toBeInTheDocument();
   });
 
   it("renders full markdown sections inside rubric modals", () => {

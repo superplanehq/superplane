@@ -2,6 +2,7 @@ import type { CanvasesCanvas } from "@/api-client";
 import { Input } from "@/components/Input/input";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useRecentCanvasOpens } from "@/hooks/useRecentCanvasOpens";
 import { getApiErrorMessage } from "@/lib/errors";
 import { sortCanvasProjectsByRecentOpen, type CanvasProjectOption } from "@/lib/recentCanvasOpens";
@@ -13,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Command as CommandPrimitive } from "cmdk";
 import { Check, MoreVertical, Pencil, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const SWITCHER_HEIGHT_CLASS = "h-7";
 const SWITCHER_WIDTH_CLASS = "w-[320px] min-w-[320px] max-w-full";
@@ -145,6 +146,7 @@ export function CanvasProjectSwitcher({
       isLoading={isLoading}
       projects={projects}
       activeCanvasId={activeCanvasId}
+      organizationId={organizationId}
       onSelect={handleSelect}
     />
   );
@@ -347,6 +349,7 @@ function ProjectSearchPopover({
   isLoading,
   projects,
   activeCanvasId,
+  organizationId,
   onSelect,
 }: {
   open: boolean;
@@ -355,6 +358,7 @@ function ProjectSearchPopover({
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
+  organizationId: string;
   onSelect: (canvasId: string) => void;
 }) {
   return (
@@ -412,6 +416,7 @@ function ProjectSearchList({
   activeCanvasId?: string;
   onSelect: (canvasId: string) => void;
 }) {
+  const organizationId = useOrganizationId() ?? "";
   if (isLoading) {
     return (
       <CommandList className="max-h-[280px]">
@@ -431,9 +436,19 @@ function ProjectSearchList({
             keywords={[project.name]}
             onSelect={() => onSelect(project.id)}
             className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900"
+            asChild
           >
-            <span className="min-w-0 flex-1 truncate">{project.name}</span>
-            {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-slate-600" /> : null}
+            <Link
+              to={appPath(organizationId, project.id)}
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate">{project.name}</span>
+              {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-slate-600" /> : null}
+            </Link>
           </CommandItem>
         ))}
       </CommandGroup>
