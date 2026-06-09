@@ -16,6 +16,37 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// commitCanvasRepositoryFilesForTest wraps CommitCanvasRepositoryFiles with the
+// shared services from the test ResourceRegistry so each case only has to supply
+// the request-specific arguments.
+func commitCanvasRepositoryFilesForTest(
+	ctx context.Context,
+	r *support.ResourceRegistry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	expectedHeadSha string,
+	message string,
+	operations []*pb.CanvasRepositoryFileOperation,
+) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	return CommitCanvasRepositoryFiles(
+		ctx,
+		r.GitProvider,
+		nil,
+		r.Encryptor,
+		r.Registry,
+		organizationID,
+		canvasID,
+		versionID,
+		expectedHeadSha,
+		message,
+		operations,
+		nil,
+		"",
+		r.AuthService,
+	)
+}
+
 func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	r := support.Setup(t)
 
