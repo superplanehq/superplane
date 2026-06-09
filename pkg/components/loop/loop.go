@@ -3,44 +3,28 @@ package loop
 import (
 	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const ComponentName = "loop"
-const PayloadType = "loop.iteration"
-const ChannelNameIteration = "iteration"
 
 const (
-	ModeCollection = "collection"
-	ModeCount      = "count"
-	ModeRange      = "range"
+	loopSessionKey = "loop_session"
+
+	ChannelNameBody = "body"
+	ChannelNameDone = "done"
+
+	PayloadTypeBody = "loop.body"
+	PayloadTypeDone = "loop.done"
 )
 
-const DefaultItemVariable = "item"
-
-var (
-	reservedItemVariables = map[string]struct{}{
-		"$":          {},
-		"memory":     {},
-		"config":     {},
-		"root":       {},
-		"previous":   {},
-		"ctx":        {},
-		"index":      {},
-		"totalCount": {},
-		"first":      {},
-		"last":       {},
-	}
-
-	itemVariablePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-)
+const defaultMaxIterations = 100
 
 func init() {
 	registry.RegisterAction(ComponentName, &Loop{})
@@ -49,14 +33,13 @@ func init() {
 type Loop struct{}
 
 type Spec struct {
-	Mode                 string `json:"mode"`
-	CollectionExpression string `json:"collectionExpression"`
-	CountExpression      string `json:"countExpression"`
-	StartExpression      string `json:"startExpression"`
-	EndExpression        string `json:"endExpression"`
-	StepExpression       string `json:"stepExpression"`
-	ItemVariable         string `json:"itemVariable"`
-	PayloadExpression    string `json:"payloadExpression"`
+	UntilExpression string `json:"untilExpression"`
+	MaxIterations   int    `json:"maxIterations"`
+}
+
+type ExecutionMetadata struct {
+	Iteration int  `json:"iteration"`
+	Active    bool `json:"active"`
 }
 
 func (c *Loop) Name() string {
@@ -68,55 +51,53 @@ func (c *Loop) Label() string {
 }
 
 func (c *Loop) Description() string {
-	return "Emit one downstream event per loop iteration"
+	return "Repeat downstream steps until a condition is met"
 }
 
 func (c *Loop) Documentation() string {
-	return `The Loop component emits one downstream event per iteration using collection, count, or range modes.
+	return `The Loop component runs downstream steps repeatedly until an exit condition becomes true.
 
 ## Use Cases
 
-- Iterate over any list in the message chain with a custom item variable
-- Repeat downstream steps a fixed number of times
-- Walk numeric ranges with configurable start, end, and step
-- Shape per-iteration payloads with a custom expression
-
-## Loop Modes
-
-- **Collection**: Evaluate a list expression and emit one event per element
-- **Count**: Repeat a fixed number of times (0-based index as the current value)
-- **Range**: Walk from a start value to an end value using an optional step (default ` + "`1`" + `)
+- Poll an API until a resource reaches a ready state
+- Retry a workflow segment until validation passes
+- Paginate through results until all pages are processed
+- Run approval or review cycles until consensus is reached
 
 ## How It Works
 
-1. Resolves iterations from the selected loop mode
-2. Evaluates an optional payload expression for each iteration
-3. Emits one ` + "`loop.iteration`" + ` event to the ` + "`iteration`" + ` channel per iteration
-4. If there are zero iterations, passes without emitting any events
+1. On the first run, Loop emits to the **Body** channel and starts the loop session
+2. Connect downstream nodes to the Body output and wire the last step back to Loop
+3. When the body finishes, Loop evaluates the **Until Expression**
+4. If the expression is ` + "`true`" + `, Loop emits on **Done** and the loop ends
+5. If the expression is ` + "`false`" + `, Loop emits on **Body** again for another iteration
+
+## Wiring
+
+` + "```" + `
+Trigger → Loop → Step A → Step B ──┐
+              ↑                    │
+              └────────────────────┘
+` + "```" + `
+
+Edges back into Loop are allowed so the body can return control for the next condition check.
+
+## Output Channels
+
+- **Body**: Emitted at the start of each iteration
+- **Done**: Emitted once when the until expression evaluates to true
 
 ## Limits
 
-- At most ` + fmt.Sprintf("%d", core.MaxEmitCount) + ` iterations per execution. Larger loops fail with an error.
-
-## Default Output Fields
-
-When no payload expression is configured, each event includes:
-
-- **itemVariable**: The current iteration value (key matches the configured item variable)
-- **index**: Zero-based iteration index
-- **totalCount**: Total number of iterations
-- **first**: Whether this is the first iteration
-- **last**: Whether this is the last iteration
+- **Max Iterations** caps how many body runs are allowed (default ` + fmt.Sprintf("%d", defaultMaxIterations) + `, maximum ` + fmt.Sprintf("%d", core.MaxEmitCount) + `)
 
 ## Expression Environment
 
-Each payload expression can reference:
+The until expression has access to:
 
-- **$**: The run context data
+- **$**: The run context data, including outputs from the latest body run
 - **root()**: Access root event data
-- **previous()**: Access previous node outputs
-- **index**, **totalCount**, **first**, **last**: Current iteration metadata
-- The configured **item variable** for the current value`
+- **previous()**: Access previous node outputs`
 }
 
 func (c *Loop) Icon() string {
@@ -133,103 +114,32 @@ func (c *Loop) ExampleOutput() map[string]any {
 
 func (c *Loop) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
-		{Name: ChannelNameIteration, Label: "Iteration"},
+		{Name: ChannelNameBody, Label: "Body"},
+		{Name: ChannelNameDone, Label: "Done"},
 	}
 }
 
 func (c *Loop) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "mode",
-			Label:       "Loop Mode",
-			Type:        configuration.FieldTypeSelect,
-			Description: "Choose how iterations are generated",
+			Name:        "untilExpression",
+			Label:       "Until Expression",
+			Type:        configuration.FieldTypeExpression,
+			Description: "Boolean expression that must evaluate to true to stop looping",
 			Required:    true,
-			Default:     ModeCollection,
+		},
+		{
+			Name:        "maxIterations",
+			Label:       "Max Iterations",
+			Type:        configuration.FieldTypeNumber,
+			Description: "Maximum number of body iterations before the loop fails",
+			Default:     defaultMaxIterations,
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Collection", Value: ModeCollection, Description: "Iterate over a list expression"},
-						{Label: "Count", Value: ModeCount, Description: "Repeat a fixed number of times"},
-						{Label: "Range", Value: ModeRange, Description: "Walk a numeric range"},
-					},
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(core.MaxEmitCount),
 				},
 			},
-		},
-		{
-			Name:        "collectionExpression",
-			Label:       "Collection Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to the list to iterate over",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "mode", Values: []string{ModeCollection}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "mode", Values: []string{ModeCollection}},
-			},
-		},
-		{
-			Name:        "countExpression",
-			Label:       "Count Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to a non-negative whole number",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "mode", Values: []string{ModeCount}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "mode", Values: []string{ModeCount}},
-			},
-		},
-		{
-			Name:        "startExpression",
-			Label:       "Start Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to the first range value",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "mode", Values: []string{ModeRange}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "mode", Values: []string{ModeRange}},
-			},
-		},
-		{
-			Name:        "endExpression",
-			Label:       "End Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to the last inclusive range value",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "mode", Values: []string{ModeRange}},
-			},
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "mode", Values: []string{ModeRange}},
-			},
-		},
-		{
-			Name:        "stepExpression",
-			Label:       "Step Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to the range step (defaults to 1 when empty)",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "mode", Values: []string{ModeRange}},
-			},
-		},
-		{
-			Name:        "itemVariable",
-			Label:       "Item Variable",
-			Type:        configuration.FieldTypeString,
-			Description: "Name of the current iteration value in expressions and default payloads",
-			Default:     DefaultItemVariable,
-			TypeOptions: &configuration.TypeOptions{
-				String: &configuration.StringTypeOptions{
-					AllowExpressions: boolPtr(false),
-				},
-			},
-		},
-		{
-			Name:        "payloadExpression",
-			Label:       "Payload Expression",
-			Type:        configuration.FieldTypeExpression,
-			Description: "Optional expression that evaluates to the payload object for each iteration. When empty, a default payload is emitted.",
 		},
 	}
 }
@@ -243,83 +153,178 @@ func (c *Loop) Setup(ctx core.SetupContext) error {
 }
 
 func (c *Loop) Execute(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 	if err := validateSpec(spec); err != nil {
-		return err
+		return nil, err
 	}
 
-	iterations, err := spec.resolveIterations(ctx.Expressions)
+	anchor, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to find loop session: %w", err)
 	}
 
-	if err := ctx.Metadata.Set(map[string]any{
-		"mode":         spec.Mode,
-		"count":        len(iterations),
-		"itemVariable": spec.ItemVariable,
-	}); err != nil {
-		return fmt.Errorf("failed to set execution metadata: %w", err)
+	if anchor == nil {
+		return c.startLoop(ctx, spec)
 	}
 
-	if len(iterations) == 0 {
-		return ctx.ExecutionState.Pass()
-	}
-	if len(iterations) > core.MaxEmitCount {
-		return fmt.Errorf("loop has %d iterations; Loop supports at most %d per execution", len(iterations), core.MaxEmitCount)
+	return c.handleFeedback(ctx, spec, anchor)
+}
+
+func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, error) {
+	executionCtx, err := ctx.CreateExecution()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create loop execution: %w", err)
 	}
 
-	totalCount := len(iterations)
-	payloads := make([]any, 0, totalCount)
-	for _, current := range iterations {
-		payload, payloadErr := spec.buildPayload(current, totalCount, ctx.Expressions)
-		if payloadErr != nil {
-			return payloadErr
+	if err := executionCtx.ExecutionState.SetKV(loopSessionKey, ctx.RootEventID); err != nil {
+		return nil, fmt.Errorf("failed to store loop session: %w", err)
+	}
+
+	md := ExecutionMetadata{
+		Iteration: 1,
+		Active:    true,
+	}
+	if err := executionCtx.Metadata.Set(md); err != nil {
+		return nil, fmt.Errorf("failed to set loop metadata: %w", err)
+	}
+
+	if err := ctx.DequeueItem(); err != nil {
+		return nil, fmt.Errorf("failed to dequeue item: %w", err)
+	}
+
+	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
+		return nil, fmt.Errorf("failed to update node state: %w", err)
+	}
+
+	return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+		ChannelNameBody,
+		PayloadTypeBody,
+		[]any{bodyPayload(md.Iteration, spec.MaxIterations)},
+	)
+}
+
+func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, anchor *core.ExecutionContext) (*uuid.UUID, error) {
+	if anchor.ExecutionState.IsFinished() == false {
+		return nil, fmt.Errorf("loop session execution is still running")
+	}
+
+	md, err := readMetadata(anchor)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctx.DequeueItem(); err != nil {
+		return nil, fmt.Errorf("failed to dequeue item: %w", err)
+	}
+
+	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
+		return nil, fmt.Errorf("failed to update node state: %w", err)
+	}
+
+	if !md.Active {
+		return nil, nil
+	}
+
+	done, err := evaluateUntil(spec.UntilExpression, ctx.Expressions)
+	if err != nil {
+		return c.failLoop(anchor, md, err.Error())
+	}
+
+	if done {
+		md.Active = false
+		if err := anchor.Metadata.Set(md); err != nil {
+			return nil, fmt.Errorf("failed to update loop metadata: %w", err)
 		}
-		payloads = append(payloads, payload)
+
+		executionCtx, err := ctx.CreateExecution()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create loop completion execution: %w", err)
+		}
+
+		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+			ChannelNameDone,
+			PayloadTypeDone,
+			[]any{donePayload(md.Iteration)},
+		)
 	}
 
-	return ctx.ExecutionState.Emit(ChannelNameIteration, PayloadType, payloads)
-}
-
-func (s Spec) buildPayload(current iteration, totalCount int, expressions core.ExpressionContext) (any, error) {
-	variables := iterationVariables(s.ItemVariable, current, totalCount)
-
-	if strings.TrimSpace(s.PayloadExpression) == "" {
-		return defaultPayload(variables), nil
+	if md.Iteration >= spec.MaxIterations {
+		return c.failLoop(anchor, md, fmt.Sprintf(
+			"loop reached max iterations (%d) before until expression became true",
+			spec.MaxIterations,
+		))
 	}
 
-	result, err := expressions.RunWithExtraVariables(s.PayloadExpression, variables)
+	md.Iteration++
+	if err := anchor.Metadata.Set(md); err != nil {
+		return nil, fmt.Errorf("failed to update loop metadata: %w", err)
+	}
+
+	executionCtx, err := ctx.CreateExecution()
 	if err != nil {
-		return nil, fmt.Errorf("payload expression evaluation failed: %w", err)
+		return nil, fmt.Errorf("failed to create loop iteration execution: %w", err)
 	}
 
-	if payload, ok := result.(map[string]any); ok {
-		return payload, nil
-	}
-
-	payload := defaultPayload(variables)
-	payload[s.ItemVariable] = result
-	return payload, nil
+	return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+		ChannelNameBody,
+		PayloadTypeBody,
+		[]any{bodyPayload(md.Iteration, spec.MaxIterations)},
+	)
 }
 
-func defaultPayload(variables map[string]any) map[string]any {
-	payload := make(map[string]any, len(variables))
-	for key, value := range variables {
-		payload[key] = value
+func (c *Loop) failLoop(anchor *core.ExecutionContext, md ExecutionMetadata, message string) (*uuid.UUID, error) {
+	md.Active = false
+	if err := anchor.Metadata.Set(md); err != nil {
+		return nil, fmt.Errorf("failed to update loop metadata: %w", err)
 	}
-	return payload
+
+	if err := anchor.ExecutionState.Fail("error", message); err != nil {
+		return nil, err
+	}
+
+	return &anchor.ID, nil
 }
 
-func iterationVariables(itemVariable string, current iteration, totalCount int) map[string]any {
+func evaluateUntil(expression string, expressions core.ExpressionContext) (bool, error) {
+	output, err := expressions.Run(expression)
+	if err != nil {
+		return false, fmt.Errorf("until expression evaluation failed: %w", err)
+	}
+
+	done, ok := output.(bool)
+	if !ok {
+		return false, fmt.Errorf("until expression must evaluate to boolean, got %T: %v", output, output)
+	}
+
+	return done, nil
+}
+
+func readMetadata(executionCtx *core.ExecutionContext) (ExecutionMetadata, error) {
+	md := ExecutionMetadata{}
+	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &md); err != nil {
+		return ExecutionMetadata{}, fmt.Errorf("failed to decode loop metadata: %w", err)
+	}
+	return md, nil
+}
+
+func bodyPayload(iteration, maxIterations int) map[string]any {
 	return map[string]any{
-		itemVariable: current.Value,
-		"index":      current.Index,
-		"totalCount": totalCount,
-		"first":      current.Index == 0,
-		"last":       current.Index == totalCount-1,
+		"iteration":     iteration,
+		"maxIterations": maxIterations,
+	}
+}
+
+func donePayload(iteration int) map[string]any {
+	return map[string]any{
+		"iteration": iteration,
+		"completed": true,
 	}
 }
 
@@ -328,64 +333,27 @@ func decodeSpec(raw any) (Spec, error) {
 	if err := mapstructure.Decode(raw, &spec); err != nil {
 		return Spec{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	return normalizeSpec(spec), nil
-}
-
-func normalizeSpec(spec Spec) Spec {
-	spec.Mode = strings.TrimSpace(spec.Mode)
-	if spec.Mode == "" {
-		spec.Mode = ModeCollection
+	if spec.MaxIterations == 0 {
+		spec.MaxIterations = defaultMaxIterations
 	}
-	spec.CollectionExpression = strings.TrimSpace(spec.CollectionExpression)
-	spec.CountExpression = strings.TrimSpace(spec.CountExpression)
-	spec.StartExpression = strings.TrimSpace(spec.StartExpression)
-	spec.EndExpression = strings.TrimSpace(spec.EndExpression)
-	spec.StepExpression = strings.TrimSpace(spec.StepExpression)
-	spec.ItemVariable = strings.TrimSpace(spec.ItemVariable)
-	spec.PayloadExpression = strings.TrimSpace(spec.PayloadExpression)
-	if spec.ItemVariable == "" {
-		spec.ItemVariable = DefaultItemVariable
-	}
-	return spec
+	return spec, nil
 }
 
 func validateSpec(spec Spec) error {
-	switch spec.Mode {
-	case ModeCollection:
-		if spec.CollectionExpression == "" {
-			return fmt.Errorf("collectionExpression is required when mode is collection")
-		}
-	case ModeCount:
-		if spec.CountExpression == "" {
-			return fmt.Errorf("countExpression is required when mode is count")
-		}
-	case ModeRange:
-		if spec.StartExpression == "" {
-			return fmt.Errorf("startExpression is required when mode is range")
-		}
-		if spec.EndExpression == "" {
-			return fmt.Errorf("endExpression is required when mode is range")
-		}
-	default:
-		return fmt.Errorf("mode must be one of collection, count, or range")
+	if spec.UntilExpression == "" {
+		return fmt.Errorf("untilExpression is required")
 	}
-
-	if !itemVariablePattern.MatchString(spec.ItemVariable) {
-		return fmt.Errorf("itemVariable %q must match %s", spec.ItemVariable, itemVariablePattern.String())
+	if spec.MaxIterations < 1 {
+		return fmt.Errorf("maxIterations must be at least 1")
 	}
-	if _, ok := reservedItemVariables[spec.ItemVariable]; ok {
-		return fmt.Errorf("itemVariable %q is reserved", spec.ItemVariable)
+	if spec.MaxIterations > core.MaxEmitCount {
+		return fmt.Errorf("maxIterations cannot exceed %d", core.MaxEmitCount)
 	}
-
 	return nil
 }
 
-func boolPtr(v bool) *bool {
+func intPtr(v int) *int {
 	return &v
-}
-
-func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *Loop) Cancel(ctx core.ExecutionContext) error {

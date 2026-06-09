@@ -1,14 +1,8 @@
 {
-  "type": "loop.iteration",
+  "type": "loop.body",
   "data": {
-    "item": {
-      "service": "EC2",
-      "cost_usd": 42.5
-    },
-    "index": 0,
-    "totalCount": 3,
-    "first": true,
-    "last": false
+    "iteration": 1,
+    "maxIterations": 100
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z"
 }

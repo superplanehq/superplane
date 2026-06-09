@@ -1,294 +1,234 @@
 package loop
 
 import (
-	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-type sequenceExpressionContext struct {
-	outputs []any
-	index   int
-}
-
-func (s *sequenceExpressionContext) Run(_ string) (any, error) {
-	if s.index >= len(s.outputs) {
-		return nil, fmt.Errorf("unexpected expression at index %d", s.index)
-	}
-	out := s.outputs[s.index]
-	s.index++
-	return out, nil
-}
-
-func (s *sequenceExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
-	if expression == `{"label": row, "position": index + 1}` {
-		return map[string]any{
-			"label":    variables["row"],
-			"position": variables["index"].(int) + 1,
-		}, nil
-	}
-	return s.Run(expression)
-}
-
 func TestLoopSetup(t *testing.T) {
 	component := &Loop{}
 
-	t.Run("requires collection expression in collection mode", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"mode": ModeCollection},
-		})
+	t.Run("requires until expression", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{}})
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "collectionExpression is required")
+		assert.ErrorContains(t, err, "untilExpression is required")
 	})
 
-	t.Run("requires count expression in count mode", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"mode": ModeCount},
-		})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "countExpression is required")
-	})
-
-	t.Run("requires range expressions in range mode", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"mode": ModeRange},
-		})
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "startExpression is required")
-	})
-
-	t.Run("accepts valid collection configuration", func(t *testing.T) {
+	t.Run("accepts valid configuration", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"mode":                 ModeCollection,
-				"collectionExpression": `$["Runner"].items`,
+				"untilExpression": `$["Checker"].ready == true`,
+				"maxIterations":   10,
 			},
 		})
 		require.NoError(t, err)
 	})
 }
 
-func TestLoopExecuteCollectionMode(t *testing.T) {
+func TestLoopStartLoop(t *testing.T) {
 	component := &Loop{}
 	execState := &contexts.ExecutionStateContext{}
 	execMetadata := &contexts.MetadataContext{}
-	exprCtx := &contexts.ExpressionContext{
-		Output: []any{
-			map[string]any{"service": "EC2"},
-			map[string]any{"service": "S3"},
+	rootEventID := uuid.New().String()
+	executionID := uuid.New()
+
+	ctx := core.ProcessQueueContext{
+		RootEventID: rootEventID,
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
 		},
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return nil, nil
+		},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			return &core.ExecutionContext{
+				ID:             executionID,
+				Metadata:       execMetadata,
+				ExecutionState: execState,
+			}, nil
+		},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
 	}
 
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"mode":                 ModeCollection,
-			"collectionExpression": `$["Runner"].items`,
-		},
-		Metadata:       execMetadata,
-		ExecutionState: execState,
-		Expressions:    exprCtx,
-	})
-
+	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
+	require.NotNil(t, id)
+	assert.Equal(t, executionID, *id)
+	assert.Equal(t, rootEventID, execState.KVs[loopSessionKey])
+	md, ok := execMetadata.Metadata.(ExecutionMetadata)
+	require.True(t, ok)
+	assert.Equal(t, 1, md.Iteration)
+	assert.True(t, md.Active)
 	assert.True(t, execState.Passed)
-	assert.Equal(t, ChannelNameIteration, execState.Channel)
-	assert.Equal(t, PayloadType, execState.Type)
-	require.Len(t, execState.Payloads, 2)
-
-	first := execState.Payloads[0].(map[string]any)["data"].(map[string]any)
-	assert.Equal(t, map[string]any{"service": "EC2"}, first["item"])
-	assert.Equal(t, 0, first["index"])
-	assert.Equal(t, 2, first["totalCount"])
-	assert.Equal(t, true, first["first"])
-	assert.Equal(t, false, first["last"])
-
-	last := execState.Payloads[1].(map[string]any)["data"].(map[string]any)
-	assert.Equal(t, true, last["last"])
+	assert.Equal(t, ChannelNameBody, execState.Channel)
 }
 
-func TestLoopExecuteCountMode(t *testing.T) {
+func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 	component := &Loop{}
-	execState := &contexts.ExecutionStateContext{}
-	execMetadata := &contexts.MetadataContext{}
-	exprCtx := &contexts.ExpressionContext{Output: 3}
-
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"mode":            ModeCount,
-			"countExpression": `$["Runner"].retries`,
-		},
-		Metadata:       execMetadata,
-		ExecutionState: execState,
-		Expressions:    exprCtx,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, execState.Payloads, 3)
-
-	for i, payload := range execState.Payloads {
-		data := payload.(map[string]any)["data"].(map[string]any)
-		assert.Equal(t, i, data["item"])
-		assert.Equal(t, i, data["index"])
+	anchorMetadata := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Iteration: 2, Active: true},
 	}
-}
+	iterationExecState := &contexts.ExecutionStateContext{}
+	iterationID := uuid.New()
+	anchorID := uuid.New()
 
-func TestLoopExecuteRangeMode(t *testing.T) {
-	component := &Loop{}
-	execState := &contexts.ExecutionStateContext{}
-	execMetadata := &contexts.MetadataContext{}
-	exprCtx := &sequenceExpressionContext{outputs: []any{0, 4, 2}}
-
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"mode":            ModeRange,
-			"startExpression": "0",
-			"endExpression":   "4",
-			"stepExpression":  "2",
-		},
-		Metadata:       execMetadata,
-		ExecutionState: execState,
-		Expressions:    exprCtx,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, execState.Payloads, 3)
-
-	values := []int{0, 2, 4}
-	for i, payload := range execState.Payloads {
-		data := payload.(map[string]any)["data"].(map[string]any)
-		assert.Equal(t, values[i], data["item"])
-	}
-}
-
-func TestLoopExecuteCustomItemVariableAndPayload(t *testing.T) {
-	component := &Loop{}
-	execState := &contexts.ExecutionStateContext{}
-	execMetadata := &contexts.MetadataContext{}
-	exprCtx := &contexts.ExpressionContext{
-		Output: []any{"alpha", "beta"},
-		WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
-			if expression == `{"label": row, "position": index + 1}` {
-				return map[string]any{
-					"label":    variables["row"],
-					"position": variables["index"].(int) + 1,
-				}, nil
-			}
-			return nil, fmt.Errorf("unexpected expression %q", expression)
-		},
+	anchor := &core.ExecutionContext{
+		ID:             anchorID,
+		Metadata:       anchorMetadata,
+		ExecutionState: &finishedExecutionState{},
 	}
 
-	err := component.Execute(core.ExecutionContext{
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
 		Configuration: map[string]any{
-			"mode":                 ModeCollection,
-			"collectionExpression": `$["Runner"].items`,
-			"itemVariable":         "row",
-			"payloadExpression":    `{"label": row, "position": index + 1}`,
+			"untilExpression": `$["Checker"].ready == true`,
 		},
-		Metadata:       execMetadata,
-		ExecutionState: execState,
-		Expressions:    exprCtx,
-	})
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return anchor, nil
+		},
+		Expressions: &contexts.ExpressionContext{Output: true},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			return &core.ExecutionContext{
+				ID:             iterationID,
+				ExecutionState: iterationExecState,
+			}, nil
+		},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
+	}
 
+	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
-	require.Len(t, execState.Payloads, 2)
+	require.NotNil(t, id)
+	assert.Equal(t, iterationID, *id)
+	assert.Equal(t, ChannelNameDone, iterationExecState.Channel)
+	assert.Equal(t, PayloadTypeDone, iterationExecState.Type)
 
-	first := execState.Payloads[0].(map[string]any)["data"].(map[string]any)
-	assert.Equal(t, "alpha", first["label"])
-	assert.Equal(t, 1, first["position"])
+	donePayload := iterationExecState.Payloads[0].(map[string]any)["data"].(map[string]any)
+	assert.Equal(t, 2, donePayload["iteration"])
+	assert.Equal(t, true, donePayload["completed"])
+	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
+	require.True(t, ok)
+	assert.False(t, md.Active)
 }
 
-func TestLoopExecutePassesWhenEmpty(t *testing.T) {
+func TestLoopHandleFeedbackRepeatsBodyWhenUntilIsFalse(t *testing.T) {
 	component := &Loop{}
-	execState := &contexts.ExecutionStateContext{}
-	execMetadata := &contexts.MetadataContext{}
-	exprCtx := &contexts.ExpressionContext{Output: []any{}}
+	anchorMetadata := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Iteration: 1, Active: true},
+	}
+	iterationExecState := &contexts.ExecutionStateContext{}
+	iterationID := uuid.New()
 
-	err := component.Execute(core.ExecutionContext{
+	anchor := &core.ExecutionContext{
+		ID:             uuid.New(),
+		Metadata:       anchorMetadata,
+		ExecutionState: &finishedExecutionState{},
+	}
+
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
 		Configuration: map[string]any{
-			"mode":                 ModeCollection,
-			"collectionExpression": `$["Runner"].items`,
+			"untilExpression": `$["Checker"].ready == true`,
+			"maxIterations":   5,
 		},
-		Metadata:       execMetadata,
-		ExecutionState: execState,
-		Expressions:    exprCtx,
-	})
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return anchor, nil
+		},
+		Expressions: &contexts.ExpressionContext{Output: false},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			return &core.ExecutionContext{
+				ID:             iterationID,
+				ExecutionState: iterationExecState,
+			}, nil
+		},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
+	}
 
+	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
-	assert.True(t, execState.Passed)
-	assert.Empty(t, execState.Payloads)
+	require.NotNil(t, id)
+	assert.Equal(t, ChannelNameBody, iterationExecState.Channel)
+	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
+	require.True(t, ok)
+	assert.Equal(t, 2, md.Iteration)
 }
 
-func TestLoopExecuteErrors(t *testing.T) {
+func TestLoopHandleFeedbackFailsAtMaxIterations(t *testing.T) {
 	component := &Loop{}
+	anchorMetadata := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Iteration: 3, Active: true},
+	}
+	anchorExecState := &contexts.ExecutionStateContext{Finished: true}
 
-	t.Run("collection must evaluate to a list", func(t *testing.T) {
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"mode":                 ModeCollection,
-				"collectionExpression": `$["Runner"].name`,
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Metadata:       &contexts.MetadataContext{},
-			Expressions:    &contexts.ExpressionContext{Output: "not-a-list"},
-		})
-		assert.ErrorContains(t, err, "collection expression must evaluate to a list")
-	})
+	anchor := &core.ExecutionContext{
+		ID:             uuid.New(),
+		Metadata:       anchorMetadata,
+		ExecutionState: anchorExecState,
+	}
 
-	t.Run("rejects iteration count above limit", func(t *testing.T) {
-		items := make([]any, core.MaxEmitCount+1)
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"mode":                 ModeCollection,
-				"collectionExpression": `$["Runner"].items`,
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Metadata:       &contexts.MetadataContext{},
-			Expressions:    &contexts.ExpressionContext{Output: items},
-		})
-		assert.ErrorContains(t, err, "supports at most")
-	})
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+			"maxIterations":   3,
+		},
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return anchor, nil
+		},
+		Expressions:     &contexts.ExpressionContext{Output: false},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
+	}
 
-	t.Run("rejects reserved item variable", func(t *testing.T) {
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"mode":                 ModeCollection,
-				"collectionExpression": `$["Runner"].items`,
-				"itemVariable":         "index",
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Metadata:       &contexts.MetadataContext{},
-			Expressions:    &contexts.ExpressionContext{Output: []any{"x"}},
-		})
-		assert.ErrorContains(t, err, "itemVariable \"index\" is reserved")
-	})
-}
-
-func TestBuildRangeValues(t *testing.T) {
-	t.Run("inclusive positive step", func(t *testing.T) {
-		values, err := buildRangeValues(0, 4, 2)
-		require.NoError(t, err)
-		assert.Equal(t, []any{0, 2, 4}, values)
-	})
-
-	t.Run("empty when start is after end with positive step", func(t *testing.T) {
-		values, err := buildRangeValues(5, 1, 1)
-		require.NoError(t, err)
-		assert.Empty(t, values)
-	})
-
-	t.Run("supports negative step", func(t *testing.T) {
-		values, err := buildRangeValues(3, 0, -1)
-		require.NoError(t, err)
-		assert.Equal(t, []any{3, 2, 1, 0}, values)
-	})
-}
-
-func TestCoerceToList(t *testing.T) {
-	items, err := coerceToList([]string{"a", "b"})
+	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, []any{"a", "b"}, items)
+	require.NotNil(t, id)
+	assert.True(t, anchorExecState.Finished)
+	assert.False(t, anchorExecState.Passed)
+	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
+	require.True(t, ok)
+	assert.False(t, md.Active)
+}
+
+type finishedExecutionState struct {
+	contexts.ExecutionStateContext
+}
+
+func (f *finishedExecutionState) IsFinished() bool {
+	return true
+}
+
+func (f *finishedExecutionState) SetKV(key, value string) error { return nil }
+func (f *finishedExecutionState) GetKV(key string) (string, error) {
+	return "", core.ErrExecutionKVNotFound
+}
+func (f *finishedExecutionState) Emit(channel, payloadType string, payloads []any) error {
+	return f.ExecutionStateContext.Emit(channel, payloadType, payloads)
+}
+func (f *finishedExecutionState) Pass() error { return f.ExecutionStateContext.Pass() }
+func (f *finishedExecutionState) Fail(reason, message string) error {
+	return f.ExecutionStateContext.Fail(reason, message)
+}
+
+func TestLoopExecuteIsNoOp(t *testing.T) {
+	component := &Loop{}
+	err := component.Execute(core.ExecutionContext{})
+	require.NoError(t, err)
+}
+
+func TestLoopHandleWebhook(t *testing.T) {
+	component := &Loop{}
+	status, body, err := component.HandleWebhook(core.WebhookRequestContext{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Nil(t, body)
 }

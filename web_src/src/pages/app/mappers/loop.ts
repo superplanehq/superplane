@@ -21,17 +21,17 @@ type LoopOutputs = Record<string, OutputPayload[]>;
 
 export const LOOP_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
-  passed: {
+  body: {
+    icon: "refresh-cw",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-indigo-100",
+    badgeColor: "bg-indigo-500",
+  },
+  done: {
     icon: "circle-check",
     textColor: "text-gray-800",
     backgroundColor: "bg-green-100",
     badgeColor: "bg-emerald-500",
-  },
-  rejected: {
-    icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
   },
 };
 
@@ -56,9 +56,12 @@ export const loopStateFunction: StateFunction = (execution: ExecutionInfo): Even
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const outputs = execution.outputs as LoopOutputs | undefined;
-    const iterationOutputs = outputs?.iteration;
-    const hasIterations = Array.isArray(iterationOutputs) && iterationOutputs.length > 0;
-    return hasIterations ? "passed" : "rejected";
+    if (Array.isArray(outputs?.done) && outputs.done.length > 0) {
+      return "done";
+    }
+    if (Array.isArray(outputs?.body) && outputs.body.length > 0) {
+      return "body";
+    }
   }
 
   return "failed";
@@ -70,59 +73,26 @@ export const LOOP_STATE_REGISTRY: EventStateRegistry = {
 };
 
 type LoopConfiguration = {
-  mode?: "collection" | "count" | "range";
-  collectionExpression?: string;
-  countExpression?: string;
-  startExpression?: string;
-  endExpression?: string;
-  stepExpression?: string;
-  itemVariable?: string;
-  payloadExpression?: string;
+  untilExpression?: string;
+  maxIterations?: number;
 };
 
 type LoopMetadata = {
-  mode?: string;
-  count?: number;
-  itemVariable?: string;
+  iteration?: number;
+  active?: boolean;
 };
-
-const MODE_LABELS: Record<string, string> = {
-  collection: "Collection",
-  count: "Count",
-  range: "Range",
-};
-
-function getLoopSummary(configuration: LoopConfiguration): string | undefined {
-  switch (configuration.mode ?? "collection") {
-    case "collection":
-      return configuration.collectionExpression;
-    case "count":
-      return configuration.countExpression;
-    case "range": {
-      const parts = [configuration.startExpression, configuration.endExpression].filter(Boolean);
-      if (configuration.stepExpression) {
-        parts.push(`step ${configuration.stepExpression}`);
-      }
-      return parts.length > 0 ? parts.join(" → ") : undefined;
-    }
-    default:
-      return undefined;
-  }
-}
 
 export const loopMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const componentName = context.componentDefinition.name || "loop";
     const configuration = context.node.configuration as LoopConfiguration;
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const mode = configuration.mode ?? "collection";
-    const summary = getLoopSummary(configuration);
-    const specs = summary
+    const specs = configuration.untilExpression
       ? [
           {
-            title: MODE_LABELS[mode] ?? "Loop",
-            tooltipTitle: `${MODE_LABELS[mode] ?? "Loop"} configuration`,
-            value: summary,
+            title: "Until",
+            tooltipTitle: "Until expression",
+            value: configuration.untilExpression,
           },
         ]
       : undefined;
@@ -145,39 +115,20 @@ export const loopMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string | number> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string | number | boolean> {
     const configuration = context.execution.configuration as LoopConfiguration;
     const metadata = context.execution.metadata as LoopMetadata | undefined;
-    const mode = configuration.mode ?? metadata?.mode ?? "collection";
-    const details: Record<string, string | number> = {
+    const details: Record<string, string | number | boolean> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
-      Mode: MODE_LABELS[mode] ?? mode,
+      "Until expression": configuration.untilExpression ?? "-",
+      "Max iterations": configuration.maxIterations ?? 100,
     };
 
-    switch (mode) {
-      case "collection":
-        details["Collection expression"] = configuration.collectionExpression ?? "-";
-        break;
-      case "count":
-        details["Count expression"] = configuration.countExpression ?? "-";
-        break;
-      case "range":
-        details["Start expression"] = configuration.startExpression ?? "-";
-        details["End expression"] = configuration.endExpression ?? "-";
-        if (configuration.stepExpression) {
-          details["Step expression"] = configuration.stepExpression;
-        }
-        break;
+    if (typeof metadata?.iteration === "number") {
+      details["Current iteration"] = metadata.iteration;
     }
-
-    if (configuration.itemVariable) {
-      details["Item variable"] = configuration.itemVariable;
-    }
-    if (configuration.payloadExpression) {
-      details["Payload expression"] = configuration.payloadExpression;
-    }
-    if (typeof metadata?.count === "number") {
-      details["Iterations emitted"] = metadata.count;
+    if (typeof metadata?.active === "boolean") {
+      details.Active = metadata.active;
     }
 
     return details;
