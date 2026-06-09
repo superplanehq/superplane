@@ -51,6 +51,10 @@ web_src/src/pages/workflowv2/
     TypedPanelShell.tsx
     PanelEditorDialog.tsx
     MarkdownPanelCard.tsx
+    HtmlPanelCard.tsx
+    HtmlPanelEditor.tsx
+    HtmlBody.tsx
+    htmlSanitize.ts
     NodePanelCard.tsx
     TablePanelCard.tsx
     ChartPanelCard.tsx
@@ -121,6 +125,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | Type | Purpose | Main content fields |
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
+| `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
 | `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
@@ -294,6 +299,9 @@ In addition to the standard CEL functions cel-js ships with, the dashboard expos
 | `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
 | `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
 | `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
+| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. Useful as a wholesale value (`{{ parseJson(blob) }}`), wrapped in another function (`size(parseJson(tags))`), or for equality checks (`parseJson(value) == null`). |
+
+`parseJson` has a real limitation: **cel-js does not support postfix `.field` / `[i]` / `.method(...)` after a function call result.** That means expressions like `parseJson(blob).items[0].id` or `parseJson(tags).map(t, t)` will fail to parse. To iterate or dot-access parsed data, either shape it as a real list/map upstream (canvas memory values are JSON-typed, so storing `{"tags": ["a","b"]}` lets you write `tags.map(t, t)` natively) or compose with macros that take the parsed value as an argument (`size`, `string`, etc.).
 
 Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
 
@@ -534,6 +542,70 @@ Two source kinds are supported:
   - `$` — a map of node-execution outputs keyed by node display name. Use it as `{{ run.$["Node Name"].data.field }}` for run-level output references.
 
 Variables resolve to `null` when no row matches; CEL access on `null` renders as an empty string, so a partial template never throws. The in-card editor surfaces a per-variable preview with one-click "insert" buttons, plus a live rendered preview that mirrors what the saved panel will display.
+
+## HTML Panels
+
+HTML panels render `content.body` directly as HTML. They share the markdown panel's variable system (same `{{ name.field }}` syntax and the same `MarkdownVariablesPanel` editor), so anything you can do with markdown variables works inside an HTML body too.
+
+The editor is split code/preview: a monospace textarea for the HTML on the left, a live-rendered preview below it, and the shared variable manager on the right rail. Cmd/Ctrl+Enter saves, Escape cancels.
+
+### Safety policy
+
+The body is sanitized with DOMPurify at render time, before being injected via `dangerouslySetInnerHTML` into a scoped root element. The render pipeline is `interpolate variables -> DOMPurify allow-list -> scope <style> blocks -> render`, so variable values pulled from canvas memory or runs are sanitized the same way as hand-authored markup.
+
+Concretely:
+
+- **Allowed tags** — structural (`div`, `section`, `article`, `header`, `footer`, `main`, `aside`, `nav`, `p`, `h1`–`h6`, `blockquote`, `pre`, `hr`, `br`), inline (`span`, `strong`, `em`, `b`, `i`, `u`, `s`, `small`, `mark`, `sub`, `sup`, `code`, `kbd`, `samp`, `var`, `abbr`, `cite`, `dfn`, `q`, `time`, `data`), lists (`ul`, `ol`, `li`, `dl`, `dt`, `dd`), tables (`table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td`, `caption`, `colgroup`, `col`), links and images (`a`, `img`, `figure`, `figcaption`), interactive (`details`, `summary`), and `style` (scoped — see below).
+- **Allowed attributes** — `class`, `style`, `id`, `href`, `src`, `srcset`, `title`, `alt`, `width`, `height`, `colspan`, `rowspan`, `open`, `lang`, `dir`, `role`, `tabindex`, `name`, plus ARIA. Everything else is stripped, including every `on*` event handler.
+- **Forbidden tags** — `script`, `noscript`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `link`, `meta`, `base`, `head`, `html`, `body`, `title`, `template`, `form` and all form controls, `audio`, `video`, `source`, `track`, `canvas`, `math`, `svg`. These are removed even if they appear in the allow-list by accident.
+- **`<img>` may load external images.** `src`/`srcset` go through the same URL allow-list as `href` below, so authors can write `<img src="https://cdn.example.com/logo.png">`. Authors should be aware that cross-origin image fetches do leak the canvas URL via the `Referer` header and can act as tracking pixels — only embed images from sources you trust. Other resource hooks (`poster` on `<video>`, deprecated `background`, `<object data>`, `ping`, `formaction`, `xlink:href`) are still always stripped, and inline `style` values that contain `url(...)`, `expression(...)`, `@import`, `behavior:`, `javascript:`, or `vbscript:` are dropped wholesale.
+- **URL allow-list** — `href`, `src`, and `srcset` are restricted to `http(s)`, `mailto:`, `tel:`, fragments (`#…`), and relative paths. `javascript:` and `data:` URLs never survive on any attribute.
+- **`<style>` blocks are kept and scoped.** Each rule is rewritten so its selectors are prefixed with `[data-console-html-root="<id>"]`, where `<id>` is unique to that panel instance, so user CSS cannot leak outside the widget root. Rules referencing `url(...)` are dropped, `@import` is dropped, and unknown at-rules (`@keyframes`, `@font-face`, etc.) are dropped. `@media` and `@supports` are recursed into so the scoping still applies.
+
+### Tailwind classes
+
+Tailwind v4 compiles only classes it finds while scanning source files. To make a stable, predictable set of utilities available to HTML widget authors, `web_src/src/App.css` includes a curated `@source inline(...)` safelist covering display, flex/grid, spacing, sizing, typography, color (`text-*`, `bg-*`, `border-*` for every default palette/shade), borders, rounding, shadow, opacity, overflow, positioning, z-index, cursor, and transition utilities. Authors can rely on those utility families without having to safelist anything per-panel; classes outside the safelist that aren't already in the bundle will simply have no effect.
+
+Interactive variants (`hover:`, `focus:`) are safelisted for the families where they matter — color (`text-*`, `bg-*`, `border-*`), display, text decoration (`underline`, `line-through`, `no-underline`), `shadow*`, and `opacity-*`. So `hover:bg-blue-100`, `focus:shadow-lg`, `hover:underline`, and similar combinations all work. Hover/focus on sizing, spacing, and typography size families is **not** in the safelist (rare in practice, would multiply the bundle). The `dark:` variant is also not safelisted — dark mode in SuperPlane is opt-out via ancestors with `.dark-mode-disabled`, so widget authors should pick colors that work in both themes rather than relying on the variant.
+
+### Authoring example
+
+```yaml
+- id: release-card
+  type: html
+  content:
+    title: "{{ release.service }}"
+    body: |
+      <style>
+        .badge {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .badge-passed { background: #dcfce7; color: #166534; }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+      </style>
+      <div class="flex flex-col gap-2 text-sm">
+        <div class="flex items-center gap-2">
+          <strong>{{ release.service }}</strong>
+          <span class="badge badge-{{ lastRun.status }}">{{ lastRun.status }}</span>
+        </div>
+        <p class="text-slate-600">Triggered by {{ lastRun.nodeName }}.</p>
+      </div>
+    variables:
+      - name: release
+        source:
+          kind: memory
+          namespace: releases
+      - name: lastRun
+        source:
+          kind: run
+          select: latest
+```
+
+The example uses Tailwind classes for layout and color, a scoped `<style>` block for the status badge, and CEL templates to interpolate live values. The backend stores the body as-is; sanitization is purely client-side at render time, which matches the markdown panel's trust model.
 
 ## Node Panels
 

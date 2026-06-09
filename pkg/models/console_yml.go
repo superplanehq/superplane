@@ -19,6 +19,7 @@ const (
 	DashboardAPIVersion = "v1"
 
 	ConsolePanelTypeMarkdown = "markdown"
+	ConsolePanelTypeHTML     = "html"
 	ConsolePanelTypeNode     = "node"
 	ConsolePanelTypeNodes    = "nodes"
 	ConsolePanelTypeTable    = "table"
@@ -34,6 +35,7 @@ const (
 // — the frontend validators and per-type form editors rely on the same set.
 var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeMarkdown,
+	ConsolePanelTypeHTML,
 	ConsolePanelTypeNode,
 	ConsolePanelTypeNodes,
 	ConsolePanelTypeTable,
@@ -237,6 +239,8 @@ func validatePanelContent(panel ConsolePanel) error {
 	switch panel.Type {
 	case ConsolePanelTypeMarkdown:
 		return validateMarkdownContent(panel)
+	case ConsolePanelTypeHTML:
+		return validateHTMLContent(panel)
 	case ConsolePanelTypeNode:
 		return validateNodePanelContent(panel)
 	case ConsolePanelTypeNodes:
@@ -263,6 +267,32 @@ var AllowedMarkdownRunSelects = []string{"latest", "latest_passed", "latest_fail
 var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
 
 func validateMarkdownContent(panel ConsolePanel) error {
+	if panel.Content == nil {
+		return nil
+	}
+	if rawTitle, ok := panel.Content["title"]; ok && rawTitle != nil {
+		if _, ok := rawTitle.(string); !ok {
+			return fmt.Errorf("panel %q content.title must be a string", panel.ID)
+		}
+	}
+	if rawBody, ok := panel.Content["body"]; ok && rawBody != nil {
+		if _, ok := rawBody.(string); !ok {
+			return fmt.Errorf("panel %q content.body must be a string", panel.ID)
+		}
+	}
+	if rawVars, ok := panel.Content["variables"]; ok && rawVars != nil {
+		if err := validateMarkdownVariables(panel.ID, rawVars); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateHTMLContent enforces the shape of an html panel's content. The body
+// is stored raw and sanitized client-side at render time (same trust model as
+// markdown), so the backend only checks structure: title and body are optional
+// strings and the shared variable system rules apply.
+func validateHTMLContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
