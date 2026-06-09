@@ -346,7 +346,8 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 	if lbType == LoadBalancerTypeGateway {
 		minSubnets = minSubnetsForGWLB
 	}
-	if len(config.Subnets) < minSubnets {
+	realSubnets := countNonEmpty(config.Subnets)
+	if realSubnets < minSubnets {
 		return fmt.Errorf("at least %d subnet(s) in different Availability Zones must be specified", minSubnets)
 	}
 
@@ -555,6 +556,10 @@ func validateListenerConfig(config CreateLoadBalancerConfiguration) error {
 
 	if protocol != "" && targetGroup == "" {
 		return fmt.Errorf("listenerTargetGroup is required when listenerProtocol is specified")
+	}
+
+	if targetGroup != "" && protocol == "" {
+		return fmt.Errorf("listenerProtocol is required when listenerTargetGroup is specified")
 	}
 
 	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
