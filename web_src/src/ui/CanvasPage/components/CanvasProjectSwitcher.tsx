@@ -442,6 +442,7 @@ function ProjectSearchList({
             <Link
               to={appPath(organizationId, project.id)}
               onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
                 onSelect(project.id);
               }}

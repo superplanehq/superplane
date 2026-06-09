@@ -365,7 +365,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           <Link
                             to={
                               integration.metadata?.integrationName && integration.status?.setupState?.currentStep
-                                ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup`
+                                ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup?integrationId=${integration.metadata?.id}`
                                 : `/${organizationId}/settings/integrations/${integration.metadata?.id}`
                             }
                             className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate hover:underline"
@@ -386,7 +386,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                                 <Link
                                   to={
                                     integration.metadata?.integrationName && integration.status?.setupState?.currentStep
-                                      ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup`
+                                      ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup?integrationId=${integration.metadata?.id}`
                                       : `/${organizationId}/settings/integrations/${integration.metadata?.id}`
                                   }
                                 >
