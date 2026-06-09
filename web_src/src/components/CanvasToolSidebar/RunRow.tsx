@@ -35,9 +35,7 @@ export function RunRow({
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
-  const runHref = organizationId && appId && run.id
-    ? appPath(organizationId, appId, `?view=runs&run=${run.id}`)
-    : "#";
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
 
   return (
     <Link
