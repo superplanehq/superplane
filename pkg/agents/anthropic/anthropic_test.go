@@ -311,6 +311,26 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[3].Type)
 }
 
+func TestStreamEvents_TreatsUnknownIdleStopReasonAsTurnCompleted(t *testing.T) {
+	const sse = "data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"new_provider_reason\"}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+}
+
 func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 	// Tool use and its matching result have different event ids but share
 	// the same tool_use_id. The mapper must surface tool_use_id as the
