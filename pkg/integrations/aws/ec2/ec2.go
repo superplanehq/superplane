@@ -42,7 +42,7 @@ const (
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
 
-	loadBalancerPollInterval    = 15 * time.Second
+	loadBalancerPollInterval    = 10 * time.Second
 	maxLoadBalancerPollErrors   = 10
 	maxLoadBalancerPollAttempts = 120
 )
@@ -60,4 +60,19 @@ const (
 
 	LoadBalancerSchemeInternetFacing = "internet-facing"
 	LoadBalancerSchemeInternal       = "internal"
+
+	LoadBalancerIPAddressTypeIPv4                     = "ipv4"
+	LoadBalancerIPAddressTypeDualStack                = "dualstack"
+	LoadBalancerIPAddressTypeDualStackWithoutPublicIP = "dualstack-without-public-ipv4"
+
+	ListenerProtocolHTTP   = "HTTP"
+	ListenerProtocolHTTPS  = "HTTPS"
+	ListenerProtocolTCP    = "TCP"
+	ListenerProtocolTLS    = "TLS"
+	ListenerProtocolUDP    = "UDP"
+	ListenerProtocolTCPUDP = "TCP_UDP"
+	ListenerProtocolGENEVE = "GENEVE"
+
+	minSubnetsForALBNLB = 2
+	minSubnetsForGWLB   = 1
 )
