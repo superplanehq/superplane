@@ -293,6 +293,94 @@ func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
 	assert.Contains(t, err.Error(), "namespace")
 }
 
+func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeHTML,
+		Content: map[string]any{
+			"title": "Status",
+			"body":  `<div class="p-2"><strong>{{ rec.status }}</strong></div>`,
+			"variables": []any{
+				map[string]any{
+					"name":   "rec",
+					"source": map[string]any{"kind": "memory", "namespace": "deploys"},
+				},
+			},
+		},
+	}
+	assert.NoError(t, validateHTMLContent(panel))
+}
+
+func TestValidateHTMLContent_RejectsNonStringBody(t *testing.T) {
+	panel := ConsolePanel{
+		ID:      "p1",
+		Type:    ConsolePanelTypeHTML,
+		Content: map[string]any{"body": 42},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.body must be a string")
+}
+
+func TestValidateHTMLContent_RejectsNonStringTitle(t *testing.T) {
+	panel := ConsolePanel{
+		ID:      "p1",
+		Type:    ConsolePanelTypeHTML,
+		Content: map[string]any{"title": 42},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.title must be a string")
+}
+
+func TestValidateHTMLContent_PropagatesVariableValidation(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeHTML,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{
+					"name":   "1bad",
+					"source": map[string]any{"kind": "memory", "namespace": "n"},
+				},
+			},
+		},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "valid identifier")
+}
+
+func TestConsoleFromYML_AcceptsHTMLPanel(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: html-1
+      type: html
+      content:
+        title: Status
+        body: '<div class="p-2"><strong>{{ rec.status }}</strong></div>'
+        variables:
+          - name: rec
+            source:
+              kind: memory
+              namespace: deploys
+  layout:
+    - i: html-1
+      x: 0
+      y: 0
+      w: 6
+      h: 3
+`
+
+	resource, err := ConsoleFromYML([]byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, resource.Spec.Panels, 1)
+	assert.Equal(t, ConsolePanelTypeHTML, resource.Spec.Panels[0].Type)
+}
+
 func TestDashboardFromYML_AcceptsMarkdownVariables(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
