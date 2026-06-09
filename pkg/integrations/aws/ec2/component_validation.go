@@ -177,15 +177,38 @@ func requireLoadBalancerARN(value string) (string, error) {
 }
 
 var updateAlarmFieldKeys = []string{
-	"threshold",
+	"thresholdCondition",
 	"statistic",
-	"comparisonOperator",
 	"period",
 	"evaluationPeriods",
 	"alarmDescription",
 	"treatMissingData",
 	"alarmAction",
 	"snsTopic",
+}
+
+var updateAlarmFieldLabels = map[string]string{
+	"thresholdCondition": "Threshold",
+	"statistic":          "Statistic",
+	"period":             "Period",
+	"evaluationPeriods":  "Evaluation Periods",
+	"alarmDescription":   "Description",
+	"treatMissingData":   "Treat Missing Data",
+	"alarmAction":        "Alarm Action",
+	"snsTopic":           "SNS Topic",
+}
+
+func updatedAlarmFieldLabels(configuration any) []string {
+	labels := make([]string, 0, len(updateAlarmFieldKeys))
+	for _, key := range updateAlarmFieldKeys {
+		if hasConfigKey(configuration, key) {
+			if label, ok := updateAlarmFieldLabels[key]; ok {
+				labels = append(labels, label)
+			}
+		}
+	}
+
+	return labels
 }
 
 func requireAtLeastOneAlarmUpdate(configuration any) error {
