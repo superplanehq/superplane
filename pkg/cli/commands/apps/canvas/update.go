@@ -16,6 +16,8 @@ import (
 type updateCommand struct {
 	file            *string
 	draft           *bool
+	draftID         *string
+	versionID       *string
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -70,6 +72,14 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+	if resolvedDraftID != "" {
+		draftMode = true
+	}
+
 	yamlBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read canvas yaml: %w", err)
@@ -84,7 +94,16 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
 	}
 
-	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	var targetVersionID string
+	if draftMode || resolvedDraftID != "" {
+		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: resolvedDraftID == "",
+		})
+	} else {
+		targetVersionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
