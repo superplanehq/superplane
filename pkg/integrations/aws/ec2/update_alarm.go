@@ -15,22 +15,27 @@ import (
 type UpdateAlarm struct{}
 
 type UpdateAlarmConfiguration struct {
-	Region             string  `json:"region" mapstructure:"region"`
-	AlarmName          string  `json:"alarm" mapstructure:"alarm"`
-	Statistic          string  `json:"statistic" mapstructure:"statistic"`
-	ComparisonOperator string  `json:"comparisonOperator" mapstructure:"comparisonOperator"`
+	Region             string             `json:"region" mapstructure:"region"`
+	AlarmName          string             `json:"alarm" mapstructure:"alarm"`
+	ThresholdCondition ThresholdCondition `json:"thresholdCondition" mapstructure:"thresholdCondition"`
+	Statistic          string             `json:"statistic" mapstructure:"statistic"`
+	Period             int                `json:"period" mapstructure:"period"`
+	EvaluationPeriods  int                `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
+	AlarmDescription   string             `json:"alarmDescription" mapstructure:"alarmDescription"`
+	TreatMissingData   string             `json:"treatMissingData" mapstructure:"treatMissingData"`
+	SNSTopicARN        string             `json:"snsTopic" mapstructure:"snsTopic"`
+	AlarmAction        string             `json:"alarmAction" mapstructure:"alarmAction"`
+}
+
+type ThresholdCondition struct {
 	Threshold          float64 `json:"threshold" mapstructure:"threshold"`
-	Period             int     `json:"period" mapstructure:"period"`
-	EvaluationPeriods  int     `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
-	AlarmDescription   string  `json:"alarmDescription" mapstructure:"alarmDescription"`
-	TreatMissingData   string  `json:"treatMissingData" mapstructure:"treatMissingData"`
-	SNSTopicARN        string  `json:"snsTopic" mapstructure:"snsTopic"`
-	AlarmAction        string  `json:"alarmAction" mapstructure:"alarmAction"`
+	ComparisonOperator string  `json:"comparisonOperator" mapstructure:"comparisonOperator"`
 }
 
 type UpdateAlarmNodeMetadata struct {
-	Region    string `json:"region" mapstructure:"region"`
-	AlarmName string `json:"alarmName" mapstructure:"alarmName"`
+	Region        string   `json:"region" mapstructure:"region"`
+	AlarmName     string   `json:"alarmName" mapstructure:"alarmName"`
+	UpdatedFields []string `json:"updatedFields" mapstructure:"updatedFields"`
 }
 
 func (c *UpdateAlarm) Name() string {
@@ -58,9 +63,8 @@ func (c *UpdateAlarm) Documentation() string {
 
 - **Region**: AWS region where the alarm resides
 - **Alarm**: CloudWatch alarm to update (` + "`ec2.alarm`" + ` resource picker)
-- **Threshold** *(toggleable)*: New numeric threshold
+- **Threshold** *(toggleable)*: New threshold and comparison operator (both must be set together)
 - **Statistic** *(toggleable)*: Aggregation function (Average, Sum, Min, Max, SampleCount)
-- **Comparison Operator** *(toggleable)*: Threshold comparison operator
 - **Period** *(toggleable)*: Evaluation window in seconds
 - **Evaluation Periods** *(toggleable)*: Consecutive breaching periods required before ALARM
 - **Alarm Description** *(toggleable)*: Free-text description
@@ -126,11 +130,36 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "threshold",
-			Label:     "Threshold",
-			Type:      configuration.FieldTypeNumber,
-			Required:  false,
-			Togglable: true,
+			Name:        "thresholdCondition",
+			Label:       "Threshold",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Update the alarm threshold and comparison operator",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:     "threshold",
+							Label:    "Threshold",
+							Type:     configuration.FieldTypeNumber,
+							Required: true,
+						},
+						{
+							Name:     "comparisonOperator",
+							Label:    "Comparison Operator",
+							Type:     configuration.FieldTypeSelect,
+							Required: true,
+							Default:  "GreaterThanThreshold",
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: AlarmComparisonOperatorOptions,
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:      "statistic",
@@ -141,18 +170,6 @@ func (c *UpdateAlarm) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: AlarmStatisticOptions,
-				},
-			},
-		},
-		{
-			Name:      "comparisonOperator",
-			Label:     "Comparison Operator",
-			Type:      configuration.FieldTypeSelect,
-			Required:  false,
-			Togglable: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: AlarmComparisonOperatorOptions,
 				},
 			},
 		},
@@ -254,8 +271,9 @@ func (c *UpdateAlarm) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(UpdateAlarmNodeMetadata{
-		Region:    region,
-		AlarmName: alarmName,
+		Region:        region,
+		AlarmName:     alarmName,
+		UpdatedFields: updatedAlarmFieldLabels(ctx.Configuration),
 	})
 }
 
@@ -316,25 +334,42 @@ func (c *UpdateAlarm) Execute(ctx core.ExecutionContext) error {
 }
 
 func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfiguration) error {
+	if hasConfigKey(rawConfiguration, "thresholdCondition") {
+		conditionConfig, ok := thresholdConditionConfig(rawConfiguration)
+		if !ok {
+			return fmt.Errorf("threshold and comparison operator are required")
+		}
+
+		if _, err := requireThreshold(conditionConfig, config.ThresholdCondition.Threshold); err != nil {
+			return err
+		}
+
+		if _, err := requireComparisonOperator(config.ThresholdCondition.ComparisonOperator); err != nil {
+			return err
+		}
+	}
+
 	if hasConfigKey(rawConfiguration, "statistic") {
 		if _, err := requireStatistic(config.Statistic); err != nil {
 			return err
 		}
 	}
 
-	if hasConfigKey(rawConfiguration, "comparisonOperator") {
-		if _, err := requireComparisonOperator(config.ComparisonOperator); err != nil {
-			return err
-		}
-	}
-
-	if hasConfigKey(rawConfiguration, "threshold") {
-		if _, err := requireThreshold(rawConfiguration, config.Threshold); err != nil {
-			return err
-		}
-	}
-
 	return nil
+}
+
+func thresholdConditionConfig(rawConfiguration any) (map[string]any, bool) {
+	configurationMap, ok := rawConfiguration.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+
+	conditionConfig, ok := configurationMap["thresholdCondition"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+
+	return conditionConfig, true
 }
 
 func buildUpdateAlarmInput(
@@ -374,12 +409,18 @@ func buildUpdateAlarmInput(
 		input.Statistic = strings.TrimSpace(config.Statistic)
 	}
 
-	if hasConfigKey(rawConfiguration, "comparisonOperator") {
-		input.ComparisonOperator = strings.TrimSpace(config.ComparisonOperator)
-	}
+	if conditionConfig, ok := thresholdConditionConfig(rawConfiguration); ok {
+		if _, err := requireThreshold(conditionConfig, config.ThresholdCondition.Threshold); err != nil {
+			return PutMetricAlarmInput{}, err
+		}
 
-	if hasConfigKey(rawConfiguration, "threshold") {
-		input.Threshold = config.Threshold
+		comparisonOperator, err := requireComparisonOperator(config.ThresholdCondition.ComparisonOperator)
+		if err != nil {
+			return PutMetricAlarmInput{}, err
+		}
+
+		input.Threshold = config.ThresholdCondition.Threshold
+		input.ComparisonOperator = comparisonOperator
 	}
 
 	if hasConfigKey(rawConfiguration, "period") && config.Period > 0 {

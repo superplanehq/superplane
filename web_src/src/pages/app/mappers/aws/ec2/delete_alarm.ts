@@ -62,7 +62,6 @@ export const deleteAlarmMapper: ComponentBaseMapper = {
         "Deleted At": stringOrDash(deletedAt),
         "Alarm Name": stringOrDash(configuration?.alarm ?? nodeMetadata?.alarmName),
         Deleted: "-",
-        Region: stringOrDash(configuration?.region ?? nodeMetadata?.region),
       };
     }
 
@@ -70,7 +69,6 @@ export const deleteAlarmMapper: ComponentBaseMapper = {
       "Deleted At": stringOrDash(deletedAt),
       "Alarm Name": stringOrDash(output.alarmName ?? configuration?.alarm),
       Deleted: output.deleted === true ? "Yes" : stringOrDash(output.deleted),
-      Region: stringOrDash(output.region ?? configuration?.region),
     };
   },
 
