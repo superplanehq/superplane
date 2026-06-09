@@ -10,12 +10,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func Test_branchEventIDByParentExecution(t *testing.T) {
+func Test_consumedEventByParentFromRunChain(t *testing.T) {
 	parentID := uuid.New()
 	childID := uuid.New()
 	childEventID := uuid.New()
 
-	executions := []models.CanvasNodeExecution{
+	runChain := []models.CanvasNodeExecution{
 		{ID: parentID},
 		{
 			ID:                  childID,
@@ -24,13 +24,13 @@ func Test_branchEventIDByParentExecution(t *testing.T) {
 		},
 	}
 
-	branchEventIDByParent := branchEventIDByParentExecution(executions)
-	assert.Equal(t, childEventID, branchEventIDByParent[parentID])
+	consumedEventByParent := consumedEventByParentFromRunChain(runChain)
+	assert.Equal(t, childEventID, consumedEventByParent[parentID])
 }
 
-func Test_eventForExecution_usesBranchRoutingEvent(t *testing.T) {
+func Test_outputEvent_usesConsumedEventWhenMultipleOutputs(t *testing.T) {
 	parentExecutionID := uuid.New()
-	branchEventID := uuid.New()
+	consumedEventID := uuid.New()
 	otherEventID := uuid.New()
 	now := time.Now()
 
@@ -42,23 +42,26 @@ func Test_eventForExecution_usesBranchRoutingEvent(t *testing.T) {
 			Data:        models.NewJSONValue(map[string]any{"item": "a"}),
 		},
 		{
-			ID:          branchEventID,
+			ID:          consumedEventID,
 			ExecutionID: &parentExecutionID,
 			CreatedAt:   &now,
 			Data:        models.NewJSONValue(map[string]any{"item": "b"}),
 		},
 	}
 
-	eventsByID := indexEventsByID(events)
-	branchEventIDByParent := map[uuid.UUID]uuid.UUID{parentExecutionID: branchEventID}
+	lookup := executionOutputLookup{
+		eventsByID:            indexEventsByID(events),
+		eventsByExecutionID:   indexEventsByExecutionID(events),
+		consumedEventByParent: map[uuid.UUID]uuid.UUID{parentExecutionID: consumedEventID},
+	}
 
-	event, ok, err := eventForExecution(parentExecutionID, events, eventsByID, branchEventIDByParent)
+	event, ok, err := lookup.outputEvent(parentExecutionID)
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.Equal(t, branchEventID, event.ID)
+	assert.Equal(t, consumedEventID, event.ID)
 }
 
-func Test_eventForExecution_singleEventWithoutBranchLink(t *testing.T) {
+func Test_outputEvent_singleOutput(t *testing.T) {
 	executionID := uuid.New()
 	eventID := uuid.New()
 	now := time.Now()
@@ -67,13 +70,19 @@ func Test_eventForExecution_singleEventWithoutBranchLink(t *testing.T) {
 		{ID: eventID, ExecutionID: &executionID, CreatedAt: &now},
 	}
 
-	event, ok, err := eventForExecution(executionID, events, indexEventsByID(events), nil)
+	lookup := executionOutputLookup{
+		eventsByID:            indexEventsByID(events),
+		eventsByExecutionID:   indexEventsByExecutionID(events),
+		consumedEventByParent: nil,
+	}
+
+	event, ok, err := lookup.outputEvent(executionID)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, eventID, event.ID)
 }
 
-func Test_eventForExecution_ambiguousWithoutBranchLink(t *testing.T) {
+func Test_outputEvent_ambiguousWithoutConsumedEvent(t *testing.T) {
 	executionID := uuid.New()
 	now := time.Now()
 
@@ -82,10 +91,30 @@ func Test_eventForExecution_ambiguousWithoutBranchLink(t *testing.T) {
 		{ID: uuid.New(), ExecutionID: &executionID, CreatedAt: &now},
 	}
 
-	_, ok, err := eventForExecution(executionID, events, indexEventsByID(events), nil)
+	lookup := executionOutputLookup{
+		eventsByID:            indexEventsByID(events),
+		eventsByExecutionID:   indexEventsByExecutionID(events),
+		consumedEventByParent: nil,
+	}
+
+	_, ok, err := lookup.outputEvent(executionID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ambiguous outputs")
 	assert.False(t, ok)
+}
+
+func Test_consumedEventIDsFromMap(t *testing.T) {
+	first := uuid.New()
+	second := uuid.New()
+
+	ids := consumedEventIDsFromMap(map[uuid.UUID]uuid.UUID{
+		uuid.New(): first,
+		uuid.New(): second,
+		uuid.New(): uuid.Nil,
+	})
+
+	assert.Len(t, ids, 2)
+	assert.ElementsMatch(t, []uuid.UUID{first, second}, ids)
 }
 
 func Test_unionExecutionIDs(t *testing.T) {

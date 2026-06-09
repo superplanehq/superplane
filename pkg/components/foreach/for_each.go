@@ -53,6 +53,10 @@ func (c *ForEach) Documentation() string {
 2. Emits one ` + "`foreach.item`" + ` event to the ` + "`item`" + ` channel for each element
 3. If the array is empty, passes without emitting any events
 
+## Limits
+
+- At most ` + fmt.Sprintf("%d", core.MaxEmitCount) + ` items per execution. Larger arrays fail with an error.
+
 ## Output Fields (per item)
 
 - **item**: The array element value
@@ -132,6 +136,9 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 
 	if len(items) == 0 {
 		return ctx.ExecutionState.Pass()
+	}
+	if len(items) > core.MaxEmitCount {
+		return fmt.Errorf("array has %d items; For Each supports at most %d per execution", len(items), core.MaxEmitCount)
 	}
 
 	payloads := make([]any, 0, len(items))

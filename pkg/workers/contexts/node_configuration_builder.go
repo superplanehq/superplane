@@ -432,7 +432,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 			return nil, err
 		}
 
-		branchEvents, err := loadExecutionBranchEvents(
+		outputs, err := newExecutionOutputLookup(
 			b.tx,
 			linearExecutions,
 			executionIDsFromExecutions(executionsInChain),
@@ -448,7 +448,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 				continue
 			}
 
-			event, found, err := branchEvents.eventFor(execution.ID)
+			event, found, err := outputs.outputEvent(execution.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -807,7 +807,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		referencedExecutionIDs = append(referencedExecutionIDs, executionID)
 	}
 
-	branchEvents, err := loadExecutionBranchEvents(
+	outputs, err := newExecutionOutputLookup(
 		b.tx,
 		chainExecutions,
 		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
@@ -817,7 +817,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	}
 
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok, err := branchEvents.eventFor(executionID)
+		event, ok, err := outputs.outputEvent(executionID)
 		if err != nil {
 			return fmt.Errorf("node %s: %w", nodeRef, err)
 		}
@@ -939,7 +939,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		startIndex = 1
 	}
 
-	branchEvents, err := loadExecutionBranchEvents(
+	outputs, err := newExecutionOutputLookup(
 		b.tx,
 		executionsInChain,
 		executionIDsFromExecutions(executionsInChain),
@@ -954,7 +954,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 			continue
 		}
 
-		event, ok, err := branchEvents.eventFor(execution.ID)
+		event, ok, err := outputs.outputEvent(execution.ID)
 		if err != nil {
 			return step, nil, err
 		}

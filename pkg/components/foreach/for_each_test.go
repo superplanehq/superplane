@@ -80,6 +80,23 @@ func TestForEachExecute(t *testing.T) {
 		assert.ErrorContains(t, err, "expression must evaluate to an array")
 	})
 
+	t.Run("returns error when array exceeds emit limit", func(t *testing.T) {
+		component := &ForEach{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		items := make([]any, core.MaxEmitCount+1)
+		exprCtx := &contexts.ExpressionContext{Output: items}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"arrayExpression": `$["Runner"].items`},
+			Metadata:       execMetadata,
+			ExecutionState: execState,
+			Expressions:    exprCtx,
+		})
+
+		assert.ErrorContains(t, err, "supports at most")
+	})
+
 	t.Run("returns error when arrayExpression is missing", func(t *testing.T) {
 		component := &ForEach{}
 		execState := &contexts.ExecutionStateContext{}
