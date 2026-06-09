@@ -16,15 +16,47 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// commitCanvasRepositoryFilesForTest wraps CommitCanvasRepositoryFiles with the
+// shared services from the test ResourceRegistry so each case only has to supply
+// the request-specific arguments.
+func commitCanvasRepositoryFilesForTest(
+	ctx context.Context,
+	r *support.ResourceRegistry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	expectedHeadSha string,
+	message string,
+	operations []*pb.CanvasRepositoryFileOperation,
+) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	return CommitCanvasRepositoryFiles(
+		ctx,
+		r.GitProvider,
+		nil,
+		r.Encryptor,
+		r.Registry,
+		organizationID,
+		canvasID,
+		versionID,
+		expectedHeadSha,
+		message,
+		operations,
+		nil,
+		"",
+		r.AuthService,
+	)
+}
+
 func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			context.Background(),
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			uuid.New().String(),
+			"",
 			"abc123",
 			"commit message",
 			nil,
@@ -37,11 +69,12 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			"invalid-id",
+			"",
 			"abc123",
 			"commit message",
 			nil,
@@ -55,14 +88,17 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			"abc123",
 			"commit message",
-			nil,
+			[]*pb.CanvasRepositoryFileOperation{
+				{Path: "README.md", Content: []byte("hello")},
+			},
 		)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -73,11 +109,12 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			"stale-head",
 			"commit message",
 			[]*pb.CanvasRepositoryFileOperation{
@@ -96,11 +133,12 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		otherOrg := support.CreateOrganization(t, r, r.User)
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			otherOrg.ID.String(),
 			canvas.ID.String(),
+			"",
 			"abc123",
 			"commit message",
 			nil,
@@ -116,11 +154,12 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
 		require.NoError(t, err)
 
-		response, err := CommitCanvasRepositoryFiles(
+		response, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			headSHA,
 			"add readme",
 			[]*pb.CanvasRepositoryFileOperation{
