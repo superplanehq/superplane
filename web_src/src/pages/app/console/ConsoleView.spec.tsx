@@ -149,7 +149,8 @@ describe("ConsoleView grid transitions", () => {
     );
     expect(screen.getByText("REMOVED")).toBeTruthy();
     expect(screen.getByText("Old Panel")).toBeTruthy();
-    expect(container.querySelectorAll(".react-grid-item.console-grid-item")).toHaveLength(3);
+    expect(container.querySelectorAll(".react-grid-item.console-grid-item")).toHaveLength(2);
+    expect(container.querySelectorAll('[data-testid="console-removed-panel-ghost"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-testid="console-panel-diff-border"]')).toHaveLength(3);
     expect(container.querySelector('[data-testid="console-panel-diff-border"]')).toHaveClass("rounded-lg", "border-2");
     expect(screen.queryByText("See diff")).not.toBeInTheDocument();
@@ -177,6 +178,7 @@ describe("ConsoleView grid transitions", () => {
     expect(screen.queryByText("REMOVED")).not.toBeInTheDocument();
     expect(screen.queryByText("Old Panel")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".react-grid-item.console-grid-item")).toHaveLength(2);
+    expect(container.querySelectorAll('[data-testid="console-removed-panel-ghost"]')).toHaveLength(0);
   });
 
   it("renders a deleted panel ghost immediately after local delete", () => {
@@ -199,6 +201,7 @@ describe("ConsoleView grid transitions", () => {
 
     expect(screen.getByText("REMOVED")).toBeTruthy();
     expect(screen.getByText("Readme")).toBeTruthy();
-    expect(container.querySelectorAll(".react-grid-item.console-grid-item")).toHaveLength(1);
+    expect(container.querySelectorAll(".react-grid-item.console-grid-item")).toHaveLength(0);
+    expect(container.querySelectorAll('[data-testid="console-removed-panel-ghost"]')).toHaveLength(1);
   });
 });
