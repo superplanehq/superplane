@@ -184,11 +184,16 @@ const FORBID_TAGS = [
 const FORBID_ATTR = ["poster", "background", "data", "ping", "formaction", "action", "xlink:href", "xmlns"];
 
 /**
- * Allowed schemes for `href`. Excludes `javascript:` (XSS) and `data:`
- * (would allow embedded payloads). Tighter than DOMPurify's default URI
+ * Allowed schemes for `href`/`src`/`srcset`. Excludes `javascript:` (XSS) and
+ * `data:` (would allow embedded payloads). Tighter than DOMPurify's default URI
  * regex so we don't accidentally accept `vbscript:` or unknown protocols.
+ *
+ * The relative-path branch deliberately rejects protocol-relative URLs: a bare
+ * `/` must NOT be followed by another `/` (or a `\`, which browsers normalize
+ * to `/`). Otherwise `//evil.example/...` would slip through as a "relative
+ * path" and silently target an arbitrary third-party host.
  */
-const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:|tel:|#|\/|\.\/|\.\.\/)/i;
+const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:|tel:|#|\/(?![/\\])|\.\/|\.\.\/)/i;
 
 /**
  * Substrings that disqualify an inline `style` attribute. We do a substring

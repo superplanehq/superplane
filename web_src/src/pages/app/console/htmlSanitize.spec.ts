@@ -93,6 +93,34 @@ describe("sanitizeHtml - dangerous attributes", () => {
     expect(links[2].getAttribute("href")).toBe("tel:+1");
   });
 
+  it("rejects protocol-relative hrefs that target arbitrary hosts", () => {
+    const out = sanitizeHtml('<a href="//evil.example/phish">a</a><a href="/\\evil.example/phish">b</a>', ROOT_ID);
+    const links = parse(out).querySelectorAll("a");
+    expect(links).toHaveLength(2);
+    expect(links[0].getAttribute("href")).toBeNull();
+    expect(links[1].getAttribute("href")).toBeNull();
+  });
+
+  it("allows same-origin absolute and relative path hrefs", () => {
+    const out = sanitizeHtml(
+      '<a href="/dashboard">a</a><a href="./page">b</a><a href="../up">c</a><a href="#frag">d</a>',
+      ROOT_ID,
+    );
+    const links = parse(out).querySelectorAll("a");
+    expect(links).toHaveLength(4);
+    expect(links[0].getAttribute("href")).toBe("/dashboard");
+    expect(links[1].getAttribute("href")).toBe("./page");
+    expect(links[2].getAttribute("href")).toBe("../up");
+    expect(links[3].getAttribute("href")).toBe("#frag");
+  });
+
+  it("rejects protocol-relative src on <img>", () => {
+    const out = sanitizeHtml('<img src="//evil.example/pixel.png" alt="a">', ROOT_ID);
+    const img = parse(out).querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBeNull();
+  });
+
   it("allows http(s) src/srcset on <img> but strips deprecated resource attrs", () => {
     // `src` and `srcset` survive when they point at http(s) so authors can
     // actually use <img>. `background` (deprecated <body> attr) and other
