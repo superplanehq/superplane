@@ -79,9 +79,19 @@ func runQuery(client Client, fullURL string) (map[string]any, error) {
 		}
 	}
 
+	// Only vector/matrix results are arrays of series. scalar/string results are
+	// a single [timestamp, value] pair — counting their array length would
+	// misreport seriesCount as 2.
 	seriesCount := 0
-	if series, ok := result.([]any); ok {
-		seriesCount = len(series)
+	switch resp.Data.ResultType {
+	case "vector", "matrix":
+		if series, ok := result.([]any); ok {
+			seriesCount = len(series)
+		}
+	case "scalar", "string":
+		if result != nil {
+			seriesCount = 1
+		}
 	}
 
 	return map[string]any{

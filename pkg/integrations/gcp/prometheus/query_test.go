@@ -61,6 +61,29 @@ func Test__Query__Execute(t *testing.T) {
 		require.Len(t, payload["result"].([]any), 1)
 	})
 
+	t.Run("scalar result reports a single value, not its array length", func(t *testing.T) {
+		mc := &mockClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, url string) ([]byte, error) {
+				// A scalar result is a [timestamp, value] pair, not a list of series.
+				return []byte(`{"status":"success","data":{"resultType":"scalar","result":[1767225600,"42"]}}`), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := q.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"query": "scalar(up)"},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		payload := firstPayload(t, state)
+		assert.Equal(t, "scalar", payload["resultType"])
+		assert.Equal(t, 1, payload["seriesCount"])
+	})
+
 	t.Run("prometheus error status fails the execution", func(t *testing.T) {
 		mc := &mockClient{
 			projectID: "my-project",
