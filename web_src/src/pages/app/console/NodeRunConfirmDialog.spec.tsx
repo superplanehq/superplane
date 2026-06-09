@@ -52,6 +52,28 @@ describe("NodeRunConfirmDialog", () => {
     expect(preview.textContent).toContain('"template": "manual"');
   });
 
+  it("keeps long parameter values inside a horizontally scrollable preview", () => {
+    render(
+      <NodeRunConfirmDialog
+        open
+        onOpenChange={() => undefined}
+        resolved={resolvedFor({
+          ...NODE_NO_PARAMS,
+          configuration: {
+            templates: [{ name: "manual", payload: { token: "a".repeat(200) } }],
+          },
+        })}
+        templateName="manual"
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const preview = screen.getByTestId("node-run-confirm-parameters");
+    expect(preview.getAttribute("class")).toContain("overflow-x-auto");
+    expect(preview.getAttribute("class")).toContain("whitespace-pre");
+    expect(preview.getAttribute("class")).not.toContain("break-all");
+  });
+
   it("submits coerced parameter values along with the template name", async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
