@@ -42,7 +42,7 @@ export function RunRow({
       to={runHref}
       data-testid="runs-sidebar-row"
       onClick={(e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (e.button === 1 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
         if (run.id) onSelectRun(run.id);
       }}
@@ -106,11 +106,9 @@ export function RunRow({
           event.preventDefault();
           event.stopPropagation();
           void (async () => {
-            const url = new URL(window.location.href);
-            url.searchParams.set("view", "runs");
-            url.searchParams.set("run", run.id || "");
+            const copyUrl = new URL(runHref, window.location.origin);
             try {
-              await navigator.clipboard.writeText(url.toString());
+              await navigator.clipboard.writeText(copyUrl.toString());
               toast.success("Run link copied");
             } catch {
               toast.error("Failed to copy run link");
