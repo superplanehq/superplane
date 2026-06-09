@@ -1,10 +1,12 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
+import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface RunRowProps {
@@ -30,28 +32,28 @@ export function RunRow({
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
 
   return (
     <div
       data-testid="runs-sidebar-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => run.id && onSelectRun(run.id)}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        if (run.id) {
-          onSelectRun(run.id);
-        }
-      }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left transition-colors",
+        "group relative flex w-full items-center gap-1.5 px-3 py-2 transition-colors",
         !hideBottomBorder && "border-b border-b-slate-950/10",
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
+      <Link
+        to={runHref}
+        onClick={() => {
+          if (run.id) onSelectRun(run.id);
+        }}
+        className="absolute inset-0"
+        aria-label={title}
+      />
       <RunNodeIcon
         iconSrc={iconSrc}
         iconSlug={iconSlug}
@@ -83,15 +85,13 @@ export function RunRow({
       <button
         type="button"
         title="Copy link to run"
-        className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
         onClick={(event) => {
           event.stopPropagation();
           void (async () => {
-            const url = new URL(window.location.href);
-            url.searchParams.set("view", "runs");
-            url.searchParams.set("run", run.id || "");
+            const copyUrl = new URL(runHref, window.location.origin);
             try {
-              await navigator.clipboard.writeText(url.toString());
+              await navigator.clipboard.writeText(copyUrl.toString());
               toast.success("Run link copied");
             } catch {
               toast.error("Failed to copy run link");
