@@ -26,13 +26,13 @@ import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowS
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 import { validateNumberDataSource } from "./numberDataSourceValidation";
 import { validateNumberMetrics } from "./numberMetricsValidation";
-import { validateMarkdownVariables, type MarkdownVariable } from "./markdownVariables";
+import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "node", "nodes", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 export interface PanelTypeMeta {
@@ -50,6 +50,12 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "markdown",
     label: "Markdown",
     description: "Free-form notes, docs, or runbooks rendered as GitHub-flavored markdown.",
+  },
+  html: {
+    type: "html",
+    label: "HTML",
+    description:
+      "Custom HTML with inline styles, scoped <style>, and Tailwind classes. Scripts and external resources are blocked.",
   },
   node: {
     type: "node",
@@ -92,6 +98,14 @@ export interface MarkdownPanelContent {
   /** Named variables referenced from the markdown body via `{{ name.field }}`. */
   variables?: MarkdownVariable[];
 }
+
+/**
+ * Content shape for the `html` panel. Structurally identical to
+ * {@link MarkdownPanelContent} - title, raw body, and the shared variable
+ * system - but the body is HTML rendered through the strict sanitizer in
+ * `htmlSanitize.ts` instead of the markdown pipeline.
+ */
+export type HtmlPanelContent = MarkdownPanelContent;
 
 export interface NodePanelContent {
   title?: string;
@@ -240,6 +254,7 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
   switch (type) {
     case "markdown":
+    case "html":
       return { title: defaultTitle ?? "", body: "", variables: [] } satisfies MarkdownPanelContent;
     case "node":
       return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
@@ -278,6 +293,9 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
 export function validatePanelContent(type: PanelType, content: unknown): string | null {
   switch (type) {
     case "markdown":
+    case "html":
+      // Both kinds carry the same `title?` + `body?` + variables shape; only
+      // the renderer differs (markdown pipeline vs. HTML sanitizer).
       return validateMarkdownContent(content);
     case "node":
       return validateNodeContent(content);
@@ -295,19 +313,6 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
 export function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
-}
-
-function validateMarkdownContent(content: unknown): string | null {
-  if (content === undefined || content === null) return null;
-  const obj = asObject(content);
-  if (!obj) return "content must be an object.";
-  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
-    return "content.title must be a string.";
-  }
-  if (obj.body !== undefined && obj.body !== null && typeof obj.body !== "string") {
-    return "content.body must be a string.";
-  }
-  return validateMarkdownVariables(obj.variables);
 }
 
 function validateNodeContent(content: unknown): string | null {

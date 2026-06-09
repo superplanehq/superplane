@@ -20,8 +20,8 @@ import {
   markdownTemplateHasExpressions,
   markdownTextIsLoading,
 } from "./markdownInterpolation";
-import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
-import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
+import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
+import { HtmlPanelEditor, type HtmlCodeEditorHandle } from "./HtmlPanelEditor";
 import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
 
 /**
@@ -32,25 +32,15 @@ import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
  */
 const EMPTY_VARIABLES: MarkdownVariable[] = [];
 
-/**
- * Which field auto-focuses when the user enters edit mode. Driven by which
- * affordance the user activated:
- *  - pencil icon → title input
- *  - double-click on the body / "click to edit" empty state → body textarea
- */
 type EditFocus = "title" | "body" | null;
 
 /**
  * Resolve the persisted variables for the read-only / display path and derive
- * the display title plus the body loading gate.
- *
- * The editor re-resolves the draft variables on its own so its preview stays
- * in lockstep with whatever the user just typed; while editing this hook is
- * disabled (empty list, no side-load text) so the editor's hook is the single
- * owner of the queries for this panel. Title + body are both interpolated, so
- * the combined text drives the run-node side-load gate.
+ * the display title plus the body loading gate. Same shape as the markdown
+ * panel's display hook (title is interpolated, body is gated until the
+ * backing queries settle).
  */
-function useMarkdownDisplay({
+function useHtmlDisplay({
   panelId,
   body,
   persistedTitle,
@@ -72,27 +62,13 @@ function useMarkdownDisplay({
     isEditing ? "" : textForSideload,
   );
 
-  // While the backing variable queries (including the per-run execution
-  // side-load behind `{{ run.$["Node"]... }}`) are still in flight, the var map
-  // is only partially resolved. Interpolating against it now would render those
-  // references as empty fields and then flash to the real values once the
-  // side-load settles. Mirror the table run widget, which treats execution
-  // side-load as part of initial loading, and hold a loading state instead.
-  // Gating is per-text and per-phase: text that doesn't reference a run node
-  // resolves without the execution side-load, so it isn't held on that phase.
   const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
   const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
 
   const displayTitle = useMemo(() => {
-    // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
-    // and can't be interpolated yet, so fall back to the stable panel id while
-    // the variables it actually depends on load.
     if (titleLoading) return panelId;
     const interpolated = interpolateMarkdownTemplate(persistedTitle, vars).trim();
     if (interpolated) return interpolated;
-    // A templated title that resolves to an empty string must not fall back to
-    // its raw source (that would leak the unparsed `{{ }}` syntax). Only a
-    // static title is safe to show verbatim; otherwise use the stable panel id.
     if (markdownTemplateHasExpressions(persistedTitle)) return panelId;
     return persistedTitle.trim() || panelId;
   }, [titleLoading, persistedTitle, vars, panelId]);
@@ -100,7 +76,7 @@ function useMarkdownDisplay({
   return { canvasId, displayVars: vars, bodyLoading, displayTitle };
 }
 
-interface MarkdownPanelCardProps {
+interface HtmlPanelCardProps {
   panel: ConsolePanel;
   readOnly: boolean;
   onDelete: () => void;
@@ -108,7 +84,7 @@ interface MarkdownPanelCardProps {
   onEditingChange?: (editing: boolean) => void;
 }
 
-export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: MarkdownPanelCardProps) {
+export function HtmlPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: HtmlPanelCardProps) {
   const body = typeof panel.content?.body === "string" ? panel.content.body : "";
   const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
   const variables = useMemo(() => readVariables(panel.content), [panel.content]);
@@ -119,13 +95,11 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
   const [draftTitle, setDraftTitle] = useState(persistedTitle);
   const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const codeEditorRef = useRef<HtmlCodeEditorHandle | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // Surfaced when an in-card save is blocked by the shared variable validator
-  // (e.g. invalid name, empty namespace); cleared once the author edits again.
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const { canvasId, displayVars, bodyLoading, displayTitle } = useMarkdownDisplay({
+  const { canvasId, displayVars, bodyLoading, displayTitle } = useHtmlDisplay({
     panelId: panel.id,
     body,
     persistedTitle,
@@ -133,8 +107,6 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
     isEditing,
   });
 
-  // Sync drafts from props when we're not editing, so external updates
-  // (YAML import, websocket invalidation, etc.) flow into the rendered view.
   useEffect(() => {
     if (!isEditing) {
       setDraftBody(body);
@@ -148,7 +120,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
       titleInputRef.current?.focus();
       titleInputRef.current?.select();
     } else if (editFocus === "body") {
-      textareaRef.current?.focus();
+      codeEditorRef.current?.focus();
     }
   }, [editFocus]);
 
@@ -156,9 +128,6 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
     if (!isEditing) return;
     const trimmedTitle = draftTitle.trim();
     const normalizedVars = normalizeDraftVariables(draftVariables);
-    // Guard the in-card save with the same validator the YAML / dialog editor
-    // and the backend use, so we never persist content the API would reject.
-    // Keep the editor open with the message so the author can fix it.
     const validationError = validateMarkdownVariables(normalizedVars);
     if (validationError) {
       setSaveError(validationError);
@@ -195,8 +164,6 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
     onEditingChange?.(true);
   };
 
-  // Editing the variables clears a stale save error so the blocked-save banner
-  // doesn't linger after the author addresses it.
   const updateDraftVariables = (next: MarkdownVariable[]) => {
     if (saveError) setSaveError(null);
     setDraftVariables(next);
@@ -204,7 +171,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
 
   if (isEditing && !readOnly) {
     return (
-      <MarkdownPanelEditor
+      <HtmlPanelEditor
         panelId={panel.id}
         canvasId={canvasId}
         draftTitle={draftTitle}
@@ -214,7 +181,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
         draftVariables={draftVariables}
         setDraftVariables={updateDraftVariables}
         titleInputRef={titleInputRef}
-        textareaRef={textareaRef}
+        codeEditorRef={codeEditorRef}
         saveError={saveError}
         onCancel={cancel}
         onCommit={commit}
@@ -223,7 +190,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
   }
 
   return (
-    <MarkdownPanelView
+    <HtmlPanelView
       body={body}
       displayTitle={displayTitle}
       displayVars={displayVars}
@@ -242,7 +209,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
   );
 }
 
-function MarkdownPanelView({
+function HtmlPanelView({
   body,
   displayTitle,
   displayVars,
@@ -270,7 +237,7 @@ function MarkdownPanelView({
   return (
     <>
       <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
-        <MarkdownPanelHeader
+        <HtmlPanelHeader
           displayTitle={displayTitle}
           readOnly={readOnly}
           onEditTitle={onEditTitle}
@@ -280,9 +247,9 @@ function MarkdownPanelView({
           <div
             className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3"
             onDoubleClick={readOnly ? undefined : onEditBody}
-            data-testid="console-markdown-view"
+            data-testid="console-html-view"
           >
-            {bodyLoading ? <MarkdownBodyLoading /> : <MarkdownBody body={body} vars={displayVars} />}
+            {bodyLoading ? <HtmlBodyLoading /> : <HtmlBody body={body} vars={displayVars} />}
           </div>
         ) : (
           <button
@@ -290,7 +257,7 @@ function MarkdownPanelView({
             onClick={readOnly ? undefined : onEditBody}
             disabled={readOnly}
             className="console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500"
-            data-testid="console-markdown-empty"
+            data-testid="console-html-empty"
           >
             <Pencil className="size-4" />
             <span>{readOnly ? "Empty panel" : "Click to edit"}</span>
@@ -302,7 +269,7 @@ function MarkdownPanelView({
   );
 }
 
-function MarkdownPanelHeader({
+function HtmlPanelHeader({
   displayTitle,
   readOnly,
   onEditTitle,
@@ -325,10 +292,6 @@ function MarkdownPanelHeader({
         {displayTitle}
       </span>
       {!readOnly ? (
-        // The action buttons sit inside the drag-handle header, but
-        // react-grid-layout's draggableCancel selector excludes the
-        // `console-grid-no-drag` class so clicks land on the buttons
-        // instead of starting a drag.
         <div className="console-grid-no-drag -mr-0.5 flex shrink-0 items-center opacity-0 transition-opacity group-hover/panel:opacity-100">
           <Button
             type="button"
@@ -342,7 +305,7 @@ function MarkdownPanelHeader({
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Edit panel"
             className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700"
-            data-testid="console-edit-panel"
+            data-testid="console-html-edit-panel"
           >
             <Pencil className="size-3.5" />
           </Button>
@@ -358,7 +321,7 @@ function MarkdownPanelHeader({
             onPointerDown={(e) => e.stopPropagation()}
             aria-label="Delete panel"
             className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
-            data-testid="console-delete-panel"
+            data-testid="console-html-delete-panel"
           >
             <Trash2 className="size-3.5" />
           </Button>
@@ -371,7 +334,8 @@ function MarkdownPanelHeader({
 /**
  * Read the `variables` array off a panel's persisted content while filtering
  * out malformed entries (defensive against YAML hand-edits). Returns a fresh
- * array so callers can compare with referential identity.
+ * array so callers can compare with referential identity. Identical to the
+ * markdown panel reader; kept inlined to avoid coupling the two cards.
  */
 function readVariables(content: ConsolePanel["content"]): MarkdownVariable[] {
   const raw = (content as Record<string, unknown> | undefined)?.variables;
@@ -387,11 +351,6 @@ function readVariables(content: ConsolePanel["content"]): MarkdownVariable[] {
   return out;
 }
 
-/**
- * Normalize a draft variables list for persistence: drop entries with an
- * empty name, strip blank optional fields, and trim free-text inputs. This
- * keeps persisted YAML deterministic so save/reload round-trips are stable.
- */
 function normalizeDraftVariables(list: MarkdownVariable[]): MarkdownVariable[] {
   const out: MarkdownVariable[] = [];
   const seen = new Set<string>();
@@ -422,11 +381,6 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
   return { kind: "run", select: source.select };
 }
 
-/**
- * Cheap deep equality for two variables arrays — used to skip the
- * `onChange` write on a save with no diffs. Falls back to JSON.stringify
- * since the shape is small and entirely JSON-safe.
- */
 function variablesEqual(a: MarkdownVariable[], b: MarkdownVariable[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -453,7 +407,7 @@ function DeleteConfirmDialog({
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm} data-testid="console-delete-confirm">
+          <Button type="button" variant="destructive" onClick={onConfirm} data-testid="console-html-delete-confirm">
             Delete panel
           </Button>
         </DialogFooter>
