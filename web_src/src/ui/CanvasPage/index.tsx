@@ -2411,7 +2411,7 @@ function CanvasContent({
         );
         const shouldOpenSettings = hasConfigurationWarning || isEditMode;
 
-        if (setCurrentTab && !isSameNode) {
+        if (setCurrentTab && (!isSameNode || shouldOpenSettings)) {
           if (!wasSidebarOpen) {
             setCurrentTab(shouldOpenSettings ? "settings" : "latest");
           } else if (shouldOpenSettings) {

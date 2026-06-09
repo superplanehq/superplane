@@ -267,6 +267,10 @@ export function SettingsTab({
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
+    if (isReadOnly) {
+      return;
+    }
+
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
         autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
@@ -293,7 +297,7 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
