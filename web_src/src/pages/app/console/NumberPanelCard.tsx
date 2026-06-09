@@ -25,11 +25,16 @@ interface NumberPanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function NumberPanelCard({ panel, readOnly, onDelete, onChange }: NumberPanelCardProps) {
+export function NumberPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: NumberPanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -37,14 +42,14 @@ export function NumberPanelCard({ panel, readOnly, onDelete, onChange }: NumberP
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <NumberPanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<NumberPanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="number"
         initialContent={content}

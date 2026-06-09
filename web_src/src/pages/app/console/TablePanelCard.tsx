@@ -17,11 +17,16 @@ interface TablePanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function TablePanelCard({ panel, readOnly, onDelete, onChange }: TablePanelCardProps) {
+export function TablePanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: TablePanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeTablePanelContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -29,14 +34,14 @@ export function TablePanelCard({ panel, readOnly, onDelete, onChange }: TablePan
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <TablePanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<TablePanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="table"
         initialContent={content}
