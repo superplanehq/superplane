@@ -69,4 +69,31 @@ describe("buildConfigurationDisplayModel", () => {
 
     expect(model.rows[0]?.integrationStatus).toBe("Not connected");
   });
+
+  it("does not default to the first integration when no ref is saved", () => {
+    const model = buildConfigurationDisplayModel({
+      configuration: {},
+      configurationFields: [],
+      integrationName: "github",
+      integrations: STORY_INTEGRATIONS,
+    });
+
+    expect(model.rows).toHaveLength(1);
+    expect(model.rows[0]?.integrationStatus).toBe("Not connected");
+    expect(model.rows.some((row) => row.label === "Instance")).toBe(false);
+  });
+
+  it("does not default to the first integration when the saved ref is stale", () => {
+    const model = buildConfigurationDisplayModel({
+      configuration: {},
+      configurationFields: [],
+      integrationName: "github",
+      integrationRef: { id: "int_deleted", name: "Old GitHub" },
+      integrations: STORY_INTEGRATIONS,
+    });
+
+    expect(model.rows).toHaveLength(1);
+    expect(model.rows[0]?.integrationStatus).toBe("Not connected");
+    expect(model.rows.some((row) => row.label === "Instance" && row.displayText === "GitHub Production")).toBe(false);
+  });
 });

@@ -52,42 +52,33 @@ function appendCustomNameRow(
   });
 }
 
-function appendIntegrationRows(rows: ConfigurationDisplayRow[], input: BuildConfigurationDisplayModelInput): void {
-  const { integrationName, integrationRef, integrations = [], allowIntegrations = true } = input;
-  if (!integrationName) {
-    return;
+function appendNotConnectedIntegrationRow(rows: ConfigurationDisplayRow[], typeLabel: string): void {
+  rows.push({
+    key: "integration.notConnected",
+    label: "Integration",
+    kind: "integration",
+    displayText: `${typeLabel} — not connected`,
+    integrationStatus: "Not connected",
+    integrationStatusVariant: "pending",
+  });
+}
+
+function findSelectedIntegration(
+  integrationsOfType: OrganizationsIntegration[],
+  integrationRef?: ComponentsIntegrationRef,
+): OrganizationsIntegration | undefined {
+  if (!integrationRef?.id) {
+    return undefined;
   }
 
-  const typeLabel = getIntegrationTypeDisplayName(undefined, integrationName) || integrationName;
+  return integrationsOfType.find((integration) => integration.metadata?.id === integrationRef.id);
+}
 
-  if (!allowIntegrations) {
-    rows.push({
-      key: "integration.permission",
-      label: "Integration",
-      kind: "text",
-      displayText: "You don't have permission to view integrations.",
-    });
-    return;
-  }
-
-  const integrationsOfType = integrations.filter(
-    (integration) => integration.metadata?.integrationName === integrationName,
-  );
-  if (integrationsOfType.length === 0) {
-    rows.push({
-      key: "integration.notConnected",
-      label: "Integration",
-      kind: "integration",
-      displayText: `${typeLabel} — not connected`,
-      integrationStatus: "Not connected",
-      integrationStatusVariant: "pending",
-    });
-    return;
-  }
-
-  const selectedIntegration =
-    integrationsOfType.find((integration) => integration.metadata?.id === integrationRef?.id) ?? integrationsOfType[0];
-
+function appendConnectedIntegrationRows(
+  rows: ConfigurationDisplayRow[],
+  typeLabel: string,
+  selectedIntegration: OrganizationsIntegration,
+): void {
   const status = selectedIntegration.status?.state ?? "unknown";
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
   const statusVariant = status === "ready" ? "ready" : status === "error" ? "error" : ("pending" as const);
@@ -121,6 +112,36 @@ function appendIntegrationRows(rows: ConfigurationDisplayRow[], input: BuildConf
       displayText: selectedIntegration.status.stateDescription,
     });
   }
+}
+
+function appendIntegrationRows(rows: ConfigurationDisplayRow[], input: BuildConfigurationDisplayModelInput): void {
+  const { integrationName, integrationRef, integrations = [], allowIntegrations = true } = input;
+  if (!integrationName) {
+    return;
+  }
+
+  const typeLabel = getIntegrationTypeDisplayName(undefined, integrationName) || integrationName;
+
+  if (!allowIntegrations) {
+    rows.push({
+      key: "integration.permission",
+      label: "Integration",
+      kind: "text",
+      displayText: "You don't have permission to view integrations.",
+    });
+    return;
+  }
+
+  const integrationsOfType = integrations.filter(
+    (integration) => integration.metadata?.integrationName === integrationName,
+  );
+  const selectedIntegration = findSelectedIntegration(integrationsOfType, integrationRef);
+  if (!selectedIntegration) {
+    appendNotConnectedIntegrationRow(rows, typeLabel);
+    return;
+  }
+
+  appendConnectedIntegrationRows(rows, typeLabel, selectedIntegration);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
