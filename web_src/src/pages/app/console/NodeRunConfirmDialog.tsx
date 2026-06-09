@@ -20,7 +20,7 @@ import {
   parameterDisplayLabel,
   type StartTemplateParameter,
 } from "../mappers/start/templatePayload";
-import { ConfirmFact } from "./confirmDialogPreview";
+import { ConfirmFact, ConfirmParametersPreview } from "./confirmDialogPreview";
 import { formatParameters } from "./formatConfirmDialogParameters";
 import { resolveStartTemplate } from "./consoleTriggerParameters";
 
@@ -117,10 +117,10 @@ export function NodeRunConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (submitting ? null : onOpenChange(next))}>
-      <DialogContent className="pb-6">
-        <DialogHeader>
+      <DialogContent className="min-w-0 overflow-hidden pb-6">
+        <DialogHeader className="min-w-0">
           <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="min-w-0">
             {resolved ? (
               <>
                 Manually run <span className="font-medium text-slate-700">{resolved.label}</span>
@@ -140,13 +140,13 @@ export function NodeRunConfirmDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-xs" data-testid={`${testId}-body`}>
+        <div className="min-w-0 space-y-3 text-xs" data-testid={`${testId}-body`}>
           {!template ? (
             <p className="text-amber-700">This node does not declare any runnable Start template.</p>
           ) : (
             <>
               {hasParameters ? (
-                <div className="space-y-1.5" data-testid={`${testId}-fields`}>
+                <div className="min-w-0 space-y-1.5" data-testid={`${testId}-fields`}>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Parameters</p>
                   <StartRunParameterFields
                     parameters={parameters}
@@ -156,18 +156,15 @@ export function NodeRunConfirmDialog({
                 </div>
               ) : null}
               <ConfirmFact label="Will submit">
-                <pre
-                  className="mt-1 max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] leading-snug text-slate-700"
-                  data-testid={`${testId}-parameters`}
-                >
+                <ConfirmParametersPreview testId={`${testId}-parameters`}>
                   {formatParameters(previewParameters)}
-                </pre>
+                </ConfirmParametersPreview>
               </ConfirmFact>
             </>
           )}
           <SubmitErrorMessage error={submitError} testId={testId} />
         </div>
-        <DialogFooter>
+        <DialogFooter className="min-w-0">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>

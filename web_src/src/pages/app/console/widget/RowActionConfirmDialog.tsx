@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { ConfirmFact } from "../confirmDialogPreview";
+import { ConfirmFact, ConfirmParametersPreview } from "../confirmDialogPreview";
 import { formatParameters } from "../formatConfirmDialogParameters";
 import type { resolveConsoleNode } from "../ConsoleContext";
 import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
@@ -70,17 +70,17 @@ export function RowActionConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="pb-6">
-        <DialogHeader>
+      <DialogContent className="min-w-0 overflow-hidden pb-6">
+        <DialogHeader className="min-w-0">
           <DialogTitle>{label}</DialogTitle>
-          <DialogDescription>{confirmBody}</DialogDescription>
+          <DialogDescription className="min-w-0">{confirmBody}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-xs" data-testid={`${testId}-preview`}>
+        <div className="min-w-0 space-y-3 text-xs" data-testid={`${testId}-preview`}>
           <ConfirmTriggerFact resolved={resolved} fallback={action.node} isTrigger={isTrigger} />
           <ConfirmHookFact hookName={hookName} templateName={extractTemplateName(preview?.parameters)} />
           <ConfirmParametersFact preview={preview} testId={testId} />
         </div>
-        <DialogFooter>
+        <DialogFooter className="min-w-0">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -149,18 +149,9 @@ function ConfirmParametersFact({
       {preview?.error ? (
         <span className="text-red-600">Failed to build parameters: {preview.error}</span>
       ) : (
-        <pre
-          // `min-w-0` lets this `<pre>` shrink below its intrinsic content
-          // width inside the grid `DialogContent` (grid items default to
-          // `min-width: auto`), and `whitespace-pre-wrap` + `break-all`
-          // wraps long string values so the payload doesn't push the dialog
-          // wider than the viewport. We keep `overflow-auto` as a fallback
-          // for the rare unbreakable token plus the vertical clamp.
-          className="mt-1 max-h-40 min-w-0 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] leading-snug whitespace-pre-wrap break-all text-slate-700"
-          data-testid={`${testId}-parameters`}
-        >
+        <ConfirmParametersPreview testId={`${testId}-parameters`}>
           {formatParameters(preview?.parameters)}
-        </pre>
+        </ConfirmParametersPreview>
       )}
     </ConfirmFact>
   );
