@@ -3,6 +3,7 @@ package ec2
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -15,16 +16,17 @@ import (
 type CreateLoadBalancer struct{}
 
 type CreateLoadBalancerConfiguration struct {
-	Region              string   `json:"region" mapstructure:"region"`
-	Name                string   `json:"name" mapstructure:"name"`
-	Type                string   `json:"type" mapstructure:"type"`
-	Scheme              string   `json:"scheme" mapstructure:"scheme"`
-	IpAddressType       string   `json:"ipAddressType" mapstructure:"ipAddressType"`
-	Subnets             []string `json:"subnets" mapstructure:"subnets"`
-	SecurityGroups      []string `json:"securityGroups" mapstructure:"securityGroups"`
-	ListenerProtocol    string   `json:"listenerProtocol" mapstructure:"listenerProtocol"`
-	ListenerPort        int      `json:"listenerPort" mapstructure:"listenerPort"`
-	ListenerTargetGroup string   `json:"listenerTargetGroup" mapstructure:"listenerTargetGroup"`
+	Region                 string   `json:"region" mapstructure:"region"`
+	Name                   string   `json:"name" mapstructure:"name"`
+	Type                   string   `json:"type" mapstructure:"type"`
+	Scheme                 string   `json:"scheme" mapstructure:"scheme"`
+	IpAddressType          string   `json:"ipAddressType" mapstructure:"ipAddressType"`
+	Subnets                []string `json:"subnets" mapstructure:"subnets"`
+	SecurityGroups         []string `json:"securityGroups" mapstructure:"securityGroups"`
+	ListenerProtocol       string   `json:"listenerProtocol" mapstructure:"listenerProtocol"`
+	ListenerPort           int      `json:"listenerPort" mapstructure:"listenerPort"`
+	ListenerTargetGroup    string   `json:"listenerTargetGroup" mapstructure:"listenerTargetGroup"`
+	ListenerCertificateArn string   `json:"listenerCertificateArn" mapstructure:"listenerCertificateArn"`
 }
 
 type CreateLoadBalancerNodeMetadata struct {
@@ -310,6 +312,16 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "listenerCertificateArn",
+			Label:       "Listener Certificate ARN",
+			Description: "ACM certificate ARN required for HTTPS and TLS listeners",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "listenerProtocol", Values: []string{ListenerProtocolHTTPS, ListenerProtocolTLS}},
+			},
+		},
 	}
 }
 
@@ -531,6 +543,40 @@ func validateListenerConfig(config CreateLoadBalancerConfiguration) error {
 	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
 		return fmt.Errorf("listener port must be between 1 and 65535")
 	}
+
+	lbType := strings.TrimSpace(config.Type)
+	if err := validateProtocolForType(protocol, lbType); err != nil {
+		return err
+	}
+
+	if protocol == ListenerProtocolHTTPS || protocol == ListenerProtocolTLS {
+		if strings.TrimSpace(config.ListenerCertificateArn) == "" {
+			return fmt.Errorf("listenerCertificateArn is required for %s listeners", protocol)
+		}
+	}
+	return nil
+}
+
+func validateProtocolForType(protocol, lbType string) error {
+	if protocol == "" {
+		return nil
+	}
+	switch lbType {
+	case LoadBalancerTypeApplication, "":
+		valid := []string{ListenerProtocolHTTP, ListenerProtocolHTTPS}
+		if !slices.Contains(valid, protocol) {
+			return fmt.Errorf("protocol %s is not valid for application load balancers; valid protocols: HTTP, HTTPS", protocol)
+		}
+	case LoadBalancerTypeNetwork:
+		valid := []string{ListenerProtocolTCP, ListenerProtocolTLS, ListenerProtocolUDP, ListenerProtocolTCPUDP}
+		if !slices.Contains(valid, protocol) {
+			return fmt.Errorf("protocol %s is not valid for network load balancers; valid protocols: TCP, TLS, UDP, TCP_UDP", protocol)
+		}
+	case LoadBalancerTypeGateway:
+		if protocol != ListenerProtocolGENEVE {
+			return fmt.Errorf("protocol %s is not valid for gateway load balancers; valid protocol: GENEVE", protocol)
+		}
+	}
 	return nil
 }
 
@@ -546,6 +592,7 @@ func (c *CreateLoadBalancer) maybeCreateListener(client *Client, lbARN string, c
 		Protocol:        protocol,
 		Port:            config.ListenerPort,
 		TargetGroupARN:  targetGroup,
+		CertificateARN:  strings.TrimSpace(config.ListenerCertificateArn),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create listener: %w", err)

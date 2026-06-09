@@ -2941,6 +2941,7 @@ type CreateListenerInput struct {
 	Protocol        string
 	Port            int
 	TargetGroupARN  string
+	CertificateARN  string
 }
 
 type CreateListenerOutput struct {
@@ -2996,6 +2997,9 @@ func (c *Client) CreateListener(input CreateListenerInput) (*CreateListenerOutpu
 	params.Set("Port", fmt.Sprintf("%d", input.Port))
 	params.Set("DefaultActions.member.1.Type", "forward")
 	params.Set("DefaultActions.member.1.TargetGroupArn", strings.TrimSpace(input.TargetGroupARN))
+	if cert := strings.TrimSpace(input.CertificateARN); cert != "" {
+		params.Set("Certificates.member.1.CertificateArn", cert)
+	}
 
 	response := xmlCreateListenerResponse{}
 	if err := c.postELBForm("CreateListener", params, &response); err != nil {
