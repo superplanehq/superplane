@@ -36,6 +36,14 @@ const MODE_TO_TAB: Record<string, string> = {
   runs: RUNS_MODE,
 };
 
+/** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
+function handleTabClick(e: React.MouseEvent, callback: () => void) {
+  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+    e.preventDefault();
+    callback();
+  }
+}
+
 function modeToTab(mode: string): string {
   return MODE_TO_TAB[mode] ?? CANVAS_TAB;
 }
@@ -81,7 +89,7 @@ export function CanvasModeToggle({
       {showConsole ? (
         <Link
           to={tabHref("console")}
-          onClick={() => void onSelectConsole?.()}
+          onClick={(e) => handleTabClick(e, () => void onSelectConsole?.())}
           className={tabClasses(selected, CONSOLE_TAB, editing)}
           data-testid="canvas-view-mode-console"
           aria-label="Console"
@@ -95,7 +103,7 @@ export function CanvasModeToggle({
       ) : null}
       <Link
         to={tabHref()}
-        onClick={() => void onSelectLive()}
+        onClick={(e) => handleTabClick(e, () => void onSelectLive())}
         className={tabClasses(selected, CANVAS_TAB, editing)}
         data-testid="canvas-view-mode-live"
         aria-label={editing ? "Canvas (editing)" : "Canvas"}
@@ -109,7 +117,7 @@ export function CanvasModeToggle({
       {showMemory ? (
         <Link
           to={tabHref("memory")}
-          onClick={() => void onSelectMemory?.()}
+          onClick={(e) => handleTabClick(e, () => void onSelectMemory?.())}
           className={tabClasses(selected, MEMORY_TAB, editing)}
           data-testid="canvas-view-mode-memory"
           aria-label="Memory"
@@ -121,7 +129,7 @@ export function CanvasModeToggle({
       {showFiles ? (
         <Link
           to={tabHref("files")}
-          onClick={() => void onSelectFiles?.()}
+          onClick={(e) => handleTabClick(e, () => void onSelectFiles?.())}
           className={tabClasses(selected, FILES_TAB, editing)}
           data-testid="canvas-view-mode-files"
           aria-label="Files"
