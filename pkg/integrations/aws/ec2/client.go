@@ -2790,20 +2790,24 @@ func (c *Client) CreateLoadBalancer(input CreateLoadBalancerInput) (*CreateLoadB
 		params.Set("IpAddressType", ip)
 	}
 
-	for i, subnetID := range input.SubnetIDs {
+	subnetIndex := 1
+	for _, subnetID := range input.SubnetIDs {
 		trimmed := strings.TrimSpace(subnetID)
 		if trimmed == "" {
 			continue
 		}
-		params.Set(fmt.Sprintf("Subnets.member.%d", i+1), trimmed)
+		params.Set(fmt.Sprintf("Subnets.member.%d", subnetIndex), trimmed)
+		subnetIndex++
 	}
 
-	for i, sgID := range input.SecurityGroups {
+	sgIndex := 1
+	for _, sgID := range input.SecurityGroups {
 		trimmed := strings.TrimSpace(sgID)
 		if trimmed == "" {
 			continue
 		}
-		params.Set(fmt.Sprintf("SecurityGroups.member.%d", i+1), trimmed)
+		params.Set(fmt.Sprintf("SecurityGroups.member.%d", sgIndex), trimmed)
+		sgIndex++
 	}
 
 	response := xmlCreateLoadBalancerResponse{}

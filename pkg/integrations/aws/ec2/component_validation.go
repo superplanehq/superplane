@@ -175,3 +175,13 @@ func requireLoadBalancerARN(value string) (string, error) {
 
 	return arn, nil
 }
+
+func countNonEmpty(values []string) int {
+	count := 0
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			count++
+		}
+	}
+	return count
+}

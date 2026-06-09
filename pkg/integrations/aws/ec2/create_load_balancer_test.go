@@ -116,6 +116,34 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "listenerTargetGroup is required when listenerProtocol is specified")
 	})
 
+	t.Run("target group set without listener protocol -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":                "my-lb",
+				"region":              "us-east-1",
+				"type":                LoadBalancerTypeApplication,
+				"scheme":              LoadBalancerSchemeInternetFacing,
+				"subnets":             []string{"subnet-abc123", "subnet-def456"},
+				"listenerTargetGroup": "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/tg/abc",
+				"listenerPort":        80,
+			},
+		})
+		require.ErrorContains(t, err, "listenerProtocol is required when listenerTargetGroup is specified")
+	})
+
+	t.Run("subnets with blank entries below minimum -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123", " ", ""},
+			},
+		})
+		require.ErrorContains(t, err, "at least 2 subnet(s)")
+	})
+
 	t.Run("NLB with TCP listener and target group -> valid configuration", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
@@ -234,6 +262,63 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		stored, ok := metaCtx.Get().(CreateLoadBalancerExecutionMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/50dc6c495c0c9188", stored.LoadBalancerARN)
+	})
+
+	t.Run("blank subnet entries -> consecutive member indices in request", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<CreateLoadBalancerResponse xmlns="https://elasticloadbalancing.amazonaws.com/doc/2015-12-01/">
+							<CreateLoadBalancerResult>
+								<LoadBalancers>
+									<member>
+										<LoadBalancerArn>arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc</LoadBalancerArn>
+										<LoadBalancerName>my-lb</LoadBalancerName>
+										<DNSName>my-lb.us-east-1.elb.amazonaws.com</DNSName>
+										<Scheme>internet-facing</Scheme>
+										<Type>application</Type>
+										<State><Code>provisioning</Code></State>
+										<VpcId>vpc-12345678</VpcId>
+									</member>
+								</LoadBalancers>
+							</CreateLoadBalancerResult>
+							<ResponseMetadata><RequestId>req-1</RequestId></ResponseMetadata>
+						</CreateLoadBalancerResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123", " ", "subnet-def456"},
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+			Requests: &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		bodyStr := string(body)
+		assert.Contains(t, bodyStr, "Subnets.member.1=subnet-abc123")
+		assert.Contains(t, bodyStr, "Subnets.member.2=subnet-def456")
+		assert.NotContains(t, bodyStr, "Subnets.member.3")
 	})
 
 	t.Run("gateway load balancer -> no security groups in request", func(t *testing.T) {
