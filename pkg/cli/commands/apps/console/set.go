@@ -13,6 +13,8 @@ import (
 type setCommand struct {
 	file      *string
 	draftOnly *bool
+	draftID   *string
+	versionID *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -54,7 +56,24 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+	if resolvedDraftID != "" {
+		draftOnly = true
+	}
+
+	var versionID string
+	if draftOnly || resolvedDraftID != "" {
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: resolvedDraftID == "",
+		})
+	} else {
+		versionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
