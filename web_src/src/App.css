@@ -136,6 +136,20 @@
  *
  * The console "html" panel renders user-authored HTML at runtime, but
  * Tailwind v4 only compiles classes it discovers while scanning source
+ *
+ * Variant policy:
+ *  - Color (`text-*`, `bg-*`, `border-*`), text decoration, shadow, opacity,
+ *    and display utilities are safelisted with `{hover:,focus:,}` so authors
+ *    can write interactive styles like `hover:bg-blue-100`, `focus:shadow-lg`,
+ *    or `hover:underline` without the compiler dropping them. Adding a new
+ *    interactive utility family requires extending the safelist below.
+ *  - Sizing / spacing / typography size families intentionally do not get
+ *    `hover:` / `focus:` variants — animating those on hover is rare and
+ *    multiplies the bundle without payoff. Author can still use them as
+ *    static utilities.
+ *  - `dark:` is not safelisted. Dark mode in this app is opt-out (via
+ *    ancestors with `.dark-mode-disabled`), so widget authors should pick
+ *    colors that work in both themes rather than relying on the variant.
  * files. To make a stable, predictable set of utilities available to html
  * panel authors (and to anyone else writing untracked class strings such
  * as those interpolated from canvas memory), we explicitly inline-source
@@ -171,9 +185,9 @@
 @source inline("font-{sans,serif,mono}");
 @source inline("italic");
 @source inline("not-italic");
-@source inline("underline");
-@source inline("line-through");
-@source inline("no-underline");
+@source inline("{hover:,focus:,}underline");
+@source inline("{hover:,focus:,}line-through");
+@source inline("{hover:,focus:,}no-underline");
 @source inline("uppercase");
 @source inline("lowercase");
 @source inline("capitalize");
@@ -183,19 +197,19 @@
 @source inline("truncate");
 @source inline("whitespace-{normal,nowrap,pre,pre-line,pre-wrap,break-spaces}");
 @source inline("break-{normal,words,all,keep}");
-@source inline("text-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
-@source inline("text-{white,black,inherit,current,transparent}");
-@source inline("bg-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
-@source inline("bg-{white,black,inherit,current,transparent}");
+@source inline("{hover:,focus:,}text-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}text-{white,black,inherit,current,transparent}");
+@source inline("{hover:,focus:,}bg-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}bg-{white,black,inherit,current,transparent}");
 @source inline("border-{0,1,2,4,8}");
 @source inline("border-{t,r,b,l}-{0,1,2,4,8}");
 @source inline("border-{solid,dashed,dotted,double,none}");
-@source inline("border-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
-@source inline("border-{white,black,transparent,current}");
+@source inline("{hover:,focus:,}border-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}border-{white,black,transparent,current}");
 @source inline("rounded{,-sm,-md,-lg,-xl,-2xl,-3xl,-full,-none}");
 @source inline("rounded-{t,r,b,l,tl,tr,bl,br}-{sm,md,lg,xl,2xl,3xl,full,none}");
-@source inline("shadow{,-sm,-md,-lg,-xl,-2xl,-inner,-none}");
-@source inline("opacity-{0,5,10,20,25,30,40,50,60,70,75,80,90,95,100}");
+@source inline("{hover:,focus:,}shadow{,-sm,-md,-lg,-xl,-2xl,-inner,-none}");
+@source inline("{hover:,focus:,}opacity-{0,5,10,20,25,30,40,50,60,70,75,80,90,95,100}");
 @source inline("overflow-{auto,hidden,clip,visible,scroll,x-auto,y-auto,x-hidden,y-hidden,x-scroll,y-scroll}");
 @source inline("relative");
 @source inline("absolute");

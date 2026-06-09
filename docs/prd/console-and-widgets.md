@@ -566,6 +566,8 @@ Concretely:
 
 Tailwind v4 compiles only classes it finds while scanning source files. To make a stable, predictable set of utilities available to HTML widget authors, `web_src/src/App.css` includes a curated `@source inline(...)` safelist covering display, flex/grid, spacing, sizing, typography, color (`text-*`, `bg-*`, `border-*` for every default palette/shade), borders, rounding, shadow, opacity, overflow, positioning, z-index, cursor, and transition utilities. Authors can rely on those utility families without having to safelist anything per-panel; classes outside the safelist that aren't already in the bundle will simply have no effect.
 
+Interactive variants (`hover:`, `focus:`) are safelisted for the families where they matter — color (`text-*`, `bg-*`, `border-*`), display, text decoration (`underline`, `line-through`, `no-underline`), `shadow*`, and `opacity-*`. So `hover:bg-blue-100`, `focus:shadow-lg`, `hover:underline`, and similar combinations all work. Hover/focus on sizing, spacing, and typography size families is **not** in the safelist (rare in practice, would multiply the bundle). The `dark:` variant is also not safelisted — dark mode in SuperPlane is opt-out via ancestors with `.dark-mode-disabled`, so widget authors should pick colors that work in both themes rather than relying on the variant.
+
 ### Authoring example
 
 ```yaml
