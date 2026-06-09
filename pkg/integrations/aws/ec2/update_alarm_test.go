@@ -18,9 +18,12 @@ func Test__UpdateAlarm__Setup(t *testing.T) {
 	t.Run("missing region -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":    " ",
-				"alarm":     "HighCPU",
-				"threshold": 90.0,
+				"region": " ",
+				"alarm":  "HighCPU",
+				"thresholdCondition": map[string]any{
+					"threshold":          90.0,
+					"comparisonOperator": "GreaterThanThreshold",
+				},
 			},
 		})
 		require.ErrorContains(t, err, "region is required")
@@ -29,9 +32,12 @@ func Test__UpdateAlarm__Setup(t *testing.T) {
 	t.Run("missing alarm name -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":    "us-east-1",
-				"alarm":     " ",
-				"threshold": 90.0,
+				"region": "us-east-1",
+				"alarm":  " ",
+				"thresholdCondition": map[string]any{
+					"threshold":          90.0,
+					"comparisonOperator": "GreaterThanThreshold",
+				},
 			},
 		})
 		require.ErrorContains(t, err, "alarm name is required")
@@ -47,16 +53,38 @@ func Test__UpdateAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one alarm property to update is required")
 	})
 
-	t.Run("valid configuration -> no error", func(t *testing.T) {
+	t.Run("threshold condition missing threshold -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":    "us-east-1",
-				"alarm":     "HighCPU",
-				"threshold": 90.0,
+				"region": "us-east-1",
+				"alarm":  "HighCPU",
+				"thresholdCondition": map[string]any{
+					"comparisonOperator": "GreaterThanThreshold",
+				},
 			},
-			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "threshold is required")
+	})
+
+	t.Run("valid configuration -> stores updated fields in metadata", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "HighCPU",
+				"thresholdCondition": map[string]any{
+					"threshold":          90.0,
+					"comparisonOperator": "GreaterThanThreshold",
+				},
+				"statistic": "Average",
+			},
+			Metadata: metadata,
 		})
 		require.NoError(t, err)
+
+		stored, ok := metadata.Get().(UpdateAlarmNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, []string{"Threshold", "Statistic"}, stored.UpdatedFields)
 	})
 }
 
@@ -84,9 +112,12 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":    "us-east-1",
-				"alarm":     "HighCPU",
-				"threshold": 90.0,
+				"region": "us-east-1",
+				"alarm":  "HighCPU",
+				"thresholdCondition": map[string]any{
+					"threshold":          90.0,
+					"comparisonOperator": "GreaterThanThreshold",
+				},
 			},
 			HTTP:           httpContext,
 			ExecutionState: executionState,
