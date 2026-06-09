@@ -40,14 +40,28 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "name is required")
 	})
 
+	t.Run("too few subnets -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123"},
+			},
+		})
+		require.ErrorContains(t, err, "at least 2 subnet(s)")
+	})
+
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":   "my-lb",
-				"region": "us-east-1",
-				"type":   LoadBalancerTypeApplication,
-				"scheme": LoadBalancerSchemeInternetFacing,
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123", "subnet-def456"},
 			},
 			Metadata: metadata,
 		})
