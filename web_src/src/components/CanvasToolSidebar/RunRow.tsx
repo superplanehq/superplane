@@ -48,8 +48,11 @@ export function RunRow({
     >
       <Link
         to={runHref}
-        onClick={() => {
-          if (run.id) onSelectRun(run.id);
+        onClick={(e) => {
+          if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+            e.preventDefault();
+            if (run.id) onSelectRun(run.id);
+          }
         }}
         className="absolute inset-0"
         aria-label={title}

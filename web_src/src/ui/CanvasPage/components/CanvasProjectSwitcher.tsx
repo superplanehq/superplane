@@ -438,7 +438,14 @@ function ProjectSearchList({
             className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900"
             asChild
           >
-            <Link to={appPath(organizationId, project.id)}>
+            <Link
+              to={appPath(organizationId, project.id)}
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                }
+              }}
+            >
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
               {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-slate-600" /> : null}
             </Link>
