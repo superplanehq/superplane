@@ -20,9 +20,15 @@ import type { Ec2Alarm } from "./types";
 interface Configuration {
   region?: string;
   alarm?: string;
-  threshold?: number;
+  thresholdCondition?: {
+    threshold?: number;
+    comparisonOperator?: string;
+  };
   statistic?: string;
-  comparisonOperator?: string;
+  period?: number;
+  evaluationPeriods?: number;
+  alarmDescription?: string;
+  treatMissingData?: string;
   alarmAction?: string;
   snsTopic?: string;
 }
@@ -30,6 +36,7 @@ interface Configuration {
 interface UpdateAlarmNodeMetadata {
   region?: string;
   alarmName?: string;
+  updatedFields?: string[];
 }
 
 export const updateAlarmMapper: ComponentBaseMapper = {
@@ -82,12 +89,34 @@ function updateAlarmMetadata(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "bell", label: alarmLabel });
   }
 
-  const region = configuration?.region || nodeMetadata?.region;
-  if (region) {
-    metadata.push({ icon: "globe", label: region });
+  // Always derive from the live configuration so toggling fields on/off is
+  // immediately reflected without requiring a publish cycle.
+  for (const field of inferUpdatedFields(configuration).slice(0, 2)) {
+    metadata.push({ icon: "pen-line", label: field });
   }
 
-  return metadata;
+  return metadata.slice(0, 3);
+}
+
+function inferUpdatedFields(configuration: Configuration | undefined): string[] {
+  if (!configuration) {
+    return [];
+  }
+
+  const fieldMap: [keyof Configuration, string][] = [
+    ["thresholdCondition", "Threshold"],
+    ["statistic", "Statistic"],
+    ["period", "Period"],
+    ["evaluationPeriods", "Evaluation Periods"],
+    ["alarmDescription", "Description"],
+    ["treatMissingData", "Treat Missing Data"],
+    ["alarmAction", "Alarm Action"],
+    ["snsTopic", "SNS Topic"],
+  ];
+
+  return fieldMap
+    .filter(([key]) => configuration[key] !== undefined && configuration[key] !== null)
+    .map(([, label]) => label);
 }
 
 function formatTimestamp(value?: string): string | undefined {
@@ -103,7 +132,10 @@ function updateAlarmDetailsFallback(
     "Updated At": stringOrDash(updatedAt),
     "Alarm Name": stringOrDash(configuration?.alarm ?? nodeMetadata?.alarmName),
     Metric: "-",
-    Threshold: configuration?.threshold !== undefined ? String(configuration.threshold) : "-",
+    Threshold:
+      configuration?.thresholdCondition?.threshold !== undefined
+        ? String(configuration.thresholdCondition.threshold)
+        : "-",
     State: "-",
     Region: stringOrDash(configuration?.region ?? nodeMetadata?.region),
   };

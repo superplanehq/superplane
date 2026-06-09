@@ -83,8 +83,8 @@ describe("deleteAlarmMapper.getExecutionDetails", () => {
     });
     const details = deleteAlarmMapper.getExecutionDetails(ctx);
     expect(details["Alarm Name"]).toBe("HighCPU");
-    expect(details["Region"]).toBe("us-east-1");
     expect(details["Deleted"]).toBe("-");
+    expect(details["Region"]).toBeUndefined();
   });
 
   it("extracts deletion confirmation from output", () => {
@@ -98,7 +98,7 @@ describe("deleteAlarmMapper.getExecutionDetails", () => {
     const details = deleteAlarmMapper.getExecutionDetails(ctx);
     expect(details["Alarm Name"]).toBe("HighCPU");
     expect(details["Deleted"]).toBe("Yes");
-    expect(details["Region"]).toBe("us-east-1");
+    expect(details["Region"]).toBeUndefined();
   });
 });
 

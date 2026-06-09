@@ -87,7 +87,11 @@ describe("updateAlarmMapper.getExecutionDetails", () => {
   it("uses configuration when output is absent", () => {
     const ctx = buildDetailsCtx({
       node: {
-        configuration: { region: "us-east-1", alarm: "HighCPU", threshold: 90 },
+        configuration: {
+          region: "us-east-1",
+          alarm: "HighCPU",
+          thresholdCondition: { threshold: 90, comparisonOperator: "GreaterThanThreshold" },
+        },
       },
       execution: { outputs: undefined },
     });
@@ -110,15 +114,66 @@ describe("updateAlarmMapper.getExecutionDetails", () => {
 });
 
 describe("updateAlarmMapper.props", () => {
-  it("includes alarm name in metadata", () => {
+  it("shows alarm name and toggled field labels from configuration", () => {
     const props = updateAlarmMapper.props(
       buildPropsContext({
-        node: buildNode({ configuration: { alarm: "HighCPU", region: "us-east-1" } }),
+        node: buildNode({
+          configuration: {
+            alarm: "HighCPU",
+            alarmDescription: "my desc",
+          },
+        }),
       }),
     );
     const labels = props.metadata?.map((m) => m.label) ?? [];
     expect(labels).toContain("HighCPU");
-    expect(labels).toContain("us-east-1");
+    expect(labels).toContain("Description");
+  });
+
+  it("reflects the current configuration, not stale stored metadata", () => {
+    // Old publish stored ["Threshold", "Period"] but current config only has description toggled.
+    const props = updateAlarmMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          configuration: { alarm: "HighCPU", alarmDescription: "new desc" },
+          metadata: { updatedFields: ["Threshold", "Period"] },
+        }),
+      }),
+    );
+    const labels = props.metadata?.map((m) => m.label) ?? [];
+    expect(labels).toContain("Description");
+    expect(labels).not.toContain("Period");
+  });
+
+  it("removes field label immediately when toggle is turned off", () => {
+    const props = updateAlarmMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          // period was previously toggled but is now absent (toggled off)
+          configuration: { alarm: "HighCPU", statistic: "Average" },
+          metadata: { updatedFields: ["Threshold", "Period"] },
+        }),
+      }),
+    );
+    const labels = props.metadata?.map((m) => m.label) ?? [];
+    expect(labels).toContain("Statistic");
+    expect(labels).not.toContain("Period");
+  });
+
+  it("caps metadata at 3 items", () => {
+    const props = updateAlarmMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          configuration: {
+            alarm: "HighCPU",
+            thresholdCondition: { threshold: 90, comparisonOperator: "GreaterThanThreshold" },
+            statistic: "Average",
+            period: 300,
+          },
+        }),
+      }),
+    );
+    expect((props.metadata ?? []).length).toBeLessThanOrEqual(3);
   });
 });
 
