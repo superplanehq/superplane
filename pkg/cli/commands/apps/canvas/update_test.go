@@ -643,3 +643,38 @@ func writeTestCanvasFileWithChangeManagementEnabled(t *testing.T, canvasID strin
 	require.NoError(t, os.WriteFile(filePath, content, 0o644))
 	return filePath
 }
+
+func TestUpdateFromFileErrorsWhenMultipleDraftsWithDraftFlag(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		expectMe(),
+		requestExpectation{
+			method: http.MethodGet,
+			path:   draftVersionsPath(canvasID),
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}},{"metadata":{"id":"draft-2","owner":{"id":"user-1"}}}]}`))
+			},
+		},
+	)
+
+	filePath := writeTestCanvasFileWithMetadataID(t, "multi-draft", canvasID)
+	file := filePath
+	draft := true
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "multiple drafts found")
+}

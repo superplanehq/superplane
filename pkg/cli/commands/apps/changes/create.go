@@ -11,6 +11,7 @@ import (
 
 type CreateCommand struct {
 	versionID   *string
+	draftID     *string
 	title       *string
 	description *string
 }
@@ -31,8 +32,12 @@ func (c *CreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	versionID := ""
-	if c.versionID != nil {
-		versionID = strings.TrimSpace(*c.versionID)
+	if c.versionID != nil || c.draftID != nil {
+		var err error
+		versionID, err = common.MergeDraftOrVersionID(c.draftID, c.versionID)
+		if err != nil {
+			return err
+		}
 	}
 
 	if versionID == "" {
