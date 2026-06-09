@@ -36,12 +36,7 @@ export function ConfigurationNestedGroup({
   return (
     <div className={cn("min-w-0 mt-1", className)}>
       <ConfigurationGroupHeader header={header} />
-      <div
-        className={cn(
-          "relative ml-1.5 mt-1.5 min-w-0 border-l border-slate-950/10 pl-3",
-          contentClassName,
-        )}
-      >
+      <div className={cn("relative ml-1.5 mt-1.5 min-w-0 border-l border-slate-950/10 pl-3", contentClassName)}>
         <div className="flex flex-col gap-2">{children}</div>
       </div>
     </div>

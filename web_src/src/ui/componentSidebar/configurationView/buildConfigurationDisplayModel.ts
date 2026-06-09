@@ -13,6 +13,15 @@ export type BuildConfigurationDisplayModelInput = {
   allowIntegrations?: boolean;
 };
 
+type FieldRowsContext = {
+  fields: ConfigurationField[];
+  values: Record<string, unknown>;
+  rootConfiguration: Record<string, unknown>;
+  parentPath: string;
+  depth: number;
+  rows: ConfigurationDisplayRow[];
+};
+
 function resolveIntegrationInstanceName(integration: OrganizationsIntegration): string {
   const instanceName = integration.metadata?.name;
   const typeName = integration.metadata?.integrationName;
@@ -114,83 +123,146 @@ function appendIntegrationRows(rows: ConfigurationDisplayRow[], input: BuildConf
   }
 }
 
-function appendFieldRows(
-  fields: ConfigurationField[],
-  values: Record<string, unknown>,
-  rootConfiguration: Record<string, unknown>,
-  parentPath: string,
-  depth: number,
-  rows: ConfigurationDisplayRow[],
-): void {
-  for (const field of fields) {
-    if (!field.name || field.name === "customName") {
-      continue;
-    }
-    if (!isFieldVisible(field, { ...rootConfiguration, ...values })) {
-      continue;
-    }
-
-    const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
-    const rawValue = values[field.name];
-    const objectSchema = field.typeOptions?.object?.schema;
-    const listItemSchema = field.typeOptions?.list?.itemDefinition?.schema;
-    const listItemType = field.typeOptions?.list?.itemDefinition?.type;
-
-    if (field.type === "object" && objectSchema && isRecord(rawValue)) {
-      const schemaDefaults = parseDefaultValues(objectSchema);
-      const mergedValues = { ...schemaDefaults, ...rawValue };
-      if (depth === 0) {
-        rows.push({
-          key: `${fieldPath}.__group`,
-          label: formatConfigurationLabel(field),
-          kind: "text",
-          displayText: "",
-          depth,
-        });
-      }
-      appendFieldRows(objectSchema, mergedValues, rootConfiguration, fieldPath, depth + 1, rows);
-      continue;
-    }
-
-    if (field.type === "list" && Array.isArray(rawValue) && listItemSchema && listItemType === "object") {
-      rows.push({
-        key: `${fieldPath}.__group`,
-        label: formatConfigurationLabel(field),
-        kind: rawValue.length === 0 ? "empty" : "list",
-        displayText:
-          rawValue.length === 0 ? EMPTY_DISPLAY_VALUE : `${rawValue.length} item${rawValue.length === 1 ? "" : "s"}`,
-        depth,
-      });
-
-      rawValue.forEach((item, index) => {
-        if (!isRecord(item)) {
-          return;
-        }
-        const itemLabel = field.typeOptions?.list?.itemLabel ?? "Item";
-        rows.push({
-          key: `${fieldPath}[${index}].__header`,
-          label: `${itemLabel} ${index + 1}`,
-          kind: "text",
-          displayText: "",
-          depth: depth + 1,
-        });
-        appendFieldRows(listItemSchema, item, rootConfiguration, `${fieldPath}[${index}]`, depth + 2, rows);
-      });
-      continue;
-    }
-
-    const formatted = formatConfigurationValue(field, rawValue);
-    rows.push({
-      key: fieldPath,
-      label: formatConfigurationLabel(field),
-      depth,
-      ...formatted,
-    });
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function shouldSkipField(field: ConfigurationField, ctx: FieldRowsContext): boolean {
+  if (!field.name || field.name === "customName") {
+    return true;
+  }
+  return !isFieldVisible(field, { ...ctx.rootConfiguration, ...ctx.values });
+}
+
+function appendObjectFieldRows(
+  field: ConfigurationField,
+  rawValue: Record<string, unknown>,
+  fieldPath: string,
+  ctx: FieldRowsContext,
+): void {
+  const objectSchema = field.typeOptions?.object?.schema;
+  if (!objectSchema) {
+    return;
+  }
+
+  const schemaDefaults = parseDefaultValues(objectSchema);
+  const mergedValues = { ...schemaDefaults, ...rawValue };
+  if (ctx.depth === 0) {
+    ctx.rows.push({
+      key: `${fieldPath}.__group`,
+      label: formatConfigurationLabel(field),
+      kind: "text",
+      displayText: "",
+      depth: ctx.depth,
+    });
+  }
+
+  appendFieldRows({
+    ...ctx,
+    fields: objectSchema,
+    values: mergedValues,
+    parentPath: fieldPath,
+    depth: ctx.depth + 1,
+  });
+}
+
+function appendListFieldRows(
+  field: ConfigurationField,
+  rawValue: unknown[],
+  fieldPath: string,
+  ctx: FieldRowsContext,
+): void {
+  const listItemSchema = field.typeOptions?.list?.itemDefinition?.schema;
+  if (!listItemSchema) {
+    return;
+  }
+
+  ctx.rows.push({
+    key: `${fieldPath}.__group`,
+    label: formatConfigurationLabel(field),
+    kind: rawValue.length === 0 ? "empty" : "list",
+    displayText:
+      rawValue.length === 0 ? EMPTY_DISPLAY_VALUE : `${rawValue.length} item${rawValue.length === 1 ? "" : "s"}`,
+    depth: ctx.depth,
+  });
+
+  const itemLabel = field.typeOptions?.list?.itemLabel ?? "Item";
+  rawValue.forEach((item, index) => {
+    if (!isRecord(item)) {
+      return;
+    }
+
+    ctx.rows.push({
+      key: `${fieldPath}[${index}].__header`,
+      label: `${itemLabel} ${index + 1}`,
+      kind: "text",
+      displayText: "",
+      depth: ctx.depth + 1,
+    });
+    appendFieldRows({
+      ...ctx,
+      fields: listItemSchema,
+      values: item,
+      parentPath: `${fieldPath}[${index}]`,
+      depth: ctx.depth + 2,
+    });
+  });
+}
+
+function appendScalarFieldRow(
+  field: ConfigurationField,
+  rawValue: unknown,
+  fieldPath: string,
+  ctx: FieldRowsContext,
+): void {
+  const formatted = formatConfigurationValue(field, rawValue);
+  ctx.rows.push({
+    key: fieldPath,
+    label: formatConfigurationLabel(field),
+    depth: ctx.depth,
+    ...formatted,
+  });
+}
+
+function isObjectFieldValue(field: ConfigurationField, rawValue: unknown): rawValue is Record<string, unknown> {
+  return field.type === "object" && Boolean(field.typeOptions?.object?.schema) && isRecord(rawValue);
+}
+
+function isListFieldValue(field: ConfigurationField, rawValue: unknown): rawValue is unknown[] {
+  const listItemType = field.typeOptions?.list?.itemDefinition?.type;
+  return (
+    field.type === "list" &&
+    Array.isArray(rawValue) &&
+    Boolean(field.typeOptions?.list?.itemDefinition?.schema) &&
+    listItemType === "object"
+  );
+}
+
+function processField(field: ConfigurationField, ctx: FieldRowsContext): void {
+  const fieldPath = ctx.parentPath ? `${ctx.parentPath}.${field.name}` : field.name!;
+  const rawValue = ctx.values[field.name!];
+
+  if (isObjectFieldValue(field, rawValue)) {
+    appendObjectFieldRows(field, rawValue, fieldPath, ctx);
+    return;
+  }
+
+  if (isListFieldValue(field, rawValue)) {
+    appendListFieldRows(field, rawValue, fieldPath, ctx);
+    return;
+  }
+
+  appendScalarFieldRow(field, rawValue, fieldPath, ctx);
+}
+
+function appendFieldRows(ctx: FieldRowsContext): void {
+  for (const field of ctx.fields) {
+    if (shouldSkipField(field, ctx)) {
+      continue;
+    }
+
+    processField(field, ctx);
+  }
 }
 
 export function buildConfigurationDisplayModel(input: BuildConfigurationDisplayModelInput): ConfigurationDisplayModel {
@@ -198,7 +270,14 @@ export function buildConfigurationDisplayModel(input: BuildConfigurationDisplayM
 
   appendCustomNameRow(rows, input.configuration, input.configurationFields);
   appendIntegrationRows(rows, input);
-  appendFieldRows(input.configurationFields, input.configuration, input.configuration, "", 0, rows);
+  appendFieldRows({
+    fields: input.configurationFields,
+    values: input.configuration,
+    rootConfiguration: input.configuration,
+    parentPath: "",
+    depth: 0,
+    rows,
+  });
 
   return { rows };
 }
