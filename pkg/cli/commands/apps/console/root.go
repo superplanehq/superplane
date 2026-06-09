@@ -15,6 +15,8 @@ live console and writes always target your draft version.`,
 	}
 
 	var getDraft bool
+	var getDraftID string
+	var getVersionID string
 	getCmd := &cobra.Command{
 		Use:   "get [app-name-or-id]",
 		Short: "Get the console for an app",
@@ -27,10 +29,14 @@ configured with "superplane apps active" is used.`,
 		Args: cobra.MaximumNArgs(1),
 	}
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "read the current user's draft console instead of the live console")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
+	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
+	getCmd.Flags().StringVar(&getVersionID, "version-id", "", "alias for --draft-id")
+	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID}, options)
 
 	var setFile string
 	var setDraftOnly bool
+	var setDraftID string
+	var setVersionID string
 	setCmd := &cobra.Command{
 		Use:   "set [app-name-or-id] [file]",
 		Short: "Replace the console draft with YAML",
@@ -53,7 +59,9 @@ YAML source resolution order:
 	}
 	setCmd.Flags().StringVarP(&setFile, "file", "f", "", `console YAML file path, or "-" for stdin`)
 	setCmd.Flags().BoolVar(&setDraftOnly, "draft", false, "update the draft only; do not create a change request when change management is enabled")
-	core.Bind(setCmd, &setCommand{file: &setFile, draftOnly: &setDraftOnly}, options)
+	setCmd.Flags().StringVar(&setDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
+	setCmd.Flags().StringVar(&setVersionID, "version-id", "", "alias for --draft-id")
+	core.Bind(setCmd, &setCommand{file: &setFile, draftOnly: &setDraftOnly, draftID: &setDraftID, versionID: &setVersionID}, options)
 
 	root.AddCommand(getCmd)
 	root.AddCommand(setCmd)
