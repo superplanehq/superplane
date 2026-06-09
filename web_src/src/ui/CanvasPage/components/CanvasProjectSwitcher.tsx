@@ -418,6 +418,8 @@ function ProjectSearchList({
   organizationId: string;
   onSelect: (canvasId: string) => void;
 }) {
+  const modifierClickRef = useRef(false);
+
   if (isLoading) {
     return (
       <CommandList className="max-h-[280px]">
@@ -435,16 +437,24 @@ function ProjectSearchList({
             key={project.id}
             value={`${project.name} ${project.id}`}
             keywords={[project.name]}
-            onSelect={() => onSelect(project.id)}
+            onSelect={() => {
+              if (modifierClickRef.current) {
+                modifierClickRef.current = false;
+                return;
+              }
+              onSelect(project.id);
+            }}
             className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900"
             asChild
           >
             <Link
               to={appPath(organizationId, project.id)}
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+                  modifierClickRef.current = true;
+                  return;
+                }
                 e.preventDefault();
-                onSelect(project.id);
               }}
               onAuxClick={(e) => {
                 // Middle-click: let the browser handle it (open in new tab)

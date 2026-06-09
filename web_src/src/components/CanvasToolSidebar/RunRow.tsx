@@ -82,11 +82,30 @@ export function RunRow({
       >
         {title}
       </span>
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         title="Copy link to run"
         className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            void (async () => {
+              const url = new URL(window.location.href);
+              url.searchParams.set("view", "runs");
+              url.searchParams.set("run", run.id || "");
+              try {
+                await navigator.clipboard.writeText(url.toString());
+                toast.success("Run link copied");
+              } catch {
+                toast.error("Failed to copy run link");
+              }
+            })();
+          }
+        }}
         onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           void (async () => {
             const url = new URL(window.location.href);
@@ -102,7 +121,7 @@ export function RunRow({
         }}
       >
         <LinkIcon className="h-3 w-3" />
-      </button>
+      </span>
       {run.createdAt ? (
         <span className="shrink-0 text-xs tabular-nums text-gray-500">
           <TimeAgo date={run.createdAt} includeAgo={false} />

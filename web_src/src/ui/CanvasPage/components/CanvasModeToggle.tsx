@@ -48,6 +48,7 @@ export function CanvasModeToggle({
   hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
+  const modifierClickRef = useRef(false);
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -71,6 +72,11 @@ export function CanvasModeToggle({
     <Tabs
       value={selected}
       onValueChange={(next) => {
+        // Skip if this was a modifier click (user is opening in new tab)
+        if (modifierClickRef.current) {
+          modifierClickRef.current = false;
+          return;
+        }
         // Radix Tabs may emit more than one `onValueChange` per click when `value` is controlled and the parent
         // doesn't update it synchronously. We only want to suppress duplicates from the same user interaction,
         // not block subsequent clicks.
@@ -125,7 +131,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=console") : "#"}
-              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
+              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
             >
               <span className="inline-flex items-center gap-1.5">
                 Console
@@ -142,7 +148,7 @@ export function CanvasModeToggle({
         >
           <Link
             to={organizationId && appId ? appPath(organizationId, appId) : "#"}
-            onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
+            onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
           >
             <span className="inline-flex items-center gap-1.5">
               Canvas
@@ -154,7 +160,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=memory") : "#"}
-              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
+              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
             >
               Memory
             </Link>
@@ -164,7 +170,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=files") : "#"}
-              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
+              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
             >
               Files
             </Link>
