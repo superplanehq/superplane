@@ -1,14 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { CanvasModeToggle } from "./CanvasModeToggle";
+
+const routerWrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 describe("CanvasModeToggle", () => {
   it("exits runs mode when clicking the Canvas tab", async () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
 
@@ -19,7 +24,9 @@ describe("CanvasModeToggle", () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
@@ -38,6 +45,7 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         onSelectMemory={onSelectMemory}
       />,
+      { wrapper: routerWrapper },
     );
 
     await user.click(screen.getByRole("tab", { name: "Memory" }));
@@ -46,13 +54,17 @@ describe("CanvasModeToggle", () => {
   });
 
   it("hides the Memory tab when onSelectMemory is not provided", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
 
   it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />);
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toBeInTheDocument();
     expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
@@ -68,6 +80,7 @@ describe("CanvasModeToggle", () => {
         hasDraft
         hasConsoleDraft
       />,
+      { wrapper: routerWrapper },
     );
 
     const tabList = screen.getByRole("tablist", { name: "Canvas view" });
@@ -91,6 +104,7 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         onSelectFiles={onSelectFiles}
       />,
+      { wrapper: routerWrapper },
     );
 
     await user.click(screen.getByRole("tab", { name: "Files" }));

@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunsTabPanel } from "./RunsTabPanel";
+
+const routerWrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
@@ -61,7 +64,7 @@ describe("RunsTabPanel", () => {
   };
 
   it("shows an empty state when there are no runs", () => {
-    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />);
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />, { wrapper: routerWrapper });
 
     expect(screen.getByText("No Runs")).toBeInTheDocument();
   });
@@ -81,6 +84,7 @@ describe("RunsTabPanel", () => {
         selectedRunId={null}
         {...baseProps}
       />,
+      { wrapper: routerWrapper },
     );
 
     const rows = screen.getAllByTestId("runs-sidebar-row");
@@ -106,6 +110,7 @@ describe("RunsTabPanel", () => {
         selectedRunId={null}
         {...baseProps}
       />,
+      { wrapper: routerWrapper },
     );
 
     fireEvent.click(screen.getByLabelText("Filter runs"));
@@ -128,7 +133,9 @@ describe("RunsTabPanel", () => {
       }),
     );
 
-    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
     const scroller = screen.getByTestId("runs-sidebar-scroll");
 
     Object.defineProperties(scroller, {
@@ -146,6 +153,7 @@ describe("RunsTabPanel", () => {
         isFetchingNextPage={false}
         onLoadMore={onLoadMore}
       />,
+      { wrapper: routerWrapper },
     );
 
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
@@ -158,7 +166,9 @@ describe("RunsTabPanel", () => {
   });
 
   it("opens run detail on initial deep link", () => {
-    render(<RunsTabPanel runs={[makeRun()]} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
+    render(<RunsTabPanel runs={[makeRun()]} selectedRunId="run-1" initialOpenDetail {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
   });
@@ -175,6 +185,7 @@ describe("RunsTabPanel", () => {
         onBackToRunList={onBackToRunList}
         {...baseProps}
       />,
+      { wrapper: routerWrapper },
     );
 
     await user.click(screen.getByTestId("run-detail-back"));
@@ -185,10 +196,14 @@ describe("RunsTabPanel", () => {
   it("opens run detail when initialOpenDetail arrives after mount", () => {
     const runs = [makeRun()];
 
-    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
     expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
@@ -199,13 +214,15 @@ describe("RunsTabPanel", () => {
       makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
     ];
 
-    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />);
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
     expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />);
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />, { wrapper: routerWrapper });
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />, { wrapper: routerWrapper });
     expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
     expect(screen.getByText("Second run")).toBeInTheDocument();
   });
@@ -218,14 +235,19 @@ describe("RunsTabPanel", () => {
 
     const { rerender } = render(
       <RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />,
+      { wrapper: routerWrapper },
     );
 
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
     expect(screen.getByText("Second run")).toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 });

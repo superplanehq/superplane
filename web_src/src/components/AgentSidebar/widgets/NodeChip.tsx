@@ -1,5 +1,5 @@
 import { createElement, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { cn, resolveIcon } from "@/lib/utils";
 import { appPath } from "@/lib/appPaths";
 import { useCanvas } from "@/hooks/useCanvasData";
@@ -124,7 +124,6 @@ function NodeHoverHeader({
 }
 
 export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipProps) {
-  const navigate = useNavigate();
   const { data: canvas } = useCanvas(organizationId, canvasId, {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
@@ -137,16 +136,21 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
   const isTrigger = isTriggerNode(node, component);
   const edges = canvas?.spec?.edges ?? [];
 
-  const handleClick = useCallback(() => {
-    navigate(appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`));
-    window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
-  }, [navigate, organizationId, canvasId, node?.id, nodeId]);
+  const nodeHref = appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
+    },
+    [node?.id, nodeId],
+  );
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
-        <button
-          type="button"
+        <Link
+          to={nodeHref}
           onClick={handleClick}
           className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer align-middle whitespace-nowrap",
@@ -156,7 +160,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
         >
           <NodeIconInline component={component} isTrigger={isTrigger} />
           {label}
-        </button>
+        </Link>
       </HoverCardTrigger>
       {node && (
         <HoverCardContent className="w-64 p-0" side="top" align="start">
