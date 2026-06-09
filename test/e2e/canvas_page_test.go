@@ -126,6 +126,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.publishCanvas()
 		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.saveCanvas()
 		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
@@ -138,6 +139,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.addFilter("Filter")
 		steps.connectNodes("Start", "Filter")
 		steps.saveCanvas()
+		steps.waitForDraftConnection("Start", "Filter")
 		steps.openNodeSettings("Filter")
 		steps.typeExpression("$")
 		steps.assertAutocompleteNodeSuggestionVisible()
@@ -226,6 +228,36 @@ func (s *CanvasPageSteps) enterEditMode() {
 
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
 	s.canvas.DeleteConnection(sourceName, targetName)
+}
+
+func (s *CanvasPageSteps) waitForDraftConnection(sourceName, targetName string) {
+	require.Eventually(s.t, func() bool {
+		draft := s.canvas.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+
+		sourceID := ""
+		targetID := ""
+		for _, node := range draft.Nodes {
+			if node.Name == sourceName {
+				sourceID = node.ID
+			}
+			if node.Name == targetName {
+				targetID = node.ID
+			}
+		}
+		if sourceID == "" || targetID == "" {
+			return false
+		}
+
+		for _, edge := range draft.Edges {
+			if edge.SourceID == sourceID && edge.TargetID == targetID {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
 }
 
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {

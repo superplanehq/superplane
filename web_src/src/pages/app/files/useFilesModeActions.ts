@@ -62,5 +62,6 @@ function toFilesSearchParams(current: URLSearchParams): URLSearchParams {
 function removeFilesSearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
+  next.delete("file");
   return next;
 }

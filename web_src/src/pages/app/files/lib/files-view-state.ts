@@ -1,5 +1,6 @@
 import { getApiErrorMessage } from "@/lib/errors";
 
+import { isWorkflowSpecPath } from "../../lib/workflow-spec-paths";
 import type { PendingFileChange, AppFile } from "../types";
 
 type RepositoryQueryLike = {
@@ -60,14 +61,19 @@ function resolveSelectedFileContent(
   selectedPath: string | null,
   selectedGeneratedFile: AppFile | undefined,
   selectedChange: PendingFileChange | undefined,
+  selectedSpecDraft: string | undefined,
   loadedContentByPath: Record<string, string>,
 ): string {
-  if (selectedGeneratedFile) {
-    return selectedGeneratedFile.content;
+  if (selectedSpecDraft !== undefined) {
+    return selectedSpecDraft;
   }
 
   if (selectedChange?.type === "added" || selectedChange?.type === "modified") {
     return selectedChange.content;
+  }
+
+  if (selectedGeneratedFile) {
+    return selectedGeneratedFile.content;
   }
 
   if (!selectedPath) {
@@ -94,6 +100,7 @@ export function getSelectedFileViewState({
   selectedPath,
   selectedGeneratedFile,
   selectedChange,
+  selectedSpecDraft,
   loadedContentByPath,
   selectedPathExistsInRepository,
   selectedFileQuery,
@@ -102,6 +109,7 @@ export function getSelectedFileViewState({
   selectedPath: string | null;
   selectedGeneratedFile?: AppFile;
   selectedChange?: PendingFileChange;
+  selectedSpecDraft?: string;
   loadedContentByPath: Record<string, string>;
   selectedPathExistsInRepository: boolean;
   selectedFileQuery: SelectedFileQueryLike;
@@ -112,6 +120,7 @@ export function getSelectedFileViewState({
     selectedPath,
     selectedGeneratedFile,
     selectedChange,
+    selectedSpecDraft,
     loadedContentByPath,
   );
   const selectedContentLoaded = isSelectedFileContentLoaded(
@@ -126,12 +135,14 @@ export function getSelectedFileViewState({
   const editorErrorMessage =
     selectedGeneratedFile?.errorMessage ||
     (selectedFileQuery.error ? getApiErrorMessage(selectedFileQuery.error, "Failed to load file.") : undefined);
+  const isEditableSpecFile = !!selectedPath && isWorkflowSpecPath(selectedPath);
   const editorDisabled =
-    !!selectedGeneratedFile ||
+    !!selectedGeneratedFile?.loading ||
     !canManageRepositoryFiles ||
     !selectedPath ||
     selectedIsDeleted ||
-    !selectedContentLoaded;
+    !selectedContentLoaded ||
+    (!!selectedGeneratedFile && !isEditableSpecFile);
 
   return {
     selectedContent,
