@@ -48,6 +48,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	core.Bind(getCmd, &GetCommand{}, options)
 
 	var createVersionID string
+	var createDraftID string
 	var createTitle string
 	var createDescription string
 
@@ -58,11 +59,13 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 
 	createCmd.Flags().StringVar(&createVersionID, "version-id", "", "version id to use (defaults to current user draft)")
+	createCmd.Flags().StringVar(&createDraftID, "draft-id", "", "alias for --version-id")
 	createCmd.Flags().StringVar(&createTitle, "title", "", "change request title")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "change request description")
 
 	core.Bind(createCmd, &CreateCommand{
 		versionID:   &createVersionID,
+		draftID:     &createDraftID,
 		title:       &createTitle,
 		description: &createDescription,
 	}, options)

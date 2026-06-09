@@ -5,6 +5,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/changes"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -44,6 +45,7 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 	root.AddCommand(NewCreateCommand(options))
 	root.AddCommand(NewDeleteCommand(options))
 	root.AddCommand(changes.NewCommand(options))
+	root.AddCommand(drafts.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))
