@@ -60,8 +60,21 @@ func CommitCanvasRepositoryFiles(
 	}
 
 	resolvedAutoLayout := resolveCommitCanvasAutoLayout(autoLayout != nil, autoLayout)
-
 	specOps, gitOps := splitRepositoryFileOperations(operations)
+
+	// canvas.yaml and console.yaml are persisted in the database, while the
+	// remaining files are committed to git, so the two stores cannot share a
+	// single transaction. Commit the git files first: if the git commit fails
+	// (for example on a stale head SHA), the request returns before any spec
+	// change is written, keeping the database consistent with the failed commit.
+	var commitSha string
+	if len(gitOps) > 0 {
+		commitSha, err = commitGitFileOperations(ctx, gitProvider, orgID, canvasID, organizationID, userID, expectedHeadSha, message, gitOps)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if len(specOps) > 0 {
 		if err := ApplyRepositorySpecFileOperations(
 			ctx,
@@ -80,18 +93,30 @@ func CommitCanvasRepositoryFiles(
 		}
 	}
 
-	if len(gitOps) == 0 {
-		return &pb.CommitCanvasRepositoryFilesResponse{}, nil
-	}
+	return &pb.CommitCanvasRepositoryFilesResponse{
+		CommitSha: commitSha,
+	}, nil
+}
 
+func commitGitFileOperations(
+	ctx context.Context,
+	gitProvider git.Provider,
+	orgID uuid.UUID,
+	canvasID uuid.UUID,
+	organizationID string,
+	userID string,
+	expectedHeadSha string,
+	message string,
+	gitOps []*pb.CanvasRepositoryFileOperation,
+) (string, error) {
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return "", status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
+		return "", status.Errorf(codes.Internal, "failed to find user: %v", err)
 	}
 
 	gitOperations := make([]git.FileOperation, 0, len(gitOps))
@@ -121,12 +146,9 @@ func CommitCanvasRepositoryFiles(
 			Email: user.GetEmail(),
 		},
 	})
-
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+		return "", status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
 	}
 
-	return &pb.CommitCanvasRepositoryFilesResponse{
-		CommitSha: newCommitSha,
-	}, nil
+	return newCommitSha, nil
 }
