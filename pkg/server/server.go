@@ -211,7 +211,15 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL)
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agents.NewCustomToolRouter(
+			agents.NewSuperPlaneCanvasTool(agents.SuperPlaneCanvasToolOptions{
+				Encryptor:      encryptor,
+				Registry:       registry,
+				WebhookBaseURL: getWebhookBaseURL(baseURL),
+				AuthService:    authService,
+			}),
+			agents.NewSuperPlaneComponentSchemaTool(registry),
+		))
 		go w.Start(context.Background())
 	}
 
