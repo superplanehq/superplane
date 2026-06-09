@@ -332,6 +332,14 @@ func getDraftStatus(canvasID uuid.UUID) string {
 				draftCreatedAt(draft),
 			)
 		}
+		if len(drafts) == 1 {
+			result += "Use --draft-id " + drafts[0].ID.String() + " on canvas/console CLI commands.\n"
+		} else {
+			result += fmt.Sprintf(
+				"Use --draft-id <uuid> on canvas/console commands. Run `superplane apps drafts list %s` to choose a draft.\n",
+				canvasID.String(),
+			)
+		}
 		return result
 	}
 

@@ -52,7 +52,7 @@ Categories with `##` headings. Criteria should be functional requirements, not i
 
 ## Draft Actions
 
-**When to use:** After successfully creating a canvas draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
+**When to use:** After successfully creating or updating a canvas/console draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
 
 ```
 :::draft-actions
@@ -61,6 +61,7 @@ message: Draft ready — added health check nodes
 :::
 ```
 
+Use the `versionId` from this block (or from CLI update output) as `--draft-id` on follow-up `canvas get/update` and `console get/set` commands in the same session.
 ## Chart
 
 **When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.
