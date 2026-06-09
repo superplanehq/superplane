@@ -2642,7 +2642,7 @@ type CreateLoadBalancerInput struct {
 	Name           string
 	Type           string
 	Scheme         string
-	IpAddressType  string
+	IPAddressType  string
 	SubnetIDs      []string
 	SecurityGroups []string
 }
@@ -2786,7 +2786,7 @@ func (c *Client) CreateLoadBalancer(input CreateLoadBalancerInput) (*CreateLoadB
 		params.Set("Scheme", strings.TrimSpace(input.Scheme))
 	}
 
-	if ip := strings.TrimSpace(input.IpAddressType); ip != "" {
+	if ip := strings.TrimSpace(input.IPAddressType); ip != "" {
 		params.Set("IpAddressType", ip)
 	}
 
