@@ -29,11 +29,17 @@ configured with "superplane apps active" is used.`,
 		Args: cobra.MaximumNArgs(1),
 	}
 	var getDraft bool
+	var getDraftID string
+	var getVersionID string
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
+	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
+	getCmd.Flags().StringVar(&getVersionID, "version-id", "", "alias for --draft-id")
+	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID}, options)
 
 	var updateFile string
 	var updateDraft bool
+	var updateDraftID string
+	var updateVersionID string
 	var updateAutoLayout string
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
@@ -46,12 +52,16 @@ configured with "superplane apps active" is used.`,
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
+	updateCmd.Flags().StringVar(&updateDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
+	updateCmd.Flags().StringVar(&updateVersionID, "version-id", "", "alias for --draft-id")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
 		file:            &updateFile,
 		draft:           &updateDraft,
+		draftID:         &updateDraftID,
+		versionID:       &updateVersionID,
 		autoLayout:      &updateAutoLayout,
 		autoLayoutScope: &updateAutoLayoutScope,
 		autoLayoutNodes: &updateAutoLayoutNodes,

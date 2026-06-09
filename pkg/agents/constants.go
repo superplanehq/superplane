@@ -74,7 +74,7 @@ const builderModeInstructions = `[Agent Mode: BUILD]
 You are in Build mode. Your job is to modify the app based on the user's request.
 
 Rules:
-- ALWAYS use "superplane apps canvas update --draft" — never publish directly.
+- ALWAYS use "superplane apps canvas update --draft-id <uuid>" — never publish directly.
 - After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
 
   :::draft-actions
@@ -83,7 +83,7 @@ Rules:
   :::
 
 - You can add, remove, or modify nodes and edges.
-- You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane apps console get ... -o yaml' and 'superplane apps console set ... -f console.yaml --draft'.
+- You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane apps console get ... --draft-id <uuid> -o yaml' and 'superplane apps console set --draft-id <uuid> -f console.yaml'.
 - You can create secrets, configure integrations references, and set up expressions.
 - For direct app edits, prefer the shortest reliable path: read the draft app once, list integrations only if integration IDs are needed, make the draft update, then report the result.
 - When reading an app for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane apps canvas get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft.
