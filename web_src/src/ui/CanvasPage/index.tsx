@@ -2397,6 +2397,8 @@ function CanvasContent({
         onNodeClick(nodeId);
       } else {
         const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
+        const previousSelectedNodeId = stateRef.current.componentSidebar.selectedNodeId;
+        const isSameNode = wasSidebarOpen && previousSelectedNodeId === nodeId;
         stateRef.current.componentSidebar.open(nodeId);
 
         const nodeData = clickedNode?.data as {
@@ -2407,9 +2409,14 @@ function CanvasContent({
         const hasConfigurationWarning = Boolean(
           nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
         );
+        const shouldOpenSettings = hasConfigurationWarning || isEditMode;
 
-        if (setCurrentTab && !wasSidebarOpen) {
-          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
+        if (setCurrentTab && !isSameNode) {
+          if (!wasSidebarOpen) {
+            setCurrentTab(shouldOpenSettings ? "settings" : "latest");
+          } else if (shouldOpenSettings) {
+            setCurrentTab("settings");
+          }
         }
 
         if (onBuildingBlocksSidebarToggle) {
