@@ -1,3 +1,4 @@
+import { isWorkflowSpecPath } from "../../lib/workflow-spec-paths";
 import {
   getRepositoryFileListErrorMessage,
   getRepositoryFileListLoading,
@@ -22,6 +23,7 @@ type EditorViewParams = {
   };
   pending: {
     pendingChangesByPath: Record<string, PendingFileChange>;
+    specDraftByPath: Record<string, string>;
     newFilePath: string | null;
     startNewFile: () => void;
     createNewFile: () => void;
@@ -59,10 +61,13 @@ export function buildFilesEditorResult({
   headerActionsHost,
 }: EditorViewParams) {
   const selectedChange = tabs.selectedPath ? pending.pendingChangesByPath[tabs.selectedPath] : undefined;
+  const selectedSpecDraft =
+    tabs.selectedPath && isWorkflowSpecPath(tabs.selectedPath) ? pending.specDraftByPath[tabs.selectedPath] : undefined;
   const editorView = getSelectedFileViewState({
     selectedPath: tabs.selectedPath,
     selectedGeneratedFile: selection.selectedGeneratedFile,
     selectedChange,
+    selectedSpecDraft,
     loadedContentByPath,
     selectedPathExistsInRepository: selection.selectedPathExistsInRepository,
     selectedFileQuery: selection.selectedFileQuery,

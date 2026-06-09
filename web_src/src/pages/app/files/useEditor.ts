@@ -1,6 +1,6 @@
 import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
 import { CANVAS_YAML_PATH } from "../lib/workflow-spec-paths";
@@ -20,6 +20,7 @@ type UseEditorOptions = {
   files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 };
 
 export function useEditor({
@@ -30,6 +31,7 @@ export function useEditor({
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
+  onSpecFileChange,
 }: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
@@ -48,12 +50,16 @@ export function useEditor({
   const pending = usePendingState({
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
-    generatedFilesByPath: catalog.generatedFilesByPath,
     finalRepositoryPathsRef,
     allPathsRef,
     loadedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
+    onSpecFileChange,
   });
+  const clearSpecDrafts = pending.clearSpecDrafts;
+  useEffect(() => {
+    clearSpecDrafts();
+  }, [versionId, clearSpecDrafts]);
   const pendingChanges = useMemo(
     () => Object.values(pending.pendingChangesByPath).sort((left, right) => left.path.localeCompare(right.path)),
     [pending.pendingChangesByPath],

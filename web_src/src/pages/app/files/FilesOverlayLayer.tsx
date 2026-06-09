@@ -12,6 +12,7 @@ interface FilesOverlayLayerProps {
   files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 }
 
 export function FilesOverlayLayer({
@@ -23,6 +24,7 @@ export function FilesOverlayLayer({
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
+  onSpecFileChange,
 }: FilesOverlayLayerProps) {
   if (!isFilesMode) return null;
 
@@ -35,6 +37,7 @@ export function FilesOverlayLayer({
       files={files}
       headerActionsSlotId={headerActionsSlotId}
       onHeaderActionsChange={onHeaderActionsChange}
+      onSpecFileChange={onSpecFileChange}
     />
   );
 }

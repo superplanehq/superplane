@@ -19,6 +19,7 @@ export function FilesView({
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
+  onSpecFileChange,
 }: {
   canvasId?: string;
   versionId?: string;
@@ -27,6 +28,7 @@ export function FilesView({
   files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 }) {
   const editor = useEditor({
     canvasId,
@@ -36,6 +38,7 @@ export function FilesView({
     files,
     headerActionsSlotId,
     onHeaderActionsChange,
+    onSpecFileChange,
   });
 
   return (

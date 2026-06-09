@@ -128,6 +128,8 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useSpecFileAutosave } from "./useSpecFileAutosave";
+import { buildAppFiles } from "./files/lib/app-files";
 import { useCanvasConsoleVersionDiff, useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
@@ -5062,7 +5064,35 @@ export function AppPage() {
     onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const appFiles = useMemo(() => [], []);
+  const appFiles = useMemo(
+    () =>
+      buildAppFiles({
+        canvas,
+        canvasNodes: nodes,
+        panels: consoleQuery.data?.panels,
+        layout: consoleQuery.data?.layout,
+        canvasId,
+        canvasName: canvas?.metadata?.name,
+        consoleLoading: consoleQuery.isLoading,
+        consoleError: consoleQuery.error,
+      }),
+    [
+      canvas,
+      nodes,
+      consoleQuery.data?.panels,
+      consoleQuery.data?.layout,
+      canvasId,
+      consoleQuery.isLoading,
+      consoleQuery.error,
+    ],
+  );
+  const { onSpecFileChange } = useSpecFileAutosave({
+    canvas,
+    isReadOnly,
+    applyLocalWorkflowUpdate,
+    handleSaveWorkflow,
+    updateConsoleMutation,
+  });
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
@@ -5311,6 +5341,7 @@ export function AppPage() {
             files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
             onHeaderActionsChange: onFilesHeaderActionsChange,
+            onSpecFileChange,
           }}
         />
         <CanvasPage

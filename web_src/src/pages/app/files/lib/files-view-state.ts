@@ -61,8 +61,13 @@ function resolveSelectedFileContent(
   selectedPath: string | null,
   selectedGeneratedFile: AppFile | undefined,
   selectedChange: PendingFileChange | undefined,
+  selectedSpecDraft: string | undefined,
   loadedContentByPath: Record<string, string>,
 ): string {
+  if (selectedSpecDraft !== undefined) {
+    return selectedSpecDraft;
+  }
+
   if (selectedChange?.type === "added" || selectedChange?.type === "modified") {
     return selectedChange.content;
   }
@@ -95,6 +100,7 @@ export function getSelectedFileViewState({
   selectedPath,
   selectedGeneratedFile,
   selectedChange,
+  selectedSpecDraft,
   loadedContentByPath,
   selectedPathExistsInRepository,
   selectedFileQuery,
@@ -103,6 +109,7 @@ export function getSelectedFileViewState({
   selectedPath: string | null;
   selectedGeneratedFile?: AppFile;
   selectedChange?: PendingFileChange;
+  selectedSpecDraft?: string;
   loadedContentByPath: Record<string, string>;
   selectedPathExistsInRepository: boolean;
   selectedFileQuery: SelectedFileQueryLike;
@@ -113,6 +120,7 @@ export function getSelectedFileViewState({
     selectedPath,
     selectedGeneratedFile,
     selectedChange,
+    selectedSpecDraft,
     loadedContentByPath,
   );
   const selectedContentLoaded = isSelectedFileContentLoaded(

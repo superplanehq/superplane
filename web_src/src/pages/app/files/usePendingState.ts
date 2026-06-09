@@ -4,28 +4,29 @@ import { useCallback, useState, type RefObject } from "react";
 import { isWorkflowSpecPath } from "../lib/workflow-spec-paths";
 import { applyPendingContentUpdate, applyPendingDelete } from "./lib/files-pending-state";
 import { getPathValidationError, nextUntitledPath, normalizeFilePath } from "./lib/files-paths";
-import type { AppFile, PendingFileChange } from "./types";
+import type { PendingFileChange } from "./types";
 
 type UsePendingStateOptions = {
   generatedPathSet: Set<string>;
   generatedPaths: string[];
-  generatedFilesByPath: Map<string, AppFile>;
   finalRepositoryPathsRef: RefObject<string[]>;
   allPathsRef: RefObject<string[]>;
   loadedContentByPathRef: RefObject<Record<string, string>>;
   openFile: (path: string) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 };
 
 export function usePendingState({
   generatedPathSet,
   generatedPaths,
-  generatedFilesByPath,
   finalRepositoryPathsRef,
   allPathsRef,
   loadedContentByPathRef,
   openFile,
+  onSpecFileChange,
 }: UsePendingStateOptions) {
   const [pendingChangesByPath, setPendingChangesByPath] = useState<Record<string, PendingFileChange>>({});
+  const [specDraftByPath, setSpecDraftByPath] = useState<Record<string, string>>({});
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
 
   const startNewFile = useCallback(() => {
@@ -63,16 +64,22 @@ export function usePendingState({
     (selectedPath: string | null, value: string) => {
       if (!selectedPath) return;
 
-      const isSpecPath = isWorkflowSpecPath(selectedPath);
-      if (!isSpecPath && generatedPathSet.has(selectedPath)) return;
+      // Spec files (canvas.yaml / console.yaml) are not part of the normal
+      // pending/publish flow. They are materialized into the live canvas /
+      // console state and auto-saved immediately. We keep a local draft so the
+      // editor stays responsive while the debounced save runs.
+      if (isWorkflowSpecPath(selectedPath)) {
+        setSpecDraftByPath((current) => ({ ...current, [selectedPath]: value }));
+        onSpecFileChange?.(selectedPath, value);
+        return;
+      }
 
-      const originalContent = isSpecPath
-        ? generatedFilesByPath.get(selectedPath)?.content
-        : loadedContentByPathRef.current[selectedPath];
+      if (generatedPathSet.has(selectedPath)) return;
 
+      const originalContent = loadedContentByPathRef.current[selectedPath];
       setPendingChangesByPath((current) => applyPendingContentUpdate(current, selectedPath, value, originalContent));
     },
-    [generatedFilesByPath, generatedPathSet, loadedContentByPathRef],
+    [generatedPathSet, loadedContentByPathRef, onSpecFileChange],
   );
 
   const deleteFile = useCallback(
@@ -87,14 +94,21 @@ export function usePendingState({
     setPendingChangesByPath({});
   }, []);
 
+  const clearSpecDrafts = useCallback(() => {
+    setSpecDraftByPath({});
+  }, []);
+
   const resetPendingState = useCallback(() => {
     setPendingChangesByPath({});
+    setSpecDraftByPath({});
     setNewFilePath(null);
   }, []);
 
   return {
     pendingChangesByPath,
     setPendingChangesByPath,
+    specDraftByPath,
+    clearSpecDrafts,
     newFilePath,
     setNewFilePath,
     startNewFile,
