@@ -1,6 +1,6 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,
@@ -362,16 +362,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           >
                             {statusLabel}
                           </span>
-                          <Link
-                            to={
-                              integration.metadata?.integrationName && integration.status?.setupState?.currentStep
-                                ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup?integrationId=${integration.metadata?.id}`
-                                : `/${organizationId}/settings/integrations/${integration.metadata?.id}`
-                            }
-                            className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate hover:underline"
-                          >
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                             {integrationDisplayName}
-                          </Link>
+                          </p>
                           <div className="ml-auto flex items-center gap-4">
                             <PermissionTooltip
                               allowed={canUpdateIntegrations || permissionsLoading}
@@ -380,18 +373,23 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                asChild
+                                onClick={() => {
+                                  if (!canUpdateIntegrations) return;
+                                  const providerName = integration.metadata?.integrationName;
+                                  if (providerName && integration.status?.setupState?.currentStep) {
+                                    navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+                                      state: { integrationId: integration.metadata?.id },
+                                    });
+                                    return;
+                                  }
+
+                                  navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
+                                    state: { tab: "configuration" },
+                                  });
+                                }}
                                 disabled={!canUpdateIntegrations}
                               >
-                                <Link
-                                  to={
-                                    integration.metadata?.integrationName && integration.status?.setupState?.currentStep
-                                      ? `/${organizationId}/settings/integrations/${integration.metadata.integrationName}/setup?integrationId=${integration.metadata?.id}`
-                                      : `/${organizationId}/settings/integrations/${integration.metadata?.id}`
-                                  }
-                                >
-                                  Configure
-                                </Link>
+                                Configure
                               </Button>
                             </PermissionTooltip>
                           </div>

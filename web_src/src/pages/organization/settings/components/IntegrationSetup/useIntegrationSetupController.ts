@@ -70,13 +70,12 @@ function useIntegrationSetupRoute(organizationId: string) {
   const integrationName = routeIntegrationName || "";
   const integrationsHref = `/${organizationId}/settings/integrations`;
   const routeState = location.state as IntegrationSetupRouteState | null;
-  const searchParams = new URLSearchParams(location.search);
 
   return {
     navigate,
     integrationName,
     integrationsHref,
-    setupIntegrationId: routeState?.integrationId || searchParams.get("integrationId") || undefined,
+    setupIntegrationId: routeState?.integrationId,
   };
 }
 
