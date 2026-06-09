@@ -69,6 +69,38 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "listener port must be between 1 and 65535")
 	})
 
+	t.Run("listener protocol does not match lb type -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":                "my-lb",
+				"region":              "us-east-1",
+				"type":                LoadBalancerTypeApplication,
+				"scheme":              LoadBalancerSchemeInternetFacing,
+				"subnets":             []string{"subnet-abc123", "subnet-def456"},
+				"listenerProtocol":    ListenerProtocolTCP,
+				"listenerTargetGroup": "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/tg/abc",
+				"listenerPort":        80,
+			},
+		})
+		require.ErrorContains(t, err, "not valid for application load balancers")
+	})
+
+	t.Run("HTTPS listener without certificate -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":                "my-lb",
+				"region":              "us-east-1",
+				"type":                LoadBalancerTypeApplication,
+				"scheme":              LoadBalancerSchemeInternetFacing,
+				"subnets":             []string{"subnet-abc123", "subnet-def456"},
+				"listenerProtocol":    ListenerProtocolHTTPS,
+				"listenerTargetGroup": "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/tg/abc",
+				"listenerPort":        443,
+			},
+		})
+		require.ErrorContains(t, err, "listenerCertificateArn is required for HTTPS listeners")
+	})
+
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
