@@ -1,10 +1,12 @@
 import type { ConfigurationField } from "@/api-client";
 import { BookOpen, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PayloadPreview } from "@/ui/BuildingBlocksSidebar/PayloadPreview";
 
-function ConfigTable({ fields }: { fields: ConfigurationField[] }) {
+function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; showTopBorder?: boolean }) {
   return (
-    <div className="w-full px-4 pt-3 pb-3 border-t border-gray-200">
+    <div className={cn("w-full px-4 pt-3 pb-3", showTopBorder && "border-t border-slate-950/15")}>
       <span className="text-[13px] font-medium text-gray-500">Configuration</span>
       <div className="overflow-x-auto mt-2">
         <table className="text-xs w-full border-collapse">
@@ -56,6 +58,7 @@ export function DocsTab({
   configurationFields = [],
 }: DocsTabProps) {
   const hasPayload = examplePayload && Object.keys(examplePayload).length > 0;
+  const hasFollowingContent = Boolean(hasPayload || configurationFields.length > 0);
 
   if (!description && !hasPayload && configurationFields.length === 0 && !documentationUrl) {
     return (
@@ -68,28 +71,27 @@ export function DocsTab({
   return (
     <div className="pb-8">
       {documentationUrl && (
-        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2.5">
-          <a
-            href={documentationUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
-          >
-            <BookOpen size={12} className="shrink-0" aria-hidden />
-            <span>Docs reference</span>
-            <ExternalLink size={10} className="shrink-0" aria-hidden />
-          </a>
+        <div className="bg-slate-100 px-4 py-2.5">
+          <Button variant="outline" size="xs" asChild>
+            <a href={documentationUrl} target="_blank" rel="noopener noreferrer">
+              <BookOpen className="size-3" aria-hidden />
+              Docs reference
+              <ExternalLink className="size-3" aria-hidden />
+            </a>
+          </Button>
         </div>
       )}
       {description && (
-        <div className="w-full px-4 pt-3 pb-3">
+        <div className={cn("w-full px-4 pt-3 pb-3", hasFollowingContent && "border-b border-slate-950/15")}>
           <span className="text-[13px] font-medium text-gray-500">Description</span>
           <p className="text-[13px] text-gray-800 mt-1 leading-relaxed">{description}</p>
         </div>
       )}
 
       {hasPayload && (
-        <div className="w-full px-2 py-2 border-t border-gray-200">
+        <div
+          className={cn("w-full px-2 py-2", configurationFields.length > 0 && "border-b border-slate-950/15")}
+        >
           <div className="px-2">
             <PayloadPreview
               value={examplePayload!}
@@ -103,7 +105,9 @@ export function DocsTab({
         </div>
       )}
 
-      {configurationFields.length > 0 && <ConfigTable fields={configurationFields} />}
+      {configurationFields.length > 0 && (
+        <ConfigTable fields={configurationFields} showTopBorder={!hasPayload && Boolean(description || documentationUrl)} />
+      )}
     </div>
   );
 }
