@@ -21,6 +21,8 @@ import {
   validateFieldForSubmission,
 } from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
+import { buildConfigurationDisplayModel } from "./configurationView/buildConfigurationDisplayModel";
+import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
 
 const REQUIRED_FIELD_BADGE_CLASS =
@@ -53,6 +55,9 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
   /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
   configurationSaveMode?: "manual" | "auto";
 }
@@ -96,6 +101,9 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
   configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
@@ -451,12 +459,38 @@ export function SettingsTab({
     };
   }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
+  const configurationDisplayModel = useMemo(
+    () =>
+      buildConfigurationDisplayModel({
+        configuration: nodeConfiguration,
+        configurationFields,
+        integrationName,
+        integrationRef: selectedIntegration,
+        integrations,
+        allowIntegrations,
+      }),
+    [allowIntegrations, configurationFields, integrationName, integrations, nodeConfiguration, selectedIntegration],
+  );
+
+  if (isReadOnly) {
+    return (
+      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+        <ConfigurationView
+          model={configurationDisplayModel}
+          onEdit={onEnterEditMode}
+          editDisabled={enterEditModeDisabled}
+          editDisabledTooltip={enterEditModeDisabledTooltip}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
-        if (configurationSaveMode !== "auto" || isReadOnly) {
+        if (configurationSaveMode !== "auto") {
           return;
         }
         const target = event.target as HTMLElement | null;
@@ -471,7 +505,7 @@ export function SettingsTab({
     >
       <div className="space-y-6">
         {/* Node identification section — always visible */}
-        <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
+        <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
@@ -488,7 +522,6 @@ export function SettingsTab({
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
-            disabled={isReadOnly}
           />
         </div>
 
@@ -497,7 +530,7 @@ export function SettingsTab({
           const runTitleField = configurationFields?.find((f) => f.name === "customName");
           if (!runTitleField || !shouldShowConfiguration) return null;
           return (
-            <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
+            <div>
               <ConfigurationFieldRenderer
                 allowExpressions={true}
                 field={runTitleField}
@@ -525,9 +558,7 @@ export function SettingsTab({
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -550,7 +581,7 @@ export function SettingsTab({
                   size="sm"
                   onClick={onOpenCreateIntegrationDialog}
                   className="flex-shrink-0"
-                  disabled={isReadOnly || !allowCreateIntegrations}
+                  disabled={!allowCreateIntegrations}
                 >
                   Connect
                 </Button>
@@ -570,7 +601,7 @@ export function SettingsTab({
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
                       if (value === CONNECT_ANOTHER_INSTANCE_VALUE) {
-                        if (!isReadOnly && allowCreateIntegrations && onOpenCreateIntegrationDialog) {
+                        if (allowCreateIntegrations && onOpenCreateIntegrationDialog) {
                           onOpenCreateIntegrationDialog();
                         }
                         return;
@@ -584,7 +615,6 @@ export function SettingsTab({
                         requestAutosave();
                       }
                     }}
-                    disabled={isReadOnly}
                   >
                     <SelectTrigger className="w-full shadow-none">
                       <SelectValue placeholder="Select an installation" />
@@ -666,7 +696,7 @@ export function SettingsTab({
                                 size="sm"
                                 className="text-sm py-1.5"
                                 onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                                disabled={isReadOnly || !allowUpdateIntegrations}
+                                disabled={!allowUpdateIntegrations}
                               >
                                 Configure...
                               </Button>
@@ -697,9 +727,7 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
               if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
@@ -766,7 +794,6 @@ export function SettingsTab({
             data-testid="save-node-button"
             variant="default"
             onClick={handleSave}
-            disabled={isReadOnly}
             loading={isSaving}
             loadingText="Saving..."
           >
