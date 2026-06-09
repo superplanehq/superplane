@@ -3,52 +3,43 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router-dom";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalCommandPalette } from ".";
-import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { openGlobalCommandPalette } from "./controller";
 
-const {
-  accountState,
-  createCanvasMock,
-  defaultAccount,
-  defaultPermissions,
-  featureState,
-  navigateMock,
-  permissionsState,
-} = vi.hoisted(() => {
-  const defaultAccount = {
-    id: "account-1",
-    name: "Ada Lovelace",
-    email: "ada@example.com",
-    avatar_url: "",
-    installation_admin: true,
-    has_password: true,
-  };
-  type Account = typeof defaultAccount;
-  const defaultPermissions = [
-    { resource: "canvases", action: "create" },
-    { resource: "canvases", action: "read" },
-    { resource: "canvases", action: "update" },
-    { resource: "org", action: "read" },
-    { resource: "members", action: "read" },
-    { resource: "service_accounts", action: "read" },
-    { resource: "groups", action: "read" },
-    { resource: "roles", action: "read" },
-    { resource: "integrations", action: "read" },
-    { resource: "secrets", action: "read" },
-  ];
+const { accountState, createCanvasMock, defaultAccount, defaultPermissions, navigateMock, permissionsState } =
+  vi.hoisted(() => {
+    const defaultAccount = {
+      id: "account-1",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      avatar_url: "",
+      installation_admin: true,
+      has_password: true,
+    };
+    type Account = typeof defaultAccount;
+    const defaultPermissions = [
+      { resource: "canvases", action: "create" },
+      { resource: "canvases", action: "read" },
+      { resource: "canvases", action: "update" },
+      { resource: "org", action: "read" },
+      { resource: "members", action: "read" },
+      { resource: "service_accounts", action: "read" },
+      { resource: "groups", action: "read" },
+      { resource: "roles", action: "read" },
+      { resource: "integrations", action: "read" },
+      { resource: "secrets", action: "read" },
+    ];
 
-  return {
-    accountState: { account: defaultAccount as Account | null, loading: false },
-    createCanvasMock: vi.fn(),
-    defaultAccount,
-    defaultPermissions,
-    featureState: { managedAgentsEnabled: true },
-    navigateMock: vi.fn(),
-    permissionsState: { permissions: defaultPermissions },
-  };
-});
+    return {
+      accountState: { account: defaultAccount as Account | null, loading: false },
+      createCanvasMock: vi.fn(),
+      defaultAccount,
+      defaultPermissions,
+      navigateMock: vi.fn(),
+      permissionsState: { permissions: defaultPermissions },
+    };
+  });
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof ReactRouterDom>("react-router-dom");
@@ -115,12 +106,25 @@ vi.mock("@/hooks/useOrganizationData", () => ({
     data: { enabled: true },
     error: null,
   }),
+  useOrganizationInviteLink: () => ({
+    data: { token: "test-invite-token", enabled: true },
+  }),
 }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (feature: string) => feature === "claude_managed_agents" && featureState.managedAgentsEnabled,
-    enabledExperimentalFeatures: featureState.managedAgentsEnabled ? ["claude_managed_agents"] : [],
+vi.mock("@/hooks/useIntegrations", () => ({
+  useConnectedIntegrations: () => ({
+    data: [
+      {
+        metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
+        status: { state: "ready" },
+      },
+    ],
+  }),
+}));
+
+vi.mock("@/hooks/useServiceAccounts", () => ({
+  useServiceAccounts: () => ({
+    data: [{ id: "sa-1", name: "deploy-bot" }],
   }),
 }));
 
@@ -128,13 +132,11 @@ vi.mock("@/lib/canvasNameGenerator", () => ({
   generateCanvasName: () => "generated-canvas",
 }));
 
-let unregisterCanvasNodeSearchProvider: (() => void) | undefined;
-
 function openPalette() {
   openGlobalCommandPalette();
 }
 
-function renderPalette(path = "/org-1/apps/canvas-1") {
+function renderPalette(path = "/org-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -160,58 +162,20 @@ describe("GlobalCommandPalette", () => {
     createCanvasMock.mockResolvedValue({ data: { canvas: { metadata: { id: "canvas-new" } } } });
     navigateMock.mockReset();
     permissionsState.permissions = [...defaultPermissions];
-    featureState.managedAgentsEnabled = true;
   });
 
-  afterEach(() => {
-    unregisterCanvasNodeSearchProvider?.();
-    unregisterCanvasNodeSearchProvider = undefined;
-  });
-
-  it("opens and shows contextual commands", async () => {
+  it("opens and shows quick links", async () => {
     renderPalette();
 
     openPalette();
 
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.getByText("New Canvas")).toBeInTheDocument();
-    expect(screen.getByText("Console")).toBeInTheDocument();
-    expect(screen.getByText("Agent")).toBeInTheDocument();
-    expect(screen.getByText("Versions")).toBeInTheDocument();
-    expect(screen.getByText("Organization Settings")).toBeInTheDocument();
-    expect(screen.getByText("Installation Admin")).toBeInTheDocument();
-  });
-
-  it("hides the agent command when managed agents are disabled", async () => {
-    featureState.managedAgentsEnabled = false;
-    renderPalette();
-
-    openPalette();
-
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
-    expect(screen.getByText("Versions")).toBeInTheDocument();
-  });
-
-  it("opens current canvas tool tabs from commands", async () => {
-    const user = userEvent.setup();
-    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
-    renderPalette("/org-1/apps/canvas-1?view=memory");
-
-    openPalette();
-    await user.click(await screen.findByText("Versions"));
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-1");
-      expect(dispatchEventSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "canvas-tool-sidebar:select-tab",
-          detail: { tab: "versions" },
-        }),
-      );
-    });
-
-    dispatchEventSpy.mockRestore();
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    expect(screen.getByText("New App")).toBeInTheDocument();
+    expect(screen.getByText("Copy Invite Link")).toBeInTheDocument();
+    expect(screen.getByText("Apps")).toBeInTheDocument();
+    expect(screen.getByText("Integrations")).toBeInTheDocument();
+    expect(screen.getByText("Go to Docs")).toBeInTheDocument();
+    expect(screen.getByText("Sign Out")).toBeInTheDocument();
   });
 
   it("does not open before the account is available", () => {
@@ -220,73 +184,67 @@ describe("GlobalCommandPalette", () => {
 
     openPalette();
 
-    expect(screen.queryByPlaceholderText("What can we help with?")).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Search components and commands")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
   });
 
-  it("does not treat apps/new as a current canvas route", async () => {
-    renderPalette("/org-1/apps/new");
-
-    openPalette();
-
-    expect(await screen.findByPlaceholderText("What can we help with?")).toBeInTheDocument();
-    expect(screen.queryByText("Console")).not.toBeInTheDocument();
-    expect(screen.queryByText("Versions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
-  });
-
-  it("opens organization settings as a nested command page", async () => {
+  it("expands app list when clicking Apps", async () => {
     const user = userEvent.setup();
     renderPalette();
 
     openPalette();
-    await user.click(await screen.findByText("Organization Settings"));
-    await user.click(await screen.findByText("Members"));
+    await user.click(await screen.findByText("Apps"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/settings/members");
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
+    expect(screen.getByText("Database Backups")).toBeInTheDocument();
   });
 
-  it("lists canvases when opening canvas settings outside a canvas route", async () => {
+  it("navigates to an app when selected from expanded list", async () => {
     const user = userEvent.setup();
-    renderPalette("/org-1");
+    renderPalette();
 
     openPalette();
-    await user.click(await screen.findByText("Canvas Settings"));
+    await user.click(await screen.findByText("Apps"));
     await user.click(await screen.findByText("Database Backups"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-2/settings");
+    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-2");
   });
 
-  it("disables canvas settings commands without canvas update permission", async () => {
-    permissionsState.permissions = defaultPermissions.filter(
-      (permission) => !(permission.resource === "canvases" && permission.action === "update"),
-    );
+  it("searches apps by name", async () => {
+    const user = userEvent.setup();
     renderPalette();
 
     openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "Deploy");
 
-    await screen.findByPlaceholderText("Search components and commands");
-    const settingsItems = screen.getAllByText("Canvas Settings").map((label) => label.closest("[cmdk-item]"));
-
-    expect(settingsItems).toHaveLength(2);
-    settingsItems.forEach((item) => expect(item).toHaveAttribute("data-disabled", "true"));
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
   });
 
-  it("uses template route canvas ids for contextual canvas commands", async () => {
-    renderPalette("/org-1/templates/canvas-1");
+  it("searches integrations by name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
 
     openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "puppies");
 
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.getByText("Console")).toBeInTheDocument();
+    expect(await screen.findByText("puppies-github")).toBeInTheDocument();
   });
 
-  it("creates a canvas with the quick shortcut", async () => {
+  it("searches service accounts by name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy-bot");
+
+    expect(await screen.findByText("deploy-bot")).toBeInTheDocument();
+  });
+
+  it("creates an app with the quick shortcut", async () => {
     renderPalette();
 
     openPalette();
     await waitFor(() => {
-      expect(screen.getByText("New Canvas").closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+      expect(screen.getByText("New App").closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
     });
     fireEvent.keyDown(document, { key: "/", metaKey: true });
 
@@ -296,34 +254,16 @@ describe("GlobalCommandPalette", () => {
     expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-new");
   });
 
-  it("searches canvas components from the root command palette", async () => {
+  it("collapses expanded section when back is clicked", async () => {
     const user = userEvent.setup();
-    const selectNode = vi.fn();
-    unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
-      searchNodes: (query) =>
-        [
-          {
-            id: "node-api",
-            label: "Deploy API",
-            iconSlug: "box",
-            keywords: ["deploy api", "node-api"],
-          },
-          {
-            id: "node-worker",
-            label: "Refresh Worker",
-            iconSlug: "box",
-            keywords: ["refresh worker", "node-worker"],
-          },
-        ].filter((node) => node.label.toLowerCase().includes(query.toLowerCase())),
-      selectNode,
-    });
-
     renderPalette();
 
     openPalette();
-    await user.type(await screen.findByPlaceholderText("Search components and commands"), "worker");
-    await user.click(await screen.findByText("Refresh Worker"));
+    await user.click(await screen.findByText("Apps"));
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
 
-    expect(selectNode).toHaveBeenCalledWith("node-worker");
+    await user.click(screen.getByText("Back"));
+    expect(screen.queryByText("Deploy API")).not.toBeInTheDocument();
+    expect(screen.getByText("Apps")).toBeInTheDocument();
   });
 });

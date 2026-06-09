@@ -50,6 +50,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
 
   useCommandPaletteShortcuts({
     canvasId: route.canvasId,
+    organizationId: route.organizationId,
     createCanvas,
     createCanvasDisabled: data.createCanvasDisabled,
     enabled,
@@ -161,10 +162,7 @@ function useClosePalette(
   }, [setOpen, setPage, setSearch]);
 }
 
-function usePaletteNavigation(
-  closePalette: () => void,
-  navigate: NavigateFunction,
-) {
+function usePaletteNavigation(closePalette: () => void, navigate: NavigateFunction) {
   const goTo = useCallback(
     (href: string) => {
       closePalette();
