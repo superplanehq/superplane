@@ -71,6 +71,9 @@ export function CanvasModeToggle({
   return (
     <Tabs
       value={selected}
+      onPointerDownCapture={(e) => {
+        modifierClickRef.current = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+      }}
       onValueChange={(next) => {
         // Skip if this was a modifier click (user is opening in new tab)
         if (modifierClickRef.current) {
@@ -131,7 +134,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=console") : "#"}
-              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
+              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
             >
               <span className="inline-flex items-center gap-1.5">
                 Console
@@ -148,7 +151,7 @@ export function CanvasModeToggle({
         >
           <Link
             to={organizationId && appId ? appPath(organizationId, appId) : "#"}
-            onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
+            onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
           >
             <span className="inline-flex items-center gap-1.5">
               Canvas
@@ -160,7 +163,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=memory") : "#"}
-              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
+              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
             >
               Memory
             </Link>
@@ -170,7 +173,7 @@ export function CanvasModeToggle({
           <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files" asChild>
             <Link
               to={organizationId && appId ? appPath(organizationId, appId, "?view=files") : "#"}
-              onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { modifierClickRef.current = true; return; } e.preventDefault(); }}
+              onClick={(e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault(); }}
             >
               Files
             </Link>

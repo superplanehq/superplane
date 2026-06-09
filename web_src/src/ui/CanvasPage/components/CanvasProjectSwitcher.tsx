@@ -453,11 +453,11 @@ function ProjectSearchList({
           >
             <Link
               to={appPath(organizationId, project.id)}
+              onPointerDown={(e) => {
+                modifierClickRef.current = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+              }}
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
-                  modifierClickRef.current = true;
-                  return;
-                }
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
               }}
               onAuxClick={(e) => {
