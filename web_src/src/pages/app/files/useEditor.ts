@@ -3,6 +3,7 @@ import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
+import { canPublishPendingFileChanges } from "./useFilesPublish";
 import { useEditorLifecycle } from "./useEditorLifecycle";
 import { usePendingState } from "./usePendingState";
 import { useFilesPublish } from "./useFilesPublish";
@@ -12,20 +13,24 @@ import type { AppFile, FilesHeaderActionsState } from "./types";
 
 type UseEditorOptions = {
   canvasId?: string;
+  versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 };
 
 export function useEditor({
   canvasId,
+  versionId,
   isEditing,
   canWrite,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
+  onSpecFileChange,
 }: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
@@ -48,6 +53,8 @@ export function useEditor({
     allPathsRef,
     loadedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
+    versionId,
+    onSpecFileChange,
   });
   const pendingChanges = useMemo(
     () => Object.values(pending.pendingChangesByPath).sort((left, right) => left.path.localeCompare(right.path)),
@@ -56,21 +63,26 @@ export function useEditor({
   const pathLists = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
-  const tabs = useFilesTabState(catalog.generatedPaths[0] ?? null, pathLists.allPaths, catalog.generatedPaths);
+  const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
+
   const selection = useRepositorySelectedFileQuery(
     canvasId,
     tabs.selectedPath,
     catalog.repositoryPathSet,
     catalog.generatedFilesByPath,
+    versionId,
   );
 
   useFilesPublish({
     canManageRepositoryFiles,
     canPublishFiles:
-      canManageRepositoryFiles && pendingChanges.length > 0 && !pathLists.commitPathError && !commitFiles.isPending,
+      canManageRepositoryFiles &&
+      canPublishPendingFileChanges(pendingChanges, pathLists.commitPathError) &&
+      !commitFiles.isPending,
     commitPathError: pathLists.commitPathError,
     headSha: catalog.headSha,
+    versionId,
     pendingChanges,
     setPendingChangesByPath: pending.setPendingChangesByPath,
     setLoadedContentByPath,

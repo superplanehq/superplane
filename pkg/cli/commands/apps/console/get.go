@@ -42,21 +42,24 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	request := ctx.API.CanvasAPI.CanvasesGetConsole(ctx.Context, canvasID)
-	if versionID != "" {
-		request = request.VersionId(versionID)
-	}
-
-	response, _, err := request.Execute()
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
 	if err != nil {
 		return err
 	}
-	if response.Console == nil {
+	if strings.TrimSpace(string(yamlBytes)) == "" {
 		return fmt.Errorf("app %q has no console", canvasID)
 	}
 
-	console := *response.Console
-	resource := consoleYAMLFromAPI(canvasName, console)
+	resource, err := ParseConsoleYAML(yamlBytes)
+	if err != nil {
+		return fmt.Errorf("invalid console yaml from server: %w", err)
+	}
+	if strings.TrimSpace(resource.Metadata.Name) == "" {
+		resource.Metadata.Name = canvasName
+	}
+	if strings.TrimSpace(resource.Metadata.CanvasID) == "" {
+		resource.Metadata.CanvasID = canvasID
+	}
 
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(resource)
@@ -70,7 +73,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID := strings.TrimSpace(console.GetVersionId()); versionID != "" {
+		if versionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
 		}
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(resource.Spec.Panels))
