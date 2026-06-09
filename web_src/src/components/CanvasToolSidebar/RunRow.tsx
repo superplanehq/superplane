@@ -1,10 +1,12 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
+import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface RunRowProps {
@@ -30,21 +32,21 @@ export function RunRow({
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
+  const runHref = organizationId && appId && run.id
+    ? appPath(organizationId, appId, `?view=runs&run=${run.id}`)
+    : "#";
 
   return (
-    <div
+    <Link
+      to={runHref}
       data-testid="runs-sidebar-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => run.id && onSelectRun(run.id)}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        if (run.id) {
-          onSelectRun(run.id);
-        }
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        if (run.id) onSelectRun(run.id);
       }}
       className={cn(
         "group flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left transition-colors",
@@ -80,11 +82,30 @@ export function RunRow({
       >
         {title}
       </span>
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         title="Copy link to run"
         className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            void (async () => {
+              const url = new URL(window.location.href);
+              url.searchParams.set("view", "runs");
+              url.searchParams.set("run", run.id || "");
+              try {
+                await navigator.clipboard.writeText(url.toString());
+                toast.success("Run link copied");
+              } catch {
+                toast.error("Failed to copy run link");
+              }
+            })();
+          }
+        }}
         onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           void (async () => {
             const url = new URL(window.location.href);
@@ -100,12 +121,12 @@ export function RunRow({
         }}
       >
         <LinkIcon className="h-3 w-3" />
-      </button>
+      </span>
       {run.createdAt ? (
         <span className="shrink-0 text-xs tabular-nums text-gray-500">
           <TimeAgo date={run.createdAt} includeAgo={false} />
         </span>
       ) : null}
-    </div>
+    </Link>
   );
 }
