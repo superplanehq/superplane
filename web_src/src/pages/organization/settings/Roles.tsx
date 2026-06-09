@@ -6,6 +6,8 @@ import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
+import { cn } from "@/lib/utils";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -227,19 +229,18 @@ function EditRoleButton({ canUpdate, href }: { canUpdate: boolean; href: string 
 }
 
 function NewRoleButton({ canCreate, organizationId }: { canCreate: boolean; organizationId: string }) {
+  if (canCreate) {
+    return (
+      <Link to={`/${organizationId}/settings/create-role`} className={cn(buttonVariants(), "flex items-center")}>
+        <Icon name="plus" />
+        New Organization Role
+      </Link>
+    );
+  }
   return (
-    <Button className="flex items-center" disabled={!canCreate} asChild={canCreate}>
-      {canCreate ? (
-        <Link to={`/${organizationId}/settings/create-role`}>
-          <Icon name="plus" />
-          New Organization Role
-        </Link>
-      ) : (
-        <>
-          <Icon name="plus" />
-          New Organization Role
-        </>
-      )}
+    <Button className="flex items-center" disabled>
+      <Icon name="plus" />
+      New Organization Role
     </Button>
   );
 }

@@ -15,7 +15,7 @@ describe("CanvasModeToggle", () => {
       wrapper: routerWrapper,
     });
 
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
 
     expect(onSelectLive).toHaveBeenCalledTimes(1);
   });
@@ -28,8 +28,8 @@ describe("CanvasModeToggle", () => {
       wrapper: routerWrapper,
     });
 
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
 
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
@@ -48,7 +48,7 @@ describe("CanvasModeToggle", () => {
       { wrapper: routerWrapper },
     );
 
-    await user.click(screen.getByRole("tab", { name: "Memory" }));
+    await user.click(screen.getByRole("link", { name: "Memory" }));
 
     expect(onSelectMemory).toHaveBeenCalledTimes(1);
   });
@@ -83,11 +83,14 @@ describe("CanvasModeToggle", () => {
       { wrapper: routerWrapper },
     );
 
-    const tabList = screen.getByRole("tablist", { name: "Canvas view" });
+    const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-blue-50");
-    expect(tabList.className).toContain("text-blue-800/80");
     expect(tabList.className).not.toContain("bg-slate-100");
     expect(tabList.className).not.toContain("purple");
+
+    // Inactive tabs get editing-specific styling
+    const consoleTab = screen.getByRole("link", { name: "Console" });
+    expect(consoleTab.className).toContain("text-blue-800/80");
 
     expect(screen.getByTestId("canvas-view-mode-live-draft-dot")).toHaveClass("bg-blue-500");
     expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toHaveClass("bg-blue-500");
@@ -107,7 +110,7 @@ describe("CanvasModeToggle", () => {
       { wrapper: routerWrapper },
     );
 
-    await user.click(screen.getByRole("tab", { name: "Files" }));
+    await user.click(screen.getByRole("link", { name: "Files" }));
 
     expect(onSelectFiles).toHaveBeenCalledTimes(1);
   });

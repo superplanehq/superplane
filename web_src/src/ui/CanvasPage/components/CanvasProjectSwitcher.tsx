@@ -15,12 +15,6 @@ import { Check, MoreVertical, Pencil, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-/** Allow modifier clicks and middle-clicks to pass through to the browser for new-tab behavior. */
-function allowNewTabClick(e: React.MouseEvent) {
-  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
-  e.preventDefault();
-}
-
 const SWITCHER_HEIGHT_CLASS = "h-7";
 const SWITCHER_WIDTH_CLASS = "w-[320px] min-w-[320px] max-w-full";
 const SWITCHER_BORDER_CLASS = "border border-slate-950/20";
@@ -445,7 +439,7 @@ function ProjectSearchList({
             className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900"
             asChild
           >
-            <Link to={appPath(organizationId, project.id)} onClick={allowNewTabClick}>
+            <Link to={appPath(organizationId, project.id)}>
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
               {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-slate-600" /> : null}
             </Link>
