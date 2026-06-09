@@ -1172,10 +1172,23 @@ The Create Load Balancer component provisions an Elastic Load Balancer (ELBv2) a
 
 - **Name**: Name for the load balancer (must be unique per account/region)
 - **Region**: AWS region where the load balancer will be created
-- **Type**: Load balancer type — Application (HTTP/HTTPS), Network (TCP/UDP), or Gateway
-- **Scheme**: `internet-facing` (public DNS) or `internal` (private VPC only)
-- **Subnets**: One or more subnets across at least two Availability Zones
-- **Security Groups** (optional): Security groups for Application Load Balancers
+- **Type**: Load balancer type:
+  - `application` — Layer 7; routes HTTP/HTTPS traffic
+  - `network` — Layer 4; routes TCP, TLS, UDP, or TCP_UDP traffic
+  - `gateway` — Layer 3; routes traffic through third-party virtual appliances using GENEVE
+- **Scheme** (Application and Network only): `internet-facing` (public DNS) or `internal` (private VPC only). Not applicable for Gateway load balancers.
+- **Subnets**: Subnets to attach to the load balancer. Application and Network load balancers require at least two subnets in different Availability Zones; Gateway load balancers require at least one.
+- **Security Groups** (Application only): Security groups to associate with the load balancer.
+- **IP Address Type** (optional): Address family for the load balancer:
+  - `ipv4` — IPv4 only (default)
+  - `dualstack` — IPv4 and IPv6
+  - `dualstack-without-public-ipv4` — IPv6 public, IPv4 private only
+- **Listener Protocol** (optional): Protocol for the default listener. Valid values depend on the load balancer type:
+  - Application: `HTTP`, `HTTPS`
+  - Network: `TCP`, `TLS`, `UDP`, `TCP_UDP`
+  - Gateway: `GENEVE`
+- **Listener Port** (optional): Port the listener receives traffic on (1–65535). Shown when a Listener Protocol is selected.
+- **Target Group** (optional): Target group to forward listener traffic to. Shown when a Listener Protocol is selected.
 
 ### Output
 

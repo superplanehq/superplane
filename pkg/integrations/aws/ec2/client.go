@@ -1990,6 +1990,7 @@ type CreateLoadBalancerInput struct {
 	Name           string
 	Type           string
 	Scheme         string
+	IpAddressType  string
 	SubnetIDs      []string
 	SecurityGroups []string
 }
@@ -2043,6 +2044,7 @@ type xmlCreateLoadBalancerResponse struct {
 
 type xmlDescribeLoadBalancersResult struct {
 	LoadBalancers xmlLoadBalancerMembers `xml:"LoadBalancers"`
+	NextMarker    string                 `xml:"NextMarker"`
 }
 
 type xmlDescribeLoadBalancersResponse struct {
@@ -2128,7 +2130,13 @@ func (c *Client) CreateLoadBalancer(input CreateLoadBalancerInput) (*CreateLoadB
 	params := url.Values{}
 	params.Set("Name", strings.TrimSpace(input.Name))
 	params.Set("Type", strings.TrimSpace(input.Type))
-	params.Set("Scheme", strings.TrimSpace(input.Scheme))
+	if strings.TrimSpace(input.Type) != LoadBalancerTypeGateway {
+		params.Set("Scheme", strings.TrimSpace(input.Scheme))
+	}
+
+	if ip := strings.TrimSpace(input.IpAddressType); ip != "" {
+		params.Set("IpAddressType", ip)
+	}
 
 	for i, subnetID := range input.SubnetIDs {
 		trimmed := strings.TrimSpace(subnetID)
@@ -2252,7 +2260,11 @@ func (c *Client) ListLoadBalancers() ([]LoadBalancer, error) {
 		// ELBv2 DescribeLoadBalancers uses a Marker for pagination
 		// The marker field lives inside <DescribeLoadBalancersResult><NextMarker>
 		// We break when there are no more results
-		break
+		nextMarker := strings.TrimSpace(response.Result.NextMarker)
+		if nextMarker == "" {
+			break
+		}
+		marker = nextMarker
 	}
 
 	return loadBalancers, nil
@@ -2261,4 +2273,131 @@ func (c *Client) ListLoadBalancers() ([]LoadBalancer, error) {
 func IsLoadBalancerNotFound(err error) bool {
 	var awsErr *common.Error
 	return errors.As(err, &awsErr) && awsErr.Code == "LoadBalancerNotFound"
+}
+
+// ─── ELBv2 Target Groups & Listeners ────────────────────────────────────────
+
+type TargetGroup struct {
+	TargetGroupARN string `json:"targetGroupArn" mapstructure:"targetGroupArn"`
+	Name           string `json:"name" mapstructure:"name"`
+	Protocol       string `json:"protocol" mapstructure:"protocol"`
+	Port           int    `json:"port" mapstructure:"port"`
+	TargetType     string `json:"targetType" mapstructure:"targetType"`
+	VpcID          string `json:"vpcId" mapstructure:"vpcId"`
+}
+
+type CreateListenerInput struct {
+	LoadBalancerARN string
+	Protocol        string
+	Port            int
+	TargetGroupARN  string
+}
+
+type CreateListenerOutput struct {
+	ListenerARN string `json:"listenerArn" mapstructure:"listenerArn"`
+	Protocol    string `json:"protocol" mapstructure:"protocol"`
+	Port        int    `json:"port" mapstructure:"port"`
+}
+
+type xmlTargetGroupMember struct {
+	TargetGroupARN  string `xml:"TargetGroupArn"`
+	TargetGroupName string `xml:"TargetGroupName"`
+	Protocol        string `xml:"Protocol"`
+	Port            int    `xml:"Port"`
+	TargetType      string `xml:"TargetType"`
+	VpcID           string `xml:"VpcId"`
+}
+
+type xmlTargetGroupMembers struct {
+	Members []xmlTargetGroupMember `xml:"member"`
+}
+
+type xmlDescribeTargetGroupsResult struct {
+	TargetGroups xmlTargetGroupMembers `xml:"TargetGroups"`
+	NextMarker   string                `xml:"NextMarker"`
+}
+
+type xmlDescribeTargetGroupsResponse struct {
+	RequestID string                        `xml:"ResponseMetadata>RequestId"`
+	Result    xmlDescribeTargetGroupsResult `xml:"DescribeTargetGroupsResult"`
+}
+
+type xmlListenerMember struct {
+	ListenerARN string `xml:"ListenerArn"`
+	Protocol    string `xml:"Protocol"`
+	Port        int    `xml:"Port"`
+}
+
+type xmlCreateListenerResult struct {
+	Listeners struct {
+		Members []xmlListenerMember `xml:"member"`
+	} `xml:"Listeners"`
+}
+
+type xmlCreateListenerResponse struct {
+	RequestID string                  `xml:"ResponseMetadata>RequestId"`
+	Result    xmlCreateListenerResult `xml:"CreateListenerResult"`
+}
+
+func (c *Client) CreateListener(input CreateListenerInput) (*CreateListenerOutput, error) {
+	params := url.Values{}
+	params.Set("LoadBalancerArn", strings.TrimSpace(input.LoadBalancerARN))
+	params.Set("Protocol", strings.TrimSpace(input.Protocol))
+	params.Set("Port", fmt.Sprintf("%d", input.Port))
+	params.Set("DefaultActions.member.1.Type", "forward")
+	params.Set("DefaultActions.member.1.TargetGroupArn", strings.TrimSpace(input.TargetGroupARN))
+
+	response := xmlCreateListenerResponse{}
+	if err := c.postELBForm("CreateListener", params, &response); err != nil {
+		return nil, err
+	}
+
+	members := response.Result.Listeners.Members
+	if len(members) == 0 {
+		return nil, fmt.Errorf("response did not include listener details")
+	}
+
+	l := members[0]
+	return &CreateListenerOutput{
+		ListenerARN: l.ListenerARN,
+		Protocol:    l.Protocol,
+		Port:        l.Port,
+	}, nil
+}
+
+func (c *Client) ListTargetGroups() ([]TargetGroup, error) {
+	targetGroups := []TargetGroup{}
+	marker := ""
+
+	for {
+		params := url.Values{}
+		params.Set("PageSize", "100")
+		if marker != "" {
+			params.Set("Marker", marker)
+		}
+
+		response := xmlDescribeTargetGroupsResponse{}
+		if err := c.postELBForm("DescribeTargetGroups", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, tg := range response.Result.TargetGroups.Members {
+			targetGroups = append(targetGroups, TargetGroup{
+				TargetGroupARN: tg.TargetGroupARN,
+				Name:           tg.TargetGroupName,
+				Protocol:       tg.Protocol,
+				Port:           tg.Port,
+				TargetType:     tg.TargetType,
+				VpcID:          tg.VpcID,
+			})
+		}
+
+		nextMarker := strings.TrimSpace(response.Result.NextMarker)
+		if nextMarker == "" {
+			break
+		}
+		marker = nextMarker
+	}
+
+	return targetGroups, nil
 }
