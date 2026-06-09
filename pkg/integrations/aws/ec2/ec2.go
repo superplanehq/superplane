@@ -42,9 +42,10 @@ const (
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
 
-	loadBalancerPollInterval    = 10 * time.Second
-	maxLoadBalancerPollErrors   = 10
-	maxLoadBalancerPollAttempts = 120
+	loadBalancerPollInterval      = 10 * time.Second
+	maxLoadBalancerPollErrors     = 10
+	maxLoadBalancerPollAttempts   = 120
+	maxLoadBalancerListenerErrors = 5
 )
 
 const (
