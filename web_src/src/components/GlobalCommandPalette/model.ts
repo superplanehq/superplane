@@ -16,13 +16,12 @@ import {
   buildCurrentCanvasActions,
   buildOrganizationSettingsActions,
   buildRootActions,
-  buildRootPageActions,
 } from "./actions";
 import { buildCanvasNodeSearchActions, useCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { useCommandPaletteShortcuts, usePalettePermissions } from "./hooks";
 import { useShortcutModifierLabel } from "@/hooks/useShortcutLabel";
 import { getRouteContext } from "./route";
-import type { CanvasCommandListProps, CommandPage, PaletteAction, PalettePageAction } from "./types";
+import type { CanvasCommandListProps, CommandPage, PaletteAction } from "./types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -39,7 +38,6 @@ export type CommandPaletteModel = {
   organizationName: string;
   page: CommandPage;
   rootActions: PaletteAction[];
-  rootPageActions: PalettePageAction[];
   search: string;
   setOpen: Dispatch<SetStateAction<boolean>>;
   setPage: Dispatch<SetStateAction<CommandPage>>;
@@ -64,6 +62,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const enabled = !loading && !!account;
 
   useCommandPaletteShortcuts({
+    canvasId: route.canvasId,
     createCanvas,
     createCanvasDisabled: data.createCanvasDisabled,
     enabled,
@@ -83,7 +82,6 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
 
   return buildModel({
     accountEmail: account.email,
-    accountInstallationAdmin: account.installation_admin,
     canvasId: route.canvasId,
     closePalette,
     createCanvas,
@@ -162,7 +160,7 @@ function canUsePermission(
 }
 
 function currentCanvasNameFor(canvas: CanvasesCanvas | undefined) {
-  return canvas?.metadata?.name ?? "Current canvas";
+  return canvas?.metadata?.name ?? "Current app";
 }
 
 function isUsageEnabled(enabled: boolean, error: unknown) {
@@ -240,14 +238,13 @@ function useCreateCanvasCommand(
       closePalette();
       navigate(appPath(organizationId, nextCanvasId));
     } catch (error) {
-      showErrorToast(getUsageLimitToastMessage(error, "Failed to create canvas"));
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
     }
   }, [closePalette, data.canCreateCanvas, data.createCanvasMutation, navigate, organizationId]);
 }
 
 function buildModel({
   accountEmail,
-  accountInstallationAdmin,
   canvasId,
   closePalette,
   createCanvas,
@@ -265,7 +262,6 @@ function buildModel({
   showToolTabCommands,
 }: {
   accountEmail: string;
-  accountInstallationAdmin: boolean;
   canvasId: string | null;
   closePalette: () => void;
   createCanvas: () => Promise<void>;
@@ -325,15 +321,6 @@ function buildModel({
         closePalette();
         window.location.href = "/logout";
       },
-    }),
-    rootPageActions: buildRootPageActions({
-      accountInstallationAdmin,
-      canReadCanvas: data.canReadCanvas,
-      canUpdateCanvas: data.canUpdateCanvas,
-      canvasId,
-      currentCanvasName: data.currentCanvasName,
-      organizationId,
-      organizationName: data.organizationName,
     }),
     search,
     setOpen,
