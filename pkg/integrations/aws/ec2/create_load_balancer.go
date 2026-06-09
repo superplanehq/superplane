@@ -36,6 +36,7 @@ type CreateLoadBalancerNodeMetadata struct {
 
 type CreateLoadBalancerExecutionMetadata struct {
 	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
+	ListenerCreated bool   `json:"listenerCreated" mapstructure:"listenerCreated"`
 	PollErrors      int    `json:"pollErrors" mapstructure:"pollErrors"`
 	PollAttempts    int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
@@ -336,6 +337,10 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least %d subnet(s) in different Availability Zones must be specified", minSubnets)
 	}
 
+	if err := validateListenerConfig(config); err != nil {
+		return err
+	}
+
 	return ctx.Metadata.Set(CreateLoadBalancerNodeMetadata{
 		Region: region,
 		Name:   strings.TrimSpace(config.Name),
@@ -375,6 +380,11 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
+	var securityGroups []string
+	if lbType == LoadBalancerTypeApplication {
+		securityGroups = config.SecurityGroups
+	}
+
 	client := NewClient(ctx.HTTP, creds, region)
 	output, err := client.CreateLoadBalancer(CreateLoadBalancerInput{
 		Name:           name,
@@ -382,7 +392,7 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		Scheme:         scheme,
 		IpAddressType:  strings.TrimSpace(config.IpAddressType),
 		SubnetIDs:      config.Subnets,
-		SecurityGroups: config.SecurityGroups,
+		SecurityGroups: securityGroups,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create load balancer: %w", err)
@@ -463,8 +473,14 @@ func (c *CreateLoadBalancer) poll(ctx core.ActionHookContext) error {
 
 	switch lb.State {
 	case LoadBalancerStateActive:
-		if err := c.maybeCreateListener(client, metadata.LoadBalancerARN, config, ctx); err != nil {
-			return err
+		if !metadata.ListenerCreated {
+			if err := c.maybeCreateListener(client, metadata.LoadBalancerARN, config, ctx); err != nil {
+				return err
+			}
+			metadata.ListenerCreated = true
+			if err := ctx.Metadata.Set(metadata); err != nil {
+				return err
+			}
 		}
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateLoadBalancerPayloadType, []any{
 			map[string]any{
@@ -506,14 +522,23 @@ func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil, nil
 }
 
+func validateListenerConfig(config CreateLoadBalancerConfiguration) error {
+	protocol := strings.TrimSpace(config.ListenerProtocol)
+	targetGroup := strings.TrimSpace(config.ListenerTargetGroup)
+	if protocol == "" && targetGroup == "" {
+		return nil
+	}
+	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
+		return fmt.Errorf("listener port must be between 1 and 65535")
+	}
+	return nil
+}
+
 func (c *CreateLoadBalancer) maybeCreateListener(client *Client, lbARN string, config CreateLoadBalancerConfiguration, ctx core.ActionHookContext) error {
 	protocol := strings.TrimSpace(config.ListenerProtocol)
 	targetGroup := strings.TrimSpace(config.ListenerTargetGroup)
 	if protocol == "" || targetGroup == "" {
 		return nil
-	}
-	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
-		return fmt.Errorf("listener port must be between 1 and 65535")
 	}
 
 	_, err := client.CreateListener(CreateListenerInput{
