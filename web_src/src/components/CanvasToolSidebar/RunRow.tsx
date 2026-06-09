@@ -44,6 +44,7 @@ export function RunRow({
       to={runHref}
       data-testid="runs-sidebar-row"
       onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
         if (run.id) onSelectRun(run.id);
       }}
