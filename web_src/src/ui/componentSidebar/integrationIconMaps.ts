@@ -11,6 +11,7 @@ import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import awsPrometheusIcon from "@/assets/icons/integrations/aws.prometheus.svg";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
@@ -167,6 +168,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
+    prometheus: awsPrometheusIcon,
   },
   honeycomb: honeycombIcon,
   gcp: {
