@@ -3,7 +3,7 @@ import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
 import { useServiceAccounts } from "@/hooks/useServiceAccounts";
 import { appPath } from "@/lib/appPaths";
 import { Key, Palette, Plug } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DOCS_URL } from "./constants";
 import type { CommandPaletteModel } from "./model";
@@ -13,6 +13,12 @@ import type { PaletteAction } from "./types";
 export function useCommandPalettePageProps(model: CommandPaletteModel): CommandPalettePageProps {
   const [expandedSection, setExpandedSection] = useState<"apps" | "integrations" | null>(null);
   const organizationId = model.canvasListProps.organizationId ?? "";
+  const goTo = model.canvasListProps.goTo;
+
+  // Reset expanded section when palette closes
+  useEffect(() => {
+    if (!model.open) setExpandedSection(null);
+  }, [model.open]);
 
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
@@ -41,8 +47,8 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   }, [model]);
 
   const searchResults = useMemo(
-    () => buildSearchResults(model, integrations, serviceAccounts, organizationId, closePalette),
-    [model, integrations, serviceAccounts, organizationId, closePalette],
+    () => buildSearchResults(model, integrations, serviceAccounts, organizationId, goTo),
+    [model, integrations, serviceAccounts, organizationId, goTo],
   );
 
   const handleCopyInviteLink = useCallback(() => {
@@ -82,28 +88,24 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       window.open(DOCS_URL, "_blank", "noopener,noreferrer");
     },
     onNewServiceAccount: () => {
-      closePalette();
-      window.location.href = `/${organizationId}/settings/service-accounts`;
+      goTo(`/${organizationId}/settings/service-accounts`);
     },
     onNewSecret: () => {
-      closePalette();
-      window.location.href = `/${organizationId}/settings/secrets`;
+      goTo(`/${organizationId}/settings/secrets`);
     },
     onSignOut: () => {
       closePalette();
       window.location.href = "/logout";
     },
     onConnectIntegration: () => {
-      closePalette();
-      window.location.href = `/${organizationId}/settings/integrations`;
+      goTo(`/${organizationId}/settings/integrations`);
     },
     onSelectIntegration: (id: string) => {
-      closePalette();
-      window.location.href = `/${organizationId}/settings/integrations/${id}`;
+      goTo(`/${organizationId}/settings/integrations/${id}`);
     },
     expandedSection,
-    createAppLabel: "New App",
-    createAppDisabled: !model.canvasListProps.organizationId,
+    createAppLabel: model.rootActions.find((a) => a.id === "new-canvas")?.label ?? "New App",
+    createAppDisabled: model.rootActions.find((a) => a.id === "new-canvas")?.disabled ?? true,
     searchActive: !!model.search,
     searchResults,
     handleSetSearch,
@@ -117,12 +119,24 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   };
 }
 
+type IntegrationSearchItem = {
+  id: string;
+  name: string;
+  providerName: string;
+  status: string;
+};
+
+type ServiceAccountSearchItem = {
+  id?: string;
+  name?: string;
+};
+
 function buildSearchResults(
   model: CommandPaletteModel,
-  integrations: Array<{ id: string; name: string; providerName: string; status: string }>,
-  serviceAccounts: Array<{ id?: string; name?: string }>,
+  integrations: IntegrationSearchItem[],
+  serviceAccounts: ServiceAccountSearchItem[],
   organizationId: string,
-  closePalette: () => void,
+  goTo: (href: string) => void,
 ): PaletteAction[] {
   if (!model.search) return [];
   const query = model.search.toLowerCase();
@@ -139,9 +153,7 @@ function buildSearchResults(
         onSelect: () => {
           const id = canvas.metadata?.id;
           if (organizationId && id) {
-            closePalette();
-            window.history.pushState({}, "", appPath(organizationId, id));
-            window.dispatchEvent(new PopStateEvent("popstate"));
+            goTo(appPath(organizationId, id));
           }
         },
         keywords: [name],
@@ -156,10 +168,7 @@ function buildSearchResults(
         label: integration.name,
         description: `Integration · ${integration.status}`,
         icon: Plug,
-        onSelect: () => {
-          closePalette();
-          window.location.href = `/${organizationId}/settings/integrations/${integration.id}`;
-        },
+        onSelect: () => goTo(`/${organizationId}/settings/integrations/${integration.id}`),
         keywords: [integration.name, integration.providerName],
       });
     }
@@ -173,10 +182,7 @@ function buildSearchResults(
         label: name,
         description: "Service Account",
         icon: Key,
-        onSelect: () => {
-          closePalette();
-          window.location.href = `/${organizationId}/settings/service-accounts/${sa.id}`;
-        },
+        onSelect: () => goTo(`/${organizationId}/settings/service-accounts/${sa.id}`),
         keywords: [name],
       });
     }
