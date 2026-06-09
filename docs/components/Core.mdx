@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
@@ -457,6 +458,59 @@ The expression has access to:
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "filter.executed"
+}
+```
+
+<a id="for-each"></a>
+
+## For Each
+
+**Component key:** `forEach`
+
+The For Each component reads an array from the upstream payload and emits one downstream event per element.
+
+### Use Cases
+
+- Iterate over a list of results and process each one independently
+- Split runner output arrays into per-item workflow paths
+- Process each page, service, or record with the same downstream steps
+
+### How It Works
+
+1. Evaluates the configured array expression against the incoming event data
+2. Emits one `foreach.item` event to the `item` channel for each element
+3. If the array is empty, passes without emitting any events
+
+### Limits
+
+- At most 500 items per execution. Larger arrays fail with an error.
+
+### Output Fields (per item)
+
+- **item**: The array element value
+- **index**: Zero-based index of the element
+- **totalCount**: Total number of items in the array
+
+### Expression Environment
+
+- **$**: The run context data
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "index": 0,
+    "item": {
+      "cost_usd": 42.5,
+      "service": "EC2"
+    },
+    "totalCount": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "foreach.item"
 }
 ```
 
