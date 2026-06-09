@@ -2397,8 +2397,6 @@ function CanvasContent({
         onNodeClick(nodeId);
       } else {
         const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
-        const previousSelectedNodeId = stateRef.current.componentSidebar.selectedNodeId;
-        const isSameNode = wasSidebarOpen && previousSelectedNodeId === nodeId;
         stateRef.current.componentSidebar.open(nodeId);
 
         const nodeData = clickedNode?.data as {
@@ -2411,13 +2409,11 @@ function CanvasContent({
         );
         const shouldOpenSettings = hasConfigurationWarning || isEditMode;
 
-        if (setCurrentTab && (!isSameNode || shouldOpenSettings)) {
+        if (setCurrentTab) {
           if (!wasSidebarOpen) {
             setCurrentTab(shouldOpenSettings ? "settings" : "latest");
           } else if (shouldOpenSettings) {
             setCurrentTab("settings");
-          } else if (!isSameNode) {
-            setCurrentTab("latest");
           }
         }
 
