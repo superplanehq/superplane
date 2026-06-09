@@ -7,6 +7,7 @@ import {
   MAX_METADATA_ITEMS,
   prometheusSubtitle,
   type WorkspaceOutput,
+  workspaceAliasFromMetadata,
   workspaceExecutionDetails,
 } from "./common";
 
@@ -22,7 +23,12 @@ export const getWorkspaceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const data = firstOutputData<WorkspaceOutput>(context.execution.outputs);
-    return workspaceExecutionDetails(data?.workspace);
+    return workspaceExecutionDetails(
+      data?.workspace,
+      context.execution,
+      "Retrieved At",
+      workspaceAliasFromMetadata(context.node),
+    );
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -33,9 +39,10 @@ export const getWorkspaceMapper: ComponentBaseMapper = {
 function getWorkspaceMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as GetWorkspaceConfiguration | undefined;
   const items: MetadataItem[] = [];
+  const alias = workspaceAliasFromMetadata(node);
 
-  if (config?.workspace) {
-    items.push({ icon: "activity", label: config.workspace });
+  if (alias || config?.workspace) {
+    items.push({ icon: "activity", label: alias ?? config?.workspace ?? "" });
   }
   if (config?.region) {
     items.push({ icon: "globe", label: config.region });

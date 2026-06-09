@@ -65,8 +65,15 @@ func (c *UpdateWorkspace) Configuration() []configuration.Field {
 }
 
 func (c *UpdateWorkspace) Setup(ctx core.SetupContext) error {
-	_, err := c.decodeConfiguration(ctx.Configuration)
-	return err
+	config, err := c.decodeConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	return setWorkspaceNodeMetadata(ctx, resolveWorkspaceNodeMetadata(ctx, workspaceConfiguration{
+		Region:      config.Region,
+		WorkspaceID: config.WorkspaceID,
+	}))
 }
 
 func (c *UpdateWorkspace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

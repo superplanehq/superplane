@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -58,8 +59,12 @@ func (c *DeleteWorkspace) Configuration() []configuration.Field {
 }
 
 func (c *DeleteWorkspace) Setup(ctx core.SetupContext) error {
-	_, err := decodeWorkspaceConfiguration(ctx.Configuration)
-	return err
+	config, err := decodeWorkspaceConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	return setWorkspaceNodeMetadata(ctx, resolveWorkspaceNodeMetadata(ctx, config))
 }
 
 func (c *DeleteWorkspace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -83,6 +88,7 @@ func (c *DeleteWorkspace) Execute(ctx core.ExecutionContext) error {
 
 	output := map[string]any{
 		"workspaceId": config.WorkspaceID,
+		"alias":       workspaceAliasFromExecution(ctx),
 		"deleted":     true,
 	}
 
@@ -111,4 +117,17 @@ func (c *DeleteWorkspace) Hooks() []core.Hook {
 
 func (c *DeleteWorkspace) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func workspaceAliasFromExecution(ctx core.ExecutionContext) string {
+	if ctx.NodeMetadata == nil {
+		return ""
+	}
+
+	metadata := WorkspaceNodeMetadata{}
+	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata); err != nil {
+		return ""
+	}
+
+	return metadata.WorkspaceAlias
 }

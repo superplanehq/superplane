@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
 
+import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./common";
 import { getWorkspaceMapper } from "./get_workspace";
-import { buildDetailsCtx, buildOutput } from "./workspace_test_helpers";
+
+describe("getWorkspaceMapper.props", () => {
+  it("shows the workspace alias in metadata", () => {
+    const props = getWorkspaceMapper.props(
+      buildComponentCtx({
+        configuration: { region: "us-east-1", workspace: "ws-abc123" },
+        metadata: { workspaceAlias: "metrics" },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ icon: "activity", label: "metrics" }),
+        expect.objectContaining({ icon: "globe", label: "us-east-1" }),
+      ]),
+    );
+    expect(props.metadata).not.toEqual(expect.arrayContaining([expect.objectContaining({ label: "ws-abc123" })]));
+  });
+});
 
 describe("getWorkspaceMapper.getExecutionDetails", () => {
   it("maps get workspace output", () => {
@@ -25,7 +44,9 @@ describe("getWorkspaceMapper.getExecutionDetails", () => {
       }),
     );
 
-    expect(details["Workspace ID"]).toBe("ws-abc123");
+    expect(Object.keys(details)[0]).toBe("Retrieved At");
+    expect(details["Retrieved At"]).toBe(new Date("2026-06-08T09:01:00Z").toLocaleString());
+    expect(details["Workspace ID"]).toBeUndefined();
     expect(details.Alias).toBe("metrics");
     expect(details.Status).toBe("ACTIVE");
     expect(details["Prometheus Endpoint"]).toContain("/workspaces/ws-abc123/");

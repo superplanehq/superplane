@@ -58,6 +58,7 @@ type CreateWorkspaceInput struct {
 }
 
 type CreateWorkspaceResponse struct {
+	Alias       string            `json:"alias,omitempty"`
 	Arn         string            `json:"arn"`
 	KMSKeyArn   string            `json:"kmsKeyArn,omitempty"`
 	Status      WorkspaceStatus   `json:"status"`

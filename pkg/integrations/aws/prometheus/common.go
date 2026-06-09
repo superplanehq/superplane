@@ -18,6 +18,12 @@ type workspaceConfiguration struct {
 	ClientToken string `json:"clientToken" mapstructure:"clientToken"`
 }
 
+type WorkspaceNodeMetadata struct {
+	Region         string `json:"region" mapstructure:"region"`
+	WorkspaceID    string `json:"workspaceId" mapstructure:"workspaceId"`
+	WorkspaceAlias string `json:"workspaceAlias" mapstructure:"workspaceAlias"`
+}
+
 func regionField() configuration.Field {
 	return configuration.Field{
 		Name:     "region",
@@ -158,6 +164,56 @@ func workspaceClient(ctx core.ExecutionContext, region string) (*Client, error) 
 	}
 
 	return NewClient(ctx.HTTP, creds, region), nil
+}
+
+func workspaceSetupClient(ctx core.SetupContext, region string) (*Client, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	return NewClient(ctx.HTTP, creds, region), nil
+}
+
+func resolveWorkspaceNodeMetadata(ctx core.SetupContext, config workspaceConfiguration) WorkspaceNodeMetadata {
+	metadata := WorkspaceNodeMetadata{
+		Region:      config.Region,
+		WorkspaceID: config.WorkspaceID,
+	}
+
+	metadata.WorkspaceAlias = resolveWorkspaceAlias(ctx, config.Region, config.WorkspaceID)
+	return metadata
+}
+
+func setWorkspaceNodeMetadata(ctx core.SetupContext, metadata WorkspaceNodeMetadata) error {
+	if ctx.Metadata == nil {
+		return nil
+	}
+
+	return ctx.Metadata.Set(metadata)
+}
+
+func resolveWorkspaceAlias(ctx core.SetupContext, region string, workspaceID string) string {
+	if ctx.HTTP == nil || ctx.Integration == nil || region == "" || workspaceID == "" {
+		return workspaceID
+	}
+
+	client, err := workspaceSetupClient(ctx, region)
+	if err != nil {
+		return workspaceID
+	}
+
+	workspace, err := client.DescribeWorkspace(workspaceID)
+	if err != nil {
+		return workspaceID
+	}
+
+	alias := strings.TrimSpace(workspace.Alias)
+	if alias == "" {
+		return workspaceID
+	}
+
+	return alias
 }
 
 func noopWebhook() (int, *core.WebhookResponseBody, error) {

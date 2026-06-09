@@ -110,6 +110,7 @@ func (c *CreateWorkspace) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Prometheus workspace: %w", err)
 	}
+	response.Alias = config.Alias
 
 	output := map[string]any{
 		"workspace": response,

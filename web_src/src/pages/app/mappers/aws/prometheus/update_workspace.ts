@@ -2,7 +2,14 @@ import type { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, SubtitleCo
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
-import { buildPrometheusComponentProps, firstOutputData, MAX_METADATA_ITEMS, prometheusSubtitle } from "./common";
+import {
+  buildPrometheusComponentProps,
+  firstOutputData,
+  formatExecutionTimestamp,
+  MAX_METADATA_ITEMS,
+  prometheusSubtitle,
+  workspaceAliasFromMetadata,
+} from "./common";
 
 interface UpdateWorkspaceConfiguration {
   region?: string;
@@ -23,13 +30,18 @@ export const updateWorkspaceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const data = firstOutputData<UpdateWorkspaceOutput>(context.execution.outputs);
+    const config = context.node.configuration as UpdateWorkspaceConfiguration | undefined;
     if (!data) {
-      return {};
+      return {
+        "Updated At": stringOrDash(formatExecutionTimestamp(context.execution)),
+        Alias: stringOrDash(config?.alias ?? workspaceAliasFromMetadata(context.node)),
+        Status: "-",
+      };
     }
 
     return {
-      "Workspace ID": stringOrDash(data.workspaceId),
-      Alias: stringOrDash(data.alias),
+      "Updated At": stringOrDash(formatExecutionTimestamp(context.execution)),
+      Alias: stringOrDash(data.alias ?? config?.alias ?? workspaceAliasFromMetadata(context.node)),
       Status: data.updated ? "Updated" : "-",
     };
   },
@@ -42,12 +54,14 @@ export const updateWorkspaceMapper: ComponentBaseMapper = {
 function updateWorkspaceMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as UpdateWorkspaceConfiguration | undefined;
   const items: MetadataItem[] = [];
+  const currentAlias = workspaceAliasFromMetadata(node);
+  const newAlias = config?.alias?.trim();
 
-  if (config?.workspace) {
-    items.push({ icon: "activity", label: config.workspace });
+  if (currentAlias || config?.workspace) {
+    items.push({ icon: "activity", label: currentAlias ? `Current: ${currentAlias}` : (config?.workspace ?? "") });
   }
-  if (config?.alias) {
-    items.push({ icon: "tag", label: config.alias });
+  if (newAlias) {
+    items.push({ icon: "tag", label: `New: ${newAlias}` });
   }
   if (config?.region) {
     items.push({ icon: "globe", label: config.region });

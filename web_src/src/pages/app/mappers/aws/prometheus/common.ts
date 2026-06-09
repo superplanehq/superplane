@@ -1,12 +1,19 @@
 import type React from "react";
-import type { ComponentBaseContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
+import type {
+  ComponentBaseContext,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import { stringOrDash } from "../../utils";
-import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
+import prometheusIcon from "@/assets/icons/integrations/aws.prometheus.svg";
 
 export const MAX_METADATA_ITEMS = 3;
 
@@ -26,6 +33,12 @@ export interface PrometheusWorkspace {
 
 export interface WorkspaceOutput {
   workspace?: PrometheusWorkspace;
+}
+
+export interface WorkspaceNodeMetadata {
+  region?: string;
+  workspaceId?: string;
+  workspaceAlias?: string;
 }
 
 export function buildPrometheusComponentProps(
@@ -84,17 +97,25 @@ export function firstOutputData<T>(outputs: unknown): T | undefined {
   return typedOutputs?.default?.[0]?.data as T | undefined;
 }
 
-export function workspaceExecutionDetails(workspace?: PrometheusWorkspace): Record<string, string> {
+export function workspaceExecutionDetails(
+  workspace: PrometheusWorkspace | undefined,
+  execution: ExecutionInfo,
+  timestampLabel: string,
+  fallbackAlias?: string,
+  timestampSource: "created" | "completed" = "completed",
+): Record<string, string> {
+  const details: Record<string, string> = {
+    [timestampLabel]: stringOrDash(formatExecutionTimestamp(execution, timestampSource)),
+  };
+
   if (!workspace) {
-    return {};
+    details.Alias = stringOrDash(fallbackAlias);
+    return details;
   }
 
-  const details: Record<string, string> = {
-    "Workspace ID": stringOrDash(workspace.workspaceId),
-    Alias: stringOrDash(workspace.alias),
-    Status: stringOrDash(workspace.status?.statusCode),
-    ARN: stringOrDash(workspace.arn),
-  };
+  details.Alias = stringOrDash(workspace.alias ?? fallbackAlias);
+  details.Status = stringOrDash(workspace.status?.statusCode);
+  details.ARN = stringOrDash(workspace.arn);
 
   if (workspace.prometheusEndpoint) {
     details["Prometheus Endpoint"] = workspace.prometheusEndpoint;
@@ -104,4 +125,79 @@ export function workspaceExecutionDetails(workspace?: PrometheusWorkspace): Reco
   }
 
   return details;
+}
+
+export function formatExecutionTimestamp(
+  execution: ExecutionInfo,
+  timestampSource: "created" | "completed" = "completed",
+): string | undefined {
+  const timestamp = timestampSource === "created" ? execution.createdAt : execution.updatedAt || execution.createdAt;
+  if (!timestamp) {
+    return undefined;
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
+
+export function workspaceAliasFromMetadata(node: NodeInfo): string | undefined {
+  const metadata = node.metadata as WorkspaceNodeMetadata | undefined;
+  return metadata?.workspaceAlias?.trim() || undefined;
+}
+
+export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
+  return {
+    id: "node-1",
+    name: "Workspace",
+    componentName: "prometheus.getWorkspace",
+    isCollapsed: false,
+    configuration: {},
+    metadata: {},
+    ...overrides,
+  };
+}
+
+export function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
+  return {
+    id: "exec-1",
+    createdAt: new Date("2026-06-08T09:00:00Z").toISOString(),
+    updatedAt: new Date("2026-06-08T09:01:00Z").toISOString(),
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    metadata: {},
+    configuration: {},
+    rootEvent: undefined,
+    ...overrides,
+  };
+}
+
+export function buildOutput(data: Record<string, unknown>) {
+  return { type: "json", timestamp: new Date().toISOString(), data };
+}
+
+export function buildDetailsCtx(overrides?: {
+  node?: Partial<NodeInfo>;
+  execution?: Partial<ExecutionInfo>;
+}): ExecutionDetailsContext {
+  const node = buildNode(overrides?.node);
+  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
+}
+
+export function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseContext {
+  const node = buildNode(nodeOverrides);
+  return {
+    nodes: [node],
+    node,
+    componentDefinition: {
+      name: node.componentName,
+      label: "Prometheus • Workspace",
+      description: "",
+      icon: "aws",
+      color: "gray",
+    },
+    lastExecutions: [],
+    currentUser: undefined,
+    actions: { invokeNodeExecutionHook: async () => {} },
+  };
 }

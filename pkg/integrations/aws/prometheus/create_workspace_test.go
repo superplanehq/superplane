@@ -91,6 +91,7 @@ func Test__CreateWorkspace__Execute(t *testing.T) {
 		workspace, ok := payload["workspace"].(*CreateWorkspaceResponse)
 		require.True(t, ok)
 		assert.Equal(t, "ws-abc123", workspace.WorkspaceID)
+		assert.Equal(t, "metrics", workspace.Alias)
 		assert.Equal(t, "CREATING", workspace.Status.StatusCode)
 
 		require.Len(t, httpContext.Requests, 1)

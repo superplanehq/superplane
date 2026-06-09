@@ -23,7 +23,8 @@ export const createWorkspaceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const data = firstOutputData<WorkspaceOutput>(context.execution.outputs);
-    return workspaceExecutionDetails(data?.workspace);
+    const config = context.node.configuration as CreateWorkspaceConfiguration | undefined;
+    return workspaceExecutionDetails(data?.workspace, context.execution, "Created At", config?.alias, "created");
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {

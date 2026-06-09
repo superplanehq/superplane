@@ -36,6 +36,42 @@ func Test__GetWorkspace__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("valid configuration -> stores workspace alias in metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"workspace": {
+							"alias": "metrics",
+							"arn": "arn:aws:aps:us-east-1:123456789012:workspace/ws-abc123",
+							"status": {"statusCode": "ACTIVE"},
+							"workspaceId": "ws-abc123"
+						}
+					}`)),
+				},
+			},
+		}
+
+		metadata := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"workspace": "ws-abc123",
+			},
+			HTTP:        httpContext,
+			Integration: validIntegrationContext(),
+			Metadata:    metadata,
+		})
+
+		require.NoError(t, err)
+		stored, ok := metadata.Get().(WorkspaceNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "us-east-1", stored.Region)
+		assert.Equal(t, "ws-abc123", stored.WorkspaceID)
+		assert.Equal(t, "metrics", stored.WorkspaceAlias)
+	})
 }
 
 func Test__GetWorkspace__Execute(t *testing.T) {
