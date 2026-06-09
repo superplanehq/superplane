@@ -398,6 +398,7 @@ function ProjectSearchPopover({
             activeCanvasId={activeCanvasId}
             organizationId={organizationId}
             onSelect={onSelect}
+            onClose={() => onOpenChange(false)}
           />
         </Command>
       </PopoverContent>
@@ -411,12 +412,14 @@ function ProjectSearchList({
   activeCanvasId,
   organizationId,
   onSelect,
+  onClose,
 }: {
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
   organizationId: string;
   onSelect: (canvasId: string) => void;
+  onClose?: () => void;
 }) {
   const modifierClickRef = useRef(false);
 
@@ -440,6 +443,7 @@ function ProjectSearchList({
             onSelect={() => {
               if (modifierClickRef.current) {
                 modifierClickRef.current = false;
+                onClose?.();
                 return;
               }
               onSelect(project.id);

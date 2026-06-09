@@ -175,14 +175,22 @@ export function Roles({ organizationId }: RolesProps) {
                                   >
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Link
-                                          to={roleHref(role)}
-                                          className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
-                                          aria-label="Edit role"
-                                          onClick={(e) => { if (!canUpdateRoles) e.preventDefault(); }}
-                                        >
-                                          <Icon name="edit" size="sm" />
-                                        </Link>
+                                        {canUpdateRoles ? (
+                                          <Link
+                                            to={roleHref(role)}
+                                            className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                            aria-label="Edit role"
+                                          >
+                                            <Icon name="edit" size="sm" />
+                                          </Link>
+                                        ) : (
+                                          <span
+                                            className="p-1 rounded-sm text-gray-400 cursor-not-allowed"
+                                            aria-label="Edit role"
+                                          >
+                                            <Icon name="edit" size="sm" />
+                                          </span>
+                                        )}
                                       </TooltipTrigger>
                                       <TooltipContent side="top">Edit Role</TooltipContent>
                                     </Tooltip>
