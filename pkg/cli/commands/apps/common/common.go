@@ -36,6 +36,61 @@ func ResolveAppNameOrIDArg(ctx core.CommandContext, arg string) (string, error) 
 	return FindAppID(ctx, ctx.API, trimmed)
 }
 
+// ResolveAppForDraft resolves the app that owns a draft. It prefers the active
+// app and falls back to searching the drafts of every app the user can see so
+// `drafts delete <id>` works without an app when the draft id is unambiguous.
+func ResolveAppForDraft(ctx core.CommandContext, draftID string) (string, error) {
+	if ctx.Config != nil {
+		if active := strings.TrimSpace(ctx.Config.GetActiveApp()); active != "" {
+			return FindAppID(ctx, ctx.API, active)
+		}
+	}
+	return findAppIDByDraftID(ctx, draftID)
+}
+
+// findAppIDByDraftID scans the drafts of every app the user can list and
+// returns the id of the app whose drafts contain draftID. It is a best-effort
+// fallback used when no app is given and none is active.
+func findAppIDByDraftID(ctx core.CommandContext, draftID string) (string, error) {
+	trimmedDraftID := strings.TrimSpace(draftID)
+	if trimmedDraftID == "" {
+		return "", fmt.Errorf("draft id is required")
+	}
+
+	response, _, err := ctx.API.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
+	if err != nil {
+		return "", err
+	}
+
+	for _, canvas := range response.GetCanvases() {
+		if canvas.Metadata == nil || canvas.Metadata.Id == nil {
+			continue
+		}
+		appID := strings.TrimSpace(*canvas.Metadata.Id)
+		if appID == "" {
+			continue
+		}
+
+		drafts, err := ListDraftVersions(ctx, appID)
+		if err != nil {
+			return "", err
+		}
+		for _, version := range drafts {
+			if version.Metadata == nil {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(version.Metadata.GetId()), trimmedDraftID) {
+				return appID, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf(
+		"draft %q not found in any app (pass [app] or set an active app with `superplane apps active`)",
+		trimmedDraftID,
+	)
+}
+
 // ChangeManagementEnabled reports whether change management is enabled on
 // the app identified by `appID`.
 func ChangeManagementEnabled(ctx core.CommandContext, appID string) (bool, error) {

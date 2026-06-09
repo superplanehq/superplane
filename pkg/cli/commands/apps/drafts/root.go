@@ -36,9 +36,13 @@ and console commands.`,
 	core.Bind(listCmd, &listCommand{all: &listAll}, options)
 
 	deleteCmd := &cobra.Command{
-		Use:   "delete <draft-id> [app]",
+		Use:   "delete <draft-id>",
 		Short: "Delete a draft",
-		Args:  cobra.RangeArgs(1, 2),
+		Long: `Delete a draft.
+
+The app is resolved from the active app, or by searching the drafts of every app
+you can access when no active app is set.`,
+		Args: cobra.ExactArgs(1),
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
