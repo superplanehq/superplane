@@ -81,9 +81,10 @@ interface HtmlPanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function HtmlPanelCard({ panel, readOnly, onDelete, onChange }: HtmlPanelCardProps) {
+export function HtmlPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: HtmlPanelCardProps) {
   const body = typeof panel.content?.body === "string" ? panel.content.body : "";
   const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
   const variables = useMemo(() => readVariables(panel.content), [panel.content]);
@@ -134,6 +135,7 @@ export function HtmlPanelCard({ panel, readOnly, onDelete, onChange }: HtmlPanel
     }
     setSaveError(null);
     setEditFocus(null);
+    onEditingChange?.(false);
     const bodyChanged = draftBody !== body;
     const titleChanged = trimmedTitle !== persistedTitle;
     const varsChanged = !variablesEqual(normalizedVars, variables);
@@ -149,6 +151,7 @@ export function HtmlPanelCard({ panel, readOnly, onDelete, onChange }: HtmlPanel
   const cancel = () => {
     setEditFocus(null);
     setSaveError(null);
+    onEditingChange?.(false);
     setDraftBody(body);
     setDraftTitle(persistedTitle);
     setDraftVariables(variables);
@@ -158,6 +161,7 @@ export function HtmlPanelCard({ panel, readOnly, onDelete, onChange }: HtmlPanel
     if (readOnly || focus === null) return;
     setSaveError(null);
     setEditFocus(focus);
+    onEditingChange?.(true);
   };
 
   const updateDraftVariables = (next: MarkdownVariable[]) => {

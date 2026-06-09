@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
@@ -98,6 +99,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
+      { wrapper: MemoryRouter },
     );
 
     expect(screen.getByRole("button", { name: "Close canvas.yaml" })).toBeInTheDocument();
@@ -125,6 +127,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
+      { wrapper: MemoryRouter },
     );
 
     await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
@@ -154,6 +157,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
+      { wrapper: MemoryRouter },
     );
 
     await user.click(screen.getByRole("button", { name: "New file" }));
@@ -184,6 +188,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
+      { wrapper: MemoryRouter },
     );
 
     expect(document.getElementById(slotId)).toBeNull();
@@ -232,6 +237,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
+      { wrapper: MemoryRouter },
     );
 
     const overlay = screen.getByTestId("files-overlay");
