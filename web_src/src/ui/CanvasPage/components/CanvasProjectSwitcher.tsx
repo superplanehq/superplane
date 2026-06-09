@@ -2,6 +2,7 @@ import type { CanvasesCanvas } from "@/api-client";
 import { Input } from "@/components/Input/input";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useRecentCanvasOpens } from "@/hooks/useRecentCanvasOpens";
 import { getApiErrorMessage } from "@/lib/errors";
 import { sortCanvasProjectsByRecentOpen, type CanvasProjectOption } from "@/lib/recentCanvasOpens";
@@ -396,7 +397,6 @@ function ProjectSearchPopover({
             isLoading={isLoading}
             projects={projects}
             activeCanvasId={activeCanvasId}
-            organizationId={organizationId}
             onSelect={onSelect}
           />
         </Command>
@@ -409,15 +409,14 @@ function ProjectSearchList({
   isLoading,
   projects,
   activeCanvasId,
-  organizationId,
   onSelect,
 }: {
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
-  organizationId: string;
   onSelect: (canvasId: string) => void;
 }) {
+  const organizationId = useOrganizationId() ?? "";
   if (isLoading) {
     return (
       <CommandList className="max-h-[280px]">

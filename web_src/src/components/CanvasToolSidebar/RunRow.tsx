@@ -38,18 +38,22 @@ export function RunRow({
   const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
 
   return (
-    <Link
-      to={runHref}
+    <div
       data-testid="runs-sidebar-row"
-      onClick={() => {
-        if (run.id) onSelectRun(run.id);
-      }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left transition-colors",
+        "group relative flex w-full items-center gap-1.5 px-3 py-2 transition-colors",
         !hideBottomBorder && "border-b border-b-slate-950/10",
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
+      <Link
+        to={runHref}
+        onClick={() => {
+          if (run.id) onSelectRun(run.id);
+        }}
+        className="absolute inset-0"
+        aria-label={title}
+      />
       <RunNodeIcon
         iconSrc={iconSrc}
         iconSlug={iconSlug}
@@ -78,30 +82,11 @@ export function RunRow({
       >
         {title}
       </span>
-      <span
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         title="Copy link to run"
-        className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            event.stopPropagation();
-            void (async () => {
-              const url = new URL(window.location.href);
-              url.searchParams.set("view", "runs");
-              url.searchParams.set("run", run.id || "");
-              try {
-                await navigator.clipboard.writeText(url.toString());
-                toast.success("Run link copied");
-              } catch {
-                toast.error("Failed to copy run link");
-              }
-            })();
-          }
-        }}
+        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
         onClick={(event) => {
-          event.preventDefault();
           event.stopPropagation();
           void (async () => {
             const copyUrl = new URL(runHref, window.location.origin);
@@ -115,12 +100,12 @@ export function RunRow({
         }}
       >
         <LinkIcon className="h-3 w-3" />
-      </span>
+      </button>
       {run.createdAt ? (
         <span className="shrink-0 text-xs tabular-nums text-gray-500">
           <TimeAgo date={run.createdAt} includeAgo={false} />
         </span>
       ) : null}
-    </Link>
+    </div>
   );
 }
