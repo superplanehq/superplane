@@ -138,7 +138,8 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
 
   const nodeHref = appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
   }, [node?.id, nodeId]);
 
