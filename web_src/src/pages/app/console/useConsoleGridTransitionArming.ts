@@ -16,15 +16,16 @@ import { useLayoutEffect, useRef, useState } from "react";
  */
 export function useConsoleGridTransitionArming(gridVisible: boolean) {
   const [transitionsArmed, setTransitionsArmed] = useState(false);
+  const [gridWidth, setGridWidth] = useState(0);
   const gridWrapperRef = useRef<HTMLDivElement>(null);
   const armFrameRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     if (!gridVisible) {
       setTransitionsArmed(false);
+      setGridWidth(0);
       return undefined;
     }
-    if (transitionsArmed) return undefined;
     const el = gridWrapperRef.current;
     if (!el) return undefined;
     if (typeof ResizeObserver === "undefined") {
@@ -35,9 +36,11 @@ export function useConsoleGridTransitionArming(gridVisible: boolean) {
     }
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 0;
+      setGridWidth(width);
       if (width <= 0) return;
-      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
-      observer.disconnect();
+      if (!transitionsArmed) {
+        armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
+      }
     });
     observer.observe(el);
     return () => {
@@ -46,5 +49,5 @@ export function useConsoleGridTransitionArming(gridVisible: boolean) {
     };
   }, [gridVisible, transitionsArmed]);
 
-  return { transitionsArmed, gridWrapperRef };
+  return { transitionsArmed, gridWrapperRef, gridWidth };
 }
