@@ -2,6 +2,7 @@ import type { CanvasesCanvas } from "@/api-client";
 import { Input } from "@/components/Input/input";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
+import { isNormalClick } from "@/lib/linkHelpers";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useRecentCanvasOpens } from "@/hooks/useRecentCanvasOpens";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -146,7 +147,6 @@ export function CanvasProjectSwitcher({
       isLoading={isLoading}
       projects={projects}
       activeCanvasId={activeCanvasId}
-      organizationId={organizationId}
       onSelect={handleSelect}
     />
   );
@@ -349,7 +349,6 @@ function ProjectSearchPopover({
   isLoading,
   projects,
   activeCanvasId,
-  organizationId,
   onSelect,
 }: {
   open: boolean;
@@ -358,7 +357,6 @@ function ProjectSearchPopover({
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
-  organizationId: string;
   onSelect: (canvasId: string) => void;
 }) {
   return (
@@ -441,9 +439,7 @@ function ProjectSearchList({
             <Link
               to={appPath(organizationId, project.id)}
               onClick={(e) => {
-                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                  e.preventDefault();
-                }
+                if (isNormalClick(e)) e.preventDefault();
               }}
             >
               <span className="min-w-0 flex-1 truncate">{project.name}</span>

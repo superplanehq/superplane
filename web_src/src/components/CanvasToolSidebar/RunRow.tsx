@@ -8,6 +8,7 @@ import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { isNormalClick } from "@/lib/linkHelpers";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
@@ -35,8 +36,7 @@ export function RunRow({
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
-  const runHref =
-    organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : undefined;
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
 
   return (
     <div
@@ -47,19 +47,17 @@ export function RunRow({
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
-      {runHref && (
-        <Link
-          to={runHref}
-          onClick={(e) => {
-            if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
-              e.preventDefault();
-              if (run.id) onSelectRun(run.id);
-            }
-          }}
-          className="absolute inset-0 z-0"
-          aria-label={title}
-        />
-      )}
+      <Link
+        to={runHref}
+        onClick={(e) => {
+          if (isNormalClick(e)) {
+            e.preventDefault();
+            if (run.id) onSelectRun(run.id);
+          }
+        }}
+        className="absolute inset-0 z-0"
+        aria-label={title}
+      />
       <span className="pointer-events-none relative z-0 flex w-full items-center gap-1.5">
         <RunNodeIcon
           iconSrc={iconSrc}
@@ -90,27 +88,25 @@ export function RunRow({
           {title}
         </span>
       </span>
-      {runHref && (
-        <button
-          type="button"
-          title="Copy link to run"
-          className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
-          onClick={(event) => {
-            event.stopPropagation();
-            void (async () => {
-              const copyUrl = new URL(runHref, window.location.origin);
-              try {
-                await navigator.clipboard.writeText(copyUrl.toString());
-                toast.success("Run link copied");
-              } catch {
-                toast.error("Failed to copy run link");
-              }
-            })();
-          }}
-        >
-          <LinkIcon className="h-3 w-3" />
-        </button>
-      )}
+      <button
+        type="button"
+        title="Copy link to run"
+        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        onClick={(event) => {
+          event.stopPropagation();
+          void (async () => {
+            const copyUrl = new URL(runHref, window.location.origin);
+            try {
+              await navigator.clipboard.writeText(copyUrl.toString());
+              toast.success("Run link copied");
+            } catch {
+              toast.error("Failed to copy run link");
+            }
+          })();
+        }}
+      >
+        <LinkIcon className="h-3 w-3" />
+      </button>
       {run.createdAt ? (
         <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
           <TimeAgo date={run.createdAt} includeAgo={false} />

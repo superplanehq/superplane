@@ -1,4 +1,5 @@
 import { appPath } from "@/lib/appPaths";
+import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 
@@ -37,10 +38,10 @@ const MODE_TO_TAB: Record<string, string> = {
 };
 
 /** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
-function handleTabClick(e: React.MouseEvent, callback: () => void) {
-  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+function handleTabClick(e: React.MouseEvent, isActive: boolean, callback: () => void) {
+  if (isNormalClick(e)) {
     e.preventDefault();
-    callback();
+    if (!isActive) callback();
   }
 }
 
@@ -89,7 +90,7 @@ export function CanvasModeToggle({
       {showConsole ? (
         <Link
           to={tabHref("console")}
-          onClick={(e) => handleTabClick(e, () => void onSelectConsole?.())}
+          onClick={(e) => handleTabClick(e, selected === CONSOLE_TAB, () => void onSelectConsole?.())}
           className={tabClasses(selected, CONSOLE_TAB, editing)}
           data-testid="canvas-view-mode-console"
           aria-label="Console"
@@ -103,7 +104,7 @@ export function CanvasModeToggle({
       ) : null}
       <Link
         to={tabHref()}
-        onClick={(e) => handleTabClick(e, () => void onSelectLive())}
+        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
         className={tabClasses(selected, CANVAS_TAB, editing)}
         data-testid="canvas-view-mode-live"
         aria-label={editing ? "Canvas (editing)" : "Canvas"}
@@ -117,7 +118,7 @@ export function CanvasModeToggle({
       {showMemory ? (
         <Link
           to={tabHref("memory")}
-          onClick={(e) => handleTabClick(e, () => void onSelectMemory?.())}
+          onClick={(e) => handleTabClick(e, selected === MEMORY_TAB, () => void onSelectMemory?.())}
           className={tabClasses(selected, MEMORY_TAB, editing)}
           data-testid="canvas-view-mode-memory"
           aria-label="Memory"
@@ -129,7 +130,7 @@ export function CanvasModeToggle({
       {showFiles ? (
         <Link
           to={tabHref("files")}
-          onClick={(e) => handleTabClick(e, () => void onSelectFiles?.())}
+          onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
           className={tabClasses(selected, FILES_TAB, editing)}
           data-testid="canvas-view-mode-files"
           aria-label="Files"
