@@ -2,9 +2,12 @@ package workers
 
 import (
 	"context"
+	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,18 +32,26 @@ const (
 	stuckCleanupCadence = 5 * time.Minute
 )
 
+var errCustomToolResultsRequired = errors.New("custom tool results required")
+
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
-	provider    agents.Provider
-	rabbitMQURL string
-	slots       chan struct{}
+	provider           agents.Provider
+	customToolExecutor agents.CustomToolExecutor
+	rabbitMQURL        string
+	slots              chan struct{}
 }
 
-func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string) *AgentStreamWorker {
+func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customToolExecutor ...agents.CustomToolExecutor) *AgentStreamWorker {
+	var executor agents.CustomToolExecutor
+	if len(customToolExecutor) > 0 {
+		executor = customToolExecutor[0]
+	}
 	return &AgentStreamWorker{
-		provider:    provider,
-		rabbitMQURL: rabbitMQURL,
-		slots:       make(chan struct{}, maxConcurrentStreams),
+		provider:           provider,
+		customToolExecutor: executor,
+		rabbitMQURL:        rabbitMQURL,
+		slots:              make(chan struct{}, maxConcurrentStreams),
 	}
 }
 
@@ -164,6 +175,16 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 		return nil
 	}
 
+	unlock, locked, err := tryAgentStreamLock(parentCtx, sessionID)
+	if err != nil {
+		return fmt.Errorf("agent stream: acquire session lock: %w", err)
+	}
+	if !locked {
+		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, dropping duplicate request")
+		return nil
+	}
+	defer unlock()
+
 	session, err := models.FindAgentSession(sessionID)
 	if err != nil {
 		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: session not found, dropping")
@@ -191,13 +212,28 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 	publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
 
 	var streamErr error
+	customTools := newCustomToolTurnState()
 
-	err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-		return handleProviderEvent(sessionID, evt, publish, &streamErr)
-	})
+	for {
+		customTools.clearRequirement()
+		err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
+			return handleProviderEvent(sessionID, evt, publish, &streamErr, customTools)
+		})
 
-	if streamErr == nil && err != nil && !isContextCancel(err) {
-		streamErr = err
+		if errors.Is(err, errCustomToolResultsRequired) {
+			err = nil
+		}
+		if streamErr == nil && err != nil && !isContextCancel(err) {
+			streamErr = err
+		}
+		if streamErr != nil || !customTools.resultsRequired {
+			break
+		}
+
+		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
+			streamErr = err
+			break
+		}
 	}
 
 	closeOpenTools(sessionID, publish)
@@ -224,6 +260,7 @@ func handleProviderEvent(
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
 	streamErr *error,
+	customTools *customToolTurnState,
 ) error {
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
@@ -232,6 +269,17 @@ func handleProviderEvent(
 		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventToolUseFinished:
 		return persistToolEvent(sessionID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
+	case agents.ProviderEventCustomToolUseStarted:
+		customTools.remember(evt)
+		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+	case agents.ProviderEventCustomToolResultsRequired:
+		customTools.require(evt.CustomToolEventIDs)
+		if err := customTools.resolvePersisted(sessionID); err != nil {
+			return err
+		}
+		if customTools.resultsRequired {
+			return errCustomToolResultsRequired
+		}
 	case agents.ProviderEventTurnCompleted:
 		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
 	case agents.ProviderEventOutcomeEvaluationStart:
@@ -248,6 +296,175 @@ func handleProviderEvent(
 		*streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
 	}
 	return nil
+}
+
+func (w *AgentStreamWorker) executeAndSendCustomToolResults(
+	ctx context.Context,
+	session *models.AgentSession,
+	customTools *customToolTurnState,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	sender, ok := w.provider.(agents.CustomToolResultSender)
+	if !ok {
+		return fmt.Errorf("provider does not support custom tool results")
+	}
+	if w.customToolExecutor == nil {
+		return fmt.Errorf("custom tool executor is not configured")
+	}
+
+	results := make([]agents.CustomToolResult, 0, len(customTools.requiredIDs))
+	for _, id := range customTools.requiredIDs {
+		toolUse, ok := customTools.pending[id]
+		if !ok {
+			results = append(results, agents.CustomToolResult{
+				CustomToolUseID: id,
+				Content:         "custom tool use event not found",
+				IsError:         true,
+			})
+			continue
+		}
+
+		result := w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)
+		results = append(results, result)
+
+		status := models.AgentToolStatusFinished
+		if result.IsError {
+			status = models.AgentToolStatusFailed
+		}
+		if err := persistToolEvent(session.ID, agents.ProviderEvent{
+			ProviderEventID: result.CustomToolUseID,
+			Type:            agents.ProviderEventToolUseFinished,
+			ToolName:        toolUse.Name,
+			ToolCallID:      result.CustomToolUseID,
+		}, status, result.Content, "tool_finished", publish); err != nil {
+			return err
+		}
+	}
+
+	if err := sender.SendCustomToolResults(ctx, session.ProviderSessionID, results); err != nil {
+		return err
+	}
+	customTools.markResolved()
+	return nil
+}
+
+func agentSessionContext(session *models.AgentSession) agents.AgentSessionContext {
+	return agents.AgentSessionContext{
+		SessionID:         session.ID.String(),
+		ProviderSessionID: session.ProviderSessionID,
+		OrganizationID:    session.OrganizationID.String(),
+		UserID:            session.UserID.String(),
+		CanvasID:          session.CanvasID.String(),
+	}
+}
+
+type customToolTurnState struct {
+	pending         map[string]agents.CustomToolUse
+	resolved        map[string]struct{}
+	requiredIDs     []string
+	resultsRequired bool
+}
+
+func newCustomToolTurnState() *customToolTurnState {
+	return &customToolTurnState{
+		pending:  map[string]agents.CustomToolUse{},
+		resolved: map[string]struct{}{},
+	}
+}
+
+func (s *customToolTurnState) remember(evt agents.ProviderEvent) {
+	if evt.CustomToolUse == nil || evt.CustomToolUse.ID == "" {
+		return
+	}
+	s.pending[evt.CustomToolUse.ID] = *evt.CustomToolUse
+}
+
+func (s *customToolTurnState) require(ids []string) {
+	s.requiredIDs = s.requiredIDs[:0]
+	for _, id := range ids {
+		if _, ok := s.resolved[id]; ok {
+			continue
+		}
+		s.requiredIDs = append(s.requiredIDs, id)
+	}
+	s.resultsRequired = len(s.requiredIDs) > 0
+}
+
+func (s *customToolTurnState) clearRequirement() {
+	s.requiredIDs = nil
+	s.resultsRequired = false
+}
+
+func (s *customToolTurnState) markResolved() {
+	for _, id := range s.requiredIDs {
+		s.resolved[id] = struct{}{}
+	}
+	s.clearRequirement()
+}
+
+func (s *customToolTurnState) resolvePersisted(sessionID uuid.UUID) error {
+	if len(s.requiredIDs) == 0 {
+		return nil
+	}
+
+	var resolved []string
+	if err := database.Conn().
+		Model(&models.AgentSessionMessage{}).
+		Where("session_id = ?", sessionID).
+		Where("provider_event_id IN ?", s.requiredIDs).
+		Where("role = ?", models.AgentMessageRoleTool).
+		Where("tool_status IN ?", []string{models.AgentToolStatusFinished, models.AgentToolStatusFailed}).
+		Pluck("provider_event_id", &resolved).
+		Error; err != nil {
+		return err
+	}
+
+	for _, id := range resolved {
+		s.resolved[id] = struct{}{}
+	}
+	s.require(s.requiredIDs)
+	return nil
+}
+
+func tryAgentStreamLock(ctx context.Context, sessionID uuid.UUID) (func(), bool, error) {
+	db, err := database.Conn().DB()
+	if err != nil {
+		return nil, false, err
+	}
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	key := agentStreamLockKey(sessionID)
+	var locked bool
+	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", key).Scan(&locked); err != nil {
+		_ = conn.Close()
+		return nil, false, err
+	}
+
+	if !locked {
+		_ = conn.Close()
+		return nil, false, nil
+	}
+
+	return func() {
+		releaseAgentStreamLock(conn, key)
+	}, true, nil
+}
+
+func releaseAgentStreamLock(conn *sql.Conn, key int64) {
+	defer conn.Close()
+	if _, err := conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key); err != nil {
+		log.WithError(err).Warn("agent stream: failed to release session lock")
+	}
+}
+
+func agentStreamLockKey(sessionID uuid.UUID) int64 {
+	h := fnv.New64a()
+	h.Write(sessionID[:])
+	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; the key only needs to be deterministic
 }
 
 func persistAssistantEvent(
