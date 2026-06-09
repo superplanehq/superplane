@@ -1,16 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { CanvasModeToggle } from "./CanvasModeToggle";
+
+const routerWrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 describe("CanvasModeToggle", () => {
   it("exits runs mode when clicking the Canvas tab", async () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
 
     expect(onSelectLive).toHaveBeenCalledTimes(1);
   });
@@ -19,10 +24,12 @@ describe("CanvasModeToggle", () => {
     const user = userEvent.setup();
     const onSelectLive = vi.fn();
 
-    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
+    await user.click(screen.getByRole("link", { name: "Canvas" }));
 
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
@@ -38,21 +45,26 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         onSelectMemory={onSelectMemory}
       />,
+      { wrapper: routerWrapper },
     );
 
-    await user.click(screen.getByRole("tab", { name: "Memory" }));
+    await user.click(screen.getByRole("link", { name: "Memory" }));
 
     expect(onSelectMemory).toHaveBeenCalledTimes(1);
   });
 
   it("hides the Memory tab when onSelectMemory is not provided", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />);
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
 
   it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />);
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />, {
+      wrapper: routerWrapper,
+    });
 
     expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toBeInTheDocument();
     expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
@@ -68,13 +80,17 @@ describe("CanvasModeToggle", () => {
         hasDraft
         hasConsoleDraft
       />,
+      { wrapper: routerWrapper },
     );
 
-    const tabList = screen.getByRole("tablist", { name: "Canvas view" });
+    const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-blue-50");
-    expect(tabList.className).toContain("text-blue-800/80");
     expect(tabList.className).not.toContain("bg-slate-100");
     expect(tabList.className).not.toContain("purple");
+
+    // Inactive tabs get editing-specific styling
+    const consoleTab = screen.getByRole("link", { name: "Console" });
+    expect(consoleTab.className).toContain("text-blue-800/80");
 
     expect(screen.getByTestId("canvas-view-mode-live-draft-dot")).toHaveClass("bg-blue-500");
     expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toHaveClass("bg-blue-500");
@@ -91,9 +107,10 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         onSelectFiles={onSelectFiles}
       />,
+      { wrapper: routerWrapper },
     );
 
-    await user.click(screen.getByRole("tab", { name: "Files" }));
+    await user.click(screen.getByRole("link", { name: "Files" }));
 
     expect(onSelectFiles).toHaveBeenCalledTimes(1);
   });
