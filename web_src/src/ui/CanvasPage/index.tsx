@@ -2416,6 +2416,8 @@ function CanvasContent({
             setCurrentTab(shouldOpenSettings ? "settings" : "latest");
           } else if (shouldOpenSettings) {
             setCurrentTab("settings");
+          } else if (!isSameNode) {
+            setCurrentTab("latest");
           }
         }
 
