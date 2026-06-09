@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 
 export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
@@ -37,6 +37,11 @@ function editingTabListClassName(): string {
   );
 }
 
+/** Allow modifier clicks to pass through to the browser for new-tab behavior. */
+function preventUnmodifiedClick(e: React.MouseEvent) {
+  if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault();
+}
+
 export function CanvasModeToggle({
   mode,
   onSelectLive,
@@ -48,7 +53,6 @@ export function CanvasModeToggle({
   hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
-  const modifierClickRef = useRef(false);
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -68,39 +72,47 @@ export function CanvasModeToggle({
     valueChangeHandledRef.current = false;
   }, [mode]);
 
-  const handleValueChange = useCallback(
-    (next: string) => {
-      if (modifierClickRef.current) {
-        modifierClickRef.current = false;
-        return;
-      }
-      if (valueChangeHandledRef.current) return;
-
-      const handlers: Record<string, (() => void) | undefined> = {
-        [CANVAS_TAB]: selected !== CANVAS_TAB ? onSelectLive : undefined,
-        [CONSOLE_TAB]: selected !== CONSOLE_TAB ? onSelectConsole : undefined,
-        [MEMORY_TAB]: selected !== MEMORY_TAB ? onSelectMemory : undefined,
-        [FILES_TAB]: selected !== FILES_TAB ? onSelectFiles : undefined,
-      };
-      const handler = handlers[next];
-      if (handler) {
-        valueChangeHandledRef.current = true;
-        queueMicrotask(() => {
-          valueChangeHandledRef.current = false;
-        });
-        void handler();
-      }
-    },
-    [selected, onSelectLive, onSelectConsole, onSelectMemory, onSelectFiles],
-  );
+  const tabHref = (view?: string) =>
+    organizationId && appId ? appPath(organizationId, appId, view ? `?view=${view}` : undefined) : "#";
 
   return (
     <Tabs
       value={selected}
-      onPointerDownCapture={(e) => {
-        modifierClickRef.current = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+      onValueChange={(next) => {
+        if (valueChangeHandledRef.current) return;
+
+        if (next === CANVAS_TAB && selected !== CANVAS_TAB) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectLive();
+          return;
+        }
+        if (next === CONSOLE_TAB && selected !== CONSOLE_TAB && onSelectConsole) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectConsole();
+          return;
+        }
+        if (next === MEMORY_TAB && selected !== MEMORY_TAB && onSelectMemory) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectMemory();
+          return;
+        }
+        if (next === FILES_TAB && selected !== FILES_TAB && onSelectFiles) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectFiles();
+        }
       }}
-      onValueChange={handleValueChange}
     >
       <TabsList
         aria-label="Canvas view"
@@ -113,12 +125,7 @@ export function CanvasModeToggle({
       >
         {showConsole ? (
           <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console" asChild>
-            <Link
-              to={organizationId && appId ? appPath(organizationId, appId, "?view=console") : "#"}
-              onClick={(e) => {
-                if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault();
-              }}
-            >
+            <Link to={tabHref("console")} onClick={preventUnmodifiedClick}>
               <span className="inline-flex items-center gap-1.5">
                 Console
                 <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
@@ -132,12 +139,7 @@ export function CanvasModeToggle({
           aria-label={editing ? "Canvas (editing)" : "Canvas"}
           asChild
         >
-          <Link
-            to={organizationId && appId ? appPath(organizationId, appId) : "#"}
-            onClick={(e) => {
-              if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault();
-            }}
-          >
+          <Link to={tabHref()} onClick={preventUnmodifiedClick}>
             <span className="inline-flex items-center gap-1.5">
               Canvas
               <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
@@ -146,24 +148,14 @@ export function CanvasModeToggle({
         </TabsTrigger>
         {showMemory ? (
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory" asChild>
-            <Link
-              to={organizationId && appId ? appPath(organizationId, appId, "?view=memory") : "#"}
-              onClick={(e) => {
-                if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault();
-              }}
-            >
+            <Link to={tabHref("memory")} onClick={preventUnmodifiedClick}>
               Memory
             </Link>
           </TabsTrigger>
         ) : null}
         {showFiles ? (
           <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files" asChild>
-            <Link
-              to={organizationId && appId ? appPath(organizationId, appId, "?view=files") : "#"}
-              onClick={(e) => {
-                if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) e.preventDefault();
-              }}
-            >
+            <Link to={tabHref("files")} onClick={preventUnmodifiedClick}>
               Files
             </Link>
           </TabsTrigger>

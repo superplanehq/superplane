@@ -15,6 +15,12 @@ import { Check, MoreVertical, Pencil, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+/** Allow modifier clicks and middle-clicks to pass through to the browser for new-tab behavior. */
+function allowNewTabClick(e: React.MouseEvent) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+  e.preventDefault();
+}
+
 const SWITCHER_HEIGHT_CLASS = "h-7";
 const SWITCHER_WIDTH_CLASS = "w-[320px] min-w-[320px] max-w-full";
 const SWITCHER_BORDER_CLASS = "border border-slate-950/20";
@@ -398,7 +404,6 @@ function ProjectSearchPopover({
             activeCanvasId={activeCanvasId}
             organizationId={organizationId}
             onSelect={onSelect}
-            onClose={() => onOpenChange(false)}
           />
         </Command>
       </PopoverContent>
@@ -412,17 +417,13 @@ function ProjectSearchList({
   activeCanvasId,
   organizationId,
   onSelect,
-  onClose,
 }: {
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
   organizationId: string;
   onSelect: (canvasId: string) => void;
-  onClose?: () => void;
 }) {
-  const modifierClickRef = useRef(false);
-
   if (isLoading) {
     return (
       <CommandList className="max-h-[280px]">
@@ -440,33 +441,11 @@ function ProjectSearchList({
             key={project.id}
             value={`${project.name} ${project.id}`}
             keywords={[project.name]}
-            onSelect={() => {
-              if (modifierClickRef.current) {
-                modifierClickRef.current = false;
-                onClose?.();
-                return;
-              }
-              onSelect(project.id);
-            }}
+            onSelect={() => onSelect(project.id)}
             className="cursor-pointer text-[13px] data-[selected=true]:bg-sky-100 data-[selected=true]:text-slate-900"
             asChild
           >
-            <Link
-              to={appPath(organizationId, project.id)}
-              onPointerDown={(e) => {
-                modifierClickRef.current = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
-              }}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-                e.preventDefault();
-              }}
-              onAuxClick={(e) => {
-                // Middle-click: let the browser handle it (open in new tab)
-                if (e.button === 1) {
-                  e.stopPropagation();
-                }
-              }}
-            >
+            <Link to={appPath(organizationId, project.id)} onClick={allowNewTabClick}>
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
               {project.id === activeCanvasId ? <Check className="size-3.5 shrink-0 text-slate-600" /> : null}
             </Link>

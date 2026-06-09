@@ -101,19 +101,7 @@ export function Roles({ organizationId }: RolesProps) {
             allowed={canCreateRoles || permissionsLoading}
             message="You don't have permission to create roles."
           >
-            <Button className="flex items-center" disabled={!canCreateRoles} asChild={canCreateRoles}>
-              {canCreateRoles ? (
-                <Link to={`/${organizationId}/settings/create-role`}>
-                  <Icon name="plus" />
-                  New Organization Role
-                </Link>
-              ) : (
-                <>
-                  <Icon name="plus" />
-                  New Organization Role
-                </>
-              )}
-            </Button>
+            <NewRoleButton canCreate={canCreateRoles} organizationId={organizationId} />
           </PermissionTooltip>
         </div>
         <div className="px-6 pb-6">
@@ -175,22 +163,7 @@ export function Roles({ organizationId }: RolesProps) {
                                   >
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        {canUpdateRoles ? (
-                                          <Link
-                                            to={roleHref(role)}
-                                            className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
-                                            aria-label="Edit role"
-                                          >
-                                            <Icon name="edit" size="sm" />
-                                          </Link>
-                                        ) : (
-                                          <span
-                                            className="p-1 rounded-sm text-gray-400 cursor-not-allowed"
-                                            aria-label="Edit role"
-                                          >
-                                            <Icon name="edit" size="sm" />
-                                          </span>
-                                        )}
+                                        <EditRoleButton canUpdate={canUpdateRoles} href={roleHref(role)} />
                                       </TooltipTrigger>
                                       <TooltipContent side="top">Edit Role</TooltipContent>
                                     </Tooltip>
@@ -231,5 +204,42 @@ export function Roles({ organizationId }: RolesProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function EditRoleButton({ canUpdate, href }: { canUpdate: boolean; href: string }) {
+  if (canUpdate) {
+    return (
+      <Link
+        to={href}
+        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+        aria-label="Edit role"
+      >
+        <Icon name="edit" size="sm" />
+      </Link>
+    );
+  }
+  return (
+    <span className="p-1 rounded-sm text-gray-400 cursor-not-allowed" aria-label="Edit role">
+      <Icon name="edit" size="sm" />
+    </span>
+  );
+}
+
+function NewRoleButton({ canCreate, organizationId }: { canCreate: boolean; organizationId: string }) {
+  return (
+    <Button className="flex items-center" disabled={!canCreate} asChild={canCreate}>
+      {canCreate ? (
+        <Link to={`/${organizationId}/settings/create-role`}>
+          <Icon name="plus" />
+          New Organization Role
+        </Link>
+      ) : (
+        <>
+          <Icon name="plus" />
+          New Organization Role
+        </>
+      )}
+    </Button>
   );
 }

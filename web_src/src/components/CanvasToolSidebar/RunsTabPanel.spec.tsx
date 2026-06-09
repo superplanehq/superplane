@@ -153,7 +153,6 @@ describe("RunsTabPanel", () => {
         isFetchingNextPage={false}
         onLoadMore={onLoadMore}
       />,
-      { wrapper: routerWrapper },
     );
 
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
@@ -201,9 +200,7 @@ describe("RunsTabPanel", () => {
     });
     expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />, {
-      wrapper: routerWrapper,
-    });
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
 
     expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
@@ -219,10 +216,10 @@ describe("RunsTabPanel", () => {
     });
     expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />, { wrapper: routerWrapper });
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />, { wrapper: routerWrapper });
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
     expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
     expect(screen.getByText("Second run")).toBeInTheDocument();
   });
@@ -240,14 +237,10 @@ describe("RunsTabPanel", () => {
 
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />, {
-      wrapper: routerWrapper,
-    });
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
     expect(screen.getByText("Second run")).toBeInTheDocument();
 
-    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />, {
-      wrapper: routerWrapper,
-    });
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 });
