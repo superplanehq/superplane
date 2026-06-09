@@ -16,11 +16,16 @@ interface ChartPanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function ChartPanelCard({ panel, readOnly, onDelete, onChange }: ChartPanelCardProps) {
+export function ChartPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: ChartPanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -28,14 +33,14 @@ export function ChartPanelCard({ panel, readOnly, onDelete, onChange }: ChartPan
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <ChartPanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<ChartPanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="chart"
         initialContent={content}

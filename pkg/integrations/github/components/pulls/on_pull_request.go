@@ -43,12 +43,13 @@ func (p *OnPullRequest) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Actions**: Select which PR actions to listen for (opened, closed, synchronize, etc.)
+- **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
 
 ## Event Data
 
 Each PR event includes:
-- **action**: The action that triggered the event (opened, closed, synchronize, etc.)
+- **action**: The action that triggered the event (opened, edited, closed, synchronize, etc.)
+- **changes**: When action is edited, includes what changed (title, body, base branch)
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
@@ -92,6 +93,7 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 						{Label: "Assigned", Value: "assigned"},
 						{Label: "Unassigned", Value: "unassigned"},
 						{Label: "Opened", Value: "opened"},
+						{Label: "Edited", Value: "edited"},
 						{Label: "Closed", Value: "closed"},
 						{Label: "Labeled", Value: "labeled"},
 						{Label: "Unlabeled", Value: "unlabeled"},

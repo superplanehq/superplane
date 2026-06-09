@@ -1,12 +1,11 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { canvasesDescribeCanvasVersion } from "@/api-client";
 import { useQueries } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 import { canvasKeys, useListDraftBranches } from "@/hooks/useCanvasData";
 import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 import { isDraftVersion, sortDraftVersionsDesc } from "./lib/canvas-versions";
 
 type UseCanvasDraftBranchQueriesOptions = {
@@ -34,14 +33,7 @@ export function useCanvasDraftBranchQueries({
       .filter((versionId) => !!versionId)
       .map((versionId) => ({
         queryKey: canvasKeys.versionDetail(canvasId!, versionId),
-        queryFn: async () => {
-          const response = await canvasesDescribeCanvasVersion(
-            withOrganizationHeader({
-              path: { canvasId: canvasId!, versionId },
-            }),
-          );
-          return response.data?.version;
-        },
+        queryFn: async () => fetchCanvasVersionWithSpec(canvasId!, versionId),
         enabled: !!organizationId && !!canvasId && !!versionId && !isTemplateCanvas,
       })),
   });
