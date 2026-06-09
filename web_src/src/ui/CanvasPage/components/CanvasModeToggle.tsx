@@ -1,6 +1,8 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
+import { Link, useParams } from "react-router-dom";
 
 export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
@@ -45,6 +47,7 @@ export function CanvasModeToggle({
   hasDraft = false,
   hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -119,31 +122,52 @@ export function CanvasModeToggle({
         )}
       >
         {showConsole ? (
-          <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console">
-            <span className="inline-flex items-center gap-1.5">
-              Console
-              <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
-            </span>
+          <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console" asChild>
+            <Link
+              to={organizationId && appId ? appPath(organizationId, appId, "?view=console") : "#"}
+              onClick={(e) => e.preventDefault()}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                Console
+                <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
+              </span>
+            </Link>
           </TabsTrigger>
         ) : null}
         <TabsTrigger
           value={CANVAS_TAB}
           data-testid="canvas-view-mode-live"
           aria-label={editing ? "Canvas (editing)" : "Canvas"}
+          asChild
         >
-          <span className="inline-flex items-center gap-1.5">
-            Canvas
-            <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
-          </span>
+          <Link
+            to={organizationId && appId ? appPath(organizationId, appId) : "#"}
+            onClick={(e) => e.preventDefault()}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              Canvas
+              <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
+            </span>
+          </Link>
         </TabsTrigger>
         {showMemory ? (
-          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
-            Memory
+          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory" asChild>
+            <Link
+              to={organizationId && appId ? appPath(organizationId, appId, "?view=memory") : "#"}
+              onClick={(e) => e.preventDefault()}
+            >
+              Memory
+            </Link>
           </TabsTrigger>
         ) : null}
         {showFiles ? (
-          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
-            Files
+          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files" asChild>
+            <Link
+              to={organizationId && appId ? appPath(organizationId, appId, "?view=files") : "#"}
+              onClick={(e) => e.preventDefault()}
+            >
+              Files
+            </Link>
           </TabsTrigger>
         ) : null}
       </TabsList>
