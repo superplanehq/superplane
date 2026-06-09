@@ -1,81 +1,17 @@
 package canvases
 
 import (
-	"bytes"
-	"encoding/json"
+	"strings"
 
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
-	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
-func quoteYAMLPositionYKeys(text string) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimLeft(line, " \t")
-		if strings.HasPrefix(trimmed, "y:") {
-			indent := line[:len(line)-len(trimmed)]
-			lines[i] = indent + `"y"` + trimmed[1:]
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
-	protoVersion := SerializeCanvasVersion(version, organizationID)
-
-	// Use protojson (not encoding/json) so proto enums such as node.type are
-	// emitted as their canonical names (e.g. "TYPE_TRIGGER") instead of their
-	// numeric values. ParseCanvasResource reads canvas.yaml back with protojson,
-	// and the UI relies on the string enum names, so serialization must match.
-	specJSON, err := protojson.Marshal(protoVersion.GetSpec())
-	if err != nil {
-		return "", err
-	}
-
-	var spec map[string]any
-	if err := json.Unmarshal(specJSON, &spec); err != nil {
-		return "", err
-	}
-
-	if _, ok := spec["nodes"]; !ok {
-		spec["nodes"] = []any{}
-	}
-	if _, ok := spec["edges"]; !ok {
-		spec["edges"] = []any{}
-	}
-	ensureCanvasYAMLNodeDefaults(spec)
-	ensureCanvasYAMLEdgeDefaults(spec)
-
-	resource := map[string]any{
-		"apiVersion": canvasyaml.CanvasAPIVersion,
-		"kind":       canvasyaml.CanvasKind,
-		"metadata": map[string]any{
-			"id":          canvas.ID.String(),
-			"name":        protoVersion.GetMetadata().GetName(),
-			"description": protoVersion.GetMetadata().GetDescription(),
-			"isTemplate":  canvas.IsTemplate,
-		},
-		"spec": spec,
-	}
-
-	var buf bytes.Buffer
-	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(resource); err != nil {
-		return "", err
-	}
-	if err := encoder.Close(); err != nil {
-		return "", err
-	}
-
-	return quoteYAMLPositionYKeys(buf.String()), nil
+	return canvasyaml.CanvasResourceYAML(SerializeCanvasVersion(version, organizationID), canvas.ID.String(), canvas.IsTemplate)
 }
 
 func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
@@ -84,52 +20,6 @@ func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
 		return "", err
 	}
 	return string(raw), nil
-}
-
-func ensureCanvasYAMLNodeDefaults(spec map[string]any) {
-	nodes, ok := spec["nodes"].([]any)
-	if !ok {
-		return
-	}
-
-	for i, raw := range nodes {
-		node, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		if _, hasType := node["type"]; !hasType {
-			// Proto JSON omits TYPE_ACTION (enum value 0); the UI needs an explicit type.
-			node["type"] = "TYPE_ACTION"
-		}
-
-		nodes[i] = node
-	}
-
-	spec["nodes"] = nodes
-}
-
-func ensureCanvasYAMLEdgeDefaults(spec map[string]any) {
-	edges, ok := spec["edges"].([]any)
-	if !ok {
-		return
-	}
-
-	for i, raw := range edges {
-		edge, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		channel, _ := edge["channel"].(string)
-		if channel == "" {
-			edge["channel"] = "default"
-		}
-
-		edges[i] = edge
-	}
-
-	spec["edges"] = edges
 }
 
 func canvasFromYAMLText(text string) (*pb.Canvas, error) {
