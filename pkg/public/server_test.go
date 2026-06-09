@@ -111,6 +111,16 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 }
 
+func Test__ListenAddr(t *testing.T) {
+	t.Run("formats IPv4 addresses", func(t *testing.T) {
+		require.Equal(t, "127.0.0.1:3000", listenAddr("127.0.0.1", 3000))
+	})
+
+	t.Run("formats IPv6 addresses with brackets", func(t *testing.T) {
+		require.Equal(t, "[::1]:3000", listenAddr("::1", 3000))
+	})
+}
+
 func Test__OpenAPIEndpoints(t *testing.T) {
 	checkSwaggerFiles(t)
 

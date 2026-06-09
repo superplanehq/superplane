@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -1076,6 +1077,10 @@ func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func listenAddr(host string, port int) string {
+	return net.JoinHostPort(host, strconv.Itoa(port))
+}
+
 func (s *Server) Serve(host string, port int) error {
 	log.Infof("Starting server at %s:%d", host, port)
 
@@ -1084,7 +1089,7 @@ func (s *Server) Serve(host string, port int) error {
 	s.wsHub.Run()
 
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", host, port),
+		Addr:         listenAddr(host, port),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
