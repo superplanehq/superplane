@@ -1,0 +1,77 @@
+import { cn, isUrl } from "@/lib/utils";
+import type { ConfigurationDisplayRow } from "./types";
+import { EMPTY_DISPLAY_VALUE } from "./formatConfigurationValue";
+
+type ConfigurationValueDisplayProps = {
+  row: ConfigurationDisplayRow;
+  className?: string;
+};
+
+export function ConfigurationValueDisplay({ row, className }: ConfigurationValueDisplayProps) {
+  if (row.kind === "empty" || row.displayText === EMPTY_DISPLAY_VALUE) {
+    return <span className={cn("text-gray-400 dark:text-gray-500", className)}>{EMPTY_DISPLAY_VALUE}</span>;
+  }
+
+  if (row.kind === "integration" && row.integrationStatus) {
+    const variant = row.integrationStatusVariant ?? "pending";
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium",
+          variant === "ready"
+            ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
+            : variant === "error"
+              ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
+              : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400",
+          className,
+        )}
+      >
+        {row.integrationStatus}
+      </span>
+    );
+  }
+
+  if (row.chips && row.chips.length > 0) {
+    return (
+      <div className={cn("flex flex-wrap gap-1", className)}>
+        {row.chips.map((chip) => (
+          <span
+            key={chip}
+            className="inline-flex max-w-full truncate rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            title={chip}
+          >
+            {chip}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  const href = row.href ?? (row.kind === "url" && isUrl(row.displayText) ? row.displayText : undefined);
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn("min-w-0 break-all text-primary underline underline-offset-2", className)}
+      >
+        {row.displayText}
+      </a>
+    );
+  }
+
+  const isMonospace = row.kind === "expression" || row.kind === "code";
+
+  return (
+    <span
+      className={cn(
+        "min-w-0 break-all text-gray-800 dark:text-gray-100",
+        isMonospace && "font-mono text-[12px]",
+        className,
+      )}
+    >
+      {row.displayText}
+    </span>
+  );
+}
