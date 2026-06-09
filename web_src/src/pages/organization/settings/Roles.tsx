@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
@@ -17,7 +17,6 @@ interface RolesProps {
 
 export function Roles({ organizationId }: RolesProps) {
   usePageTitle(["Roles"]);
-  const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId);
 
@@ -26,19 +25,7 @@ export function Roles({ organizationId }: RolesProps) {
   const canUpdateRoles = canAct("roles", "update");
   const canDeleteRoles = canAct("roles", "delete");
 
-  const handleCreateRole = () => {
-    if (!canCreateRoles) return;
-    navigate(`/${organizationId}/settings/create-role`);
-  };
-
-  const handleEditRole = (role: RolesRole) => {
-    if (!canUpdateRoles) return;
-    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
-  };
-
-  const handleViewRole = (role: RolesRole) => {
-    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
-  };
+  const roleHref = (role: RolesRole) => `/${organizationId}/settings/create-role/${role.metadata?.name}`;
 
   const handleDeleteRole = async (role: RolesRole) => {
     if (!canDeleteRoles) return;
@@ -114,9 +101,18 @@ export function Roles({ organizationId }: RolesProps) {
             allowed={canCreateRoles || permissionsLoading}
             message="You don't have permission to create roles."
           >
-            <Button className="flex items-center" onClick={handleCreateRole} disabled={!canCreateRoles}>
-              <Icon name="plus" />
-              New Organization Role
+            <Button className="flex items-center" disabled={!canCreateRoles} asChild={canCreateRoles}>
+              {canCreateRoles ? (
+                <Link to={`/${organizationId}/settings/create-role`}>
+                  <Icon name="plus" />
+                  New Organization Role
+                </Link>
+              ) : (
+                <>
+                  <Icon name="plus" />
+                  New Organization Role
+                </>
+              )}
             </Button>
           </PermissionTooltip>
         </div>
@@ -158,14 +154,13 @@ export function Roles({ organizationId }: RolesProps) {
                                 <TooltipProvider delayDuration={200}>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleViewRole(role)}
+                                      <Link
+                                        to={roleHref(role)}
                                         className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
                                         aria-label="View role"
                                       >
                                         <Icon name="eye" size="sm" />
-                                      </button>
+                                      </Link>
                                     </TooltipTrigger>
                                     <TooltipContent side="top">View Permissions</TooltipContent>
                                   </Tooltip>
@@ -180,15 +175,14 @@ export function Roles({ organizationId }: RolesProps) {
                                   >
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleEditRole(role)}
+                                        <Link
+                                          to={roleHref(role)}
                                           className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
                                           aria-label="Edit role"
-                                          disabled={!canUpdateRoles}
+                                          onClick={(e) => { if (!canUpdateRoles) e.preventDefault(); }}
                                         >
                                           <Icon name="edit" size="sm" />
-                                        </button>
+                                        </Link>
                                       </TooltipTrigger>
                                       <TooltipContent side="top">Edit Role</TooltipContent>
                                     </Tooltip>
