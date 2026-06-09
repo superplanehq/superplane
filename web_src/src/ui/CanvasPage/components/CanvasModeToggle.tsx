@@ -1,6 +1,7 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { appPath } from "@/lib/appPaths";
+import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef } from "react";
+import { Link, useParams } from "react-router-dom";
 
 export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
@@ -21,18 +22,43 @@ const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
 const RUNS_MODE = "runs";
 
-const EDITING_TAB_TRIGGER_ACTIVE =
-  "[&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-sm";
-const EDITING_TAB_TRIGGER_BASE =
-  "[&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent";
+const BASE_TAB_CLASSES =
+  "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
 
-function editingTabListClassName(): string {
-  return cn(
-    "rounded-full bg-blue-50",
-    EDITING_TAB_TRIGGER_BASE,
-    "[&_[data-slot=tabs-trigger][data-state=inactive]]:text-blue-800/80 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-blue-900",
-    EDITING_TAB_TRIGGER_ACTIVE,
-  );
+const ACTIVE_CLASSES = "bg-background text-foreground shadow-sm";
+const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
+const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
+const EDITING_INACTIVE_CLASSES = "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none";
+
+const MODE_TO_TAB: Record<string, string> = {
+  console: CONSOLE_TAB,
+  memory: MEMORY_TAB,
+  files: FILES_TAB,
+  runs: RUNS_MODE,
+};
+
+/** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
+function handleTabClick(e: React.MouseEvent, isActive: boolean, callback: () => void) {
+  if (isNormalClick(e)) {
+    e.preventDefault();
+    if (!isActive) callback();
+  }
+}
+
+function modeToTab(mode: string): string {
+  return MODE_TO_TAB[mode] ?? CANVAS_TAB;
+}
+
+function tabClasses(selected: string, value: string, editing: boolean) {
+  const isActive = selected === value;
+  const stateClass = isActive
+    ? editing
+      ? EDITING_ACTIVE_CLASSES
+      : ACTIVE_CLASSES
+    : editing
+      ? EDITING_INACTIVE_CLASSES
+      : INACTIVE_CLASSES;
+  return cn(BASE_TAB_CLASSES, stateClass);
 }
 
 export function CanvasModeToggle({
@@ -45,109 +71,75 @@ export function CanvasModeToggle({
   hasDraft = false,
   hasConsoleDraft = false,
 }: CanvasModeToggleProps) {
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
-  const selected =
-    mode === CONSOLE_TAB
-      ? CONSOLE_TAB
-      : mode === MEMORY_TAB
-        ? MEMORY_TAB
-        : mode === FILES_TAB
-          ? FILES_TAB
-          : mode === RUNS_MODE
-            ? RUNS_MODE
-            : CANVAS_TAB;
-  const valueChangeHandledRef = useRef(false);
-
-  useEffect(() => {
-    valueChangeHandledRef.current = false;
-  }, [mode]);
+  const selected = modeToTab(mode);
+  const baseHref = organizationId && appId ? appPath(organizationId, appId) : "#";
+  const tabHref = (view?: string) => (view ? `${baseHref}?view=${view}` : baseHref);
 
   return (
-    <Tabs
-      value={selected}
-      onValueChange={(next) => {
-        // Radix Tabs may emit more than one `onValueChange` per click when `value` is controlled and the parent
-        // doesn't update it synchronously. We only want to suppress duplicates from the same user interaction,
-        // not block subsequent clicks.
-        if (valueChangeHandledRef.current) return;
-
-        if (next === CANVAS_TAB && selected !== CANVAS_TAB) {
-          valueChangeHandledRef.current = true;
-          queueMicrotask(() => {
-            valueChangeHandledRef.current = false;
-          });
-          void onSelectLive();
-          return;
-        }
-
-        if (next === CONSOLE_TAB && selected !== CONSOLE_TAB && onSelectConsole) {
-          valueChangeHandledRef.current = true;
-          queueMicrotask(() => {
-            valueChangeHandledRef.current = false;
-          });
-          void onSelectConsole();
-          return;
-        }
-
-        if (next === MEMORY_TAB && selected !== MEMORY_TAB && onSelectMemory) {
-          valueChangeHandledRef.current = true;
-          queueMicrotask(() => {
-            valueChangeHandledRef.current = false;
-          });
-          void onSelectMemory();
-          return;
-        }
-
-        if (next === FILES_TAB && selected !== FILES_TAB && onSelectFiles) {
-          valueChangeHandledRef.current = true;
-          queueMicrotask(() => {
-            valueChangeHandledRef.current = false;
-          });
-          void onSelectFiles();
-        }
-      }}
+    <nav
+      aria-label="Canvas view"
+      className={cn(
+        "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
+        editing ? "bg-blue-50" : "bg-slate-100",
+      )}
     >
-      <TabsList
-        aria-label="Canvas view"
-        className={cn(
-          "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
-          editing
-            ? editingTabListClassName()
-            : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
-        )}
-      >
-        {showConsole ? (
-          <TabsTrigger value={CONSOLE_TAB} data-testid="canvas-view-mode-console" aria-label="Console">
-            <span className="inline-flex items-center gap-1.5">
-              Console
-              <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
-            </span>
-          </TabsTrigger>
-        ) : null}
-        <TabsTrigger
-          value={CANVAS_TAB}
-          data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : "Canvas"}
+      {showConsole ? (
+        <Link
+          to={tabHref("console")}
+          onClick={(e) => handleTabClick(e, selected === CONSOLE_TAB, () => void onSelectConsole?.())}
+          className={tabClasses(selected, CONSOLE_TAB, editing)}
+          data-testid="canvas-view-mode-console"
+          aria-label="Console"
+          aria-current={selected === CONSOLE_TAB ? "page" : undefined}
         >
           <span className="inline-flex items-center gap-1.5">
-            Canvas
-            <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
+            Console
+            <DraftDot show={hasConsoleDraft} editing={editing} testId="canvas-view-mode-console-draft-dot" />
           </span>
-        </TabsTrigger>
-        {showMemory ? (
-          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
-            Memory
-          </TabsTrigger>
-        ) : null}
-        {showFiles ? (
-          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
-            Files
-          </TabsTrigger>
-        ) : null}
-      </TabsList>
-    </Tabs>
+        </Link>
+      ) : null}
+      <Link
+        to={tabHref()}
+        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
+        className={tabClasses(selected, CANVAS_TAB, editing)}
+        data-testid="canvas-view-mode-live"
+        aria-label={editing ? "Canvas (editing)" : "Canvas"}
+        aria-current={selected === CANVAS_TAB ? "page" : undefined}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          Canvas
+          <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
+        </span>
+      </Link>
+      {showMemory ? (
+        <Link
+          to={tabHref("memory")}
+          onClick={(e) => handleTabClick(e, selected === MEMORY_TAB, () => void onSelectMemory?.())}
+          className={tabClasses(selected, MEMORY_TAB, editing)}
+          data-testid="canvas-view-mode-memory"
+          aria-label="Memory"
+          aria-current={selected === MEMORY_TAB ? "page" : undefined}
+        >
+          Memory
+        </Link>
+      ) : null}
+      {showFiles ? (
+        <Link
+          to={tabHref("files")}
+          onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
+          className={tabClasses(selected, FILES_TAB, editing)}
+          data-testid="canvas-view-mode-files"
+          aria-label="Files"
+          aria-current={selected === FILES_TAB ? "page" : undefined}
+        >
+          Files
+        </Link>
+      ) : null}
+    </nav>
   );
 }
 
