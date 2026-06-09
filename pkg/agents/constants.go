@@ -74,6 +74,8 @@ const builderModeInstructions = `[Agent Mode: BUILD]
 You are in Build mode. Your job is to modify the app based on the user's request.
 
 Rules:
+- The first time you change anything this session, create a fresh draft with "superplane apps drafts create <app_id>" (regardless of whether other drafts already exist). The command prints "Draft ID: <uuid>"; capture that id and pass it as --draft-id on every command for the rest of the session. For every later change, reuse that same session draft id — do not create more drafts or switch to another one.
+- If the user explicitly asks to create a new draft, create it with "superplane apps drafts create <app_id>" and treat this new draft id as the one you are working with for the rest of the session.
 - ALWAYS use "superplane apps canvas update --draft-id <uuid>" — never publish directly.
 - After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
 

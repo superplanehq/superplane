@@ -327,19 +327,12 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		result := "[Draft Status]\n"
 		for _, draft := range drafts {
 			result += fmt.Sprintf(
-				"- Active draft: version %s (created %s)\n",
+				"- Existing draft: version %s (created %s)\n",
 				draft.ID.String(),
 				draftCreatedAt(draft),
 			)
 		}
-		if len(drafts) == 1 {
-			result += "Use --draft-id " + drafts[0].ID.String() + " on canvas/console CLI commands.\n"
-		} else {
-			result += fmt.Sprintf(
-				"Use --draft-id <uuid> on canvas/console commands. Run `superplane apps drafts list %s` to choose a draft.\n",
-				canvasID.String(),
-			)
-		}
+		result += "These drafts may belong to other sessions or users. To make changes, reuse the session draft you created earlier (pass its --draft-id), or create a new one with `superplane apps drafts create` if you have not yet this session. Do not reuse an unrelated draft.\n"
 		return result
 	}
 

@@ -15,9 +15,10 @@ Prefer delegating schema lookups and component research to your Component Resear
 For trivial edits where you already know the exact fields (renaming a node, changing a URL, updating a cron expression), you can skip the researcher and edit directly.
 
 When building or modifying apps:
-1. Resolve the target draft id (see **Draft Selection** below), then read once with `superplane apps canvas get <app_id> --draft-id <id> -o yaml`.
-2. Kick off researchers for any components you need schemas for.
-3. Apply the draft update and verify once.
+1. On the first change this session, create your session draft by running `superplane apps drafts create <app_id>` (add `--name "<short label>"` when helpful). The command prints `Draft ID: <uuid>` — capture that id as your session draft and pass it as `--draft-id <id>` on every command, starting by reading once with `superplane apps canvas get <app_id> --draft-id <id> -o yaml`. On later changes, reuse the same session draft id.
+2. If the user explicitly asks to create a new draft, create it with `superplane apps drafts create <app_id>` and treat this new draft id as the one you are working with for the rest of the session.
+3. Kick off researchers for any components you need schemas for.
+4. Apply the draft update and verify once.
 
 For Console edits, read the draft once with `superplane apps console get <app_id> --draft-id <id> -o yaml`, then apply with `superplane apps console set --draft-id <id> -f /tmp/console.yaml`. Read `/mnt/session/uploads/ref/skills/superplane-cli/references/console-yaml-spec.md` for the YAML envelope and `/mnt/session/uploads/ref/docs/prd/console-and-widgets.md` for widget behavior.
 
@@ -25,14 +26,13 @@ Avoid repeated CLI fetch commands against the same draft. Fetch once, save local
 
 ## Draft Selection
 
-Users can own **multiple drafts** per app. Always pass `--draft-id <uuid>` on `canvas get/update` and `console get/set`.
+Users can own **multiple drafts** per app. Every session works against **one draft that you create**, and you always pass its `--draft-id <uuid>` on `canvas get/update` and `console get/set`.
 
-**Resolve the draft id before read/write:**
-1. **From context** — the last `:::draft-actions` block you emitted, structured CLI output from an update, or the `[Draft Status]` preamble on each turn.
-2. **From the CLI** — `superplane apps drafts list <app_id>` (sorted by most recently updated). Pick the draft you are working on, usually the newest one you created.
-3. **No draft yet** — `superplane apps drafts create <app_id> [--name "..."]`, then use the returned id on all subsequent commands.
+**The first time the user asks you to change anything in this session**, create a fresh draft before touching the canvas or console — `superplane apps drafts create <app_id>`. Do this **regardless of whether other drafts already exist**; never reuse a pre-existing draft, and never edit the live version. Remember the returned id as your session draft.
 
-**New draft branch:** use `superplane apps drafts create` only when the user explicitly wants a separate draft; otherwise keep editing the current draft id.
+**For every later change the user requests in the same session**, reuse that same session draft id. Do not create additional drafts and do not switch to another draft, even if `[Draft Status]` or `apps drafts list` shows others.
+
+**If you lose the session draft id**, recover it before creating a new one: read the `versionId` field of the `:::draft-actions` block you emitted earlier this session (that value is the draft id — `versionId` and `--draft-id` are the same thing), then check structured CLI output from your previous update. Only create a new draft if you genuinely have not created one yet this session.
 
 **Lifecycle (rare):** `superplane apps drafts delete <draft-id> [app_id]` discards a draft. Do not delete drafts unless the user asks.
 
@@ -305,7 +305,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` section 6
 
 - If update returns "configuration errors" → app was saved but broken. Fix nodes and re-submit.
 - If "integration is required" → node needs a connected integration. Show the integration button and ask the user.
-- If draft id is missing or invalid → run `superplane apps drafts list <app_id>` (or create one) and retry with `--draft-id`.
+- If you have not created a session draft yet → `superplane apps drafts create <app_id>` and use the returned id. If you lost the id mid-session, recover it from your earlier `:::draft-actions` or update output before creating another.
 - If a native component isn't available → offer alternatives: core components, different vendor, or placeholder with `noop`.
 
 Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging failed runs and inspecting executions.
@@ -316,8 +316,8 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 2. **Design** — show mermaid diagram + :::rubric spec (you should already have schemas from step 1)
 3. **Wait for user** — user clicks "Start Building" or says yes
 4. **Read YAML specs** — read `/mnt/session/uploads/ref/skills/superplane-cli/references/app-yaml-spec.md`; if changing Console, also read `/mnt/session/uploads/ref/skills/superplane-cli/references/console-yaml-spec.md` and `/mnt/session/uploads/ref/docs/prd/console-and-widgets.md`
-5. **Build** — write app YAML to /tmp/canvas.yaml and Console YAML to /tmp/console.yaml when needed
-6. **Apply** — `superplane apps canvas update --draft-id <id> -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <id> -f /tmp/console.yaml` for Console changes
+5. **Build** — on the first change this session, create your session draft (`superplane apps drafts create <app_id>`); write app YAML to /tmp/canvas.yaml and Console YAML to /tmp/console.yaml when needed
+6. **Apply** — using your session draft id: `superplane apps canvas update --draft-id <id> -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <id> -f /tmp/console.yaml` for Console changes
 7. **Verify** — after updates, run one `superplane apps canvas get <id> --draft-id <id> -o yaml` or `superplane apps console get <id> --draft-id <id> -o yaml`, save the result locally, and check for errors locally
 8. **Output** — :::draft-actions with version ID and summary using node chips
 
@@ -353,7 +353,7 @@ The rich-ui-widgets skill has the full syntax.
 ## App Update Rules
 
 - **ALWAYS** update drafts by id, never live directly: `superplane apps canvas update <id> --draft-id <uuid> -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <uuid> -f /tmp/console.yaml` for Console changes
-- Resolve the draft id from `:::draft-actions`, update output, or `[Draft Status]` before the first read/write; if none exists, run `superplane apps drafts list` or `apps drafts create`
+- On the first change this session, create a fresh draft (`apps drafts create <app_id>`) regardless of existing drafts; reuse that same session draft id for all later changes
 - After successful draft updates, output `:::draft-actions` with the version ID from the CLI response
 - After update, verify once with `apps canvas get --draft-id <uuid> -o yaml` or `apps console get --draft-id <uuid> -o yaml`
 

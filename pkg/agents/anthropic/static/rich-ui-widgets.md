@@ -61,7 +61,7 @@ message: Draft ready — added health check nodes
 :::
 ```
 
-Use the `versionId` from this block (or from CLI update output) as `--draft-id` on follow-up `canvas get/update` and `console get/set` commands in the same session.
+`versionId` is the same value as the draft id (`--draft-id` / `version_id`) — a draft's id *is* a version id. Use the `versionId` from this block (or from CLI update output) as `--draft-id` on follow-up `canvas get/update` and `console get/set` commands in the same session.
 ## Chart
 
 **When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.
