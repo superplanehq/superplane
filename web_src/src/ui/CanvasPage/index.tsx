@@ -1604,6 +1604,9 @@ function CanvasPage(props: CanvasPageProps) {
                 canReadIntegrations={props.canReadIntegrations}
                 canCreateIntegrations={props.canCreateIntegrations}
                 canUpdateIntegrations={props.canUpdateIntegrations}
+                onEnterEditMode={props.onEnterEditMode}
+                enterEditModeDisabled={props.enterEditModeDisabled}
+                enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
               />
             ) : null}
           </div>
@@ -1681,6 +1684,9 @@ function Sidebar({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -1728,6 +1734,9 @@ function Sidebar({
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1892,6 +1901,9 @@ function Sidebar({
       hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
+      onEnterEditMode={onEnterEditMode}
+      enterEditModeDisabled={enterEditModeDisabled}
+      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
     />
   );
 }
@@ -2384,6 +2396,7 @@ function CanvasContent({
       } else if (onNodeClick) {
         onNodeClick(nodeId);
       } else {
+        const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
         stateRef.current.componentSidebar.open(nodeId);
 
         const nodeData = clickedNode?.data as {
@@ -2395,7 +2408,7 @@ function CanvasContent({
           nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
         );
 
-        if (setCurrentTab) {
+        if (setCurrentTab && !wasSidebarOpen) {
           setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
         }
 
