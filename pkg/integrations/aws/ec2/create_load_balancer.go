@@ -15,12 +15,16 @@ import (
 type CreateLoadBalancer struct{}
 
 type CreateLoadBalancerConfiguration struct {
-	Region         string   `json:"region" mapstructure:"region"`
-	Name           string   `json:"name" mapstructure:"name"`
-	Type           string   `json:"type" mapstructure:"type"`
-	Scheme         string   `json:"scheme" mapstructure:"scheme"`
-	Subnets        []string `json:"subnets" mapstructure:"subnets"`
-	SecurityGroups []string `json:"securityGroups" mapstructure:"securityGroups"`
+	Region              string   `json:"region" mapstructure:"region"`
+	Name                string   `json:"name" mapstructure:"name"`
+	Type                string   `json:"type" mapstructure:"type"`
+	Scheme              string   `json:"scheme" mapstructure:"scheme"`
+	IpAddressType       string   `json:"ipAddressType" mapstructure:"ipAddressType"`
+	Subnets             []string `json:"subnets" mapstructure:"subnets"`
+	SecurityGroups      []string `json:"securityGroups" mapstructure:"securityGroups"`
+	ListenerProtocol    string   `json:"listenerProtocol" mapstructure:"listenerProtocol"`
+	ListenerPort        int      `json:"listenerPort" mapstructure:"listenerPort"`
+	ListenerTargetGroup string   `json:"listenerTargetGroup" mapstructure:"listenerTargetGroup"`
 }
 
 type CreateLoadBalancerNodeMetadata struct {
@@ -61,10 +65,23 @@ func (c *CreateLoadBalancer) Documentation() string {
 
 - **Name**: Name for the load balancer (must be unique per account/region)
 - **Region**: AWS region where the load balancer will be created
-- **Type**: Load balancer type — Application (HTTP/HTTPS), Network (TCP/UDP), or Gateway
-- **Scheme**: ` + "`internet-facing`" + ` (public DNS) or ` + "`internal`" + ` (private VPC only)
-- **Subnets**: One or more subnets across at least two Availability Zones
-- **Security Groups** (optional): Security groups for Application Load Balancers
+- **Type**: Load balancer type:
+  - ` + "`application`" + ` — Layer 7; routes HTTP/HTTPS traffic
+  - ` + "`network`" + ` — Layer 4; routes TCP, TLS, UDP, or TCP_UDP traffic
+  - ` + "`gateway`" + ` — Layer 3; routes traffic through third-party virtual appliances using GENEVE
+- **Scheme** (Application and Network only): ` + "`internet-facing`" + ` (public DNS) or ` + "`internal`" + ` (private VPC only). Not applicable for Gateway load balancers.
+- **Subnets**: Subnets to attach to the load balancer. Application and Network load balancers require at least two subnets in different Availability Zones; Gateway load balancers require at least one.
+- **Security Groups** (Application only): Security groups to associate with the load balancer.
+- **IP Address Type** (optional): Address family for the load balancer:
+  - ` + "`ipv4`" + ` — IPv4 only (default)
+  - ` + "`dualstack`" + ` — IPv4 and IPv6
+  - ` + "`dualstack-without-public-ipv4`" + ` — IPv6 public, IPv4 private only
+- **Listener Protocol** (optional): Protocol for the default listener. Valid values depend on the load balancer type:
+  - Application: ` + "`HTTP`" + `, ` + "`HTTPS`" + `
+  - Network: ` + "`TCP`" + `, ` + "`TLS`" + `, ` + "`UDP`" + `, ` + "`TCP_UDP`" + `
+  - Gateway: ` + "`GENEVE`" + `
+- **Listener Port** (optional): Port the listener receives traffic on (1–65535). Shown when a Listener Protocol is selected.
+- **Target Group** (optional): Target group to forward listener traffic to. Shown when a Listener Protocol is selected.
 
 ## Output
 
@@ -101,6 +118,33 @@ var lbSchemeOptions = []configuration.FieldOption{
 	{Label: "Internet-facing", Value: LoadBalancerSchemeInternetFacing},
 	{Label: "Internal", Value: LoadBalancerSchemeInternal},
 }
+
+var lbIPAddressTypeOptions = []configuration.FieldOption{
+	{Label: "IPv4", Value: LoadBalancerIPAddressTypeIPv4},
+	{Label: "Dual-stack (IPv4 + IPv6)", Value: LoadBalancerIPAddressTypeDualStack},
+	{Label: "Dual-stack without public IPv4", Value: LoadBalancerIPAddressTypeDualStackWithoutPublicIP},
+}
+
+var albListenerProtocolOptions = []configuration.FieldOption{
+	{Label: "HTTP", Value: ListenerProtocolHTTP},
+	{Label: "HTTPS", Value: ListenerProtocolHTTPS},
+}
+
+var nlbListenerProtocolOptions = []configuration.FieldOption{
+	{Label: "TCP", Value: ListenerProtocolTCP},
+	{Label: "TLS", Value: ListenerProtocolTLS},
+	{Label: "UDP", Value: ListenerProtocolUDP},
+	{Label: "TCP/UDP", Value: ListenerProtocolTCPUDP},
+}
+
+var gwlbListenerProtocolOptions = []configuration.FieldOption{
+	{Label: "GENEVE", Value: ListenerProtocolGENEVE},
+}
+
+var allListenerProtocolOptions = append(
+	append(albListenerProtocolOptions, nlbListenerProtocolOptions...),
+	gwlbListenerProtocolOptions...,
+)
 
 func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 	return []configuration.Field{
@@ -200,6 +244,71 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:     "ipAddressType",
+			Label:    "IP Address Type",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			Default:  LoadBalancerIPAddressTypeIPv4,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: lbIPAddressTypeOptions,
+				},
+			},
+		},
+		{
+			Name:        "listenerProtocol",
+			Label:       "Listener Protocol",
+			Description: "Protocol for the default listener — ALB: HTTP/HTTPS · NLB: TCP/TLS/UDP/TCP_UDP · GWLB: GENEVE",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: allListenerProtocolOptions,
+				},
+			},
+		},
+		{
+			Name:        "listenerPort",
+			Label:       "Listener Port",
+			Description: "Port the listener receives traffic on (1–65535)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "listenerProtocol", Values: []string{"*"}},
+			},
+		},
+		{
+			Name:        "listenerTargetGroup",
+			Label:       "Target Group",
+			Description: "Target group to forward traffic to",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "listenerProtocol", Values: []string{"*"}},
+				{Field: "region", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  "ec2.targetGroup",
+					Multi: false,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -218,10 +327,19 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	lbType := strings.TrimSpace(config.Type)
+	minSubnets := minSubnetsForALBNLB
+	if lbType == LoadBalancerTypeGateway {
+		minSubnets = minSubnetsForGWLB
+	}
+	if len(config.Subnets) < minSubnets {
+		return fmt.Errorf("at least %d subnet(s) in different Availability Zones must be specified", minSubnets)
+	}
+
 	return ctx.Metadata.Set(CreateLoadBalancerNodeMetadata{
 		Region: region,
 		Name:   strings.TrimSpace(config.Name),
-		Type:   strings.TrimSpace(config.Type),
+		Type:   lbType,
 		Scheme: strings.TrimSpace(config.Scheme),
 	})
 }
@@ -248,7 +366,7 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	}
 
 	scheme := strings.TrimSpace(config.Scheme)
-	if scheme == "" {
+	if scheme == "" && lbType != LoadBalancerTypeGateway {
 		scheme = LoadBalancerSchemeInternetFacing
 	}
 
@@ -262,6 +380,7 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		Name:           name,
 		Type:           lbType,
 		Scheme:         scheme,
+		IpAddressType:  strings.TrimSpace(config.IpAddressType),
 		SubnetIDs:      config.Subnets,
 		SecurityGroups: config.SecurityGroups,
 	})
@@ -344,6 +463,9 @@ func (c *CreateLoadBalancer) poll(ctx core.ActionHookContext) error {
 
 	switch lb.State {
 	case LoadBalancerStateActive:
+		if err := c.maybeCreateListener(client, metadata.LoadBalancerARN, config, ctx); err != nil {
+			return err
+		}
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateLoadBalancerPayloadType, []any{
 			map[string]any{
 				"loadBalancerArn": lb.LoadBalancerARN,
@@ -382,4 +504,28 @@ func (c *CreateLoadBalancer) Cleanup(ctx core.SetupContext) error {
 
 func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
+}
+
+func (c *CreateLoadBalancer) maybeCreateListener(client *Client, lbARN string, config CreateLoadBalancerConfiguration, ctx core.ActionHookContext) error {
+	protocol := strings.TrimSpace(config.ListenerProtocol)
+	targetGroup := strings.TrimSpace(config.ListenerTargetGroup)
+	if protocol == "" || targetGroup == "" {
+		return nil
+	}
+	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
+		return fmt.Errorf("listener port must be between 1 and 65535")
+	}
+
+	_, err := client.CreateListener(CreateListenerInput{
+		LoadBalancerARN: lbARN,
+		Protocol:        protocol,
+		Port:            config.ListenerPort,
+		TargetGroupARN:  targetGroup,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create listener: %w", err)
+	}
+
+	ctx.Logger.Infof("created %s listener on port %d for load balancer %s", protocol, config.ListenerPort, lbARN)
+	return nil
 }
