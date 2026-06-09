@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, CodeXml, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -243,6 +243,7 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
 
 const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   markdown: FileText,
+  html: CodeXml,
   node: Workflow,
   nodes: Network,
   table: Table2,
