@@ -218,8 +218,9 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
+	canvasSnapshot := buildCanvasSnapshot(session)
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -348,6 +349,80 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		latestPublished.ID.String(),
 		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
 	)
+}
+
+func buildCanvasSnapshot(session *models.AgentSession) string {
+	canvas, err := models.FindCanvas(session.OrganizationID, session.CanvasID)
+	if err != nil {
+		log.WithError(err).Warn("failed to load canvas for agent snapshot")
+		return "[Canvas Snapshot]\nUnable to load current canvas snapshot."
+	}
+
+	var builder strings.Builder
+	builder.WriteString("[Canvas Snapshot]\n")
+	builder.WriteString(fmt.Sprintf("canvas_id: %s\n", canvas.ID.String()))
+	builder.WriteString(fmt.Sprintf("name: %s\n", canvas.Name))
+
+	if canvas.LiveVersionID != nil {
+		builder.WriteString(fmt.Sprintf("live_version_id: %s\n", canvas.LiveVersionID.String()))
+	}
+
+	draft, err := ownedDraftVersion(session.CanvasID, session.UserID)
+	if err != nil {
+		log.WithError(err).Warn("failed to load owned draft for agent snapshot")
+		builder.WriteString("owned_draft: unavailable\n")
+	} else if draft != nil {
+		builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
+		builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
+	} else {
+		builder.WriteString("owned_draft: none\n")
+	}
+
+	version := selectedVersion(canvas, draft, draftSnapshotSource(draft))
+	if version == nil {
+		builder.WriteString("nodes: unavailable\n")
+		return strings.TrimRight(builder.String(), "\n")
+	}
+
+	builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", draftSnapshotSource(draft)))
+	builder.WriteString(fmt.Sprintf("node_count: %d\n", len(version.Nodes)))
+	builder.WriteString(fmt.Sprintf("edge_count: %d\n", len(version.Edges)))
+
+	nodes := summarizeNodes(version.Nodes, 12)
+	if len(nodes) == 0 {
+		builder.WriteString("node_summaries: []\n")
+		return strings.TrimRight(builder.String(), "\n")
+	}
+
+	builder.WriteString("node_summaries:\n")
+	for _, node := range nodes {
+		component := node.Component
+		if component == "" {
+			component = "unknown"
+		}
+		name := node.Name
+		if name == "" {
+			name = node.ID
+		}
+		line := fmt.Sprintf("  - id=%s name=%q type=%s component=%s", node.ID, name, node.Type, component)
+		if node.Issue != "" {
+			line += fmt.Sprintf(" issue=%q", node.Issue)
+		}
+		builder.WriteString(line + "\n")
+	}
+
+	if len(version.Nodes) > len(nodes) {
+		builder.WriteString(fmt.Sprintf("  - ... %d more nodes omitted\n", len(version.Nodes)-len(nodes)))
+	}
+
+	return strings.TrimRight(builder.String(), "\n")
+}
+
+func draftSnapshotSource(draft *models.CanvasVersion) string {
+	if draft == nil {
+		return "live"
+	}
+	return "draft"
 }
 
 const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
