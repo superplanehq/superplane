@@ -161,6 +161,53 @@ describe("celExpr", () => {
     });
   });
 
+  describe("parseJson builtin", () => {
+    // cel-js's grammar does not allow postfix `.foo` / `[i]` / `.method(...)`
+    // after a function call result. So `parseJson(blob).items` is a parse
+    // error. The builtin is still useful when composed with other functions
+    // (`size(...)`, `string(...)`, equality), or when the whole expression
+    // is `parseJson(value)` and the renderer consumes the structured result.
+    it("parses a JSON array string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(tags)");
+      expect(evalExpr(compiled, { tags: '["a","b"]' }, buildEnv())).toEqual(["a", "b"]);
+    });
+
+    it("parses a JSON object string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(blob)");
+      const result = evalExpr(compiled, { blob: '{"items":[{"id":1}]}' }, buildEnv());
+      expect(result).toEqual({ items: [{ id: 1 }] });
+    });
+
+    it("composes with size() to count parsed elements", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: '["a","b","c"]' }, buildEnv())).toBe(3);
+    });
+
+    it("passes already-parsed values through unchanged", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: ["a", "b", "c"] }, buildEnv())).toBe(3);
+    });
+
+    it("returns null for malformed JSON so equality checks stay defined", () => {
+      const compiled = compileExpr("parseJson(bad) == null");
+      expect(evalExpr(compiled, { bad: "not json" }, buildEnv())).toBe(true);
+    });
+
+    it("returns null for null inputs without throwing", () => {
+      const compiled = compileExpr("parseJson(value)");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBeNull();
+    });
+
+    it("works inside templated interpolation when the whole expression is parseJson", () => {
+      const template = compileTemplate("Tags: {{ parseJson(blob) }}");
+      const result = evalTemplate(template, { blob: '["a","b"]' }, buildEnv(), String);
+      // Template stringify uses String() on the parsed value; nested objects
+      // serialize via JS's default Array#toString. Authors who need pretty
+      // formatting should compose `string()` or shape the data upstream.
+      expect(result).toBe("Tags: a,b");
+    });
+  });
+
   describe("error reporting", () => {
     it("reports a compile error for invalid CEL", () => {
       const compiled = compileExpr("value /");

@@ -169,6 +169,20 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
     const date = coerceToDate(value);
     return date ? date.getTime() : 0;
   },
+  // Parse a JSON-encoded string into a structured CEL value (list, map, or
+  // scalar) so authors can `.map`, `.filter`, or dot-access the result. Already
+  // parsed non-string inputs pass through unchanged, and any parse failure
+  // returns `null` so downstream operations fail soft — matching the
+  // graceful-degrade convention used by `epochMs`, `matches`, and friends.
+  parseJson: (value: unknown): unknown => {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  },
 };
 
 function toInt(value: unknown): number {

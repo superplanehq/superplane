@@ -146,7 +146,6 @@ export function CanvasProjectSwitcher({
       isLoading={isLoading}
       projects={projects}
       activeCanvasId={activeCanvasId}
-      organizationId={organizationId}
       onSelect={handleSelect}
     />
   );
@@ -349,7 +348,6 @@ function ProjectSearchPopover({
   isLoading,
   projects,
   activeCanvasId,
-  organizationId,
   onSelect,
 }: {
   open: boolean;
@@ -358,7 +356,6 @@ function ProjectSearchPopover({
   isLoading: boolean;
   projects: CanvasProjectOption[];
   activeCanvasId?: string;
-  organizationId: string;
   onSelect: (canvasId: string) => void;
 }) {
   return (
