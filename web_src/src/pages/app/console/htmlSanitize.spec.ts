@@ -170,6 +170,26 @@ describe("sanitizeHtml - dangerous attributes", () => {
     expect(doc.querySelector("div")?.getAttribute("class")).toBe("flex gap-2 text-slate-800");
   });
 
+  it("preserves aria-* attributes for accessible markup", () => {
+    const out = sanitizeHtml(
+      '<div role="alert" aria-label="status" aria-hidden="true"><span aria-describedby="foo">x</span></div>',
+      ROOT_ID,
+    );
+    const doc = parse(out);
+    const div = doc.querySelector("div");
+    expect(div?.getAttribute("role")).toBe("alert");
+    expect(div?.getAttribute("aria-label")).toBe("status");
+    expect(div?.getAttribute("aria-hidden")).toBe("true");
+    expect(doc.querySelector("span")?.getAttribute("aria-describedby")).toBe("foo");
+  });
+
+  it("drops data-* attributes (only aria-* is allowed beyond the allow-list)", () => {
+    const out = sanitizeHtml('<div data-secret="x" aria-label="ok">y</div>', ROOT_ID);
+    const div = parse(out).querySelector("div");
+    expect(div?.getAttribute("data-secret")).toBeNull();
+    expect(div?.getAttribute("aria-label")).toBe("ok");
+  });
+
   it("drops disallowed attributes (e.g. style on a removed tag)", () => {
     const out = sanitizeHtml('<script style="x"></script>', ROOT_ID);
     expect(out).not.toContain("script");
@@ -210,6 +230,27 @@ describe("sanitizeHtml - <style> blocks", () => {
     expect(css).not.toMatch(/\.bad/);
     expect(css).toMatch(/\.ok/);
     expect(css).toMatch(/color:\s*blue/);
+  });
+
+  it("keeps selectors with commas inside :not()/:is() intact when scoping", () => {
+    const out = sanitizeHtml("<style>div:not(.a, .b) { color: red; }</style>", ROOT_ID);
+    const css = parse(out).querySelector("style")?.textContent ?? "";
+    // The whole selector is scoped once; the inner list is not split apart.
+    expect(css).toMatch(/\[data-console-html-root="html-root"\]\s+div:not\(\.a, \.b\)\s*\{/);
+    expect(css).toMatch(/color:\s*red/);
+  });
+
+  it("splits a real top-level selector list while preserving nested commas", () => {
+    const out = sanitizeHtml("<style>:is(h1, h2), p:not(.x, .y) { font-weight: bold; }</style>", ROOT_ID);
+    const css = parse(out).querySelector("style")?.textContent ?? "";
+    expect(css).toMatch(/\[data-console-html-root="html-root"\]\s+:is\(h1, h2\)/);
+    expect(css).toMatch(/\[data-console-html-root="html-root"\]\s+p:not\(\.x, \.y\)/);
+  });
+
+  it("does not split on commas inside attribute selector values", () => {
+    const out = sanitizeHtml('<style>[data-x="a,b"] { color: blue; }</style>', ROOT_ID);
+    const css = parse(out).querySelector("style")?.textContent ?? "";
+    expect(css).toMatch(/\[data-console-html-root="html-root"\]\s+\[data-x="a,b"\]\s*\{/);
   });
 
   it("scopes rules nested inside @media", () => {

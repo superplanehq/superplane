@@ -387,12 +387,67 @@ function cleanBlock(block: CssBlock, rootSelector: string): string {
  * caller can drop the rule entirely.
  */
 function scopeSelector(selectorList: string, rootSelector: string): string {
-  const parts = selectorList
-    .split(",")
+  const parts = splitSelectorList(selectorList)
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length === 0) return "";
   return parts.map((sel) => `${rootSelector} ${sel}`).join(", ");
+}
+
+/**
+ * Split a CSS selector list on top-level commas only. Commas nested inside
+ * parentheses (e.g. `:not(.a, .b)`, `:is(h1, h2)`), attribute brackets
+ * (e.g. `[data-x="a,b"]`), or string literals are part of a single selector
+ * and must not split it apart. A naive `","`-split would tear those selectors
+ * up and re-scope each fragment, breaking the rule.
+ */
+function splitSelectorList(selectorList: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+  let i = 0;
+  while (i < selectorList.length) {
+    const ch = selectorList[i];
+    if (ch === '"' || ch === "'") {
+      const end = scanStringLiteral(selectorList, i);
+      current += selectorList.slice(i, end);
+      i = end;
+      continue;
+    }
+    if (ch === "(" || ch === "[") depth += 1;
+    else if ((ch === ")" || ch === "]") && depth > 0) depth -= 1;
+    else if (ch === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+      i += 1;
+      continue;
+    }
+    current += ch;
+    i += 1;
+  }
+  parts.push(current);
+  return parts;
+}
+
+/**
+ * Given that `start` points at an opening quote in `css`, return the index
+ * just past the matching closing quote (or end of input), skipping escaped
+ * characters. Used to keep commas/brackets inside string literals from being
+ * treated as selector structure.
+ */
+function scanStringLiteral(css: string, start: number): number {
+  const quote = css[start];
+  let i = start + 1;
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === quote) return i + 1;
+    i += 1;
+  }
+  return css.length;
 }
 
 /**
@@ -414,6 +469,11 @@ export function sanitizeHtml(raw: string, rootId: string): string {
     FORBID_ATTR,
     ALLOWED_URI_REGEXP,
     ALLOW_DATA_ATTR: false,
+    // Keep `aria-*` attributes (accessible markup is documented as allowed in
+    // the PRD). DOMPurify allows these via this flag independently of
+    // ALLOWED_ATTR, so it's set explicitly rather than relying on the library
+    // default staying `true`.
+    ALLOW_ARIA_ATTR: true,
     RETURN_TRUSTED_TYPE: false,
     // `<style>` would otherwise be hoisted into <head> by the HTML parser and
     // then stripped because DOMPurify operates on the body by default. With
