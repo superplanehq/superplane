@@ -465,11 +465,11 @@ export function SettingsTab({
         configuration: nodeConfiguration,
         configurationFields,
         integrationName,
-        integrationRef: selectedIntegration,
+        integrationRef,
         integrations,
         allowIntegrations,
       }),
-    [allowIntegrations, configurationFields, integrationName, integrations, nodeConfiguration, selectedIntegration],
+    [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
   );
 
   if (isReadOnly) {
