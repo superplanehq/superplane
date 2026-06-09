@@ -20,7 +20,7 @@ type CreateLoadBalancerConfiguration struct {
 	Name                   string   `json:"name" mapstructure:"name"`
 	Type                   string   `json:"type" mapstructure:"type"`
 	Scheme                 string   `json:"scheme" mapstructure:"scheme"`
-	IpAddressType          string   `json:"ipAddressType" mapstructure:"ipAddressType"`
+	IPAddressType          string   `json:"ipAddressType" mapstructure:"ipAddressType"`
 	Subnets                []string `json:"subnets" mapstructure:"subnets"`
 	SecurityGroups         []string `json:"securityGroups" mapstructure:"securityGroups"`
 	ListenerProtocol       string   `json:"listenerProtocol" mapstructure:"listenerProtocol"`
@@ -39,6 +39,7 @@ type CreateLoadBalancerNodeMetadata struct {
 type CreateLoadBalancerExecutionMetadata struct {
 	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
 	ListenerCreated bool   `json:"listenerCreated" mapstructure:"listenerCreated"`
+	ListenerErrors  int    `json:"listenerErrors" mapstructure:"listenerErrors"`
 	PollErrors      int    `json:"pollErrors" mapstructure:"pollErrors"`
 	PollAttempts    int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
@@ -402,7 +403,7 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		Name:           name,
 		Type:           lbType,
 		Scheme:         scheme,
-		IpAddressType:  strings.TrimSpace(config.IpAddressType),
+		IPAddressType:  strings.TrimSpace(config.IPAddressType),
 		SubnetIDs:      config.Subnets,
 		SecurityGroups: securityGroups,
 	})
@@ -484,12 +485,23 @@ func (c *CreateLoadBalancer) poll(ctx core.ActionHookContext) error {
 	}
 
 	switch lb.State {
-	case LoadBalancerStateActive:
+	case LoadBalancerStateActive, LoadBalancerStateActiveImpaired:
 		if !metadata.ListenerCreated {
 			if err := c.maybeCreateListener(client, metadata.LoadBalancerARN, config, ctx); err != nil {
-				return err
+				metadata.ListenerErrors++
+				ctx.Logger.Warnf("failed to create listener for load balancer %s (attempt %d/%d): %v",
+					metadata.LoadBalancerARN, metadata.ListenerErrors, maxLoadBalancerListenerErrors, err)
+				if metadata.ListenerErrors >= maxLoadBalancerListenerErrors {
+					return fmt.Errorf("giving up creating listener for load balancer %s after %d consecutive errors: %w",
+						metadata.LoadBalancerARN, maxLoadBalancerListenerErrors, err)
+				}
+				if err := ctx.Metadata.Set(metadata); err != nil {
+					return err
+				}
+				return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, loadBalancerPollInterval)
 			}
 			metadata.ListenerCreated = true
+			metadata.ListenerErrors = 0
 			if err := ctx.Metadata.Set(metadata); err != nil {
 				return err
 			}
@@ -540,6 +552,11 @@ func validateListenerConfig(config CreateLoadBalancerConfiguration) error {
 	if protocol == "" && targetGroup == "" {
 		return nil
 	}
+
+	if protocol != "" && targetGroup == "" {
+		return fmt.Errorf("listenerTargetGroup is required when listenerProtocol is specified")
+	}
+
 	if config.ListenerPort <= 0 || config.ListenerPort > 65535 {
 		return fmt.Errorf("listener port must be between 1 and 65535")
 	}
