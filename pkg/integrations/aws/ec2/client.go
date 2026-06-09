@@ -1971,10 +1971,6 @@ func publicImageResourceName(image Image) string {
 	return fmt.Sprintf("%s (%s, %s)", name, image.ImageID, architecture)
 }
 
-// ────────────────────────────────────────────────────────────
-// ELBv2 types
-// ────────────────────────────────────────────────────────────
-
 type LoadBalancer struct {
 	LoadBalancerARN string `json:"loadBalancerArn" mapstructure:"loadBalancerArn"`
 	Name            string `json:"name" mapstructure:"name"`
@@ -2274,8 +2270,6 @@ func IsLoadBalancerNotFound(err error) bool {
 	var awsErr *common.Error
 	return errors.As(err, &awsErr) && awsErr.Code == "LoadBalancerNotFound"
 }
-
-// ─── ELBv2 Target Groups & Listeners ────────────────────────────────────────
 
 type TargetGroup struct {
 	TargetGroupARN string `json:"targetGroupArn" mapstructure:"targetGroupArn"`
