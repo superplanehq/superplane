@@ -114,6 +114,34 @@ describe("sanitizeHtml - dangerous attributes", () => {
     expect(links[3].getAttribute("href")).toBe("#frag");
   });
 
+  it("allows bare relative path hrefs without a scheme", () => {
+    const out = sanitizeHtml(
+      '<a href="logo.png">a</a><a href="page.html">b</a><a href="assets/img/logo.png?v=2">c</a>',
+      ROOT_ID,
+    );
+    const links = parse(out).querySelectorAll("a");
+    expect(links).toHaveLength(3);
+    expect(links[0].getAttribute("href")).toBe("logo.png");
+    expect(links[1].getAttribute("href")).toBe("page.html");
+    expect(links[2].getAttribute("href")).toBe("assets/img/logo.png?v=2");
+  });
+
+  it("allows bare relative src/srcset on <img>", () => {
+    const out = sanitizeHtml('<img src="logo.png" srcset="logo.png 1x, logo@2x.png 2x" alt="x">', ROOT_ID);
+    const img = parse(out).querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe("logo.png");
+    expect(img!.getAttribute("srcset")).toBe("logo.png 1x, logo@2x.png 2x");
+  });
+
+  it("rejects unknown-scheme hrefs even without a slash (e.g. vbscript:)", () => {
+    const out = sanitizeHtml('<a href="vbscript:msgbox(1)">a</a><a href="foo:bar">b</a>', ROOT_ID);
+    const links = parse(out).querySelectorAll("a");
+    expect(links).toHaveLength(2);
+    expect(links[0].getAttribute("href")).toBeNull();
+    expect(links[1].getAttribute("href")).toBeNull();
+  });
+
   it("rejects protocol-relative src on <img>", () => {
     const out = sanitizeHtml('<img src="//evil.example/pixel.png" alt="a">', ROOT_ID);
     const img = parse(out).querySelector("img");

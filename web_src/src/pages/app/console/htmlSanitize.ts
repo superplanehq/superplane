@@ -188,12 +188,21 @@ const FORBID_ATTR = ["poster", "background", "data", "ping", "formaction", "acti
  * `data:` (would allow embedded payloads). Tighter than DOMPurify's default URI
  * regex so we don't accidentally accept `vbscript:` or unknown protocols.
  *
- * The relative-path branch deliberately rejects protocol-relative URLs: a bare
- * `/` must NOT be followed by another `/` (or a `\`, which browsers normalize
- * to `/`). Otherwise `//evil.example/...` would slip through as a "relative
- * path" and silently target an arbitrary third-party host.
+ * Relative URLs (e.g. `logo.png`, `assets/page.html`, `./page`, `../up`,
+ * `/dashboard`) are allowed via the final branch, which matches any value
+ * that is NOT an absolute URL with a scheme. We detect a scheme by looking
+ * for a `:` before the first `/`, `?`, or `#`; anything with such a colon
+ * (e.g. `javascript:`, `data:`, `vbscript:`) is rejected because only the
+ * explicitly listed schemes above are permitted.
+ *
+ * The relative branch also rejects protocol-relative URLs: a leading `/` or
+ * `\` (browsers normalize `\` to `/`) is excluded so `//evil.example/...` or
+ * `\\evil.example/...` cannot slip through as a "relative path" and silently
+ * target an arbitrary third-party host. Genuine absolute paths (a single
+ * leading `/` not followed by `/` or `\`) are still permitted via the
+ * dedicated branch.
  */
-const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:|tel:|#|\/(?![/\\])|\.\/|\.\.\/)/i;
+const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel):|#|\/(?![/\\])|(?![/\\])(?![^/?#]*:))/i;
 
 /**
  * Substrings that disqualify an inline `style` attribute. We do a substring
