@@ -82,6 +82,18 @@ describe("formatConfigurationValue", () => {
     expect(formatted.href).toBe("https://api.example.com/hook");
   });
 
+  it("does not link url fields with non-http(s) values", () => {
+    const field: ConfigurationField = { name: "endpoint", label: "Endpoint", type: "url" };
+    expect(formatConfigurationValue(field, "javascript:alert(1)")).toEqual({
+      kind: "text",
+      displayText: "javascript:alert(1)",
+    });
+    expect(formatConfigurationValue(field, "ftp://files.example.com/data")).toEqual({
+      kind: "text",
+      displayText: "ftp://files.example.com/data",
+    });
+  });
+
   it("uses monospace kind for expressions", () => {
     const field: ConfigurationField = { name: "filter", label: "Filter", type: "expression" };
     expect(formatConfigurationValue(field, '$["trigger"].payload.id').kind).toBe("expression");

@@ -64,7 +64,8 @@ export function ConfigurationValueDisplay({ row, className }: ConfigurationValue
     return <ChipList chips={row.chips} className={className} />;
   }
 
-  const href = row.href ?? (row.kind === "url" && isUrl(row.displayText) ? row.displayText : undefined);
+  const candidateHref = row.href ?? (row.kind === "url" ? row.displayText : undefined);
+  const href = candidateHref && isUrl(candidateHref) ? candidateHref : undefined;
   if (href) {
     return (
       <a

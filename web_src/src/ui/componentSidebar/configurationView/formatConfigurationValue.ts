@@ -90,11 +90,18 @@ function formatStringValue(value: unknown, field: ConfigurationField): Formatted
     };
   }
 
-  if (field.type === "url" || isUrl(stringValue)) {
+  if (isUrl(stringValue)) {
     return {
       kind: "url",
       displayText: stringValue,
       href: stringValue,
+    };
+  }
+
+  if (field.type === "url") {
+    return {
+      kind: "text",
+      displayText: stringValue,
     };
   }
 
