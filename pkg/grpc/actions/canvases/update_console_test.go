@@ -220,14 +220,14 @@ func Test__UpdateConsole(t *testing.T) {
 		require.Len(t, doc.Spec.Layout, 2)
 		assert.Equal(t, versionID, resp.ID.String())
 
-		got, err := GetConsole(ctx, orgID, canvas.ID.String(), versionID)
+		got, err := ReadRepositorySpecFile(ctx, orgID, canvas.ID.String(), versionID, ConsoleYAMLRepositoryPath)
 		require.NoError(t, err)
 		gotDoc, err := models.ConsoleFromYML([]byte(got))
 		require.NoError(t, err)
 		assert.Len(t, gotDoc.Spec.Panels, 2)
 		assert.Len(t, gotDoc.Spec.Layout, 2)
 
-		live, err := GetConsole(ctx, orgID, canvas.ID.String(), "")
+		live, err := ReadRepositorySpecFile(ctx, orgID, canvas.ID.String(), "", ConsoleYAMLRepositoryPath)
 		require.NoError(t, err)
 		liveDoc, err := models.ConsoleFromYML([]byte(live))
 		require.NoError(t, err)

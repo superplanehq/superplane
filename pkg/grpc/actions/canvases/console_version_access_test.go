@@ -44,8 +44,8 @@ func TestEnsureConsoleVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	t.Run("GetConsole returns the snapshot console to a reviewer", func(t *testing.T) {
-		resp, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
+	t.Run("reading console.yaml returns the snapshot console to a reviewer", func(t *testing.T) {
+		resp, err := ReadRepositorySpecFile(reviewerCtx, r.Organization.ID.String(), canvasID, snapshotVersionID, ConsoleYAMLRepositoryPath)
 		require.NoError(t, err, "reviewer should see the CR snapshot console")
 		require.NotEmpty(t, resp)
 	})
@@ -57,8 +57,8 @@ func TestEnsureConsoleVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T
 		assert.Equal(t, snapshotVersionID, resp.GetVersion().GetMetadata().GetId())
 	})
 
-	t.Run("GetConsole returns the snapshot console to its owner", func(t *testing.T) {
-		resp, err := GetConsole(authorCtx, r.Organization.ID.String(), canvasID, snapshotVersionID)
+	t.Run("reading console.yaml returns the snapshot console to its owner", func(t *testing.T) {
+		resp, err := ReadRepositorySpecFile(authorCtx, r.Organization.ID.String(), canvasID, snapshotVersionID, ConsoleYAMLRepositoryPath)
 		require.NoError(t, err)
 		require.NotEmpty(t, resp)
 	})
@@ -74,8 +74,8 @@ func TestEnsureConsoleVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	t.Run("GetConsole denies non-owners on a draft", func(t *testing.T) {
-		_, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+	t.Run("reading console.yaml denies non-owners on a draft", func(t *testing.T) {
+		_, err := ReadRepositorySpecFile(reviewerCtx, r.Organization.ID.String(), canvasID, draftVersionID, ConsoleYAMLRepositoryPath)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -91,7 +91,7 @@ func TestEnsureConsoleVersionReadable_DraftRemainsOwnerPrivate(t *testing.T) {
 	})
 
 	t.Run("Owner can still read their draft", func(t *testing.T) {
-		resp, err := GetConsole(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+		resp, err := ReadRepositorySpecFile(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID, ConsoleYAMLRepositoryPath)
 		require.NoError(t, err)
 		require.NotEmpty(t, resp)
 	})
@@ -120,7 +120,7 @@ func TestEnsureConsoleVersionReadable_NoCRStillDenies(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	_, err := GetConsole(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID.String())
+	_, err := ReadRepositorySpecFile(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID.String(), ConsoleYAMLRepositoryPath)
 	require.Error(t, err)
 	s, ok := status.FromError(err)
 	require.True(t, ok)
