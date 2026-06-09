@@ -47,6 +47,7 @@ function toConsoleSearchParams(current: URLSearchParams): URLSearchParams {
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
+  next.delete("file");
   return next;
 }
 
