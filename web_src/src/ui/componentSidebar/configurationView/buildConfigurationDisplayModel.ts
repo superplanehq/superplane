@@ -57,7 +57,7 @@ function appendNotConnectedIntegrationRow(rows: ConfigurationDisplayRow[], typeL
     key: "integration.notConnected",
     label: "Integration",
     kind: "integration",
-    displayText: `${typeLabel} — not connected`,
+    displayText: typeLabel,
     integrationStatus: "Not connected",
     integrationStatusVariant: "pending",
   });
@@ -245,8 +245,8 @@ function appendScalarFieldRow(
   });
 }
 
-function isObjectFieldValue(field: ConfigurationField, rawValue: unknown): rawValue is Record<string, unknown> {
-  return field.type === "object" && Boolean(field.typeOptions?.object?.schema) && isRecord(rawValue);
+function hasObjectFieldSchema(field: ConfigurationField): boolean {
+  return field.type === "object" && Boolean(field.typeOptions?.object?.schema);
 }
 
 function isListFieldValue(field: ConfigurationField, rawValue: unknown): rawValue is unknown[] {
@@ -263,8 +263,8 @@ function processField(field: ConfigurationField, ctx: FieldRowsContext): void {
   const fieldPath = ctx.parentPath ? `${ctx.parentPath}.${field.name}` : field.name!;
   const rawValue = ctx.values[field.name!];
 
-  if (isObjectFieldValue(field, rawValue)) {
-    appendObjectFieldRows(field, rawValue, fieldPath, ctx);
+  if (hasObjectFieldSchema(field)) {
+    appendObjectFieldRows(field, isRecord(rawValue) ? rawValue : {}, fieldPath, ctx);
     return;
   }
 

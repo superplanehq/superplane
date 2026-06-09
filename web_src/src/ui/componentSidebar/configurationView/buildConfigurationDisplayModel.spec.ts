@@ -96,4 +96,26 @@ describe("buildConfigurationDisplayModel", () => {
     expect(model.rows[0]?.integrationStatus).toBe("Not connected");
     expect(model.rows.some((row) => row.label === "Instance" && row.displayText === "GitHub Production")).toBe(false);
   });
+
+  it("shows not connected integration type label", () => {
+    const model = buildConfigurationDisplayModel({
+      configuration: {},
+      configurationFields: [],
+      integrationName: "github",
+      integrations: STORY_INTEGRATIONS,
+    });
+
+    expect(model.rows[0]?.displayText).toBe("GitHub");
+    expect(model.rows[0]?.integrationStatus).toBe("Not connected");
+  });
+
+  it("expands object schema defaults when the object value is missing", () => {
+    const configurationFields = settingsTabFields.filter((field) => field.name === "authConfig");
+    const model = buildConfigurationDisplayModel({
+      configuration: {},
+      configurationFields,
+    });
+
+    expect(model.rows.some((row) => row.label === "Auth method")).toBe(true);
+  });
 });

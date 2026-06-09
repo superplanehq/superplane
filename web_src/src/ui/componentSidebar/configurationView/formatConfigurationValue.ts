@@ -83,18 +83,18 @@ function formatStringValue(value: unknown, field: ConfigurationField): Formatted
     return { kind: "text", displayText: "••••••" };
   }
 
+  if (field.type === "expression") {
+    return {
+      kind: "expression",
+      displayText: stringValue,
+    };
+  }
+
   if (field.type === "url" || isUrl(stringValue)) {
     return {
       kind: "url",
       displayText: stringValue,
       href: stringValue,
-    };
-  }
-
-  if (field.type === "expression") {
-    return {
-      kind: "expression",
-      displayText: stringValue,
     };
   }
 
@@ -132,6 +132,11 @@ function formatTypedFieldValue(value: unknown, field: ConfigurationField): Forma
       return formatMultiValueField(field, value);
     case "secret-key":
       return { kind: "text", displayText: formatSecretKeyValue(value) };
+    case "expression":
+      return {
+        kind: "expression",
+        displayText: typeof value === "object" ? JSON.stringify(value, null, 2) : String(value),
+      };
     default:
       return null;
   }

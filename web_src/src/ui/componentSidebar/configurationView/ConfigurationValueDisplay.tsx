@@ -17,16 +17,20 @@ const INTEGRATION_STATUS_CLASSES = {
 
 function IntegrationStatusBadge({ row, className }: { row: ConfigurationDisplayRow; className?: string }) {
   const variant = row.integrationStatusVariant ?? "pending";
+  const showSummary =
+    row.displayText !== "" && row.displayText !== EMPTY_DISPLAY_VALUE && row.displayText !== row.integrationStatus;
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium",
-        INTEGRATION_STATUS_CLASSES[variant],
-        className,
-      )}
-    >
-      {row.integrationStatus}
+    <span className={cn("inline-flex flex-wrap items-center gap-2", className)}>
+      {showSummary ? <span className="text-[13px] text-gray-800 dark:text-gray-100">{row.displayText}</span> : null}
+      <span
+        className={cn(
+          "inline-flex items-center rounded px-2 py-0.5 text-xs font-medium",
+          INTEGRATION_STATUS_CLASSES[variant],
+        )}
+      >
+        {row.integrationStatus}
+      </span>
     </span>
   );
 }

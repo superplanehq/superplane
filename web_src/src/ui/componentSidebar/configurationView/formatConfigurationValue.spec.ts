@@ -86,4 +86,12 @@ describe("formatConfigurationValue", () => {
     const field: ConfigurationField = { name: "filter", label: "Filter", type: "expression" };
     expect(formatConfigurationValue(field, '$["trigger"].payload.id').kind).toBe("expression");
   });
+
+  it("does not treat expression values as urls", () => {
+    const field: ConfigurationField = { name: "endpoint", label: "Endpoint", type: "expression" };
+    expect(formatConfigurationValue(field, "https://api.example.com/hook")).toEqual({
+      kind: "expression",
+      displayText: "https://api.example.com/hook",
+    });
+  });
 });
