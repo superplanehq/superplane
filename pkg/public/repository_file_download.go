@@ -14,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +80,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 			path,
 		)
 		if readErr != nil {
-			log.Errorf("Failed to read repository spec file %s in canvas %s: %v", path, canvasID.String(), readErr)
-			http.Error(w, "Failed to get file", http.StatusInternalServerError)
+			writeRepositorySpecFileError(w, readErr, path, canvasID.String())
 			return
 		}
 
@@ -122,4 +123,45 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Failed to copy file", http.StatusInternalServerError)
 		return
 	}
+}
+
+// writeRepositorySpecFileError maps a gRPC error returned by
+// ReadRepositorySpecFile to an HTTP response. Client-caused errors (NotFound,
+// PermissionDenied, InvalidArgument, Unauthenticated) become 4xx so they are
+// not reported as server errors to Sentry, and only true server errors are
+// logged at error level.
+func writeRepositorySpecFileError(w http.ResponseWriter, err error, path, canvasID string) {
+	code := status.Code(err)
+	httpStatus, message := repositorySpecFileHTTPStatus(code, err)
+
+	if httpStatus >= http.StatusInternalServerError {
+		log.Errorf("Failed to read repository spec file %s in canvas %s: %v", path, canvasID, err)
+	} else {
+		log.Debugf("Repository spec file %s in canvas %s not served: %v", path, canvasID, err)
+	}
+
+	http.Error(w, message, httpStatus)
+}
+
+func repositorySpecFileHTTPStatus(code codes.Code, err error) (int, string) {
+	switch code {
+	case codes.NotFound:
+		return http.StatusNotFound, statusMessageOrDefault(err, "File not found")
+	case codes.PermissionDenied:
+		return http.StatusForbidden, statusMessageOrDefault(err, "Forbidden")
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized, statusMessageOrDefault(err, "Unauthenticated")
+	case codes.InvalidArgument, codes.FailedPrecondition, codes.OutOfRange:
+		return http.StatusBadRequest, statusMessageOrDefault(err, "Invalid request")
+	default:
+		return http.StatusInternalServerError, "Failed to get file"
+	}
+}
+
+func statusMessageOrDefault(err error, fallback string) string {
+	message := strings.TrimSpace(status.Convert(err).Message())
+	if message == "" {
+		return fallback
+	}
+	return message
 }
