@@ -1,5 +1,5 @@
 import { showErrorToast } from "@/lib/toast";
-import { useCallback, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 
 import { isWorkflowSpecPath } from "../lib/workflow-spec-paths";
 import { applyPendingContentUpdate, applyPendingDelete } from "./lib/files-pending-state";
@@ -13,6 +13,7 @@ type UsePendingStateOptions = {
   allPathsRef: RefObject<string[]>;
   loadedContentByPathRef: RefObject<Record<string, string>>;
   openFile: (path: string) => void;
+  versionId?: string;
   onSpecFileChange?: (path: string, content: string) => void;
 };
 
@@ -23,11 +24,18 @@ export function usePendingState({
   allPathsRef,
   loadedContentByPathRef,
   openFile,
+  versionId,
   onSpecFileChange,
 }: UsePendingStateOptions) {
   const [pendingChangesByPath, setPendingChangesByPath] = useState<Record<string, PendingFileChange>>({});
   const [specDraftByPath, setSpecDraftByPath] = useState<Record<string, string>>({});
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
+
+  // Spec drafts are scoped to a canvas version; drop them when the version
+  // changes so a switch never shows stale edits from a previous version.
+  useEffect(() => {
+    setSpecDraftByPath({});
+  }, [versionId]);
 
   const startNewFile = useCallback(() => {
     setNewFilePath(nextUntitledPath(new Set(allPathsRef.current)));
@@ -94,10 +102,6 @@ export function usePendingState({
     setPendingChangesByPath({});
   }, []);
 
-  const clearSpecDrafts = useCallback(() => {
-    setSpecDraftByPath({});
-  }, []);
-
   const resetPendingState = useCallback(() => {
     setPendingChangesByPath({});
     setSpecDraftByPath({});
@@ -108,7 +112,6 @@ export function usePendingState({
     pendingChangesByPath,
     setPendingChangesByPath,
     specDraftByPath,
-    clearSpecDrafts,
     newFilePath,
     setNewFilePath,
     startNewFile,

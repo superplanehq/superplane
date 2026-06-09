@@ -4704,6 +4704,7 @@ export function AppPage() {
           next.set("run", runId);
           next.delete("sidebar");
           next.delete("node");
+          next.delete("file");
           return next;
         },
         { replace: true },
@@ -4726,6 +4727,7 @@ export function AppPage() {
         next.set("view", "runs");
         next.delete("sidebar");
         next.delete("node");
+        next.delete("file");
         return next;
       },
       { replace: true },

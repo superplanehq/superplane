@@ -1,9 +1,8 @@
 import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
-import { CANVAS_YAML_PATH } from "../lib/workflow-spec-paths";
 import { canPublishPendingFileChanges } from "./useFilesPublish";
 import { useEditorLifecycle } from "./useEditorLifecycle";
 import { usePendingState } from "./usePendingState";
@@ -54,12 +53,9 @@ export function useEditor({
     allPathsRef,
     loadedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
+    versionId,
     onSpecFileChange,
   });
-  const clearSpecDrafts = pending.clearSpecDrafts;
-  useEffect(() => {
-    clearSpecDrafts();
-  }, [versionId, clearSpecDrafts]);
   const pendingChanges = useMemo(
     () => Object.values(pending.pendingChangesByPath).sort((left, right) => left.path.localeCompare(right.path)),
     [pending.pendingChangesByPath],
@@ -67,11 +63,9 @@ export function useEditor({
   const pathLists = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
-  const initialPath = pathLists.allPaths.includes(CANVAS_YAML_PATH)
-    ? CANVAS_YAML_PATH
-    : (catalog.generatedPaths[0] ?? null);
-  const tabs = useFilesTabState(initialPath, pathLists.allPaths, catalog.generatedPaths);
+  const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
+
   const selection = useRepositorySelectedFileQuery(
     canvasId,
     tabs.selectedPath,
