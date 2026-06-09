@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
+import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
+
 import type {
   ConsoleLayoutItem,
   ConsolePanel,
@@ -58,6 +60,10 @@ export type ConsoleOverlayProps = {
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
   consoleYamlReadOnly?: boolean;
+  visualDiff?: {
+    enabled: boolean;
+    summary?: DraftConsoleDiffSummary;
+  };
 };
 
 export function ConsoleOverlay({
@@ -80,6 +86,7 @@ export function ConsoleOverlay({
   onConsoleAddPanel,
   onConsoleOpenYaml,
   consoleYamlReadOnly,
+  visualDiff,
 }: ConsoleOverlayProps) {
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
   updateConsoleMutationRef.current = updateConsoleMutation;
@@ -119,6 +126,7 @@ export function ConsoleOverlay({
             onChange={handleChange}
             addPanelDialogOpen={addPanelDialogOpen}
             onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
+            visualDiff={visualDiff}
           />
         </div>
         {showConsoleEditControls ? (

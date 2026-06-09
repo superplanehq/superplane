@@ -5322,6 +5322,10 @@ export function AppPage() {
             canvasNodes,
             nodeStatuses: consoleNodeStatuses,
             onTriggerNode: handleConsoleTriggerNode,
+            visualDiff: {
+              enabled: draftVisualDiff.visualDiffEnabled && isViewingDraftVersion,
+              summary: canvasConsoleVersionDiff.draftConsoleDiffSummary,
+            },
           }}
           memory={{
             canEdit: canEditCanvasMemory({

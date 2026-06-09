@@ -105,9 +105,10 @@ interface MarkdownPanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: MarkdownPanelCardProps) {
+export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: MarkdownPanelCardProps) {
   const body = typeof panel.content?.body === "string" ? panel.content.body : "";
   const persistedTitle = typeof panel.content?.title === "string" ? panel.content.title : "";
   const variables = useMemo(() => readVariables(panel.content), [panel.content]);
@@ -165,6 +166,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: Markd
     }
     setSaveError(null);
     setEditFocus(null);
+    onEditingChange?.(false);
     const bodyChanged = draftBody !== body;
     const titleChanged = trimmedTitle !== persistedTitle;
     const varsChanged = !variablesEqual(normalizedVars, variables);
@@ -180,6 +182,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: Markd
   const cancel = () => {
     setEditFocus(null);
     setSaveError(null);
+    onEditingChange?.(false);
     setDraftBody(body);
     setDraftTitle(persistedTitle);
     setDraftVariables(variables);
@@ -189,6 +192,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange }: Markd
     if (readOnly || focus === null) return;
     setSaveError(null);
     setEditFocus(focus);
+    onEditingChange?.(true);
   };
 
   // Editing the variables clears a stale save error so the blocked-save banner

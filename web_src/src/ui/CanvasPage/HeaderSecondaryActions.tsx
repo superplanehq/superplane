@@ -61,7 +61,12 @@ export function SecondaryHeaderActions({
             />
           ) : null}
           {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
-            <DiffSummaryHoverCard diffCounts={draftConsoleDiff.diffCounts} onShowDiff={onShowConsoleDiff} />
+            <ConsoleDiffSummaryHoverCard
+              draftConsoleDiff={draftConsoleDiff}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              onShowConsoleDiff={onShowConsoleDiff}
+            />
           ) : null}
           <EditModePublishDiscardActions
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -76,6 +81,24 @@ export function SecondaryHeaderActions({
         </>
       ) : null}
     </div>
+  );
+}
+
+function ConsoleDiffSummaryHoverCard({
+  draftConsoleDiff,
+  visualDiffEnabled,
+  onToggleVisualDiff,
+  onShowConsoleDiff,
+}: {
+  draftConsoleDiff: NonNullable<HeaderProps["draftConsoleDiff"]>;
+} & Pick<HeaderProps, "visualDiffEnabled" | "onToggleVisualDiff" | "onShowConsoleDiff">) {
+  return (
+    <DiffSummaryHoverCard
+      diffCounts={draftConsoleDiff.diffCounts}
+      visualDiffEnabled={visualDiffEnabled}
+      onToggleVisualDiff={onToggleVisualDiff}
+      onShowDiff={onShowConsoleDiff}
+    />
   );
 }
 
