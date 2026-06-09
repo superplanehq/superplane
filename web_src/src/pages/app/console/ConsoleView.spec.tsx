@@ -161,6 +161,37 @@ describe("ConsoleView grid transitions", () => {
     expect(screen.getByText("Console panel diff for updated panel.")).toBeTruthy();
   });
 
+  it.each([
+    ["EDITED", "updated"],
+    ["ADDED", "added"],
+  ] as const)("hides the %s badge while its panel is editing", (label, changeType) => {
+    render(
+      <TestWrapper>
+        <ConsoleView
+          {...BASE_PROPS}
+          readOnly={false}
+          isLoading={false}
+          errorMessage={undefined}
+          visualDiff={{
+            enabled: true,
+            summary: {
+              addedCount: changeType === "added" ? 1 : 0,
+              updatedCount: changeType === "updated" ? 1 : 0,
+              removedCount: 0,
+              items: [{ id: "readme", title: "Readme", changeType, lines: [] }],
+            },
+          }}
+        />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByText(label)).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("console-edit-panel"));
+
+    expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
+
   it("replaces deleted ghost panels when a live panel occupies their layout", () => {
     const { container } = render(
       <TestWrapper>

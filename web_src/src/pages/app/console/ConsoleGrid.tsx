@@ -5,14 +5,9 @@ import { cn } from "@/lib/utils";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
-import { ChartPanelCard } from "./ChartPanelCard";
 import { ConsolePanelDiffBadge, ConsolePanelDiffDialog } from "./ConsolePanelDiff";
+import { PanelCardRouter } from "./ConsolePanelCards";
 import { consolePanelDiffBorderClassName } from "./consolePanelDiffPresentation";
-import { MarkdownPanelCard } from "./MarkdownPanelCard";
-import { NodePanelCard } from "./NodePanelCard";
-import { NodesPanelCard } from "./NodesPanelCard";
-import { NumberPanelCard } from "./NumberPanelCard";
-import { TablePanelCard } from "./TablePanelCard";
 import { useConsoleGridTransitionArming } from "./useConsoleGridTransitionArming";
 
 import "react-grid-layout/css/styles.css";
@@ -50,6 +45,7 @@ export function ConsoleGrid({
   const [selectedDiffItem, setSelectedDiffItem] = useState<DraftConsoleDiffItem | null>(null);
   const [activeInteractionLayout, setActiveInteractionLayout] = useState<ConsoleLayoutItem[] | null>(null);
   const [isInteractingWithLayout, setIsInteractingWithLayout] = useState(false);
+  const [editingPanelIds, setEditingPanelIds] = useState<Set<string>>(() => new Set());
   const visualDiffState = useMemo(
     () => buildConsoleVisualDiffState(visualDiff?.enabled ? visualDiff.summary : undefined),
     [visualDiff?.enabled, visualDiff?.summary],
@@ -92,6 +88,14 @@ export function ConsoleGrid({
   const handleDiffDialogOpenChange = useCallback((open: boolean) => {
     if (!open) setSelectedDiffItem(null);
   }, []);
+  const handlePanelEditingChange = useCallback((panelId: string, editing: boolean) => {
+    setEditingPanelIds((current) => {
+      const next = new Set(current);
+      if (editing) next.add(panelId);
+      else next.delete(panelId);
+      return next;
+    });
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
@@ -104,8 +108,10 @@ export function ConsoleGrid({
             readOnly={readOnly}
             transitionsArmed={transitionsArmed}
             visualDiffState={visualDiffState}
+            editingPanelIds={editingPanelIds}
             onDeletePanel={onDeletePanel}
             onPanelContentChange={onPanelContentChange}
+            onPanelEditingChange={handlePanelEditingChange}
             onLayoutChange={onLayoutChange}
             onSelectDiffItem={setSelectedDiffItem}
             onInteractionStart={handleInteractionStart}
@@ -125,8 +131,10 @@ function ConsoleGridLayout({
   readOnly,
   transitionsArmed,
   visualDiffState,
+  editingPanelIds,
   onDeletePanel,
   onPanelContentChange,
+  onPanelEditingChange,
   onLayoutChange,
   onSelectDiffItem,
   onInteractionStart,
@@ -138,8 +146,10 @@ function ConsoleGridLayout({
   readOnly: boolean;
   transitionsArmed: boolean;
   visualDiffState: ConsoleVisualDiffState;
+  editingPanelIds: Set<string>;
   onDeletePanel: (panelId: string) => void;
   onPanelContentChange: (panelId: string, content: Record<string, unknown>) => void;
+  onPanelEditingChange: (panelId: string, editing: boolean) => void;
   onLayoutChange: (layout: ConsoleLayoutItem[]) => void;
   onSelectDiffItem: (item: DraftConsoleDiffItem) => void;
   onInteractionStart: () => void;
@@ -190,8 +200,10 @@ function ConsoleGridLayout({
           panel,
           readOnly,
           diffItem: visualDiffState.itemsById.get(panel.id),
+          isEditing: editingPanelIds.has(panel.id),
           onDeletePanel,
           onPanelContentChange,
+          onPanelEditingChange,
           onSelectDiffItem,
         }),
       )}
@@ -203,17 +215,23 @@ function renderConsoleGridPanel({
   panel,
   readOnly,
   diffItem,
+  isEditing,
   onDeletePanel,
   onPanelContentChange,
+  onPanelEditingChange,
   onSelectDiffItem,
 }: {
   panel: ConsolePanel;
   readOnly: boolean;
   diffItem?: DraftConsoleDiffItem;
+  isEditing: boolean;
   onDeletePanel: (panelId: string) => void;
   onPanelContentChange: (panelId: string, content: Record<string, unknown>) => void;
+  onPanelEditingChange: (panelId: string, editing: boolean) => void;
   onSelectDiffItem: (item: DraftConsoleDiffItem) => void;
 }) {
+  const showDiffBadge = diffItem && (!isEditing || diffItem.changeType === "removed");
+
   return (
     <div key={panel.id} className="console-grid-item group/console-panel-diff relative rounded-lg">
       <PanelCardRouter
@@ -221,9 +239,10 @@ function renderConsoleGridPanel({
         readOnly={readOnly}
         onDelete={() => onDeletePanel(panel.id)}
         onChange={(content) => onPanelContentChange(panel.id, content)}
+        onEditingChange={(editing) => onPanelEditingChange(panel.id, editing)}
       />
       {diffItem ? <ConsolePanelDiffBorder status={diffItem.changeType} /> : null}
-      {diffItem ? (
+      {showDiffBadge ? (
         <ConsolePanelDiffBadge
           status={diffItem.changeType}
           panelTitle={diffItem.title || panel.id}
@@ -433,32 +452,4 @@ function toConsoleLayout(next: Layout[]): ConsoleLayoutItem[] {
     if (typeof item.minH === "number") result.minH = item.minH;
     return result;
   });
-}
-
-function PanelCardRouter({
-  panel,
-  readOnly,
-  onDelete,
-  onChange,
-}: {
-  panel: ConsolePanel;
-  readOnly: boolean;
-  onDelete: () => void;
-  onChange: (content: Record<string, unknown>) => void;
-}) {
-  switch (panel.type) {
-    case "node":
-      return <NodePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "nodes":
-      return <NodesPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "table":
-      return <TablePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "chart":
-      return <ChartPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "number":
-      return <NumberPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "markdown":
-    default:
-      return <MarkdownPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-  }
 }
