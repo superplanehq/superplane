@@ -481,6 +481,10 @@ The For Each component reads an array from the upstream payload and emits one do
 2. Emits one `foreach.item` event to the `item` channel for each element
 3. If the array is empty, passes without emitting any events
 
+### Limits
+
+- At most 500 items per execution. Larger arrays fail with an error.
+
 ### Output Fields (per item)
 
 - **item**: The array element value
