@@ -1568,6 +1568,9 @@ function CanvasPage(props: CanvasPageProps) {
                 canReadIntegrations={props.canReadIntegrations}
                 canCreateIntegrations={props.canCreateIntegrations}
                 canUpdateIntegrations={props.canUpdateIntegrations}
+                onEnterEditMode={props.onEnterEditMode}
+                enterEditModeDisabled={props.enterEditModeDisabled}
+                enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
               />
             ) : null}
           </div>
@@ -1645,6 +1648,9 @@ function Sidebar({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -1692,6 +1698,9 @@ function Sidebar({
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1856,6 +1865,9 @@ function Sidebar({
       hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
+      onEnterEditMode={onEnterEditMode}
+      enterEditModeDisabled={enterEditModeDisabled}
+      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
     />
   );
 }
@@ -2075,6 +2087,35 @@ function resolveAbsoluteNodeRect(
     w: resolveNodeWidth(internal, node),
     h: resolveNodeHeight(internal, node),
   };
+}
+
+type ComponentSidebarTab = "latest" | "settings" | "docs";
+
+type NodeConfigurationWarningData = {
+  component?: { error?: string };
+  composite?: { error?: string };
+  trigger?: { error?: string };
+} | null;
+
+function shouldOpenSidebarSettingsTab(nodeData: NodeConfigurationWarningData, isEditMode: boolean): boolean {
+  return Boolean(nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error) || isEditMode;
+}
+
+function applySidebarTabOnNodeOpen(
+  setCurrentTab: ((tab: ComponentSidebarTab) => void) | undefined,
+  wasSidebarOpen: boolean,
+  shouldOpenSettings: boolean,
+): void {
+  if (!setCurrentTab) {
+    return;
+  }
+  if (!wasSidebarOpen) {
+    setCurrentTab(shouldOpenSettings ? "settings" : "latest");
+    return;
+  }
+  if (shouldOpenSettings) {
+    setCurrentTab("settings");
+  }
 }
 
 function CanvasContent({
@@ -2354,24 +2395,12 @@ function CanvasContent({
       } else if (onNodeClick) {
         onNodeClick(nodeId);
       } else {
+        const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
         stateRef.current.componentSidebar.open(nodeId);
 
-        const nodeData = clickedNode?.data as {
-          component?: { error?: string };
-          composite?: { error?: string };
-          trigger?: { error?: string };
-        } | null;
-        const hasConfigurationWarning = Boolean(
-          nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
-        );
-
-        if (setCurrentTab) {
-          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
-        }
-
-        if (onBuildingBlocksSidebarToggle) {
-          onBuildingBlocksSidebarToggle(false);
-        }
+        const nodeData = clickedNode?.data as NodeConfigurationWarningData;
+        applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, shouldOpenSidebarSettingsTab(nodeData, isEditMode));
+        onBuildingBlocksSidebarToggle?.(false);
       }
 
       stateRef.current.setNodes((nodes) =>
