@@ -1,9 +1,18 @@
 import { useMemo } from "react";
 
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
+export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["runs", "versions", "memory", "files"]);
+
+export function normalizeCanvasHeaderMode(headerMode: CanvasPageHeaderMode | undefined): WorkflowHeaderMode {
+  if (!headerMode || headerMode === "default") {
+    return "version-live";
+  }
+
+  return headerMode;
+}
 
 export function isPanelHeaderMode(headerMode: WorkflowHeaderMode): boolean {
   return PANEL_HEADER_MODES.has(headerMode);

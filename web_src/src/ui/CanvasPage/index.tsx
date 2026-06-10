@@ -66,6 +66,7 @@ import {
   blocksBuildingBlocksShortcut,
   isPanelHeaderMode,
   isRunsOrVersionsHeaderMode,
+  normalizeCanvasHeaderMode,
 } from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
 import { Sentry } from "@/sentry";
@@ -773,6 +774,7 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
+  const workflowHeaderMode = normalizeCanvasHeaderMode(props.headerMode);
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
@@ -1187,7 +1189,7 @@ function CanvasPage(props: CanvasPageProps) {
       readOnly ||
       Boolean(props.hideAddControls) ||
       !props.isEditing ||
-      blocksBuildingBlocksShortcut(props.headerMode ?? "version-live") ||
+      blocksBuildingBlocksShortcut(workflowHeaderMode) ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
@@ -1291,7 +1293,7 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "memory" ||
           props.headerMode === "files") &&
           "sp-canvas-live",
-        isRunsOrVersionsHeaderMode(props.headerMode ?? "version-live") && "sp-canvas-live",
+        isRunsOrVersionsHeaderMode(workflowHeaderMode) && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
       )}
     >
@@ -1366,7 +1368,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
-        {isPanelHeaderMode(props.headerMode ?? "version-live") ? null : props.isEditing ? (
+        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1389,7 +1391,7 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen={
               isBuildingBlocksSidebarOpen &&
               !!props.isEditing &&
-              allowsBuildingBlocksSidebar(props.headerMode ?? "version-live")
+              allowsBuildingBlocksSidebar(workflowHeaderMode)
             }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
