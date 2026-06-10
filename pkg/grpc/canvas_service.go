@@ -44,7 +44,7 @@ func NewCanvasService(
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvases(ctx, s.registry, organizationID, req.IncludeTemplates)
+	return canvases.ListCanvases(ctx, s.registry, organizationID)
 }
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {

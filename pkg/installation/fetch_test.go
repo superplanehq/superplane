@@ -40,7 +40,6 @@ kind: Canvas
 metadata:
   name: Preview Environments
   description: StoreJS preview
-  isTemplate: false
 spec:
   nodes: []
   edges: []
@@ -50,7 +49,6 @@ spec:
 	require.NoError(t, err)
 	assert.Equal(t, "Preview Environments", canvas.GetMetadata().GetName())
 	assert.Equal(t, "StoreJS preview", canvas.GetMetadata().GetDescription())
-	assert.False(t, canvas.GetMetadata().GetIsTemplate())
 	assert.Empty(t, canvas.GetMetadata().GetId())
 }
 

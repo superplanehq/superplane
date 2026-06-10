@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -11,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
@@ -22,15 +20,7 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			template, templateErr := models.FindCanvasTemplate(canvasID)
-			if templateErr != nil {
-				return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-			}
-			canvas = template
-		} else {
-			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-		}
+		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
 	var user *models.User

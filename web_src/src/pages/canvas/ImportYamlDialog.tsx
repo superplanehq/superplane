@@ -29,7 +29,6 @@ interface ParsedCanvas {
   metadata?: {
     name?: string;
     description?: string;
-    isTemplate?: boolean;
   };
   spec?: {
     nodes?: unknown[];
