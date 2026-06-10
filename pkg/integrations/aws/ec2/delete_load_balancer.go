@@ -58,9 +58,9 @@ func (c *DeleteLoadBalancer) Documentation() string {
 
 ## Output
 
-Emits a deletion payload on the default output channel:
+Emits a deletion payload on the default output channel once AWS confirms the load balancer is gone:
 - ` + "`loadBalancerArn`" + ` — ARN of the deleted load balancer
-- ` + "`state`" + ` — ` + "`deleting`" + `
+- ` + "`state`" + ` — ` + "`deleted`" + `
 `
 }
 
@@ -137,39 +137,34 @@ func (c *DeleteLoadBalancer) Setup(ctx core.SetupContext) error {
 func (c *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	config := DeleteLoadBalancerConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	region, err := requireRegion(config.Region)
 	if err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	lbARN, err := requireLoadBalancerARN(config.LoadBalancerARN)
 	if err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to get AWS credentials: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get AWS credentials: %v", err))
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
 	if _, err := client.DeleteLoadBalancer(lbARN); err != nil {
 		if IsLoadBalancerNotFound(err) {
-			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteLoadBalancerPayloadType, []any{
-				map[string]any{
-					"loadBalancerArn": lbARN,
-					"state":           LoadBalancerStateDeleting,
-				},
-			})
+			return ctx.ExecutionState.Fail("not-found", fmt.Sprintf("load balancer %s not found: it may have already been deleted", lbARN))
 		}
-		return fmt.Errorf("failed to delete load balancer: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete load balancer: %v", err))
 	}
 
 	if err := ctx.Metadata.Set(DeleteLoadBalancerExecutionMetadata{LoadBalancerARN: lbARN}); err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to save execution metadata: %v", err))
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, loadBalancerPollInterval)
@@ -183,7 +178,7 @@ func (c *DeleteLoadBalancer) Hooks() []core.Hook {
 
 func (c *DeleteLoadBalancer) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("unknown action: %s", ctx.Name))
 	}
 
 	return c.poll(ctx)
@@ -196,25 +191,25 @@ func (c *DeleteLoadBalancer) poll(ctx core.ActionHookContext) error {
 
 	var metadata DeleteLoadBalancerExecutionMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode metadata: %v", err))
 	}
 	if metadata.LoadBalancerARN == "" {
-		return fmt.Errorf("poll metadata is missing loadBalancerArn: execution state may be corrupted")
+		return ctx.ExecutionState.Fail("error", "poll metadata is missing loadBalancerArn: execution state may be corrupted")
 	}
 
 	config := DeleteLoadBalancerConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	region, err := requireRegion(config.Region)
 	if err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to get AWS credentials: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get AWS credentials: %v", err))
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
@@ -228,11 +223,11 @@ func (c *DeleteLoadBalancer) poll(ctx core.ActionHookContext) error {
 		ctx.Logger.Warnf("failed to describe load balancer %s (attempt %d/%d): %v",
 			metadata.LoadBalancerARN, metadata.PollErrors, maxLoadBalancerPollErrors, err)
 		if metadata.PollErrors >= maxLoadBalancerPollErrors {
-			return fmt.Errorf("giving up polling load balancer %s after %d consecutive errors: %w",
-				metadata.LoadBalancerARN, maxLoadBalancerPollErrors, err)
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("giving up polling load balancer %s after %d consecutive errors: %v",
+				metadata.LoadBalancerARN, maxLoadBalancerPollErrors, err))
 		}
 		if err := ctx.Metadata.Set(metadata); err != nil {
-			return err
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to save poll error count: %v", err))
 		}
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, loadBalancerPollInterval)
 	}
@@ -240,12 +235,12 @@ func (c *DeleteLoadBalancer) poll(ctx core.ActionHookContext) error {
 	metadata.PollErrors = 0
 	metadata.PollAttempts++
 	if err := ctx.Metadata.Set(metadata); err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to save poll attempt count: %v", err))
 	}
 
 	if metadata.PollAttempts >= maxLoadBalancerPollAttempts {
-		return fmt.Errorf("timed out waiting for load balancer %s to be deleted after %d poll attempts (state: %s)",
-			metadata.LoadBalancerARN, metadata.PollAttempts, lb.State)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("timed out waiting for load balancer %s to be deleted after %d poll attempts (state: %s)",
+			metadata.LoadBalancerARN, metadata.PollAttempts, lb.State))
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, loadBalancerPollInterval)
@@ -255,7 +250,7 @@ func (c *DeleteLoadBalancer) emitDeleted(ctx core.ActionHookContext, lbARN strin
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteLoadBalancerPayloadType, []any{
 		map[string]any{
 			"loadBalancerArn": lbARN,
-			"state":           LoadBalancerStateDeleting,
+			"state":           LoadBalancerStateDeleted,
 		},
 	})
 }

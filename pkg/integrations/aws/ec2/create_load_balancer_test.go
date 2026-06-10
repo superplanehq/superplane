@@ -736,7 +736,7 @@ func Test__CreateLoadBalancer__Poll(t *testing.T) {
 		assert.False(t, stored.ListenerCreated)
 	})
 
-	t.Run("listener creation failure exceeds limit -> returns error", func(t *testing.T) {
+	t.Run("listener creation failure exceeds limit -> fails execution", func(t *testing.T) {
 		lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/50dc6c495c0c9188"
 		tgARN := "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/tg/abc"
 
@@ -784,6 +784,7 @@ func Test__CreateLoadBalancer__Poll(t *testing.T) {
 			},
 		}
 
+		executionState := &contexts.ExecutionStateContext{}
 		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
@@ -809,12 +810,15 @@ func Test__CreateLoadBalancer__Poll(t *testing.T) {
 					ListenerErrors:  maxLoadBalancerListenerErrors - 1,
 				},
 			},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: executionState,
 			Requests:       &contexts.RequestContext{},
 			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
-		require.ErrorContains(t, err, "giving up creating listener")
+		require.NoError(t, err)
+		assert.True(t, executionState.Finished)
+		assert.False(t, executionState.Passed)
+		assert.Contains(t, executionState.FailureMessage, "giving up creating listener")
 	})
 
 	t.Run("active state with listener already created -> does not create listener again", func(t *testing.T) {

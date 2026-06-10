@@ -94,6 +94,50 @@ func Test__DeleteLoadBalancer__Setup(t *testing.T) {
 func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 	component := &DeleteLoadBalancer{}
 
+	t.Run("load balancer not found -> fails execution", func(t *testing.T) {
+		lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/50dc6c495c0c9188"
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Error>
+								<Code>LoadBalancerNotFound</Code>
+								<Message>Load balancer not found</Message>
+							</Error>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"loadBalancer": lbARN,
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Finished)
+		assert.False(t, executionState.Passed)
+		assert.Equal(t, "not-found", executionState.FailureReason)
+		assert.Contains(t, executionState.FailureMessage, "not found")
+	})
+
 	t.Run("delete load balancer -> schedules poll", func(t *testing.T) {
 		lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/50dc6c495c0c9188"
 		httpContext := &contexts.HTTPContext{
@@ -193,7 +237,7 @@ func Test__DeleteLoadBalancer__Poll(t *testing.T) {
 		require.Len(t, executionState.Payloads, 1)
 		data := executionState.Payloads[0].(map[string]any)["data"].(map[string]any)
 		assert.Equal(t, lbARN, data["loadBalancerArn"])
-		assert.Equal(t, LoadBalancerStateDeleting, data["state"])
+		assert.Equal(t, LoadBalancerStateDeleted, data["state"])
 	})
 
 	t.Run("still deleting -> schedules next poll", func(t *testing.T) {
