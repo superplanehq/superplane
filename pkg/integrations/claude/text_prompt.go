@@ -187,7 +187,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 		for _, f := range spec.Files {
 			if !fileSet[f] {
-				return fmt.Errorf("file %q not found in repository. Available files: %v", f, available)
+				return fmt.Errorf("file %q not found in app repository", f)
 			}
 		}
 	}
