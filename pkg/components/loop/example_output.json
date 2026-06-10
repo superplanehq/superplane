@@ -1,0 +1,8 @@
+{
+  "type": "loop.next",
+  "data": {
+    "iteration": 1,
+    "maxIterations": 100
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z"
+}
