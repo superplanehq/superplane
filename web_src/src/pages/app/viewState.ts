@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 const CONSOLE_VIEW = "console";
@@ -15,6 +15,7 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
   const view = searchParams.get("view") ?? "";
   return {
     isRunsMode: view === "runs",
+    isVersionsMode: view === "versions",
     isMemoryMode: view === "memory",
     isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
@@ -51,11 +52,13 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isRunsMode,
+  isVersionsMode,
   isMemoryMode,
   isFilesMode,
 }: {
   isConsoleMode: boolean;
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
 }): WorkflowHeaderMode {
@@ -73,6 +76,10 @@ export function getWorkflowHeaderMode({
 
   if (isRunsMode) {
     return "runs";
+  }
+
+  if (isVersionsMode) {
+    return "versions";
   }
 
   return "version-live";
@@ -105,6 +112,7 @@ export function getWorkflowCanvasStateMode({
 export function getWorkflowViewPresentation({
   isConsoleMode,
   isRunsMode,
+  isVersionsMode,
   isMemoryMode,
   isFilesMode,
   isTemplate,
@@ -114,6 +122,7 @@ export function getWorkflowViewPresentation({
 }: {
   isConsoleMode: boolean;
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
   isTemplate: boolean;
@@ -124,7 +133,7 @@ export function getWorkflowViewPresentation({
   const hideNonCanvasChrome = isRunsMode || isMemoryMode || isFilesMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isMemoryMode, isFilesMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isVersionsMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,
