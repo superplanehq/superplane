@@ -44,6 +44,23 @@ The event processing system is the engine that drives workflow execution. It ope
 
 This architecture enables parallel execution of independent workflow branches, reliable event delivery, and scalable processing through worker queues.
 
+**Event Size Limits:**
+
+Every event that flows through the graph is capped at **64 KiB (65,536 bytes)** of serialized JSON payload. The limit applies in three places:
+
+- **Webhook ingress** (`pkg/triggers/webhook/webhook.go`): incoming webhook bodies above the limit are rejected with `413 Request Entity Too Large`.
+- **Public event API** (`pkg/public/server.go`): the same limit is enforced on event submission endpoints.
+- **Event propagation** (`pkg/workers/contexts/event_context.go`): when a component emits an event, the serialized payload is checked against the limit. Components that produce a larger payload fail with `event payload too large: <size> bytes (max 65536)`.
+
+The cap exists to keep queue items, database rows, and downstream component memory usage predictable. Exceeding it is a hard error — the event is not truncated.
+
+**Patterns for handling large payloads:**
+
+- **Store the blob externally, pass a reference**: write the large content (artifact, diff, log) to S3, GCS, or another object store, and emit only the URL or key on the event.
+- **Project the fields you need**: when fetching from an HTTP API that returns a large body, transform or filter the response to keep only the fields downstream nodes actually consume.
+- **Chunk and fan out**: split a large list into several smaller events (one per item or page), and let the graph process them in parallel rather than passing them as a single payload.
+- **Use canvas memory for accumulating state**: persistent state across executions belongs in the canvas memory store (see [Canvas Memory](../components/Core.mdx#add-memory)) rather than being threaded through event payloads.
+
 ## Authentication & Authorization
 
 SuperPlane uses a multi-layered security model to authenticate users and enforce fine-grained permissions.
