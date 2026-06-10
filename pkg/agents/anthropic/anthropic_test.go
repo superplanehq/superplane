@@ -311,6 +311,78 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[3].Type)
 }
 
+func TestStreamEvents_TreatsUnknownIdleStopReasonAsTurnCompleted(t *testing.T) {
+	const sse = "data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"new_provider_reason\"}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+}
+
+func TestStreamEvents_IgnoresUnknownMidTurnEvents(t *testing.T) {
+	const sse = "data: {\"id\":\"think-1\",\"type\":\"agent.thinking\"}\n\n" +
+		"data: {\"id\":\"msg-1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after thinking\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
+	assert.Equal(t, "after thinking", received[0].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
+}
+
+func TestStreamEvents_StopsWhenCallbackRequestsCustomToolHandling(t *testing.T) {
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
+		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	err := p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		if e.Type == agents.ProviderEventCustomToolResultsRequired {
+			return io.ErrUnexpectedEOF
+		}
+		return nil
+	})
+
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
+	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
+	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
+}
+
 func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 	// Tool use and its matching result have different event ids but share
 	// the same tool_use_id. The mapper must surface tool_use_id as the
@@ -333,6 +405,32 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 	require.Len(t, received, 3)
 	assert.Equal(t, "toolu_1", received[0].ProviderEventID, "tool_use must key on tool_use_id")
 	assert.Equal(t, "toolu_1", received[1].ProviderEventID, "tool_result must key on the same tool_use_id")
+}
+
+func TestStreamEvents_KeysCustomToolUseByEventID(t *testing.T) {
+	// Managed Agents require user.custom_tool_result.custom_tool_use_id to
+	// reference the agent.custom_tool_use event id from requires_action.
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, "evt_custom", received[0].ProviderEventID)
+	assert.Equal(t, "evt_custom", received[0].ToolCallID)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
 }
 
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {

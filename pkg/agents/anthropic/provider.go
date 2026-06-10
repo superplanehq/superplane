@@ -147,6 +147,39 @@ func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, 
 	return nil
 }
 
+func (p *Provider) SendCustomToolResults(ctx context.Context, providerSessionID string, results []agents.CustomToolResult) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+	if len(results) == 0 {
+		return nil
+	}
+
+	events := make([]map[string]any, 0, len(results))
+	for _, result := range results {
+		if result.CustomToolUseID == "" {
+			return fmt.Errorf("anthropic: custom tool use id is required")
+		}
+		event := map[string]any{
+			"type":               "user.custom_tool_result",
+			"custom_tool_use_id": result.CustomToolUseID,
+			"content": []map[string]string{
+				{"type": "text", "text": result.Content},
+			},
+		}
+		if result.IsError {
+			event["is_error"] = true
+		}
+		events = append(events, event)
+	}
+
+	body := map[string]any{"events": events}
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		return fmt.Errorf("anthropic: send custom tool results: %w", err)
+	}
+	return nil
+}
+
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
 	if providerSessionID == "" {
 		return fmt.Errorf("anthropic: provider session id is required")
@@ -221,5 +254,6 @@ func parseSSEData(line string) (agents.ProviderEvent, bool) {
 }
 
 func isTerminalEvent(t agents.ProviderEventType) bool {
-	return t == agents.ProviderEventTurnCompleted || t == agents.ProviderEventSessionFailed
+	return t == agents.ProviderEventTurnCompleted ||
+		t == agents.ProviderEventSessionFailed
 }
