@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 const MessagePayloadType = "claude.message"
@@ -181,10 +181,12 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 		fileSet := make(map[string]bool, len(available))
 		for _, f := range available {
-			if norm, err := gitprovider.NormalizePath(f); err == nil { fileSet[norm] = true }
+			if norm, err := gitprovider.NormalizePath(f); err == nil {
+				fileSet[norm] = true
+			}
 		}
 		for _, f := range spec.Files {
-			norm, err := gitprovider.NormalizePath(f)
+			norm, err := gitprovider.ValidateUserPath(f)
 			if err != nil {
 				return fmt.Errorf("invalid file path %q: %v", f, err)
 			}
@@ -300,7 +302,7 @@ func extractMessageText(response *CreateMessageResponse) string {
 	return builder.String()
 }
 
-const maxFileSize = 100 * 1024 // 100KB per file
+const maxFileSize = 100 * 1024      // 100KB per file
 const maxTotalFileSize = 500 * 1024 // 500KB total across all files
 
 // buildUserContent creates the message content for the user message.
@@ -319,7 +321,7 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 	totalSize := 0
 
 	for _, path := range spec.Files {
-		normalized, normErr := gitprovider.NormalizePath(path)
+		normalized, normErr := gitprovider.ValidateUserPath(path)
 		if normErr != nil {
 			return nil, fmt.Errorf("invalid file path %q: %w", path, normErr)
 		}
@@ -362,8 +364,6 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 	return blocks, nil
 }
 
-
-
 func (c *TextPrompt) Hooks() []core.Hook {
 	return []core.Hook{}
 }
@@ -371,4 +371,3 @@ func (c *TextPrompt) Hooks() []core.Hook {
 func (c *TextPrompt) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
-

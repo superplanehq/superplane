@@ -18,8 +18,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -382,9 +382,9 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
-		CanvasMemory:    contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		Files: contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
-		Webhook:         contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+		Files:          contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
+		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions:    contexts.NewExpressionContext(builder),
 	}
 

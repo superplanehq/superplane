@@ -39,9 +39,9 @@ type ContentBlock struct {
 
 // ContentBlockSource describes the source of a document content block.
 type ContentBlockSource struct {
-	Type      string `json:"type"`                // "text" for inline content
-	MediaType string `json:"media_type"`          // e.g. "text/plain", "text/markdown"
-	Data      string `json:"data"`                // the actual content
+	Type      string `json:"type"`       // "text" for inline content
+	MediaType string `json:"media_type"` // e.g. "text/plain", "text/markdown"
+	Data      string `json:"data"`       // the actual content
 }
 
 type CreateMessageRequest struct {

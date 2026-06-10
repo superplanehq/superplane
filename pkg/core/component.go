@@ -41,7 +41,7 @@ type ExecutionContext struct {
 	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
-	Files RepositoryFilesContext
+	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 }
@@ -67,15 +67,15 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger          *log.Entry
-	Configuration   any
-	HTTP            HTTPContext
-	Metadata        MetadataWriter
-	Requests        RequestContext
-	Auth            AuthReader
-	Integration     IntegrationContext
-	Webhook         NodeWebhookContext
-	Files RepositoryFilesContext
+	Logger        *log.Entry
+	Configuration any
+	HTTP          HTTPContext
+	Metadata      MetadataWriter
+	Requests      RequestContext
+	Auth          AuthReader
+	Integration   IntegrationContext
+	Webhook       NodeWebhookContext
+	Files         RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {

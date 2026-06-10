@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -179,7 +179,6 @@ func PublishCanvasChangeRequest(
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
 				GitProvider:    gitProv,
-				
 			},
 		); err != nil {
 			return err

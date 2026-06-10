@@ -10,7 +10,7 @@ import type { FieldRendererProps } from "./types";
 export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const { appId } = useParams<{ appId: string }>();
 
-  const { data: files = [], isLoading } = useQuery({
+  const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ["repository-files", appId],
     queryFn: async () => {
       if (!appId) return [];
@@ -38,7 +38,8 @@ export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ fiel
             {filePath}
           </SelectItem>
         ))}
-        {!isLoading && files.length === 0 && <div className="px-2 py-1.5 text-sm text-slate-500">No files found</div>}
+        {isError && <div className="px-2 py-1.5 text-sm text-red-500">Failed to load files</div>}
+        {!isLoading && !isError && files.length === 0 && <div className="px-2 py-1.5 text-sm text-slate-500">No files found</div>}
       </SelectContent>
     </Select>
   );
