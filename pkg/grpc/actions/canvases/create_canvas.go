@@ -208,6 +208,7 @@ func CreateCanvas(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
+			GitProvider:    gitProvider,
 		})
 
 		if err != nil {
