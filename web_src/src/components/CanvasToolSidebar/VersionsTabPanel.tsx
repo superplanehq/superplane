@@ -2,6 +2,7 @@ import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanva
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { DraftBranchRow } from "./DraftBranchRow";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
@@ -32,6 +33,7 @@ export interface VersionsTabPanelProps {
   changeRequestApprovalConfig?: CanvasChangeManagement;
   draftBranches?: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
+  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   onOpenDraftBranch?: (branchName: string) => void;
   onDeleteDraftBranch?: (versionId: string) => void;
   deleteDraftBranchPending?: boolean;
@@ -68,6 +70,7 @@ export function VersionsTabPanel({
   changeRequestApprovalConfig,
   draftBranches,
   activeDraftBranch,
+  draftBranchEditStatusByVersionId,
   onOpenDraftBranch,
   onDeleteDraftBranch,
   deleteDraftBranchPending,
@@ -117,6 +120,7 @@ export function VersionsTabPanel({
         <DraftBranchesSection
           drafts={draftBranches ?? []}
           activeDraftBranch={activeDraftBranch}
+          draftBranchEditStatusByVersionId={draftBranchEditStatusByVersionId}
           canUpdateCanvas={canUpdateCanvas}
           deleteDraftBranchPending={deleteDraftBranchPending}
           onOpenDraftBranch={onOpenDraftBranch}
@@ -211,6 +215,7 @@ function useVersionsPanelData({
 function DraftBranchesSection({
   drafts,
   activeDraftBranch,
+  draftBranchEditStatusByVersionId,
   canUpdateCanvas,
   deleteDraftBranchPending,
   onOpenDraftBranch,
@@ -218,6 +223,7 @@ function DraftBranchesSection({
 }: {
   drafts: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
+  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   canUpdateCanvas: boolean;
   deleteDraftBranchPending?: boolean;
   onOpenDraftBranch?: (branchName: string) => void;
@@ -242,6 +248,7 @@ function DraftBranchesSection({
             key={branchName || draftVersionId(draft)}
             draft={draft}
             isActive={branchName === activeDraftBranch}
+            editStatus={draftBranchEditStatusByVersionId?.get(draftVersionId(draft) ?? "") ?? "no-changes"}
             canUpdateCanvas={canUpdateCanvas}
             deletePending={deleteDraftBranchPending}
             onOpen={(nextBranchName) => onOpenDraftBranch?.(nextBranchName)}

@@ -184,6 +184,13 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  /** True when the active draft has uncommitted staged spec edits. Shows the Commit/Reset controls. */
+  hasStagingChanges?: boolean;
+  /** Commits staged canvas.yaml/console.yaml edits into the draft version row. */
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  /** Discards staged edits, reverting to the last committed draft. */
+  onResetStaging?: () => void;
   headerMode?: "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
@@ -212,6 +219,17 @@ export interface CanvasPageProps {
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  /** True when a non-spec repository file is staged; shows a dot on the Files tab. */
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasVersion[];
@@ -1349,6 +1367,10 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+          hasStagingChanges={props.hasStagingChanges}
+          onCommitStaging={props.onCommitStaging}
+          commitStagingPending={props.commitStagingPending}
+          onResetStaging={props.onResetStaging}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
           onSelectCanvasView={props.onSelectCanvasView}
@@ -1366,6 +1388,16 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+          hasFilesStagingChanges={props.hasFilesStagingChanges}
+          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+          hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
+          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+          hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
+          hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
+          readyToPublishDraftChanges={props.readyToPublishDraftChanges}
+          editTabTone={props.editTabTone}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           startEditingDrafts={props.startEditingDrafts}
@@ -1917,6 +1949,10 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
   headerMode,
   isEditing,
   onSelectCanvasView,
@@ -1934,6 +1970,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasFilesStagingChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
+  hasUncommittedFilesDraftChanges,
+  hasCommittedCanvasDraftChanges,
+  hasCommittedConsoleDraftChanges,
+  hasCommittedFilesDraftChanges,
+  hasUncommittedDraftChanges,
+  readyToPublishDraftChanges,
+  editTabTone,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   startEditingDrafts,
@@ -1978,6 +2024,10 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  hasStagingChanges?: boolean;
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  onResetStaging?: () => void;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
   onSelectCanvasView?: () => void;
@@ -1995,6 +2045,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasVersion[];
@@ -2039,6 +2099,10 @@ function CanvasContentHeader({
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+      hasStagingChanges={hasStagingChanges}
+      onCommitStaging={onCommitStaging}
+      commitStagingPending={commitStagingPending}
+      onResetStaging={onResetStaging}
       mode={headerMode}
       isEditing={isEditing}
       onSelectCanvasView={onSelectCanvasView}
@@ -2056,6 +2120,16 @@ function CanvasContentHeader({
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
+      hasFilesStagingChanges={hasFilesStagingChanges}
+      hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
+      hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+      hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
+      hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
+      hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+      hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
+      hasUncommittedDraftChanges={hasUncommittedDraftChanges}
+      readyToPublishDraftChanges={readyToPublishDraftChanges}
+      editTabTone={editTabTone}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       startEditingDrafts={startEditingDrafts}

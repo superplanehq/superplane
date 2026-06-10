@@ -65,19 +65,52 @@ func ReadRepositorySpecFile(
 	versionID string,
 	path string,
 ) (string, error) {
+	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, false)
+}
+
+// ReadRepositorySpecFileStaged returns the effective draft content for a spec
+// path: staged content when present, the materialized version row otherwise.
+func ReadRepositorySpecFileStaged(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	path string,
+) (string, error) {
+	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, true)
+}
+
+func readRepositorySpecFile(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	path string,
+	stage bool,
+) (string, error) {
 	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", err
 	}
 
 	normalized := normalizeRepositoryFilePath(path)
+	if normalized != CanvasYAMLRepositoryPath && normalized != ConsoleYAMLRepositoryPath {
+		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+	}
+
+	if stage {
+		_, rows, stagingErr := stagingStateForVersion(version.ID)
+		if stagingErr != nil {
+			return "", stagingErr
+		}
+		return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
+	}
+
 	switch normalized {
 	case CanvasYAMLRepositoryPath:
 		return canvasYAMLFromVersion(canvas, version, organizationID)
-	case ConsoleYAMLRepositoryPath:
-		return consoleYAMLFromVersion(version)
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+		return consoleYAMLFromVersion(version)
 	}
 }
 
@@ -137,21 +170,10 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
-	if !hasAutoLayout {
-		return nil
-	}
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
-		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
-		len(autoLayout.NodeIds) == 0 {
-		return nil
-	}
-	return autoLayout
-}
-
+// ApplyRepositorySpecFileOperations parses staged canvas.yaml/console.yaml
+// content into the draft version row. It is the validated commit path shared by
+// CommitCanvasStaging; positions come from the staged YAML, so no layout is
+// applied here (auto-layout is its own RPC).
 func ApplyRepositorySpecFileOperations(
 	ctx context.Context,
 	usageService usage.Service,
@@ -162,7 +184,6 @@ func ApplyRepositorySpecFileOperations(
 	versionID string,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-	autoLayout *pb.CanvasAutoLayout,
 	operations []*pb.CanvasRepositoryFileOperation,
 ) error {
 	if strings.TrimSpace(versionID) == "" {
@@ -196,7 +217,7 @@ func ApplyRepositorySpecFileOperations(
 				canvasID,
 				versionID,
 				pbCanvas,
-				autoLayout,
+				nil,
 				webhookBaseURL,
 				authService,
 			)
@@ -219,18 +240,4 @@ func ApplyRepositorySpecFileOperations(
 	}
 
 	return nil
-}
-
-func splitRepositoryFileOperations(operations []*pb.CanvasRepositoryFileOperation) (specOps []*pb.CanvasRepositoryFileOperation, gitOps []*pb.CanvasRepositoryFileOperation) {
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-		if IsRepositorySpecFilePath(operation.GetPath()) {
-			specOps = append(specOps, operation)
-			continue
-		}
-		gitOps = append(gitOps, operation)
-	}
-	return specOps, gitOps
 }

@@ -120,15 +120,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayout = &defaultLayout
 	}
 
-	if err := common.CommitRepositorySpecFile(
+	if err := common.StageCommitRepositorySpecFile(
 		ctx,
 		canvasID,
 		targetVersionID,
 		common.CanvasYAMLRepositoryPath,
 		yamlBytes,
-		"Update canvas.yaml",
 		autoLayout,
-		true,
 	); err != nil {
 		return err
 	}

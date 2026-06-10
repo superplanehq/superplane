@@ -32,6 +32,10 @@ export function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
   const onConsoleTab = mode === "console";
@@ -69,7 +73,6 @@ export function SecondaryHeaderActions({
             />
           ) : null}
           <EditModePublishDiscardActions
-            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardVersion={onDiscardVersion}
             discardVersionDisabled={discardVersionDisabled}
             discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -77,6 +80,10 @@ export function SecondaryHeaderActions({
             publishVersionLabel={publishVersionLabel}
             publishVersionDisabled={publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+            hasStagingChanges={hasStagingChanges}
+            onCommitStaging={onCommitStaging}
+            commitStagingPending={commitStagingPending}
+            onResetStaging={onResetStaging}
           />
         </>
       ) : null}
@@ -119,7 +126,6 @@ function FilesHeaderActionsSlot({
 }
 
 function EditModePublishDiscardActions({
-  hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -127,9 +133,12 @@ function EditModePublishDiscardActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: Pick<
   HeaderProps,
-  | "hasUnpublishedDraftChanges"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -137,13 +146,42 @@ function EditModePublishDiscardActions({
   | "publishVersionLabel"
   | "publishVersionDisabled"
   | "publishVersionDisabledTooltip"
+  | "hasStagingChanges"
+  | "onCommitStaging"
+  | "commitStagingPending"
+  | "onResetStaging"
 >) {
+  const showStagingActions = !!hasStagingChanges && !!onCommitStaging;
+
+  // Staging and committed states are mutually exclusive: while there are staged
+  // edits the user can only Reset/Commit them; once everything is committed they
+  // can Discard the draft or Publish it.
+  if (showStagingActions) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {onResetStaging ? (
+          <UIButton
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onResetStaging()}
+            disabled={!!commitStagingPending}
+            data-testid="canvas-reset-staging-button"
+          >
+            Reset to last commit
+          </UIButton>
+        ) : null}
+        <CommitStagingButton onCommit={() => onCommitStaging?.()} pending={!!commitStagingPending} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5">
-      {hasUnpublishedDraftChanges ? (
+      {onDiscardVersion ? (
         <DiscardDraftButton
-          onDiscard={() => onDiscardVersion?.()}
-          disabled={discardVersionDisabled || !onDiscardVersion}
+          onDiscard={() => onDiscardVersion()}
+          disabled={!!discardVersionDisabled}
           disabledTooltip={discardVersionDisabledTooltip}
         />
       ) : null}
@@ -155,6 +193,22 @@ function EditModePublishDiscardActions({
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       />
     </div>
+  );
+}
+
+function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
+  return (
+    <UIButton
+      type="button"
+      variant="default"
+      size="sm"
+      className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
+      onClick={onCommit}
+      disabled={pending}
+      data-testid="canvas-commit-staging-button"
+    >
+      {pending ? "Committing…" : "Commit"}
+    </UIButton>
   );
 }
 

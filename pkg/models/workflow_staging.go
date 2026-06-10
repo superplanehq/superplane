@@ -10,16 +10,16 @@ import (
 )
 
 type WorkflowStaging struct {
-	ID             uuid.UUID  `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
-	VersionID      uuid.UUID  `gorm:"type:uuid;not null"`
-	OrganizationID uuid.UUID  `gorm:"type:uuid;not null"`
-	Path           string     `gorm:"type:text;not null"`
-	Content        string     `gorm:"type:text;not null;default:''"`
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	VersionID      uuid.UUID `gorm:"type:uuid;not null"`
+	OrganizationID uuid.UUID `gorm:"type:uuid;not null"`
+	Path           string    `gorm:"type:text;not null"`
+	Content        string    `gorm:"type:text;not null;default:''"`
 	// Deleted marks a staged file removal (row kept). Effective read returns empty
 	// content when true. DiscardWorkflowStaging hard-deletes rows to revert staging.
-	Deleted        bool       `gorm:"not null;default:false"`
-	UpdatedBy      *uuid.UUID `gorm:"type:uuid"`
-	UpdatedAt      time.Time  `gorm:"not null"`
+	Deleted   bool       `gorm:"not null;default:false"`
+	UpdatedBy *uuid.UUID `gorm:"type:uuid"`
+	UpdatedAt time.Time  `gorm:"not null"`
 }
 
 func (WorkflowStaging) TableName() string {
