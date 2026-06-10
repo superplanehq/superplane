@@ -79,30 +79,22 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 
 	err := a.Execute(execCtx)
 	require.NoError(t, err)
-	require.True(t, executionState.Finished)
-	assert.Equal(t, payloadType, executionState.Type)
-	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
-	assert.Equal(t, "Done", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
-	assert.Equal(t, "", requestsCtx.Action)
+	assert.Equal(t, "stream", requestsCtx.Action)
+	assert.False(t, executionState.Finished)
 
-	require.Len(t, httpContext.Requests, 4)
+	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
-	assert.Equal(t, "GET", httpContext.Requests[2].Method)
-	assert.Contains(t, httpContext.Requests[2].URL.Path, "/events/stream")
-	assert.Equal(t, "DELETE", httpContext.Requests[3].Method)
-	assert.Contains(t, httpContext.Requests[3].URL.Path, "/sessions/sess_1")
 }
 
-func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
+func Test__RunAgent__Execute__schedulesStream(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
@@ -124,8 +116,7 @@ func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
 	err := a.Execute(execCtx)
 	require.NoError(t, err)
 	assert.False(t, executionState.Finished)
-	assert.Equal(t, "poll", requestsCtx.Action)
-	assert.Equal(t, initialPoll, requestsCtx.Duration)
+	assert.Equal(t, "stream", requestsCtx.Action)
 }
 
 func Test__RunAgent__poll__terminal(t *testing.T) {

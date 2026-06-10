@@ -1,10 +1,8 @@
 package runagent
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -155,29 +153,10 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
-	// Stream session events until completion.
-	// This captures agent messages in real-time, avoiding the eventual
-	// consistency issue with the events list API.
-	ctx.Logger.Infof("Started Managed Agent session %s. Streaming events...", session.ID)
-	streamCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-	status, lastMessage, messages, streamErr := client.StreamSessionUntilIdle(streamCtx, session.ID)
-	if streamErr != nil {
-		ctx.Logger.Warnf("Stream failed for session %s: %v. Falling back to poll.", session.ID, streamErr)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
-	}
-
-	// Update metadata with final status
-	metadata.Session.Status = status
-	_ = ctx.Metadata.Set(metadata)
-
-	// Clean up the session on Anthropic's side
-	if err := client.DeleteManagedSession(session.ID); err != nil {
-		ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
-	}
-
-	out := buildOutput(status, session.ID, lastMessage, messages)
-	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+	// Don't block Execute() — it runs inside a DB transaction.
+	// Schedule streaming as an action call that runs outside the transaction.
+	ctx.Logger.Infof("Started Managed Agent session %s. Scheduling stream...", session.ID)
+	return ctx.Requests.ScheduleActionCall("stream", map[string]any{"attempt": 1, "errors": 0}, 0)
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }

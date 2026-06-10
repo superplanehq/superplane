@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,17 +16,55 @@ func (a *RunAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (a *RunAgent) Hooks() []core.Hook {
-	return []core.Hook{{
-		Name: "poll",
-		Type: core.HookTypeInternal,
-	}}
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
+		{Name: "stream", Type: core.HookTypeInternal},
+	}
 }
 
 func (a *RunAgent) HandleHook(ctx core.ActionHookContext) error {
-	if ctx.Name == "poll" {
+	switch ctx.Name {
+	case "stream":
+		return a.stream(ctx)
+	case "poll":
 		return a.poll(ctx)
+	default:
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
-	return fmt.Errorf("unknown hook: %s", ctx.Name)
+}
+
+func (a *RunAgent) stream(ctx core.ActionHookContext) error {
+	metadata := ExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata, &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	if metadata.Session.ID == "" {
+		return fmt.Errorf("missing session id in metadata")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	streamCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	status, lastMessage, messages, streamErr := client.StreamSessionUntilIdle(streamCtx, metadata.Session.ID)
+	if streamErr != nil {
+		ctx.Logger.Warnf("Stream failed for session %s: %v. Falling back to poll.", metadata.Session.ID, streamErr)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	}
+
+	metadata.Session.Status = status
+	_ = ctx.Metadata.Set(metadata)
+
+	if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
+		ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
+	}
+
+	out := buildOutput(status, metadata.Session.ID, lastMessage, messages)
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 
 func (a *RunAgent) poll(ctx core.ActionHookContext) error {
