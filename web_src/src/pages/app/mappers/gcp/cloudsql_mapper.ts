@@ -11,13 +11,13 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import cloudSqlIcon from "@/assets/icons/integrations/gcp.cloudsql.svg";
 import type { MetadataItem } from "@/ui/metadataList";
 
 function cloudsqlProps(context: ComponentBaseContext): ComponentBaseProps {
   return {
     ...baseMapper.props(context),
-    iconSrc: gcpIcon,
+    iconSrc: cloudSqlIcon,
     metadata: cloudsqlMetadataList(context.node),
   };
 }
