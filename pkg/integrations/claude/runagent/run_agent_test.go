@@ -45,12 +45,18 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	a := &RunAgent{}
+
+	// SSE stream that sends an agent message then goes idle
+	sseStream := "data: {\"type\":\"session.status_running\"}\n\n" +
+		"data: {\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Done\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"user.message","content":[{"type":"text","text":"Hello"}]},{"type":"agent.message","content":[{"type":"text","text":"Done"}]}],"next_page":null}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(sseStream))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -73,31 +79,22 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 
 	err := a.Execute(execCtx)
 	require.NoError(t, err)
-	require.True(t, executionState.Finished)
-	assert.Equal(t, payloadType, executionState.Type)
-	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
-	assert.Equal(t, "Done", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
-	assert.Equal(t, "", requestsCtx.Action)
+	assert.Equal(t, "stream", requestsCtx.Action)
+	assert.False(t, executionState.Finished)
 
-	require.Len(t, httpContext.Requests, 4)
+	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
-	assert.Equal(t, "GET", httpContext.Requests[2].Method)
-	assert.Equal(t, "GET", httpContext.Requests[3].Method)
-	assert.Contains(t, httpContext.Requests[3].URL.Path, "/events")
-	assert.Equal(t, "desc", httpContext.Requests[3].URL.Query().Get("order"))
-	assert.Equal(t, sessionEventsPageLimit, httpContext.Requests[3].URL.Query().Get("limit"))
 }
 
-func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
+func Test__RunAgent__Execute__schedulesStream(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
@@ -119,8 +116,7 @@ func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
 	err := a.Execute(execCtx)
 	require.NoError(t, err)
 	assert.False(t, executionState.Finished)
-	assert.Equal(t, "poll", requestsCtx.Action)
-	assert.Equal(t, initialPoll, requestsCtx.Duration)
+	assert.Equal(t, "stream", requestsCtx.Action)
 }
 
 func Test__RunAgent__poll__terminal(t *testing.T) {
