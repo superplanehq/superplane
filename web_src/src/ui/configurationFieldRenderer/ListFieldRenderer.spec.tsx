@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ConfigurationField } from "@/api-client";
@@ -99,5 +100,27 @@ describe("ListFieldRenderer", () => {
     );
 
     expect(screen.queryByLabelText(/Drag to reorder/)).not.toBeInTheDocument();
+  });
+
+  it("does not warn about switching the accordion between controlled and uncontrolled when items are added", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const Harness = () => {
+      const [value, setValue] = useState<unknown>(undefined);
+      return (
+        <ListFieldRenderer field={parameterListField()} value={value} onChange={(next) => setValue(next as unknown)} />
+      );
+    };
+
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Parameter/i }));
+
+    const controlledWarnings = consoleError.mock.calls.filter(
+      ([message]) => typeof message === "string" && message.includes("changing from uncontrolled to controlled"),
+    );
+    expect(controlledWarnings).toHaveLength(0);
+
+    consoleError.mockRestore();
   });
 });
