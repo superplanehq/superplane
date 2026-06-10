@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ import (
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Canvases)
@@ -69,7 +68,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Canvases, 2)
@@ -139,7 +138,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// List canvases for original organization
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -186,7 +185,7 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -237,7 +236,7 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -277,7 +276,7 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	assert.Nil(t, listedCanvas.Status)
 }
 
-func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(t *testing.T) {
+func Test__ListCanvases__DoesNotReturnTemplateCanvases(t *testing.T) {
 	r := support.Setup(t)
 
 	activeCanvas, _ := support.CreateCanvas(
@@ -297,34 +296,14 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		[]models.Edge{},
 	)
 
-	deletedCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-2",
-				Name:   "Node 2",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	require.NoError(t, deletedCanvas.SoftDelete())
-
 	now := time.Now()
 	templateLiveVersionID := uuid.New()
 	templateCanvas := &models.Canvas{
 		ID:             uuid.New(),
-		OrganizationID: models.TemplateOrganizationID,
+		OrganizationID: r.Organization.ID,
 		LiveVersionID:  &templateLiveVersionID,
 		IsTemplate:     true,
 		Name:           support.RandomName("template"),
-		Description:    "Template workflow",
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
@@ -345,16 +324,9 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		}).Error
 	}))
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), true)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
-
-	canvasIDs := make([]string, len(response.Canvases))
-	for i, canvas := range response.Canvases {
-		canvasIDs[i] = canvas.Metadata.Id
-	}
-
-	assert.True(t, slices.Contains(canvasIDs, activeCanvas.ID.String()))
-	assert.True(t, slices.Contains(canvasIDs, templateCanvas.ID.String()))
-	assert.False(t, slices.Contains(canvasIDs, deletedCanvas.ID.String()))
+	require.Len(t, response.Canvases, 1)
+	assert.Equal(t, activeCanvas.ID.String(), response.Canvases[0].Metadata.Id)
 }
