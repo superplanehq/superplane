@@ -51,10 +51,12 @@ type fakeProvider struct {
 	mu               sync.Mutex
 	createCalled     int
 	sendCalled       int
+	sentSessions     []string
 	lastPreamble     string
 	lastOutcomeOpts  agents.DefineOutcomeOptions
 	createSessionErr error
 	sendErr          error
+	sendErrs         []error
 	defineOutcomeErr error
 }
 
@@ -70,11 +72,17 @@ func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOp
 	return &agents.CreateSessionResult{ProviderSessionID: "provider-session-" + uuid.NewString()}, nil
 }
 
-func (f *fakeProvider) SendMessage(_ context.Context, _ string, _ string, opts agents.SendMessageOptions) error {
+func (f *fakeProvider) SendMessage(_ context.Context, providerSessionID string, _ string, opts agents.SendMessageOptions) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sendCalled++
+	f.sentSessions = append(f.sentSessions, providerSessionID)
 	f.lastPreamble = opts.ContextPreamble
+	if len(f.sendErrs) > 0 {
+		err := f.sendErrs[0]
+		f.sendErrs = f.sendErrs[1:]
+		return err
+	}
 	return f.sendErr
 }
 
@@ -251,6 +259,93 @@ func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", persisted.Content)
 }
 
+func TestService_SendMessage_ReturnsBusyWhenSessionIsStreaming(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+	require.ErrorIs(t, err, agents.ErrSessionBusy)
+	require.Nil(t, persisted)
+	assert.Equal(t, 0, provider.sendCalled)
+}
+
+func TestService_SendMessage_ProviderBusyKeepsSessionStreaming(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{sendErr: agents.ErrSessionBusy}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+	require.ErrorIs(t, err, agents.ErrSessionBusy)
+	require.Nil(t, persisted)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
+func TestService_SendMessage_RecreatesUnavailableProviderSession(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{
+		sendErrs: []error{agents.ErrProviderSessionUnavailable, nil},
+	}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	require.Len(t, provider.sentSessions, 2)
+	assert.Equal(t, originalProviderSessionID, provider.sentSessions[0])
+	assert.Equal(t, refreshed.ProviderSessionID, provider.sentSessions[1])
+	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
+func TestService_SendMessage_RecoversFailedSession(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusFailed))
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry")
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	assert.Equal(t, 1, provider.sendCalled)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
 func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -276,6 +371,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
 	require.NoError(t, err)
@@ -379,6 +475,7 @@ func TestService_ListMessages_TailPagination(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		_, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "m")
 		require.NoError(t, err)
+		require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
 	}
 
 	latest, err := svc.ListMessages(session.ID, uuid.Nil, 2)

@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -104,6 +105,12 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isSessionAwaitingToolResults(err) {
+			return fmt.Errorf("%w: %w", agents.ErrSessionBusy, err)
+		}
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: send message: %w", err)
 	}
 	return nil
@@ -119,6 +126,9 @@ func (p *Provider) InterruptSession(ctx context.Context, providerSessionID strin
 		},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: interrupt session: %w", err)
 	}
 	return nil
@@ -142,6 +152,12 @@ func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, 
 		"events": []map[string]any{event},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isSessionAwaitingToolResults(err) {
+			return fmt.Errorf("%w: %w", agents.ErrSessionBusy, err)
+		}
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: define outcome: %w", err)
 	}
 	return nil
@@ -180,6 +196,26 @@ func (p *Provider) SendCustomToolResults(ctx context.Context, providerSessionID 
 	return nil
 }
 
+func isSessionAwaitingToolResults(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	return strings.Contains(apiErr.Message, "waiting on responses to events")
+}
+
+func isProviderSessionUnavailable(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusGone {
+		return true
+	}
+	message := strings.ToLower(apiErr.Message)
+	return strings.Contains(message, "archived") || strings.Contains(message, "not found")
+}
+
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
 	if providerSessionID == "" {
 		return fmt.Errorf("anthropic: provider session id is required")
@@ -187,6 +223,9 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 
 	body, err := p.client.openStream(ctx, "/sessions/"+providerSessionID+"/events/stream")
 	if err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: open stream: %w", err)
 	}
 	defer body.Close()
