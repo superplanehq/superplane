@@ -162,14 +162,16 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	_ = ctx.Metadata.Set(metadata)
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
-		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(session.ID, finalMessageReads, finalMessageDelay)
+		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", session.ID, err)
+			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v", session.ID, err)
 		}
-		if err == nil && lastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", session.ID, managedSessionEventTypes(events))
+
+		if err := client.DeleteManagedSession(session.ID); err != nil {
+			ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
 		}
-		out := buildOutput(refreshed.Status, session.ID, lastMessage)
+
+		out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
