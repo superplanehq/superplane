@@ -38,24 +38,23 @@ type SessionMetadata struct {
 
 // OutputPayload is emitted on the default channel when the run completes.
 type OutputPayload struct {
-	Status      string `json:"status"`
-	SessionID   string `json:"sessionId"`
-	LastMessage string `json:"lastMessage"`
+	Status      string   `json:"status"`
+	SessionID   string   `json:"sessionId"`
+	LastMessage string   `json:"lastMessage"`
+	Messages    []string `json:"messages"`
 }
 
 func isSessionTerminal(status string) bool {
 	return status == sessionStatusIdle || status == sessionStatusTerminated
 }
 
-func buildOutput(status, sessionID string, lastMessage ...string) OutputPayload {
-	out := OutputPayload{
-		Status:    status,
-		SessionID: sessionID,
+func buildOutput(status, sessionID string, lastMessage string, messages []string) OutputPayload {
+	return OutputPayload{
+		Status:      status,
+		SessionID:   sessionID,
+		LastMessage: lastMessage,
+		Messages:    messages,
 	}
-	if len(lastMessage) > 0 {
-		out.LastMessage = lastMessage[0]
-	}
-	return out
 }
 
 func mergeSessionIntoMetadata(metadata *ExecutionMetadata, s *ManagedSession) {
