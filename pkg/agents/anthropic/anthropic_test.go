@@ -361,6 +361,46 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
 }
 
+func TestSendMessage_MapsWaitingOnToolResultsToBusySession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Invalid user.message event at events[0]: waiting on responses to events [sevt_012]; only user.tool_result may be sent"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_abc", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrSessionBusy)
+}
+
+func TestSendMessage_MapsArchivedSessionToUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"not_found_error","message":"session has been archived"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_archived", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"tool target not found"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
 func TestDefineOutcome_PrependsPreambleToDescription(t *testing.T) {
 	var capturedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
