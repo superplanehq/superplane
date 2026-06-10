@@ -49,7 +49,6 @@ export interface CanvasVersionsSidebarPanelConfig {
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
-  isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;

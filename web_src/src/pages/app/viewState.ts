@@ -142,7 +142,6 @@ export function getWorkflowViewPresentation({
   isVersionsMode,
   isMemoryMode,
   isFilesMode,
-  isTemplate,
   hasEditableVersion,
   isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
@@ -152,7 +151,6 @@ export function getWorkflowViewPresentation({
   isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
-  isTemplate: boolean;
   hasEditableVersion: boolean;
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
@@ -166,8 +164,8 @@ export function getWorkflowViewPresentation({
       isViewingPendingApprovalVersion,
       isViewingCurrentLiveVersion,
     }),
-    showBottomStatusControls: !isTemplate && !hideNonCanvasChrome,
-    hideAddControls: isTemplate || hideNonCanvasChrome,
+    showBottomStatusControls: !hideNonCanvasChrome,
+    hideAddControls: hideNonCanvasChrome,
     readOnlyViewModes: isRunsMode || isVersionsMode || isFilesMode,
   };
 }
@@ -198,14 +196,12 @@ export function getExitEditModeDisabledTooltip({
 
 export function getRunActionState({
   hasRunBlockingChanges,
-  isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
   isViewingDraftVersion,
   isViewingCurrentLiveVersion,
 }: {
   hasRunBlockingChanges: boolean;
-  isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   isViewingDraftVersion: boolean;
@@ -213,7 +209,6 @@ export function getRunActionState({
 }): { disabled: boolean; tooltip?: string } {
   const disabled =
     hasRunBlockingChanges ||
-    isTemplate ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     isViewingDraftVersion ||
@@ -233,10 +228,6 @@ export function getRunActionState({
 
   if (!canUpdateCanvas) {
     return { disabled, tooltip: "You don't have permission to emit events on this canvas." };
-  }
-
-  if (isTemplate) {
-    return { disabled, tooltip: "Templates are read-only" };
   }
 
   if (hasRunBlockingChanges) {

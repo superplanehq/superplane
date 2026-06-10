@@ -8,7 +8,7 @@ import { materializeCanvasSpec, materializeConsoleSpec } from "./lib/workflow-sp
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 
 const sampleCanvas: CanvasesCanvas = {
-  metadata: { id: "canvas-1", name: "Sample", description: "", isTemplate: false },
+  metadata: { id: "canvas-1", name: "Sample", description: "" },
   spec: {
     nodes: [{ id: "node-1", name: "Start", type: "TYPE_TRIGGER", component: "schedule", position: { x: 0, y: 0 } }],
     edges: [],

@@ -11,7 +11,7 @@ import (
 )
 
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
-	return canvasyaml.CanvasResourceYAML(SerializeCanvasVersion(version, organizationID), canvas.ID.String(), canvas.IsTemplate)
+	return canvasyaml.CanvasResourceYAML(SerializeCanvasVersion(version, organizationID), canvas.ID.String())
 }
 
 func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
