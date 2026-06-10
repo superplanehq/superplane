@@ -22,37 +22,49 @@ function event(data: Record<string, unknown>): EventInfo {
 }
 
 describe("onAlertTriggerRenderer", () => {
-  it("getTitleAndSubtitle prefers the incident summary", () => {
-    const context: TriggerEventContext = { event: event({ summary: "CPU > 80% on prod", state: "open" }) };
-    const { title, subtitle } = onAlertTriggerRenderer.getTitleAndSubtitle(context);
-    expect(title).toBe("Alerting incident");
-    expect(subtitle).toBe("CPU > 80% on prod");
-  });
-
-  it("getTitleAndSubtitle falls back to state + condition name", () => {
+  it("getTitleAndSubtitle puts the condition in the title and the time in the subtitle", () => {
     const context: TriggerEventContext = { event: event({ state: "open", conditionName: "High CPU" }) };
-    expect(onAlertTriggerRenderer.getTitleAndSubtitle(context).subtitle).toBe("OPEN — High CPU");
+    const { title, subtitle } = onAlertTriggerRenderer.getTitleAndSubtitle(context);
+    expect(title).toBe("Alerting incident · High CPU");
+    // The subtitle is a relative-time node (renderTimeAgo), not the incident content.
+    expect(subtitle).not.toBe("");
   });
 
-  it("getTitleAndSubtitle uses the policy name's last segment when no condition is present", () => {
+  it("getTitleAndSubtitle falls back to the policy name's last segment in the title", () => {
     const context: TriggerEventContext = {
       event: event({ state: "closed", policyName: "projects/p/alertPolicies/123" }),
     };
-    expect(onAlertTriggerRenderer.getTitleAndSubtitle(context).subtitle).toBe("CLOSED — 123");
+    expect(onAlertTriggerRenderer.getTitleAndSubtitle(context).title).toBe("Alerting incident · 123");
   });
 
-  it("getTitleAndSubtitle is empty when there is no data", () => {
-    const context: TriggerEventContext = { event: event({}) };
-    expect(onAlertTriggerRenderer.getTitleAndSubtitle(context).subtitle).toBe("");
+  it("getTitleAndSubtitle is a bare title when there is no condition or policy", () => {
+    const context: TriggerEventContext = { event: event({ state: "open" }) };
+    expect(onAlertTriggerRenderer.getTitleAndSubtitle(context).title).toBe("Alerting incident");
   });
 
-  it("getRootEventValues flattens the event data", () => {
+  it("getRootEventValues returns at most 6 curated fields with Emitted At first", () => {
     const context: TriggerEventContext = {
-      event: event({ state: "open", policyName: "projects/p/alertPolicies/123" }),
+      event: event({
+        incidentId: "i-1",
+        state: "open",
+        conditionName: "High CPU",
+        summary: "CPU is high",
+        policyName: "projects/p/alertPolicies/123",
+        url: "https://console.cloud.google.com/...",
+        resourceName: "my-vm",
+        resourceDisplayName: "my-vm",
+        observedValue: "0.93",
+        thresholdValue: "0.8",
+      }),
     };
     const values = onAlertTriggerRenderer.getRootEventValues(context);
-    expect(values.state).toBe("open");
-    expect(values.policyName).toBe("projects/p/alertPolicies/123");
+    const keys = Object.keys(values);
+    expect(keys[0]).toBe("Emitted At");
+    expect(keys.length).toBeLessThanOrEqual(6);
+    expect(values["State"]).toBe("open");
+    expect(values["Condition"]).toBe("High CPU");
+    expect(values["Summary"]).toBe("CPU is high");
+    expect(values["Resource"]).toBe("my-vm");
   });
 
   it("getTriggerProps uses the node name and surfaces the last event", () => {
@@ -70,8 +82,7 @@ describe("onAlertTriggerRenderer", () => {
     };
     const props = onAlertTriggerRenderer.getTriggerProps(context);
     expect(props.title).toBe("My Alert Trigger");
-    expect(props.lastEventData?.title).toBe("Alerting incident");
-    expect(props.lastEventData?.subtitle).toBe("OPEN — High CPU");
+    expect(props.lastEventData?.title).toBe("Alerting incident · High CPU");
     expect(props.lastEventData?.state).toBe("triggered");
   });
 
