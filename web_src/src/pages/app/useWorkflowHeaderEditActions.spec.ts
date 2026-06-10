@@ -7,9 +7,12 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof useWorkflowHeaderEditActions>[0]> = {}) {
   const config = {
     isRunsMode: false,
+    isVersionsMode: false,
     handleExitRunsMode: vi.fn(),
+    handleExitVersionsMode: vi.fn(),
     handleToggleEditMode: vi.fn().mockResolvedValue(undefined),
     setIsRunsMode: vi.fn(),
+    setIsVersionsMode: vi.fn(),
     setSelectedRunId: vi.fn(),
     setRunDetailNodeId: vi.fn(),
     setSearchParams: vi.fn() as unknown as SetURLSearchParams,
@@ -66,9 +69,12 @@ describe("useWorkflowHeaderEditActions", () => {
     renderHook(() =>
       useWorkflowHeaderEditActions({
         isRunsMode: false,
+        isVersionsMode: false,
         handleExitRunsMode: vi.fn(),
+        handleExitVersionsMode: vi.fn(),
         handleToggleEditMode,
         setIsRunsMode: vi.fn(),
+        setIsVersionsMode: vi.fn(),
         setSelectedRunId: vi.fn(),
         setRunDetailNodeId: vi.fn(),
         setSearchParams: setSearchParams as unknown as SetURLSearchParams,

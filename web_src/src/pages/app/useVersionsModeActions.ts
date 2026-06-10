@@ -1,39 +1,39 @@
 import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
-interface FilesModeActionsConfig {
-  setIsFilesMode: (value: boolean) => void;
+interface VersionsModeActionsConfig {
+  setIsVersionsMode: (value: boolean) => void;
   setIsConsoleMode: (value: boolean) => void;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
-  setIsVersionsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
+  setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
-export function useFilesModeActions({
-  setIsFilesMode,
+export function useVersionsModeActions({
+  setIsVersionsMode,
   setIsConsoleMode,
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
   setIsRunsMode,
-  setIsVersionsMode,
   setIsMemoryMode,
+  setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
-}: FilesModeActionsConfig) {
-  const handleSelectFilesMode = useCallback(() => {
-    setIsFilesMode(true);
+}: VersionsModeActionsConfig) {
+  const handleSelectVersionsMode = useCallback(() => {
+    setIsVersionsMode(true);
     setIsConsoleMode(false);
     setIsConsoleAddPanelOpen(false);
     setIsConsoleYamlOpen(false);
     setIsRunsMode(false);
-    setIsVersionsMode(false);
     setIsMemoryMode(false);
+    setIsFilesMode(false);
     setSelectedRunId(null);
-    setSearchParams(toFilesSearchParams, { replace: true });
+    setSearchParams(toVersionsSearchParams, { replace: true });
   }, [
     setIsConsoleAddPanelOpen,
     setIsConsoleMode,
@@ -42,30 +42,30 @@ export function useFilesModeActions({
     setIsMemoryMode,
     setIsRunsMode,
     setIsVersionsMode,
-    setSearchParams,
     setSelectedRunId,
+    setSearchParams,
   ]);
 
-  const handleExitFilesMode = useCallback(() => {
-    setIsFilesMode(false);
-    setSearchParams(removeFilesSearchParam, { replace: true });
-  }, [setIsFilesMode, setSearchParams]);
+  const handleExitVersionsMode = useCallback(() => {
+    setIsVersionsMode(false);
+    setSearchParams(removeVersionsSearchParam, { replace: true });
+  }, [setIsVersionsMode, setSearchParams]);
 
-  return { handleSelectFilesMode, handleExitFilesMode };
+  return { handleSelectVersionsMode, handleExitVersionsMode };
 }
 
-function toFilesSearchParams(current: URLSearchParams): URLSearchParams {
+function toVersionsSearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "files");
+  next.set("view", "versions");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
+  next.delete("file");
   return next;
 }
 
-function removeFilesSearchParam(current: URLSearchParams): URLSearchParams {
+function removeVersionsSearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
-  next.delete("file");
   return next;
 }
