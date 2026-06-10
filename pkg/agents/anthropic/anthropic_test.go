@@ -522,7 +522,7 @@ func TestStreamEvents_IgnoresUnknownMidTurnEvents(t *testing.T) {
 }
 
 func TestStreamEvents_StopsWhenCallbackRequestsCustomToolHandling(t *testing.T) {
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
 		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
 
@@ -576,7 +576,7 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 func TestStreamEvents_KeysCustomToolUseByEventID(t *testing.T) {
 	// Managed Agents require user.custom_tool_result.custom_tool_use_id to
 	// reference the agent.custom_tool_use event id from requires_action.
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -620,7 +620,7 @@ func TestStreamEvents_MapsAlternateToolNameField(t *testing.T) {
 }
 
 func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
-	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_app\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
 		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
 
