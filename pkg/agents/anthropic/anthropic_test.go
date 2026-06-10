@@ -88,15 +88,23 @@ func TestDefaultAgentPrompt_IsEmbedded(t *testing.T) {
 	assert.Contains(t, prompt, "## App Update Rules")
 }
 
+func defaultAgentToolsJSON(t *testing.T) string {
+	t.Helper()
+	tools, err := json.Marshal(defaultAgentTools())
+	require.NoError(t, err)
+	return string(tools)
+}
+
 func TestSyncAgentPrompt_SkipsUpdateWhenCurrent(t *testing.T) {
 	postCount := 0
+	tools := defaultAgentToolsJSON(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/agents/agent-123", r.URL.Path)
 		assert.Equal(t, "test-key", r.Header.Get("x-api-key"))
 
 		if r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte("{\"system\":\"current prompt\\n\\n\",\"version\":7}"))
+			_, _ = w.Write([]byte(`{"system":"current prompt\n\n","version":7,"tools":` + tools + `}`))
 			return
 		}
 
@@ -114,8 +122,68 @@ func TestSyncAgentPrompt_SkipsUpdateWhenCurrent(t *testing.T) {
 	assert.Equal(t, 0, postCount)
 }
 
+func TestSyncAgentPrompt_UpdatesWhenCurrentAndToolsOmittedOnRead(t *testing.T) {
+	postCount := 0
+	tools := defaultAgentToolsJSON(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"current prompt\n","version":7}`))
+			return
+		}
+
+		postCount++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"system":"current prompt\n","version":8,"tools":` + tools + `}`))
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "current prompt\n")
+	require.NoError(t, err)
+	assert.Equal(t, 1, postCount)
+}
+
+func TestSyncAgentPrompt_SkipsUpdateWhenCurrentToolsHaveDifferentOrder(t *testing.T) {
+	postCount := 0
+	reversedTools, err := json.Marshal([]map[string]any{
+		defaultAgentTools()[2],
+		defaultAgentTools()[1],
+		defaultAgentTools()[0],
+	})
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"current prompt\n","version":7,"tools":` + string(reversedTools) + `}`))
+			return
+		}
+
+		postCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	err = SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "current prompt\n")
+	require.NoError(t, err)
+	assert.Equal(t, 0, postCount)
+}
+
 func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
 	var capturedBody map[string]any
+	tools := defaultAgentToolsJSON(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/agents/agent-123", r.URL.Path)
 
@@ -129,7 +197,7 @@ func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
 			_ = json.Unmarshal(body, &capturedBody)
 
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10,"tools":` + tools + `}`))
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -144,9 +212,58 @@ func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new prompt", capturedBody["system"])
 	assert.Equal(t, float64(9), capturedBody["version"])
+	require.NotEmpty(t, capturedBody["tools"])
 }
 
 func TestSyncAgentPrompt_AcceptsUpdatedPromptWithNormalizedTrailingNewlines(t *testing.T) {
+	tools := defaultAgentToolsJSON(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10,"tools":` + tools + `}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt\n\n")
+	require.NoError(t, err)
+}
+
+func TestSyncAgentPrompt_ErrorsWhenUpdatedToolsDiffer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10,"tools":[{"type":"agent_toolset_20260401"}]}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provider returned different tools")
+}
+
+func TestSyncAgentPrompt_ErrorsWhenUpdatedToolsAreOmitted(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -165,8 +282,9 @@ func TestSyncAgentPrompt_AcceptsUpdatedPromptWithNormalizedTrailingNewlines(t *t
 		APIKey:  "test-key",
 		AgentID: "agent-123",
 		BaseURL: server.URL,
-	}, "new prompt\n\n")
-	require.NoError(t, err)
+	}, "new prompt")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provider returned different tools")
 }
 
 func TestSendMessage_PrependsPreamble(t *testing.T) {
@@ -245,6 +363,32 @@ func TestDefineOutcome_PrependsPreambleToDescription(t *testing.T) {
 	require.Len(t, events, 1)
 	event := events[0].(map[string]any)
 	assert.Equal(t, "[ctx]\n\nBuild the workflow", event["description"])
+}
+
+func TestSendCustomToolResults_SendsUserCustomToolResultEvents(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/sessions/sesn_abc/events", r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendCustomToolResults(context.Background(), "sesn_abc", []agents.CustomToolResult{
+		{CustomToolUseID: "evt_1", Content: `{"ok":true}`},
+	})
+	require.NoError(t, err)
+
+	events := capturedBody["events"].([]any)
+	require.Len(t, events, 1)
+	event := events[0].(map[string]any)
+	assert.Equal(t, "user.custom_tool_result", event["type"])
+	assert.Equal(t, "evt_1", event["custom_tool_use_id"])
+	content := event["content"].([]any)
+	assert.Equal(t, `{"ok":true}`, content[0].(map[string]any)["text"])
 }
 
 func TestDeleteSession_SendsCorrectRequest(t *testing.T) {
@@ -401,6 +545,70 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 	require.Len(t, received, 3)
 	assert.Equal(t, "toolu_1", received[0].ProviderEventID, "tool_use must key on tool_use_id")
 	assert.Equal(t, "toolu_1", received[1].ProviderEventID, "tool_result must key on the same tool_use_id")
+}
+
+func TestStreamEvents_MapsAlternateToolNameField(t *testing.T) {
+	const sse = "data: {\"id\":\"evt_A\",\"type\":\"agent.tool_use\",\"tool_use_id\":\"toolu_1\",\"tool_name\":\"read\",\"input\":{\"file_path\":\"/tmp/spec.md\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+	require.Len(t, received, 2)
+	assert.Equal(t, "read", received[0].ToolName)
+	assert.Contains(t, received[0].ToolInput, "/tmp/spec.md")
+}
+
+func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
+		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
+	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
+}
+
+func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
+	const sse = "data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
 }
 
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
