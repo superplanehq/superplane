@@ -1,0 +1,10 @@
+{
+  "data": {
+    "name": "my-instance",
+    "operation": "400d82dd-5a29-4530-8fea-bcf800000032",
+    "status": "PENDING",
+    "state": "PENDING_CREATE"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}
