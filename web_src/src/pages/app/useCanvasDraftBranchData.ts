@@ -11,7 +11,6 @@ import { isDraftVersion, sortDraftVersionsDesc } from "./lib/canvas-versions";
 type UseCanvasDraftBranchQueriesOptions = {
   organizationId?: string;
   canvasId?: string;
-  isTemplateCanvas: boolean;
   currentUserId?: string;
   searchParams: URLSearchParams;
   setSearchParams: SetURLSearchParams;
@@ -20,12 +19,11 @@ type UseCanvasDraftBranchQueriesOptions = {
 export function useCanvasDraftBranchQueries({
   organizationId,
   canvasId,
-  isTemplateCanvas,
   currentUserId,
   searchParams,
   setSearchParams,
 }: UseCanvasDraftBranchQueriesOptions) {
-  const { data: draftBranchesRaw = [] } = useListDraftBranches(organizationId!, canvasId!, !isTemplateCanvas);
+  const { data: draftBranchesRaw = [] } = useListDraftBranches(organizationId!, canvasId!, true);
   const draftBranches = useMemo(() => sortDraftVersionsDesc(draftBranchesRaw), [draftBranchesRaw]);
   const draftVersionQueries = useQueries({
     queries: draftBranches
@@ -34,7 +32,7 @@ export function useCanvasDraftBranchQueries({
       .map((versionId) => ({
         queryKey: canvasKeys.versionDetail(canvasId!, versionId),
         queryFn: async () => fetchCanvasVersionWithSpec(canvasId!, versionId),
-        enabled: !!organizationId && !!canvasId && !!versionId && !isTemplateCanvas,
+        enabled: !!organizationId && !!canvasId && !!versionId,
       })),
   });
   const draftVersionsFromBranches = useMemo(

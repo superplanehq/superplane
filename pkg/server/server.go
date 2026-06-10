@@ -27,7 +27,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
@@ -138,7 +137,7 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -161,7 +160,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -560,8 +559,6 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-
-	templates.Setup(registry)
 
 	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
 

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -53,27 +52,6 @@ func TestDeleteCanvasVersion(t *testing.T) {
 		s, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-	})
-
-	t.Run("template canvas -> error", func(t *testing.T) {
-		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-delete-template")
-		canvasUUID := uuid.MustParse(canvasID)
-
-		createResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "")
-		require.NoError(t, err)
-		versionID := createResponse.GetVersion().GetMetadata().GetId()
-
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", canvasUUID).
-			Update("is_template", true).
-			Error)
-
-		_, err = DeleteCanvasVersion(ctx, r.Organization.ID.String(), canvasID, versionID)
-		s, ok := status.FromError(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "templates are read-only")
 	})
 
 	t.Run("missing version -> not found", func(t *testing.T) {

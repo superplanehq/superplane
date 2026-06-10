@@ -98,7 +98,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
-				IsTemplate:     canvas.IsTemplate,
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
@@ -151,7 +150,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
-			IsTemplate:     canvas.IsTemplate,
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
