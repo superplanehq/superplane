@@ -33,7 +33,6 @@ const (
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
-var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
@@ -103,9 +102,9 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 	}
 }
 
-// dispatch acquires a concurrency slot and the per-session stream lock before
-// ACKing the queue message. If another worker already owns the session lock,
-// it returns an error so the message can be retried instead of dropped.
+// dispatch acquires a concurrency slot before ACKing the queue message. If
+// another worker already owns the session lock, this worker waits for the lock
+// and then rechecks session state so a follow-up turn is not dropped.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	select {
 	case w.slots <- struct{}{}:
@@ -125,13 +124,12 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 
 	go func() {
 		defer func() {
-			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
 				log.WithField("panic", r).Error("agent stream handler panicked")
 			}
 		}()
-		if err := w.handleLocked(ctx, request.req, request.sessionID); err != nil {
+		if err := w.handleRequest(ctx, request); err != nil {
 			log.WithError(err).Error("agent stream handler error")
 		}
 	}()
@@ -191,8 +189,7 @@ func (w *AgentStreamWorker) Handle(parentCtx context.Context, body []byte) error
 	if request == nil {
 		return nil
 	}
-	defer request.unlock()
-	return w.handleLocked(parentCtx, request.req, request.sessionID)
+	return w.handleRequest(parentCtx, request)
 }
 
 type lockedAgentStreamRequest struct {
@@ -219,8 +216,11 @@ func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedA
 		return nil, fmt.Errorf("agent stream: acquire session lock: %w", err)
 	}
 	if !locked {
-		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, retrying request later")
-		return nil, errAgentStreamAlreadyLocked
+		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, waiting to retry request")
+		return &lockedAgentStreamRequest{
+			req:       req,
+			sessionID: sessionID,
+		}, nil
 	}
 
 	return &lockedAgentStreamRequest{
@@ -228,6 +228,18 @@ func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedA
 		sessionID: sessionID,
 		unlock:    unlock,
 	}, nil
+}
+
+func (w *AgentStreamWorker) handleRequest(parentCtx context.Context, request *lockedAgentStreamRequest) error {
+	if request.unlock == nil {
+		unlock, err := waitAgentStreamLock(parentCtx, request.sessionID)
+		if err != nil {
+			return fmt.Errorf("agent stream: wait for session lock: %w", err)
+		}
+		request.unlock = unlock
+	}
+	defer request.unlock()
+	return w.handleLocked(parentCtx, request.req, request.sessionID)
 }
 
 func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages.AgentStreamRequest, sessionID uuid.UUID) error {
@@ -244,9 +256,13 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		}).Warn("agent stream: provider mismatch, dropping")
 		return nil
 	}
-
-	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
-	defer cancel()
+	if session.Status != models.AgentSessionStatusStreaming {
+		log.WithFields(log.Fields{
+			"session_id": sessionID,
+			"status":     session.Status,
+		}).Info("agent stream: session is no longer streaming, dropping request")
+		return nil
+	}
 
 	publish := func(event messages.AgentSessionEventMessage) {
 		event.SessionID = sessionID.String()
@@ -255,15 +271,64 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		}
 	}
 
-	publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
+	for {
+		turnStartedAt := session.UpdatedAt
+		publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
+
+		streamErr := w.streamProviderTurn(parentCtx, session, publish)
+		closeOpenTools(sessionID, publish)
+
+		if streamErr != nil {
+			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+			publish(messages.AgentSessionEventMessage{
+				Event:  "session_failed",
+				Status: models.AgentSessionStatusFailed,
+				Error:  streamErr.Error(),
+			})
+			log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			return nil
+		}
+
+		markedIdle, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusIdle, turnStartedAt)
+		if err != nil {
+			log.WithError(err).Warn("agent stream: failed to mark session idle")
+			return nil
+		}
+		if markedIdle {
+			return nil
+		}
+
+		session, err = models.FindAgentSession(sessionID)
+		if err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: session not found after turn, stopping")
+			return nil
+		}
+		if session.Status != models.AgentSessionStatusStreaming {
+			log.WithFields(log.Fields{
+				"session_id": sessionID,
+				"status":     session.Status,
+			}).Info("agent stream: session changed after turn, stopping")
+			return nil
+		}
+		log.WithField("session_id", sessionID).Info("agent stream: follow-up request arrived while stream was locked, continuing")
+	}
+}
+
+func (w *AgentStreamWorker) streamProviderTurn(
+	parentCtx context.Context,
+	session *models.AgentSession,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
+	defer cancel()
 
 	var streamErr error
 	customTools := newCustomToolTurnState()
 
 	for {
 		customTools.clearRequirement()
-		err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(sessionID, evt, publish, &streamErr, customTools)
+		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
+			return handleProviderEvent(session.ID, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
@@ -273,32 +338,13 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 			streamErr = err
 		}
 		if streamErr != nil || !customTools.resultsRequired {
-			break
+			return streamErr
 		}
 
 		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
-			streamErr = err
-			break
+			return err
 		}
 	}
-
-	closeOpenTools(sessionID, publish)
-
-	if streamErr != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		publish(messages.AgentSessionEventMessage{
-			Event:  "session_failed",
-			Status: models.AgentSessionStatusFailed,
-			Error:  streamErr.Error(),
-		})
-		log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
-		return nil
-	}
-
-	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle); err != nil {
-		log.WithError(err).Warn("agent stream: failed to mark session idle")
-	}
-	return nil
 }
 
 func handleProviderEvent(
@@ -505,6 +551,30 @@ func tryAgentStreamLock(ctx context.Context, sessionID uuid.UUID) (func(), bool,
 	return func() {
 		releaseAgentStreamLock(conn, db, key)
 	}, true, nil
+}
+
+func waitAgentStreamLock(ctx context.Context, sessionID uuid.UUID) (func(), error) {
+	db, err := database.OpenDedicatedSQLDB("agent-stream-lock-wait", 1)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	key := agentStreamLockKey(sessionID)
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
+		_ = conn.Close()
+		_ = db.Close()
+		return nil, err
+	}
+
+	return func() {
+		releaseAgentStreamLock(conn, db, key)
+	}, nil
 }
 
 func releaseAgentStreamLock(conn *sql.Conn, db *sql.DB, key int64) {

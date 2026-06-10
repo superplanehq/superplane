@@ -7,10 +7,15 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const sendMutation = {
-  isPending: false,
-  mutateAsync: vi.fn(),
-};
+const { sendMutation, chatState } = vi.hoisted(() => ({
+  sendMutation: {
+    isPending: false,
+    mutateAsync: vi.fn(),
+  },
+  chatState: {
+    status: "idle",
+  },
+}));
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: { spec: { nodes: [] } } }),
@@ -20,7 +25,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 vi.mock("@/hooks/useAgentChats", () => ({
-  useCanvasAgentChat: () => ({ data: { id: "chat-1" }, isLoading: false }),
+  useCanvasAgentChat: () => ({ data: { id: "chat-1", status: chatState.status }, isLoading: false }),
   useAgentChatMessages: () => ({
     data: {
       pages: [
@@ -83,6 +88,10 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
+    chatState.status = "idle";
+    sendMutation.isPending = false;
+    sendMutation.mutateAsync.mockReset();
+    sendMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
   });
 
@@ -90,6 +99,19 @@ describe("CanvasToolSidebar", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+  });
+
+  it("allows retrying a failed session", async () => {
+    const user = userEvent.setup();
+    chatState.status = "failed";
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    expect(await screen.findByText("Last turn failed")).toBeInTheDocument();
+    await user.type(screen.getByTestId("agent-input"), "retry");
+    await user.click(screen.getByTestId("agent-send-message-button"));
+
+    expect(sendMutation.mutateAsync).toHaveBeenCalledWith({ chatId: "chat-1", content: "retry", mode: "operator" });
   });
 
   it("does not render when managed agents are disabled", () => {
