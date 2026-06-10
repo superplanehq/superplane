@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,8 @@ export function MarkdownVariablesPanel({
   errors,
   isLoading,
   onInsertSnippet,
+  collapsed = false,
+  onToggleCollapsed,
 }: {
   canvasId: string;
   draftBody: string;
@@ -87,6 +89,10 @@ export function MarkdownVariablesPanel({
   errors: MarkdownVariableError[];
   isLoading: boolean;
   onInsertSnippet: (snippet: string) => void;
+  /** When `true`, render the slim collapsed strip instead of the full rail. */
+  collapsed?: boolean;
+  /** Toggle the collapsed state. Required when `collapsed` is used. */
+  onToggleCollapsed?: () => void;
 }) {
   void _draftBody;
   const updateVariable = (index: number, next: MarkdownVariable) => {
@@ -127,6 +133,10 @@ export function MarkdownVariablesPanel({
     return dups;
   }, [draftVariables]);
 
+  if (collapsed) {
+    return <CollapsedVariablesStrip count={draftVariables.length} onToggleCollapsed={onToggleCollapsed} />;
+  }
+
   return (
     <div
       // `min-h-0 min-w-0` ensures the panel can shrink to its grid track even
@@ -136,9 +146,24 @@ export function MarkdownVariablesPanel({
       className="flex min-h-0 min-w-0 flex-col bg-slate-50/40 text-xs text-slate-700"
       data-testid="console-markdown-variables"
     >
-      <div className="flex items-center justify-between border-b border-slate-950/10 px-3 py-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Variables</Label>
-        <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={addVariable}>
+      <div className="flex items-center justify-between gap-1 border-b border-slate-950/10 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-1">
+          {onToggleCollapsed ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={onToggleCollapsed}
+              aria-label="Collapse variables"
+              className="h-6 w-6 shrink-0 text-slate-500 hover:text-slate-700"
+              data-testid="console-markdown-variables-collapse"
+            >
+              <ChevronRight className="size-3.5" />
+            </Button>
+          ) : null}
+          <Label className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">Variables</Label>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="h-7 shrink-0 gap-1" onClick={addVariable}>
           <Plus className="size-3.5" />
           Add
         </Button>
@@ -167,6 +192,40 @@ export function MarkdownVariablesPanel({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Slim vertical strip shown in place of the full variables rail when the
+ * panel is collapsed (either auto-collapsed because the parent widget is
+ * narrow, or because the author explicitly hid the rail). Clicking anywhere
+ * on the strip re-expands the rail; the count badge is just an
+ * at-a-glance affordance so the author knows whether there are variables to
+ * come back to.
+ */
+function CollapsedVariablesStrip({ count, onToggleCollapsed }: { count: number; onToggleCollapsed?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleCollapsed}
+      aria-label="Expand variables"
+      aria-expanded={false}
+      className="flex h-full w-9 shrink-0 flex-col items-center gap-2 border-l border-slate-950/10 bg-slate-50/40 py-2 text-slate-500 hover:bg-slate-100/60 hover:text-slate-700"
+      data-testid="console-markdown-variables-expand"
+    >
+      <ChevronLeft className="size-3.5" />
+      <span
+        className="text-[10px] font-semibold uppercase tracking-wide"
+        style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+      >
+        Variables
+      </span>
+      {count > 0 ? (
+        <span className="mt-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+          {count}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
