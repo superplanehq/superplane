@@ -21,16 +21,10 @@ interface QueryConfiguration {
 
 interface QueryRangeConfiguration {
   query?: string;
-  lookbackPeriod?: string;
+  start?: string;
+  end?: string;
+  step?: string;
 }
-
-const lookbackLabels: Record<string, string> = {
-  "1h": "last 1 hour",
-  "6h": "last 6 hours",
-  "24h": "last 24 hours",
-  "7d": "last 7 days",
-  "14d": "last 14 days",
-};
 
 interface QueryNodeMetadata {
   query?: string;
@@ -103,8 +97,11 @@ function queryMetadata(node: NodeInfo): MetadataItem[] {
 function queryRangeMetadata(node: NodeInfo): MetadataItem[] {
   const metadata = queryMetadata(node);
   const config = node.configuration as QueryRangeConfiguration | undefined;
-  if (config?.lookbackPeriod) {
-    metadata.push({ icon: "clock", label: lookbackLabels[config.lookbackPeriod] || config.lookbackPeriod });
+  // Show the resolution step (the most compact part of the window); skip
+  // unresolved expressions like other GCP mappers.
+  const step = config?.step;
+  if (step && !step.includes("{{")) {
+    metadata.push({ icon: "clock", label: `step ${step}` });
   }
   return metadata;
 }

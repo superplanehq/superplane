@@ -1550,20 +1550,22 @@ Emits one `gcp.prometheus.query` payload:
 
 **Component key:** `gcp.prometheus.queryRange`
 
-The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over a relative lookback window.
+The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over an explicit time range.
 
-GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range` and returns a matrix of samples from `now - lookback` to `now`.
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range` and returns a matrix of samples between `start` and `end` at the given `step` resolution.
 
 ### Use Cases
 
 - **Trend analysis**: Pull a metric over a window to summarise or chart it downstream
-- **Incident investigation**: Fetch recent samples when responding to an alert
+- **Incident investigation**: Fetch samples for a specific time range when responding to an alert
 - **Anomaly checks**: Evaluate an expression across time before acting
 
 ### Configuration
 
 - **Query**: Required PromQL expression to evaluate (supports expressions). Example: `rate(prometheus_http_requests_total[5m])`
-- **Lookback Period**: How far back to query (1 hour to 14 days). The component computes the start/end window and a sensible resolution step automatically.
+- **Start**: Required start timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step (e.g. `15s`, `1m`)
 
 ### Output
 
@@ -1571,7 +1573,7 @@ Emits one `gcp.prometheus.queryRange` payload:
 - **resultType**: typically `matrix`
 - **result**: the Prometheus result (series with their labels and `values` over time)
 - **seriesCount**: number of series returned
-- **lookbackPeriod**, **start**, **end**, **step**: the resolved query window
+- **start**, **end**, **step**: the query window
 
 ### Important Notes
 
@@ -1584,7 +1586,6 @@ Emits one `gcp.prometheus.queryRange` payload:
 {
   "data": {
     "end": "2026-01-01T01:00:00Z",
-    "lookbackPeriod": "1h",
     "result": [
       {
         "metric": {

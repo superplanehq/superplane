@@ -3,9 +3,7 @@ package prometheus
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -13,39 +11,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// rangeLookbackOptions are the relative windows offered for a range query,
-// matching the lookback convention used by the metrics components.
-var rangeLookbackOptions = []configuration.FieldOption{
-	{Label: "Last 1 hour", Value: "1h"},
-	{Label: "Last 6 hours", Value: "6h"},
-	{Label: "Last 24 hours", Value: "24h"},
-	{Label: "Last 7 days", Value: "7d"},
-	{Label: "Last 14 days", Value: "14d"},
-}
-
-var rangeLookbackDurations = map[string]time.Duration{
-	"1h":  time.Hour,
-	"6h":  6 * time.Hour,
-	"24h": 24 * time.Hour,
-	"7d":  7 * 24 * time.Hour,
-	"14d": 14 * 24 * time.Hour,
-}
-
-// rangeLookbackStepSeconds is the query resolution step per window, kept coarse
-// enough to stay well within the Prometheus points-per-query limit.
-var rangeLookbackStepSeconds = map[string]int{
-	"1h":  60,
-	"6h":  300,
-	"24h": 300,
-	"7d":  3600,
-	"14d": 3600,
-}
-
 type QueryRange struct{}
 
 type QueryRangeSpec struct {
-	Query          string `mapstructure:"query"`
-	LookbackPeriod string `mapstructure:"lookbackPeriod"`
+	Query string `mapstructure:"query"`
+	Start string `mapstructure:"start"`
+	End   string `mapstructure:"end"`
+	Step  string `mapstructure:"step"`
 }
 
 func (q *QueryRange) Name() string {
@@ -61,20 +33,22 @@ func (q *QueryRange) Description() string {
 }
 
 func (q *QueryRange) Documentation() string {
-	return `The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over a relative lookback window.
+	return `The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over an explicit time range.
 
-GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls ` + "`GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range`" + ` and returns a matrix of samples from ` + "`now - lookback`" + ` to ` + "`now`" + `.
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls ` + "`GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range`" + ` and returns a matrix of samples between ` + "`start`" + ` and ` + "`end`" + ` at the given ` + "`step`" + ` resolution.
 
 ## Use Cases
 
 - **Trend analysis**: Pull a metric over a window to summarise or chart it downstream
-- **Incident investigation**: Fetch recent samples when responding to an alert
+- **Incident investigation**: Fetch samples for a specific time range when responding to an alert
 - **Anomaly checks**: Evaluate an expression across time before acting
 
 ## Configuration
 
 - **Query**: Required PromQL expression to evaluate (supports expressions). Example: ` + "`rate(prometheus_http_requests_total[5m])`" + `
-- **Lookback Period**: How far back to query (1 hour to 14 days). The component computes the start/end window and a sensible resolution step automatically.
+- **Start**: Required start timestamp in RFC3339 or Unix format (supports expressions). Example: ` + "`2026-01-01T00:00:00Z`" + `
+- **End**: Required end timestamp in RFC3339 or Unix format (supports expressions). Example: ` + "`2026-01-02T00:00:00Z`" + `
+- **Step**: Required query resolution step (e.g. ` + "`15s`" + `, ` + "`1m`" + `)
 
 ## Output
 
@@ -82,7 +56,7 @@ Emits one ` + "`gcp.prometheus.queryRange`" + ` payload:
 - **resultType**: typically ` + "`matrix`" + `
 - **result**: the Prometheus result (series with their labels and ` + "`values`" + ` over time)
 - **seriesCount**: number of series returned
-- **lookbackPeriod**, **start**, **end**, **step**: the resolved query window
+- **start**, **end**, **step**: the query window
 
 ## Important Notes
 
@@ -113,17 +87,31 @@ func (q *QueryRange) Configuration() []configuration.Field {
 			Description: "PromQL expression to evaluate",
 		},
 		{
-			Name:        "lookbackPeriod",
-			Label:       "Lookback Period",
-			Type:        configuration.FieldTypeSelect,
+			Name:        "start",
+			Label:       "Start",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Default:     "1h",
-			Description: "How far back to query metrics data",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: rangeLookbackOptions,
-				},
-			},
+			Placeholder: "2026-01-01T00:00:00Z",
+			Default:     "2026-01-01T00:00:00Z",
+			Description: "Start timestamp (RFC3339 or Unix)",
+		},
+		{
+			Name:        "end",
+			Label:       "End",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "2026-01-02T00:00:00Z",
+			Default:     "2026-01-02T00:00:00Z",
+			Description: "End timestamp (RFC3339 or Unix)",
+		},
+		{
+			Name:        "step",
+			Label:       "Step",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "15s",
+			Default:     "15s",
+			Description: "Query resolution step (e.g. 15s, 1m)",
 		},
 	}
 }
@@ -148,32 +136,23 @@ func (q *QueryRange) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	duration := rangeLookbackDurations[spec.LookbackPeriod]
-	stepSeconds := rangeLookbackStepSeconds[spec.LookbackPeriod]
-	end := time.Now().UTC()
-	start := end.Add(-duration)
-	step := fmt.Sprintf("%ds", stepSeconds)
+	start := strings.TrimSpace(spec.Start)
+	end := strings.TrimSpace(spec.End)
+	step := strings.TrimSpace(spec.Step)
 
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	url := rangeQueryURL(
-		client.ProjectID(),
-		strings.TrimSpace(spec.Query),
-		strconv.FormatInt(start.Unix(), 10),
-		strconv.FormatInt(end.Unix(), 10),
-		step,
-	)
+	url := rangeQueryURL(client.ProjectID(), strings.TrimSpace(spec.Query), start, end, step)
 	payload, err := runQuery(client, url)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to query managed prometheus", err))
 	}
 
-	payload["lookbackPeriod"] = spec.LookbackPeriod
-	payload["start"] = start.Format(time.RFC3339)
-	payload["end"] = end.Format(time.RFC3339)
+	payload["start"] = start
+	payload["end"] = end
 	payload["step"] = step
 
 	return ctx.ExecutionState.Emit(
@@ -187,11 +166,14 @@ func validateRangeSpec(spec QueryRangeSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return fmt.Errorf("query is required")
 	}
-	if spec.LookbackPeriod == "" {
-		return fmt.Errorf("lookbackPeriod is required")
+	if strings.TrimSpace(spec.Start) == "" {
+		return fmt.Errorf("start is required")
 	}
-	if _, ok := rangeLookbackDurations[spec.LookbackPeriod]; !ok {
-		return fmt.Errorf("invalid lookbackPeriod %q: must be one of 1h, 6h, 24h, 7d, 14d", spec.LookbackPeriod)
+	if strings.TrimSpace(spec.End) == "" {
+		return fmt.Errorf("end is required")
+	}
+	if strings.TrimSpace(spec.Step) == "" {
+		return fmt.Errorf("step is required")
 	}
 	return nil
 }

@@ -3,7 +3,6 @@
   "data": {
     "resultType": "matrix",
     "seriesCount": 1,
-    "lookbackPeriod": "1h",
     "start": "2026-01-01T00:00:00Z",
     "end": "2026-01-01T01:00:00Z",
     "step": "60s",
