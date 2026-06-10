@@ -293,6 +293,83 @@ func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
 	assert.Contains(t, err.Error(), "namespace")
 }
 
+func TestValidateMarkdownVariables_MemoryListMode(t *testing.T) {
+	// `mode: list` is the new opt-in that resolves the variable to every
+	// matching memory row so authors can use CEL list macros. We exercise
+	// the validator across the documented happy/sad paths so YAML diffs and
+	// the FE editor surface the same errors.
+	build := func(source map[string]any) ConsolePanel {
+		return ConsolePanel{
+			ID:   "p1",
+			Type: ConsolePanelTypeMarkdown,
+			Content: map[string]any{
+				"variables": []any{
+					map[string]any{"name": "rows", "source": source},
+				},
+			},
+		}
+	}
+
+	t.Run("accepts mode: list with no limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list",
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts mode: list with an integer limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 25,
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts mode: list with a whole-number float64 limit (YAML decoder shape)", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": float64(10),
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects an unknown mode", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "many",
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mode")
+	})
+
+	t.Run("rejects a non-numeric limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": "5",
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+
+	t.Run("rejects a fractional limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 1.5,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+
+	t.Run("rejects a zero / negative limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 0,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+
+		err = validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": -3,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+}
+
 func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
 	panel := ConsolePanel{
 		ID:   "p1",
