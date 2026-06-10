@@ -126,6 +126,54 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		assert.Contains(t, response.Body.String(), "Failed to get file")
 	})
 
+	t.Run("returns canvas.yaml for live version", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+
+		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "canvas.yaml")
+		assert.Equal(t, http.StatusOK, response.Code)
+		assert.Contains(t, response.Body.String(), "kind: Canvas")
+		assert.Contains(t, response.Header().Get("Content-Type"), "yaml")
+	})
+
+	t.Run("returns console.yaml for live version", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+
+		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "console.yaml")
+		assert.Equal(t, http.StatusOK, response.Code)
+		assert.Contains(t, response.Body.String(), "kind: Console")
+	})
+
+	t.Run("invalid version_id -> bad request", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+
+		url := fmt.Sprintf("/api/v1/canvases/%s/repository/file?path=canvas.yaml&version_id=not-a-uuid", canvas.ID.String())
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+		token, err := authentication.GenerateAccountToken(signer, authenticated.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("missing canvas version -> not found", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		missingVersion := uuid.NewString()
+
+		url := fmt.Sprintf("/api/v1/canvases/%s/repository/file?path=canvas.yaml&version_id=%s", canvas.ID.String(), missingVersion)
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+		token, err := authentication.GenerateAccountToken(signer, authenticated.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
 	t.Run("returns file contents", func(t *testing.T) {
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID)
