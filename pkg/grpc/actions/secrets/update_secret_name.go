@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"google.golang.org/grpc/codes"
@@ -18,15 +16,9 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	err := actions.ValidateUUIDs(idOrName)
-	var secret *models.Secret
+	secret, err := findSecretInDomain(domainType, domainID, idOrName)
 	if err != nil {
-		secret, err = models.FindSecretByName(domainType, uuid.MustParse(domainID), idOrName)
-	} else {
-		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
-	}
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, err
 	}
 
 	if secret.Name == name {

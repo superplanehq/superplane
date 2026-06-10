@@ -28,6 +28,17 @@ func TestSecrets(t *testing.T) {
 		steps.assertSecretVisibleInList("E2E Test Secret")
 	})
 
+	t.Run("secret remains usable after organization rename", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Secret After Org Rename", map[string]string{"API_KEY": "test-api-key-value"})
+		steps.renameOrganization("E2E Renamed Organization")
+		steps.assertSecretVisibleInList("E2E Secret After Org Rename")
+		steps.clickEditSecret("E2E Secret After Org Rename")
+		steps.assertSecretSavedInDB("E2E Secret After Org Rename", map[string]string{"API_KEY": "test-api-key-value"})
+	})
+
 	t.Run("adding a key/value pair to a secret", func(t *testing.T) {
 		steps := &SecretsSteps{t: t}
 		steps.start()
@@ -98,6 +109,15 @@ func (s *SecretsSteps) start() {
 func (s *SecretsSteps) visitSecretsPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/secrets")
 	s.session.Sleep(500)
+}
+
+func (s *SecretsSteps) renameOrganization(name string) {
+	s.session.Visit("/" + s.session.OrgID.String() + "/settings/general")
+	page := s.session.Page()
+	err := page.Locator("#organization-name-input").Fill(name)
+	require.NoError(s.t, err)
+	s.session.Click(q.Text("Save Changes"))
+	s.session.AssertText("Organization updated successfully")
 }
 
 func (s *SecretsSteps) clickCreateSecret() {
