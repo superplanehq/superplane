@@ -48,10 +48,6 @@ func ResolveCanvasChangeRequest(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)

@@ -5,7 +5,6 @@ import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./canvas-mem
 describe("canEditCanvasMemory", () => {
   const editingState = {
     canUpdateCanvas: true,
-    isTemplate: false,
     canvasDeletedRemotely: false,
     hasEditableVersion: true,
   };
@@ -18,12 +17,9 @@ describe("canEditCanvasMemory", () => {
     expect(canEditCanvasMemory({ ...editingState, hasEditableVersion: false })).toBe(false);
   });
 
-  it.each([{ canUpdateCanvas: false }, { isTemplate: true }, { canvasDeletedRemotely: true }])(
-    "blocks memory edits when %o",
-    (override) => {
-      expect(canEditCanvasMemory({ ...editingState, ...override })).toBe(false);
-    },
-  );
+  it.each([{ canUpdateCanvas: false }, { canvasDeletedRemotely: true }])("blocks memory edits when %o", (override) => {
+    expect(canEditCanvasMemory({ ...editingState, ...override })).toBe(false);
+  });
 });
 
 describe("shouldLoadCanvasMemoryEntries", () => {

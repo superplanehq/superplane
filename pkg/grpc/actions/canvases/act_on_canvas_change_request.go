@@ -135,10 +135,6 @@ func parseActOnCanvasChangeRequestIDs(canvasID string, changeRequestID string) (
 }
 
 func validateActOnCanvasChangeRequestCanvas(canvas *models.Canvas) error {
-	if canvas.IsTemplate {
-		return status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
 		return status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)

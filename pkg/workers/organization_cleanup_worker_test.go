@@ -10,6 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__CanvasCleanupWorker_GracePeriod(t *testing.T) {
@@ -114,5 +116,57 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		assert.Equal(t, int64(0), countAgentSessions(t, orphanSession.ID))
 		assert.Equal(t, int64(0), countAgentSessionMessages(t, orphanSession.ID))
 		assert.Contains(t, cleaner.deleted, orphanSession.ProviderSessionID)
+	})
+
+	t.Run("cleans up organization with legacy template workflows", func(t *testing.T) {
+		r2 := support.Setup(t)
+		defer r2.Close()
+
+		worker := NewOrganizationCleanupWorker(r2.GitProvider)
+		templateLiveVersionID := uuid.New()
+		templateCanvas := &models.Canvas{
+			ID:             uuid.New(),
+			OrganizationID: r2.Organization.ID,
+			LiveVersionID:  &templateLiveVersionID,
+			IsTemplate:     true,
+			Name:           support.RandomName("template"),
+		}
+		now := time.Now()
+		templateCanvas.CreatedAt = &now
+		templateCanvas.UpdatedAt = &now
+		require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(templateCanvas).Error; err != nil {
+				return err
+			}
+
+			return tx.Create(&models.CanvasVersion{
+				ID:          templateLiveVersionID,
+				WorkflowID:  templateCanvas.ID,
+				State:       models.CanvasVersionStatePublished,
+				PublishedAt: &now,
+				Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+				Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+				CreatedAt:   &now,
+				UpdatedAt:   &now,
+			}).Error
+		}))
+
+		require.NoError(t, models.SoftDeleteOrganization(r2.Organization.ID.String()))
+		deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r2.Organization.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
+
+		deletedOrganizations, err := models.ListDeletedOrganizations()
+		require.NoError(t, err)
+		require.Len(t, deletedOrganizations, 1)
+
+		require.NoError(t, worker.LockAndProcessOrganization(deletedOrganizations[0]))
+
+		var organizationCount int64
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r2.Organization.ID).Count(&organizationCount).Error)
+		assert.Equal(t, int64(0), organizationCount)
+
+		var templateCount int64
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", templateCanvas.ID).Count(&templateCount).Error)
+		assert.Equal(t, int64(0), templateCount)
 	})
 }
