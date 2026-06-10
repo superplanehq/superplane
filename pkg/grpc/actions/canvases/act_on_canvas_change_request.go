@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -27,6 +28,7 @@ func ActOnCanvasChangeRequest(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	changeRequestID string,
@@ -48,6 +50,7 @@ func ActOnCanvasChangeRequest(
 			ctx,
 			encryptor,
 			registry,
+			gitProv,
 			organizationID,
 			canvasID,
 			changeRequestID,

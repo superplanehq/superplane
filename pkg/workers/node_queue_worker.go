@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,17 +27,19 @@ import (
 )
 
 type NodeQueueWorker struct {
-	registry  *registry.Registry
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	registry    *registry.Registry
+	gitProvider gitprovider.Provider
+	semaphore   *semaphore.Weighted
+	logger      *log.Entry
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
 	return &NodeQueueWorker{
 		registry:    registry,
+		gitProvider: gitProvider,
 		rabbitMQURL: rabbitMQURL,
 		semaphore:   semaphore.NewWeighted(25),
 		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
@@ -229,7 +232,9 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents)
+	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
+
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents, repoFiles)
 	if err != nil {
 
 		//
