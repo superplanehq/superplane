@@ -3,6 +3,7 @@ package monitoring
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -53,7 +54,7 @@ func Test__OnAlert__Setup(t *testing.T) {
 		assert.Equal(t, stored.WebhookURL, labels["url"])
 	})
 
-	t.Run("updates the existing channel URL instead of creating a second channel", func(t *testing.T) {
+	t.Run("resyncs the existing channel URL and password instead of creating a second channel", func(t *testing.T) {
 		postCalled := false
 		var patchURL string
 		var patchBody map[string]any
@@ -78,17 +79,22 @@ func Test__OnAlert__Setup(t *testing.T) {
 		err := tr.Setup(core.TriggerContext{
 			Configuration: map[string]any{"states": []string{"open"}},
 			Integration:   &contexts.IntegrationContext{},
-			Webhook:       &contexts.NodeWebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "rotated-secret"},
 			Metadata:      meta,
 		})
 
 		require.NoError(t, err)
 		assert.False(t, postCalled, "should not create a second channel")
-		// The existing channel is patched to the node's (new) webhook URL.
+		// The existing channel is patched (URL + Basic-auth credentials), so a
+		// moved URL or a rotated secret keeps signed deliveries working.
 		assert.Contains(t, patchURL, "/notificationChannels/existing?updateMask=labels.url")
+		assert.Contains(t, patchURL, "labels.password")
+		labels := patchBody["labels"].(map[string]any)
+		assert.Equal(t, webhookAuthUsername, labels["username"])
+		assert.Equal(t, "rotated-secret", labels["password"])
 		stored := OnAlertMetadata{}
 		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
-		assert.Equal(t, stored.WebhookURL, patchBody["labels"].(map[string]any)["url"])
+		assert.Equal(t, stored.WebhookURL, labels["url"])
 	})
 
 	t.Run("requires a connected GCP integration", func(t *testing.T) {
@@ -246,6 +252,34 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, code)
 		assert.Empty(t, events.Payloads)
 	})
+
+	t.Run("fails closed when the webhook secret cannot be read", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(webhookAuthUsername+":test-webhook-secret")))
+
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"open"}},
+			Body:          openIncident,
+			Headers:       headers,
+			// A transient decrypt/lookup error must not be treated as "no secret".
+			Webhook: secretErrorWebhookContext{&contexts.NodeWebhookContext{}},
+			Events:  events,
+		})
+		require.Error(t, err)
+		assert.Equal(t, http.StatusUnauthorized, code)
+		assert.Empty(t, events.Payloads)
+	})
+}
+
+// secretErrorWebhookContext simulates a transient failure when reading the node
+// webhook secret (e.g. a decrypt or database error), to verify auth fails closed.
+type secretErrorWebhookContext struct {
+	*contexts.NodeWebhookContext
+}
+
+func (secretErrorWebhookContext) GetSecret() ([]byte, error) {
+	return nil, errors.New("decrypt failed")
 }
 
 func Test__OnAlert__Cleanup(t *testing.T) {
@@ -277,5 +311,22 @@ func Test__OnAlert__Cleanup(t *testing.T) {
 			Metadata:    &contexts.MetadataContext{},
 		})
 		require.NoError(t, err)
+	})
+
+	t.Run("does not block node removal when the integration is gone", func(t *testing.T) {
+		deleteCalled := false
+		withFactory(&mockClient{
+			projectID: "my-project",
+			deleteFunc: func(ctx context.Context, url string) ([]byte, error) {
+				deleteCalled = true
+				return []byte(`{}`), nil
+			},
+		})
+		err := tr.Cleanup(core.TriggerContext{
+			Integration: nil,
+			Metadata:    &contexts.MetadataContext{Metadata: OnAlertMetadata{NotificationChannel: "projects/my-project/notificationChannels/123"}},
+		})
+		require.NoError(t, err)
+		assert.False(t, deleteCalled, "cannot call Cloud Monitoring without an integration")
 	})
 }

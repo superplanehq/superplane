@@ -130,35 +130,32 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to set up webhook URL: %w", err)
 	}
-	previousURL := metadata.WebhookURL
 	metadata.WebhookURL = webhookURL
 
+	// The node webhook secret is the channel's Basic-auth password, so Cloud
+	// Monitoring signs every incident delivery (verified in HandleWebhook).
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return fmt.Errorf("failed to read webhook secret: %w", err)
+	}
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
 	if metadata.NotificationChannel == "" {
-		// First setup for this node: create the webhook channel signed with the
-		// node's webhook secret (Basic auth), so Cloud Monitoring authenticates
-		// every delivery.
-		secret, err := ctx.Webhook.GetSecret()
-		if err != nil {
-			return fmt.Errorf("failed to read webhook secret: %w", err)
-		}
-		client, err := getClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return fmt.Errorf("failed to create GCP client: %w", err)
-		}
+		// First setup for this node: create the signed webhook channel.
 		channelName, err := createWebhookChannel(client, webhookURL, string(secret))
 		if err != nil {
 			return err
 		}
 		metadata.NotificationChannel = channelName
-	} else if previousURL != webhookURL {
-		// The node webhook URL changed (e.g. the instance's public URL moved):
-		// point the existing channel at the new URL so Cloud Monitoring keeps
-		// delivering incidents instead of POSTing to the stale URL.
-		client, err := getClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return fmt.Errorf("failed to create GCP client: %w", err)
-		}
-		if err := updateWebhookChannelURL(client, metadata.NotificationChannel, webhookURL); err != nil {
+	} else {
+		// The channel already exists: resync its URL and Basic-auth password so a
+		// moved node webhook URL or a rotated webhook secret keeps signed
+		// deliveries flowing, instead of Cloud Monitoring POSTing to a stale URL
+		// or with an outdated password.
+		if err := updateWebhookChannel(client, metadata.NotificationChannel, webhookURL, string(secret)); err != nil {
 			return err
 		}
 	}
@@ -178,6 +175,13 @@ func (t *OnAlert) Cleanup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	if metadata.NotificationChannel == "" {
+		return nil
+	}
+
+	if ctx.Integration == nil {
+		// The integration is already gone, so we can't (and needn't) call Cloud
+		// Monitoring to delete the channel. Don't block removing the node on a
+		// missing integration — best-effort cleanup.
 		return nil
 	}
 
@@ -240,7 +244,12 @@ func authenticateWebhook(ctx core.WebhookRequestContext) error {
 		return nil
 	}
 	secret, err := ctx.Webhook.GetSecret()
-	if err != nil || len(secret) == 0 {
+	if err != nil {
+		// Fail closed: a transient decrypt/lookup error must not be treated as
+		// "no secret configured" and let an unauthenticated request through.
+		return fmt.Errorf("failed to read webhook secret: %w", err)
+	}
+	if len(secret) == 0 {
 		// No secret to verify against (e.g. a legacy channel) — don't block.
 		return nil
 	}
@@ -304,16 +313,21 @@ func createWebhookChannel(client Client, webhookURL, secret string) (string, err
 	return created.Name, nil
 }
 
-// updateWebhookChannelURL points an existing webhook notification channel at a
-// new node webhook URL, so a changed URL doesn't leave Cloud Monitoring posting
-// incidents to a stale endpoint.
-func updateWebhookChannelURL(client Client, channelName, webhookURL string) error {
+// updateWebhookChannel resyncs an existing webhook notification channel's URL and
+// Basic-auth credentials, so a moved node webhook URL or a rotated webhook secret
+// doesn't leave Cloud Monitoring posting incidents to a stale endpoint or with an
+// outdated password.
+func updateWebhookChannel(client Client, channelName, webhookURL, secret string) error {
 	body := map[string]any{
-		"labels": map[string]any{"url": webhookURL},
+		"labels": map[string]any{
+			"url":      webhookURL,
+			"username": webhookAuthUsername,
+			"password": secret,
+		},
 	}
-	url := fmt.Sprintf("%s/%s?updateMask=labels.url", monitoringBaseURL, channelName)
+	url := fmt.Sprintf("%s/%s?updateMask=labels.url,labels.username,labels.password", monitoringBaseURL, channelName)
 	if _, err := client.PatchURL(context.Background(), url, body); err != nil {
-		return fmt.Errorf("%s", apiErrorMessage("failed to update notification channel URL", roleHintChannelEditor, err))
+		return fmt.Errorf("%s", apiErrorMessage("failed to update notification channel", roleHintChannelEditor, err))
 	}
 	return nil
 }
