@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
@@ -130,19 +131,33 @@ func ListDatabases(ctx context.Context, client Client, project, instance string)
 	return resp.Items, nil
 }
 
-// ListInstances lists the Cloud SQL instances in the project.
+// ListInstances lists the Cloud SQL instances in the project, following
+// pagination so projects with more instances than one page are fully listed.
 func ListInstances(ctx context.Context, client Client, project string) ([]Instance, error) {
-	respBody, err := client.GetURL(ctx, instancesURL(project))
-	if err != nil {
-		return nil, err
+	var all []Instance
+	pageToken := ""
+	for {
+		u := instancesURL(project)
+		if pageToken != "" {
+			u += "?pageToken=" + url.QueryEscape(pageToken)
+		}
+		respBody, err := client.GetURL(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		var resp struct {
+			Items         []Instance `json:"items"`
+			NextPageToken string     `json:"nextPageToken"`
+		}
+		if err := json.Unmarshal(respBody, &resp); err != nil {
+			return nil, fmt.Errorf("parse instances list: %w", err)
+		}
+		all = append(all, resp.Items...)
+		if resp.NextPageToken == "" {
+			return all, nil
+		}
+		pageToken = resp.NextPageToken
 	}
-	var resp struct {
-		Items []Instance `json:"items"`
-	}
-	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("parse instances list: %w", err)
-	}
-	return resp.Items, nil
 }
 
 // databasePayload converts a Database into the component output payload.
