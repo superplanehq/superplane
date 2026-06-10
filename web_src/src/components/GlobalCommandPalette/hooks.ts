@@ -80,13 +80,7 @@ export function useCommandPaletteShortcuts({
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
 
-      if (
-        usesModifier &&
-        event.key === "k" &&
-        !canvasId &&
-        organizationId &&
-        (open || !isEditableTarget(event.target))
-      ) {
+      if (canToggleCommandPalette({ canvasId, event, open, organizationId, usesModifier })) {
         event.preventDefault();
         setOpen((prev) => !prev);
         return;
@@ -121,4 +115,24 @@ function toPermissionSet(permissions: AuthorizationPermission[]) {
       })
       .filter((value): value is string => !!value),
   );
+}
+
+function canToggleCommandPalette({
+  canvasId,
+  event,
+  open,
+  organizationId,
+  usesModifier,
+}: {
+  canvasId: string | null;
+  event: KeyboardEvent;
+  open: boolean;
+  organizationId: string | null;
+  usesModifier: boolean;
+}) {
+  if (!usesModifier) return false;
+  if (event.key !== "k") return false;
+  if (canvasId) return false;
+  if (!organizationId) return false;
+  return open || !isEditableTarget(event.target);
 }
