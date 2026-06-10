@@ -407,6 +407,32 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 	assert.Equal(t, "toolu_1", received[1].ProviderEventID, "tool_result must key on the same tool_use_id")
 }
 
+func TestStreamEvents_KeysCustomToolUseByEventID(t *testing.T) {
+	// Managed Agents require user.custom_tool_result.custom_tool_use_id to
+	// reference the agent.custom_tool_use event id from requires_action.
+	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"tool_use_id\":\"toolu_custom\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, "evt_custom", received[0].ProviderEventID)
+	assert.Equal(t, "evt_custom", received[0].ToolCallID)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
+}
+
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
 	const sse = "data: {\"id\":\"evt_fallback\",\"type\":\"agent.tool_use\",\"name\":\"search\"}\n\n" +
 		"data: {\"type\":\"session.status_idle\"}\n\n"
