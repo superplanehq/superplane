@@ -3,43 +3,57 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router-dom";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalCommandPalette } from ".";
+import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { openGlobalCommandPalette } from "./controller";
 
-const { accountState, createCanvasMock, defaultAccount, defaultPermissions, navigateMock, permissionsState } =
-  vi.hoisted(() => {
-    const defaultAccount = {
-      id: "account-1",
-      name: "Ada Lovelace",
-      email: "ada@example.com",
-      avatar_url: "",
-      installation_admin: true,
-      has_password: true,
-    };
-    type Account = typeof defaultAccount;
-    const defaultPermissions = [
-      { resource: "canvases", action: "create" },
-      { resource: "canvases", action: "read" },
-      { resource: "canvases", action: "update" },
-      { resource: "org", action: "read" },
-      { resource: "members", action: "read" },
-      { resource: "service_accounts", action: "read" },
-      { resource: "groups", action: "read" },
-      { resource: "roles", action: "read" },
-      { resource: "integrations", action: "read" },
-      { resource: "secrets", action: "read" },
-    ];
+const {
+  accountState,
+  createCanvasMock,
+  defaultAccount,
+  defaultPermissions,
+  inviteLinkQueryState,
+  inviteLinkState,
+  navigateMock,
+  permissionsState,
+  writeTextMock,
+} = vi.hoisted(() => {
+  const defaultAccount = {
+    id: "account-1",
+    name: "Ada Lovelace",
+    email: "ada@example.com",
+    avatar_url: "",
+    installation_admin: true,
+    has_password: true,
+  };
+  type Account = typeof defaultAccount;
+  const defaultPermissions = [
+    { resource: "canvases", action: "create" },
+    { resource: "canvases", action: "read" },
+    { resource: "canvases", action: "update" },
+    { resource: "org", action: "read" },
+    { resource: "members", action: "read" },
+    { resource: "members", action: "create" },
+    { resource: "service_accounts", action: "read" },
+    { resource: "groups", action: "read" },
+    { resource: "roles", action: "read" },
+    { resource: "integrations", action: "read" },
+    { resource: "secrets", action: "read" },
+  ];
 
-    return {
-      accountState: { account: defaultAccount as Account | null, loading: false },
-      createCanvasMock: vi.fn(),
-      defaultAccount,
-      defaultPermissions,
-      navigateMock: vi.fn(),
-      permissionsState: { permissions: defaultPermissions },
-    };
-  });
+  return {
+    accountState: { account: defaultAccount as Account | null, loading: false },
+    createCanvasMock: vi.fn(),
+    defaultAccount,
+    defaultPermissions,
+    inviteLinkQueryState: { enabledValues: [] as boolean[] },
+    inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
+    navigateMock: vi.fn(),
+    permissionsState: { permissions: defaultPermissions },
+    writeTextMock: vi.fn(),
+  };
+});
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof ReactRouterDom>("react-router-dom");
@@ -106,9 +120,13 @@ vi.mock("@/hooks/useOrganizationData", () => ({
     data: { enabled: true },
     error: null,
   }),
-  useOrganizationInviteLink: () => ({
-    data: { token: "test-invite-token", enabled: true },
-  }),
+  useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
+    inviteLinkQueryState.enabledValues.push(enabled);
+    return {
+      data: enabled ? inviteLinkState.data : undefined,
+      isLoading: false,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
@@ -153,6 +171,15 @@ function renderPalette(path = "/org-1") {
   );
 }
 
+function installClipboardWriteMock() {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: writeTextMock },
+  });
+}
+
+let unregisterCanvasNodeSearchProvider: (() => void) | null = null;
+
 describe("GlobalCommandPalette", () => {
   beforeEach(() => {
     accountState.account = defaultAccount;
@@ -161,7 +188,17 @@ describe("GlobalCommandPalette", () => {
     createCanvasMock.mockReset();
     createCanvasMock.mockResolvedValue({ data: { canvas: { metadata: { id: "canvas-new" } } } });
     navigateMock.mockReset();
+    inviteLinkQueryState.enabledValues = [];
+    inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
+    writeTextMock.mockReset();
+    writeTextMock.mockResolvedValue(undefined);
+    installClipboardWriteMock();
+  });
+
+  afterEach(() => {
+    unregisterCanvasNodeSearchProvider?.();
+    unregisterCanvasNodeSearchProvider = null;
   });
 
   it("opens and shows quick links", async () => {
@@ -171,7 +208,7 @@ describe("GlobalCommandPalette", () => {
 
     expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
     expect(screen.getByText("New App")).toBeInTheDocument();
-    expect(screen.getByText("Copy Invite Link")).toBeInTheDocument();
+    expect(await screen.findByText("Copy Invite Link")).toBeInTheDocument();
     expect(screen.getByText("Apps")).toBeInTheDocument();
     expect(screen.getByText("Integrations")).toBeInTheDocument();
     expect(screen.getByText("Go to Docs")).toBeInTheDocument();
@@ -250,6 +287,104 @@ describe("GlobalCommandPalette", () => {
     await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy-bot");
 
     expect(await screen.findByText("deploy-bot")).toBeInTheDocument();
+  });
+
+  it("searches canvas nodes from the canvas page", async () => {
+    const user = userEvent.setup();
+    const selectNode = vi.fn();
+    unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
+      searchNodes: (query) =>
+        query.toLowerCase().includes("deploy")
+          ? [
+              {
+                id: "node-1",
+                label: "Deploy component",
+                iconSlug: "box",
+                keywords: ["deploy component", "node-1"],
+              },
+            ]
+          : [],
+      selectNode,
+    });
+    renderPalette("/org-1/apps/canvas-1");
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy");
+    await user.click(await screen.findByText("Deploy component"));
+
+    expect(selectNode).toHaveBeenCalledWith("node-1");
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not fetch or show the invite command without member create permission", async () => {
+    permissionsState.permissions = defaultPermissions.filter(
+      (permission) => permission.resource !== "members" || permission.action !== "create",
+    );
+    renderPalette();
+
+    openPalette();
+
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(inviteLinkQueryState.enabledValues.length).toBeGreaterThan(0);
+    });
+    expect(inviteLinkQueryState.enabledValues).not.toContain(true);
+    expect(screen.queryByText("Copy Invite Link")).not.toBeInTheDocument();
+  });
+
+  it("disables invite copy when the invite link is inactive", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    inviteLinkState.data = { token: "test-invite-token", enabled: false };
+    renderPalette();
+
+    openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
+
+    expect(copyInviteLink.closest("[cmdk-item]")).toHaveAttribute("data-disabled", "true");
+    await user.click(copyInviteLink);
+    expect(writeTextMock).not.toHaveBeenCalled();
+  });
+
+  it("closes after copying the invite link successfully", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    renderPalette();
+
+    openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
+    await waitFor(() => {
+      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+    });
+    await user.click(copyInviteLink);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("stays open when invite link copy fails", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    writeTextMock.mockRejectedValue(new Error("Clipboard unavailable"));
+    renderPalette();
+
+    openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
+    await waitFor(() => {
+      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+    });
+    await user.click(copyInviteLink);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
+    });
+    expect(screen.getByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
   });
 
   it("creates an app with the quick shortcut", async () => {

@@ -8,6 +8,7 @@ import { isUsagePageForced } from "@/lib/env";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { buildAdminActions, buildOrganizationSettingsActions, buildRootActions } from "./actions";
+import { buildCanvasNodeSearchActions, useCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { useCommandPaletteShortcuts, usePalettePermissions } from "./hooks";
 import { useShortcutModifierLabel } from "@/hooks/useShortcutLabel";
 import { getRouteContext } from "./route";
@@ -21,6 +22,8 @@ export type CommandPaletteModel = {
   adminActions: PaletteAction[];
   canvasId: string | null;
   canvasListProps: CanvasCommandListProps;
+  canvasNodeSearchActions: PaletteAction[];
+  canManageInviteLink: boolean;
   currentCanvasName: string;
   open: boolean;
   organizationName: string;
@@ -44,6 +47,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const shortcutModifier = useShortcutModifierLabel();
   const data = useCommandPaletteData(route.organizationId, route.canvasId, !!account);
   const closePalette = useClosePalette(setOpen, setPage, setSearch);
+  const canvasNodeSearchProvider = useCanvasNodeSearchProvider();
   const navigation = usePaletteNavigation(closePalette, navigate);
   const createCanvas = useCreateCanvasCommand(data, closePalette, navigate, route.organizationId);
   const enabled = !loading && !!account;
@@ -71,6 +75,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   return buildModel({
     accountEmail: account.email,
     canvasId: route.canvasId,
+    canvasNodeSearchProvider,
     closePalette,
     createCanvas,
     data,
@@ -88,6 +93,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
 
 type PaletteData = {
   canCreateCanvas: boolean;
+  canManageInviteLink: boolean;
   canReadCanvas: boolean;
   canUpdateCanvas: boolean;
   canvases: CanvasesCanvas[];
@@ -114,11 +120,13 @@ function useCommandPaletteData(
   const createCanvasMutation = useCreateCanvas(queryOrganizationId);
   const currentCanvas = canvases.find((canvas) => canvas.metadata?.id === canvasId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");
+  const canManageInviteLink = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
   const canReadCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "read");
   const canUpdateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "update");
 
   return {
     canCreateCanvas,
+    canManageInviteLink,
     canReadCanvas,
     canUpdateCanvas,
     canvases,
@@ -206,6 +214,7 @@ function useCreateCanvasCommand(
 function buildModel({
   accountEmail,
   canvasId,
+  canvasNodeSearchProvider,
   closePalette,
   createCanvas,
   data,
@@ -221,6 +230,7 @@ function buildModel({
 }: {
   accountEmail: string;
   canvasId: string | null;
+  canvasNodeSearchProvider: ReturnType<typeof useCanvasNodeSearchProvider>;
   closePalette: () => void;
   createCanvas: () => Promise<void>;
   data: PaletteData;
@@ -243,6 +253,12 @@ function buildModel({
       goTo: navigation.goTo,
       organizationId,
     },
+    canvasNodeSearchActions: buildCanvasNodeSearchActions({
+      closePalette,
+      provider: canvasNodeSearchProvider,
+      query: search,
+    }),
+    canManageInviteLink: data.canManageInviteLink,
     currentCanvasName: data.currentCanvasName,
     open,
     organizationName: data.organizationName,

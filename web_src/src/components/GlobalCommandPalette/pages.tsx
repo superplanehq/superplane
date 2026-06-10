@@ -18,6 +18,8 @@ export type CommandPalettePageProps = {
   integrations: IntegrationItem[];
   onCreateApp: () => void;
   onCopyInviteLink: () => void;
+  showCopyInviteLink: boolean;
+  copyInviteLinkDisabled: boolean;
   onExpandApps: () => void;
   onExpandIntegrations: () => void;
   onCollapse: () => void;
@@ -68,10 +70,17 @@ function DefaultView(props: CommandPalettePageProps) {
           <Plus className="mr-2 size-4 shrink-0" />
           <span>{props.createAppLabel}</span>
         </CommandItem>
-        <CommandItem value="copy-invite-link" onSelect={props.onCopyInviteLink} className="cursor-pointer">
-          <Link2 className="mr-2 size-4 shrink-0" />
-          <span>Copy Invite Link</span>
-        </CommandItem>
+        {props.showCopyInviteLink ? (
+          <CommandItem
+            value="copy-invite-link"
+            onSelect={props.onCopyInviteLink}
+            disabled={props.copyInviteLinkDisabled}
+            className="cursor-pointer"
+          >
+            <Link2 className="mr-2 size-4 shrink-0" />
+            <span>Copy Invite Link</span>
+          </CommandItem>
+        ) : null}
       </CommandGroup>
 
       <CommandSeparator className="my-2" />

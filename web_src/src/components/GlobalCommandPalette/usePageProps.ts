@@ -23,8 +23,9 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
-  const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId);
+  const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId && model.canManageInviteLink);
   const { data: serviceAccounts = [] } = useServiceAccounts(organizationId);
+  const inviteLinkToken = inviteLink?.enabled ? inviteLink.token : undefined;
 
   const integrations = useMemo<IntegrationItem[]>(
     () =>
@@ -49,17 +50,19 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   );
 
   const handleCopyInviteLink = useCallback(() => {
-    if (!inviteLink?.token) {
+    if (!inviteLinkToken) {
       toast.error("Invite link not available");
       return;
     }
-    const url = `${window.location.origin}/invite/${inviteLink.token}`;
+    const url = `${window.location.origin}/invite/${inviteLinkToken}`;
     void navigator.clipboard.writeText(url).then(
-      () => toast.success("Invite link copied"),
+      () => {
+        toast.success("Invite link copied");
+        closePalette();
+      },
       () => toast.error("Failed to copy invite link"),
     );
-    closePalette();
-  }, [inviteLink, closePalette]);
+  }, [inviteLinkToken, closePalette]);
 
   const handleSetSearch = useCallback(
     (value: string) => {
@@ -77,6 +80,8 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       createAction?.onSelect?.();
     },
     onCopyInviteLink: handleCopyInviteLink,
+    showCopyInviteLink: model.canManageInviteLink,
+    copyInviteLinkDisabled: !inviteLinkToken,
     onExpandApps: () => setExpandedSection("apps"),
     onExpandIntegrations: () => setExpandedSection("integrations"),
     onCollapse: () => setExpandedSection(null),
@@ -136,7 +141,7 @@ function buildSearchResults(
 ): PaletteAction[] {
   if (!model.search) return [];
   const query = model.search.toLowerCase();
-  const results: PaletteAction[] = [];
+  const results: PaletteAction[] = [...model.canvasNodeSearchActions];
 
   for (const canvas of model.canvasListProps.canvases) {
     const name = canvas.metadata?.name ?? "";
