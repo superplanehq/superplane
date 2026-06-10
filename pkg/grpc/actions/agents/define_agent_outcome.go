@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,6 +35,9 @@ func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID st
 	if err := svc.DefineOutcome(ctx, org, user, chatID, req.Description, req.Rubric, maxIter); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
+		}
+		if errors.Is(err, agentservice.ErrSessionBusy) {
+			return nil, status.Error(codes.FailedPrecondition, "agent is still processing the previous turn")
 		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to define agent outcome")
 		return nil, status.Error(codes.Internal, "failed to define agent outcome")
