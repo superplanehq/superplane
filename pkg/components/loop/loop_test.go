@@ -176,7 +176,7 @@ func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 	assert.Equal(t, ChannelNameDone, iterationExecState.Channel)
 	assert.Equal(t, PayloadTypeDone, iterationExecState.Type)
 
-	donePayload := iterationExecState.Payloads[0].(map[string]any)["data"].(map[string]any)
+	donePayload := iterationExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
 	assert.Equal(t, 2, donePayload["iterations"])
 	assert.Equal(t, StopReasonConditionMet, donePayload["stopReason"])
 	elapsedMs, ok := donePayload["elapsedMs"].(int64)
@@ -302,7 +302,7 @@ func TestLoopHandleNextIterationHook(t *testing.T) {
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 	assert.Equal(t, PayloadTypeNext, execState.Type)
 
-	payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)
+	payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)["next"].(map[string]any)
 	assert.Equal(t, 3, payload["iteration"])
 	assert.Equal(t, 10, payload["maxIterations"])
 }
@@ -368,7 +368,7 @@ func TestLoopHandleFeedbackCompletesAtMaxIterations(t *testing.T) {
 	assert.Equal(t, doneExecutionID, *id)
 	assert.Equal(t, ChannelNameDone, doneExecState.Channel)
 
-	payload := doneExecState.Payloads[0].(map[string]any)["data"].(map[string]any)
+	payload := doneExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
 	assert.Equal(t, 3, payload["iterations"])
 	assert.Equal(t, StopReasonMaxIterations, payload["stopReason"])
 	elapsedMs, ok := payload["elapsedMs"].(int64)
@@ -419,14 +419,14 @@ func TestLoopExampleOutput(t *testing.T) {
 
 	next, ok := output["next"].(map[string]any)
 	require.True(t, ok)
-	nextData, ok := next["data"].(map[string]any)
+	nextData, ok := next["data"].(map[string]any)["next"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, PayloadTypeNext, next["type"])
 	assert.Equal(t, 1, nextData["iteration"])
 
 	done, ok := output["done"].(map[string]any)
 	require.True(t, ok)
-	doneData, ok := done["data"].(map[string]any)
+	doneData, ok := done["data"].(map[string]any)["done"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, PayloadTypeDone, done["type"])
 	assert.Equal(t, 3, doneData["iterations"])

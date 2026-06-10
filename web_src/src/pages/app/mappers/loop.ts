@@ -157,19 +157,21 @@ export const loopMapper: ComponentBaseMapper = {
 
     const doneOutput = (context.execution.outputs as LoopOutputs | undefined)?.done?.[0]?.data as
       | {
-          iterations?: number;
-          stopReason?: string;
-          elapsedMs?: number;
+          done?: {
+            iterations?: number;
+            stopReason?: string;
+            elapsedMs?: number;
+          };
         }
       | undefined;
-    if (typeof doneOutput?.iterations === "number") {
-      details.Iterations = doneOutput.iterations;
+    if (typeof doneOutput?.done?.iterations === "number") {
+      details.Iterations = doneOutput.done.iterations;
     }
-    if (doneOutput?.stopReason) {
-      details["Stop reason"] = doneOutput.stopReason;
+    if (doneOutput?.done?.stopReason) {
+      details["Stop reason"] = doneOutput.done.stopReason;
     }
-    if (typeof doneOutput?.elapsedMs === "number") {
-      details["Elapsed (ms)"] = doneOutput.elapsedMs;
+    if (typeof doneOutput?.done?.elapsedMs === "number") {
+      details["Elapsed (ms)"] = doneOutput.done.elapsedMs;
     }
 
     if (configuration.delayBetweenIterations?.enabled) {

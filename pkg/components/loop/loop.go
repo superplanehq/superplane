@@ -114,8 +114,8 @@ Edges back into Loop are allowed so downstream steps can return control for the 
 
 ## Output Channels
 
-- **Done**: Emitted once when the loop stops. The payload includes ` + "`iterations`" + `, ` + "`stopReason`" + ` (` + "`conditionTrue`" + ` or ` + "`max_iterations`" + `), and ` + "`elapsedMs`" + `
-- **Next**: Emitted at the start of each iteration
+- **Done**: Emitted once when the loop stops. Payload is under ` + "`data.done`" + ` with ` + "`iterations`" + `, ` + "`stopReason`" + ` (` + "`conditionTrue`" + ` or ` + "`max_iterations`" + `), and ` + "`elapsedMs`" + `
+- **Next**: Emitted at the start of each iteration. Payload is under ` + "`data.next`" + ` with ` + "`iteration`" + ` and ` + "`maxIterations`" + `
 
 ## Limits
 
@@ -435,16 +435,20 @@ func readMetadata(executionCtx *core.ExecutionContext) (ExecutionMetadata, error
 
 func nextPayload(iteration, maxIterations int) map[string]any {
 	return map[string]any{
-		"iteration":     iteration,
-		"maxIterations": maxIterations,
+		"next": map[string]any{
+			"iteration":     iteration,
+			"maxIterations": maxIterations,
+		},
 	}
 }
 
 func donePayload(iterations int, stopReason string, elapsedMs int64) map[string]any {
 	return map[string]any{
-		"iterations": iterations,
-		"stopReason": stopReason,
-		"elapsedMs":  elapsedMs,
+		"done": map[string]any{
+			"iterations": iterations,
+			"stopReason": stopReason,
+			"elapsedMs":  elapsedMs,
+		},
 	}
 }
 
