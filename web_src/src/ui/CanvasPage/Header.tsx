@@ -7,7 +7,15 @@ import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type HeaderMode =
+  | "default"
+  | "version-live"
+  | "version-edit"
+  | "runs"
+  | "versions"
+  | "console"
+  | "memory"
+  | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
@@ -52,6 +60,10 @@ export interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
+  /** Provided when Runs is available as a first-class tab; opens the Runs view. */
+  onSelectRuns?: () => void;
+  /** Provided when Versions is available as a first-class tab; opens the Versions view. */
+  onSelectVersions?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
@@ -218,7 +230,10 @@ function PageHeader({
             />
           </div>
         ) : null}
-        {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
+        {mode !== "runs" &&
+        mode !== "versions" &&
+        !isEditing &&
+        (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -256,6 +271,8 @@ function SecondaryHeader(props: HeaderProps) {
               mode={canvasViewMode}
               onSelectLive={props.onSelectCanvasView}
               onSelectConsole={props.onSelectConsole}
+              onSelectRuns={props.onSelectRuns}
+              onSelectVersions={props.onSelectVersions}
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
@@ -272,7 +289,13 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (!props.onSelectConsole && !props.onSelectMemory && !props.onSelectFiles) {
+  if (
+    !props.onSelectConsole &&
+    !props.onSelectRuns &&
+    !props.onSelectVersions &&
+    !props.onSelectMemory &&
+    !props.onSelectFiles
+  ) {
     return false;
   }
 
@@ -284,6 +307,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
     mode === "version-live" ||
     mode === "version-edit" ||
     mode === "runs" ||
+    mode === "versions" ||
     mode === "console" ||
     mode === "memory" ||
     mode === "files"
@@ -291,7 +315,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "runs" || mode === "console" || mode === "memory" || mode === "files") {
+  if (mode === "runs" || mode === "versions" || mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 

@@ -7,6 +7,7 @@ interface WorkflowViewModeActionsConfig {
   isMemoryMode: boolean;
   isFilesMode: boolean;
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   hasEditableVersion: boolean;
   isTemplate: boolean;
   canUpdateCanvas: boolean;
@@ -15,6 +16,7 @@ interface WorkflowViewModeActionsConfig {
   handleExitMemoryMode: () => void;
   handleExitFilesMode: () => void;
   handleExitRunsMode: () => void;
+  handleExitVersionsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
@@ -25,6 +27,7 @@ export function useWorkflowViewModeActions({
   isMemoryMode,
   isFilesMode,
   isRunsMode,
+  isVersionsMode,
   hasEditableVersion,
   isTemplate,
   canUpdateCanvas,
@@ -33,6 +36,7 @@ export function useWorkflowViewModeActions({
   handleExitMemoryMode,
   handleExitFilesMode,
   handleExitRunsMode,
+  handleExitVersionsMode,
   handleToggleEditMode,
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
@@ -52,16 +56,22 @@ export function useWorkflowViewModeActions({
     }
     if (isRunsMode) {
       handleExitRunsMode();
+      return;
+    }
+    if (isVersionsMode) {
+      handleExitVersionsMode();
     }
   }, [
     handleExitConsoleMode,
     handleExitFilesMode,
     handleExitMemoryMode,
     handleExitRunsMode,
+    handleExitVersionsMode,
     isConsoleMode,
     isFilesMode,
     isMemoryMode,
     isRunsMode,
+    isVersionsMode,
   ]);
 
   const handleConsoleAddPanelRequest = useCallback(async () => {
