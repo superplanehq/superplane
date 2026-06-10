@@ -11,6 +11,9 @@ import { create } from "zustand";
  * refusing to grow further. Dragging back does NOT restore the pushed
  * sidebar — that is intentional, matching how most resizable splitters work.
  *
+ * Runs/Versions panels register as an auxiliary left sidebar so their combined
+ * width with the agent sidebar respects the same canvas minimum.
+ *
  * Persistence keys are kept identical to the pre-refactor implementation so
  * existing local storage values are honored.
  */
@@ -53,15 +56,21 @@ function persistWidth(key: string, value: number): void {
 interface SidebarLayoutState {
   leftWidth: number;
   rightWidth: number;
+  auxLeftWidth: number;
+  auxLeftStorageKey: string | null;
   leftMountCount: number;
   rightMountCount: number;
+  auxLeftMountCount: number;
   isLeftResizing: boolean;
   isRightResizing: boolean;
+  isAuxLeftResizing: boolean;
 
   registerLeft: () => () => void;
   registerRight: () => () => void;
+  registerAuxLeft: (storageKey: string, defaultWidth: number) => () => void;
   setLeftResizing: (resizing: boolean) => void;
   setRightResizing: (resizing: boolean) => void;
+  setAuxLeftResizing: (resizing: boolean) => void;
 
   /**
    * Drive the left sidebar to {@link target} px. Pushes the right sidebar
@@ -73,10 +82,15 @@ interface SidebarLayoutState {
    * Mirrors {@link resizeLeft} for the right sidebar.
    */
   resizeRight: (target: number) => void;
+  /**
+   * Mirrors {@link resizeLeft} for the runs/versions auxiliary sidebar.
+   */
+  resizeAuxLeft: (target: number) => void;
 
   /**
    * Recompute widths against the current viewport, shrinking sidebars (right
-   * first, then left) only if necessary. Called on window resize.
+   * first, then auxiliary left, then agent left) only if necessary. Called on
+   * window resize.
    */
   recomputeForViewport: () => void;
 
@@ -95,13 +109,21 @@ function rightIsMounted(state: SidebarLayoutState): boolean {
   return state.rightMountCount > 0;
 }
 
+function auxLeftIsMounted(state: SidebarLayoutState): boolean {
+  return state.auxLeftMountCount > 0;
+}
+
 export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
   leftWidth: readPersistedWidth(LEFT_STORAGE_KEY, DEFAULT_LEFT_WIDTH),
   rightWidth: readPersistedWidth(RIGHT_STORAGE_KEY, DEFAULT_RIGHT_WIDTH),
+  auxLeftWidth: DEFAULT_LEFT_WIDTH,
+  auxLeftStorageKey: null,
   leftMountCount: 0,
   rightMountCount: 0,
+  auxLeftMountCount: 0,
   isLeftResizing: false,
   isRightResizing: false,
+  isAuxLeftResizing: false,
 
   registerLeft: () => {
     set((state) => ({ leftMountCount: state.leftMountCount + 1 }));
@@ -115,21 +137,38 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
     return () => set((state) => ({ rightMountCount: Math.max(0, state.rightMountCount - 1) }));
   },
 
+  registerAuxLeft: (storageKey, defaultWidth) => {
+    set((state) => ({
+      auxLeftMountCount: state.auxLeftMountCount + 1,
+      auxLeftStorageKey: storageKey,
+      auxLeftWidth: readPersistedWidth(storageKey, defaultWidth),
+    }));
+    get().recomputeForViewport();
+    return () =>
+      set((state) => ({
+        auxLeftMountCount: Math.max(0, state.auxLeftMountCount - 1),
+        auxLeftStorageKey: state.auxLeftMountCount <= 1 ? null : state.auxLeftStorageKey,
+      }));
+  },
+
   setLeftResizing: (resizing) => set({ isLeftResizing: resizing }),
   setRightResizing: (resizing) => set({ isRightResizing: resizing }),
+  setAuxLeftResizing: (resizing) => set({ isAuxLeftResizing: resizing }),
 
   resizeLeft: (target) => {
     const state = get();
     const viewport = getViewportWidth();
     const otherMounted = rightIsMounted(state);
+    const auxMounted = auxLeftIsMounted(state);
 
+    const auxFloor = auxMounted ? state.auxLeftWidth : 0;
     const otherFloor = otherMounted ? SIDEBAR_MIN_WIDTH : 0;
-    const maxLeft = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - otherFloor);
+    const maxLeft = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - otherFloor - auxFloor);
     const nextLeft = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxLeft, Math.round(target)));
 
     let nextRight = state.rightWidth;
     if (otherMounted) {
-      const allowedRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - nextLeft);
+      const allowedRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - nextLeft - auxFloor);
       if (state.rightWidth > allowedRight) nextRight = allowedRight;
     }
 
@@ -143,33 +182,92 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
   resizeRight: (target) => {
     const state = get();
     const viewport = getViewportWidth();
-    const otherMounted = leftIsMounted(state);
+    const leftMounted = leftIsMounted(state);
+    const auxMounted = auxLeftIsMounted(state);
 
-    const otherFloor = otherMounted ? SIDEBAR_MIN_WIDTH : 0;
-    const maxRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - otherFloor);
+    const leftTotal = (leftMounted ? state.leftWidth : 0) + (auxMounted ? state.auxLeftWidth : 0);
+    const maxRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - leftTotal);
     const nextRight = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxRight, Math.round(target)));
 
     let nextLeft = state.leftWidth;
-    if (otherMounted) {
-      const allowedLeft = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - nextRight);
-      if (state.leftWidth > allowedLeft) nextLeft = allowedLeft;
+    let nextAuxLeft = state.auxLeftWidth;
+    if (leftMounted || auxMounted) {
+      const allowedLeftTotal = Math.max(
+        leftMounted && auxMounted ? SIDEBAR_MIN_WIDTH * 2 : SIDEBAR_MIN_WIDTH,
+        viewport - MIDDLE_MIN_WIDTH - nextRight,
+      );
+      const currentLeftTotal = (leftMounted ? state.leftWidth : 0) + (auxMounted ? state.auxLeftWidth : 0);
+      if (currentLeftTotal > allowedLeftTotal) {
+        let overflow = currentLeftTotal - allowedLeftTotal;
+        if (auxMounted && state.auxLeftWidth > SIDEBAR_MIN_WIDTH) {
+          const auxShrink = Math.min(overflow, state.auxLeftWidth - SIDEBAR_MIN_WIDTH);
+          nextAuxLeft = state.auxLeftWidth - auxShrink;
+          overflow -= auxShrink;
+        }
+        if (overflow > 0 && leftMounted && state.leftWidth > SIDEBAR_MIN_WIDTH) {
+          nextLeft = Math.max(SIDEBAR_MIN_WIDTH, state.leftWidth - overflow);
+        }
+      }
     }
 
-    if (nextRight === state.rightWidth && nextLeft === state.leftWidth) return;
+    if (nextRight === state.rightWidth && nextLeft === state.leftWidth && nextAuxLeft === state.auxLeftWidth) return;
 
     persistWidth(RIGHT_STORAGE_KEY, nextRight);
     if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
-    set({ leftWidth: nextLeft, rightWidth: nextRight });
+    if (nextAuxLeft !== state.auxLeftWidth && state.auxLeftStorageKey) {
+      persistWidth(state.auxLeftStorageKey, nextAuxLeft);
+    }
+    set({ leftWidth: nextLeft, rightWidth: nextRight, auxLeftWidth: nextAuxLeft });
+  },
+
+  resizeAuxLeft: (target) => {
+    const state = get();
+    const viewport = getViewportWidth();
+    const leftMounted = leftIsMounted(state);
+    const rightMounted = rightIsMounted(state);
+    const leftFloor = leftMounted ? state.leftWidth : 0;
+
+    const maxAux = Math.max(
+      SIDEBAR_MIN_WIDTH,
+      viewport - MIDDLE_MIN_WIDTH - leftFloor - (rightMounted ? state.rightWidth : 0),
+    );
+    const nextAux = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxAux, Math.round(target)));
+
+    let nextRight = state.rightWidth;
+    if (rightMounted) {
+      const allowedRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - leftFloor - nextAux);
+      if (state.rightWidth > allowedRight) nextRight = allowedRight;
+    }
+
+    let nextLeft = state.leftWidth;
+    if (leftMounted) {
+      const allowedLeft = Math.max(
+        SIDEBAR_MIN_WIDTH,
+        viewport - MIDDLE_MIN_WIDTH - nextAux - (rightMounted ? nextRight : 0),
+      );
+      if (state.leftWidth > allowedLeft) nextLeft = allowedLeft;
+    }
+
+    if (nextAux === state.auxLeftWidth && nextRight === state.rightWidth && nextLeft === state.leftWidth) return;
+
+    if (state.auxLeftStorageKey) persistWidth(state.auxLeftStorageKey, nextAux);
+    if (nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, nextRight);
+    if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
+    set({ auxLeftWidth: nextAux, rightWidth: nextRight, leftWidth: nextLeft });
   },
 
   hydrateFromStorage: () => {
     set({
       leftWidth: readPersistedWidth(LEFT_STORAGE_KEY, DEFAULT_LEFT_WIDTH),
       rightWidth: readPersistedWidth(RIGHT_STORAGE_KEY, DEFAULT_RIGHT_WIDTH),
+      auxLeftWidth: DEFAULT_LEFT_WIDTH,
+      auxLeftStorageKey: null,
       leftMountCount: 0,
       rightMountCount: 0,
+      auxLeftMountCount: 0,
       isLeftResizing: false,
       isRightResizing: false,
+      isAuxLeftResizing: false,
     });
   },
 
@@ -178,28 +276,45 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
     const viewport = getViewportWidth();
     const leftActive = leftIsMounted(state);
     const rightActive = rightIsMounted(state);
-    const effectiveLeft = leftActive ? state.leftWidth : 0;
-    const effectiveRight = rightActive ? state.rightWidth : 0;
-
-    if (effectiveLeft + effectiveRight + MIDDLE_MIN_WIDTH <= viewport) return;
+    const auxActive = auxLeftIsMounted(state);
 
     let nextLeft = state.leftWidth;
     let nextRight = state.rightWidth;
+    let nextAux = state.auxLeftWidth;
+
+    const total = (leftActive ? nextLeft : 0) + (auxActive ? nextAux : 0) + (rightActive ? nextRight : 0);
+    if (total + MIDDLE_MIN_WIDTH <= viewport) return;
 
     // Shrink the right sidebar first since it overlays the canvas.
     if (rightActive) {
-      const cap = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - (leftActive ? nextLeft : 0));
+      const cap = Math.max(
+        SIDEBAR_MIN_WIDTH,
+        viewport - MIDDLE_MIN_WIDTH - (leftActive ? nextLeft : 0) - (auxActive ? nextAux : 0),
+      );
       if (nextRight > cap) nextRight = cap;
     }
+    if (auxActive) {
+      const cap = Math.max(
+        SIDEBAR_MIN_WIDTH,
+        viewport - MIDDLE_MIN_WIDTH - (leftActive ? nextLeft : 0) - (rightActive ? nextRight : 0),
+      );
+      if (nextAux > cap) nextAux = cap;
+    }
     if (leftActive) {
-      const cap = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - (rightActive ? nextRight : 0));
+      const cap = Math.max(
+        SIDEBAR_MIN_WIDTH,
+        viewport - MIDDLE_MIN_WIDTH - (auxActive ? nextAux : 0) - (rightActive ? nextRight : 0),
+      );
       if (nextLeft > cap) nextLeft = cap;
     }
 
-    if (nextLeft === state.leftWidth && nextRight === state.rightWidth) return;
+    if (nextLeft === state.leftWidth && nextRight === state.rightWidth && nextAux === state.auxLeftWidth) return;
     if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
     if (nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, nextRight);
-    set({ leftWidth: nextLeft, rightWidth: nextRight });
+    if (nextAux !== state.auxLeftWidth && state.auxLeftStorageKey) {
+      persistWidth(state.auxLeftStorageKey, nextAux);
+    }
+    set({ leftWidth: nextLeft, rightWidth: nextRight, auxLeftWidth: nextAux });
   },
 }));
 
@@ -213,6 +328,18 @@ export function useSidebarMount(side: "left" | "right"): void {
   const registerLeft = useSidebarLayoutStore((s) => s.registerLeft);
   const registerRight = useSidebarLayoutStore((s) => s.registerRight);
   useEffect(() => (side === "left" ? registerLeft() : registerRight()), [side, registerLeft, registerRight]);
+}
+
+/**
+ * Subscribe the runs/versions auxiliary sidebar to the layout store. Only
+ * registers while {@link isOpen} is true so closed panels do not consume width.
+ */
+export function useAuxLeftSidebarMount(isOpen: boolean, storageKey: string, defaultWidth: number): void {
+  const registerAuxLeft = useSidebarLayoutStore((s) => s.registerAuxLeft);
+  useEffect(() => {
+    if (!isOpen) return;
+    return registerAuxLeft(storageKey, defaultWidth);
+  }, [isOpen, storageKey, defaultWidth, registerAuxLeft]);
 }
 
 /**
@@ -235,6 +362,8 @@ export function useSidebarLayoutViewport(): void {
  */
 export function useEffectiveLeftSidebarWidth(): number {
   const leftWidth = useSidebarLayoutStore((state) => state.leftWidth);
+  const auxLeftWidth = useSidebarLayoutStore((state) => state.auxLeftWidth);
   const leftMounted = useSidebarLayoutStore((state) => state.leftMountCount > 0);
-  return leftMounted ? leftWidth : 0;
+  const auxLeftMounted = useSidebarLayoutStore((state) => state.auxLeftMountCount > 0);
+  return (leftMounted ? leftWidth : 0) + (auxLeftMounted ? auxLeftWidth : 0);
 }

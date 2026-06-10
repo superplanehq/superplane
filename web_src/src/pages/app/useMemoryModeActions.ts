@@ -7,6 +7,7 @@ interface MemoryModeActionsConfig {
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsVersionsMode: (value: boolean) => void;
   setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
@@ -18,6 +19,7 @@ export function useMemoryModeActions({
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
   setIsRunsMode,
+  setIsVersionsMode,
   setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
@@ -28,6 +30,7 @@ export function useMemoryModeActions({
     setIsConsoleAddPanelOpen(false);
     setIsConsoleYamlOpen(false);
     setIsRunsMode(false);
+    setIsVersionsMode(false);
     setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toMemorySearchParams, { replace: true });
@@ -38,6 +41,7 @@ export function useMemoryModeActions({
     setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
+    setIsVersionsMode,
     setSearchParams,
     setSelectedRunId,
   ]);

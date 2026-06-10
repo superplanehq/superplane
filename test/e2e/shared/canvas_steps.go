@@ -74,11 +74,11 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar opens the Versions tab in the canvas tool sidebar.
+// OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.waitForToolSidebarOpen()
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.session.Click(q.TestID("canvas-view-mode-versions"))
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
 }
 
