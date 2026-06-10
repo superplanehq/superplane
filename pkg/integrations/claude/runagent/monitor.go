@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,17 +16,69 @@ func (a *RunAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (a *RunAgent) Hooks() []core.Hook {
-	return []core.Hook{{
-		Name: "poll",
-		Type: core.HookTypeInternal,
-	}}
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
+		{Name: "stream", Type: core.HookTypeInternal},
+	}
 }
 
 func (a *RunAgent) HandleHook(ctx core.ActionHookContext) error {
-	if ctx.Name == "poll" {
+	switch ctx.Name {
+	case "stream":
+		return a.stream(ctx)
+	case "poll":
 		return a.poll(ctx)
+	default:
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
-	return fmt.Errorf("unknown hook: %s", ctx.Name)
+}
+
+func (a *RunAgent) stream(ctx core.ActionHookContext) error {
+	metadata := ExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	if metadata.Session.ID == "" {
+		return fmt.Errorf("missing session id in metadata")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		ctx.Logger.Warnf("Stream hook: failed to create client: %v. Falling back to poll.", err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	}
+
+	streamCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	status, lastMessage, messages, streamErr := client.StreamSessionUntilIdle(streamCtx, metadata.Session.ID)
+	if streamErr != nil {
+		ctx.Logger.Warnf("Stream failed for session %s: %v. Falling back to poll.", metadata.Session.ID, streamErr)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	}
+
+	// If the stream completed but didn't capture any agent messages,
+	// fall back to the events list API as a backfill.
+	if lastMessage == "" {
+		backfill, _, backfillErr := client.GetLastManagedSessionAgentMessageWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
+		if backfillErr != nil {
+			ctx.Logger.Warnf("Backfill fetch failed for session %s: %v", metadata.Session.ID, backfillErr)
+		}
+		if backfill != "" {
+			lastMessage = backfill
+			messages = append(messages, backfill)
+		}
+	}
+
+	metadata.Session.Status = status
+	_ = ctx.Metadata.Set(metadata)
+
+	if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
+		ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
+	}
+
+	out := buildOutput(status, metadata.Session.ID, lastMessage, messages)
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 
 func (a *RunAgent) poll(ctx core.ActionHookContext) error {
@@ -56,7 +109,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 
 	if attempt > maxPollAttempts {
 		ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", metadata.Session.ID)
-		out := buildOutput("timeout", metadata.Session.ID)
+		out := buildOutput("timeout", metadata.Session.ID, "", nil)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
@@ -70,7 +123,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		errs++
 		if errs >= maxPollErrors {
 			ctx.Logger.Errorf("Managed session %s: polling failed repeatedly: %v", metadata.Session.ID, err)
-			out := buildOutput("error", metadata.Session.ID)
+			out := buildOutput("error", metadata.Session.ID, "", nil)
 			return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
@@ -90,7 +143,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if err == nil && lastMessage == "" {
 			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", metadata.Session.ID, managedSessionEventTypes(events))
 		}
-		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage)
+		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage, nil)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
