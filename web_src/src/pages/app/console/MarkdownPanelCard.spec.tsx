@@ -169,6 +169,42 @@ describe("MarkdownPanelCard variable interpolation", () => {
     expect(view.textContent).toMatch(/Approved: api/);
   });
 
+  it("resolves a list-mode memory variable and renders it via join(map())", async () => {
+    // End-to-end coverage for list mode: the variable resolves to the full
+    // sorted array, `rows.map(...)` runs the CEL macro, and `join(..., sep)`
+    // flattens it into a string — the documented pattern for rendering lists.
+    const panel: ConsolePanel = {
+      id: "panel-list",
+      type: "markdown",
+      content: {
+        body: 'Services: {{ join(rows.map(item, item.service), ", ") }}',
+        variables: [{ name: "rows", source: { kind: "memory", namespace: "deploys", mode: "list" } }],
+      },
+    };
+    renderWithVariables({
+      panel,
+      memoryEntries: [
+        {
+          id: "row-old",
+          namespace: "deploys",
+          values: { service: "api" },
+          source: "node",
+          createdAt: "2026-06-01T00:00:00Z",
+        },
+        {
+          id: "row-new",
+          namespace: "deploys",
+          values: { service: "web" },
+          source: "node",
+          createdAt: "2026-06-04T00:00:00Z",
+        },
+      ],
+    });
+    const view = await waitFor(() => screen.getByTestId("console-markdown"));
+    // Sorted createdAt desc by default, so the newest row comes first.
+    expect(view.textContent).toMatch(/Services: web, api/);
+  });
+
   it("renders the original markdown when a referenced variable has no data", async () => {
     const panel: ConsolePanel = {
       id: "panel-3",
