@@ -588,12 +588,14 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 		return nil
 	}))
 
-	require.Len(t, received, 2)
+	require.Len(t, received, 3)
 	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
 	require.NotNil(t, received[0].CustomToolUse)
 	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
 	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
 	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[2].Type)
+	assert.Equal(t, "after pause", received[2].Text)
 }
 
 func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {

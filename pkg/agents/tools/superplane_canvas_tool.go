@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +27,7 @@ type SuperPlaneCanvasTool struct {
 	registry       *registry.Registry
 	webhookBaseURL string
 	authService    authorization.Authorization
+	usageService   usage.Service
 }
 
 type SuperPlaneCanvasToolOptions struct {
@@ -33,6 +35,7 @@ type SuperPlaneCanvasToolOptions struct {
 	Registry       *registry.Registry
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
+	UsageService   usage.Service
 }
 
 func NewSuperPlaneCanvasTool(opts SuperPlaneCanvasToolOptions) *SuperPlaneCanvasTool {
@@ -41,6 +44,7 @@ func NewSuperPlaneCanvasTool(opts SuperPlaneCanvasToolOptions) *SuperPlaneCanvas
 		registry:       opts.Registry,
 		webhookBaseURL: opts.WebhookBaseURL,
 		authService:    opts.AuthService,
+		usageService:   opts.UsageService,
 	}
 }
 
@@ -202,7 +206,7 @@ func (t *SuperPlaneCanvasTool) updateDraft(ctx context.Context, session agents.A
 
 	if err := grpcCanvases.ApplyRepositorySpecFileOperations(
 		ctx,
-		nil,
+		t.usageService,
 		t.encryptor,
 		t.registry,
 		session.OrganizationID,
