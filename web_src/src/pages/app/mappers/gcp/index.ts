@@ -18,6 +18,7 @@ import {
   PUBSUB_ACTION_STATE_REGISTRY,
 } from "./pubsub_mapper";
 import { onMessageTriggerRenderer } from "./on_message";
+import { onAlertTriggerRenderer } from "./on_alert";
 import { cloudDNSMapper } from "./clouddns";
 import { deleteVMInstanceMapper } from "./delete_vm_instance";
 import { getVMInstanceMapper } from "./get_vm_instance";
@@ -74,6 +75,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "artifactregistry.onArtifactPush": onArtifactPushTriggerRenderer,
   "artifactregistry.onArtifactAnalysis": onArtifactAnalysisTriggerRenderer,
   "pubsub.onMessage": onMessageTriggerRenderer,
+  "monitoring.onAlert": onAlertTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
