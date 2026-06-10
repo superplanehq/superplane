@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string, includeTemplates bool) (*pb.ListCanvasesResponse, error) {
-	canvases, err := models.ListCanvases(organizationID, includeTemplates)
+func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListCanvasesResponse, error) {
+	canvases, err := models.ListCanvases(organizationID)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
 		return nil, status.Error(codes.Internal, "failed to list canvases")
