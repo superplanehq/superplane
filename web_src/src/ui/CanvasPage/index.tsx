@@ -1388,11 +1388,7 @@ function CanvasPage(props: CanvasPageProps) {
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={
-              isBuildingBlocksSidebarOpen &&
-              !!props.isEditing &&
-              allowsBuildingBlocksSidebar(workflowHeaderMode)
-            }
+            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
