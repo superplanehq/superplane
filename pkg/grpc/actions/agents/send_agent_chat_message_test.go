@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
@@ -69,6 +70,22 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, string) (*models.AgentSessionMessage, error) {
+			return nil, agentservice.ErrSessionBusy
+		},
+	}
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId:  uuid.NewString(),
+		Content: "x",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 }
 
 func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
