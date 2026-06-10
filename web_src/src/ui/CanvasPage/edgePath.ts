@@ -1,6 +1,9 @@
 import { Position, getBezierPath, getSmoothStepPath } from "@xyflow/react";
 
 const BACKWARD_ROUTE_OFFSET = 80;
+const DOWNWARD_ROUTE_TARGET_BIAS = 0.75;
+const MIN_DISTANCE_FROM_TARGET_TOP = 50;
+const TARGET_HANDLE_TOP_OFFSET = 18;
 const SMOOTH_STEP_BORDER_RADIUS = 16;
 const HANDLE_OFFSET = 24;
 
@@ -42,8 +45,12 @@ export function isBackwardEdge({
 
 export function getBackwardRouteCenterY(sourceY: number, targetY: number): number {
   if (targetY > sourceY) {
-    // Downward branch: route through the gap between the two nodes.
-    return (sourceY + targetY) / 2;
+    const biasedY = sourceY + (targetY - sourceY) * DOWNWARD_ROUTE_TARGET_BIAS;
+    const targetTop = targetY - TARGET_HANDLE_TOP_OFFSET;
+    const maxCenterY = targetTop - MIN_DISTANCE_FROM_TARGET_TOP;
+
+    // Downward branch: stay close to the target, but keep the line above its top edge.
+    return Math.min(biasedY, maxCenterY);
   }
 
   // Loop-back: route below both nodes.

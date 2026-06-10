@@ -35,8 +35,12 @@ describe("getBackwardRouteCenterY", () => {
     expect(getBackwardRouteCenterY(300, 100)).toBe(380);
   });
 
-  it("routes downward backward edges through the gap between nodes", () => {
-    expect(getBackwardRouteCenterY(120, 420)).toBe(270);
+  it("routes downward backward edges closer to the target node", () => {
+    expect(getBackwardRouteCenterY(120, 420)).toBe(345);
+  });
+
+  it("never routes closer than the minimum distance above the target top", () => {
+    expect(getBackwardRouteCenterY(300, 420)).toBe(352);
   });
 });
 
@@ -79,6 +83,6 @@ describe("getCanvasEdgePath", () => {
     });
 
     expect(path).not.toContain("C");
-    expect(path).toContain("270");
+    expect(path).toContain("345");
   });
 });
