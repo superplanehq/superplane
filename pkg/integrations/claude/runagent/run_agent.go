@@ -153,13 +153,12 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
-	// Refresh status after work may have already progressed.
+	// Check if session already finished (fast tasks).
+	// Don't write terminal status to metadata yet — only after emit.
 	refreshed, err := client.GetManagedSession(session.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
-	mergeSessionIntoMetadata(&metadata, refreshed)
-	_ = ctx.Metadata.Set(metadata)
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
 		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
@@ -170,6 +169,9 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				return emitErr
 			}
+			// Persist terminal status only after successful emit
+			mergeSessionIntoMetadata(&metadata, refreshed)
+			_ = ctx.Metadata.Set(metadata)
 			if err := client.DeleteManagedSession(session.ID); err != nil {
 				ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
 			}

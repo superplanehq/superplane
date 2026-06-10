@@ -41,9 +41,6 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	if metadata.Session == nil || metadata.Session.ID == "" {
 		return nil
 	}
-	if isSessionTerminal(metadata.Session.Status) {
-		return nil
-	}
 
 	attempt := 1
 	errs := 0
@@ -76,9 +73,8 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
-	mergeSessionIntoMetadata(&metadata, sess)
-	_ = ctx.Metadata.Set(metadata)
-
+	// Don't write terminal status to metadata yet — we only persist it
+	// after a successful emit to avoid blocking future poll retries.
 	if sess == nil {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
@@ -97,6 +93,10 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 			return emitErr
 		}
+
+		// Only persist terminal status after successful emit
+		mergeSessionIntoMetadata(&metadata, sess)
+		_ = ctx.Metadata.Set(metadata)
 
 		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
