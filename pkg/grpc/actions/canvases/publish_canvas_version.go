@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -25,6 +26,7 @@ func PublishCanvasVersion(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	versionID string,
@@ -63,7 +65,7 @@ func PublishCanvasVersion(
 	}
 
 	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
@@ -88,6 +90,7 @@ func publishDraftVersionInTransaction(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
@@ -139,6 +142,7 @@ func publishDraftVersionInTransaction(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				GitProvider:    gitProv,
 			},
 		)
 		if err != nil {
