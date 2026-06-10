@@ -204,17 +204,32 @@ func startWorkers(
 	}
 
 	var workerUsageService usage.Service
-	getWorkerUsageService := func() usage.Service {
+	initWorkerUsageService := func() (usage.Service, error) {
 		if workerUsageService != nil {
-			return workerUsageService
+			return workerUsageService, nil
 		}
 
 		service, err := usage.NewServiceFromEnv()
 		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+			return nil, err
 		}
 		workerUsageService = service
-		return workerUsageService
+		return workerUsageService, nil
+	}
+	getRequiredWorkerUsageService := func() usage.Service {
+		service, err := initWorkerUsageService()
+		if err != nil {
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+		}
+		return service
+	}
+	getOptionalWorkerUsageService := func() usage.Service {
+		service, err := initWorkerUsageService()
+		if err != nil {
+			log.Printf("usage service unavailable for agent canvas tool: %v", err)
+			return nil
+		}
+		return service
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
@@ -232,7 +247,7 @@ func startWorkers(
 				Registry:       registry,
 				WebhookBaseURL: getWebhookBaseURL(baseURL),
 				AuthService:    authService,
-				UsageService:   getWorkerUsageService(),
+				UsageService:   getOptionalWorkerUsageService(),
 			}),
 			agenttools.NewSuperPlaneComponentSchemaTool(registry),
 		))
@@ -240,7 +255,7 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService := getWorkerUsageService()
+		usageService := getRequiredWorkerUsageService()
 
 		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Event Retention Worker")
