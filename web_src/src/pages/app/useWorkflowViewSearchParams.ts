@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 /**
@@ -14,32 +14,30 @@ function isConsoleView(view: string): boolean {
 }
 
 /**
- * Keeps runs/console/memory/files view mode and selected run in sync with `view` and `run` search params.
+ * Keeps console UI state and selected run in sync with `view` and `run` search params.
+ * View mode flags are derived directly from the URL so they match header chrome on the
+ * same render (including browser back/forward), without waiting for a post-render effect.
  */
 export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSearchParams: SetURLSearchParams) {
-  const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
-  const [isVersionsMode, setIsVersionsMode] = useState(() => searchParams.get("view") === "versions");
-  const [isConsoleMode, setIsConsoleMode] = useState(() => isConsoleView(searchParams.get("view") ?? ""));
-  const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
-  const [isFilesMode, setIsFilesMode] = useState(() => searchParams.get("view") === "files");
-  const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
-  const [isConsoleYamlOpen, setIsConsoleYamlOpen] = useState(false);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
-
   const viewParam = searchParams.get("view") ?? "";
   const runParam = searchParams.get("run") ?? "";
   const consoleViewActive = isConsoleView(viewParam);
+
+  const isRunsMode = viewParam === "runs";
+  const isVersionsMode = viewParam === "versions";
+  const isMemoryMode = viewParam === "memory";
+  const isFilesMode = viewParam === "files";
+  const isConsoleMode = consoleViewActive;
+  const selectedRunId = runParam || null;
+
+  const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
+  const [isConsoleYamlOpen, setIsConsoleYamlOpen] = useState(false);
 
   const setSearchParamsRef = useRef(setSearchParams);
   setSearchParamsRef.current = setSearchParams;
 
   useEffect(() => {
-    setIsRunsMode(viewParam === "runs");
-    setIsVersionsMode(viewParam === "versions");
-    setIsMemoryMode(viewParam === "memory");
-    setIsFilesMode(viewParam === "files");
     if (consoleViewActive) {
-      setIsConsoleMode(true);
       // Migrate legacy `?view=dashboard` to the canonical `?view=console`
       // in-place so the address bar and any future link sharing reflect
       // the renamed feature without breaking existing bookmarks.
@@ -57,31 +55,30 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
         );
       }
     } else {
-      setIsConsoleMode(false);
-    }
-    setSelectedRunId(runParam || null);
-    if (!consoleViewActive) {
       setIsConsoleAddPanelOpen(false);
       setIsConsoleYamlOpen(false);
     }
-  }, [viewParam, runParam, consoleViewActive]);
+  }, [viewParam, consoleViewActive]);
+
+  const noopSetBoolean = useCallback((_value: boolean) => {}, []);
+  const noopSetSelectedRunId = useCallback((_value: string | null) => {}, []);
 
   return {
     isRunsMode,
-    setIsRunsMode,
+    setIsRunsMode: noopSetBoolean,
     isVersionsMode,
-    setIsVersionsMode,
+    setIsVersionsMode: noopSetBoolean,
     isConsoleMode,
-    setIsConsoleMode,
+    setIsConsoleMode: noopSetBoolean,
     isMemoryMode,
-    setIsMemoryMode,
+    setIsMemoryMode: noopSetBoolean,
     isFilesMode,
-    setIsFilesMode,
+    setIsFilesMode: noopSetBoolean,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
     setIsConsoleYamlOpen,
     selectedRunId,
-    setSelectedRunId,
+    setSelectedRunId: noopSetSelectedRunId,
   };
 }
