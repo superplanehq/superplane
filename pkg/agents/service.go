@@ -367,24 +367,23 @@ func buildCanvasSnapshot(session *models.AgentSession) string {
 		builder.WriteString(fmt.Sprintf("live_version_id: %s\n", canvas.LiveVersionID.String()))
 	}
 
-	draft, err := ownedDraftVersion(session.CanvasID, session.UserID)
-	if err != nil {
-		log.WithError(err).Warn("failed to load owned draft for agent snapshot")
-		builder.WriteString("owned_draft: unavailable\n")
-	} else if draft != nil {
-		builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
-		builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
-	} else {
-		builder.WriteString("owned_draft: none\n")
+	draft, draftErr := ownedDraftVersion(session.CanvasID, session.UserID)
+	if draftErr != nil {
+		log.WithError(draftErr).Warn("failed to load owned draft for agent snapshot")
 	}
 
-	version := selectedVersion(canvas, draft, draftSnapshotSource(draft))
+	snapshotSource, snapshotAvailable := appendDraftSnapshotStatus(&builder, draft, draftErr)
+	if !snapshotAvailable {
+		return strings.TrimRight(builder.String(), "\n")
+	}
+
+	version := selectedVersion(canvas, draft, snapshotSource)
 	if version == nil {
 		builder.WriteString("nodes: unavailable\n")
 		return strings.TrimRight(builder.String(), "\n")
 	}
 
-	builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", draftSnapshotSource(draft)))
+	builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
 	builder.WriteString(fmt.Sprintf("node_count: %d\n", len(version.Nodes)))
 	builder.WriteString(fmt.Sprintf("edge_count: %d\n", len(version.Edges)))
 
@@ -418,11 +417,22 @@ func buildCanvasSnapshot(session *models.AgentSession) string {
 	return strings.TrimRight(builder.String(), "\n")
 }
 
-func draftSnapshotSource(draft *models.CanvasVersion) string {
-	if draft == nil {
-		return "live"
+func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVersion, err error) (string, bool) {
+	if err != nil {
+		builder.WriteString("owned_draft: unavailable\n")
+		builder.WriteString("snapshot_source: unavailable\n")
+		builder.WriteString("nodes: unavailable\n")
+		return "", false
 	}
-	return "draft"
+
+	if draft == nil {
+		builder.WriteString("owned_draft: none\n")
+		return "live", true
+	}
+
+	builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
+	builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
+	return "draft", true
 }
 
 const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
