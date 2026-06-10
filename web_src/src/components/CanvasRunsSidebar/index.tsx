@@ -8,7 +8,7 @@ export interface CanvasRunsSidebarProps {
 }
 
 export function CanvasRunsSidebar({ isOpen, children }: CanvasRunsSidebarProps) {
-  const { sidebarRef, width, isResizing, handleMouseDown } = useRunsSidebarWidth();
+  const { sidebarRef, width, isResizing, handleMouseDown } = useRunsSidebarWidth(isOpen);
 
   if (!isOpen) {
     return null;

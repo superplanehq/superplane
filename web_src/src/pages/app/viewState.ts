@@ -130,7 +130,7 @@ export function getWorkflowViewPresentation({
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunsMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunsMode || isVersionsMode || isMemoryMode || isFilesMode;
 
   return {
     headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isVersionsMode, isMemoryMode, isFilesMode }),
@@ -141,7 +141,7 @@ export function getWorkflowViewPresentation({
     }),
     showBottomStatusControls: !isTemplate && !hideNonCanvasChrome,
     hideAddControls: isTemplate || hideNonCanvasChrome,
-    readOnlyViewModes: isRunsMode || isFilesMode,
+    readOnlyViewModes: isRunsMode || isVersionsMode || isFilesMode,
   };
 }
 

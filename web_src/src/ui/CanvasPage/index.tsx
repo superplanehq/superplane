@@ -1185,6 +1185,7 @@ function CanvasPage(props: CanvasPageProps) {
       props.headerMode === "memory" ||
       props.headerMode === "files" ||
       props.headerMode === "runs" ||
+      props.headerMode === "versions" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
@@ -1364,6 +1365,7 @@ function CanvasPage(props: CanvasPageProps) {
         </CanvasVersionsSidebar>
 
         {props.headerMode === "runs" ||
+        props.headerMode === "versions" ||
         props.headerMode === "memory" ||
         props.headerMode === "files" ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
@@ -1391,7 +1393,8 @@ function CanvasPage(props: CanvasPageProps) {
               props.headerMode !== "console" &&
               props.headerMode !== "memory" &&
               props.headerMode !== "files" &&
-              props.headerMode !== "runs"
+              props.headerMode !== "runs" &&
+              props.headerMode !== "versions"
             }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
