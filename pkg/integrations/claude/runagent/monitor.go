@@ -143,7 +143,11 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if err == nil && lastMessage == "" {
 			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", metadata.Session.ID, managedSessionEventTypes(events))
 		}
-		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage, nil)
+		var msgs []string
+		if lastMessage != "" {
+			msgs = []string{lastMessage}
+		}
+		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage, msgs)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
