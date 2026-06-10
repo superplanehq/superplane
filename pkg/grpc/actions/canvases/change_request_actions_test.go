@@ -384,6 +384,7 @@ func actOnCanvasChangeRequestAction(
 		r.AuthService,
 		r.Encryptor,
 		r.Registry,
+		nil,
 		r.Organization.ID.String(),
 		canvasID,
 		changeRequestID,

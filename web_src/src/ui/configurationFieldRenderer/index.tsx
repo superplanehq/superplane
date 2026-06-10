@@ -23,6 +23,7 @@ import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
+import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
@@ -369,6 +370,9 @@ export const ConfigurationFieldRenderer = ({
 
       case "git-ref":
         return <GitRefFieldRenderer {...commonProps} />;
+
+      case "repository-file":
+        return <RepositoryFileFieldRenderer {...commonProps} />;
 
       case "user":
         if (!domainId) {

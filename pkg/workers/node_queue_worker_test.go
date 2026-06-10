@@ -22,7 +22,7 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
@@ -111,7 +111,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
@@ -255,7 +255,7 @@ func Test__NodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	// - Node state is updated to processing
 	// - Queue item is deleted
 	//
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
@@ -286,7 +286,7 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
@@ -391,7 +391,7 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
@@ -494,13 +494,13 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the node concurrently.
 	//
 	go func() {
-		worker1 := NewNodeQueueWorker(r.Registry, amqpURL)
+		worker1 := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 		logger := log.NewEntry(log.New())
 		results <- worker1.LockAndProcessNode(logger, *node)
 	}()
 
 	go func() {
-		worker2 := NewNodeQueueWorker(r.Registry, amqpURL)
+		worker2 := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 		logger := log.NewEntry(log.New())
 		results <- worker2.LockAndProcessNode(logger, *node)
 	}()
@@ -536,7 +536,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
@@ -631,7 +631,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, nil, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
