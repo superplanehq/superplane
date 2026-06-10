@@ -411,12 +411,19 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
     const matches = (source.matches ?? [])
       .map((match) => ({ field: match?.field?.trim() ?? "", value: match?.value ?? "" }))
       .filter((match) => match.field !== "");
+    // `mode: single` is the implicit default, so only persist `mode`/`limit`
+    // when the author opted into list mode. Dropping them otherwise keeps the
+    // YAML minimal and round-trips identically.
+    const isList = source.mode === "list";
+    const hasLimit = isList && typeof source.limit === "number" && source.limit > 0;
     return {
       kind: "memory",
       namespace,
       ...(orderBy ? { orderBy } : {}),
       ...(source.direction ? { direction: source.direction } : {}),
       ...(matches.length > 0 ? { matches } : {}),
+      ...(isList ? { mode: "list" as const } : {}),
+      ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
   return { kind: "run", select: source.select };
