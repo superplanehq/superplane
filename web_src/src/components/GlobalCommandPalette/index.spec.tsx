@@ -136,6 +136,10 @@ vi.mock("@/hooks/useIntegrations", () => ({
         metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
         status: { state: "ready" },
       },
+      {
+        metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
+        status: { state: "ready" },
+      },
     ],
   }),
 }));
@@ -269,6 +273,16 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByText("Deploy API")).toBeInTheDocument();
   });
 
+  it("searches apps by description", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "Production");
+
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
+  });
+
   it("searches integrations by name", async () => {
     const user = userEvent.setup();
     renderPalette();
@@ -277,6 +291,16 @@ describe("GlobalCommandPalette", () => {
     await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "puppies");
 
     expect(await screen.findByText("puppies-github")).toBeInTheDocument();
+  });
+
+  it("searches integrations by provider name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "slack");
+
+    expect(await screen.findByText("deploy-alerts")).toBeInTheDocument();
   });
 
   it("searches service accounts by name", async () => {

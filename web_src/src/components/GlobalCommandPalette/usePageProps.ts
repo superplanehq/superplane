@@ -145,7 +145,8 @@ function buildSearchResults(
 
   for (const canvas of model.canvasListProps.canvases) {
     const name = canvas.metadata?.name ?? "";
-    if (name.toLowerCase().includes(query)) {
+    const description = canvas.metadata?.description ?? "";
+    if (matchesSearch(query, name, description, "Open app")) {
       results.push({
         id: `app-${canvas.metadata?.id}`,
         label: name,
@@ -157,37 +158,41 @@ function buildSearchResults(
             goTo(appPath(organizationId, id));
           }
         },
-        keywords: [name],
+        keywords: [name, description],
       });
     }
   }
 
   for (const integration of integrations) {
-    if (integration.name.toLowerCase().includes(query)) {
+    if (matchesSearch(query, integration.name, integration.providerName, integration.status, "Integration")) {
       results.push({
         id: `integration-${integration.id}`,
         label: integration.name,
         description: `Integration · ${integration.status}`,
         icon: Plug,
         onSelect: () => goTo(`/${organizationId}/settings/integrations/${integration.id}`),
-        keywords: [integration.name, integration.providerName],
+        keywords: [integration.name, integration.providerName, integration.status],
       });
     }
   }
 
   for (const sa of serviceAccounts) {
     const name = sa.name ?? "";
-    if (name.toLowerCase().includes(query)) {
+    if (matchesSearch(query, name, sa.id, "Service Account")) {
       results.push({
         id: `sa-${sa.id}`,
         label: name,
         description: "Service Account",
         icon: Key,
         onSelect: () => goTo(`/${organizationId}/settings/service-accounts/${sa.id}`),
-        keywords: [name],
+        keywords: [name, sa.id ?? ""],
       });
     }
   }
 
   return results;
+}
+
+function matchesSearch(query: string, ...values: Array<string | undefined>) {
+  return values.some((value) => value?.toLowerCase().includes(query));
 }
