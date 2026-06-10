@@ -131,8 +131,9 @@ type apiError struct {
 }
 
 type agentMetadata struct {
-	System  string `json:"system"`
-	Version int    `json:"version"`
+	System  string          `json:"system"`
+	Version int             `json:"version"`
+	Tools   json.RawMessage `json:"tools,omitempty"`
 }
 
 func (e *apiError) Error() string {
@@ -157,6 +158,7 @@ func (c *Client) updateAgentSystemPrompt(ctx context.Context, agentID string, ve
 	body := map[string]any{
 		"system":  prompt,
 		"version": version,
+		"tools":   defaultAgentTools(),
 	}
 	data, err := c.executeHTTP(ctx, http.MethodPost, "/agents/"+url.PathEscape(agentID), body)
 	if err != nil {

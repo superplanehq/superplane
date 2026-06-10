@@ -19,12 +19,19 @@ import (
 	"gorm.io/gorm"
 )
 
-const testProvider = "test"
+const (
+	testProvider       = "test"
+	testCustomToolName = "test_custom_tool"
+)
 
 type scriptedProvider struct {
-	name   string
-	events []agents.ProviderEvent
-	err    error
+	name         string
+	events       []agents.ProviderEvent
+	eventBatches [][]agents.ProviderEvent
+	streamCalls  int
+	sentResults  []agents.CustomToolResult
+	err          error
+	sendErr      error
 }
 
 func (p *scriptedProvider) Name() string { return p.name }
@@ -41,14 +48,42 @@ func (p *scriptedProvider) DefineOutcome(context.Context, string, agents.DefineO
 	return errors.New("not used")
 }
 func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, cb func(agents.ProviderEvent) error) error {
-	for _, e := range p.events {
+	events := p.events
+	if len(p.eventBatches) > 0 {
+		index := p.streamCalls
+		if index >= len(p.eventBatches) {
+			index = len(p.eventBatches) - 1
+		}
+		events = p.eventBatches[index]
+	}
+	p.streamCalls++
+	for _, e := range events {
 		if err := cb(e); err != nil {
 			return err
 		}
 	}
 	return p.err
 }
+func (p *scriptedProvider) SendCustomToolResults(_ context.Context, _ string, results []agents.CustomToolResult) error {
+	if p.sendErr != nil {
+		return p.sendErr
+	}
+	p.sentResults = append(p.sentResults, results...)
+	return nil
+}
 func (p *scriptedProvider) ArchiveSession(context.Context, string) error { return nil }
+
+type fakeCustomToolExecutor struct {
+	seen []agents.CustomToolUse
+}
+
+func (e *fakeCustomToolExecutor) ExecuteCustomTool(_ context.Context, session agents.AgentSessionContext, toolUse agents.CustomToolUse) agents.CustomToolResult {
+	e.seen = append(e.seen, toolUse)
+	return agents.CustomToolResult{
+		CustomToolUseID: toolUse.ID,
+		Content:         `{"ok":true,"canvas_id":"` + session.CanvasID + `"}`,
+	}
+}
 
 func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.UUID) *models.AgentSession {
 	t.Helper()
@@ -137,6 +172,234 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
 	assert.Equal(t, "rg --files", stored[0].Content,
 		"tool_finished must not wipe the input captured by tool_started — the UI's expandable command relies on it")
+}
+
+func TestAgentStreamWorker_ExecutesCustomToolsAndResumesStream(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{
+					ProviderEventID: "custom-1",
+					Type:            agents.ProviderEventCustomToolUseStarted,
+					ToolName:        testCustomToolName,
+					ToolCallID:      "custom-1",
+					ToolInput:       `{"action":"read"}`,
+					CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+				},
+				{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+			},
+			{
+				{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Done"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+		},
+	}
+	executor := &fakeCustomToolExecutor{}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", executor)
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	require.Equal(t, 2, provider.streamCalls)
+	require.Len(t, executor.seen, 1)
+	require.Len(t, provider.sentResults, 1)
+	assert.Equal(t, "custom-1", provider.sentResults[0].CustomToolUseID)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	assert.Equal(t, models.AgentMessageRoleTool, stored[0].Role)
+	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
+	assert.Contains(t, stored[0].Content, `"ok":true`)
+	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
+	assert.Equal(t, "Done", stored[1].Content)
+}
+
+func TestAgentStreamWorker_SendsErrorResultWhenCustomToolExecutorMissing(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{
+					ProviderEventID: "custom-1",
+					Type:            agents.ProviderEventCustomToolUseStarted,
+					ToolName:        testCustomToolName,
+					ToolCallID:      "custom-1",
+					ToolInput:       `{"action":"read"}`,
+					CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+				},
+				{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+			},
+			{
+				{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Recovered"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	require.Len(t, provider.sentResults, 1)
+	assert.Equal(t, "custom-1", provider.sentResults[0].CustomToolUseID)
+	assert.True(t, provider.sentResults[0].IsError)
+	assert.Contains(t, provider.sentResults[0].Content, "custom tool executor is not configured")
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	assert.Equal(t, models.AgentToolStatusFailed, stored[0].ToolStatus)
+	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
+	assert.Equal(t, "Recovered", stored[1].Content)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status)
+}
+
+func TestAgentStreamWorker_DoesNotPersistFinishedCustomToolWhenResultSendFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name:    testProvider,
+		sendErr: errors.New("provider unavailable"),
+		events: []agents.ProviderEvent{
+			{
+				ProviderEventID: "custom-1",
+				Type:            agents.ProviderEventCustomToolUseStarted,
+				ToolName:        testCustomToolName,
+				ToolCallID:      "custom-1",
+				ToolInput:       `{"action":"read"}`,
+				CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+			},
+			{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", &fakeCustomToolExecutor{})
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
+	assert.Equal(t, `{"action":"read"}`, stored[0].Content)
+	assert.NotContains(t, stored[0].Content, `"ok":true`)
+	assert.Empty(t, provider.sentResults)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status)
+}
+
+func TestAgentStreamWorker_DoesNotResendResolvedCustomToolResults(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{
+					ProviderEventID: "custom-1",
+					Type:            agents.ProviderEventCustomToolUseStarted,
+					ToolName:        testCustomToolName,
+					ToolCallID:      "custom-1",
+					ToolInput:       `{"action":"read"}`,
+					CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+				},
+				{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+			},
+			{
+				{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+				{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Done after replay"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+		},
+	}
+	executor := &fakeCustomToolExecutor{}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", executor)
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	require.Equal(t, 2, provider.streamCalls)
+	require.Len(t, executor.seen, 1)
+	require.Len(t, provider.sentResults, 1)
+	assert.Equal(t, "custom-1", provider.sentResults[0].CustomToolUseID)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
+	assert.Equal(t, "Done after replay", stored[1].Content)
+}
+
+func TestAgentStreamWorker_DoesNotResendPersistedCustomToolResultsOnReplay(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID:       session.ID,
+		ProviderEventID: "custom-1",
+		Role:            models.AgentMessageRoleTool,
+		Content:         `{"ok":true}`,
+		ToolName:        testCustomToolName,
+		ToolStatus:      models.AgentToolStatusFinished,
+	}))
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		events: []agents.ProviderEvent{
+			{
+				ProviderEventID: "custom-1",
+				Type:            agents.ProviderEventCustomToolUseStarted,
+				ToolName:        testCustomToolName,
+				ToolCallID:      "custom-1",
+				ToolInput:       `{"action":"read"}`,
+				CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+			},
+			{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1"}},
+			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Recovered message"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+	executor := &fakeCustomToolExecutor{}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", executor)
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	require.Len(t, executor.seen, 0)
+	require.Len(t, provider.sentResults, 0)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	assert.Equal(t, models.AgentMessageRoleTool, stored[0].Role)
+	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
+	assert.Equal(t, `{"ok":true}`, stored[0].Content)
+	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
+	assert.Equal(t, "Recovered message", stored[1].Content)
 }
 
 func TestAgentStreamWorker_ParallelToolsTrackedIndependently(t *testing.T) {
