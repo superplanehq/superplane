@@ -27,6 +27,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import atlasCloudIcon from "@/assets/icons/integrations/atlascloud.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
@@ -84,6 +85,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  atlascloud: atlasCloudIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
@@ -133,6 +135,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
+  atlascloud: atlasCloudIcon,
   claude: claudeIcon,
   logfire: logfireIcon,
   cursor: cursorIcon,
