@@ -30,7 +30,7 @@ import {
   deleteAlertingPolicyMapper,
   updateAlertingPolicyMapper,
 } from "./monitoring";
-import { queryMapper, queryRangeMapper } from "./prometheus";
+import { queryMapper } from "./prometheus";
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
 import { deleteImageMapper } from "./delete_image";
@@ -65,7 +65,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
   "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
   "prometheus.query": queryMapper,
-  "prometheus.queryRange": queryRangeMapper,
   "compute.createStaticIP": createStaticIPMapper,
   "compute.deleteStaticIP": deleteStaticIPMapper,
   "compute.manageStaticIP": manageStaticIPMapper,

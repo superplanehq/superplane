@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { queryMapper, queryRangeMapper } from "./prometheus";
+import { queryMapper } from "./prometheus";
 import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 
 describe("queryMapper.getExecutionDetails", () => {
@@ -31,15 +31,43 @@ describe("queryMapper.getExecutionDetails", () => {
     const details = queryMapper.getExecutionDetails(ctx);
     expect(details["Series"]).toBe("0");
   });
-});
 
-describe("queryRangeMapper.getExecutionDetails", () => {
-  it("surfaces the matrix result type and series count", () => {
+  it("surfaces a matrix result type for a range (lookback) query", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildOutput({ resultType: "matrix", seriesCount: 2 })] } },
     });
-    const details = queryRangeMapper.getExecutionDetails(ctx);
+    const details = queryMapper.getExecutionDetails(ctx);
     expect(details["Result Type"]).toBe("matrix");
     expect(details["Series"]).toBe("2");
+  });
+});
+
+describe("queryMapper.props lookback metadata", () => {
+  function node(configuration: Record<string, unknown>) {
+    return {
+      id: "n1",
+      name: "Query",
+      componentName: "gcp.prometheus.query",
+      isCollapsed: false,
+      configuration,
+      metadata: {},
+    };
+  }
+  const ctx = (configuration: Record<string, unknown>) =>
+    ({
+      node: node(configuration),
+      nodes: [],
+      lastExecutions: [],
+      componentDefinition: { name: "gcp.prometheus.query", label: "Query", icon: "chart-line" },
+    }) as unknown as Parameters<typeof queryMapper.props>[0];
+
+  it("shows a lookback chip when a window is set", () => {
+    const props = queryMapper.props(ctx({ query: "up", lookbackPeriod: "1h" }));
+    expect(props.metadata?.some((m) => m.label === "last 1 hour")).toBe(true);
+  });
+
+  it("omits the lookback chip for an instant query", () => {
+    const props = queryMapper.props(ctx({ query: "up", lookbackPeriod: "instant" }));
+    expect(props.metadata?.some((m) => m.icon === "clock")).toBe(false);
   });
 });

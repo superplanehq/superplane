@@ -200,7 +200,6 @@ func (g *GCP) Actions() []core.Action {
 		&monitoring.DeleteAlertingPolicy{},
 		&monitoring.UpdateAlertingPolicy{},
 		&gcpprometheus.Query{},
-		&gcpprometheus.QueryRange{},
 	}
 }
 

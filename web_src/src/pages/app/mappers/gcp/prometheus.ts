@@ -16,15 +16,11 @@ import { baseEventSections } from "./event_helpers";
 
 interface QueryConfiguration {
   query?: string;
-  time?: string;
-}
-
-interface QueryRangeConfiguration {
-  query?: string;
   lookbackPeriod?: string;
 }
 
 const lookbackLabels: Record<string, string> = {
+  "5m": "last 5 minutes",
   "1h": "last 1 hour",
   "6h": "last 6 hours",
   "24h": "last 24 hours",
@@ -97,14 +93,12 @@ function queryMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const label = queryLabel(node);
   if (label) metadata.push({ icon: "chart-line", label });
-  return metadata;
-}
-
-function queryRangeMetadata(node: NodeInfo): MetadataItem[] {
-  const metadata = queryMetadata(node);
-  const config = node.configuration as QueryRangeConfiguration | undefined;
-  if (config?.lookbackPeriod) {
-    metadata.push({ icon: "clock", label: lookbackLabels[config.lookbackPeriod] || config.lookbackPeriod });
+  // Show the lookback window when the query runs in range mode (anything other
+  // than the default instant read).
+  const config = node.configuration as QueryConfiguration | undefined;
+  const lookback = config?.lookbackPeriod;
+  if (lookback && lookback !== "instant") {
+    metadata.push({ icon: "clock", label: lookbackLabels[lookback] || lookback });
   }
   return metadata;
 }
@@ -112,14 +106,6 @@ function queryRangeMetadata(node: NodeInfo): MetadataItem[] {
 export const queryMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context, "chart-line", "Query Managed Prometheus", queryMetadata(context.node));
-  },
-  getExecutionDetails: queryDetails,
-  subtitle,
-};
-
-export const queryRangeMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context, "chart-line", "Query Managed Prometheus Range", queryRangeMetadata(context.node));
   },
   getExecutionDetails: queryDetails,
   subtitle,
