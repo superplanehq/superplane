@@ -35,7 +35,45 @@ const (
 	ManageInstancePowerHibernatePayloadType = "aws.ec2.instance.power.hibernated"
 	UpdateInstancePayloadType               = "aws.ec2.instance.updated"
 
+	CreateLoadBalancerPayloadType = "aws.ec2.loadBalancer"
+	DeleteLoadBalancerPayloadType = "aws.ec2.loadBalancer.deleted"
+
 	instancePollInterval    = 10 * time.Second
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
+
+	loadBalancerPollInterval      = 10 * time.Second
+	maxLoadBalancerPollErrors     = 10
+	maxLoadBalancerPollAttempts   = 120
+	maxLoadBalancerListenerErrors = 5
+)
+
+const (
+	LoadBalancerStateProvisioning   = "provisioning"
+	LoadBalancerStateActive         = "active"
+	LoadBalancerStateActiveImpaired = "active_impaired"
+	LoadBalancerStateFailed         = "failed"
+	LoadBalancerStateDeleted        = "deleted"
+
+	LoadBalancerTypeApplication = "application"
+	LoadBalancerTypeNetwork     = "network"
+	LoadBalancerTypeGateway     = "gateway"
+
+	LoadBalancerSchemeInternetFacing = "internet-facing"
+	LoadBalancerSchemeInternal       = "internal"
+
+	LoadBalancerIPAddressTypeIPv4                     = "ipv4"
+	LoadBalancerIPAddressTypeDualStack                = "dualstack"
+	LoadBalancerIPAddressTypeDualStackWithoutPublicIP = "dualstack-without-public-ipv4"
+
+	ListenerProtocolHTTP   = "HTTP"
+	ListenerProtocolHTTPS  = "HTTPS"
+	ListenerProtocolTCP    = "TCP"
+	ListenerProtocolTLS    = "TLS"
+	ListenerProtocolUDP    = "UDP"
+	ListenerProtocolTCPUDP = "TCP_UDP"
+	ListenerProtocolGENEVE = "GENEVE"
+
+	minSubnetsForALBNLB = 2
+	minSubnetsForGWLB   = 1
 )

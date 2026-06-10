@@ -67,3 +67,22 @@ func requireSecurityGroupID(value string) (string, error) {
 
 	return securityGroupID, nil
 }
+
+func requireLoadBalancerARN(value string) (string, error) {
+	arn := strings.TrimSpace(value)
+	if arn == "" {
+		return "", fmt.Errorf("load balancer ARN is required")
+	}
+
+	return arn, nil
+}
+
+func countNonEmpty(values []string) int {
+	count := 0
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			count++
+		}
+	}
+	return count
+}
