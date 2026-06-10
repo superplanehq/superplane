@@ -126,7 +126,6 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
       id: workflow.metadata?.id || "",
       name: workflow.metadata?.name || "Canvas",
       description: workflow.metadata?.description || "",
-      isTemplate: workflow.metadata?.isTemplate ?? false,
     },
     spec: {
       nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),

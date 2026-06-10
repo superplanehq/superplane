@@ -466,7 +466,8 @@ service Canvases {
 }
 
 message ListCanvasesRequest {
-  bool include_templates = 1;
+  reserved 1;
+  reserved "include_templates";
 }
 
 message ListCanvasesResponse {
@@ -739,7 +740,8 @@ message Canvas {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
-    bool is_template = 8;
+    reserved 8;
+    reserved "is_template";
     string folder_id = 9;
   }
 
