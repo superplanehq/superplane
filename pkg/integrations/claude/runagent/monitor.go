@@ -34,6 +34,11 @@ func (a *RunAgent) HandleHook(ctx core.ActionHookContext) error {
 }
 
 func (a *RunAgent) stream(ctx core.ActionHookContext) error {
+	// Guard against duplicate/retried stream actions
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
 	metadata := ExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
@@ -70,15 +75,23 @@ func (a *RunAgent) stream(ctx core.ActionHookContext) error {
 		}
 	}
 
+	// Emit output BEFORE updating metadata or deleting session.
+	// If emit fails, the poll fallback can still access the session.
+	out := buildOutput(status, metadata.Session.ID, lastMessage, messages)
+	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
+		ctx.Logger.Warnf("Emit failed for session %s: %v. Falling back to poll.", metadata.Session.ID, err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	}
+
 	metadata.Session.Status = status
 	_ = ctx.Metadata.Set(metadata)
 
+	// Clean up session after successful emit
 	if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
 		ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
 	}
 
-	out := buildOutput(status, metadata.Session.ID, lastMessage, messages)
-	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+	return nil
 }
 
 func (a *RunAgent) poll(ctx core.ActionHookContext) error {
