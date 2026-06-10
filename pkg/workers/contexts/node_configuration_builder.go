@@ -363,9 +363,38 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		if err != nil {
 			return nil, err
 		}
+
+		//
+		// listExecutionsInChain merges the current execution's linear lineage
+		// (walked via previous_execution_id) with every run-wide execution of
+		// upstream nodes. When the graph has a feedback cycle (e.g. a loop whose
+		// body points back at the loop), an upstream node has one execution per
+		// iteration, so the same name maps to many executions in the run. We must
+		// bind each name to the execution in the *current* lineage; otherwise
+		// expressions like a loop's until-condition would read a stale
+		// iteration's output. So a linear-chain execution always wins over a
+		// run-wide upstream match for the same node.
+		//
+		linearExecutions, err := b.listLinearExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		linearExecutionIDs := make(map[uuid.UUID]struct{}, len(linearExecutions))
+		for _, execution := range linearExecutions {
+			linearExecutionIDs[execution.ID] = struct{}{}
+		}
+
 		executionByNodeID = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 		for _, execution := range executionsInChain {
 			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+
+			if existing, ok := executionByNodeID[execution.NodeID]; ok {
+				_, existingIsLinear := linearExecutionIDs[existing.ID]
+				_, candidateIsLinear := linearExecutionIDs[execution.ID]
+				if existingIsLinear && !candidateIsLinear {
+					continue
+				}
+			}
 			executionByNodeID[execution.NodeID] = execution
 		}
 	}
