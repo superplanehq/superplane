@@ -159,36 +159,19 @@ func connect() *gorm.DB {
 
 func TruncateTables() error {
 	return Conn().Exec(`
-		truncate table
-			secrets,
-			account_magic_codes,
-			account_password_auth,
-			accounts,
-			account_providers,
-			users,
-			organizations,
-			organization_invitations,
-			organization_invite_links,
-			app_installations,
-			app_installation_secrets,
-			app_installation_requests,
-			app_installation_subscriptions,
-			casbin_rule,
-			role_metadata,
-			group_metadata,
-			installation_metadata,
-			blueprints,
-			workflows,
-			workflow_runs,
-			workflow_nodes,
-			workflow_events,
-			workflow_node_execution_kvs,
-			workflow_node_executions,
-			workflow_node_queue_items,
-			workflow_node_requests,
-			webhooks,
-			agent_sessions,
-			agent_session_messages
-		restart identity cascade;
+		DO $$
+		DECLARE
+			tables text;
+		BEGIN
+			SELECT string_agg(format('%I', tablename), ', ' ORDER BY tablename)
+			INTO tables
+			FROM pg_tables
+			WHERE schemaname = 'public'
+			  AND tablename != 'schema_migrations';
+
+			IF tables IS NOT NULL THEN
+				EXECUTE 'TRUNCATE TABLE ' || tables || ' RESTART IDENTITY CASCADE';
+			END IF;
+		END$$;
 	`).Error
 }

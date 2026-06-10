@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -19,6 +21,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/queries"
 )
+
+const postgresDeadlockDetected = "40P01"
 
 // TestSession handles per-test actions: db, auth, and page ops.
 type TestSession struct {
@@ -120,22 +124,26 @@ func (s *TestSession) Sleep(ms int) {
 }
 
 func (s *TestSession) resetDatabase() {
-	sql := `DO $$
-    DECLARE r RECORD;
-    BEGIN
-        FOR r IN (
-            SELECT tablename
-            FROM pg_tables
-            WHERE schemaname = 'public'
-              AND tablename NOT IN ('schema_migrations')
-        ) LOOP
-            EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
-        END LOOP;
-    END$$;`
+	const maxAttempts = 3
 
-	if err := database.Conn().Exec(sql).Error; err != nil {
-		s.t.Fatalf("reset database: %v", err)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err := database.TruncateTables()
+		if err == nil {
+			return
+		}
+
+		if !isPostgresDeadlock(err) || attempt == maxAttempts {
+			s.t.Fatalf("reset database: %v", err)
+		}
+
+		s.t.Logf("reset database deadlocked; retrying attempt %d/%d: %v", attempt+1, maxAttempts, err)
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
 	}
+}
+
+func isPostgresDeadlock(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == postgresDeadlockDetected
 }
 
 func (s *TestSession) Login() {
