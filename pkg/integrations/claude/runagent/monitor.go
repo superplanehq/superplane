@@ -56,6 +56,19 @@ func (a *RunAgent) stream(ctx core.ActionHookContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
 	}
 
+	// If the stream completed but didn't capture any agent messages,
+	// fall back to the events list API as a backfill.
+	if lastMessage == "" {
+		backfill, _, backfillErr := client.GetLastManagedSessionAgentMessageWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
+		if backfillErr != nil {
+			ctx.Logger.Warnf("Backfill fetch failed for session %s: %v", metadata.Session.ID, backfillErr)
+		}
+		if backfill != "" {
+			lastMessage = backfill
+			messages = append(messages, backfill)
+		}
+	}
+
 	metadata.Session.Status = status
 	_ = ctx.Metadata.Set(metadata)
 
