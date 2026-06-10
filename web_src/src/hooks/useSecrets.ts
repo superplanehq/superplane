@@ -20,12 +20,16 @@ export const secretKeys = {
     [...secretKeys.byDomain(domainId, domainType), "detail", secretId] as const,
 };
 
+const organizationIdForDomain = (domainId: string, domainType: AuthorizationDomainType) =>
+  domainType === "DOMAIN_TYPE_ORGANIZATION" ? domainId : undefined;
+
 export const useSecrets = (domainId: string, domainType: AuthorizationDomainType) => {
   return useQuery({
     queryKey: secretKeys.byDomain(domainId, domainType),
     queryFn: async () => {
       const response = await secretsListSecrets(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           query: { domainId: domainId, domainType: domainType },
         }),
       );
@@ -43,6 +47,7 @@ export const useSecret = (domainId: string, domainType: AuthorizationDomainType,
     queryFn: async () => {
       const response = await secretsDescribeSecret(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           query: {
             domainType: domainType,
             domainId: domainId,
@@ -95,6 +100,7 @@ export const useCreateSecret = (domainId: string, domainType: AuthorizationDomai
 
       return await secretsCreateSecret(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           body: secret,
         }),
       );
@@ -144,6 +150,7 @@ export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomai
 
       return await secretsUpdateSecret(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           body: {
             secret: secret.secret,
             domainId,
@@ -173,6 +180,7 @@ export const useDeleteSecret = (domainId: string, domainType: AuthorizationDomai
     mutationFn: async (secretId: string) => {
       return await secretsDeleteSecret(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           path: {
             idOrName: secretId,
           },
@@ -203,6 +211,7 @@ export const useSetSecretKey = (domainId: string, domainType: AuthorizationDomai
     mutationFn: async (params: SetSecretKeyParams) => {
       return await secretsSetSecretKey(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           path: { idOrName: secretId, keyName: params.keyName },
           body: {
             value: params.value,
@@ -230,6 +239,7 @@ export const useDeleteSecretKey = (domainId: string, domainType: AuthorizationDo
     mutationFn: async (keyName: string) => {
       return await secretsDeleteSecretKey(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           path: { idOrName: secretId, keyName },
           query: { domainId, domainType },
         }),
@@ -253,6 +263,7 @@ export const useUpdateSecretName = (domainId: string, domainType: AuthorizationD
     mutationFn: async (name: string) => {
       return await secretsUpdateSecretName(
         withOrganizationHeader({
+          organizationId: organizationIdForDomain(domainId, domainType),
           path: { idOrName: secretId },
           body: { name, domainType, domainId },
         }),
