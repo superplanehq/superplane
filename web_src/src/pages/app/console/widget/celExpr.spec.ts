@@ -208,6 +208,62 @@ describe("celExpr", () => {
     });
   });
 
+  describe("join builtin", () => {
+    // `join` exists specifically so authors can flatten the result of a `.map`
+    // macro chain into a single string. cel-js doesn't allow `.method()`
+    // postfix after a function-call result, so the canonical form is
+    // `join(list.map(x, expr), sep)`.
+    it("joins a list of strings with the separator", () => {
+      const compiled = compileExpr('join(["a", "b", "c"], ", ")');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("a, b, c");
+    });
+
+    it("uses an empty separator when sep is missing or not a string", () => {
+      const compiled = compileExpr('join(["x", "y"], 0)');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("xy");
+    });
+
+    it("renders null / undefined / number elements as their string form", () => {
+      const compiled = compileExpr('join(value, "|")');
+      expect(evalExpr(compiled, { value: ["a", null, 2, "b"] }, buildEnv())).toBe("a||2|b");
+    });
+
+    it("returns an empty string for non-array inputs", () => {
+      const compiled = compileExpr('join(value, ",")');
+      expect(evalExpr(compiled, { value: "not a list" }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: 42 }, buildEnv())).toBe("");
+    });
+
+    it("composes with a list.map macro to render an HTML list", () => {
+      const compiled = compileExpr('join(items.map(x, "<li>" + x.name + "</li>"), "")');
+      const result = evalExpr(compiled, { items: [{ name: "alice" }, { name: "bob" }] }, buildEnv());
+      expect(result).toBe("<li>alice</li><li>bob</li>");
+    });
+
+    it("composes with list.filter to skip rows before joining", () => {
+      const compiled = compileExpr('join(items.filter(x, x.active).map(x, x.name), ", ")');
+      const result = evalExpr(
+        compiled,
+        {
+          items: [
+            { name: "a", active: true },
+            { name: "b", active: false },
+            { name: "c", active: true },
+          ],
+        },
+        buildEnv(),
+      );
+      expect(result).toBe("a, c");
+    });
+
+    it("works inside templated interpolation", () => {
+      const template = compileTemplate('Hits: {{ join(tags, ", ") }}');
+      const result = evalTemplate(template, { tags: ["red", "blue"] }, buildEnv(), String);
+      expect(result).toBe("Hits: red, blue");
+    });
+  });
+
   describe("error reporting", () => {
     it("reports a compile error for invalid CEL", () => {
       const compiled = compileExpr("value /");
