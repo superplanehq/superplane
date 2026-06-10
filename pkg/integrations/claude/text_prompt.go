@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	pathpkg "path"
 	"strings"
 
 	"github.com/google/uuid"
@@ -176,17 +177,20 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	}
 
 	// Validate that configured files exist in the repository
-	if len(spec.Files) > 0 && ctx.RepositoryFiles != nil {
+	if len(spec.Files) > 0 {
+		if ctx.RepositoryFiles == nil {
+			return fmt.Errorf("files configured but app repository is not available")
+		}
 		available, err := ctx.RepositoryFiles.List()
 		if err != nil {
 			return fmt.Errorf("failed to list repository files: %v", err)
 		}
 		fileSet := make(map[string]bool, len(available))
 		for _, f := range available {
-			fileSet[f] = true
+			fileSet[normalizeFilePath(f)] = true
 		}
 		for _, f := range spec.Files {
-			if !fileSet[f] {
+			if !fileSet[normalizeFilePath(f)] {
 				return fmt.Errorf("file %q not found in app repository", f)
 			}
 		}
@@ -358,6 +362,14 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 
 func mediaTypeForPath(path string) string {
 	return "text/plain"
+}
+
+// normalizeFilePath cleans up a file path for consistent comparison.
+func normalizeFilePath(p string) string {
+	p = pathpkg.Clean(p)
+	p = strings.TrimPrefix(p, "/")
+	p = strings.TrimPrefix(p, "./")
+	return p
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {

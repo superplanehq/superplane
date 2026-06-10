@@ -233,7 +233,6 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	}
 
 	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
-	logger.Infof("RepositoryFiles context created: gitProvider=%v, canvasID=%s", w.gitProvider != nil, queueItem.WorkflowID)
 
 	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents, repoFiles)
 	if err != nil {

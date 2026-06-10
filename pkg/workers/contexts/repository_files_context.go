@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 // repositoryFilesContext implements core.RepositoryFilesContext by reading
@@ -17,6 +18,7 @@ import (
 type repositoryFilesContext struct {
 	gitProvider gitprovider.Provider
 	canvasID    uuid.UUID
+	tx          *gorm.DB // optional transaction for repo lookup
 
 	once   sync.Once
 	repoID string
@@ -25,6 +27,7 @@ type repositoryFilesContext struct {
 
 // NewRepositoryFilesContext creates a RepositoryFilesContext that lazily
 // resolves the git repository for the given canvas.
+// Returns nil when gitProvider is nil (e.g., code paths where git is unavailable).
 func NewRepositoryFilesContext(
 	gitProvider gitprovider.Provider,
 	canvasID uuid.UUID,
@@ -38,9 +41,33 @@ func NewRepositoryFilesContext(
 	}
 }
 
+// NewRepositoryFilesContextInTransaction creates a RepositoryFilesContext
+// that uses the given transaction for repository lookup, ensuring
+// visibility of repos created within the same transaction.
+func NewRepositoryFilesContextInTransaction(
+	gitProvider gitprovider.Provider,
+	canvasID uuid.UUID,
+	tx *gorm.DB,
+) core.RepositoryFilesContext {
+	if gitProvider == nil {
+		return nil
+	}
+	return &repositoryFilesContext{
+		gitProvider: gitProvider,
+		canvasID:    canvasID,
+		tx:          tx,
+	}
+}
+
 func (c *repositoryFilesContext) resolveRepo() (string, error) {
 	c.once.Do(func() {
-		repo, err := models.FindRepositoryUnscoped(c.canvasID)
+		var repo *models.Repository
+		var err error
+		if c.tx != nil {
+			repo, err = models.FindRepositoryInTransaction(c.tx, c.canvasID)
+		} else {
+			repo, err = models.FindRepositoryUnscoped(c.canvasID)
+		}
 		if err != nil {
 			c.err = fmt.Errorf("find repository for canvas %s: %w", c.canvasID, err)
 			return
