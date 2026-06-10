@@ -83,15 +83,16 @@ func toolsEqual(current json.RawMessage, expected []map[string]any) bool {
 	if len(currentByKey) != len(expectedByKey) {
 		return false
 	}
-	for key, currentTool := range currentByKey {
-		if expectedByKey[key] != currentTool {
+	for key, expectedTool := range expectedByKey {
+		currentTool, ok := currentByKey[key]
+		if !ok || !toolContainsExpectedFields(currentTool, expectedTool) {
 			return false
 		}
 	}
 	return true
 }
 
-func toolsByKey(data json.RawMessage) (map[string]string, error) {
+func toolsByKey(data json.RawMessage) (map[string]map[string]any, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("tools missing")
 	}
@@ -101,22 +102,52 @@ func toolsByKey(data json.RawMessage) (map[string]string, error) {
 		return nil, err
 	}
 
-	byKey := map[string]string{}
+	byKey := map[string]map[string]any{}
 	for _, tool := range tools {
 		key := toolIdentity(tool)
 		if key == "" {
 			return nil, fmt.Errorf("tool identity missing")
 		}
-		value, err := json.Marshal(tool)
-		if err != nil {
-			return nil, err
-		}
 		if _, exists := byKey[key]; exists {
 			return nil, fmt.Errorf("duplicate tool identity")
 		}
-		byKey[key] = string(value)
+		byKey[key] = tool
 	}
 	return byKey, nil
+}
+
+func toolContainsExpectedFields(current, expected map[string]any) bool {
+	for key, expectedValue := range expected {
+		currentValue, ok := current[key]
+		if !ok || !valueMatchesExpected(currentValue, expectedValue) {
+			return false
+		}
+	}
+	return true
+}
+
+func valueMatchesExpected(current, expected any) bool {
+	expectedMap, expectedIsMap := expected.(map[string]any)
+	if expectedIsMap {
+		currentMap, ok := current.(map[string]any)
+		return ok && toolContainsExpectedFields(currentMap, expectedMap)
+	}
+
+	expectedSlice, expectedIsSlice := expected.([]any)
+	if expectedIsSlice {
+		currentSlice, ok := current.([]any)
+		if !ok || len(currentSlice) != len(expectedSlice) {
+			return false
+		}
+		for i := range expectedSlice {
+			if !valueMatchesExpected(currentSlice[i], expectedSlice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	return fmt.Sprint(current) == fmt.Sprint(expected)
 }
 
 func toolIdentity(tool map[string]any) string {

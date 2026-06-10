@@ -181,6 +181,28 @@ func TestSyncAgentPrompt_SkipsUpdateWhenCurrentToolsHaveDifferentOrder(t *testin
 	assert.Equal(t, 0, postCount)
 }
 
+func TestToolsEqual_IgnoresProviderMetadata(t *testing.T) {
+	currentTools := defaultAgentTools()
+	currentTools[1]["provider_created_at"] = "2026-06-10T00:00:00Z"
+	currentTools[1]["cache_control"] = nil
+	currentTools[1]["input_schema"].(map[string]any)["provider_schema_id"] = "schema_123"
+
+	current, err := json.Marshal(currentTools)
+	require.NoError(t, err)
+
+	assert.True(t, toolsEqual(current, defaultAgentTools()))
+}
+
+func TestToolsEqual_FailsWhenExpectedToolFieldsDiffer(t *testing.T) {
+	currentTools := defaultAgentTools()
+	currentTools[1]["description"] = "different"
+
+	current, err := json.Marshal(currentTools)
+	require.NoError(t, err)
+
+	assert.False(t, toolsEqual(current, defaultAgentTools()))
+}
+
 func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
 	var capturedBody map[string]any
 	tools := defaultAgentToolsJSON(t)

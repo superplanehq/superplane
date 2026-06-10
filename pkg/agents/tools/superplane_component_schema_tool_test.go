@@ -100,6 +100,38 @@ func TestSuperPlaneComponentSchemaTool_ReportsOmittedValidKeysWhenLimited(t *tes
 	assert.Contains(t, result.Notes, "Result was truncated by limit; request omitted component_keys explicitly or raise limit up to 40 if you need more.")
 }
 
+func TestSuperPlaneComponentSchemaTool_ReportsOmittedVendorMatchesWhenLimited(t *testing.T) {
+	tool := newComponentSchemaTool(t)
+
+	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
+		Vendors: []string{"slack"},
+		Limit:   1,
+	})
+
+	require.Len(t, result.Components, 1)
+	require.NotEmpty(t, result.Omitted)
+	assert.True(t, result.Truncated)
+	for _, key := range result.Omitted {
+		assert.Contains(t, key, "slack.")
+	}
+}
+
+func TestSuperPlaneComponentSchemaTool_ReportsOmittedQueryMatchesWhenLimited(t *testing.T) {
+	tool := newComponentSchemaTool(t)
+
+	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
+		Query: "slack",
+		Limit: 1,
+	})
+
+	require.Len(t, result.Components, 1)
+	require.NotEmpty(t, result.Omitted)
+	assert.True(t, result.Truncated)
+	for _, key := range result.Omitted {
+		assert.NotEmpty(t, key)
+	}
+}
+
 func newComponentSchemaTool(t *testing.T) *SuperPlaneComponentSchemaTool {
 	t.Helper()
 

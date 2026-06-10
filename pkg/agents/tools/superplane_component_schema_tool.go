@@ -88,7 +88,10 @@ func (t *SuperPlaneComponentSchemaTool) lookup(input superPlaneComponentSchemaIn
 		for _, component := range t.vendorComponents(vendor, false) {
 			var limitHit bool
 			components, limitHit = appendUniqueComponent(components, seen, component, limit)
-			truncated = truncated || limitHit
+			if limitHit {
+				omitted = append(omitted, component.Key)
+				truncated = true
+			}
 		}
 	}
 
@@ -98,7 +101,10 @@ func (t *SuperPlaneComponentSchemaTool) lookup(input superPlaneComponentSchemaIn
 			if componentMatchesQuery(component, query) {
 				var limitHit bool
 				components, limitHit = appendUniqueComponent(components, seen, component, limit)
-				truncated = truncated || limitHit
+				if limitHit {
+					omitted = append(omitted, component.Key)
+					truncated = true
+				}
 			}
 		}
 	}
