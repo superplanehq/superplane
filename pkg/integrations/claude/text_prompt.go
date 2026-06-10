@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	pathpkg "path"
 	"strings"
 
 	"github.com/google/uuid"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -172,16 +172,23 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 
 	// Validate that configured files exist in the repository
 	if len(spec.Files) > 0 {
+		if ctx.Files == nil {
+			return fmt.Errorf("files configured but file access is not available")
+		}
 		available, err := ctx.Files.List()
 		if err != nil {
 			return fmt.Errorf("failed to list repository files: %v", err)
 		}
 		fileSet := make(map[string]bool, len(available))
 		for _, f := range available {
-			fileSet[normalizeFilePath(f)] = true
+			if norm, err := gitprovider.NormalizePath(f); err == nil { fileSet[norm] = true }
 		}
 		for _, f := range spec.Files {
-			if !fileSet[normalizeFilePath(f)] {
+			norm, err := gitprovider.NormalizePath(f)
+			if err != nil {
+				return fmt.Errorf("invalid file path %q: %v", f, err)
+			}
+			if !fileSet[norm] {
 				return fmt.Errorf("file %q not found in app repository", f)
 			}
 		}
@@ -312,7 +319,11 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 	totalSize := 0
 
 	for _, path := range spec.Files {
-		reader, err := ctx.Files.Read(normalizeFilePath(path))
+		normalized, normErr := gitprovider.NormalizePath(path)
+		if normErr != nil {
+			return nil, fmt.Errorf("invalid file path %q: %w", path, normErr)
+		}
+		reader, err := ctx.Files.Read(normalized)
 		if err != nil {
 			return nil, fmt.Errorf("read file %q: %w", path, err)
 		}
@@ -352,15 +363,6 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 }
 
 
-// normalizeFilePath cleans up a file path for consistent comparison.
-func normalizeFilePath(p string) string {
-	p = pathpkg.Clean(p)
-	p = strings.TrimPrefix(p, "/")
-	if p == "." {
-		return ""
-	}
-	return p
-}
 
 func (c *TextPrompt) Hooks() []core.Hook {
 	return []core.Hook{}
