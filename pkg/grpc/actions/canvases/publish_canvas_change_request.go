@@ -176,6 +176,7 @@ func PublishCanvasChangeRequest(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				
 			},
 		); err != nil {
 			return err
