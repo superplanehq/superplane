@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DOCS_URL } from "./constants";
 import type { CommandPaletteModel } from "./model";
-import type { CommandPalettePageProps } from "./pages";
+import type { CommandPalettePageProps, IntegrationItem, IntegrationStatus } from "./pages";
 import type { PaletteAction } from "./types";
 
 export function useCommandPalettePageProps(model: CommandPaletteModel): CommandPalettePageProps {
@@ -26,16 +26,13 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId);
   const { data: serviceAccounts = [] } = useServiceAccounts(organizationId);
 
-  const integrations = useMemo(
+  const integrations = useMemo<IntegrationItem[]>(
     () =>
-      connectedIntegrations.map((i) => ({
-        id: i.metadata?.id ?? "",
-        name: i.metadata?.name ?? i.metadata?.integrationName ?? "Unknown",
-        providerName: i.metadata?.integrationName ?? "",
-        status: (i.status?.state === "ready" ? "ready" : i.status?.state === "error" ? "error" : "pending") as
-          | "ready"
-          | "error"
-          | "pending",
+      connectedIntegrations.map((integration) => ({
+        id: integration.metadata?.id ?? "",
+        name: integration.metadata?.name ?? integration.metadata?.integrationName ?? "Unknown",
+        providerName: integration.metadata?.integrationName ?? "",
+        status: integrationStatusFrom(integration.status?.state),
       })),
     [connectedIntegrations],
   );
@@ -119,21 +116,20 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   };
 }
 
-type IntegrationSearchItem = {
-  id: string;
-  name: string;
-  providerName: string;
-  status: string;
-};
-
 type ServiceAccountSearchItem = {
   id?: string;
   name?: string;
 };
 
+function integrationStatusFrom(state: string | undefined): IntegrationStatus {
+  if (state === "ready") return "ready";
+  if (state === "error") return "error";
+  return "pending";
+}
+
 function buildSearchResults(
   model: CommandPaletteModel,
-  integrations: IntegrationSearchItem[],
+  integrations: IntegrationItem[],
   serviceAccounts: ServiceAccountSearchItem[],
   organizationId: string,
   goTo: (href: string) => void,
