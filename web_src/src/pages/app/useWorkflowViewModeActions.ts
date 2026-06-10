@@ -8,7 +8,6 @@ interface WorkflowViewModeActionsConfig {
   isFilesMode: boolean;
   isRunsMode: boolean;
   hasEditableVersion: boolean;
-  isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   handleExitConsoleMode: () => void;
@@ -26,7 +25,6 @@ export function useWorkflowViewModeActions({
   isFilesMode,
   isRunsMode,
   hasEditableVersion,
-  isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
   handleExitConsoleMode,
@@ -89,7 +87,6 @@ export function useWorkflowViewModeActions({
     ...getConsoleHeaderActions({
       isEditing: hasEditableVersion,
       isConsoleMode,
-      isTemplate,
       canUpdateCanvas,
       canvasDeletedRemotely,
       openAddPanel: () => void handleConsoleAddPanelRequest(),

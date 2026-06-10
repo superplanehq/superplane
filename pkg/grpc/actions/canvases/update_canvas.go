@@ -39,15 +39,7 @@ func UpdateCanvas(
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
-				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-			}
-		}
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -138,7 +130,6 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 			"organization_id",
 			"live_version_id",
 			"folder_id",
-			"is_template",
 			"name",
 			"created_by",
 			"created_at",

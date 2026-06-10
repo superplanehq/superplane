@@ -13,7 +13,7 @@ import (
 // CanvasResourceYAML serializes a canvas version into the canonical canvas.yaml
 // representation. The caller passes the already-serialized proto version so this
 // package stays free of model/database dependencies.
-func CanvasResourceYAML(version *pb.CanvasVersion, canvasID string, isTemplate bool) (string, error) {
+func CanvasResourceYAML(version *pb.CanvasVersion, canvasID string) (string, error) {
 	// Use protojson (not encoding/json) so proto enums such as node.type are
 	// emitted as their canonical names (e.g. "TYPE_TRIGGER") instead of their
 	// numeric values. ParseCanvasResource reads canvas.yaml back with protojson,
@@ -44,7 +44,6 @@ func CanvasResourceYAML(version *pb.CanvasVersion, canvasID string, isTemplate b
 			"id":          canvasID,
 			"name":        version.GetMetadata().GetName(),
 			"description": version.GetMetadata().GetDescription(),
-			"isTemplate":  isTemplate,
 		},
 		"spec": spec,
 	}
