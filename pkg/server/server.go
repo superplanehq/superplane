@@ -10,8 +10,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
-	agenttools "github.com/superplanehq/superplane/pkg/agents/tools"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -241,16 +241,14 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agents.NewCustomToolRouter(
-			agenttools.NewSuperPlaneCanvasTool(agenttools.SuperPlaneCanvasToolOptions{
-				Encryptor:      encryptor,
-				Registry:       registry,
-				WebhookBaseURL: getWebhookBaseURL(baseURL),
-				AuthService:    authService,
-				UsageService:   getOptionalWorkerUsageService(),
-			}),
-			agenttools.NewSuperPlaneComponentSchemaTool(registry),
-		))
+		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
+			Encryptor:         encryptor,
+			ComponentRegistry: registry,
+			WebhookBaseURL:    getWebhookBaseURL(baseURL),
+			AuthService:       authService,
+			UsageService:      getOptionalWorkerUsageService(),
+		})
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agentToolRegistry)
 		go w.Start(context.Background())
 	}
 
