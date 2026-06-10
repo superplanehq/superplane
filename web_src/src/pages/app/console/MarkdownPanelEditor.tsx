@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
@@ -100,6 +101,15 @@ export function MarkdownPanelEditor({
   // vertical space, useful on shorter panel cards.
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
+  // Variables rail collapses automatically when the parent widget is narrow.
+  // The manual toggle wins until the breakpoint flips again, at which point
+  // the auto behavior takes over so resizes always honor the current width.
+  const {
+    containerRef: gridRef,
+    collapsed: variablesCollapsed,
+    toggle: toggleVariablesCollapsed,
+  } = useResponsiveRailCollapse();
+
   const insertAtCursor = (snippet: string) => {
     const el = textareaRef.current;
     if (!el) {
@@ -131,7 +141,13 @@ export function MarkdownPanelEditor({
           data-testid="console-markdown-title-editor"
         />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+      <div
+        ref={gridRef}
+        className={cn(
+          "grid min-h-0 flex-1 grid-cols-1 gap-0",
+          variablesCollapsed ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_minmax(220px,320px)]",
+        )}
+      >
         <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10">
           <Textarea
             ref={textareaRef}
@@ -159,6 +175,8 @@ export function MarkdownPanelEditor({
           errors={errors}
           isLoading={isLoading}
           onInsertSnippet={insertAtCursor}
+          collapsed={variablesCollapsed}
+          onToggleCollapsed={toggleVariablesCollapsed}
         />
       </div>
       <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
