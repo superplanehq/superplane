@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/tools"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -202,6 +203,20 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	var workerUsageService usage.Service
+	getWorkerUsageService := func() usage.Service {
+		if workerUsageService != nil {
+			return workerUsageService
+		}
+
+		service, err := usage.NewServiceFromEnv()
+		if err != nil {
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+		}
+		workerUsageService = service
+		return workerUsageService
+	}
+
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
@@ -211,15 +226,21 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL)
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agents.NewCustomToolRouter(
+			agenttools.NewSuperPlaneCanvasTool(agenttools.SuperPlaneCanvasToolOptions{
+				Encryptor:      encryptor,
+				Registry:       registry,
+				WebhookBaseURL: getWebhookBaseURL(baseURL),
+				AuthService:    authService,
+				UsageService:   getWorkerUsageService(),
+			}),
+			agenttools.NewSuperPlaneComponentSchemaTool(registry),
+		))
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService, err := usage.NewServiceFromEnv()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
+		usageService := getWorkerUsageService()
 
 		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Event Retention Worker")
