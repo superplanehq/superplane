@@ -787,6 +787,8 @@ export function AppPage() {
         return;
       }
 
+      canvasRef.current = updatedWorkflow;
+      canvasContentVersionIdRef.current = activeCanvasVersionId;
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (!isViewingDraftVersion || !activeCanvasVersionId || !updatedWorkflow.spec) {
@@ -3657,16 +3659,17 @@ export function AppPage() {
 
   const handleNodeCollapseChange = useCallback(
     async (nodeId: string, collapsed: boolean) => {
-      if (!canvas || !organizationId || !canvasId) return;
+      const currentWorkflow = canvasRef.current ?? canvas;
+      if (!currentWorkflow || !organizationId || !canvasId) return;
 
-      const currentNode = canvas.spec?.nodes?.find((node) => node.id === nodeId);
+      const currentNode = currentWorkflow.spec?.nodes?.find((node) => node.id === nodeId);
       if (!currentNode) return;
 
       if (currentNode.isCollapsed === collapsed) {
         return;
       }
 
-      const updatedNodes = canvas.spec?.nodes?.map((node) =>
+      const updatedNodes = currentWorkflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
@@ -3676,9 +3679,9 @@ export function AppPage() {
       );
 
       const updatedWorkflow = {
-        ...canvas,
+        ...currentWorkflow,
         spec: {
-          ...canvas.spec,
+          ...currentWorkflow.spec,
           nodes: updatedNodes,
         },
       };

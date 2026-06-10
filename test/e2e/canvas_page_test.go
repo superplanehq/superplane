@@ -56,8 +56,10 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertIsNodeExpanded("Hello")
 		steps.toggleNodeViewOnCanvas("Hello")
 		steps.assertIsNodeCollapsed("Hello")
+		steps.assertNodeCollapsedInDraft("Hello", true)
 		steps.toggleNodeViewOnCanvas("Hello")
 		steps.assertIsNodeExpanded("Hello")
+		steps.assertNodeCollapsedInDraft("Hello", false)
 	})
 
 	t.Run("deleting a node from a canvas", func(t *testing.T) {
@@ -274,6 +276,23 @@ func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
 	s.session.AssertVisible(selector)
 }
 
+func (s *CanvasPageSteps) assertNodeCollapsedInDraft(nodeName string, collapsed bool) {
+	require.Eventually(s.t, func() bool {
+		draft := s.canvas.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+
+		for _, node := range draft.Nodes {
+			if node.Name == nodeName {
+				return node.IsCollapsed == collapsed
+			}
+		}
+
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
 func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
 	s.session.AssertText(nodeName)
 }
@@ -300,9 +319,8 @@ func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
 	)
 
 	s.session.HoverOver(node)
-	s.session.Sleep(100)
+	s.session.AssertVisible(toggleButton)
 	s.session.Click(toggleButton)
-	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
