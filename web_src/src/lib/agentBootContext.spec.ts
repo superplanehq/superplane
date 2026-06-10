@@ -83,8 +83,9 @@ describe("agent boot context", () => {
     expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
     expect(getAgentBootMessage("canvas-1")).not.toContain("This template deploys preview environments.");
     expect(getAgentBootMessage("canvas-1")).not.toContain("Read the current canvas state and connected integrations.");
+    expect(getAgentBootMessage("canvas-1")).not.toContain("Do not inspect the canvas");
     expect(getAgentBootMessage("canvas-1")).toContain(
-      "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+      "Do not run commands or tools to inspect the canvas, integrations, or files.",
     );
     expect(getAgentBootMessage("canvas-1")).toContain(
       'Reply only with: "Tell me what you would like to do next in the canvas."',

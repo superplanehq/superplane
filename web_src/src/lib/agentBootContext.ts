@@ -77,7 +77,7 @@ function buildTemplateBootMessage({ instructions, initialMessage }: TemplateAgen
 
   return [
     "The UI has already shown the user the template introduction.",
-    "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+    "Do not run commands or tools to inspect the canvas, integrations, or files.",
     `Reply only with: "${TEMPLATE_NEXT_STEP_MESSAGE}"`,
   ].join("\n\n");
 }
