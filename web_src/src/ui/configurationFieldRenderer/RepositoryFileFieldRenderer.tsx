@@ -14,7 +14,7 @@ export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ fiel
     queryFn: async () => {
       if (!appId) return [];
       const response = await canvasesListCanvasRepositoryFiles({
-        path: { canvas_id: appId },
+        path: { canvasId: appId },
       });
       return response.data?.files?.map((f) => f.path ?? "").filter(Boolean) ?? [];
     },
