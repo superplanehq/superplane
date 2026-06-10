@@ -75,6 +75,12 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
       "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
     example: "previous(2).data.image.version",
   },
+  {
+    name: "run",
+    snippet: "run().",
+    description: "Returns the current run, exposing its id, url, and started_at.",
+    example: "run().url",
+  },
   // String
   {
     name: "trim",
@@ -1403,6 +1409,11 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
     }
 
     return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+  }
+
+  const runMatch = expr.match(/^run\(\)/);
+  if (runMatch) {
+    return `__run${expr.slice(runMatch[0].length)}`;
   }
 
   return expr;
