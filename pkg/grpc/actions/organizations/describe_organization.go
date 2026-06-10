@@ -9,7 +9,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -25,19 +24,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 	}
 
 	response := &pb.DescribeOrganizationResponse{
-		Organization: &pb.Organization{
-			Metadata: &pb.Organization_Metadata{
-				Id:          organization.ID.String(),
-				Name:        organization.Name,
-				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
-			},
-			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
-				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
-			},
-		},
+		Organization: organizationToProto(organization),
 	}
 
 	return response, nil
