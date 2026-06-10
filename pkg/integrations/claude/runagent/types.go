@@ -11,8 +11,8 @@ const (
 	maxPollInterval         = 5 * time.Minute
 	maxPollAttempts         = 200
 	maxPollErrors           = 5
-	finalMessageReads       = 5
-	finalMessageDelay       = time.Second
+	finalMessageReads       = 15
+	finalMessageDelay       = 2 * time.Second
 )
 
 // Spec is the workflow node configuration for claude.runAgent.
