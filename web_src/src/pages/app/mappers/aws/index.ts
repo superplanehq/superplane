@@ -57,7 +57,14 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
-import { createWorkspaceMapper, deleteWorkspaceMapper, getWorkspaceMapper, updateWorkspaceMapper } from "./prometheus";
+import {
+  createWorkspaceMapper,
+  deleteWorkspaceMapper,
+  getWorkspaceMapper,
+  queryMapper,
+  queryRangeMapper,
+  updateWorkspaceMapper,
+} from "./prometheus";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -78,6 +85,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "prometheus.getWorkspace": getWorkspaceMapper,
   "prometheus.updateWorkspace": updateWorkspaceMapper,
   "prometheus.deleteWorkspace": deleteWorkspaceMapper,
+  "prometheus.query": queryMapper,
+  "prometheus.queryRange": queryRangeMapper,
   "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
   "codeArtifact.createRepository": createRepositoryMapper,
   "codeArtifact.deletePackageVersions": deletePackageVersionsMapper,
@@ -148,6 +157,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "prometheus.getWorkspace": buildActionStateRegistry("retrieved"),
   "prometheus.updateWorkspace": buildActionStateRegistry("updated"),
   "prometheus.deleteWorkspace": buildActionStateRegistry("deleted"),
+  "prometheus.query": buildActionStateRegistry("success"),
+  "prometheus.queryRange": buildActionStateRegistry("success"),
   "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
   "codeArtifact.createRepository": buildActionStateRegistry("created"),
   "codeArtifact.deletePackageVersions": buildActionStateRegistry("deleted"),
