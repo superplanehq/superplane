@@ -285,7 +285,7 @@ describe("CanvasPage connection drop", () => {
     });
   });
 
-  it("creates a starter placeholder when the add component button is clicked", async () => {
+  it("opens the building blocks sidebar without creating a placeholder when the add component button is clicked", async () => {
     const onPlaceholderAdd = vi.fn(
       async (_data: { position: { x: number; y: number }; sourceNodeId?: string; sourceHandleId?: string | null }) =>
         "placeholder-starter",
@@ -311,14 +311,8 @@ describe("CanvasPage connection drop", () => {
       fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
-    expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
-    const payload = onPlaceholderAdd.mock.calls[0]?.[0];
-    expect(payload).toBeDefined();
-    expect(payload).toMatchObject({
-      position: { x: expect.any(Number), y: expect.any(Number) },
-    });
-    expect(payload?.sourceNodeId).toBeUndefined();
-    expect(payload?.sourceHandleId).toBeUndefined();
+    expect(onPlaceholderAdd).not.toHaveBeenCalled();
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
   it("opens the canvas YAML modal without switching to the Files tab", async () => {

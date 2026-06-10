@@ -776,7 +776,6 @@ function CanvasPage(props: CanvasPageProps) {
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
-  const isCreatingStarterPlaceholderRef = useRef(false);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
   const localIsSidebarOpenRef = useRef<boolean | null>(null);
@@ -1134,7 +1133,7 @@ function CanvasPage(props: CanvasPageProps) {
    * a free-floating node. Otherwise we place the new node at the viewport
    * center using the same algorithm as "Add Note".
    */
-  const handleBuildingBlockEnter = useCallback(
+  const handleBuildingBlockSelect = useCallback(
     (block: BuildingBlock) => {
       if (readOnly) return;
 
@@ -1156,59 +1155,14 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
-  const onPlaceholderAdd = props.onPlaceholderAdd;
-  const viewportRefProp = props.viewportRef;
-
-  const handleBuildingBlocksShortcutOpen = useCallback(async () => {
+  const handleBuildingBlocksShortcutOpen = useCallback(() => {
     if (readOnly) {
       return;
     }
 
-    if (templateNodeId) {
-      handleSidebarToggle(true);
-      state.componentSidebar.close();
-      return;
-    }
-
-    if (!onPlaceholderAdd) {
-      handleSidebarToggle(true);
-      return;
-    }
-
-    if (isCreatingStarterPlaceholderRef.current) {
-      return;
-    }
-
-    isCreatingStarterPlaceholderRef.current = true;
-    try {
-      const position = findFreePositionInViewport({
-        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
-        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
-        nodes: state.nodes || [],
-        nodeSize: { width: 420, height: 200 },
-        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
-      });
-      const placeholderId = await onPlaceholderAdd({ position });
-      if (!placeholderId) {
-        handleSidebarToggle(true);
-        return;
-      }
-
-      setTemplateNodeId(placeholderId);
-      setIsBuildingBlocksSidebarOpen(true);
-      state.componentSidebar.close();
-    } finally {
-      isCreatingStarterPlaceholderRef.current = false;
-    }
-  }, [
-    readOnly,
-    templateNodeId,
-    onPlaceholderAdd,
-    viewportRefProp,
-    state.nodes,
-    state.componentSidebar,
-    handleSidebarToggle,
-  ]);
+    handleSidebarToggle(true);
+    state.componentSidebar.close();
+  }, [readOnly, state.componentSidebar, handleSidebarToggle]);
 
   useBuildingBlocksShortcut({
     disabled:
@@ -1435,8 +1389,8 @@ function CanvasPage(props: CanvasPageProps) {
             canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockClick}
-            onEnterSubmit={handleBuildingBlockEnter}
+            onBlockClick={handleBuildingBlockSelect}
+            onEnterSubmit={handleBuildingBlockSelect}
           />
         )}
 
