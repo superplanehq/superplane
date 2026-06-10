@@ -3,6 +3,24 @@ import { useMemo } from "react";
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
+const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["runs", "versions", "memory", "files"]);
+
+export function isPanelHeaderMode(headerMode: WorkflowHeaderMode): boolean {
+  return PANEL_HEADER_MODES.has(headerMode);
+}
+
+export function blocksBuildingBlocksShortcut(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode === "console" || isPanelHeaderMode(headerMode);
+}
+
+export function allowsBuildingBlocksSidebar(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode !== "console" && !isPanelHeaderMode(headerMode);
+}
+
+export function isRunsOrVersionsHeaderMode(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode === "runs" || headerMode === "versions";
+}
+
 const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
 

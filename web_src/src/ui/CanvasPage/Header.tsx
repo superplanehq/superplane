@@ -132,6 +132,32 @@ export function Header(props: HeaderProps) {
   );
 }
 
+interface PageHeaderBarProps {
+  organizationId?: string;
+  headerTitle: string;
+  showCanvasSettingsMenu?: boolean;
+  mode?: HeaderMode;
+  isEditing?: boolean;
+  hasUnpublishedDraftChanges?: boolean;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onDiscardDraftAndStartEdit?: () => void;
+  unpublishedDraftUpdatedAt?: string;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
+}
+
 function PageHeader({
   organizationId,
   headerTitle,
@@ -156,31 +182,7 @@ function PageHeader({
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
-}: {
-  organizationId?: string;
-  headerTitle: string;
-  showCanvasSettingsMenu?: boolean;
-  mode?: HeaderMode;
-  isEditing?: boolean;
-  hasUnpublishedDraftChanges?: boolean;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  unpublishedDraftUpdatedAt?: string;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
-}) {
+}: PageHeaderBarProps) {
   const {
     workflowId,
     canvasId: canvasIdParam,

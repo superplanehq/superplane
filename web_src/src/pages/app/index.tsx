@@ -24,8 +24,10 @@ import type {
 import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
-import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
-import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
+import {
+  renderCanvasRunsSidebarPanel,
+  renderCanvasVersionsSidebarPanel,
+} from "@/pages/app/canvasToolSidebarPanelContent";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
@@ -5299,6 +5301,52 @@ export function AppPage() {
         ? resolvedActiveBranch
         : undefined;
 
+  const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
+    isOpen: isRunsMode,
+    canvasId: canvasId!,
+    runs: runsData.runs,
+    selectedRunId,
+    onSelectRun: handleSelectRun,
+    onBackToRunList: handleBackToRunList,
+    initialOpenDetail: openRunDetailOnMount,
+    detailDismissedForRunId,
+    selectedNodeId: runDetailNodeId,
+    onSelectNode: setRunDetailNodeId,
+    hasNextPage: !!infiniteRunsQuery.hasNextPage,
+    isFetchingNextPage: infiniteRunsQuery.isFetchingNextPage,
+    onLoadMore: () => infiniteRunsQuery.fetchNextPage(),
+    isLoading: infiniteRunsQuery.isLoading,
+    isError: infiniteRunsQuery.isError,
+    onRetry: () => infiniteRunsQuery.refetch(),
+    workflowNodes: canvasNodes,
+    componentIconMap,
+    onStatusFiltersChange: setRunStatusFilters,
+  });
+  const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
+    isOpen: isVersionsMode,
+    scrollPersistenceKey: canvasId,
+    liveCanvasVersionId: effectiveLiveCanvasVersionId,
+    selectedCanvasVersion,
+    pendingApprovalVersions,
+    liveVersions,
+    liveVersionChangeRequestsByVersionId,
+    canUpdateCanvas,
+    isTemplate,
+    canvasDeletedRemotely,
+    onUseVersion: handleUseVersionFromVersionPanel,
+    onVersionNodeDiffContextChange: setVersionNodeDiffContext,
+    onLoadMoreLiveVersions: hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined,
+    loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
+    loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
+    changeRequestApprovalConfig: liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement,
+    rejectedVersions,
+    draftBranches,
+    activeDraftBranch: resolvedActiveBranch,
+    onOpenDraftBranch: handleContinueDraftBranch,
+    onDeleteDraftBranch: handleDeleteDraftBranch,
+    deleteDraftBranchPending: deleteDraftBranchMutation.isPending,
+  });
+
   return (
     <>
       <div className="relative h-full w-full">
@@ -5501,59 +5549,8 @@ export function AppPage() {
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           onNodeClick={isRunsMode ? handleRunCanvasNodeClick : undefined}
-          toolSidebarRunsContent={
-            isRunsMode ? (
-              <RunsTabPanel
-                canvasId={canvasId!}
-                runs={runsData.runs}
-                selectedRunId={selectedRunId}
-                onSelectRun={handleSelectRun}
-                onBackToRunList={handleBackToRunList}
-                initialOpenDetail={openRunDetailOnMount}
-                detailDismissedForRunId={detailDismissedForRunId}
-                selectedNodeId={runDetailNodeId}
-                onSelectNode={setRunDetailNodeId}
-                hasNextPage={!!infiniteRunsQuery.hasNextPage}
-                isFetchingNextPage={infiniteRunsQuery.isFetchingNextPage}
-                onLoadMore={() => infiniteRunsQuery.fetchNextPage()}
-                isLoading={infiniteRunsQuery.isLoading}
-                isError={infiniteRunsQuery.isError}
-                onRetry={() => infiniteRunsQuery.refetch()}
-                workflowNodes={canvasNodes}
-                componentIconMap={componentIconMap}
-                onStatusFiltersChange={setRunStatusFilters}
-              />
-            ) : null
-          }
-          toolSidebarVersionsContent={
-            isVersionsMode ? (
-              <VersionsTabPanel
-                scrollPersistenceKey={canvasId}
-                liveCanvasVersionId={effectiveLiveCanvasVersionId}
-                selectedCanvasVersion={selectedCanvasVersion}
-                pendingApprovalVersions={pendingApprovalVersions}
-                liveVersions={liveVersions}
-                liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                canUpdateCanvas={canUpdateCanvas}
-                isTemplate={isTemplate}
-                canvasDeletedRemotely={canvasDeletedRemotely}
-                onUseVersion={handleUseVersionFromVersionPanel}
-                onVersionNodeDiffContextChange={setVersionNodeDiffContext}
-                onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-                loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-                loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-                changeRequestApprovalConfig={
-                  liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
-                }
-                rejectedVersions={rejectedVersions}
-                draftBranches={draftBranches}
-                activeDraftBranch={resolvedActiveBranch}
-                onOpenDraftBranch={handleContinueDraftBranch}
-                onDeleteDraftBranch={handleDeleteDraftBranch}
-                deleteDraftBranchPending={deleteDraftBranchMutation.isPending}
-              />
-            ) : null
-          }
+          toolSidebarRunsContent={toolSidebarRunsContent}
+          toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
         />

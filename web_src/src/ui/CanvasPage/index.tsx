@@ -61,6 +61,12 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
+import {
+  allowsBuildingBlocksSidebar,
+  blocksBuildingBlocksShortcut,
+  isPanelHeaderMode,
+  isRunsOrVersionsHeaderMode,
+} from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
@@ -1181,11 +1187,7 @@ function CanvasPage(props: CanvasPageProps) {
       readOnly ||
       Boolean(props.hideAddControls) ||
       !props.isEditing ||
-      props.headerMode === "console" ||
-      props.headerMode === "memory" ||
-      props.headerMode === "files" ||
-      props.headerMode === "runs" ||
-      props.headerMode === "versions" ||
+      blocksBuildingBlocksShortcut(props.headerMode ?? "version-live") ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
@@ -1289,7 +1291,7 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "memory" ||
           props.headerMode === "files") &&
           "sp-canvas-live",
-        (props.headerMode === "runs" || props.headerMode === "versions") && "sp-canvas-live",
+        isRunsOrVersionsHeaderMode(props.headerMode ?? "version-live") && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
       )}
     >
@@ -1364,10 +1366,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
-        {props.headerMode === "runs" ||
-        props.headerMode === "versions" ||
-        props.headerMode === "memory" ||
-        props.headerMode === "files" ? null : props.isEditing ? (
+        {isPanelHeaderMode(props.headerMode ?? "version-live") ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1390,11 +1389,7 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen={
               isBuildingBlocksSidebarOpen &&
               !!props.isEditing &&
-              props.headerMode !== "console" &&
-              props.headerMode !== "memory" &&
-              props.headerMode !== "files" &&
-              props.headerMode !== "runs" &&
-              props.headerMode !== "versions"
+              allowsBuildingBlocksSidebar(props.headerMode ?? "version-live")
             }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}

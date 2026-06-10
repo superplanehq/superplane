@@ -1,5 +1,13 @@
 import { useEffect } from "react";
 import { create } from "zustand";
+import {
+  computeRecomputeForViewport,
+  computeResizeAuxLeft,
+  computeResizeLeft,
+  computeResizeRight,
+  SIDEBAR_MIN_WIDTH,
+  type SidebarLayoutSnapshot,
+} from "./sidebarLayoutConstraints";
 
 /**
  * Shared layout store for the canvas page's left and right sidebars.
@@ -18,8 +26,7 @@ import { create } from "zustand";
  * existing local storage values are honored.
  */
 
-export const SIDEBAR_MIN_WIDTH = 300;
-export const MIDDLE_MIN_WIDTH = 220;
+export { MIDDLE_MIN_WIDTH, SIDEBAR_MIN_WIDTH } from "./sidebarLayoutConstraints";
 
 const LEFT_STORAGE_KEY = "agent-sidebar-width";
 const RIGHT_STORAGE_KEY = "componentSidebarWidth";
@@ -53,14 +60,8 @@ function persistWidth(key: string, value: number): void {
   }
 }
 
-interface SidebarLayoutState {
-  leftWidth: number;
-  rightWidth: number;
-  auxLeftWidth: number;
+interface SidebarLayoutState extends SidebarLayoutSnapshot {
   auxLeftStorageKey: string | null;
-  leftMountCount: number;
-  rightMountCount: number;
-  auxLeftMountCount: number;
   isLeftResizing: boolean;
   isRightResizing: boolean;
   isAuxLeftResizing: boolean;
@@ -71,46 +72,33 @@ interface SidebarLayoutState {
   setLeftResizing: (resizing: boolean) => void;
   setRightResizing: (resizing: boolean) => void;
   setAuxLeftResizing: (resizing: boolean) => void;
-
-  /**
-   * Drive the left sidebar to {@link target} px. Pushes the right sidebar
-   * down to {@link SIDEBAR_MIN_WIDTH} when needed; will not violate the
-   * middle-section minimum.
-   */
   resizeLeft: (target: number) => void;
-  /**
-   * Mirrors {@link resizeLeft} for the right sidebar.
-   */
   resizeRight: (target: number) => void;
-  /**
-   * Mirrors {@link resizeLeft} for the runs/versions auxiliary sidebar.
-   */
   resizeAuxLeft: (target: number) => void;
-
-  /**
-   * Recompute widths against the current viewport, shrinking sidebars (right
-   * first, then auxiliary left, then agent left) only if necessary. Called on
-   * window resize.
-   */
   recomputeForViewport: () => void;
-
-  /**
-   * Re-read both widths from localStorage and reset transient flags. Useful
-   * from tests that mutate storage between renders.
-   */
   hydrateFromStorage: () => void;
 }
 
-function leftIsMounted(state: SidebarLayoutState): boolean {
-  return state.leftMountCount > 0;
-}
+function applyWidthUpdate(
+  state: SidebarLayoutState,
+  set: (partial: Partial<SidebarLayoutState>) => void,
+  next: { nextLeft: number; nextRight: number; nextAuxLeft: number },
+) {
+  if (
+    next.nextLeft === state.leftWidth &&
+    next.nextRight === state.rightWidth &&
+    next.nextAuxLeft === state.auxLeftWidth
+  ) {
+    return;
+  }
 
-function rightIsMounted(state: SidebarLayoutState): boolean {
-  return state.rightMountCount > 0;
-}
+  if (next.nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, next.nextLeft);
+  if (next.nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, next.nextRight);
+  if (next.nextAuxLeft !== state.auxLeftWidth && state.auxLeftStorageKey) {
+    persistWidth(state.auxLeftStorageKey, next.nextAuxLeft);
+  }
 
-function auxLeftIsMounted(state: SidebarLayoutState): boolean {
-  return state.auxLeftMountCount > 0;
+  set({ leftWidth: next.nextLeft, rightWidth: next.nextRight, auxLeftWidth: next.nextAuxLeft });
 }
 
 export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
@@ -157,103 +145,17 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
 
   resizeLeft: (target) => {
     const state = get();
-    const viewport = getViewportWidth();
-    const otherMounted = rightIsMounted(state);
-    const auxMounted = auxLeftIsMounted(state);
-
-    const auxFloor = auxMounted ? state.auxLeftWidth : 0;
-    const otherFloor = otherMounted ? SIDEBAR_MIN_WIDTH : 0;
-    const maxLeft = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - otherFloor - auxFloor);
-    const nextLeft = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxLeft, Math.round(target)));
-
-    let nextRight = state.rightWidth;
-    if (otherMounted) {
-      const allowedRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - nextLeft - auxFloor);
-      if (state.rightWidth > allowedRight) nextRight = allowedRight;
-    }
-
-    if (nextLeft === state.leftWidth && nextRight === state.rightWidth) return;
-
-    persistWidth(LEFT_STORAGE_KEY, nextLeft);
-    if (nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, nextRight);
-    set({ leftWidth: nextLeft, rightWidth: nextRight });
+    applyWidthUpdate(state, set, computeResizeLeft(state, target, getViewportWidth()));
   },
 
   resizeRight: (target) => {
     const state = get();
-    const viewport = getViewportWidth();
-    const leftMounted = leftIsMounted(state);
-    const auxMounted = auxLeftIsMounted(state);
-
-    const leftTotal = (leftMounted ? state.leftWidth : 0) + (auxMounted ? state.auxLeftWidth : 0);
-    const maxRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - leftTotal);
-    const nextRight = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxRight, Math.round(target)));
-
-    let nextLeft = state.leftWidth;
-    let nextAuxLeft = state.auxLeftWidth;
-    if (leftMounted || auxMounted) {
-      const allowedLeftTotal = Math.max(
-        leftMounted && auxMounted ? SIDEBAR_MIN_WIDTH * 2 : SIDEBAR_MIN_WIDTH,
-        viewport - MIDDLE_MIN_WIDTH - nextRight,
-      );
-      const currentLeftTotal = (leftMounted ? state.leftWidth : 0) + (auxMounted ? state.auxLeftWidth : 0);
-      if (currentLeftTotal > allowedLeftTotal) {
-        let overflow = currentLeftTotal - allowedLeftTotal;
-        if (auxMounted && state.auxLeftWidth > SIDEBAR_MIN_WIDTH) {
-          const auxShrink = Math.min(overflow, state.auxLeftWidth - SIDEBAR_MIN_WIDTH);
-          nextAuxLeft = state.auxLeftWidth - auxShrink;
-          overflow -= auxShrink;
-        }
-        if (overflow > 0 && leftMounted && state.leftWidth > SIDEBAR_MIN_WIDTH) {
-          nextLeft = Math.max(SIDEBAR_MIN_WIDTH, state.leftWidth - overflow);
-        }
-      }
-    }
-
-    if (nextRight === state.rightWidth && nextLeft === state.leftWidth && nextAuxLeft === state.auxLeftWidth) return;
-
-    persistWidth(RIGHT_STORAGE_KEY, nextRight);
-    if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
-    if (nextAuxLeft !== state.auxLeftWidth && state.auxLeftStorageKey) {
-      persistWidth(state.auxLeftStorageKey, nextAuxLeft);
-    }
-    set({ leftWidth: nextLeft, rightWidth: nextRight, auxLeftWidth: nextAuxLeft });
+    applyWidthUpdate(state, set, computeResizeRight(state, target, getViewportWidth()));
   },
 
   resizeAuxLeft: (target) => {
     const state = get();
-    const viewport = getViewportWidth();
-    const leftMounted = leftIsMounted(state);
-    const rightMounted = rightIsMounted(state);
-    const leftFloor = leftMounted ? state.leftWidth : 0;
-
-    const maxAux = Math.max(
-      SIDEBAR_MIN_WIDTH,
-      viewport - MIDDLE_MIN_WIDTH - leftFloor - (rightMounted ? state.rightWidth : 0),
-    );
-    const nextAux = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxAux, Math.round(target)));
-
-    let nextRight = state.rightWidth;
-    if (rightMounted) {
-      const allowedRight = Math.max(SIDEBAR_MIN_WIDTH, viewport - MIDDLE_MIN_WIDTH - leftFloor - nextAux);
-      if (state.rightWidth > allowedRight) nextRight = allowedRight;
-    }
-
-    let nextLeft = state.leftWidth;
-    if (leftMounted) {
-      const allowedLeft = Math.max(
-        SIDEBAR_MIN_WIDTH,
-        viewport - MIDDLE_MIN_WIDTH - nextAux - (rightMounted ? nextRight : 0),
-      );
-      if (state.leftWidth > allowedLeft) nextLeft = allowedLeft;
-    }
-
-    if (nextAux === state.auxLeftWidth && nextRight === state.rightWidth && nextLeft === state.leftWidth) return;
-
-    if (state.auxLeftStorageKey) persistWidth(state.auxLeftStorageKey, nextAux);
-    if (nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, nextRight);
-    if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
-    set({ auxLeftWidth: nextAux, rightWidth: nextRight, leftWidth: nextLeft });
+    applyWidthUpdate(state, set, computeResizeAuxLeft(state, target, getViewportWidth()));
   },
 
   hydrateFromStorage: () => {
@@ -273,48 +175,9 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
 
   recomputeForViewport: () => {
     const state = get();
-    const viewport = getViewportWidth();
-    const leftActive = leftIsMounted(state);
-    const rightActive = rightIsMounted(state);
-    const auxActive = auxLeftIsMounted(state);
-
-    let nextLeft = state.leftWidth;
-    let nextRight = state.rightWidth;
-    let nextAux = state.auxLeftWidth;
-
-    const total = (leftActive ? nextLeft : 0) + (auxActive ? nextAux : 0) + (rightActive ? nextRight : 0);
-    if (total + MIDDLE_MIN_WIDTH <= viewport) return;
-
-    // Shrink the right sidebar first since it overlays the canvas.
-    if (rightActive) {
-      const cap = Math.max(
-        SIDEBAR_MIN_WIDTH,
-        viewport - MIDDLE_MIN_WIDTH - (leftActive ? nextLeft : 0) - (auxActive ? nextAux : 0),
-      );
-      if (nextRight > cap) nextRight = cap;
-    }
-    if (auxActive) {
-      const cap = Math.max(
-        SIDEBAR_MIN_WIDTH,
-        viewport - MIDDLE_MIN_WIDTH - (leftActive ? nextLeft : 0) - (rightActive ? nextRight : 0),
-      );
-      if (nextAux > cap) nextAux = cap;
-    }
-    if (leftActive) {
-      const cap = Math.max(
-        SIDEBAR_MIN_WIDTH,
-        viewport - MIDDLE_MIN_WIDTH - (auxActive ? nextAux : 0) - (rightActive ? nextRight : 0),
-      );
-      if (nextLeft > cap) nextLeft = cap;
-    }
-
-    if (nextLeft === state.leftWidth && nextRight === state.rightWidth && nextAux === state.auxLeftWidth) return;
-    if (nextLeft !== state.leftWidth) persistWidth(LEFT_STORAGE_KEY, nextLeft);
-    if (nextRight !== state.rightWidth) persistWidth(RIGHT_STORAGE_KEY, nextRight);
-    if (nextAux !== state.auxLeftWidth && state.auxLeftStorageKey) {
-      persistWidth(state.auxLeftStorageKey, nextAux);
-    }
-    set({ leftWidth: nextLeft, rightWidth: nextRight, auxLeftWidth: nextAux });
+    const result = computeRecomputeForViewport(state, getViewportWidth());
+    if (!result.changed) return;
+    applyWidthUpdate(state, set, result);
   },
 }));
 
