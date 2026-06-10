@@ -96,6 +96,14 @@ function normalizeCanvasYamlNode(node: ComponentsNode): ComponentsNode {
         ? componentNameLegacy
         : undefined;
 
+  const rawOnError = raw as ComponentsNode & { on_error?: boolean };
+  const onError =
+    typeof rest.onError === "boolean"
+      ? rest.onError
+      : typeof rawOnError.on_error === "boolean"
+        ? rawOnError.on_error
+        : undefined;
+
   const normalized: ComponentsNode = {
     ...rest,
     ...(componentName ? { component: componentName } : {}),
@@ -105,6 +113,7 @@ function normalizeCanvasYamlNode(node: ComponentsNode): ComponentsNode {
       : typeof isCollapsedSnake === "boolean"
         ? { isCollapsed: isCollapsedSnake }
         : {}),
+    ...(onError !== undefined ? { onError } : {}),
   };
 
   if (!normalized.type && componentName) {

@@ -134,6 +134,7 @@ type Node struct {
 	IntegrationID  *string        `json:"integrationId,omitempty"`
 	ErrorMessage   *string        `json:"errorMessage,omitempty"`
 	WarningMessage *string        `json:"warningMessage,omitempty"`
+	OnError        bool           `json:"onError,omitempty"`
 }
 
 type Position struct {

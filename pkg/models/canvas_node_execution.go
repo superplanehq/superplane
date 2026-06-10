@@ -545,11 +545,12 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 
 func (e *CanvasNodeExecution) Fail(reason, message string) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		return e.FailInTransaction(tx, reason, message)
+		_, err := e.FailInTransaction(tx, reason, message)
+		return err
 	})
 }
 
-func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
+func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) (*OnErrorDispatch, error) {
 	now := time.Now()
 
 	e.State = CanvasNodeExecutionStateFinished
@@ -568,7 +569,7 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		}).Error
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//
@@ -576,14 +577,14 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	//
 	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return nil, err
 	}
 
 	if node != nil {
 		if node.State != CanvasNodeStatePaused {
 			err := node.UpdateState(tx, CanvasNodeStateReady)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -596,7 +597,7 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	if e.ParentExecutionID != nil {
 		parent, err := FindNodeExecutionInTransaction(tx, e.WorkflowID, *e.ParentExecutionID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		return parent.FailInTransaction(tx, reason, message)
@@ -604,10 +605,15 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 
 	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	dispatch, err := MaybeScheduleCanvasOnErrorInTransaction(tx, e)
+	if err != nil {
+		return nil, err
+	}
+
+	return dispatch, nil
 }
 
 func (e *CanvasNodeExecution) Cancel(cancelledBy *uuid.UUID) error {

@@ -12,10 +12,11 @@ import (
 )
 
 type ExecutionStateContext struct {
-	execution      *models.CanvasNodeExecution
-	tx             *gorm.DB
-	maxPayloadSize int
-	onNewEvents    func([]models.CanvasEvent)
+	execution                   *models.CanvasNodeExecution
+	tx                          *gorm.DB
+	maxPayloadSize              int
+	onNewEvents                 func([]models.CanvasEvent)
+	pendingOnErrorDispatch *models.OnErrorDispatch
 }
 
 func NewExecutionStateContext(
@@ -89,8 +90,17 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
-	err := s.execution.FailInTransaction(s.tx, reason, message)
-	return err
+	dispatch, err := s.execution.FailInTransaction(s.tx, reason, message)
+	if err != nil {
+		return err
+	}
+
+	s.pendingOnErrorDispatch = dispatch
+	return nil
+}
+
+func (s *ExecutionStateContext) PendingOnErrorDispatch() *models.OnErrorDispatch {
+	return s.pendingOnErrorDispatch
 }
 
 func (s *ExecutionStateContext) SetKV(key, value string) error {

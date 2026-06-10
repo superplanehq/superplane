@@ -301,6 +301,7 @@ export interface CanvasPageProps {
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
+  onToggleOnError?: (nodeId: string) => void;
   onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
@@ -469,6 +470,7 @@ type CanvasNodeRendererCallbacks = {
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
+  onToggleOnError: React.MutableRefObject<CanvasPageProps["onToggleOnError"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
@@ -652,6 +654,7 @@ function buildInteractiveNodeBlockProps(
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
+    onToggleOnError: getNodeAction(callbacks.onToggleOnError, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
     onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
@@ -662,13 +665,15 @@ function buildInteractiveNodeBlockProps(
 function buildDefaultNodeBlockProps(args: {
   nodeId: string;
   selected?: boolean;
+  isOnErrorNode?: boolean;
   callbacks?: CanvasNodeRendererCallbacks;
 }): Omit<BlockProps, "data"> {
-  const { nodeId, selected, callbacks } = args;
+  const { nodeId, selected, isOnErrorNode, callbacks } = args;
 
   return {
     nodeId,
     selected,
+    isOnErrorNode,
     runDisabled: callbacks?.runDisabled,
     runDisabledTooltip: callbacks?.runDisabledTooltip,
     ...buildInteractiveNodeBlockProps(callbacks, nodeId),
@@ -756,6 +761,7 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: Default
   const blockProps = buildDefaultNodeBlockProps({
     nodeId: nodeProps.id,
     selected: nodeProps.selected,
+    isOnErrorNode: blockData.isOnErrorNode,
     callbacks,
   });
   const fallback = <Block {...blockProps} data={createNodeRenderFallbackData(blockData)} />;
@@ -1430,6 +1436,7 @@ function CanvasPage(props: CanvasPageProps) {
                   onAnnotationUpdate={props.onAnnotationUpdate}
                   onAnnotationBlur={props.onAnnotationBlur}
                   onTogglePause={props.onTogglePause}
+                  onToggleOnError={props.onToggleOnError}
                   runDisabled={props.runDisabled}
                   runDisabledTooltip={props.runDisabledTooltip}
                   onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -2079,6 +2086,7 @@ function CanvasContent({
   onDuplicate,
   onDeactivate,
   onTogglePause,
+  onToggleOnError,
   onToggleView,
   onShowNodeDiff,
   onAnnotationUpdate,
@@ -2133,6 +2141,7 @@ function CanvasContent({
   onDuplicate?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
+  onToggleOnError?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
@@ -2385,6 +2394,9 @@ function CanvasContent({
 
   const onTogglePauseRef = useRef(onTogglePause);
   onTogglePauseRef.current = onTogglePause;
+
+  const onToggleOnErrorRef = useRef(onToggleOnError);
+  onToggleOnErrorRef.current = onToggleOnError;
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
@@ -2714,6 +2726,7 @@ function CanvasContent({
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
+    onToggleOnError: onToggleOnErrorRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
@@ -2732,6 +2745,7 @@ function CanvasContent({
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
+    onToggleOnError: onToggleOnErrorRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,

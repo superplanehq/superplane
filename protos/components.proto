@@ -25,6 +25,10 @@ message Node {
   optional string error_message = 10;
   optional string warning_message = 11;
   bool paused = 12;
+  //
+  // When true, this node runs when any other canvas node fails with an error.
+  //
+  bool on_error = 13;
 }
 
 message Position {

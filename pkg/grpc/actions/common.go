@@ -718,6 +718,11 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		// to avoid allowing requests to override node metadata.
 		// Metadata is something only triggers/components implementations can set.
 		//
+		onError := node.OnError
+		if nodeType == models.NodeTypeTrigger {
+			onError = false
+		}
+
 		result[i] = models.Node{
 			ID:             node.Id,
 			Name:           node.Name,
@@ -729,6 +734,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			IntegrationID:  integrationID,
 			ErrorMessage:   errorMessage,
 			WarningMessage: warningMessage,
+			OnError:        onError,
 		}
 	}
 
@@ -803,6 +809,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.WarningMessage != nil && *node.WarningMessage != "" {
 			result[i].WarningMessage = node.WarningMessage
+		}
+
+		if node.OnError {
+			result[i].OnError = true
 		}
 	}
 

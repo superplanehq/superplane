@@ -7,6 +7,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func serializeCanvasSpec(version *models.CanvasVersion, changeManagementEnabled bool, approvers []models.CanvasChangeRequestApprover) *pb.Canvas_Spec {
+	return &pb.Canvas_Spec{
+		Nodes:            actions.NodesToProto(version.Nodes),
+		Edges:            actions.EdgesToProto(version.Edges),
+		ChangeManagement: serializeChangeManagement(changeManagementEnabled, approvers),
+	}
+}
+
 func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
@@ -53,11 +61,11 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,
-		Spec: &pb.Canvas_Spec{
-			Nodes:            actions.NodesToProto(version.Nodes),
-			Edges:            actions.EdgesToProto(version.Edges),
-			ChangeManagement: serializeChangeManagement(version.ChangeManagementEnabled, version.EffectiveChangeRequestApprovers()),
-		},
+		Spec: serializeCanvasSpec(
+			version,
+			version.ChangeManagementEnabled,
+			version.EffectiveChangeRequestApprovers(),
+		),
 	}
 }
 

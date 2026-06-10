@@ -71,6 +71,7 @@ export function buildComponentFallbackCanvasNode({
       type: "component",
       label: displayLabel,
       state: "pending" as const,
+      isOnErrorNode: !!node.onError,
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
       renderFallback: buildMinimalRenderFallback(),
       component: {

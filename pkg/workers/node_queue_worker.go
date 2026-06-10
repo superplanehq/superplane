@@ -372,6 +372,14 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 			return nil, err
 		}
 
+		dispatch, err := models.MaybeScheduleCanvasOnErrorInTransaction(tx, &execution)
+		if err != nil {
+			return nil, err
+		}
+		if dispatch != nil {
+			PublishOnErrorDispatch(dispatch)
+		}
+
 		return []*uuid.UUID{&execution.ID}, nil
 	}
 
@@ -384,9 +392,13 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		return nil, err
 	}
 
-	err = parent.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, configErr.Err.Error())
+	dispatch, err := parent.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, configErr.Err.Error())
 	if err != nil {
 		return nil, err
+	}
+
+	if dispatch != nil {
+		PublishOnErrorDispatch(dispatch)
 	}
 
 	return []*uuid.UUID{&execution.ID, &parent.ID}, nil

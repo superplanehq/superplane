@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -177,7 +176,7 @@ func UpdateCanvasVersionWithUsage(
 				version.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
 			}
 		}
-		version.Nodes = datatypes.NewJSONSlice(nodes)
+		version.Nodes = datatypes.NewJSONSlice(models.NormalizeOnErrorNodes(nodes))
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 

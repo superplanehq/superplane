@@ -49,6 +49,7 @@ export interface BlockInternalData {
   _draftDiffStatus?: "added" | "updated" | "removed";
   isTemplate?: boolean;
   isPendingConnection?: boolean;
+  isOnErrorNode?: boolean;
 }
 
 export type CanvasBlockData = BlockData & BlockInternalData;
@@ -57,6 +58,8 @@ export type ComponentActionKeys =
   | "runDisabled"
   | "runDisabledTooltip"
   | "onTogglePause"
+  | "onToggleOnError"
+  | "isOnErrorNode"
   | "onEdit"
   | "onDuplicate"
   | "onDeactivate"

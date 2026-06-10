@@ -255,6 +255,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   runDisabled: _runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
+  onToggleOnError,
+  isOnErrorNode = false,
   onEdit: _onEdit,
   onDuplicate,
   onDeactivate: _onDeactivate,
@@ -365,6 +367,20 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               >
                 {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
                 <span>{paused ? "Resume" : "Pause"}</span>
+              </button>
+            )}
+            {onToggleOnError && !hasError && (
+              <button
+                type="button"
+                data-testid="node-action-on-error"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onToggleOnError();
+                }}
+                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
+              >
+                <span>{isOnErrorNode ? "Remove onError" : "onError"}</span>
               </button>
             )}
             {onDuplicate && (

@@ -3692,6 +3692,48 @@ export function AppPage() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
+  const handleToggleOnError = useCallback(
+    async (nodeId: string) => {
+      if (!canvasId || !organizationId || !canvas) return;
+
+      const node = canvas.spec?.nodes?.find((item) => item.id === nodeId);
+      if (!node) return;
+
+      if (node.type === "TYPE_TRIGGER") {
+        showErrorToast("Triggers cannot be the onError node");
+        return;
+      }
+
+      const enabling = !node.onError;
+      const updatedNodes = (canvas.spec?.nodes ?? []).map((item) => {
+        if (item.id === nodeId) {
+          return { ...item, onError: enabling };
+        }
+
+        if (enabling && item.onError) {
+          return { ...item, onError: false };
+        }
+
+        return item;
+      });
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      applyLocalWorkflowUpdate(updatedWorkflow);
+
+      if (!isReadOnly) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      }
+    },
+    [canvasId, organizationId, canvas, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+  );
+
   const handleTogglePause = useCallback(
     async (nodeId: string) => {
       if (!canvasId || !organizationId || !canvas) return;
@@ -5345,6 +5387,7 @@ export function AppPage() {
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
+          onToggleOnError={!isReadOnly ? handleToggleOnError : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}

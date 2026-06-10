@@ -100,11 +100,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				CreatedBy:      createdBy,
 				FolderId:       canvasFolderID,
 			},
-			Spec: &pb.Canvas_Spec{
-				Nodes:            serializedNodes,
-				Edges:            actions.EdgesToProto(liveVersion.Edges),
-				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
-			},
+			Spec: serializeCanvasSpec(
+				liveVersion,
+				changeManagementEnabled,
+				canvas.EffectiveChangeRequestApprovers(),
+			),
 			Status: nil,
 		}, nil
 	}
@@ -152,11 +152,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			CreatedBy:      createdBy,
 			FolderId:       canvasFolderID,
 		},
-		Spec: &pb.Canvas_Spec{
-			Nodes:            serializedNodes,
-			Edges:            actions.EdgesToProto(liveVersion.Edges),
-			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
-		},
+		Spec: serializeCanvasSpec(
+			liveVersion,
+			changeManagementEnabled,
+			canvas.EffectiveChangeRequestApprovers(),
+		),
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
 			LastEvents:     serializedEvents,

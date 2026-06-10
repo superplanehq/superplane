@@ -99,6 +99,8 @@ export const Composite: React.FC<CompositeProps> = ({
   onDuplicate,
   onDeactivate,
   onTogglePause,
+  onToggleOnError,
+  isOnErrorNode,
   onToggleView,
   onDelete,
   isCompactView,
@@ -215,6 +217,8 @@ export const Composite: React.FC<CompositeProps> = ({
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
       onTogglePause={onTogglePause}
+      onToggleOnError={onToggleOnError}
+      isOnErrorNode={isOnErrorNode}
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}

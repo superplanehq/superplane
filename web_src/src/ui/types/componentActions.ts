@@ -4,6 +4,8 @@ export interface ComponentActionsProps {
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   onTogglePause?: () => void;
+  onToggleOnError?: () => void;
+  isOnErrorNode?: boolean;
   onDuplicate?: () => void;
   onEdit?: () => void;
   onDeactivate?: () => void;
