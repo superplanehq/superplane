@@ -110,22 +110,8 @@ export function MarkdownPanelEditor({
     toggle: toggleVariablesCollapsed,
   } = useResponsiveRailCollapse();
 
-  const insertAtCursor = (snippet: string) => {
-    const el = textareaRef.current;
-    if (!el) {
-      setDraftBody(draftBody + snippet);
-      return;
-    }
-    const start = el.selectionStart ?? draftBody.length;
-    const end = el.selectionEnd ?? draftBody.length;
-    const next = draftBody.slice(0, start) + snippet + draftBody.slice(end);
-    setDraftBody(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const caret = start + snippet.length;
-      el.setSelectionRange(caret, caret);
-    });
-  };
+  const insertAtCursor = (snippet: string) =>
+    insertSnippetAtTextareaCursor(textareaRef.current, draftBody, snippet, setDraftBody);
 
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
@@ -201,6 +187,33 @@ export function MarkdownPanelEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * Insert `snippet` at the textarea's current selection (replacing any
+ * selected range), updating both the controlled value via `setBody` and
+ * restoring focus + caret after the React re-render. Falls back to an
+ * append when the element isn't mounted yet — matches the behavior the
+ * inline implementation had before this was extracted.
+ */
+function insertSnippetAtTextareaCursor(
+  el: HTMLTextAreaElement | null,
+  body: string,
+  snippet: string,
+  setBody: (next: string) => void,
+) {
+  if (!el) {
+    setBody(body + snippet);
+    return;
+  }
+  const start = el.selectionStart ?? body.length;
+  const end = el.selectionEnd ?? body.length;
+  setBody(body.slice(0, start) + snippet + body.slice(end));
+  requestAnimationFrame(() => {
+    el.focus();
+    const caret = start + snippet.length;
+    el.setSelectionRange(caret, caret);
+  });
 }
 
 /**
