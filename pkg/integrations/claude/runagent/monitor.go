@@ -44,7 +44,8 @@ func (a *RunAgent) stream(ctx core.ActionHookContext) error {
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+		ctx.Logger.Warnf("Stream hook: failed to create client: %v. Falling back to poll.", err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
 	}
 
 	streamCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
