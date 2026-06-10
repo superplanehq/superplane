@@ -445,13 +445,14 @@ func (s *customToolTurnState) resolvePersisted(sessionID uuid.UUID) error {
 }
 
 func tryAgentStreamLock(ctx context.Context, sessionID uuid.UUID) (func(), bool, error) {
-	db, err := database.Conn().DB()
+	db, err := database.OpenDedicatedSQLDB("agent-stream-lock", 1)
 	if err != nil {
 		return nil, false, err
 	}
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
+		_ = db.Close()
 		return nil, false, err
 	}
 
@@ -459,20 +460,23 @@ func tryAgentStreamLock(ctx context.Context, sessionID uuid.UUID) (func(), bool,
 	var locked bool
 	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", key).Scan(&locked); err != nil {
 		_ = conn.Close()
+		_ = db.Close()
 		return nil, false, err
 	}
 
 	if !locked {
 		_ = conn.Close()
+		_ = db.Close()
 		return nil, false, nil
 	}
 
 	return func() {
-		releaseAgentStreamLock(conn, key)
+		releaseAgentStreamLock(conn, db, key)
 	}, true, nil
 }
 
-func releaseAgentStreamLock(conn *sql.Conn, key int64) {
+func releaseAgentStreamLock(conn *sql.Conn, db *sql.DB, key int64) {
+	defer db.Close()
 	defer conn.Close()
 	if _, err := conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key); err != nil {
 		log.WithError(err).Warn("agent stream: failed to release session lock")
