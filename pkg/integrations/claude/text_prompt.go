@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -162,6 +161,11 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
+	if raw, ok := ctx.Configuration.(map[string]any); ok {
+		if v, ok := raw["files"]; ok {
+			spec.Files = decodeStringList(v)
+		}
+	}
 
 	if spec.Model == "" {
 		return fmt.Errorf("model is required")
@@ -169,6 +173,23 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 
 	if spec.Prompt == "" {
 		return fmt.Errorf("prompt is required")
+	}
+
+	// Validate that configured files exist in the repository
+	if len(spec.Files) > 0 && ctx.RepositoryFiles != nil {
+		available, err := ctx.RepositoryFiles.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %v", err)
+		}
+		fileSet := make(map[string]bool, len(available))
+		for _, f := range available {
+			fileSet[f] = true
+		}
+		for _, f := range spec.Files {
+			if !fileSet[f] {
+				return fmt.Errorf("file %q not found in repository. Available files: %v", f, available)
+			}
+		}
 	}
 
 	return nil
@@ -289,8 +310,12 @@ const maxFileSize = 100 * 1024 // 100KB per file
 // When files are specified, it returns an array of content blocks
 // (documents + text prompt). Otherwise, it returns the prompt string.
 func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, error) {
-	if len(spec.Files) == 0 || ctx.RepositoryFiles == nil {
+	if len(spec.Files) == 0 {
 		return spec.Prompt, nil
+	}
+
+	if ctx.RepositoryFiles == nil {
+		return nil, fmt.Errorf("files configured but repository files context is not available")
 	}
 
 	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
@@ -332,25 +357,7 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 }
 
 func mediaTypeForPath(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".md":
-		return "text/markdown"
-	case ".yaml", ".yml":
-		return "text/yaml"
-	case ".json":
-		return "application/json"
-	case ".sh", ".bash":
-		return "text/x-shellscript"
-	case ".py":
-		return "text/x-python"
-	case ".go":
-		return "text/x-go"
-	case ".js", ".ts":
-		return "text/javascript"
-	default:
-		return "text/plain"
-	}
+	return "text/plain"
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {

@@ -153,6 +153,7 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 		ctx,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.VersionId,

@@ -67,14 +67,15 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger        *log.Entry
-	Configuration any
-	HTTP          HTTPContext
-	Metadata      MetadataWriter
-	Requests      RequestContext
-	Auth          AuthReader
-	Integration   IntegrationContext
-	Webhook       NodeWebhookContext
+	Logger          *log.Entry
+	Configuration   any
+	HTTP            HTTPContext
+	Metadata        MetadataWriter
+	Requests        RequestContext
+	Auth            AuthReader
+	Integration     IntegrationContext
+	Webhook         NodeWebhookContext
+	RepositoryFiles RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {
