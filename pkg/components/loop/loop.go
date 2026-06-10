@@ -20,6 +20,7 @@ const ComponentName = "loop"
 const (
 	loopSessionKey    = "loop_session"
 	nextIterationHook = "nextIteration"
+	timeoutHook       = "timeout"
 
 	ChannelNameNext = "next"
 	ChannelNameDone = "done"
@@ -39,6 +40,16 @@ const (
 const defaultMaxIterations = 100
 
 const (
+	// DefaultTimeoutSeconds caps the total wall-clock time of a single loop run
+	// when one is not configured. It exists so a loop can never get stuck
+	// forever (e.g. downstream never reports back), which would also block every
+	// subsequent run on the node since runs are serialized.
+	DefaultTimeoutSeconds = 3600
+	TimeoutMinSeconds     = 1
+	TimeoutMaxSeconds     = 86400
+)
+
+const (
 	StopReasonConditionMet  = "conditionTrue"
 	StopReasonMaxIterations = "max_iterations"
 )
@@ -52,6 +63,7 @@ type Loop struct{}
 type Spec struct {
 	UntilExpression        string     `json:"untilExpression"`
 	MaxIterations          int        `json:"maxIterations"`
+	TimeoutSeconds         int        `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
 	DelayBetweenIterations *DelaySpec `json:"delayBetweenIterations,omitempty"`
 }
 
@@ -117,6 +129,7 @@ Edges back into Loop are allowed so downstream steps can return control for the 
 ## Limits
 
 - **Max Iterations** caps how many iterations are allowed (default ` + fmt.Sprintf("%d", defaultMaxIterations) + `, maximum ` + fmt.Sprintf("%d", core.MaxEmitCount) + `)
+- **Timeout** caps the total wall-clock time of a single run (default ` + fmt.Sprintf("%d", DefaultTimeoutSeconds) + `s, maximum ` + fmt.Sprintf("%d", TimeoutMaxSeconds) + `s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
 
 ## Delay Between Iterations
 
@@ -169,6 +182,20 @@ func (c *Loop) Configuration() []configuration.Field {
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(1),
 					Max: intPtr(core.MaxEmitCount),
+				},
+			},
+		},
+		{
+			Name:        "timeoutSeconds",
+			Label:       "Timeout (seconds)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    true,
+			Default:     DefaultTimeoutSeconds,
+			Description: "Maximum total wall-clock time for a single loop run. The run fails if it is still looping after this many seconds.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(TimeoutMinSeconds),
+					Max: intPtr(TimeoutMaxSeconds),
 				},
 			},
 		},
@@ -253,59 +280,43 @@ func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 		return nil, err
 	}
 
-	executionCtx, isNew, err := c.findOrCreateSession(ctx, spec)
+	session, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find loop session: %w", err)
+	}
+
+	if session == nil {
+		return c.startLoop(ctx, spec)
+	}
+
+	return c.handleFeedback(ctx, spec, session)
+}
+
+func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, error) {
+	//
+	// Only one loop run per node may be active at a time. If another run is
+	// still looping, push this start to the back of the queue and try later.
+	//
+	active, err := c.hasActiveSession(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	if executionCtx.ExecutionState.IsFinished() {
-		if err := ctx.DequeueItem(); err != nil {
-			return nil, fmt.Errorf("failed to dequeue item: %w", err)
+	if active {
+		if ctx.DeferQueueItem != nil {
+			if err := ctx.DeferQueueItem(); err != nil {
+				return nil, fmt.Errorf("failed to defer queue item: %w", err)
+			}
 		}
-		return nil, nil
+		return nil, core.ErrQueueItemDeferred
 	}
 
-	if err := ctx.DequeueItem(); err != nil {
-		return nil, fmt.Errorf("failed to dequeue item: %w", err)
-	}
-
-	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
-		return nil, fmt.Errorf("failed to update node state: %w", err)
-	}
-
-	if isNew {
-		md, err := readMetadata(executionCtx)
-		if err != nil {
-			return nil, err
-		}
-
-		return &executionCtx.ID, executionCtx.ExecutionState.EmitAndContinue(
-			ChannelNameNext,
-			PayloadTypeNext,
-			[]any{nextPayload(md.Iteration, spec.MaxIterations)},
-		)
-	}
-
-	return c.handleFeedback(ctx, spec, executionCtx)
-}
-
-func (c *Loop) findOrCreateSession(ctx core.ProcessQueueContext, spec Spec) (*core.ExecutionContext, bool, error) {
-	executionCtx, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
+	session, err := ctx.CreateExecution()
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to find loop session: %w", err)
+		return nil, fmt.Errorf("failed to create loop execution: %w", err)
 	}
 
-	if executionCtx != nil {
-		return executionCtx, false, nil
-	}
-
-	executionCtx, err = ctx.CreateExecution()
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to create loop execution: %w", err)
-	}
-
-	if err := executionCtx.ExecutionState.SetKV(loopSessionKey, ctx.RootEventID); err != nil {
-		return nil, false, fmt.Errorf("failed to store loop session: %w", err)
+	if err := session.ExecutionState.SetKV(loopSessionKey, ctx.RootEventID); err != nil {
+		return nil, fmt.Errorf("failed to store loop session: %w", err)
 	}
 
 	md := ExecutionMetadata{
@@ -314,43 +325,92 @@ func (c *Loop) findOrCreateSession(ctx core.ProcessQueueContext, spec Spec) (*co
 		Active:        true,
 		StartedAt:     time.Now(),
 	}
-	if err := executionCtx.Metadata.Set(md); err != nil {
-		return nil, false, fmt.Errorf("failed to set loop metadata: %w", err)
+	if err := session.Metadata.Set(md); err != nil {
+		return nil, fmt.Errorf("failed to set loop metadata: %w", err)
 	}
 
-	return executionCtx, true, nil
+	//
+	// Arm a single timeout for the whole run. If the loop is still active when it
+	// fires, the run has run too long and is failed (see handleTimeout). This
+	// guarantees the session always terminates, so it can never block later runs.
+	//
+	if err := session.Requests.ScheduleActionCall(timeoutHook, map[string]any{}, time.Duration(spec.TimeoutSeconds)*time.Second); err != nil {
+		return nil, fmt.Errorf("failed to schedule loop timeout: %w", err)
+	}
+
+	if err := c.dequeueAndReady(ctx); err != nil {
+		return nil, err
+	}
+
+	return &session.ID, session.ExecutionState.EmitAndContinue(
+		ChannelNameNext,
+		PayloadTypeNext,
+		[]any{nextPayload(md.Iteration, spec.MaxIterations)},
+	)
 }
 
-func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, anchor *core.ExecutionContext) (*uuid.UUID, error) {
+// hasActiveSession reports whether this node already has a loop run in progress.
+// A session execution stays unfinished for the whole loop and only finishes on
+// done/fail, so an active run is simply a running execution on the node.
+func (c *Loop) hasActiveSession(ctx core.ProcessQueueContext) (bool, error) {
+	if ctx.HasRunningExecutions == nil {
+		return false, nil
+	}
 
-	md, err := readMetadata(anchor)
+	active, err := ctx.HasRunningExecutions()
+	if err != nil {
+		return false, fmt.Errorf("failed to check for active loop session: %w", err)
+	}
+
+	return active, nil
+}
+
+func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, session *core.ExecutionContext) (*uuid.UUID, error) {
+	if err := c.dequeueAndReady(ctx); err != nil {
+		return nil, err
+	}
+
+	//
+	// The loop already finished (done/failed). Ignore late feedback.
+	//
+	if session.ExecutionState.IsFinished() {
+		return nil, nil
+	}
+
+	md, err := readMetadata(session)
 	if err != nil {
 		return nil, err
 	}
 
-	if !md.Active {
-		return nil, nil
-	}
-
 	done, err := evaluateUntil(spec.UntilExpression, ctx.Expressions)
 	if err != nil {
-		return c.failLoop(anchor, md, err.Error())
+		return c.failLoop(session, md, err.Error())
 	}
 
 	if done {
-		return c.completeLoop(ctx, anchor, md, StopReasonConditionMet)
+		return c.completeLoop(session, md, StopReasonConditionMet)
 	}
 
 	if md.Iteration >= spec.MaxIterations {
-		return c.completeLoop(ctx, anchor, md, StopReasonMaxIterations)
+		return c.completeLoop(session, md, StopReasonMaxIterations)
 	}
 
 	md.Iteration++
-	if err := anchor.Metadata.Set(md); err != nil {
+	if err := session.Metadata.Set(md); err != nil {
 		return nil, fmt.Errorf("failed to update loop metadata: %w", err)
 	}
 
-	return c.emitNextIteration(anchor, spec, md)
+	return c.emitNextIteration(session, spec, md)
+}
+
+func (c *Loop) dequeueAndReady(ctx core.ProcessQueueContext) error {
+	if err := ctx.DequeueItem(); err != nil {
+		return fmt.Errorf("failed to dequeue item: %w", err)
+	}
+	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
+		return fmt.Errorf("failed to update node state: %w", err)
+	}
+	return nil
 }
 
 func (c *Loop) emitNextIteration(anchor *core.ExecutionContext, spec Spec, md ExecutionMetadata) (*uuid.UUID, error) {
@@ -375,7 +435,7 @@ func (c *Loop) emitNextIteration(anchor *core.ExecutionContext, spec Spec, md Ex
 	return &anchor.ID, nil
 }
 
-func (c *Loop) completeLoop(_ core.ProcessQueueContext, anchor *core.ExecutionContext, md ExecutionMetadata, stopReason string) (*uuid.UUID, error) {
+func (c *Loop) completeLoop(anchor *core.ExecutionContext, md ExecutionMetadata, stopReason string) (*uuid.UUID, error) {
 	md.Active = false
 	md.WaitingBetweenIterations = false
 	if err := anchor.Metadata.Set(md); err != nil {
@@ -464,6 +524,9 @@ func decodeSpec(raw any) (Spec, error) {
 	if spec.MaxIterations == 0 {
 		spec.MaxIterations = defaultMaxIterations
 	}
+	if spec.TimeoutSeconds == 0 {
+		spec.TimeoutSeconds = DefaultTimeoutSeconds
+	}
 	return spec, nil
 }
 
@@ -476,6 +539,12 @@ func validateSpec(spec Spec) error {
 	}
 	if spec.MaxIterations > core.MaxEmitCount {
 		return fmt.Errorf("maxIterations cannot exceed %d", core.MaxEmitCount)
+	}
+	if spec.TimeoutSeconds < TimeoutMinSeconds {
+		return fmt.Errorf("timeoutSeconds must be at least %d", TimeoutMinSeconds)
+	}
+	if spec.TimeoutSeconds > TimeoutMaxSeconds {
+		return fmt.Errorf("timeoutSeconds cannot exceed %d", TimeoutMaxSeconds)
 	}
 
 	return validateDelaySpec(spec.DelayBetweenIterations)
@@ -503,6 +572,10 @@ func (c *Loop) Hooks() []core.Hook {
 			Name: nextIterationHook,
 			Type: core.HookTypeInternal,
 		},
+		{
+			Name: timeoutHook,
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 
@@ -510,9 +583,41 @@ func (c *Loop) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case nextIterationHook:
 		return c.handleNextIteration(ctx)
+	case timeoutHook:
+		return c.handleTimeout(ctx)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
+}
+
+func (c *Loop) handleTimeout(ctx core.ActionHookContext) error {
+	//
+	// The loop already finished (done/failed) before the timeout fired.
+	//
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	spec, err := decodeSpec(ctx.Configuration)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	md, err := readHookMetadata(ctx)
+	if err != nil {
+		return err
+	}
+
+	md.Active = false
+	md.WaitingBetweenIterations = false
+	if err := ctx.Metadata.Set(md); err != nil {
+		return fmt.Errorf("failed to update loop metadata: %w", err)
+	}
+
+	return ctx.ExecutionState.Fail("timeout", fmt.Sprintf(
+		"loop exceeded maximum processing time of %ds after %d iteration(s)",
+		spec.TimeoutSeconds, md.Iteration,
+	))
 }
 
 func (c *Loop) handleNextIteration(ctx core.ActionHookContext) error {

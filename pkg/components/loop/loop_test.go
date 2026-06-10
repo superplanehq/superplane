@@ -59,6 +59,28 @@ func TestLoopSetup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("rejects negative timeout", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"untilExpression": `$["Checker"].ready == true`,
+				"timeoutSeconds":  -5,
+			},
+		})
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "timeoutSeconds must be at least")
+	})
+
+	t.Run("rejects timeout above maximum", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"untilExpression": `$["Checker"].ready == true`,
+				"timeoutSeconds":  TimeoutMaxSeconds + 1,
+			},
+		})
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "timeoutSeconds cannot exceed")
+	})
+
 	t.Run("rejects invalid delay strategy", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -79,6 +101,7 @@ func TestLoopStartLoop(t *testing.T) {
 	component := &Loop{}
 	execState := &contexts.ExecutionStateContext{}
 	execMetadata := &contexts.MetadataContext{}
+	scheduled := &scheduledRequestContext{}
 	rootEventID := uuid.New().String()
 	executionID := uuid.New()
 
@@ -86,6 +109,7 @@ func TestLoopStartLoop(t *testing.T) {
 		RootEventID: rootEventID,
 		Configuration: map[string]any{
 			"untilExpression": `$["Checker"].ready == true`,
+			"timeoutSeconds":  120,
 		},
 		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 			return nil, nil
@@ -94,6 +118,7 @@ func TestLoopStartLoop(t *testing.T) {
 			return &core.ExecutionContext{
 				ID:             executionID,
 				Metadata:       execMetadata,
+				Requests:       scheduled,
 				ExecutionState: execState,
 			}, nil
 		},
@@ -112,6 +137,40 @@ func TestLoopStartLoop(t *testing.T) {
 	assert.True(t, md.Active)
 	assert.False(t, execState.Finished)
 	assert.Equal(t, ChannelNameNext, execState.Channel)
+	assert.True(t, scheduled.called)
+	assert.Equal(t, timeoutHook, scheduled.actionName)
+	assert.Equal(t, 120*time.Second, scheduled.interval)
+}
+
+func TestLoopStartDeferredWhenAnotherSessionActive(t *testing.T) {
+	component := &Loop{}
+	deferred := false
+
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+		},
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return nil, nil
+		},
+		HasRunningExecutions: func() (bool, error) {
+			return true, nil
+		},
+		DeferQueueItem: func() error {
+			deferred = true
+			return nil
+		},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			t.Fatal("CreateExecution should not be called when deferring")
+			return nil, nil
+		},
+	}
+
+	id, err := component.ProcessQueueItem(ctx)
+	require.ErrorIs(t, err, core.ErrQueueItemDeferred)
+	assert.Nil(t, id)
+	assert.True(t, deferred)
 }
 
 func TestReadMetadataFromPersistedJSON(t *testing.T) {
@@ -333,6 +392,47 @@ func TestLoopHandleNextIterationHook(t *testing.T) {
 	payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)["next"].(map[string]any)
 	assert.Equal(t, 3, payload["iteration"])
 	assert.Equal(t, 10, payload["maxIterations"])
+}
+
+func TestLoopHandleTimeoutHookFailsActiveLoop(t *testing.T) {
+	component := &Loop{}
+	execState := &contexts.ExecutionStateContext{}
+	execMetadata := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Iteration: 4, MaxIterations: 10, Active: true},
+	}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name: timeoutHook,
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+			"timeoutSeconds":  30,
+		},
+		Metadata:       execMetadata,
+		ExecutionState: execState,
+	})
+	require.NoError(t, err)
+	assert.True(t, execState.Finished)
+	assert.False(t, execState.Passed)
+	assert.Equal(t, "timeout", execState.FailureReason)
+	assert.Contains(t, execState.FailureMessage, "30s")
+
+	md, ok := execMetadata.Metadata.(ExecutionMetadata)
+	require.True(t, ok)
+	assert.False(t, md.Active)
+}
+
+func TestLoopHandleTimeoutHookIgnoresFinishedLoop(t *testing.T) {
+	component := &Loop{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name: timeoutHook,
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+		},
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: &finishedExecutionState{},
+	})
+	require.NoError(t, err)
 }
 
 func TestIterationDelay(t *testing.T) {

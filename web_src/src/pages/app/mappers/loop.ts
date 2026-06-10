@@ -93,6 +93,7 @@ export const LOOP_STATE_REGISTRY: EventStateRegistry = {
 type LoopConfiguration = {
   untilExpression?: string;
   maxIterations?: number;
+  timeoutSeconds?: number;
   delayBetweenIterations?: DelaySpec;
 };
 
@@ -138,6 +139,7 @@ export const loopMapper: ComponentBaseMapper = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       "Until expression": configuration.untilExpression ?? "-",
       "Max iterations": configuration.maxIterations ?? 100,
+      "Timeout (s)": configuration.timeoutSeconds ?? 3600,
     };
 
     if (typeof sessionMetadata?.iteration === "number") {

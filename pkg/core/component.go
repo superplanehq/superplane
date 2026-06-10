@@ -12,6 +12,7 @@ import (
 var (
 	ErrSecretKeyNotFound   = errors.New("secret or key not found")
 	ErrExecutionKVNotFound = errors.New("execution kv not found")
+	ErrQueueItemDeferred   = errors.New("queue item deferred")
 )
 
 /*
@@ -148,6 +149,11 @@ type ProcessQueueContext struct {
 	DequeueItem func() error
 
 	//
+	// Defers the queue item by moving it to the back of the node queue.
+	//
+	DeferQueueItem func() error
+
+	//
 	// Updates the state of the node
 	//
 	UpdateNodeState func(state string) error
@@ -162,6 +168,12 @@ type ProcessQueueContext struct {
 	// Returns an ExecutionContext.
 	//
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
+
+	//
+	// HasRunningExecutions reports whether this node currently has any
+	// unfinished (running) executions.
+	//
+	HasRunningExecutions func() (bool, error)
 
 	//
 	// DefaultProcessing performs the default processing for the queue item.
