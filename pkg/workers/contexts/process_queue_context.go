@@ -37,6 +37,7 @@ func BuildProcessQueueContext(
 	queueItem *models.CanvasNodeQueueItem,
 	configFields []configuration.Field,
 	onNewEvents func([]models.CanvasEvent),
+	repoFiles core.RepositoryFilesContext,
 ) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
@@ -148,6 +149,7 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
 	}
 
@@ -265,6 +267,7 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
 	}
 
