@@ -10,7 +10,29 @@ export type AutocompleteExampleContext = {
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   allComponentsByName: Map<string | undefined, SuperplaneActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
+  organizationId?: string;
+  canvasId?: string;
 };
+
+// Representative run id used purely to preview the shape of run() in the editor;
+// the real id is only known at runtime.
+const EXAMPLE_RUN_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+
+// buildRunExample mirrors the server's run() payload so the autocomplete can
+// surface run().id / run().url / run().started_at and show a representative preview.
+function buildRunExample(organizationId?: string, canvasId?: string): Record<string, unknown> {
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  const url =
+    base && organizationId && canvasId
+      ? `${base}/${organizationId}/apps/${canvasId}?view=runs&run=${EXAMPLE_RUN_ID}`
+      : "";
+
+  return {
+    id: EXAMPLE_RUN_ID,
+    url,
+    started_at: new Date().toISOString(),
+  };
+}
 
 function collectChainNodeIds(
   nodeId: string,
@@ -182,6 +204,7 @@ type BuildNamedExampleObjInput = {
   previousByDepth: Record<string, unknown>;
   canvasNodes: ComponentsNode[];
   incomingNodeIdsByTargetId: Map<string, string[]>;
+  runExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -193,6 +216,7 @@ function buildNamedExampleObj({
   previousByDepth,
   canvasNodes,
   incomingNodeIdsByTargetId,
+  runExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -244,6 +268,8 @@ function buildNamedExampleObj({
     namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
   }
 
+  namedExampleObj.__run = runExample;
+
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
   if (currentNodeName) {
@@ -289,6 +315,7 @@ export function buildAutocompleteExampleObj(
     nodeNamesById,
     nodeMetadata,
     previousByDepth,
+    runExample: buildRunExample(context.organizationId, context.canvasId),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

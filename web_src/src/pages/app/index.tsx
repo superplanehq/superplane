@@ -2305,6 +2305,8 @@ export function AppPage() {
       visibleNodeEventsMap,
       allComponentsByName,
       allTriggersByName,
+      organizationId,
+      canvasId,
     }),
     [
       canvasNodes,
@@ -2314,6 +2316,8 @@ export function AppPage() {
       visibleNodeEventsMap,
       allComponentsByName,
       allTriggersByName,
+      organizationId,
+      canvasId,
     ],
   );
   const getAutocompleteExampleObj = useCallback(
