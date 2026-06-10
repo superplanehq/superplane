@@ -99,6 +99,10 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "version is not your current edit version")
 		}
 
+		if !models.IsRegisteredDraftVersion(draftVersion) {
+			return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+		}
+
 		if draftVersion.OwnerID == nil || *draftVersion.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}

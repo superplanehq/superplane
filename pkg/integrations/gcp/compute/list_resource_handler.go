@@ -504,13 +504,18 @@ func ListMachineTypeResourcesForInstance(ctx context.Context, c Client, instance
 var ubuntuLTSFamilyOrder = []string{"ubuntu-24", "ubuntu-22", "ubuntu-20"}
 
 const (
-	ResourceTypePublicImages      = "publicImages"
-	ResourceTypeCustomImages      = "customImages"
-	ResourceTypeSnapshots         = "snapshots"
-	ResourceTypeDisks             = "disks"
-	ResourceTypeDiskTypes         = "diskTypes"
-	ResourceTypeSnapshotSchedules = "snapshotSchedules"
+	ResourceTypePublicImages         = "publicImages"
+	ResourceTypeCustomImages         = "customImages"
+	ResourceTypeSnapshots            = "snapshots"
+	ResourceTypeDisks                = "disks"
+	ResourceTypeDiskTypes            = "diskTypes"
+	ResourceTypeSnapshotSchedules    = "snapshotSchedules"
+	ResourceTypeImageStorageLocation = "imageStorageLocation"
 )
+
+// imageStorageMultiRegions are the Cloud Storage multi-regions an image can be
+// stored in, listed ahead of the individual regions in the picker.
+var imageStorageMultiRegions = []string{"us", "eu", "asia"}
 
 type Image struct {
 	Name        string `json:"name"`
@@ -744,6 +749,28 @@ func ListCustomImageResources(ctx context.Context, c Client, project string) ([]
 	out := make([]core.IntegrationResource, 0, len(list))
 	for _, img := range list {
 		out = append(out, core.IntegrationResource{Type: ResourceTypeCustomImages, Name: img.Name, ID: imageSelfLinkOrName(img)})
+	}
+	return out, nil
+}
+
+// ListImageStorageLocationResources lists the Cloud Storage locations an image
+// can be stored in: the multi-regions (us, eu, asia) followed by every region
+// in the project. The value used by the images API is the bare location name.
+func ListImageStorageLocationResources(ctx context.Context, c Client) ([]core.IntegrationResource, error) {
+	out := make([]core.IntegrationResource, 0, len(imageStorageMultiRegions))
+	for _, mr := range imageStorageMultiRegions {
+		out = append(out, core.IntegrationResource{
+			Type: ResourceTypeImageStorageLocation,
+			Name: fmt.Sprintf("%s (multi-region)", mr),
+			ID:   mr,
+		})
+	}
+	regions, err := ListRegions(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range regions {
+		out = append(out, core.IntegrationResource{Type: ResourceTypeImageStorageLocation, Name: r.Name, ID: r.Name})
 	}
 	return out, nil
 }

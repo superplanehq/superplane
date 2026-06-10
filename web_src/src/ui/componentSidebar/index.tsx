@@ -26,7 +26,7 @@ import type {
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
-import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 import { analytics } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
@@ -145,6 +145,9 @@ interface ComponentSidebarProps {
   executionChainRequestId?: number;
   onExecutionChainHandled?: () => void;
   readOnly?: boolean;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
 }
 
 export const ComponentSidebar = ({
@@ -215,6 +218,9 @@ export const ComponentSidebar = ({
   executionChainRequestId,
   onExecutionChainHandled,
   readOnly = false,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
 }: ComponentSidebarProps) => {
   const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
   const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
@@ -597,7 +603,7 @@ export const ComponentSidebar = ({
               className="flex-1"
             >
               {showSettingsTab && (
-                <div className="border-border border-b-1">
+                <div className="border-b border-slate-950/15">
                   <div className="flex px-4">
                     {shouldShowRunsTab && (
                       <button
@@ -687,6 +693,9 @@ export const ComponentSidebar = ({
                     integrationRef={integrationRef}
                     integrations={integrations}
                     readOnly={readOnly}
+                    onEnterEditMode={onEnterEditMode}
+                    enterEditModeDisabled={enterEditModeDisabled}
+                    enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
                     canReadIntegrations={canReadIntegrations}
                     canCreateIntegrations={canCreateIntegrations}
                     canUpdateIntegrations={canUpdateIntegrations}

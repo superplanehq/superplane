@@ -5,10 +5,13 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
@@ -16,6 +19,7 @@ import (
 func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["canvas_id"]
 	path := r.URL.Query().Get("path")
+	versionID := strings.TrimSpace(r.URL.Query().Get("version_id"))
 
 	if id == "" {
 		http.Error(w, "canvas_id is required", http.StatusBadRequest)
@@ -61,6 +65,33 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 	canvas, err := models.FindCanvas(user.OrganizationID, canvasID)
 	if err != nil {
 		http.Error(w, "Canvas not found", http.StatusNotFound)
+		return
+	}
+
+	if canvases.IsRepositorySpecFilePath(path) {
+		ctx := authentication.SetUserIdInMetadata(r.Context(), user.ID.String())
+		content, readErr := canvases.ReadRepositorySpecFile(
+			ctx,
+			user.OrganizationID.String(),
+			canvas.ID.String(),
+			versionID,
+			path,
+		)
+		if readErr != nil {
+			log.Errorf("Failed to read repository spec file %s in canvas %s: %v", path, canvasID.String(), readErr)
+			http.Error(w, "Failed to get file", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{
+			"filename": filepath.Base(path),
+		}))
+		_, err = io.WriteString(w, content)
+		if err != nil {
+			log.Errorf("Failed to write repository spec file %s in canvas %s: %v", path, canvasID.String(), err)
+		}
 		return
 	}
 

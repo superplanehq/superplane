@@ -236,12 +236,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update_version",
@@ -432,18 +426,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_ReemitTriggerEvent_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_GetCanvasDashboard_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_UpdateCanvasDashboard_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

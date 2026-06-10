@@ -4,13 +4,12 @@ export const PLACEHOLDER_NODE_CONTEXT_KEY = "add-placeholder-node";
 export const AGENT_BOOT_CONTEXT_READY_EVENT = "agent-boot-context-ready";
 
 const DEFAULT_BOOT_MESSAGE =
-  "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
+  "Session ready. Use the [Canvas Snapshot] from the session context to greet the user. Do not run CLI commands or fetch the canvas just to summarize it. Only check connected integrations if the user asks for integration-specific work.";
 
-const BLANK_BOOT_MESSAGE =
-  "The user just created a new blank app with a placeholder node on the canvas. Greet them briefly, then tell them to click on the 'New Component' node on the canvas and pick a component from the sidebar to get started. You can also ask what they want to build and help them choose the right component.";
+const BLANK_BOOT_MESSAGE = ""; // No agent boot message for blank canvas — static greeting only
 
 const BLANK_INITIAL_MESSAGE =
-  "I can help design and modify this canvas. Describe the workflow you want, and I'll use the draft, console, and run panels to propose changes, apply approved updates, and explain each step.";
+  "You can describe the workflow you want to build, or click on the 'New Component' node on the canvas to get started. I'm here to help!";
 
 const TEMPLATE_NEXT_STEP_MESSAGE = "Tell me what you would like to do next in the canvas.";
 
@@ -78,7 +77,7 @@ function buildTemplateBootMessage({ instructions, initialMessage }: TemplateAgen
 
   return [
     "The UI has already shown the user the template introduction.",
-    "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+    "Do not run commands or tools to inspect the canvas, integrations, or files.",
     `Reply only with: "${TEMPLATE_NEXT_STEP_MESSAGE}"`,
   ].join("\n\n");
 }

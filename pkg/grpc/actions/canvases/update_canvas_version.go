@@ -36,7 +36,7 @@ func UpdateCanvasVersion(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*models.CanvasVersion, error) {
 	return UpdateCanvasVersionWithUsage(
 		ctx,
 		nil,
@@ -64,7 +64,7 @@ func UpdateCanvasVersionWithUsage(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -153,19 +153,8 @@ func UpdateCanvasVersionWithUsage(
 
 		nodes := injectMetadataIntoNodes(version.Nodes, nodes)
 
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		if version.State == models.CanvasVersionStatePublished {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
-		}
-
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvasUUID, userUUID, version.ID); draftErr != nil {
-			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
-			}
-			return draftErr
+		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+			return err
 		}
 
 		nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
@@ -210,9 +199,27 @@ func UpdateCanvasVersionWithUsage(
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
-	return &pb.UpdateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
-	}, nil
+	return version, nil
+}
+
+func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
+	if version.OwnerID == nil || *version.OwnerID != userID {
+		return status.Error(codes.PermissionDenied, "version owner mismatch")
+	}
+
+	if version.State == models.CanvasVersionStatePublished {
+		return status.Error(codes.FailedPrecondition, "published versions are immutable")
+	}
+
+	if version.State != models.CanvasVersionStateDraft {
+		return status.Error(codes.FailedPrecondition, "version is not your editable draft")
+	}
+
+	if !models.IsRegisteredDraftVersion(version) {
+		return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+	}
+
+	return nil
 }
 
 func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {

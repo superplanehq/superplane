@@ -1,9 +1,11 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
+import { StartEditingDropdown } from "./components/StartEditingDropdown";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
@@ -32,7 +34,7 @@ export function SecondaryHeaderActions({
   publishVersionDisabledTooltip,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
-  const onConsoleTab = mode === "dashboard";
+  const onConsoleTab = mode === "console";
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
@@ -59,7 +61,12 @@ export function SecondaryHeaderActions({
             />
           ) : null}
           {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
-            <DiffSummaryHoverCard diffCounts={draftConsoleDiff.diffCounts} onShowDiff={onShowConsoleDiff} />
+            <ConsoleDiffSummaryHoverCard
+              draftConsoleDiff={draftConsoleDiff}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              onShowConsoleDiff={onShowConsoleDiff}
+            />
           ) : null}
           <EditModePublishDiscardActions
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -74,6 +81,24 @@ export function SecondaryHeaderActions({
         </>
       ) : null}
     </div>
+  );
+}
+
+function ConsoleDiffSummaryHoverCard({
+  draftConsoleDiff,
+  visualDiffEnabled,
+  onToggleVisualDiff,
+  onShowConsoleDiff,
+}: {
+  draftConsoleDiff: NonNullable<HeaderProps["draftConsoleDiff"]>;
+} & Pick<HeaderProps, "visualDiffEnabled" | "onToggleVisualDiff" | "onShowConsoleDiff">) {
+  return (
+    <DiffSummaryHoverCard
+      diffCounts={draftConsoleDiff.diffCounts}
+      visualDiffEnabled={visualDiffEnabled}
+      onToggleVisualDiff={onToggleVisualDiff}
+      onShowDiff={onShowConsoleDiff}
+    />
   );
 }
 
@@ -140,6 +165,13 @@ export function LiveModeTopHeaderActions({
   hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
 }: Pick<
   HeaderProps,
   | "onEnterEditMode"
@@ -148,7 +180,29 @@ export function LiveModeTopHeaderActions({
   | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
+  | "startEditingDrafts"
+  | "startEditingDefaultDraft"
+  | "startEditingMenuOpen"
+  | "onStartEditingMenuOpenChange"
+  | "onContinueDraftBranch"
+  | "onCreateDraftBranch"
+  | "createDraftBranchPending"
 >) {
+  if (startEditingDrafts !== undefined && onContinueDraftBranch && onCreateDraftBranch) {
+    return (
+      <StartEditingDropdown
+        open={startEditingMenuOpen}
+        onOpenChange={onStartEditingMenuOpenChange}
+        drafts={startEditingDrafts}
+        defaultDraft={startEditingDefaultDraft ?? null}
+        disabled={!!enterEditModeDisabled}
+        isSubmitting={createDraftBranchPending}
+        onContinueDraft={onContinueDraftBranch}
+        onCreateDraft={onCreateDraftBranch}
+      />
+    );
+  }
+
   if (!onEnterEditMode) {
     return null;
   }
@@ -243,18 +297,15 @@ function ExitEditButton({
   const button = (
     <UIButton
       type="button"
-      variant="outline"
-      size="sm"
+      variant="ghost"
+      size="icon"
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-exit-edit-button"
-      className={cn(
-        "rounded-full border-0 bg-[var(--purple)] px-3.5 text-[13px] text-white shadow-none",
-        "hover:bg-[var(--purple)] hover:text-white hover:brightness-95",
-        "focus-visible:border-[var(--purple)] focus-visible:ring-[var(--purple)]/30",
-      )}
+      aria-label="Exit edit"
+      className="-mr-0.5 size-8 shrink-0 p-0 text-slate-950 hover:bg-transparent hover:text-slate-900"
     >
-      Exit Edit
+      <X className="size-5 stroke-[2] text-slate-950 opacity-65" aria-hidden />
     </UIButton>
   );
 
@@ -348,6 +399,10 @@ function DiscardDraftButton({
   );
 }
 
+function publishVersionButtonClassName(): string {
+  return "bg-blue-500 text-white hover:bg-blue-600 hover:opacity-95 focus-visible:ring-blue-500/40";
+}
+
 function PublishVersionButton({
   onPublish,
   label,
@@ -361,24 +416,30 @@ function PublishVersionButton({
   publishVersionDisabled: boolean;
   publishVersionDisabledTooltip?: string;
 }) {
+  const button = (
+    <UIButton
+      type="button"
+      variant="default"
+      size="sm"
+      className={cn(publishVersionButtonClassName())}
+      onClick={onPublish}
+      disabled={disabled}
+      data-testid="canvas-publish-version-button"
+    >
+      {label}
+    </UIButton>
+  );
+
   if (publishVersionDisabled && publishVersionDisabledTooltip) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
-              {label}
-            </UIButton>
-          </div>
+          <div className="inline-flex">{button}</div>
         </TooltipTrigger>
         <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
       </Tooltip>
     );
   }
 
-  return (
-    <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
-      {label}
-    </UIButton>
-  );
+  return button;
 }
