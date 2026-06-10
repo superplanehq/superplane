@@ -1,7 +1,34 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
+export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+
+const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["runs", "versions", "memory", "files"]);
+
+export function normalizeCanvasHeaderMode(headerMode: CanvasPageHeaderMode | undefined): WorkflowHeaderMode {
+  if (!headerMode || headerMode === "default") {
+    return "version-live";
+  }
+
+  return headerMode;
+}
+
+export function isPanelHeaderMode(headerMode: WorkflowHeaderMode): boolean {
+  return PANEL_HEADER_MODES.has(headerMode);
+}
+
+export function blocksBuildingBlocksShortcut(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode === "console" || isPanelHeaderMode(headerMode);
+}
+
+export function allowsBuildingBlocksSidebar(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode !== "console" && !isPanelHeaderMode(headerMode);
+}
+
+export function isRunsOrVersionsHeaderMode(headerMode: WorkflowHeaderMode): boolean {
+  return headerMode === "runs" || headerMode === "versions";
+}
 
 const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
@@ -15,6 +42,7 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
   const view = searchParams.get("view") ?? "";
   return {
     isRunsMode: view === "runs",
+    isVersionsMode: view === "versions",
     isMemoryMode: view === "memory",
     isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
@@ -51,11 +79,13 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isRunsMode,
+  isVersionsMode,
   isMemoryMode,
   isFilesMode,
 }: {
   isConsoleMode: boolean;
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
 }): WorkflowHeaderMode {
@@ -73,6 +103,10 @@ export function getWorkflowHeaderMode({
 
   if (isRunsMode) {
     return "runs";
+  }
+
+  if (isVersionsMode) {
+    return "versions";
   }
 
   return "version-live";
@@ -105,6 +139,7 @@ export function getWorkflowCanvasStateMode({
 export function getWorkflowViewPresentation({
   isConsoleMode,
   isRunsMode,
+  isVersionsMode,
   isMemoryMode,
   isFilesMode,
   hasEditableVersion,
@@ -113,16 +148,17 @@ export function getWorkflowViewPresentation({
 }: {
   isConsoleMode: boolean;
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
   hasEditableVersion: boolean;
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunsMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunsMode || isVersionsMode || isMemoryMode || isFilesMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isMemoryMode, isFilesMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isVersionsMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,
@@ -130,7 +166,7 @@ export function getWorkflowViewPresentation({
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunsMode || isFilesMode,
+    readOnlyViewModes: isRunsMode || isVersionsMode || isFilesMode,
   };
 }
 
