@@ -85,13 +85,12 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	if isSessionTerminal(sess.Status) {
 		sm, err := client.GetSessionMessagesWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v", metadata.Session.ID, err)
+			ctx.Logger.Warnf("Failed to fetch messages for session %s: %v. Retrying poll.", metadata.Session.ID, err)
+			return a.scheduleNextPoll(ctx, attempt+1, errs+1)
 		}
-		if sm != nil && !sm.Complete {
-			ctx.Logger.Warnf("Events not fully written for session %s after retries", metadata.Session.ID)
-		}
-		if sm != nil && sm.LastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s", metadata.Session.ID)
+		if sm == nil || !sm.Complete {
+			ctx.Logger.Warnf("Events not complete for session %s after retries. Retrying poll.", metadata.Session.ID)
+			return a.scheduleNextPoll(ctx, attempt+1, errs)
 		}
 
 		out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
@@ -99,7 +98,6 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 			return emitErr
 		}
 
-		// Delete session only after successful emit
 		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
 		}
