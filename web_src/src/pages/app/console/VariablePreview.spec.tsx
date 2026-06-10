@@ -91,9 +91,36 @@ describe("VariablePreview list (list-mode) values", () => {
     expect(onInsertSnippet).toHaveBeenCalledWith('{{ join(tags, ", ") }}');
   });
 
-  it("explains the empty-list state without erroring", () => {
-    renderPreview({ name: "rows", value: [] });
+  it("uses bracket access for non-identifier field keys in list snippets", () => {
+    const onInsertSnippet = vi.fn();
+    renderPreview({
+      name: "rows",
+      value: [{ "deploy-status": "passed" }],
+      onInsertSnippet,
+    });
 
-    expect(screen.getByText(/empty array/)).toBeTruthy();
+    fireEvent.click(screen.getByText("deploy-status"));
+    expect(onInsertSnippet).toHaveBeenCalledWith('{{ join(rows.map(item, item["deploy-status"]), ", ") }}');
+  });
+});
+
+describe("VariablePreview object values", () => {
+  it("uses dot access for identifier-safe field keys", () => {
+    const onInsertSnippet = vi.fn();
+    renderPreview({ name: "release", value: { status: "passed" }, onInsertSnippet });
+
+    fireEvent.click(screen.getByText("status"));
+    expect(onInsertSnippet).toHaveBeenCalledWith("{{ release.status }}");
+  });
+
+  it("uses bracket access for non-identifier field keys", () => {
+    const onInsertSnippet = vi.fn();
+    renderPreview({ name: "release", value: { "deploy-status": "passed", "1up": true }, onInsertSnippet });
+
+    fireEvent.click(screen.getByText("deploy-status"));
+    expect(onInsertSnippet).toHaveBeenCalledWith('{{ release["deploy-status"] }}');
+
+    fireEvent.click(screen.getByText("1up"));
+    expect(onInsertSnippet).toHaveBeenCalledWith('{{ release["1up"] }}');
   });
 });

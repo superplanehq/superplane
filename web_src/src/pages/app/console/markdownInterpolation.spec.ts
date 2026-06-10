@@ -27,18 +27,18 @@ describe("interpolateMarkdownTemplate", () => {
     expect(out).toBe("## Deploy prod\n\n- run: failed\n- by: build");
   });
 
-  it("concatenates a mapped array of fragments without JSON delimiters", () => {
-    // `tags.map(...)` returns a list; rendering it inline should join the
-    // string fragments directly, not emit `["…","…"]`.
-    const out = interpolateMarkdownTemplate('<div>{{ tags.map(t, "<p>" + t.name + "</p>") }}</div>', {
+  it("concatenates a mapped array of fragments via join with an empty separator", () => {
+    // `tags.map(...)` returns a list; authors splice the fragments together
+    // explicitly with `join(..., "")` to avoid JSON delimiters in the output.
+    const out = interpolateMarkdownTemplate('<div>{{ join(tags.map(t, "<p>" + t.name + "</p>"), "") }}</div>', {
       tags: [{ name: "a" }, { name: "b" }, { name: "c" }],
     });
     expect(out).toBe("<div><p>a</p><p>b</p><p>c</p></div>");
   });
 
-  it("renders a bare array variable as its concatenated string elements", () => {
+  it("renders a bare array variable as JSON so the raw value stays inspectable", () => {
     const out = interpolateMarkdownTemplate("Tags: {{ tags }}", { tags: ["a", "b", "c"] });
-    expect(out).toBe("Tags: abc");
+    expect(out).toBe('Tags: ["a","b","c"]');
   });
 
   it("still supports join() for a custom separator", () => {

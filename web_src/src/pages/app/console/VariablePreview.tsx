@@ -150,7 +150,7 @@ function ListVariablePreviewBody({
   return (
     <ul className="max-h-40 space-y-0.5 overflow-y-auto pr-1">
       {fieldKeys.map((key) => {
-        const snippet = `{{ join(${name}.map(item, item.${key}), ", ") }}`;
+        const snippet = `{{ join(${name}.map(item, item${memberAccessor(key)}), ", ") }}`;
         return (
           <li key={key} className="flex min-w-0 items-start gap-2">
             <button
@@ -199,10 +199,10 @@ function VariablePreviewBlock({
   onInsertSnippet,
 }: {
   name: string;
-  fields: Array<{ key: string; preview: string }>;
+  fields: Array<{ key: string; preview: string; accessor: string }>;
   onInsertSnippet: (snippet: string) => void;
 }) {
-  const insertable = (suffix: string) => `{{ ${name}${suffix ? "." + suffix : ""} }}`;
+  const insertable = (accessor: string) => `{{ ${name}${accessor} }}`;
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -244,9 +244,9 @@ function VariablePreviewBlock({
               <li key={field.key} className="flex min-w-0 items-start gap-2">
                 <button
                   type="button"
-                  onClick={() => onInsertSnippet(insertable(field.key))}
+                  onClick={() => onInsertSnippet(insertable(field.accessor))}
                   className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
-                  title={`Insert ${insertable(field.key)}`}
+                  title={`Insert ${insertable(field.accessor)}`}
                 >
                   {field.key}
                 </button>
@@ -272,25 +272,48 @@ function VariablePreviewBlock({
  */
 const INTERNAL_PREVIEW_KEYS = new Set(["__runNodes__"]);
 
-function previewableFields(value: unknown): Array<{ key: string; preview: string }> {
+/**
+ * Matches a key that is a bare CEL identifier (`status`, `_id`, `nodeName`).
+ * Anything else — dashes, dots, spaces, leading digits — must be reached with
+ * bracket access so the generated snippet stays valid and targets the right
+ * path.
+ */
+const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Build the member-access suffix that follows a base expression for a single
+ * field key. Identifier-safe keys use dot access (`.status`); everything else
+ * falls back to quoted bracket access (`["deploy-status"]`) so keys with
+ * dashes, dots, spaces, or leading digits don't emit invalid CEL or silently
+ * resolve the wrong path.
+ */
+function memberAccessor(key: string): string {
+  return IDENTIFIER_RE.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+}
+
+function previewableFields(value: unknown): Array<{ key: string; preview: string; accessor: string }> {
   if (!value || typeof value !== "object") {
-    return [{ key: "", preview: shortPreviewString(value) }];
+    return [{ key: "", preview: shortPreviewString(value), accessor: "" }];
   }
   const record = value as Record<string, unknown>;
-  const out: Array<{ key: string; preview: string }> = [];
+  const out: Array<{ key: string; preview: string; accessor: string }> = [];
   for (const key of Object.keys(record)) {
     if (INTERNAL_PREVIEW_KEYS.has(key)) continue;
     if (key === "$") {
       const nodes = record.$ as Record<string, unknown> | undefined;
       if (nodes && typeof nodes === "object") {
         for (const nodeKey of Object.keys(nodes)) {
-          const accessor = `$[${JSON.stringify(nodeKey)}].data`;
-          out.push({ key: accessor, preview: shortPreviewString((nodes[nodeKey] as { data?: unknown })?.data) });
+          const display = `$[${JSON.stringify(nodeKey)}].data`;
+          out.push({
+            key: display,
+            preview: shortPreviewString((nodes[nodeKey] as { data?: unknown })?.data),
+            accessor: `.${display}`,
+          });
         }
       }
       continue;
     }
-    out.push({ key, preview: shortPreviewString(record[key]) });
+    out.push({ key, preview: shortPreviewString(record[key]), accessor: memberAccessor(key) });
   }
   return out.slice(0, 12);
 }
