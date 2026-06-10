@@ -45,7 +45,18 @@ describe("fromApiMessage", () => {
       toolName: "search",
       toolCallId: "call-1",
       toolStatus: "started",
+      images: [],
       createdAt: "2026-05-13T00:00:00Z",
     });
+  });
+
+  it("maps populated images and drops incomplete ones", () => {
+    const msg = fromApiMessage({
+      id: "msg-2",
+      role: "user",
+      content: "look",
+      images: [{ mediaType: "image/png", data: "aGVsbG8=" }, { mediaType: "image/png" }, { data: "aGVsbG8=" }],
+    });
+    expect(msg?.images).toEqual([{ mediaType: "image/png", data: "aGVsbG8=" }]);
   });
 });
