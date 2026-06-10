@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -21,6 +22,7 @@ type TextPromptSpec struct {
 	SystemMessage string   `json:"systemMessage"`
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
+	Files         []string `json:"files"`
 }
 
 type MessagePayload struct {
@@ -136,6 +138,21 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			Default:     "1.0",
 			Description: "Amount of randomness injected into the response (0.0 to 1.0)",
 		},
+		{
+			Name:        "files",
+			Label:       "Files",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "File paths from the Files tab to include as context in the prompt",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "File path",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -143,6 +160,11 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	spec := TextPromptSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+	if raw, ok := ctx.Configuration.(map[string]any); ok {
+		if v, ok := raw["files"]; ok {
+			spec.Files = decodeStringList(v)
+		}
 	}
 
 	if spec.Model == "" {
@@ -153,6 +175,23 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("prompt is required")
 	}
 
+	// Validate that configured files exist in the repository
+	if len(spec.Files) > 0 && ctx.RepositoryFiles != nil {
+		available, err := ctx.RepositoryFiles.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %v", err)
+		}
+		fileSet := make(map[string]bool, len(available))
+		for _, f := range available {
+			fileSet[f] = true
+		}
+		for _, f := range spec.Files {
+			if !fileSet[f] {
+				return fmt.Errorf("file %q not found in repository. Available files: %v", f, available)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -160,6 +199,11 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	spec := TextPromptSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+	if raw, ok := ctx.Configuration.(map[string]any); ok {
+		if v, ok := raw["files"]; ok {
+			spec.Files = decodeStringList(v)
+		}
 	}
 
 	if spec.Model == "" {
@@ -182,13 +226,19 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Build message content: file documents + user prompt
+	userContent, err := buildUserContent(ctx, spec)
+	if err != nil {
+		return fmt.Errorf("failed to build user content: %v", err)
+	}
+
 	req := CreateMessageRequest{
 		Model:     spec.Model,
 		MaxTokens: spec.MaxTokens,
 		Messages: []Message{
 			{
 				Role:    "user",
-				Content: spec.Prompt,
+				Content: userContent,
 			},
 		},
 		Temperature: spec.Temperature,
@@ -254,10 +304,85 @@ func extractMessageText(response *CreateMessageResponse) string {
 	return builder.String()
 }
 
+const maxFileSize = 100 * 1024 // 100KB per file
+
+// buildUserContent creates the message content for the user message.
+// When files are specified, it returns an array of content blocks
+// (documents + text prompt). Otherwise, it returns the prompt string.
+func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, error) {
+	if len(spec.Files) == 0 {
+		return spec.Prompt, nil
+	}
+
+	if ctx.RepositoryFiles == nil {
+		return nil, fmt.Errorf("files configured but repository files context is not available")
+	}
+
+	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
+
+	for _, path := range spec.Files {
+		reader, err := ctx.RepositoryFiles.Read(path)
+		if err != nil {
+			return nil, fmt.Errorf("read file %q: %w", path, err)
+		}
+
+		data, err := io.ReadAll(io.LimitReader(reader, maxFileSize+1))
+		reader.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read file %q: %w", path, err)
+		}
+
+		if len(data) > maxFileSize {
+			return nil, fmt.Errorf("file %q exceeds maximum size of %d bytes", path, maxFileSize)
+		}
+
+		mediaType := mediaTypeForPath(path)
+		blocks = append(blocks, ContentBlock{
+			Type: "document",
+			Source: &ContentBlockSource{
+				Type:      "text",
+				MediaType: mediaType,
+				Data:      string(data),
+			},
+		})
+	}
+
+	// Add the user prompt as the final text block
+	blocks = append(blocks, ContentBlock{
+		Type: "text",
+		Text: spec.Prompt,
+	})
+
+	return blocks, nil
+}
+
+func mediaTypeForPath(path string) string {
+	return "text/plain"
+}
+
 func (c *TextPrompt) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
 func (c *TextPrompt) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func decodeStringList(v any) []string {
+	switch x := v.(type) {
+	case nil:
+		return nil
+	case []string:
+		return x
+	case []any:
+		out := make([]string, 0, len(x))
+		for _, e := range x {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
