@@ -130,6 +130,10 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+	if session.Status == models.AgentSessionStatusStreaming {
+		s.enqueueStreamAfterBusySession(sessionID, organizationID, userID)
+		return ErrSessionBusy
+	}
 
 	preamble, err := s.buildPreamble(session, organizationID, userID, ModeBuilder)
 	if err != nil {
@@ -142,7 +146,26 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		MaxIterations:   maxIterations,
 		ContextPreamble: preamble,
 	}); err != nil {
-		return fmt.Errorf("define outcome: %w", err)
+		if errors.Is(err, ErrSessionBusy) {
+			s.enqueueStreamAfterBusySession(sessionID, organizationID, userID)
+			return err
+		}
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			recovered, recoverErr := s.recoverProviderSession(ctx, session)
+			if recoverErr != nil {
+				return recoverErr
+			}
+			if err := s.provider.DefineOutcome(ctx, recovered.ProviderSessionID, DefineOutcomeOptions{
+				Description:     description,
+				Rubric:          rubric,
+				MaxIterations:   maxIterations,
+				ContextPreamble: preamble,
+			}); err != nil {
+				return fmt.Errorf("define outcome after provider session recovery: %w", err)
+			}
+		} else {
+			return fmt.Errorf("define outcome: %w", err)
+		}
 	}
 
 	// Mark session as streaming and start the stream worker to pick up events
@@ -164,6 +187,10 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	if err != nil {
 		return nil, err
 	}
+	if session.Status == models.AgentSessionStatusStreaming {
+		s.enqueueStreamAfterBusySession(sessionID, organizationID, userID)
+		return nil, ErrSessionBusy
+	}
 
 	agentMode := ModeOperator
 	if len(mode) > 0 {
@@ -176,8 +203,22 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 
 	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		return nil, fmt.Errorf("forward to provider: %w", err)
+		if errors.Is(err, ErrSessionBusy) {
+			s.enqueueStreamAfterBusySession(sessionID, organizationID, userID)
+			return nil, err
+		}
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			recovered, recoverErr := s.recoverProviderSession(ctx, session)
+			if recoverErr != nil {
+				return nil, recoverErr
+			}
+			if err := s.provider.SendMessage(ctx, recovered.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+				return nil, fmt.Errorf("send message after provider session recovery: %w", err)
+			}
+		} else {
+			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+			return nil, fmt.Errorf("forward to provider: %w", err)
+		}
 	}
 
 	messageRole := models.AgentMessageRoleUser
@@ -201,6 +242,60 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 	return persisted, nil
+}
+
+func (s *Service) enqueueStreamAfterBusySession(sessionID, organizationID, userID uuid.UUID) {
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("failed to mark busy agent session as streaming")
+	}
+	if err := messages.PublishAgentStreamRequested(messages.AgentStreamRequest{
+		SessionID:      sessionID.String(),
+		OrganizationID: organizationID.String(),
+		UserID:         userID.String(),
+	}); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("failed to enqueue stream for busy agent session")
+	}
+}
+
+func (s *Service) recoverProviderSession(ctx context.Context, stale *models.AgentSession) (*models.AgentSession, error) {
+	var recovered *models.AgentSession
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockAgentSessionInTransaction(tx, stale.ID)
+		if err != nil {
+			return err
+		}
+		if locked.Status == models.AgentSessionStatusStreaming {
+			return ErrSessionBusy
+		}
+		if locked.ProviderSessionID != stale.ProviderSessionID {
+			recovered = locked
+			return nil
+		}
+
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
+			Title: sessionTitle(locked.OrganizationID, locked.CanvasID),
+		})
+		if err != nil {
+			return fmt.Errorf("create provider session: %w", err)
+		}
+
+		if err := models.UpdateAgentSessionProviderSessionInTransaction(
+			tx,
+			locked.ID,
+			upstream.ProviderSessionID,
+			models.AgentSessionStatusIdle,
+		); err != nil {
+			return err
+		}
+		locked.ProviderSessionID = upstream.ProviderSessionID
+		locked.Status = models.AgentSessionStatusIdle
+		recovered = locked
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("recover provider session: %w", err)
+	}
+	return recovered, nil
 }
 
 func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode Mode) (string, error) {
