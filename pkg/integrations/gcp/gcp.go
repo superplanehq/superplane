@@ -205,6 +205,7 @@ func (g *GCP) Triggers() []core.Trigger {
 		&artifactregistry.OnArtifactPush{},
 		&artifactregistry.OnArtifactAnalysis{},
 		&gcppubsub.OnMessage{},
+		&monitoring.OnAlert{},
 	}
 }
 
