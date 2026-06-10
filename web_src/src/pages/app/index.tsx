@@ -97,6 +97,7 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
 import { resolveFilesHeaderVersionActions, useFilesHeaderState } from "./files/useFilesHeaderState";
+import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
@@ -164,7 +165,6 @@ import {
   prepareSidebarData,
 } from "./workflowPageHelpers";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
-const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
@@ -188,6 +188,8 @@ export function AppPage() {
   const {
     isRunsMode,
     setIsRunsMode,
+    isVersionsMode,
+    setIsVersionsMode,
     setIsConsoleMode,
     isMemoryMode,
     setIsMemoryMode,
@@ -199,6 +201,17 @@ export function AppPage() {
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
+  const { handleSelectVersionsMode, handleExitVersionsMode } = useVersionsModeActions({
+    setIsVersionsMode,
+    setIsConsoleMode,
+    setIsConsoleAddPanelOpen,
+    setIsConsoleYamlOpen,
+    setIsRunsMode,
+    setIsMemoryMode,
+    setIsFilesMode,
+    setSelectedRunId,
+    setSearchParams,
+  });
   const {
     openRunDetailOnMount,
     runDetailNodeId,
@@ -633,9 +646,6 @@ export function AppPage() {
   const canActOnCanvas = canUpdateCanvas && !isTemplate && !canvasDeletedRemotely;
   const isReadOnly = !canActOnCanvas || !hasEditableVersion;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
-  const [isVersionControlOpen, setIsVersionControlOpen] = useState(() =>
-    readStoredBoolean(CANVAS_VERSION_CONTROL_STORAGE_KEY),
-  );
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
@@ -665,15 +675,6 @@ export function AppPage() {
   const hasFitToViewRef = useRef(false);
   const runsHasFitToViewRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
-  const autoOpenedVersionControlCanvasIdsRef = useRef<Set<string>>(new Set());
-  const hasAutoOpenedVersionControl = Boolean(canvasId && autoOpenedVersionControlCanvasIdsRef.current.has(canvasId));
-  const handleVersionControlAutoOpened = useCallback(() => {
-    if (!canvasId) {
-      return;
-    }
-
-    autoOpenedVersionControlCanvasIdsRef.current.add(canvasId);
-  }, [canvasId]);
 
   /**
    * Capture the initial node focus from the URL so we only zoom once.
@@ -730,12 +731,6 @@ export function AppPage() {
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
   );
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_VERSION_CONTROL_STORAGE_KEY, JSON.stringify(isVersionControlOpen));
-    }
-  }, [isVersionControlOpen]);
 
   useEffect(() => {
     if (!isCreateChangeRequestMode) {
@@ -4197,12 +4192,15 @@ export function AppPage() {
     [handleActOnChangeRequest],
   );
 
-  const handleGoToVersioningToResolveConflicts = useCallback((changeRequestId: string) => {
-    setVersionNodeDiffContext(null);
-    setSelectedChangeRequestId(changeRequestId);
-    setResolvingConflictChangeRequestId(changeRequestId);
-    setIsVersionControlOpen(true);
-  }, []);
+  const handleGoToVersioningToResolveConflicts = useCallback(
+    (changeRequestId: string) => {
+      setVersionNodeDiffContext(null);
+      setSelectedChangeRequestId(changeRequestId);
+      setResolvingConflictChangeRequestId(changeRequestId);
+      handleSelectVersionsMode();
+    },
+    [handleSelectVersionsMode],
+  );
 
   const handleOpenAwaitingApprovalNodeDiff = useCallback(() => {
     if (!selectedCanvasVersionID) {
@@ -4256,7 +4254,7 @@ export function AppPage() {
       onPublish: () => handlePublishChangeRequest(changeRequestId),
       onOpenVersioningTab: () => {
         setSelectedChangeRequestId(changeRequestId);
-        setIsVersionControlOpen(true);
+        handleSelectVersionsMode();
       },
       onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
       canAct: canActOnCanvas,
@@ -4271,6 +4269,7 @@ export function AppPage() {
     handleApproveChangeRequest,
     handleRejectChangeRequest,
     handlePublishChangeRequest,
+    handleSelectVersionsMode,
     handleOpenAwaitingApprovalNodeDiff,
     canActOnCanvas,
     actOnCanvasChangeRequestMutation.isPending,
@@ -4535,7 +4534,7 @@ export function AppPage() {
         if (changeRequestID) {
           setSelectedChangeRequestId(changeRequestID);
         }
-        setIsVersionControlOpen(true);
+        handleSelectVersionsMode();
         setSuppressUnpublishedDraftDiscard(true);
         showSuccessToast("Change request created");
       } catch (error) {
@@ -4552,6 +4551,7 @@ export function AppPage() {
       queryClient,
       liveCanvasVersionId,
       handleUseVersion,
+      handleSelectVersionsMode,
     ],
   );
 
@@ -4719,6 +4719,7 @@ export function AppPage() {
     }
 
     setIsRunsMode(true);
+    setIsVersionsMode(false);
     setIsMemoryMode(false);
     setIsFilesMode(false);
     setSearchParams(
@@ -4739,6 +4740,7 @@ export function AppPage() {
     setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
+    setIsVersionsMode,
     setSearchParams,
   ]);
 
@@ -4757,19 +4759,12 @@ export function AppPage() {
     );
   }, [setIsRunsMode, setSearchParams, setSelectedRunId, setRunDetailNodeId]);
 
-  const handleOpenVersionControl = useCallback(() => {
-    setIsVersionControlOpen(true);
-  }, []);
-
-  const handleCloseVersionControl = useCallback(() => {
-    setIsVersionControlOpen(false);
-  }, []);
-
   const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
     setIsConsoleMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
     setIsRunsMode,
+    setIsVersionsMode,
     setIsMemoryMode,
     setIsFilesMode,
     setSearchParams,
@@ -4782,6 +4777,7 @@ export function AppPage() {
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
     setIsRunsMode,
+    setIsVersionsMode,
     setIsFilesMode,
     setSearchParams,
     setSelectedRunId,
@@ -4793,6 +4789,7 @@ export function AppPage() {
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
     setIsRunsMode,
+    setIsVersionsMode,
     setIsMemoryMode,
     setSelectedRunId,
     setSearchParams,
@@ -4814,6 +4811,7 @@ export function AppPage() {
     handleExitMemoryMode,
     handleExitFilesMode,
     handleExitRunsMode,
+    handleExitVersionsMode,
     handleToggleEditMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
@@ -4821,9 +4819,12 @@ export function AppPage() {
 
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isRunsMode,
+    isVersionsMode,
     handleExitRunsMode,
+    handleExitVersionsMode,
     handleToggleEditMode,
     setIsRunsMode,
+    setIsVersionsMode,
     setSelectedRunId,
     setRunDetailNodeId,
     setSearchParams,
@@ -5365,15 +5366,11 @@ export function AppPage() {
           showCanvasSettingsMenu={canUpdateCanvas}
           onSeeCurrentVersion={handleSeeCurrentVersion}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={handleOpenVersionControl}
-          hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
-          onVersionControlAutoOpened={handleVersionControlAutoOpened}
-          onCloseVersionControl={handleCloseVersionControl}
           showBottomStatusControls={showBottomStatusControls}
           hideAddControls={hideAddControls}
           hideCanvasToolSidebar={isTemplate}
           onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
+          onSelectVersions={isTemplate ? undefined : handleSelectVersionsMode}
           nodes={nodes}
           edges={renderedEdges}
           organizationId={organizationId}
@@ -5466,7 +5463,6 @@ export function AppPage() {
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
-          onExitRunsMode={handleExitRunsMode}
           onSelectConsole={isTemplate ? undefined : handleSelectConsoleMode}
           onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
@@ -5530,31 +5526,33 @@ export function AppPage() {
             ) : null
           }
           toolSidebarVersionsContent={
-            <VersionsTabPanel
-              scrollPersistenceKey={canvasId}
-              liveCanvasVersionId={effectiveLiveCanvasVersionId}
-              selectedCanvasVersion={selectedCanvasVersion}
-              pendingApprovalVersions={pendingApprovalVersions}
-              liveVersions={liveVersions}
-              liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-              canUpdateCanvas={canUpdateCanvas}
-              isTemplate={isTemplate}
-              canvasDeletedRemotely={canvasDeletedRemotely}
-              onUseVersion={handleUseVersionFromVersionPanel}
-              onVersionNodeDiffContextChange={setVersionNodeDiffContext}
-              onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-              loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-              loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-              changeRequestApprovalConfig={
-                liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
-              }
-              rejectedVersions={rejectedVersions}
-              draftBranches={draftBranches}
-              activeDraftBranch={resolvedActiveBranch}
-              onOpenDraftBranch={handleContinueDraftBranch}
-              onDeleteDraftBranch={handleDeleteDraftBranch}
-              deleteDraftBranchPending={deleteDraftBranchMutation.isPending}
-            />
+            isVersionsMode ? (
+              <VersionsTabPanel
+                scrollPersistenceKey={canvasId}
+                liveCanvasVersionId={effectiveLiveCanvasVersionId}
+                selectedCanvasVersion={selectedCanvasVersion}
+                pendingApprovalVersions={pendingApprovalVersions}
+                liveVersions={liveVersions}
+                liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
+                canUpdateCanvas={canUpdateCanvas}
+                isTemplate={isTemplate}
+                canvasDeletedRemotely={canvasDeletedRemotely}
+                onUseVersion={handleUseVersionFromVersionPanel}
+                onVersionNodeDiffContextChange={setVersionNodeDiffContext}
+                onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
+                loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
+                loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
+                changeRequestApprovalConfig={
+                  liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
+                }
+                rejectedVersions={rejectedVersions}
+                draftBranches={draftBranches}
+                activeDraftBranch={resolvedActiveBranch}
+                onOpenDraftBranch={handleContinueDraftBranch}
+                onDeleteDraftBranch={handleDeleteDraftBranch}
+                deleteDraftBranchPending={deleteDraftBranchMutation.isPending}
+              />
+            ) : null
           }
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}

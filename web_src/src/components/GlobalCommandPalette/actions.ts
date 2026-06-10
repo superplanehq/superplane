@@ -36,7 +36,7 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "console" | "memory" | "runs") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory" | "runs" | "versions") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
@@ -132,6 +132,14 @@ export function buildCurrentCanvasActions({
       keywords: ["runs", "executions"],
     },
     {
+      id: "current-canvas-versions",
+      label: "Versions",
+      description: currentCanvasName,
+      icon: History,
+      onSelect: () => goToCurrentCanvasView("versions"),
+      keywords: ["versions", "version history", "change requests"],
+    },
+    {
       id: "current-canvas-memory",
       label: "Memory",
       description: currentCanvasName,
@@ -149,17 +157,6 @@ export function buildCurrentCanvasActions({
       keywords: ["canvas", "settings"],
     },
   ];
-
-  if (showToolTabCommands) {
-    actions.splice(4, 0, {
-      id: "current-canvas-versions",
-      label: "Versions",
-      description: currentCanvasName,
-      icon: History,
-      onSelect: () => openCurrentCanvasToolTab("versions"),
-      keywords: ["versions", "version history", "change requests"],
-    });
-  }
 
   if (agentEnabled && showToolTabCommands) {
     actions.splice(1, 0, {

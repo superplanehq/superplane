@@ -18,6 +18,7 @@ function isConsoleView(view: string): boolean {
  */
 export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSearchParams: SetURLSearchParams) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
+  const [isVersionsMode, setIsVersionsMode] = useState(() => searchParams.get("view") === "versions");
   const [isConsoleMode, setIsConsoleMode] = useState(() => isConsoleView(searchParams.get("view") ?? ""));
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
   const [isFilesMode, setIsFilesMode] = useState(() => searchParams.get("view") === "files");
@@ -34,6 +35,7 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
 
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
+    setIsVersionsMode(viewParam === "versions");
     setIsMemoryMode(viewParam === "memory");
     setIsFilesMode(viewParam === "files");
     if (consoleViewActive) {
@@ -67,6 +69,8 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   return {
     isRunsMode,
     setIsRunsMode,
+    isVersionsMode,
+    setIsVersionsMode,
     isConsoleMode,
     setIsConsoleMode,
     isMemoryMode,
