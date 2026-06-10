@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
@@ -45,6 +46,24 @@ func dbPoolSize() int {
 	return size
 }
 
+func dsnConfigFromEnv() DSNConfig {
+	postgresDbSSL := os.Getenv("POSTGRES_DB_SSL")
+	sslMode := "disable"
+	if postgresDbSSL == "true" {
+		sslMode = "require"
+	}
+
+	return DSNConfig{
+		Host:            os.Getenv("DB_HOST"),
+		Port:            os.Getenv("DB_PORT"),
+		Name:            os.Getenv("DB_NAME"),
+		Pass:            os.Getenv("DB_PASSWORD"),
+		User:            os.Getenv("DB_USERNAME"),
+		Ssl:             sslMode,
+		ApplicationName: os.Getenv("APPLICATION_NAME"),
+	}
+}
+
 func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Duration) string {
 	stmtMs := strconv.FormatInt(statementTimeout.Milliseconds(), 10)
 	idleMs := strconv.FormatInt(idleInTxTimeout.Milliseconds(), 10)
@@ -71,23 +90,36 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 	return u.String()
 }
 
+func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, error) {
+	c := dsnConfigFromEnv()
+	if applicationName != "" {
+		c.ApplicationName = applicationName
+	}
+	cfg := LoadConfig()
+	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	if maxOpenConns <= 0 {
+		maxOpenConns = 1
+	}
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetMaxIdleConns(maxOpenConns)
+	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+
+	return sqlDB, nil
+}
+
 func connect() *gorm.DB {
-	postgresDbSSL := os.Getenv("POSTGRES_DB_SSL")
-	sslMode := "disable"
-	if postgresDbSSL == "true" {
-		sslMode = "require"
-	}
-
-	c := DSNConfig{
-		Host:            os.Getenv("DB_HOST"),
-		Port:            os.Getenv("DB_PORT"),
-		Name:            os.Getenv("DB_NAME"),
-		Pass:            os.Getenv("DB_PASSWORD"),
-		User:            os.Getenv("DB_USERNAME"),
-		Ssl:             sslMode,
-		ApplicationName: os.Getenv("APPLICATION_NAME"),
-	}
-
+	c := dsnConfigFromEnv()
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
