@@ -35,6 +35,8 @@ export function usePalettePermissions(organizationId: string | null, enabled: bo
 }
 
 export function useCommandPaletteShortcuts({
+  canvasId,
+  organizationId,
   createCanvas,
   createCanvasDisabled,
   enabled,
@@ -45,6 +47,8 @@ export function useCommandPaletteShortcuts({
   setPage,
   setSearch,
 }: {
+  canvasId: string | null;
+  organizationId: string | null;
   createCanvas: () => Promise<void>;
   createCanvasDisabled: boolean;
   enabled: boolean;
@@ -76,6 +80,18 @@ export function useCommandPaletteShortcuts({
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
 
+      if (
+        usesModifier &&
+        event.key === "k" &&
+        !canvasId &&
+        organizationId &&
+        (open || !isEditableTarget(event.target))
+      ) {
+        event.preventDefault();
+        setOpen((prev) => !prev);
+        return;
+      }
+
       if (usesModifier && event.key === COMMAND_SHORTCUT && !isEditableTarget(event.target)) {
         if (createCanvasDisabled) return;
         event.preventDefault();
@@ -91,7 +107,7 @@ export function useCommandPaletteShortcuts({
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [createCanvas, createCanvasDisabled, enabled, open, page, search, setOpen, setPage]);
+  }, [canvasId, organizationId, createCanvas, createCanvasDisabled, enabled, open, page, search, setOpen, setPage]);
 }
 
 function toPermissionSet(permissions: AuthorizationPermission[]) {
