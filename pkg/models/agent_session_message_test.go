@@ -73,7 +73,7 @@ func TestAppendAgentSessionMessageInTransaction_DoesNotDowngradeFinishedToolOnRe
 		Role:            AgentMessageRoleTool,
 		Content:         `{"ok":true}`,
 		ToolCallID:      "toolu_1",
-		ToolName:        "superplane_canvas",
+		ToolName:        "superplane_app",
 		ToolStatus:      AgentToolStatusFinished,
 	}))
 
@@ -83,7 +83,7 @@ func TestAppendAgentSessionMessageInTransaction_DoesNotDowngradeFinishedToolOnRe
 		Role:            AgentMessageRoleTool,
 		Content:         `{"action":"read"}`,
 		ToolCallID:      "toolu_1",
-		ToolName:        "superplane_canvas",
+		ToolName:        "superplane_app",
 		ToolStatus:      AgentToolStatusStarted,
 	}))
 
@@ -92,7 +92,7 @@ func TestAppendAgentSessionMessageInTransaction_DoesNotDowngradeFinishedToolOnRe
 		Where("session_id = ? AND provider_event_id = ?", session.ID, "toolu_1").
 		First(&stored).Error)
 
-	assert.Equal(t, "superplane_canvas", stored.ToolName)
+	assert.Equal(t, "superplane_app", stored.ToolName)
 	assert.Equal(t, AgentToolStatusFinished, stored.ToolStatus)
 	assert.Equal(t, `{"ok":true}`, stored.Content)
 }
