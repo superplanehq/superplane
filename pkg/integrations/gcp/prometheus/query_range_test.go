@@ -16,27 +16,33 @@ func Test__QueryRange__Setup(t *testing.T) {
 		return q.Setup(core.SetupContext{Configuration: cfg, Metadata: &contexts.MetadataContext{}})
 	}
 
+	valid := map[string]any{"query": "up", "start": "2026-01-01T00:00:00Z", "end": "2026-01-02T00:00:00Z", "step": "60s"}
+
 	t.Run("valid -> ok", func(t *testing.T) {
-		require.NoError(t, setup(map[string]any{"query": "up", "lookbackPeriod": "6h"}))
+		require.NoError(t, setup(valid))
 	})
 
 	t.Run("missing query -> error", func(t *testing.T) {
-		require.ErrorContains(t, setup(map[string]any{"lookbackPeriod": "1h"}), "query is required")
+		require.ErrorContains(t, setup(map[string]any{"start": "1", "end": "2", "step": "60s"}), "query is required")
 	})
 
-	t.Run("missing lookbackPeriod -> error", func(t *testing.T) {
-		require.ErrorContains(t, setup(map[string]any{"query": "up"}), "lookbackPeriod is required")
+	t.Run("missing start -> error", func(t *testing.T) {
+		require.ErrorContains(t, setup(map[string]any{"query": "up", "end": "2", "step": "60s"}), "start is required")
 	})
 
-	t.Run("invalid lookbackPeriod -> error", func(t *testing.T) {
-		require.ErrorContains(t, setup(map[string]any{"query": "up", "lookbackPeriod": "3y"}), "invalid lookbackPeriod")
+	t.Run("missing end -> error", func(t *testing.T) {
+		require.ErrorContains(t, setup(map[string]any{"query": "up", "start": "1", "step": "60s"}), "end is required")
+	})
+
+	t.Run("missing step -> error", func(t *testing.T) {
+		require.ErrorContains(t, setup(map[string]any{"query": "up", "start": "1", "end": "2"}), "step is required")
 	})
 }
 
 func Test__QueryRange__Execute(t *testing.T) {
 	q := &QueryRange{}
 
-	t.Run("range query derives the window from the lookback period", func(t *testing.T) {
+	t.Run("range query passes the start/end/step through", func(t *testing.T) {
 		var gotURL string
 		mc := &mockClient{
 			projectID: "my-project",
@@ -49,7 +55,12 @@ func Test__QueryRange__Execute(t *testing.T) {
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := q.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"query": "up", "lookbackPeriod": "1h"},
+			Configuration: map[string]any{
+				"query": "up",
+				"start": "2026-01-01T00:00:00Z",
+				"end":   "2026-01-02T00:00:00Z",
+				"step":  "60s",
+			},
 			ExecutionState: state,
 		})
 
@@ -58,30 +69,29 @@ func Test__QueryRange__Execute(t *testing.T) {
 		assert.Equal(t, "gcp.prometheus.queryRange", state.Type)
 		assert.Contains(t, gotURL, "/location/global/prometheus/api/v1/query_range?")
 		assert.Contains(t, gotURL, "query=up")
-		// 1h window uses a 60s step; start/end are derived (Unix seconds).
 		assert.Contains(t, gotURL, "step=60s")
-		assert.Contains(t, gotURL, "start=")
-		assert.Contains(t, gotURL, "end=")
+		// start/end are passed through as provided (URL-encoded).
+		assert.Contains(t, gotURL, "start=2026-01-01T00%3A00%3A00Z")
+		assert.Contains(t, gotURL, "end=2026-01-02T00%3A00%3A00Z")
 
 		payload := firstPayload(t, state)
 		assert.Equal(t, "matrix", payload["resultType"])
 		assert.Equal(t, 1, payload["seriesCount"])
-		assert.Equal(t, "1h", payload["lookbackPeriod"])
+		assert.Equal(t, "2026-01-01T00:00:00Z", payload["start"])
+		assert.Equal(t, "2026-01-02T00:00:00Z", payload["end"])
 		assert.Equal(t, "60s", payload["step"])
-		assert.NotEmpty(t, payload["start"])
-		assert.NotEmpty(t, payload["end"])
 	})
 
-	t.Run("invalid lookback fails the execution", func(t *testing.T) {
+	t.Run("missing step fails the execution", func(t *testing.T) {
 		withFactory(&mockClient{projectID: "my-project"})
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := q.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"query": "up", "lookbackPeriod": "99h"},
+			Configuration:  map[string]any{"query": "up", "start": "1", "end": "2"},
 			ExecutionState: state,
 		})
 
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
-		assert.Contains(t, state.FailureMessage, "invalid lookbackPeriod")
+		assert.Contains(t, state.FailureMessage, "step is required")
 	})
 }
