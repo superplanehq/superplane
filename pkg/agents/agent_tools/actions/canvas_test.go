@@ -1,4 +1,4 @@
-package tools
+package actions
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
-	grpcCanvases "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -65,7 +66,7 @@ func TestResolveCustomToolAutoLayout_SkipsConsoleOnlyUpdates(t *testing.T) {
 }
 
 func TestResolveCustomToolAutoLayout_PreservesExplicitSettings(t *testing.T) {
-	layout := resolveCustomToolAutoLayout(&superPlaneCanvasAutoLayoutInput{
+	layout := resolveCustomToolAutoLayout(&AutoLayoutInput{
 		Scope:   "connected_component",
 		NodeIDs: []string{"node-1"},
 	}, true)
@@ -110,27 +111,21 @@ func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "load live canvas version summary")
 }
 
-func TestSuperPlaneCanvasTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
+func TestAppAgentTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	canvasYAML, err := grpcCanvases.ReadRepositorySpecFile(
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
 		context.Background(),
 		r.Organization.ID.String(),
 		canvas.ID.String(),
 		"",
-		grpcCanvases.CanvasYAMLRepositoryPath,
+		canvasRepository.CanvasYAMLRepositoryPath,
 	)
 	require.NoError(t, err)
 
-	input, err := json.Marshal(map[string]string{
-		"action":      "update_draft",
-		"canvas_yaml": canvasYAML,
-	})
-	require.NoError(t, err)
-
-	tool := NewSuperPlaneCanvasTool(SuperPlaneCanvasToolOptions{
+	registry := NewDefaultRegistry(Dependencies{
 		Encryptor:      r.Encryptor,
 		Registry:       r.Registry,
 		AuthService:    r.AuthService,
@@ -138,17 +133,17 @@ func TestSuperPlaneCanvasTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
 		WebhookBaseURL: "https://hooks.example.test",
 	})
 
-	result := tool.ExecuteCustomTool(context.Background(), agents.AgentSessionContext{
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
-	}, agents.CustomToolUse{
-		ID:    "tool-1",
-		Name:  SuperPlaneCanvasToolName,
-		Input: string(input),
+	}, Input{
+		Action:     "update_draft",
+		CanvasYAML: canvasYAML,
 	})
 
-	assert.True(t, result.IsError)
-	assert.Contains(t, result.Content, "canvas node limit exceeded")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "canvas node limit exceeded")
 }

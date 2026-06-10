@@ -1,4 +1,4 @@
-package tools
+package agenttools
 
 import (
 	"context"
@@ -14,51 +14,75 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const SuperPlaneComponentSchemaToolName = "superplane_component_schema"
+const ComponentSchemaAgentToolName = "superplane_component_schema"
 
 const (
 	componentSchemaDefaultLimit = 40
 	componentSchemaExampleLimit = 1600
 )
 
-type SuperPlaneComponentSchemaTool struct {
+func init() {
+	Register[superPlaneComponentSchemaInput](ComponentSchemaAgentToolName, func(deps Dependencies) AgentTool[superPlaneComponentSchemaInput] {
+		return NewComponentSchemaAgentTool(deps.ComponentRegistry)
+	})
+}
+
+var _ AgentTool[superPlaneComponentSchemaInput] = (*ComponentSchemaAgentTool)(nil)
+
+type ComponentSchemaAgentTool struct {
 	registry *registry.Registry
 }
 
-func NewSuperPlaneComponentSchemaTool(registry *registry.Registry) *SuperPlaneComponentSchemaTool {
-	return &SuperPlaneComponentSchemaTool{registry: registry}
+func NewComponentSchemaAgentTool(registry *registry.Registry) *ComponentSchemaAgentTool {
+	return &ComponentSchemaAgentTool{registry: registry}
 }
 
-func (t *SuperPlaneComponentSchemaTool) CustomToolName() string {
-	return SuperPlaneComponentSchemaToolName
+func (t *ComponentSchemaAgentTool) Name() string {
+	return ComponentSchemaAgentToolName
 }
 
-func (t *SuperPlaneComponentSchemaTool) ExecuteCustomTool(_ context.Context, _ agents.AgentSessionContext, toolUse agents.CustomToolUse) agents.CustomToolResult {
-	if toolUse.Name != SuperPlaneComponentSchemaToolName {
-		return customToolError(toolUse.ID, fmt.Sprintf("unsupported custom tool %q", toolUse.Name))
+func (t *ComponentSchemaAgentTool) Description() string {
+	return "Lookup exact SuperPlane component, trigger, and widget schemas from the backend registry without reading mounted reference files. Use this before read/grep commands or researcher delegation when you need YAML component keys, configuration fields, output channel names, integration requirements, or compact examples. Prefer this tool for repeated schema lookups; mounted docs are fallback only."
+}
+
+func (t *ComponentSchemaAgentTool) InputSchema() agents.CustomToolInputSchema {
+	return agents.CustomToolInputSchema{
+		Type: "object",
+		Properties: map[string]agents.CustomToolInputSchema{
+			"component_keys": {
+				Type:        "array",
+				Description: "Exact component, trigger, or widget keys to look up, for example schedule, http, wait, slack.waitForButtonClick.",
+				Items:       &agents.CustomToolInputSchema{Type: "string"},
+			},
+			"vendors": {
+				Type:        "array",
+				Description: "Vendor names to list schemas for, for example slack, github, grafana.",
+				Items:       &agents.CustomToolInputSchema{Type: "string"},
+			},
+			"query": {
+				Type:        "string",
+				Description: "Search term used against component keys, labels, descriptions, kind, and required integration vendor.",
+			},
+			"include_examples": {
+				Type:        "boolean",
+				Description: "Include compact example input/output payloads when available. Honored only for exact component_keys lookups; broad vendor and query lookups stay compact.",
+			},
+			"limit": {
+				Type:        "integer",
+				Description: "Maximum schemas to return. Defaults to 40 and is capped at 40.",
+			},
+		},
 	}
+}
+
+func (t *ComponentSchemaAgentTool) Call(_ context.Context, _ agents.AgentSessionContext, input superPlaneComponentSchemaInput) (Result, error) {
 	if t.registry == nil {
-		return customToolError(toolUse.ID, "component schema registry is not configured")
+		return Result{}, fmt.Errorf("component schema registry is not configured")
 	}
-
-	var input superPlaneComponentSchemaInput
-	if err := json.Unmarshal([]byte(toolUse.Input), &input); err != nil {
-		return customToolError(toolUse.ID, fmt.Sprintf("invalid input: %v", err))
-	}
-
-	payload := t.lookup(input)
-	content, err := json.Marshal(payload)
-	if err != nil {
-		return customToolError(toolUse.ID, fmt.Sprintf("encode result: %v", err))
-	}
-
-	return agents.CustomToolResult{
-		CustomToolUseID: toolUse.ID,
-		Content:         string(content),
-	}
+	return Result{Payload: t.lookup(input)}, nil
 }
 
-func (t *SuperPlaneComponentSchemaTool) lookup(input superPlaneComponentSchemaInput) superPlaneComponentSchemaResult {
+func (t *ComponentSchemaAgentTool) lookup(input superPlaneComponentSchemaInput) superPlaneComponentSchemaResult {
 	limit := input.Limit
 	if limit <= 0 || limit > componentSchemaDefaultLimit {
 		limit = componentSchemaDefaultLimit
@@ -130,7 +154,7 @@ func (t *SuperPlaneComponentSchemaTool) lookup(input superPlaneComponentSchemaIn
 	}
 }
 
-func (t *SuperPlaneComponentSchemaTool) lookupComponent(key string, includeExamples bool) (superPlaneComponentSchema, error) {
+func (t *ComponentSchemaAgentTool) lookupComponent(key string, includeExamples bool) (superPlaneComponentSchema, error) {
 	if action, err := t.registry.GetAction(key); err == nil {
 		return actionSchema(action, integrationVendor(key), includeExamples), nil
 	}
@@ -143,7 +167,7 @@ func (t *SuperPlaneComponentSchemaTool) lookupComponent(key string, includeExamp
 	return superPlaneComponentSchema{}, fmt.Errorf("component %s not found", key)
 }
 
-func (t *SuperPlaneComponentSchemaTool) vendorComponents(vendor string, includeExamples bool) []superPlaneComponentSchema {
+func (t *ComponentSchemaAgentTool) vendorComponents(vendor string, includeExamples bool) []superPlaneComponentSchema {
 	integration, err := t.registry.GetIntegration(vendor)
 	if err != nil {
 		return nil
@@ -160,7 +184,7 @@ func (t *SuperPlaneComponentSchemaTool) vendorComponents(vendor string, includeE
 	return components
 }
 
-func (t *SuperPlaneComponentSchemaTool) allComponents(includeExamples bool) []superPlaneComponentSchema {
+func (t *ComponentSchemaAgentTool) allComponents(includeExamples bool) []superPlaneComponentSchema {
 	components := []superPlaneComponentSchema{}
 	for _, trigger := range t.registry.ListTriggers() {
 		components = append(components, triggerSchema(trigger, "", includeExamples))

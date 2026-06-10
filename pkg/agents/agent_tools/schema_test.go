@@ -1,8 +1,7 @@
-package tools
+package agenttools
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +14,7 @@ import (
 
 var _ = registryimports.Loaded
 
-func TestSuperPlaneComponentSchemaTool_ReturnsExactSlackSchema(t *testing.T) {
+func TestComponentSchemaAgentTool_ReturnsExactSlackSchema(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -35,7 +34,7 @@ func TestSuperPlaneComponentSchemaTool_ReturnsExactSlackSchema(t *testing.T) {
 	assert.NotContains(t, result.Notes, "Use output_channels.name exactly in edge sourceName values; labels are display-only.")
 }
 
-func TestSuperPlaneComponentSchemaTool_ReturnsCoreComponentSchema(t *testing.T) {
+func TestComponentSchemaAgentTool_ReturnsCoreComponentSchema(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -55,7 +54,7 @@ func TestSuperPlaneComponentSchemaTool_ReturnsCoreComponentSchema(t *testing.T) 
 	assert.Contains(t, outputChannelNames(component.OutputChannels), "default")
 }
 
-func TestSuperPlaneComponentSchemaTool_ReturnsVendorComponents(t *testing.T) {
+func TestComponentSchemaAgentTool_ReturnsVendorComponents(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -73,7 +72,7 @@ func TestSuperPlaneComponentSchemaTool_ReturnsVendorComponents(t *testing.T) {
 	}
 }
 
-func TestSuperPlaneComponentSchemaTool_ReportsMissingKeys(t *testing.T) {
+func TestComponentSchemaAgentTool_ReportsMissingKeys(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -84,7 +83,7 @@ func TestSuperPlaneComponentSchemaTool_ReportsMissingKeys(t *testing.T) {
 	assert.Equal(t, []string{"missing.component"}, result.Missing)
 }
 
-func TestSuperPlaneComponentSchemaTool_ReportsOmittedValidKeysWhenLimited(t *testing.T) {
+func TestComponentSchemaAgentTool_ReportsOmittedValidKeysWhenLimited(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -100,7 +99,7 @@ func TestSuperPlaneComponentSchemaTool_ReportsOmittedValidKeysWhenLimited(t *tes
 	assert.Contains(t, result.Notes, "Result was truncated by limit; request omitted component_keys explicitly or raise limit up to 40 if you need more.")
 }
 
-func TestSuperPlaneComponentSchemaTool_ReportsOmittedVendorMatchesWhenLimited(t *testing.T) {
+func TestComponentSchemaAgentTool_ReportsOmittedVendorMatchesWhenLimited(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -116,7 +115,7 @@ func TestSuperPlaneComponentSchemaTool_ReportsOmittedVendorMatchesWhenLimited(t 
 	}
 }
 
-func TestSuperPlaneComponentSchemaTool_ReportsOmittedQueryMatchesWhenLimited(t *testing.T) {
+func TestComponentSchemaAgentTool_ReportsOmittedQueryMatchesWhenLimited(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
 	result := executeComponentSchemaTool(t, tool, superPlaneComponentSchemaInput{
@@ -132,29 +131,21 @@ func TestSuperPlaneComponentSchemaTool_ReportsOmittedQueryMatchesWhenLimited(t *
 	}
 }
 
-func newComponentSchemaTool(t *testing.T) *SuperPlaneComponentSchemaTool {
+func newComponentSchemaTool(t *testing.T) *ComponentSchemaAgentTool {
 	t.Helper()
 
 	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
-	return NewSuperPlaneComponentSchemaTool(reg)
+	return NewComponentSchemaAgentTool(reg)
 }
 
-func executeComponentSchemaTool(t *testing.T, tool *SuperPlaneComponentSchemaTool, input superPlaneComponentSchemaInput) superPlaneComponentSchemaResult {
+func executeComponentSchemaTool(t *testing.T, tool *ComponentSchemaAgentTool, input superPlaneComponentSchemaInput) superPlaneComponentSchemaResult {
 	t.Helper()
 
-	data, err := json.Marshal(input)
+	toolResult, err := tool.Call(context.Background(), agents.AgentSessionContext{}, input)
 	require.NoError(t, err)
-
-	toolResult := tool.ExecuteCustomTool(context.Background(), agents.AgentSessionContext{}, agents.CustomToolUse{
-		ID:    "toolu_schema",
-		Name:  SuperPlaneComponentSchemaToolName,
-		Input: string(data),
-	})
-	require.False(t, toolResult.IsError)
-
-	var result superPlaneComponentSchemaResult
-	require.NoError(t, json.Unmarshal([]byte(toolResult.Content), &result))
+	result, ok := toolResult.Payload.(superPlaneComponentSchemaResult)
+	require.True(t, ok)
 	return result
 }
 
