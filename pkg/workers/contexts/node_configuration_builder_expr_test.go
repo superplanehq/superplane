@@ -37,6 +37,22 @@ func TestNodeConfigurationBuilder_ResolveExpressionWithExtraVariables_RejectsRes
 	require.Contains(t, err.Error(), "reserved")
 }
 
+func TestNodeConfigurationBuilder_ResolveExpression_RunWithoutRunContext(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
+
+	_, err := b.ResolveExpression(`run()`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no run found")
+}
+
+func TestNodeConfigurationBuilder_ResolveExpression_RunRejectsArguments(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
+
+	_, err := b.ResolveExpression(`run(1)`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "run() takes no arguments")
+}
+
 func TestNodeConfigurationBuilder_ResolveExpression_UsesConfiguredExpressionVariables(t *testing.T) {
 	b := NewNodeConfigurationBuilder(nil, uuid.Nil).
 		WithInput(map[string]any{}).

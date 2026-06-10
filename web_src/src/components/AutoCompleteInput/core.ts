@@ -75,6 +75,12 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
       "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
     example: "previous(2).data.image.version",
   },
+  {
+    name: "run",
+    snippet: "run().",
+    description: "Returns the current run, exposing its id, url, and started_at.",
+    example: "run().url",
+  },
   // String
   {
     name: "trim",
