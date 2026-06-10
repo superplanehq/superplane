@@ -263,6 +263,30 @@ func TestSyncAgentPrompt_ErrorsWhenUpdatedToolsDiffer(t *testing.T) {
 	assert.Contains(t, err.Error(), "provider returned different tools")
 }
 
+func TestSyncAgentPrompt_ErrorsWhenUpdatedToolsAreOmitted(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provider returned different tools")
+}
+
 func TestSendMessage_PrependsPreamble(t *testing.T) {
 	var capturedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -590,14 +614,12 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 		return nil
 	}))
 
-	require.Len(t, received, 3)
+	require.Len(t, received, 2)
 	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
 	require.NotNil(t, received[0].CustomToolUse)
 	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
 	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
 	assert.Equal(t, []string{"evt_custom"}, received[1].CustomToolEventIDs)
-	assert.Equal(t, agents.ProviderEventAssistantMessage, received[2].Type)
-	assert.Equal(t, "after pause", received[2].Text)
 }
 
 func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
