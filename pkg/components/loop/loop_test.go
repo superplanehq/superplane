@@ -114,6 +114,23 @@ func TestLoopStartLoop(t *testing.T) {
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 }
 
+func TestReadMetadataFromPersistedJSON(t *testing.T) {
+	startedAt := time.Now().Add(-3 * time.Second).UTC().Format(time.RFC3339Nano)
+	md, err := readMetadata(&core.ExecutionContext{
+		Metadata: &contexts.MetadataContext{
+			Metadata: map[string]any{
+				"iteration": float64(2),
+				"active":    true,
+				"startedAt": startedAt,
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 2, md.Iteration)
+	assert.True(t, md.Active)
+	assert.False(t, md.StartedAt.IsZero())
+}
+
 func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 	component := &Loop{}
 	anchorMetadata := &contexts.MetadataContext{
@@ -394,6 +411,27 @@ func (s *scheduledRequestContext) ScheduleActionCall(actionName string, paramete
 	s.actionName = actionName
 	s.interval = interval
 	return nil
+}
+
+func TestLoopExampleOutput(t *testing.T) {
+	component := &Loop{}
+	output := component.ExampleOutput()
+
+	next, ok := output["next"].(map[string]any)
+	require.True(t, ok)
+	nextData, ok := next["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, PayloadTypeNext, next["type"])
+	assert.Equal(t, 1, nextData["iteration"])
+
+	done, ok := output["done"].(map[string]any)
+	require.True(t, ok)
+	doneData, ok := done["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, PayloadTypeDone, done["type"])
+	assert.Equal(t, 3, doneData["iterations"])
+	assert.Equal(t, StopReasonConditionMet, doneData["stopReason"])
+	assert.Equal(t, int64(4521), doneData["elapsedMs"])
 }
 
 func TestLoopExecuteIsNoOp(t *testing.T) {

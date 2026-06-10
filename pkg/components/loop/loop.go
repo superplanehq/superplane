@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -420,8 +421,13 @@ func evaluateUntil(expression string, expressions core.ExpressionContext) (bool,
 }
 
 func readMetadata(executionCtx *core.ExecutionContext) (ExecutionMetadata, error) {
+	raw, err := json.Marshal(executionCtx.Metadata.Get())
+	if err != nil {
+		return ExecutionMetadata{}, fmt.Errorf("failed to marshal loop metadata: %w", err)
+	}
+
 	md := ExecutionMetadata{}
-	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &md); err != nil {
+	if err := json.Unmarshal(raw, &md); err != nil {
 		return ExecutionMetadata{}, fmt.Errorf("failed to decode loop metadata: %w", err)
 	}
 	return md, nil

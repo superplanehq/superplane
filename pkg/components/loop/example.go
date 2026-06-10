@@ -1,18 +1,18 @@
 package loop
 
-import (
-	_ "embed"
-	"sync"
-
-	"github.com/superplanehq/superplane/pkg/utils"
-)
-
-//go:embed example_output.json
-var exampleOutputBytes []byte
-
-var exampleOutputOnce sync.Once
-var parsedExampleOutput map[string]any
+const exampleTimestamp = "2026-01-16T17:56:16.680755501Z"
 
 func exampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputBytes, &parsedExampleOutput)
+	return map[string]any{
+		"next": map[string]any{
+			"type":      PayloadTypeNext,
+			"data":      nextPayload(1, defaultMaxIterations),
+			"timestamp": exampleTimestamp,
+		},
+		"done": map[string]any{
+			"type":      PayloadTypeDone,
+			"data":      donePayload(3, StopReasonConditionMet, 4521),
+			"timestamp": exampleTimestamp,
+		},
+	}
 }
