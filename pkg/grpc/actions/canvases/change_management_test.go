@@ -19,13 +19,6 @@ func Test__IsChangeManagementEnabledForCanvas(t *testing.T) {
 		assert.False(t, enabled)
 	})
 
-	t.Run("template canvas returns false", func(t *testing.T) {
-		canvas := &models.Canvas{IsTemplate: true, OrganizationID: r.Organization.ID, ChangeManagementEnabled: true}
-		enabled, err := isChangeManagementEnabledForCanvasInTransaction(database.Conn(), canvas)
-		require.NoError(t, err)
-		assert.False(t, enabled)
-	})
-
 	t.Run("organization change management enabled overrides canvas setting", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		canvas.ChangeManagementEnabled = false

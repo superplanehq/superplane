@@ -148,10 +148,6 @@ func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
 		return nil, err
 	}
 
-	if canvas.Metadata.GetIsTemplate() {
-		return nil, fmt.Errorf("canvas templates cannot be installed")
-	}
-
 	canvas.Metadata.Id = ""
 
 	return canvas, nil

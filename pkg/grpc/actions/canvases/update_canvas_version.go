@@ -81,10 +81,6 @@ func UpdateCanvasVersionWithUsage(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
