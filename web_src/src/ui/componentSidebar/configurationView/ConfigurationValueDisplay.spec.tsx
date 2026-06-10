@@ -47,4 +47,17 @@ describe("ConfigurationValueDisplay", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("javascript:alert(1)").tagName).toBe("SPAN");
   });
+
+  it("preserves newlines in monospace code fallback", () => {
+    renderRow({
+      key: "script",
+      label: "Script",
+      kind: "code",
+      displayText: "line one\nline two",
+    });
+
+    const value = screen.getByText(/line one/);
+    expect(value).toHaveClass("whitespace-pre-wrap");
+    expect(value.textContent).toBe("line one\nline two");
+  });
 });
