@@ -84,7 +84,7 @@ export function ConfigurationValueDisplay({ row, className }: ConfigurationValue
   return (
     <span
       className={cn(
-        "min-w-0 break-all text-gray-800 dark:text-gray-100",
+        "min-w-0 whitespace-pre-wrap break-words text-gray-800 dark:text-gray-100",
         isMonospace && "font-mono text-[12px]",
         className,
       )}
