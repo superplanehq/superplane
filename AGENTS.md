@@ -105,10 +105,11 @@ The dev environment is entirely Docker-based. The VM needs Docker installed (wit
 ### Key gotchas
 
 - The `app` container starts with `sleep infinity` by default. You must explicitly run `make dev.server` to start the API + UI stack.
-- All `make` commands must be run from the `/agent/repos/superplane` directory.
+- All `make` commands must be run from the repository root (`/workspace` in cloud VMs).
 - The Docker daemon must be started manually in cloud VMs: `sudo dockerd &>/tmp/dockerd.log &` — wait ~3-4 seconds before issuing Docker commands.
 - After Docker daemon starts, ensure the socket is accessible: `sudo chmod 666 /var/run/docker.sock`.
 - Owner setup is enabled by default (`OWNER_SETUP_ENABLED=yes`). On first UI load at `http://localhost:8000`, you'll be prompted to create an admin account with email/password.
 - `BLOCK_SIGNUP=yes` is the default, so only the owner setup flow works for account creation (no open registration).
 - If `make dev.setup` fails on `go mod download` with missing files, run `make dev.clean.go.cache` then `make dev.setup.go`.
 - The `make dev.setup` Makefile target already creates and migrates both `superplane_dev` and `superplane_test` databases.
+- On a fresh cloud VM, start the Docker daemon (`sudo dockerd &>/tmp/dockerd.log &`, then `sudo chmod 666 /var/run/docker.sock`) before any `make` targets. The VM update script runs `make dev.up` and `make dev.setup`; run `make dev.server` separately to start the API + UI after setup.
