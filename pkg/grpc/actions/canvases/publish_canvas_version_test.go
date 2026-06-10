@@ -22,7 +22,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := PublishCanvasVersion(
 			context.Background(),
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -35,7 +35,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		_, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), "invalid-id", uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -48,7 +48,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		_, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), uuid.New().String(), "invalid-id",
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -61,7 +61,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		_, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -80,7 +80,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, canvas.LiveVersionID.String(),
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -103,7 +103,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -119,7 +119,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -137,7 +137,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		resp, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -179,7 +179,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -210,7 +210,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -248,7 +248,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -276,7 +276,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		resp, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -317,7 +317,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err = PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
@@ -357,7 +357,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 
 		_, err := PublishCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry,
+			r.Encryptor, r.Registry, nil,
 			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
