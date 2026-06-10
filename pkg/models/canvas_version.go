@@ -370,6 +370,25 @@ func NextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string,
 	return fmt.Sprintf("Draft #%d", number), nil
 }
 
+func CreateDraftBranchFromLive(
+	canvasID uuid.UUID,
+	userID uuid.UUID,
+	displayName string,
+	nodes []Node,
+	edges []Edge,
+) (*CanvasVersion, error) {
+	var draft *CanvasVersion
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		created, createErr := CreateDraftBranchFromLiveInTransaction(tx, canvasID, userID, displayName, nodes, edges)
+		draft = created
+		return createErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return draft, nil
+}
+
 func CreateDraftBranchFromLiveInTransaction(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
