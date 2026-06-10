@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,7 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetRequest(r)
 		scope.SetTag("status", strconv.Itoa(status))
+		scope.SetTag("http.path", r.URL.Path)
 		hub.Recover(recovered)
 		hub.Flush(2 * time.Second)
 	})
@@ -113,11 +115,35 @@ func captureHTTPError(r *http.Request, status int) {
 		return
 	}
 
+	// Redact UUID-shaped IDs from the URL path so errors from different
+	// integrations (or other resources) collapse into a single Sentry issue
+	// rather than creating a new one per UUID.
+	groupingPath := groupingPathForRequest(r)
+
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetRequest(r)
 		scope.SetTag("status", strconv.Itoa(status))
-		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+		scope.SetTag("http.path", r.URL.Path)
+		scope.SetLevel(sentry.LevelWarning)
+		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, groupingPath))
 	})
+}
+
+// uuidPattern matches canonical UUID strings (e.g. 8-4-4-4-12 hex segments)
+// commonly used as path parameters in the SuperPlane API.
+var uuidPattern = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
+
+// groupingPathForRequest returns a path suitable for Sentry issue grouping.
+// It redacts UUID-shaped path segments so that the same logical endpoint
+// produces a single Sentry issue regardless of the concrete identifiers in
+// the URL (e.g. /integrations/{id}/webhook rather than one issue per
+// integration UUID).
+func groupingPathForRequest(r *http.Request) string {
+	return redactPathIDs(r.URL.Path)
+}
+
+func redactPathIDs(path string) string {
+	return uuidPattern.ReplaceAllString(path, "{id}")
 }
 
 func shouldLogRequest(path string) bool {
