@@ -17,6 +17,7 @@ import {
   type MarkdownVariable,
   type MarkdownVariableDirection,
   type MarkdownVariableMatch,
+  type MarkdownVariableMode,
   type MarkdownVariableSource,
 } from "./panelTypes";
 import type { MarkdownVariableError } from "./useMarkdownVariables";
@@ -355,6 +356,90 @@ function MemorySourceControls({
       </div>
 
       <MemoryMatchesEditor matches={source.matches ?? []} onChange={(next) => onChange({ ...source, matches: next })} />
+
+      <MemoryResultControls source={source} onChange={onChange} />
+    </div>
+  );
+}
+
+const RESULT_MODE_LABELS: Record<MarkdownVariableMode, string> = {
+  single: "Single row",
+  list: "List of rows",
+};
+
+function MemoryResultControls({
+  source,
+  onChange,
+}: {
+  source: MarkdownMemoryVariableSource;
+  onChange: (next: MarkdownMemoryVariableSource) => void;
+}) {
+  const mode: MarkdownVariableMode = source.mode === "list" ? "list" : "single";
+
+  const handleModeChange = (next: MarkdownVariableMode) => {
+    if (next === "single") {
+      // Strip `mode` / `limit` so single-row variables keep the minimal YAML
+      // they had before list mode existed.
+      const { mode: _mode, limit: _limit, ...rest } = source;
+      void _mode;
+      void _limit;
+      onChange(rest);
+      return;
+    }
+    onChange({ ...source, mode: "list" });
+  };
+
+  const handleLimitChange = (raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      const { limit: _limit, ...rest } = source;
+      void _limit;
+      onChange(rest);
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+      // Keep what the author is typing locally; persisted state stays clean
+      // until the value parses as a positive integer. The validator will
+      // surface a precise error on save if they try to commit garbage.
+      return;
+    }
+    onChange({ ...source, mode: "list", limit: parsed });
+  };
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-[11px] font-medium text-slate-600">Result</Label>
+      <Select value={mode} onValueChange={(value) => handleModeChange(value as MarkdownVariableMode)}>
+        <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-memory-mode">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="single">{RESULT_MODE_LABELS.single}</SelectItem>
+          <SelectItem value="list">{RESULT_MODE_LABELS.list}</SelectItem>
+        </SelectContent>
+      </Select>
+      {mode === "list" ? (
+        <div className="space-y-1 pt-1">
+          <Label className="text-[11px] font-medium text-slate-600">Limit</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={source.limit ?? ""}
+            onChange={(e) => handleLimitChange(e.target.value)}
+            placeholder="All matching rows"
+            className="h-7 text-[12px]"
+            aria-label="Limit list to N rows"
+            data-testid="markdown-variable-memory-limit"
+          />
+          <p className="text-[11px] text-slate-400">
+            Leave empty to include every match. Use CEL list ops like{" "}
+            <code className="rounded bg-slate-100 px-1 text-[10px]">name.map(r, r.field)</code> in {"{{ }}"}.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
