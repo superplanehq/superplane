@@ -33,7 +33,6 @@ const (
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
-var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
@@ -105,7 +104,8 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 
 // dispatch acquires a concurrency slot and the per-session stream lock before
 // ACKing the queue message. If another worker already owns the session lock,
-// it returns an error so the message can be retried instead of dropped.
+// the duplicate request can be dropped because the active stream is already
+// responsible for draining provider events.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	select {
 	case w.slots <- struct{}{}:
@@ -219,8 +219,8 @@ func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedA
 		return nil, fmt.Errorf("agent stream: acquire session lock: %w", err)
 	}
 	if !locked {
-		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, retrying request later")
-		return nil, errAgentStreamAlreadyLocked
+		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, dropping duplicate request")
+		return nil, nil
 	}
 
 	return &lockedAgentStreamRequest{

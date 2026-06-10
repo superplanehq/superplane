@@ -116,7 +116,7 @@ func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.
 	return session
 }
 
-func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
+func TestAgentStreamWorker_DropsDuplicateRequestWhenSessionLockIsHeld(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -141,8 +141,7 @@ func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
 	<-provider.streamReady
 
 	err := w.Handle(context.Background(), body)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already in progress")
+	require.NoError(t, err)
 
 	close(provider.release)
 	require.NoError(t, <-firstDone)
