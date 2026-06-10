@@ -17,6 +17,7 @@ live console and writes always target your draft version.`,
 	var getDraft bool
 	var getDraftID string
 	var getVersionID string
+	var getNoStage bool
 	getCmd := &cobra.Command{
 		Use:   "get [app-name-or-id]",
 		Short: "Get the console for an app",
@@ -31,12 +32,14 @@ configured with "superplane apps active" is used.`,
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "read the current user's draft console instead of the live console")
 	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
 	getCmd.Flags().StringVar(&getVersionID, "version-id", "", "alias for --draft-id")
-	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID}, options)
+	getCmd.Flags().BoolVar(&getNoStage, "no-stage", false, "read the last committed draft console, ignoring uncommitted staging")
+	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID, noStage: &getNoStage}, options)
 
 	var setFile string
 	var setDraftOnly bool
 	var setDraftID string
 	var setVersionID string
+	var setStageOnly bool
 	setCmd := &cobra.Command{
 		Use:   "set [app-name-or-id] [file]",
 		Short: "Replace the console draft with YAML",
@@ -61,7 +64,8 @@ YAML source resolution order:
 	setCmd.Flags().BoolVar(&setDraftOnly, "draft", false, "update the draft only; do not create a change request when change management is enabled")
 	setCmd.Flags().StringVar(&setDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
 	setCmd.Flags().StringVar(&setVersionID, "version-id", "", "alias for --draft-id")
-	core.Bind(setCmd, &setCommand{file: &setFile, draftOnly: &setDraftOnly, draftID: &setDraftID, versionID: &setVersionID}, options)
+	setCmd.Flags().BoolVar(&setStageOnly, "stage-only", false, "stage the YAML without committing to the draft version row")
+	core.Bind(setCmd, &setCommand{file: &setFile, draftOnly: &setDraftOnly, draftID: &setDraftID, versionID: &setVersionID, stageOnly: &setStageOnly}, options)
 
 	root.AddCommand(getCmd)
 	root.AddCommand(setCmd)

@@ -20,7 +20,7 @@ When building or modifying apps:
 3. Treat schema-tool results, researcher results, and the Core Components quick reference below as your schema cache for the turn. Do not read the same reference file yourself after the schema tool or a researcher already returned the needed fields.
 4. Apply the draft update and verify once. `superplane_canvas.update_draft` auto-layouts graph changes by default; do not spend extra tool calls calculating manual node positions unless the user asked for a specific layout.
 
-For Console edits, prefer `superplane_canvas` with `include_console: true`, then update with `console_yaml`. Use CLI console get/set only as a fallback if the custom tool fails.
+For Console edits, read the draft once with `superplane apps console get <app_id> --draft-id <id> -o yaml` (effective staged YAML by default), then apply with `superplane apps console set --draft-id <id> --stage-only -f /tmp/console.yaml`. Read `/mnt/session/uploads/ref/skills/superplane-cli/references/console-yaml-spec.md` for the YAML envelope and `/mnt/session/uploads/ref/docs/prd/console-and-widgets.md` for widget behavior.
 
 Avoid repeated CLI fetch commands against the same draft. Fetch once, save locally, inspect with local tools, re-fetch only after an update.
 
@@ -308,11 +308,11 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 1. **Understand + schema lookup in parallel** — as soon as the user describes their task, call `superplane_component_schema` for likely components/vendors while asking clarifying questions
 2. **Design** — show mermaid diagram + :::rubric spec (you should already have schemas from step 1)
 3. **Wait for user** — user clicks "Start Building" or says yes
-4. **Use cached schemas** — by approval time you should already have the YAML/component fields from `superplane_component_schema`, researchers, or the quick reference. Do not read reference files again unless validation returns an unfamiliar field/channel error.
-5. **Build** — write app YAML to /tmp/canvas.yaml and Console YAML to /tmp/console.yaml when needed
-6. **Apply** — prefer `superplane_canvas` action `update_draft`; graph updates auto-layout by default. Use `superplane apps canvas update --draft -f /tmp/canvas.yaml` and `superplane apps console set --draft -f /tmp/console.yaml` only as a fallback
-7. **Verify** — after updates, prefer `superplane_canvas` action `read` for the draft; use one CLI `apps canvas get --draft -o yaml` or `apps console get --draft -o yaml` only as a fallback
-8. **Output** — :::draft-actions with version ID and summary using node chips
+4. **Read YAML specs** — read `/mnt/session/uploads/ref/skills/superplane-cli/references/app-yaml-spec.md`; if changing Console, also read `/mnt/session/uploads/ref/skills/superplane-cli/references/console-yaml-spec.md` and `/mnt/session/uploads/ref/docs/prd/console-and-widgets.md`
+5. **Build** — on the first change this session, create your session draft (`superplane apps drafts create <app_id>`); write app YAML to /tmp/canvas.yaml and Console YAML to /tmp/console.yaml when needed
+6. **Apply** — using your session draft id: `superplane apps canvas update --draft-id <id> --stage-only -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <id> --stage-only -f /tmp/console.yaml` for Console changes
+7. **Verify** — after updates, run one `superplane apps canvas get <id> --draft-id <id> -o yaml` or `superplane apps console get <id> --draft-id <id> -o yaml` (effective staged YAML), save the result locally, and check for errors locally
+8. **Output** — :::draft-actions with version ID and summary using node chips (staged draft ready for user commit)
 
 Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` for the complete workflow with positioning rules.
 
@@ -331,7 +331,7 @@ When the user clicks "Start Building", you receive a message "Specs approved. St
 |--------|-------------|
 | `:::buttons` | Single-choice options. Include a question line before options. |
 | `:::survey` | Multi-question form. `[input]` adds free-text field. |
-| `:::draft-actions` | After successful app update. Print in chat, not as file. |
+| `:::draft-actions` | After successful staged app update. Print in chat, not as file. |
 | `:::chart` | Run history, metrics, analytics. |
 | `:::collapse` | Any output longer than 20 lines. |
 | `:::success / :::error` | Final operation outcomes. |
@@ -345,6 +345,9 @@ The rich-ui-widgets skill has the full syntax.
 
 ## App Update Rules
 
-- **ALWAYS** update drafts only. Prefer `superplane_canvas` action `update_draft`; if using CLI fallback, use `--draft`: `superplane apps canvas update <id> --draft -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft -f /tmp/console.yaml` for Console changes
-- After successful draft updates, output `:::draft-actions` with the version ID
-- After update, verify once with `superplane_canvas` action `read`; use CLI get commands only as fallback
+- **ALWAYS** stage drafts by id with `--stage-only`, never live directly: `superplane apps canvas update <id> --draft-id <uuid> --stage-only -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <uuid> --stage-only -f /tmp/console.yaml` for Console changes
+- **NEVER** run `superplane apps drafts staging commit`, publish commands, or change-request publish flows
+- On the first change this session, create a fresh draft (`apps drafts create <app_id>`) regardless of existing drafts; reuse that same session draft id for all later changes
+- After successful staged updates, output `:::draft-actions` with the version ID from the CLI response
+- After update, verify once with `apps canvas get --draft-id <uuid> -o yaml` or `apps console get --draft-id <uuid> -o yaml` (effective staged YAML by default)
+

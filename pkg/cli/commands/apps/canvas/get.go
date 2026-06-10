@@ -14,6 +14,7 @@ type getCommand struct {
 	draft     *bool
 	draftID   *string
 	versionID *string
+	noStage   *bool
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -61,7 +62,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID)
+	useStagedRead := useDraft && (c.noStage == nil || !*c.noStage)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID, useStagedRead)
 	if err != nil {
 		return err
 	}
@@ -96,7 +98,11 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		source := "live"
 		if useDraft {
-			source = "draft"
+			if useStagedRead {
+				source = "draft (staged)"
+			} else {
+				source = "draft (committed)"
+			}
 		}
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())

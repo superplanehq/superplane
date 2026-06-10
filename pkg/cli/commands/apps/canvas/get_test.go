@@ -154,9 +154,10 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testGetCanvasID, "draft-1"),
-		expectFetchCanvasYAML(
+		expectFetchCanvasYAMLWithStage(
 			testGetCanvasID,
 			"draft-1",
+			true,
 			"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+testGetCanvasID+"\n  name: "+testGetCanvasName+"\nspec:\n  nodes:\n    - id: node-1\n      name: Trigger\n  edges: []\n",
 		),
 	)
@@ -168,6 +169,7 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 	require.NoError(t, (&getCommand{draft: &draft}).Execute(ctx))
 	require.Contains(t, stdout.String(), "Nodes: 1")
 	require.Contains(t, stdout.String(), "Edges: 0")
+	require.Contains(t, stdout.String(), "Source: draft (staged)")
 }
 
 func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
@@ -239,9 +241,10 @@ func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
 			},
 		},
-		expectFetchCanvasYAML(
+		expectFetchCanvasYAMLWithStage(
 			testGetCanvasID,
 			"draft-2",
+			true,
 			sampleCanvasYAMLBody,
 		),
 	)
@@ -251,8 +254,35 @@ func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
 
 	draftID := "draft-2"
 	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Source: draft")
+	require.Contains(t, stdout.String(), "Source: draft (staged)")
 	require.Contains(t, stdout.String(), "Version ID: draft-2")
+}
+
+func TestGetDraftNoStageReadsCommittedDraft(t *testing.T) {
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasMetadataResponse,
+		},
+		expectMe(),
+		expectListUserDraftBranch(testGetCanvasID, "draft-1"),
+		expectFetchCanvasYAMLWithStage(
+			testGetCanvasID,
+			"draft-1",
+			false,
+			sampleCanvasYAMLBody,
+		),
+	)
+
+	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{testGetCanvasID}
+
+	draft := true
+	noStage := true
+	require.NoError(t, (&getCommand{draft: &draft, noStage: &noStage}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Source: draft (committed)")
 }
 
 func TestGetDraftErrorsWhenMultipleDraftsWithoutID(t *testing.T) {

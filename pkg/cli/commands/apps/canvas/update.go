@@ -21,6 +21,7 @@ type updateCommand struct {
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
+	stageOnly       *bool
 }
 
 func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
@@ -120,7 +121,21 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayout = &defaultLayout
 	}
 
-	if err := common.StageCommitRepositorySpecFile(
+	stageOnly := c.stageOnly != nil && *c.stageOnly
+	if stageOnly {
+		if err := common.StageRepositorySpecFile(
+			ctx,
+			canvasID,
+			targetVersionID,
+			common.CanvasYAMLRepositoryPath,
+			yamlBytes,
+		); err != nil {
+			return err
+		}
+		if err := common.ApplyCanvasAutoLayout(ctx, canvasID, targetVersionID, autoLayout); err != nil {
+			return err
+		}
+	} else if err := common.StageCommitRepositorySpecFile(
 		ctx,
 		canvasID,
 		targetVersionID,
@@ -142,7 +157,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("updated version metadata is missing")
 	}
 
-	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID)
+	readStaged := stageOnly
+	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID, readStaged)
 	if err != nil {
 		return fmt.Errorf("canvas draft updated but failed to read canvas.yaml: %w", err)
 	}
@@ -178,7 +194,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			edgeCount = len(spec.GetEdges())
 		}
 
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		if stageOnly {
+			_, _ = fmt.Fprintf(stdout, "Canvas draft staged: %s\n", metadata.GetId())
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		}
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", nodeCount)
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)

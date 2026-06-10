@@ -49,20 +49,23 @@ func describeCanvasCMEnabledResponse(t *testing.T, w http.ResponseWriter, _ *htt
 	_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testCanvasID + `","name":"` + testCanvasName + `"},"spec":{"changeManagement":{"enabled":true}}}}`))
 }
 
-func repositoryCommitsPath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/repository/commits"
+func stagingFilesPath(canvasID, versionID string) string {
+	return "/api/v1/canvases/" + canvasID + "/versions/" + versionID + "/staging/files"
 }
 
-func expectCommitConsoleYAML(expectedVersionID string) requestExpectation {
+func stagingCommitPath(canvasID, versionID string) string {
+	return "/api/v1/canvases/" + canvasID + "/versions/" + versionID + "/staging/commit"
+}
+
+func expectStageConsoleYAML(expectedVersionID string) requestExpectation {
 	return requestExpectation{
 		method: http.MethodPost,
-		path:   repositoryCommitsPath(testCanvasID),
+		path:   stagingFilesPath(testCanvasID, expectedVersionID),
 		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			var parsed map[string]any
 			require.NoError(t, json.Unmarshal(body, &parsed))
-			require.Equal(t, expectedVersionID, parsed["versionId"])
 			operations, ok := parsed["operations"].([]any)
 			require.True(t, ok)
 			require.NotEmpty(t, operations)
@@ -80,22 +83,43 @@ func expectCommitConsoleYAML(expectedVersionID string) requestExpectation {
 	}
 }
 
+func expectCommitStaging(versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodPost,
+		path:   stagingCommitPath(testCanvasID, versionID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
+		},
+	}
+}
+
 func expectFetchConsoleYAML(versionID string) requestExpectation {
+	return expectFetchConsoleYAMLWithStage(versionID, false)
+}
+
+func expectFetchConsoleYAMLWithStage(versionID string, stage bool) requestExpectation {
 	return requestExpectation{
 		method: http.MethodGet,
 		path:   repositoryConsoleFilePath(testCanvasID),
 		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
 			require.Equal(t, versionID, r.URL.Query().Get("version_id"))
+			if stage {
+				require.Equal(t, "true", r.URL.Query().Get("stage"))
+			} else {
+				require.Empty(t, r.URL.Query().Get("stage"))
+			}
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			_, _ = w.Write([]byte(sampleConsoleYAML))
 		},
 	}
 }
 
-func expectCommitAndFetchConsoleYAML(versionID string) []requestExpectation {
+func expectStageCommitConsoleYAML(versionID string) []requestExpectation {
 	return []requestExpectation{
-		expectCommitConsoleYAML(versionID),
+		expectStageConsoleYAML(versionID),
+		expectCommitStaging(versionID),
 		expectFetchConsoleYAML(versionID),
 	}
 }
@@ -112,7 +136,8 @@ func TestSetFromFileFlag(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -137,7 +162,8 @@ func TestSetFromPositionalFile(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -157,7 +183,8 @@ func TestSetFromStdin(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -180,7 +207,8 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 		expectMe(),
 		expectListDraftBranchesEmpty(testCanvasID),
 		expectCreateDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -193,7 +221,8 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 		http.MethodGet + " " + testMePath,
 		http.MethodGet + " " + draftVersionsPath(testCanvasID),
 		http.MethodPost + " " + draftVersionsPath(testCanvasID),
-		http.MethodPost + " " + repositoryCommitsPath(testCanvasID),
+		http.MethodPost + " " + stagingFilesPath(testCanvasID, "draft-1"),
+		http.MethodPost + " " + stagingCommitPath(testCanvasID, "draft-1"),
 		http.MethodGet + " " + repositoryConsoleFilePath(testCanvasID),
 	})
 }
@@ -212,7 +241,8 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -254,7 +284,8 @@ func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 		requestExpectation{
 			method: http.MethodPost,
@@ -294,7 +325,8 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 		},
 		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
-		expectCommitConsoleYAML("draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectCommitStaging("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
 
@@ -342,6 +374,38 @@ func TestSetRejectsConflictingSources(t *testing.T) {
 	err := (&setCommand{file: strPtr(path)}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not both")
+}
+
+func TestSetStageOnlySkipsCommit(t *testing.T) {
+	path := writeSampleConsoleYAML(t)
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasResponse,
+		},
+		expectMe(),
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectStageConsoleYAML("draft-1"),
+		expectFetchConsoleYAMLWithStage("draft-1", true),
+	)
+
+	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
+	ctx.Args = []string{testCanvasID}
+
+	stageOnly := true
+	require.NoError(t, (&setCommand{file: strPtr(path), stageOnly: &stageOnly}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Console draft staged for app "+testCanvasID)
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " " + testDescribeCanvas,
+		http.MethodGet + " " + testMePath,
+		http.MethodGet + " " + draftVersionsPath(testCanvasID),
+		http.MethodPost + " " + stagingFilesPath(testCanvasID, "draft-1"),
+		http.MethodGet + " " + repositoryConsoleFilePath(testCanvasID),
+	})
 }
 
 func TestSetRequiresYAMLSource(t *testing.T) {

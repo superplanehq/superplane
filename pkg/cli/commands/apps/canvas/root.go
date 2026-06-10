@@ -31,10 +31,12 @@ configured with "superplane apps active" is used.`,
 	var getDraft bool
 	var getDraftID string
 	var getVersionID string
+	var getNoStage bool
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
 	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
 	getCmd.Flags().StringVar(&getVersionID, "version-id", "", "alias for --draft-id")
-	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID}, options)
+	getCmd.Flags().BoolVar(&getNoStage, "no-stage", false, "read the last committed draft version, ignoring uncommitted staging")
+	core.Bind(getCmd, &getCommand{draft: &getDraft, draftID: &getDraftID, versionID: &getVersionID, noStage: &getNoStage}, options)
 
 	var updateFile string
 	var updateDraft bool
@@ -43,6 +45,7 @@ configured with "superplane apps active" is used.`,
 	var updateAutoLayout string
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
+	var updateStageOnly bool
 	updateCmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update a canvas from a YAML file",
@@ -57,6 +60,7 @@ configured with "superplane apps active" is used.`,
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	updateCmd.Flags().BoolVar(&updateStageOnly, "stage-only", false, "stage the YAML without committing to the draft version row")
 	core.Bind(updateCmd, &updateCommand{
 		file:            &updateFile,
 		draft:           &updateDraft,
@@ -65,6 +69,7 @@ configured with "superplane apps active" is used.`,
 		autoLayout:      &updateAutoLayout,
 		autoLayoutScope: &updateAutoLayoutScope,
 		autoLayoutNodes: &updateAutoLayoutNodes,
+		stageOnly:       &updateStageOnly,
 	}, options)
 
 	var initTemplate string

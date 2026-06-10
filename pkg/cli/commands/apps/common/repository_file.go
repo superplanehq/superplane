@@ -18,7 +18,7 @@ const (
 	ConsoleYAMLRepositoryPath = "console.yaml"
 )
 
-func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID string) ([]byte, error) {
+func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID string, stage bool) ([]byte, error) {
 	config := ctx.API.GetConfig()
 	if config == nil {
 		return nil, fmt.Errorf("api client config is required")
@@ -36,6 +36,9 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 	values.Set("path", strings.TrimLeft(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/"))
 	if trimmedVersionID := strings.TrimSpace(versionID); trimmedVersionID != "" {
 		values.Set("version_id", trimmedVersionID)
+	}
+	if stage {
+		values.Set("stage", "true")
 	}
 
 	endpoint := fmt.Sprintf(
@@ -99,6 +102,21 @@ func StageRepositorySpecFile(
 
 	_, _, err := ctx.API.CanvasRepositoryAPI.
 		CanvasesStageCanvasRepositoryFile(ctx.Context, canvasID, versionID).
+		Body(*body).
+		Execute()
+	return err
+}
+
+// DiscardCanvasStaging removes staged spec edits for a draft version. When paths
+// is empty, all staging rows for the draft are discarded.
+func DiscardCanvasStaging(ctx core.CommandContext, canvasID, versionID string, paths []string) error {
+	body := openapi_client.NewCanvasesDiscardCanvasStagingBody()
+	if len(paths) > 0 {
+		body.SetPaths(paths)
+	}
+
+	_, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesDiscardCanvasStaging(ctx.Context, canvasID, versionID).
 		Body(*body).
 		Execute()
 	return err
