@@ -2,14 +2,12 @@ package agents
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.DefineAgentOutcomeRequest) (*pb.DefineAgentOutcomeResponse, error) {
@@ -32,11 +30,13 @@ func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID st
 	}
 
 	if err := svc.DefineOutcome(ctx, org, user, chatID, req.Description, req.Rubric, maxIter); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "agent chat not found")
+		translated := translateAgentServiceError(err, "failed to define agent outcome")
+		if status.Code(translated) == codes.Internal {
+			log.WithError(err).WithField("chat_id", chatID).Error("failed to define agent outcome")
+		} else {
+			log.WithError(err).WithField("chat_id", chatID).Warn("define agent outcome returned non-internal error")
 		}
-		log.WithError(err).WithField("chat_id", chatID).Error("failed to define agent outcome")
-		return nil, status.Error(codes.Internal, "failed to define agent outcome")
+		return nil, translated
 	}
 	return &pb.DefineAgentOutcomeResponse{}, nil
 }
