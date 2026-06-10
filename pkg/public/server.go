@@ -1267,8 +1267,9 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
-				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
-				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+				Notifications:   contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+				CanvasMemory:    contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+				Files: contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 			}, nil
 		},
 	})
