@@ -178,6 +178,7 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
 				require.Equal(t, "draft-1", r.URL.Query().Get("version_id"))
+				require.Equal(t, "true", r.URL.Query().Get("stage"))
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				_, _ = w.Write([]byte("apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\nspec:\n  panels: []\n  layout: []\n"))
 			},
@@ -189,7 +190,7 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 
 	draft := true
 	require.NoError(t, (&getCommand{draft: &draft}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Source: draft")
+	require.Contains(t, stdout.String(), "Source: draft (staged)")
 	require.Contains(t, stdout.String(), "Version ID: draft-1")
 }
 
@@ -267,4 +268,49 @@ func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
 	err := (&getCommand{draft: &draft}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "draft version not found")
+}
+
+func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasResponse,
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testMePath,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + testCanvasID + "/versions/draft-2",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   repositoryConsoleFilePath(testCanvasID),
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
+				require.Equal(t, "draft-2", r.URL.Query().Get("version_id"))
+				require.Equal(t, "true", r.URL.Query().Get("stage"))
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				_, _ = w.Write([]byte(sampleConsoleYAMLBody))
+			},
+		},
+	)
+
+	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
+	ctx.Args = []string{testCanvasID}
+
+	draftID := "draft-2"
+	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Version ID: draft-2")
 }

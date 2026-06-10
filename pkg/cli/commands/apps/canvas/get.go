@@ -11,7 +11,10 @@ import (
 )
 
 type getCommand struct {
-	draft *bool
+	draft     *bool
+	draftID   *string
+	versionID *string
+	noStage   *bool
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -41,16 +44,26 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	canvasName := strings.TrimSpace(described.Metadata.GetName())
 	organizationID := strings.TrimSpace(described.Metadata.GetOrganizationId())
 
-	useDraft := c.draft != nil && *c.draft
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+
+	useDraft := (c.draft != nil && *c.draft) || resolvedDraftID != ""
 	versionID := ""
 	if useDraft {
-		versionID, err = resolveCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: false,
+		})
 		if err != nil {
 			return err
 		}
 	}
 
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID)
+	useStagedRead := useDraft && (c.noStage == nil || !*c.noStage)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID, useStagedRead)
 	if err != nil {
 		return err
 	}
@@ -83,10 +96,22 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		source := "live"
+		if useDraft {
+			if useStagedRead {
+				source = "draft (staged)"
+			} else {
+				source = "draft (committed)"
+			}
+		}
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
 		if url := common.BuildAppURL(ctx, organizationID, canvasID); url != "" {
 			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
+		}
+		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
+		if versionID != "" {
+			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
 		}
 		nodeCount := 0
 		edgeCount := 0
@@ -98,24 +123,4 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)
 		return err
 	})
-}
-
-func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", fmt.Errorf("draft version not found for current user")
-	}
-	return versionID, nil
 }

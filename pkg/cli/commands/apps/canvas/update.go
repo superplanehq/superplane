@@ -16,9 +16,12 @@ import (
 type updateCommand struct {
 	file            *string
 	draft           *bool
+	draftID         *string
+	versionID       *string
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
+	stageOnly       *bool
 }
 
 func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
@@ -70,6 +73,14 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+	if resolvedDraftID != "" {
+		draftMode = true
+	}
+
 	yamlBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read canvas yaml: %w", err)
@@ -84,7 +95,16 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
 	}
 
-	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	var targetVersionID string
+	if draftMode || resolvedDraftID != "" {
+		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: resolvedDraftID == "",
+		})
+	} else {
+		targetVersionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
@@ -101,15 +121,27 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayout = &defaultLayout
 	}
 
-	if err := common.CommitRepositorySpecFile(
+	stageOnly := c.stageOnly != nil && *c.stageOnly
+	if stageOnly {
+		if err := common.StageRepositorySpecFile(
+			ctx,
+			canvasID,
+			targetVersionID,
+			common.CanvasYAMLRepositoryPath,
+			yamlBytes,
+		); err != nil {
+			return err
+		}
+		if err := common.ApplyCanvasAutoLayout(ctx, canvasID, targetVersionID, autoLayout); err != nil {
+			return err
+		}
+	} else if err := common.StageCommitRepositorySpecFile(
 		ctx,
 		canvasID,
 		targetVersionID,
 		common.CanvasYAMLRepositoryPath,
 		yamlBytes,
-		"Update canvas.yaml",
 		autoLayout,
-		true,
 	); err != nil {
 		return err
 	}
@@ -125,7 +157,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("updated version metadata is missing")
 	}
 
-	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID)
+	readStaged := stageOnly
+	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID, readStaged)
 	if err != nil {
 		return fmt.Errorf("canvas draft updated but failed to read canvas.yaml: %w", err)
 	}
@@ -161,7 +194,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			edgeCount = len(spec.GetEdges())
 		}
 
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		if stageOnly {
+			_, _ = fmt.Fprintf(stdout, "Canvas draft staged: %s\n", metadata.GetId())
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		}
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", nodeCount)
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)

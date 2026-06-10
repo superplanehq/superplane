@@ -1,6 +1,11 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useLayoutEffect, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+
+import { isWorkflowSpecPath } from "../lib/workflow-spec-paths";
+import { fetchRepositorySpecFileContent } from "../lib/repository-spec-files";
 
 type UseEditorLifecycleOptions = {
+  canvasId?: string;
+  versionId?: string;
   isEditing: boolean;
   resetPendingState: () => void;
   setIsDiffOpen: (open: boolean) => void;
@@ -9,9 +14,13 @@ type UseEditorLifecycleOptions = {
   selectedPath: string | null;
   selectedFileData?: { path?: string; content?: string };
   setLoadedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
+  setCommittedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
+  stagingResetNonce?: number;
 };
 
 export function useEditorLifecycle({
+  canvasId,
+  versionId,
   isEditing,
   resetPendingState,
   setIsDiffOpen,
@@ -20,7 +29,23 @@ export function useEditorLifecycle({
   selectedPath,
   selectedFileData,
   setLoadedContentByPath,
+  setCommittedContentByPath,
+  stagingResetNonce = 0,
 }: UseEditorLifecycleOptions) {
+  const previousStagingResetNonceRef = useRef(stagingResetNonce);
+
+  useEffect(() => {
+    if (previousStagingResetNonceRef.current === stagingResetNonce) {
+      return;
+    }
+
+    previousStagingResetNonceRef.current = stagingResetNonce;
+    resetPendingState();
+    setLoadedContentByPath({});
+    setCommittedContentByPath({});
+    setIsDiffOpen(false);
+  }, [stagingResetNonce, resetPendingState, setCommittedContentByPath, setIsDiffOpen, setLoadedContentByPath]);
+
   useEffect(() => {
     if (isEditing) return;
 
@@ -37,7 +62,7 @@ export function useEditorLifecycle({
     setHeaderActionsHost(document.getElementById(headerActionsSlotId));
   }, [headerActionsSlotId, isEditing, setHeaderActionsHost]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const path = selectedFileData?.path;
     if (!path || path !== selectedPath) return;
 
@@ -47,4 +72,30 @@ export function useEditorLifecycle({
       return { ...current, [path]: content };
     });
   }, [selectedFileData, selectedPath, setLoadedContentByPath]);
+
+  useEffect(() => {
+    const path = selectedPath;
+    if (!path || !canvasId || !versionId || isWorkflowSpecPath(path)) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetchRepositorySpecFileContent(canvasId, path, versionId, false).then((content) => {
+      if (cancelled) {
+        return;
+      }
+
+      setCommittedContentByPath((current) => {
+        if (current[path] === content) {
+          return current;
+        }
+
+        return { ...current, [path]: content };
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, selectedPath, setCommittedContentByPath, versionId]);
 }

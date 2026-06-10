@@ -10,7 +10,10 @@ import (
 )
 
 type getCommand struct {
-	draft *bool
+	draft     *bool
+	draftID   *string
+	versionID *string
+	noStage   *bool
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -33,16 +36,26 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	useDraft := c.draft != nil && *c.draft
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+
+	useDraft := (c.draft != nil && *c.draft) || resolvedDraftID != ""
 	versionID := ""
 	if useDraft {
-		versionID, err = resolveCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: false,
+		})
 		if err != nil {
 			return err
 		}
 	}
 
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	useStagedRead := useDraft && (c.noStage == nil || !*c.noStage)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID, useStagedRead)
 	if err != nil {
 		return err
 	}
@@ -68,7 +81,11 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		source := "live"
 		if useDraft {
-			source = "draft"
+			if useStagedRead {
+				source = "draft (staged)"
+			} else {
+				source = "draft (committed)"
+			}
 		}
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
@@ -94,28 +111,4 @@ func lookupCanvasName(ctx core.CommandContext, canvasID string) (string, error) 
 		return "", fmt.Errorf("canvas %q not found", canvasID)
 	}
 	return response.Canvas.Metadata.GetName(), nil
-}
-
-// resolveCurrentUserDraftVersionID returns the id of the current user's
-// existing draft version. Unlike the canvas update flow we do not create
-// a draft on read: an absent draft is an error so users get an immediate
-// signal that there is nothing to read yet.
-func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", fmt.Errorf("draft version not found for current user")
-	}
-	return versionID, nil
 }

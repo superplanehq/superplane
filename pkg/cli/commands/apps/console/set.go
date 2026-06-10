@@ -13,6 +13,9 @@ import (
 type setCommand struct {
 	file      *string
 	draftOnly *bool
+	draftID   *string
+	versionID *string
+	stageOnly *bool
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -54,25 +57,52 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
+	if err != nil {
+		return err
+	}
+	if resolvedDraftID != "" {
+		draftOnly = true
+	}
+
+	var versionID string
+	if draftOnly || resolvedDraftID != "" {
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
+			DraftID:     resolvedDraftID,
+			UseDraft:    true,
+			AllowCreate: resolvedDraftID == "",
+		})
+	} else {
+		versionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
 
-	if err := common.CommitRepositorySpecFile(
+	stageOnly := c.stageOnly != nil && *c.stageOnly
+	if stageOnly {
+		if err := common.StageRepositorySpecFile(
+			ctx,
+			canvasID,
+			versionID,
+			common.ConsoleYAMLRepositoryPath,
+			yamlBytes,
+		); err != nil {
+			return err
+		}
+	} else if err := common.StageCommitRepositorySpecFile(
 		ctx,
 		canvasID,
 		versionID,
 		common.ConsoleYAMLRepositoryPath,
 		yamlBytes,
-		"Update console.yaml",
 		nil,
-		false,
 	); err != nil {
 		return err
 	}
 
-	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	readStaged := stageOnly
+	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID, readStaged)
 	if err != nil {
 		return fmt.Errorf("console draft updated but failed to read console.yaml: %w", err)
 	}
@@ -99,7 +129,11 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
+		if stageOnly {
+			_, _ = fmt.Fprintf(stdout, "Console draft staged for app %s\n", canvasID)
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
+		}
 		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", versionID)
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
 		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))

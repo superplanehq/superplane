@@ -212,9 +212,27 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_CommitCanvasRepositoryFiles_FullMethodName: {
+		pbCanvases.Canvases_StageCanvasRepositoryFile_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update_version",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DiscardCanvasStaging_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update_version",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_CommitCanvasStaging_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ApplyCanvasAutoLayout_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

@@ -40,6 +40,13 @@ export interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  /** True when the active draft has uncommitted staged spec edits (shows Commit/Reset). */
+  hasStagingChanges?: boolean;
+  /** Commit staged canvas.yaml/console.yaml into the draft version row. */
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  /** Discard staged edits, reverting to the last committed draft. */
+  onResetStaging?: () => void;
   mode?: HeaderMode;
   /** When true, the canvas draft is active regardless of the current Console / Canvas / Memory tab. */
   isEditing?: boolean;
@@ -66,6 +73,17 @@ export interface HeaderProps {
   hasUnpublishedCanvasDraftChanges?: boolean;
   /** Draft indicator for the Console tab when console changes exist. */
   hasUnpublishedConsoleDraftChanges?: boolean;
+  /** Draft indicator for the Files tab when a non-spec repository file is staged. */
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
@@ -244,6 +262,8 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? props.mode === "version-edit";
+  const editTabTone =
+    props.editTabTone ?? (editing ? (props.hasUncommittedDraftChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
@@ -259,8 +279,13 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
-              hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
-              hasConsoleDraft={!!props.hasUnpublishedConsoleDraftChanges}
+              hasCanvasUncommitted={!!props.hasUncommittedCanvasDraftChanges}
+              hasCanvasCommitted={!!props.hasCommittedCanvasDraftChanges}
+              hasConsoleUncommitted={!!props.hasUncommittedConsoleDraftChanges}
+              hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
+              hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
+              hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
+              editTabTone={editTabTone}
             />
           ) : null}
         </div>

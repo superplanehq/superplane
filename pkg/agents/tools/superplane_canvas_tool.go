@@ -177,10 +177,6 @@ func (t *SuperPlaneCanvasTool) read(ctx context.Context, session agents.AgentSes
 }
 
 func (t *SuperPlaneCanvasTool) updateDraft(ctx context.Context, session agents.AgentSessionContext, input superPlaneCanvasToolInput) (superPlaneCanvasUpdateResult, error) {
-	if t.encryptor == nil || t.registry == nil || t.authService == nil {
-		return superPlaneCanvasUpdateResult{}, fmt.Errorf("custom tool executor is missing canvas update dependencies")
-	}
-
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return superPlaneCanvasUpdateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
@@ -209,20 +205,29 @@ func (t *SuperPlaneCanvasTool) updateDraft(ctx context.Context, session agents.A
 		return superPlaneCanvasUpdateResult{}, fmt.Errorf("canvas_yaml or console_yaml is required for update_draft")
 	}
 
-	if err := grpcCanvases.ApplyRepositorySpecFileOperations(
+	// Agents may only stage edits onto their private draft; commit and publish
+	// stay user-driven. This mirrors the human `--stage-only` CLI flow: stage
+	// the spec files, then auto-layout the staged canvas when the graph changed.
+	if _, err := grpcCanvases.StageRepositorySpecFileOperations(
 		ctx,
-		t.usageService,
-		t.encryptor,
-		t.registry,
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
-		t.webhookBaseURL,
-		t.authService,
-		resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate),
 		operations,
 	); err != nil {
 		return superPlaneCanvasUpdateResult{}, err
+	}
+
+	if autoLayout := resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate); autoLayout != nil {
+		if _, err := grpcCanvases.ApplyCanvasAutoLayout(
+			ctx,
+			session.OrganizationID,
+			session.CanvasID,
+			draft.ID.String(),
+			autoLayout,
+		); err != nil {
+			return superPlaneCanvasUpdateResult{}, err
+		}
 	}
 
 	updated, err := models.FindCanvasVersion(canvasID, draft.ID)

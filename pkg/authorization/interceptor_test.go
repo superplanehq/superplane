@@ -57,7 +57,10 @@ func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
 		{pbCanvases.Canvases_ListCanvasVersions_FullMethodName, "read"},
 		{pbCanvases.Canvases_DeleteCanvasVersion_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName, "update_version"},
-		{pbCanvases.Canvases_CommitCanvasRepositoryFiles_FullMethodName, "update"},
+		{pbCanvases.Canvases_StageCanvasRepositoryFile_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_DiscardCanvasStaging_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_CommitCanvasStaging_FullMethodName, "update"},
+		{pbCanvases.Canvases_ApplyCanvasAutoLayout_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
 		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
 		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
@@ -205,6 +208,33 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 			assert.Equal(t, tt.expectAllow, allowed)
 		})
 	}
+}
+
+func TestAgentScopedTokenStagingPermissions(t *testing.T) {
+	interceptor := NewAuthorizationInterceptor(nil)
+	canvasID := "canvas-123"
+
+	stageRule := interceptor.rules[pbCanvases.Canvases_StageCanvasRepositoryFile_FullMethodName]
+	discardRule := interceptor.rules[pbCanvases.Canvases_DiscardCanvasStaging_FullMethodName]
+	commitRule := interceptor.rules[pbCanvases.Canvases_CommitCanvasStaging_FullMethodName]
+
+	agentScopes := metadata.NewIncomingContext(
+		context.Background(),
+		metadata.Pairs(
+			"x-token-scopes",
+			marshalScopes(t, []string{
+				"canvases:read:" + canvasID,
+				"canvases:update_version:" + canvasID,
+			}),
+		),
+	)
+	stageReq := &pbCanvases.StageCanvasRepositoryFileRequest{CanvasId: canvasID, VersionId: "draft-1"}
+	discardReq := &pbCanvases.DiscardCanvasStagingRequest{CanvasId: canvasID, VersionId: "draft-1"}
+	commitReq := &pbCanvases.CommitCanvasStagingRequest{CanvasId: canvasID, VersionId: "draft-1"}
+
+	assert.True(t, hasRequiredScopedTokenPermission(agentScopes, stageReq, stageRule))
+	assert.True(t, hasRequiredScopedTokenPermission(agentScopes, discardReq, discardRule))
+	assert.False(t, hasRequiredScopedTokenPermission(agentScopes, commitReq, commitRule))
 }
 
 func TestMetadataScopedTokenPermissions(t *testing.T) {
