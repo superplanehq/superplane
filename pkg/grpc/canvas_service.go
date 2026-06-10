@@ -200,6 +200,7 @@ func (s *CanvasService) ActOnCanvasChangeRequest(ctx context.Context, req *pb.Ac
 		s.authService,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.ChangeRequestId,

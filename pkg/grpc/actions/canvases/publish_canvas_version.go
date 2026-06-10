@@ -69,7 +69,7 @@ func PublishCanvasVersion(
 	}
 
 	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
@@ -94,6 +94,7 @@ func publishDraftVersionInTransaction(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
@@ -145,6 +146,7 @@ func publishDraftVersionInTransaction(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				GitProvider:    gitProv,
 			},
 		)
 		if err != nil {
