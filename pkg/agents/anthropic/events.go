@@ -9,13 +9,15 @@ import (
 )
 
 type anthropicEvent struct {
-	ID        string                  `json:"id"`
-	Type      string                  `json:"type"`
-	Name      string                  `json:"name"`
-	ToolUseID string                  `json:"tool_use_id,omitempty"`
-	Input     json.RawMessage         `json:"input,omitempty"`
-	Content   []anthropicContentBlock `json:"content"`
-	Error     *struct {
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Name       string                  `json:"name"`
+	ToolName   string                  `json:"tool_name,omitempty"`
+	ToolUseID  string                  `json:"tool_use_id,omitempty"`
+	Input      json.RawMessage         `json:"input,omitempty"`
+	Content    []anthropicContentBlock `json:"content"`
+	StopReason *anthropicStopReason    `json:"stop_reason,omitempty"`
+	Error      *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 	// Outcome evaluation fields (from Anthropic SSE stream)
@@ -39,6 +41,11 @@ type anthropicContentBlock struct {
 	Name string `json:"name"`
 }
 
+type anthropicStopReason struct {
+	Type     string   `json:"type"`
+	EventIDs []string `json:"event_ids"`
+}
+
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	switch raw.Type {
 	case "agent.message":
@@ -47,8 +54,10 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		return toolEvent(raw, agents.ProviderEventToolUseStarted), true
 	case "agent.tool_result":
 		return toolEvent(raw, agents.ProviderEventToolUseFinished), true
+	case "agent.custom_tool_use":
+		return customToolUseEvent(raw), true
 	case "session.status_idle":
-		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
+		return idleEvent(raw)
 	case "session.status_terminated":
 		return sessionFailedEvent(raw), true
 	case "session.error":
@@ -80,10 +89,42 @@ func toolEvent(raw anthropicEvent, eventType agents.ProviderEventType) agents.Pr
 	return agents.ProviderEvent{
 		ProviderEventID: toolUseID(raw),
 		Type:            eventType,
-		ToolName:        raw.Name,
+		ToolName:        providerToolName(raw),
 		ToolCallID:      toolUseID(raw),
 		ToolInput:       redactSensitive(renderToolInput(raw.Input)),
 	}
+}
+
+func customToolUseEvent(raw anthropicEvent) agents.ProviderEvent {
+	id := customToolUseID(raw)
+	input := strings.TrimSpace(string(raw.Input))
+	return agents.ProviderEvent{
+		ProviderEventID: id,
+		Type:            agents.ProviderEventCustomToolUseStarted,
+		ToolName:        providerToolName(raw),
+		ToolCallID:      id,
+		ToolInput:       redactSensitive(input),
+		CustomToolUse: &agents.CustomToolUse{
+			ID:    id,
+			Name:  providerToolName(raw),
+			Input: input,
+		},
+	}
+}
+
+func idleEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
+	if raw.StopReason == nil || raw.StopReason.Type == "" || raw.StopReason.Type == "end_turn" {
+		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
+	}
+
+	if raw.StopReason.Type == "requires_action" {
+		return agents.ProviderEvent{
+			Type:               agents.ProviderEventCustomToolResultsRequired,
+			CustomToolEventIDs: append([]string(nil), raw.StopReason.EventIDs...),
+		}, true
+	}
+
+	return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
 }
 
 func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
@@ -137,6 +178,17 @@ func toolUseID(raw anthropicEvent) string {
 		return raw.ToolUseID
 	}
 	return raw.ID
+}
+
+func customToolUseID(raw anthropicEvent) string {
+	return raw.ID
+}
+
+func providerToolName(raw anthropicEvent) string {
+	if raw.Name != "" {
+		return raw.Name
+	}
+	return raw.ToolName
 }
 
 // renderToolInput prefers the `command` field for shell-style tools and
