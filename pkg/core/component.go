@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -40,6 +41,7 @@ type ExecutionContext struct {
 	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
+	Files RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 }
@@ -65,20 +67,26 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger        *log.Entry
-	Configuration any
-	HTTP          HTTPContext
-	Metadata      MetadataWriter
-	Requests      RequestContext
-	Auth          AuthReader
-	Integration   IntegrationContext
-	Webhook       NodeWebhookContext
+	Logger          *log.Entry
+	Configuration   any
+	HTTP            HTTPContext
+	Metadata        MetadataWriter
+	Requests        RequestContext
+	Auth            AuthReader
+	Integration     IntegrationContext
+	Webhook         NodeWebhookContext
+	Files RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
+}
+
+type RepositoryFilesContext interface {
+	List() ([]string, error)
+	Read(path string) (io.ReadCloser, error)
 }
 
 type CanvasMemoryRecord struct {
