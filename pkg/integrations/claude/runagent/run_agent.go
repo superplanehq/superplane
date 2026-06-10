@@ -162,15 +162,21 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	_ = ctx.Metadata.Set(metadata)
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
-		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(session.ID, finalMessageReads, finalMessageDelay)
+		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", session.ID, err)
+			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
+		} else if sm != nil && sm.Complete {
+			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
+			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+				return emitErr
+			}
+			if err := client.DeleteManagedSession(session.ID); err != nil {
+				ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
+			}
+			return nil
+		} else {
+			ctx.Logger.Warnf("Events not complete for session %s after retries. Scheduling poll.", session.ID)
 		}
-		if err == nil && lastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", session.ID, managedSessionEventTypes(events))
-		}
-		out := buildOutput(refreshed.Status, session.ID, lastMessage)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
 	ctx.Logger.Infof("Started Managed Agent session %s. Waiting for completion (polling)...", session.ID)
