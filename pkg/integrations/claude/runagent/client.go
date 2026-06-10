@@ -208,6 +208,86 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 	return out.Data, out.NextPage, nil
 }
 
+// SessionMessages holds all agent messages and completion status from a session's events.
+type SessionMessages struct {
+	Messages    []string // all agent.message texts in chronological order
+	LastMessage string   // the final agent.message text
+	Complete    bool     // true if session.status_idle or session.status_terminated is in the events
+}
+
+func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) {
+	result := &SessionMessages{}
+	page := ""
+	var allEvents []ManagedSessionEvent
+
+	// Fetch all events (desc order from API)
+	for {
+		events, nextPage, err := c.listManagedSessionEventsPage(sessionID, page)
+		if err != nil {
+			return nil, err
+		}
+		allEvents = append(allEvents, events...)
+		if nextPage == "" {
+			break
+		}
+		page = nextPage
+	}
+
+	// Check for terminal event (events are in desc order, so status_idle is first)
+	for _, e := range allEvents {
+		if e.Type == "session.status_idle" || e.Type == "session.status_terminated" {
+			result.Complete = true
+			break
+		}
+	}
+
+	// Collect agent messages in chronological order (reverse the desc list)
+	for i := len(allEvents) - 1; i >= 0; i-- {
+		e := allEvents[i]
+		if e.Type == "agent.message" || e.Type == "assistant.message" {
+			text := lastAgentMessageFromEvents([]ManagedSessionEvent{e})
+			if text != "" {
+				result.Messages = append(result.Messages, text)
+			}
+		}
+	}
+
+	if len(result.Messages) > 0 {
+		result.LastMessage = result.Messages[len(result.Messages)-1]
+	}
+
+	return result, nil
+}
+
+// GetSessionMessagesWithRetry polls until events are fully written
+// (session.status_idle present) or retries are exhausted.
+func (c *Client) GetSessionMessagesWithRetry(sessionID string, attempts int, delay time.Duration) (*SessionMessages, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var result *SessionMessages
+	for i := 0; i < attempts; i++ {
+		var err error
+		result, err = c.GetSessionMessages(sessionID)
+		if err != nil {
+			return nil, err
+		}
+
+		// If events are fully written, we have everything
+		if result.Complete {
+			return result, nil
+		}
+
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
+	}
+
+	return result, nil
+}
+
+// Deprecated: use GetSessionMessages instead.
 func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, []ManagedSessionEvent, error) {
 	seen := []ManagedSessionEvent{}
 	page := ""
