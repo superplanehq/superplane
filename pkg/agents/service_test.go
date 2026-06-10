@@ -274,8 +274,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "staging/files")
 	assert.Contains(t, provider.lastPreamble, "staging/discard")
-	assert.Contains(t, provider.lastPreamble, "--stage-only")
-	assert.NotContains(t, provider.lastPreamble, "drafts staging commit")
+	assert.Contains(t, provider.lastPreamble, "Commit requires the user to run the UI Commit action")
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 
