@@ -75,7 +75,7 @@ const (
 	LoadBalancerStateActive         = "active"
 	LoadBalancerStateActiveImpaired = "active_impaired"
 	LoadBalancerStateFailed         = "failed"
-	LoadBalancerStateDeleting       = "deleting"
+	LoadBalancerStateDeleted        = "deleted"
 
 	LoadBalancerTypeApplication = "application"
 	LoadBalancerTypeNetwork     = "network"
