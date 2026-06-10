@@ -324,7 +324,9 @@ func ListDeletedCanvases() ([]Canvas, error) {
 func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Canvas, error) {
 	var canvases []Canvas
 
-	err := scopeAppCanvases(queryCanvasWithLiveVersion(tx)).
+	// Organization teardown must include legacy template rows; the worker counts
+	// every workflow for the org when deciding whether cleanup can continue.
+	err := queryCanvasWithLiveVersion(tx).
 		Unscoped().
 		Where("workflows.organization_id = ?", orgID).
 		Find(&canvases).
