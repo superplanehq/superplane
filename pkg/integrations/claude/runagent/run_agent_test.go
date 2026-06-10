@@ -45,12 +45,18 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	a := &RunAgent{}
+
+	// SSE stream that sends an agent message then goes idle
+	sseStream := "data: {\"type\":\"session.status_running\"}\n\n" +
+		"data: {\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Done\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"user.message","content":[{"type":"text","text":"Hello"}]},{"type":"agent.message","content":[{"type":"text","text":"Done"}]}],"next_page":null}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(sseStream))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -85,10 +91,9 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
 	assert.Equal(t, "GET", httpContext.Requests[2].Method)
-	assert.Equal(t, "GET", httpContext.Requests[3].Method)
-	assert.Contains(t, httpContext.Requests[3].URL.Path, "/events")
-	assert.Equal(t, "desc", httpContext.Requests[3].URL.Query().Get("order"))
-	assert.Equal(t, sessionEventsPageLimit, httpContext.Requests[3].URL.Query().Get("limit"))
+	assert.Contains(t, httpContext.Requests[2].URL.Path, "/events/stream")
+	assert.Equal(t, "DELETE", httpContext.Requests[3].Method)
+	assert.Contains(t, httpContext.Requests[3].URL.Path, "/sessions/sess_1")
 }
 
 func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
