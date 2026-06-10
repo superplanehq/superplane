@@ -91,6 +91,9 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Top-level tenant boundary providing complete data isolation
 - All resources (canvases, integrations, secrets) are scoped to an organization
 - Organization metadata `change_management_enabled` (API field `changeManagementEnabled`) acts as a global override for canvas change management when enabled
+- Organization invite completion can be constrained by auth method:
+  - `allowed_oauth_providers` (API field `allowedOauthProviders`) limits which OAuth provider IDs, such as `github` or `google`, may auto-accept pending email invitations after OAuth sign-in. An empty list means no OAuth provider restriction.
+  - `allow_direct_email_invite_completion` (API field `allowDirectEmailInviteCompletion`) controls whether non-OAuth sign-in paths, such as email, magic link, or password, may auto-accept pending email invitations.
 
 **Canvas:**
 
