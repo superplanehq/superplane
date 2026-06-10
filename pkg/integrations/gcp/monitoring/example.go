@@ -19,6 +19,9 @@ var exampleOutputDeleteAlertingPolicyBytes []byte
 //go:embed example_output_update_alerting_policy.json
 var exampleOutputUpdateAlertingPolicyBytes []byte
 
+//go:embed example_data_on_alert.json
+var exampleDataOnAlertBytes []byte
+
 var (
 	exampleOutputCreateAlertingPolicyOnce sync.Once
 	exampleOutputCreateAlertingPolicy     map[string]any
@@ -31,7 +34,14 @@ var (
 
 	exampleOutputUpdateAlertingPolicyOnce sync.Once
 	exampleOutputUpdateAlertingPolicy     map[string]any
+
+	exampleDataOnAlertOnce sync.Once
+	exampleDataOnAlert     map[string]any
 )
+
+func onAlertExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
+}
 
 func (c *CreateAlertingPolicy) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertingPolicyOnce, exampleOutputCreateAlertingPolicyBytes, &exampleOutputCreateAlertingPolicy)
