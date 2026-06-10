@@ -28,15 +28,26 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
+  <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
+  <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
+  <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Delete Image" href="#compute-•-delete-image" description="Permanently delete a Google Compute Engine custom image" />
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Get VM Instance" href="#compute-•-get-vm-instance" description="Fetch the current state of a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
+  <LinkCard title="Monitoring • Create Alerting Policy" href="#monitoring-•-create-alerting-policy" description="Create a Cloud Monitoring alerting policy that triggers when Compute Engine instance metrics cross thresholds" />
+  <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Compute • Update Image" href="#compute-•-update-image" description="Update a Google Compute Engine image: deprecate or obsolete it, and update its labels" />
   <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
 
@@ -747,6 +758,216 @@ The invocation result, including:
 }
 ```
 
+<a id="compute-•-create-static-ip"></a>
+
+## Compute • Create Static IP
+
+**Component key:** `gcp.compute.createStaticIP`
+
+The Create Static IP component reserves a regional external static (reserved) IP address in Compute Engine.
+
+A static IP keeps the same address across VM restarts and re-creations, unlike an ephemeral IP. Once reserved it can be attached to a VM instance with the **Manage Static IP** component.
+
+### Use Cases
+
+- **Stable endpoints**: Give a service a fixed public address that survives VM replacement
+- **Blue/green deployments**: Reserve the address ahead of time, then attach it to whichever VM is live
+- **DNS**: Point an A record at a reserved address you control
+
+### Configuration
+
+- **Name**: The name for the new address resource (required, lowercase RFC1035 — e.g. `web-prod-ip`)
+- **Region**: The region to reserve the address in (required). Regional external IPs can only be attached to VMs in the same region.
+- **Network Tier**: `PREMIUM` (default) or `STANDARD`
+- **Description**: Optional human-readable description
+
+### Output
+
+Returns the reserved address:
+- **name**, **address** (the reserved IP), **region**, **status**, **addressType**, **networkTier**, **selfLink**
+
+### Important Notes
+
+- Reserving and holding a static IP that is not attached to a running resource incurs charges
+- The component waits for the underlying regional operation to complete before reading the address back
+
+### Example Output
+
+```json
+{
+  "data": {
+    "address": "34.1.2.3",
+    "addressType": "EXTERNAL",
+    "name": "web-prod-ip",
+    "networkTier": "PREMIUM",
+    "region": "us-central1",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/addresses/web-prod-ip",
+    "status": "RESERVED"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.created"
+}
+```
+
+<a id="compute-•-delete-static-ip"></a>
+
+## Compute • Delete Static IP
+
+**Component key:** `gcp.compute.deleteStaticIP`
+
+The Delete Static IP component releases (deletes) a regional external static IP reservation.
+
+### Use Cases
+
+- **Cost optimization**: Release reserved IPs that are no longer needed (idle reserved IPs are billed)
+- **Cleanup**: Tear down addresses as part of environment teardown
+
+### Configuration
+
+- **Static IP**: Pick from the reserved external IPs across all regions, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.compute.createStaticIP`). The selection encodes both the region and the address name.
+
+### Output
+
+Returns the released address:
+- **name**: The name of the address that was released
+- **region**: The region it was in
+
+### Important Notes
+
+- A static IP that is still **attached** to a VM cannot be deleted — detach it first with **Manage Static IP**
+- If the address is not found at the resolved region/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "web-prod-ip",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.deleted"
+}
+```
+
+<a id="compute-•-manage-static-ip"></a>
+
+## Compute • Manage Static IP
+
+**Component key:** `gcp.compute.manageStaticIP`
+
+The Manage Static IP component attaches a reserved external static IP to a VM instance, or detaches the instance's current external IP.
+
+Attaching works by managing the network interface's external access config: any existing external IP on the interface is removed first, then the static IP is assigned. Detaching removes the external access config entirely (the instance keeps its internal IP but loses external connectivity unless another address is attached).
+
+### Use Cases
+
+- **Blue/green deployments**: Move a stable public IP from the old VM to the new one with zero DNS changes
+- **Failover**: Reassign a reserved IP from a failed VM to a healthy replacement
+- **Maintenance**: Temporarily detach a public IP while a VM is serviced
+
+### Configuration
+
+- **Action**: `attach` or `detach` (required)
+- **VM Instance**: The target VM. The selection encodes both the zone and the instance name.
+- **Static IP** *(attach only)*: The reserved external IP to attach. Only IPs in the selected VM's region are listed, since a regional IP can attach only to a VM in the same region.
+- **Network Interface**: The interface to modify (default `nic0`)
+
+### Output
+
+Returns the instance state after the operation:
+- **instanceId**, **name**, **zone**, **status**, **selfLink**, **machineType**, **internalIP**, **externalIP**
+- **action**: The action performed (attach or detach)
+
+### Important Notes
+
+- A regional static IP can only be attached to a VM in the **same region**
+- Attaching is idempotent: if the static IP is already the instance's external IP, the component succeeds without changes
+- Detaching is idempotent: if the interface already has no external IP, the component succeeds without changes
+- The component waits for each underlying zone operation to complete before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "attach",
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.attached"
+}
+```
+
+<a id="compute-•-create-image"></a>
+
+## Compute • Create Image
+
+**Component key:** `gcp.createImage`
+
+The Create Image component creates a custom Compute Engine image.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable, reusable images from validated disks
+- **Backup workflows**: Capture disk state as a restorable image before changes
+- **Release automation**: Produce versioned images as part of CI/CD
+
+### Configuration
+
+- **Image Name**: Name for the new image (lowercase, numbers, hyphens; 1–63 chars).
+- **Source**: Where the image is created from:
+  - **Disk**: A persistent disk (pick the region, zone, then the disk).
+  - **Snapshot**: A disk snapshot.
+  - **Image**: Another custom image in the project.
+- **Image family**: Optional family to group related images (e.g. `my-app`).
+- **Description**: Optional human-readable description.
+- **Labels**: Optional key-value labels (billing, environment, team).
+- **Storage location**: Optional single region or multi-region to store the image (e.g. `us` or `europe-west1`). Defaults to the source's region.
+- **Force create**: When the source is a disk attached to a running instance, create the image anyway (may produce an inconsistent image).
+
+### Output
+
+Emits the created image: name, selfLink, family, status, diskSizeGb, sourceDisk, labels, deprecationState, creationTimestamp.
+
+### Important Notes
+
+- Creating an image from a disk attached to a running VM is not recommended unless **Force create** is enabled.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "ACTIVE",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production"
+    },
+    "name": "my-app-2026-06-02",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "sourceDisk": "my-disk",
+    "status": "READY",
+    "storageLocations": [
+      "us"
+    ]
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.created"
+}
+```
+
 <a id="compute-•-create-virtual-machine"></a>
 
 ## Compute • Create Virtual Machine
@@ -785,6 +1006,46 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.createVM.completed"
+}
+```
+
+<a id="compute-•-delete-image"></a>
+
+## Compute • Delete Image
+
+**Component key:** `gcp.deleteImage`
+
+The Delete Image component permanently deletes a Compute Engine custom image.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test images after use
+- **Cost optimization**: Delete unused images to reduce storage costs
+- **Lifecycle automation**: Remove obsolete images as part of release pipelines
+
+### Configuration
+
+- **Image**: The custom image to delete. Pick from the list of images in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createImage`).
+
+### Output
+
+Returns the name of the deleted image.
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone.
+- If the image is not found, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup.
+- Deleting an image does not affect VM instances or disks already created from it.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageName": "my-app-2026-06-02"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.deleted"
 }
 ```
 
@@ -830,6 +1091,61 @@ Returns information about the deleted instance:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.deleted"
+}
+```
+
+<a id="compute-•-get-vm-instance"></a>
+
+## Compute • Get VM Instance
+
+**Component key:** `gcp.getVMInstance`
+
+The Get VM Instance component reads the current state of a Compute Engine VM
+instance and emits its details on the default output channel.
+
+### Use Cases
+
+- **Status checks**: Verify a VM is in the expected state (e.g. `RUNNING`) before
+  proceeding with downstream work.
+- **Detail lookup**: Fetch IPs, machine type, or selfLink for use in later workflow steps.
+- **Health gates**: Pair with a condition to branch a workflow based on instance status.
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained
+  from an upstream node (e.g. `selfLink` from `gcp.createVM`). The
+  selection encodes both the zone and the instance name.
+
+### Output
+
+The emitted payload contains the full instance summary:
+
+- **instanceId**, **selfLink**, **status**, **zone**, **name**, **machineType**
+- **internalIP**, **externalIP** (when present)
+
+### Important Notes
+
+- If the instance is not found at the resolved zone/name, the action fails so that
+  misconfigured or stale expressions do not silently mask a missing resource.
+- The integration's bound project is authoritative; a chained `selfLink` pointing
+  at a different project is rejected rather than silently rewritten.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.fetched"
 }
 ```
 
@@ -946,6 +1262,223 @@ Returns the instance state after the operation completes:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.power.power_off"
+}
+```
+
+<a id="monitoring-•-create-alerting-policy"></a>
+
+## Monitoring • Create Alerting Policy
+
+**Component key:** `gcp.monitoring.createAlertingPolicy`
+
+The Create Alerting Policy component creates a Cloud Monitoring alerting policy with one or more threshold conditions on Compute Engine instance metrics.
+
+### Use Cases
+
+- **Capacity management**: Alert when CPU stays above a safe level
+- **Composite alerts**: Combine multiple conditions (e.g. high CPU AND high network) with a combiner
+- **Severity routing**: Tag policies Critical/Error/Warning and rate-limit or auto-close incidents
+
+### Configuration
+
+- **Display Name**: Human-readable name for the policy (required)
+- **Conditions**: One or more threshold conditions (required). Each has:
+  - **Metric**, **Comparison** (above `>` or below `<`), **Threshold**, **Duration**
+  - Optional **Aligner**, **Rolling window**, **Group reducer** + **Group by fields** (aggregation)
+  - Optional **Trigger** by count or percent of time series
+- **Combiner**: How multiple conditions combine — OR / AND / AND-with-matching-resource (default OR)
+- **Severity**: Critical / Error / Warning (optional)
+- **Notification Channels**: Existing channels to alert (optional)
+- **User Labels**: Key/value labels on the policy (optional)
+- **Enabled**: Whether the policy is active (default: true)
+- **Auto-close** / **Notification rate limit**: Alert strategy (optional)
+- **Documentation** / **Documentation subject**: Markdown shown in notifications (optional)
+
+### Output
+
+Returns the created policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition's **comparison**, **thresholdValue**, **duration**, **filter**.
+
+### Important Notes
+
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- Conditions monitor the metric across **all** Compute Engine instances in the project
+- Up to 6 conditions per policy
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.created"
+}
+```
+
+<a id="monitoring-•-delete-alerting-policy"></a>
+
+## Monitoring • Delete Alerting Policy
+
+**Component key:** `gcp.monitoring.deleteAlertingPolicy`
+
+The Delete Alerting Policy component permanently deletes a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Cleanup**: Remove policies for decommissioned services
+- **Environment teardown**: Delete alerting as part of tearing down ephemeral environments
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the deleted policy reference:
+- **name**: The resource name that was deleted
+- **id**: The policy ID
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.deleted"
+}
+```
+
+<a id="monitoring-•-get-alerting-policy"></a>
+
+## Monitoring • Get Alerting Policy
+
+**Component key:** `gcp.monitoring.getAlertingPolicy`
+
+The Get Alerting Policy component reads the configuration and state of a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Auditing**: Inspect a policy's threshold, comparison, and enabled state
+- **Conditional workflows**: Branch on whether a policy is enabled or how it's configured
+- **Chaining**: Read a policy created upstream before updating or deleting it
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the policy:
+- **name**, **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
+- **comparison**, **thresholdValue**, **duration**, **filter**: the first condition's threshold
+- **notificationChannels**: attached channels (when any)
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask a problem
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.fetched"
+}
+```
+
+<a id="monitoring-•-update-alerting-policy"></a>
+
+## Monitoring • Update Alerting Policy
+
+**Component key:** `gcp.monitoring.updateAlertingPolicy`
+
+The Update Alerting Policy component modifies an existing Cloud Monitoring alerting policy in place. Only the fields you set are changed (sent as an update mask).
+
+### Use Cases
+
+- **Threshold tuning**: Adjust a condition's threshold as baselines change
+- **Enable/disable**: Toggle a policy during maintenance windows
+- **Re-route**: Change notification channels, severity, or alert strategy
+
+### Configuration
+
+- **Alerting Policy**: The policy to update (required, supports expressions)
+- **Conditions**: Provide to **replace** the policy's conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **Combiner**: OR / AND / AND-with-matching-resource
+- **Severity**: Critical / Error / Warning
+- **Enabled**: Enable, disable, or leave unchanged
+- **Notification Channels**: Replace channels (provide empty to clear)
+- **User Labels**: Replace user labels
+- **Auto-close / Notification rate limit**: Replace the alert strategy
+- **Documentation / subject**: Replace the documentation
+
+### Output
+
+Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition summary.
+
+### Important Notes
+
+- At least one field must be provided
+- Providing **Conditions** replaces all existing conditions
+- **Auto-close**, **rate limit**, **documentation content**, and **documentation subject** are each updated independently — changing one leaves the others untouched
+- Requires the `roles/monitoring.editor` IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": false,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "thresholdValue": 0.9
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.updated"
 }
 ```
 
@@ -1083,6 +1616,66 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="compute-•-update-image"></a>
+
+## Compute • Update Image
+
+**Component key:** `gcp.updateImage`
+
+The Update Image component updates an existing Compute Engine custom image. It can change the image's deprecation status (including marking it deprecated or obsolete) and update its labels.
+
+### Use Cases
+
+- **Release lifecycle**: Mark older images deprecated or obsolete as newer ones ship
+- **Pointing consumers forward**: Set a replacement image so users are guided to the current version
+- **Inventory hygiene**: Keep image labels accurate for billing, environment, and ownership
+
+### Configuration
+
+- **Image**: The custom image to update.
+- **Deprecation state**: Optionally change the image lifecycle state:
+  - **No change**: Leave the current deprecation state untouched.
+  - **Active**: Clear any deprecation (make the image fully usable again).
+  - **Deprecated**: Mark the image deprecated (still usable; warns on use).
+  - **Obsolete**: Mark the image obsolete (cannot be used to create new resources).
+  - **Deleted**: Mark the image as logically deleted.
+- **Replacement image**: Optional image to recommend in place of this one (name or URL). Applies when setting a deprecation state.
+- **Labels**: Optional key-value labels to add or update on the image. Labels you provide are merged with the image's existing labels; existing labels you don't list are left unchanged.
+
+### Output
+
+Emits the updated image: name, selfLink, family, status, diskSizeGb, labels, deprecationState, replacement, creationTimestamp.
+
+### Important Notes
+
+- Setting the deprecation state to **Active** clears an existing deprecation.
+- Updating labels merges with the image's existing labels; labels you don't list are preserved.
+- The component waits for each underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "DEPRECATED",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production",
+      "team": "platform"
+    },
+    "name": "my-app-2026-06-02",
+    "replacement": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-v2",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "status": "READY"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.updated"
 }
 ```
 

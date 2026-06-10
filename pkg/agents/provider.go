@@ -11,15 +11,17 @@ import (
 type ProviderEventType string
 
 const (
-	ProviderEventAssistantMessage       ProviderEventType = "assistant_message"
-	ProviderEventToolUseStarted         ProviderEventType = "tool_use_started"
-	ProviderEventToolUseFinished        ProviderEventType = "tool_use_finished"
-	ProviderEventTurnCompleted          ProviderEventType = "turn_completed"
-	ProviderEventSessionFailed          ProviderEventType = "session_failed"
-	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
-	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
-	ProviderEventThreadMessageSent      ProviderEventType = "thread_message_sent"
-	ProviderEventThreadMessageReceived  ProviderEventType = "thread_message_received"
+	ProviderEventAssistantMessage          ProviderEventType = "assistant_message"
+	ProviderEventToolUseStarted            ProviderEventType = "tool_use_started"
+	ProviderEventToolUseFinished           ProviderEventType = "tool_use_finished"
+	ProviderEventCustomToolUseStarted      ProviderEventType = "custom_tool_use_started"
+	ProviderEventCustomToolResultsRequired ProviderEventType = "custom_tool_results_required"
+	ProviderEventTurnCompleted             ProviderEventType = "turn_completed"
+	ProviderEventSessionFailed             ProviderEventType = "session_failed"
+	ProviderEventOutcomeEvaluation         ProviderEventType = "outcome_evaluation"
+	ProviderEventOutcomeEvaluationStart    ProviderEventType = "outcome_evaluation_start"
+	ProviderEventThreadMessageSent         ProviderEventType = "thread_message_sent"
+	ProviderEventThreadMessageReceived     ProviderEventType = "thread_message_received"
 )
 
 type ProviderEvent struct {
@@ -30,19 +32,49 @@ type ProviderEvent struct {
 	ToolCallID      string
 	// ToolInput is a human-readable rendering of the tool's invocation
 	// (e.g. the shell command for bash, or compact JSON for other tools).
-	ToolInput     string
-	ErrorMessage  string
-	OutcomeResult *OutcomeEvaluation
+	ToolInput          string
+	ErrorMessage       string
+	OutcomeResult      *OutcomeEvaluation
+	CustomToolUse      *CustomToolUse
+	CustomToolEventIDs []string
 
 	// Multi-agent thread fields
 	AgentName string
 	ThreadID  string
 }
 
+type CustomToolUse struct {
+	ID    string
+	Name  string
+	Input string
+}
+
+type CustomToolResult struct {
+	CustomToolUseID string
+	Content         string
+	IsError         bool
+}
+
+type CustomToolExecutor interface {
+	ExecuteCustomTool(ctx context.Context, session AgentSessionContext, toolUse CustomToolUse) CustomToolResult
+}
+
+type CustomToolResultSender interface {
+	SendCustomToolResults(ctx context.Context, providerSessionID string, results []CustomToolResult) error
+}
+
 type OutcomeEvaluation struct {
 	Iteration   int
 	Result      string // "satisfied", "needs_revision", "max_iterations_reached", "failed", "interrupted"
 	Explanation string // grader's prose verdict
+}
+
+type AgentSessionContext struct {
+	SessionID         string
+	ProviderSessionID string
+	OrganizationID    string
+	UserID            string
+	CanvasID          string
 }
 
 type FileResource struct {

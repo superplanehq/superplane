@@ -22,15 +22,15 @@ export function StartRunParameterFields({
   onParameterValuesChange: React.Dispatch<React.SetStateAction<Record<string, string | number | boolean>>>;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       {parameters.map((param) => {
         if (!param.name || !param.type) return null;
         const id = `start-run-param-${param.name}`;
         const label = parameterDisplayLabel(param);
         return (
-          <div key={param.name} className="space-y-1.5">
+          <div key={param.name} className="min-w-0 space-y-1.5">
             {param.type === "boolean" ? (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <Checkbox
                   id={id}
                   checked={Boolean(parameterValues[param.name])}
@@ -41,7 +41,7 @@ export function StartRunParameterFields({
                     }))
                   }
                 />
-                <Label htmlFor={id} className="cursor-pointer">
+                <Label htmlFor={id} className="min-w-0 cursor-pointer">
                   {label}
                 </Label>
               </div>
@@ -58,7 +58,7 @@ export function StartRunParameterFields({
                   }
                   disabled={selectOptionValues(param).length === 0}
                 >
-                  <SelectTrigger id={id} className="w-full">
+                  <SelectTrigger id={id} className="w-full min-w-0">
                     <SelectValue
                       placeholder={selectOptionValues(param).length === 0 ? "No options configured" : `Select ${label}`}
                     />

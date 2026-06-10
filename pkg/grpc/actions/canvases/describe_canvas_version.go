@@ -46,23 +46,17 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	userUUID := uuid.MustParse(userID)
 	if version.State == models.CanvasVersionStatePublished {
 		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersion(version, organizationID),
+			Version: SerializeCanvasVersionMetadata(version, organizationID),
 		}, nil
 	}
 
 	canAccess := false
 	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		// Drafts: only the owning user can describe them.
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
+		if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 			canAccess = true
 			return nil
-		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-			return draftErr
 		}
 
-		// Snapshots tied to a change request are visible to any
-		// authenticated org member, mirroring DescribeCanvasChangeRequest
-		// which already returns the snapshot's full spec to reviewers.
 		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
 			canAccess = true
 			return nil
@@ -79,6 +73,6 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersionMetadata(version, organizationID),
 	}, nil
 }

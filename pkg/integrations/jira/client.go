@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -114,9 +115,11 @@ func (c *Client) GetCurrentUser() (*User, error) {
 }
 
 type Project struct {
-	ID   string `json:"id"`
-	Key  string `json:"key"`
-	Name string `json:"name"`
+	ID         string `json:"id"`
+	Key        string `json:"key"`
+	Name       string `json:"name"`
+	Style      string `json:"style,omitempty"`
+	Simplified bool   `json:"simplified,omitempty"`
 }
 
 func (c *Client) ListProjects() ([]Project, error) {
@@ -130,6 +133,21 @@ func (c *Client) ListProjects() ([]Project, error) {
 		return nil, fmt.Errorf("error parsing projects response: %v", err)
 	}
 	return projects, nil
+}
+
+func (c *Client) GetProject(projectKey string) (*Project, error) {
+	endpoint := c.apiURL("/rest/api/3/project/" + url.PathEscape(projectKey))
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var project Project
+	if err := json.Unmarshal(body, &project); err != nil {
+		return nil, fmt.Errorf("error parsing project response: %v", err)
+	}
+	return &project, nil
 }
 
 type IssueTypeMeta struct {
@@ -160,13 +178,29 @@ func (c *Client) GetProjectIssueTypes(projectKey string) ([]IssueTypeMeta, error
 	return resp.IssueTypes, nil
 }
 
+// Status represents a Jira workflow status. Category is the normalized
+// statusCategory value used by Jira's workflow APIs: "TODO",
+// "IN_PROGRESS", "DONE", or "UNDEFINED". It is populated from either the
+// flat string returned by /rest/api/3/statuses/search or the nested
+// statusCategory.key returned by /rest/api/3/project/{key}/statuses.
 type Status struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Category string `json:"-"`
+}
+
+type projectStatusCategory struct {
+	Key string `json:"key"`
+}
+
+type projectStatus struct {
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	StatusCategory projectStatusCategory `json:"statusCategory"`
 }
 
 type projectStatusesIssueType struct {
-	Statuses []Status `json:"statuses"`
+	Statuses []projectStatus `json:"statuses"`
 }
 
 // GetProjectStatuses returns the unique set of statuses across all issue
@@ -194,16 +228,123 @@ func (c *Client) GetProjectStatuses(projectKey string) ([]Status, error) {
 				continue
 			}
 			seen[s.Name] = true
-			statuses = append(statuses, s)
+			statuses = append(statuses, Status{
+				ID:       s.ID,
+				Name:     s.Name,
+				Category: normalizeStatusCategoryKey(s.StatusCategory.Key),
+			})
 		}
 	}
 	return statuses, nil
+}
+
+type globalStatusesPage struct {
+	IsLast   bool           `json:"isLast"`
+	NextPage string         `json:"nextPage"`
+	Values   []globalStatus `json:"values"`
+}
+
+type globalStatus struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	StatusCategory string `json:"statusCategory"`
+}
+
+// ListGlobalStatuses returns every workflow status visible to the caller via
+// /rest/api/3/statuses/search. Used by the issueStatus resource picker when
+// no project context is available (e.g. when defining a global workflow) and
+// to look up status categories at workflow-create time.
+func (c *Client) ListGlobalStatuses() ([]Status, error) {
+	endpoint := c.apiURL("/rest/api/3/statuses/search?maxResults=200")
+	seen := map[string]bool{}
+	statuses := []Status{}
+
+	for endpoint != "" {
+		body, err := c.execRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page globalStatusesPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, fmt.Errorf("error parsing statuses search response: %v", err)
+		}
+
+		for _, s := range page.Values {
+			if seen[s.Name] {
+				continue
+			}
+			seen[s.Name] = true
+			statuses = append(statuses, Status{
+				ID:       s.ID,
+				Name:     s.Name,
+				Category: normalizeStatusCategoryName(s.StatusCategory),
+			})
+		}
+
+		if page.IsLast || page.NextPage == "" {
+			break
+		}
+		endpoint = page.NextPage
+	}
+
+	return statuses, nil
+}
+
+// normalizeStatusCategoryKey converts the lowercase "key" values returned by
+// /rest/api/3/project/{key}/statuses (new/indeterminate/done/undefined) into
+// the upper-case category names accepted by /rest/api/3/workflows/create.
+func normalizeStatusCategoryKey(key string) string {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "new":
+		return "TODO"
+	case "indeterminate":
+		return "IN_PROGRESS"
+	case "done":
+		return "DONE"
+	default:
+		return "UNDEFINED"
+	}
+}
+
+// normalizeStatusCategoryName accepts the category names returned by
+// /rest/api/3/statuses/search (already TODO/IN_PROGRESS/DONE/UNDEFINED) and
+// returns the canonical value used by workflow create requests.
+func normalizeStatusCategoryName(name string) string {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "TODO":
+		return "TODO"
+	case "IN_PROGRESS":
+		return "IN_PROGRESS"
+	case "DONE":
+		return "DONE"
+	default:
+		return "UNDEFINED"
+	}
 }
 
 type Transition struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	To   Status `json:"to"`
+	// Fields lists the fields that are present on this transition's screen,
+	// keyed by Jira field id (for example "resolution", "customfield_10010").
+	// Populated by GetIssueTransitions because we always pass
+	// expand=transitions.fields — needed to know whether a transition supports
+	// setting fields like resolution. Empty when no screen is configured.
+	Fields map[string]any `json:"fields,omitempty"`
+}
+
+// HasField reports whether this transition's screen includes the named Jira
+// field id. Used to avoid the "Field 'X' cannot be set. It is not on the
+// appropriate screen" error from Jira when the user supplies a field that
+// the chosen transition doesn't actually accept.
+func (t Transition) HasField(fieldID string) bool {
+	if t.Fields == nil {
+		return false
+	}
+	_, ok := t.Fields[strings.TrimSpace(fieldID)]
+	return ok
 }
 
 type transitionsResponse struct {
@@ -211,9 +352,13 @@ type transitionsResponse struct {
 }
 
 // GetIssueTransitions returns the transitions available from an issue's
-// current workflow state.
+// current workflow state, expanded with each transition's per-screen fields
+// so callers can decide whether a given field (for example resolution) can
+// be set during the transition.
 func (c *Client) GetIssueTransitions(issueKey string) ([]Transition, error) {
-	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+	query := url.Values{}
+	query.Set("expand", "transitions.fields")
+	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions?" + query.Encode())
 
 	body, err := c.execRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -227,12 +372,19 @@ func (c *Client) GetIssueTransitions(issueKey string) ([]Transition, error) {
 	return resp.Transitions, nil
 }
 
-type doTransitionRequest struct {
-	Transition transitionID `json:"transition"`
-}
-
 type transitionID struct {
 	ID string `json:"id"`
+}
+
+type DoTransitionOptions struct {
+	Comment    string
+	Resolution string
+}
+
+type doTransitionRequest struct {
+	Transition transitionID   `json:"transition"`
+	Fields     map[string]any `json:"fields,omitempty"`
+	Update     map[string]any `json:"update,omitempty"`
 }
 
 // ListAssignableUsers returns the users assignable to issues in a given
@@ -276,11 +428,59 @@ func (c *Client) ListPriorities() ([]Priority, error) {
 	return priorities, nil
 }
 
+type Resolution struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListResolutions returns all resolutions configured on the Jira site.
+// Resolutions are instance-level, not project-scoped.
+func (c *Client) ListResolutions() ([]Resolution, error) {
+	body, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/resolution"), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resolutions []Resolution
+	if err := json.Unmarshal(body, &resolutions); err != nil {
+		return nil, fmt.Errorf("error parsing resolutions response: %v", err)
+	}
+	return resolutions, nil
+}
+
 // DoTransition advances an issue along the given workflow transition.
 func (c *Client) DoTransition(issueKey, id string) error {
+	return c.DoTransitionWithOptions(issueKey, id, DoTransitionOptions{})
+}
+
+// DoTransitionWithOptions advances an issue and optionally applies
+// transition-scoped fields. The caller is responsible for ensuring that any
+// fields it sets are actually on the chosen transition's screen — Jira
+// returns a 400 with "Field 'X' cannot be set. It is not on the appropriate
+// screen, or unknown." otherwise. applyStatusWithOptions handles that
+// pre-check.
+func (c *Client) DoTransitionWithOptions(issueKey, id string, opts DoTransitionOptions) error {
 	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
 
-	body, err := json.Marshal(doTransitionRequest{Transition: transitionID{ID: id}})
+	req := doTransitionRequest{Transition: transitionID{ID: id}}
+	if resolution := strings.TrimSpace(opts.Resolution); resolution != "" {
+		req.Fields = map[string]any{
+			"resolution": map[string]any{"name": resolution},
+		}
+	}
+	if comment := strings.TrimSpace(opts.Comment); comment != "" {
+		req.Update = map[string]any{
+			"comment": []map[string]any{
+				{
+					"add": map[string]any{
+						"body": WrapInADF(comment),
+					},
+				},
+			},
+		}
+	}
+
+	body, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("error marshaling transition request: %v", err)
 	}
@@ -289,6 +489,169 @@ func (c *Client) DoTransition(issueKey, id string) error {
 		return err
 	}
 	return nil
+}
+
+type FlexibleString string
+
+func (s *FlexibleString) UnmarshalJSON(b []byte) error {
+	raw := strings.TrimSpace(string(b))
+	if raw == "" || raw == "null" {
+		*s = ""
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		*s = FlexibleString(str)
+		return nil
+	}
+
+	*s = FlexibleString(raw)
+	return nil
+}
+
+func (s FlexibleString) String() string {
+	return string(s)
+}
+
+// WorkflowSchemeDetail is returned by GET /rest/api/3/workflowscheme/{id}. It
+// describes which workflow is used per issue type. Used to resolve the
+// workflow bound to an issue (issue type ID -> workflow name).
+type WorkflowSchemeDetail struct {
+	ID                FlexibleString    `json:"id"`
+	Name              string            `json:"name"`
+	DefaultWorkflow   string            `json:"defaultWorkflow"`
+	IssueTypeMappings map[string]string `json:"issueTypeMappings"`
+}
+
+// GetWorkflowScheme returns details for one workflow scheme.
+func (c *Client) GetWorkflowScheme(schemeID string) (*WorkflowSchemeDetail, error) {
+	endpoint := c.apiURL("/rest/api/3/workflowscheme/" + url.PathEscape(schemeID))
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out WorkflowSchemeDetail
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("error parsing workflow scheme response: %v", err)
+	}
+	if out.IssueTypeMappings == nil {
+		out.IssueTypeMappings = map[string]string{}
+	}
+	return &out, nil
+}
+
+// projectWorkflowSchemeAssignment captures one entry in the response of
+// /rest/api/3/workflowscheme/project — the assignment of a workflow scheme
+// (which can be inlined as workflowScheme) to a project.
+type projectWorkflowSchemeAssignment struct {
+	ProjectIDs     []string `json:"projectIds"`
+	WorkflowScheme struct {
+		ID                FlexibleString    `json:"id"`
+		Name              string            `json:"name"`
+		DefaultWorkflow   string            `json:"defaultWorkflow,omitempty"`
+		IssueTypeMappings map[string]string `json:"issueTypeMappings,omitempty"`
+	} `json:"workflowScheme"`
+}
+
+type projectWorkflowSchemesResponse struct {
+	Values []projectWorkflowSchemeAssignment `json:"values"`
+}
+
+// GetWorkflowSchemeForProject returns the workflow scheme assigned to a
+// company-managed project. For team-managed projects Jira may return an empty
+// list (their workflow lives directly on the project), so callers should
+// handle a nil result.
+func (c *Client) GetWorkflowSchemeForProject(projectID string) (*WorkflowSchemeDetail, error) {
+	query := url.Values{}
+	query.Set("projectId", projectID)
+	endpoint := c.apiURL("/rest/api/3/workflowscheme/project?" + query.Encode())
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp projectWorkflowSchemesResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing project workflow scheme response: %v", err)
+	}
+
+	for _, assignment := range resp.Values {
+		schemeID := strings.TrimSpace(assignment.WorkflowScheme.ID.String())
+		if schemeID != "" {
+			// Resolve the full scheme details (the inlined version omits issueTypeMappings).
+			return c.GetWorkflowScheme(schemeID)
+		}
+		// Jira omits the scheme id for the built-in Default Workflow Scheme
+		// (common for company-managed projects that never customized it). The
+		// inlined object still carries the default workflow and any per-issue-type
+		// mappings, so fall back to it instead of dropping the workflow entirely.
+		if defaultWorkflow := strings.TrimSpace(assignment.WorkflowScheme.DefaultWorkflow); defaultWorkflow != "" {
+			mappings := assignment.WorkflowScheme.IssueTypeMappings
+			if mappings == nil {
+				mappings = map[string]string{}
+			}
+			return &WorkflowSchemeDetail{
+				ID:                assignment.WorkflowScheme.ID,
+				Name:              assignment.WorkflowScheme.Name,
+				DefaultWorkflow:   defaultWorkflow,
+				IssueTypeMappings: mappings,
+			}, nil
+		}
+	}
+
+	return nil, nil
+}
+
+type workflowSearchEntry struct {
+	ID struct {
+		Name string `json:"name"`
+	} `json:"id"`
+	Statuses []globalStatus `json:"statuses"`
+}
+
+type workflowSearchResponse struct {
+	Values []workflowSearchEntry `json:"values"`
+}
+
+// GetWorkflowStatusesByName returns the statuses of the workflow with the
+// given exact name. Jira's /rest/api/3/workflow/search?workflowName=... does
+// a prefix-style match server-side and can return multiple workflows, so we
+// filter for an exact name match here and refuse to guess if none of the
+// returned workflows match — returning a different workflow's statuses
+// would silently mis-describe the issue's state machine.
+func (c *Client) GetWorkflowStatusesByName(workflowName string) ([]Status, error) {
+	query := url.Values{}
+	query.Set("workflowName", workflowName)
+	query.Set("expand", "statuses")
+	endpoint := c.apiURL("/rest/api/3/workflow/search?" + query.Encode())
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out workflowSearchResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("error parsing workflow search response: %v", err)
+	}
+	for _, entry := range out.Values {
+		if entry.ID.Name == workflowName {
+			return statusesFromGlobal(entry.Statuses), nil
+		}
+	}
+	return nil, fmt.Errorf("workflow %q not found", workflowName)
+}
+
+func statusesFromGlobal(raw []globalStatus) []Status {
+	statuses := make([]Status, 0, len(raw))
+	for _, s := range raw {
+		statuses = append(statuses, Status{
+			ID:       s.ID,
+			Name:     s.Name,
+			Category: normalizeStatusCategoryName(s.StatusCategory),
+		})
+	}
+	return statuses
 }
 
 type Issue struct {
@@ -640,6 +1003,123 @@ func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTota
 	}
 
 	return out, nil
+}
+
+// CustomerRequest is returned by GET /rest/servicedeskapi/request/{issueIdOrKey}.
+type CustomerRequest struct {
+	IssueID       string `json:"issueId,omitempty"`
+	IssueKey      string `json:"issueKey,omitempty"`
+	ServiceDeskID string `json:"serviceDeskId,omitempty"`
+	RequestTypeID string `json:"requestTypeId,omitempty"`
+}
+
+func (c *Client) GetCustomerRequest(issueKey string) (*CustomerRequest, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s", base, url.PathEscape(issueKey))
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var out CustomerRequest
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse customer request: %w", err)
+	}
+	return &out, nil
+}
+
+type Approval struct {
+	ID            FlexibleString `json:"id"`
+	Name          string         `json:"name,omitempty"`
+	FinalDecision string         `json:"finalDecision,omitempty"`
+	Approvers     []Approver     `json:"approvers,omitempty"`
+	CreatedDate   map[string]any `json:"createdDate,omitempty"`
+	CompletedDate map[string]any `json:"completedDate,omitempty"`
+	Links         map[string]any `json:"_links,omitempty"`
+}
+
+type Approver struct {
+	Approver         User   `json:"approver,omitempty"`
+	ApproverDecision string `json:"approverDecision,omitempty"`
+}
+
+type approvalsPage struct {
+	Values     []Approval `json:"values"`
+	IsLastPage bool       `json:"isLastPage"`
+}
+
+func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []Approval
+	start := 0
+	const pageSize = 50
+
+	for range 20 {
+		query := url.Values{}
+		query.Set("start", strconv.Itoa(start))
+		query.Set("limit", strconv.Itoa(pageSize))
+		u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/approval?%s", base, url.PathEscape(issueKey), query.Encode())
+
+		responseBody, err := c.execRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page approvalsPage
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse approvals: %w", err)
+		}
+
+		out = append(out, page.Values...)
+		if page.IsLastPage || len(page.Values) == 0 {
+			break
+		}
+		start += len(page.Values)
+	}
+
+	return out, nil
+}
+
+func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (*Approval, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf(
+		"%s/rest/servicedeskapi/request/%s/approval/%s",
+		base,
+		url.PathEscape(issueKey),
+		url.PathEscape(approvalID),
+	)
+
+	body, err := json.Marshal(map[string]string{"decision": strings.ToLower(strings.TrimSpace(decision))})
+	if err != nil {
+		return nil, fmt.Errorf("marshal approval decision: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out Approval
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse approval decision response: %w", err)
+	}
+	return &out, nil
+}
+
+func (c *Client) AddCustomerRequestComment(issueKey, body string, public bool) error {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/comment", base, url.PathEscape(issueKey))
+
+	requestBody, err := json.Marshal(map[string]any{
+		"body":   body,
+		"public": public,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal customer request comment: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, u, bytes.NewReader(requestBody))
+	return err
 }
 
 func jqlQuotedProjectKey(projectKey string) string {
@@ -1666,4 +2146,389 @@ func isNumericIssueRef(s string) bool {
 		}
 	}
 	return len(s) > 0
+}
+
+const (
+	opsAlertPollMaxAttempts = 42
+	opsAlertPollInterval    = 450 * time.Millisecond
+)
+
+// OpsAlertResponder is a responder or visibleTo entry for the Jira Service Management Ops Alerts API.
+type OpsAlertResponder struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+// OpsCreateAlertRequest is the JSON body for POST /v1/alerts.
+type OpsCreateAlertRequest struct {
+	Message         string              `json:"message"`
+	Responders      []OpsAlertResponder `json:"responders,omitempty"`
+	VisibleTo       []OpsAlertResponder `json:"visibleTo,omitempty"`
+	Note            string              `json:"note,omitempty"`
+	Alias           string              `json:"alias,omitempty"`
+	Entity          string              `json:"entity,omitempty"`
+	Source          string              `json:"source,omitempty"`
+	Tags            []string            `json:"tags,omitempty"`
+	Actions         []string            `json:"actions,omitempty"`
+	Description     string              `json:"description,omitempty"`
+	Priority        string              `json:"priority,omitempty"`
+	ExtraProperties map[string]any      `json:"extraProperties,omitempty"`
+}
+
+// OpsAsyncSuccessResponse is returned by create/delete and several mutating Ops alert endpoints (often with HTTP 202).
+type OpsAsyncSuccessResponse struct {
+	Result    string  `json:"result"`
+	RequestID string  `json:"requestId"`
+	Took      float64 `json:"took"`
+}
+
+func (c *Client) opsAlertsBasePath(cloudID string) string {
+	return fmt.Sprintf(
+		"https://api.atlassian.com/jsm/ops/api/%s/v1/alerts",
+		url.PathEscape(strings.TrimSpace(cloudID)),
+	)
+}
+
+func (c *Client) execOpsAlertJSON(method, fullURL string, body io.Reader) ([]byte, error) {
+	return c.execRequest(method, fullURL, body)
+}
+
+func parseOpsAsyncSuccess(body []byte) (*OpsAsyncSuccessResponse, error) {
+	var out OpsAsyncSuccessResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("parse ops alert response: %w", err)
+	}
+	return &out, nil
+}
+
+// CreateOpsAlert creates an alert via the JSM Ops REST API (asynchronous processing; see SuccessResponse).
+func (c *Client) CreateOpsAlert(cloudID string, req *OpsCreateAlertRequest) (*OpsAsyncSuccessResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("create alert request is required")
+	}
+	u := c.opsAlertsBasePath(cloudID)
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create alert body: %w", err)
+	}
+	body, err := c.execOpsAlertJSON(http.MethodPost, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// GetOpsAlert returns one alert by id (GET /v1/alerts/{id}).
+func (c *Client) GetOpsAlert(cloudID, alertID string) (map[string]any, error) {
+	alertID = strings.TrimSpace(alertID)
+	if alertID == "" {
+		return nil, fmt.Errorf("alert id is required")
+	}
+	u := fmt.Sprintf("%s/%s", c.opsAlertsBasePath(cloudID), url.PathEscape(alertID))
+	body, err := c.execOpsAlertJSON(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("parse get alert response: %w", err)
+	}
+	return out, nil
+}
+
+// DeleteOpsAlert deletes an alert by id (DELETE /v1/alerts/{id}).
+func (c *Client) DeleteOpsAlert(cloudID, alertID string) (*OpsAsyncSuccessResponse, error) {
+	alertID = strings.TrimSpace(alertID)
+	if alertID == "" {
+		return nil, fmt.Errorf("alert id is required")
+	}
+	u := fmt.Sprintf("%s/%s", c.opsAlertsBasePath(cloudID), url.PathEscape(alertID))
+	body, err := c.execOpsAlertJSON(http.MethodDelete, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// AssignOpsAlert assigns an alert to a user via POST /v1/alerts/{id}/assign.
+func (c *Client) AssignOpsAlert(cloudID, alertID, accountID string) (*OpsAsyncSuccessResponse, error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, fmt.Errorf("assignee account id is required")
+	}
+	payload, err := json.Marshal(map[string]string{"accountId": accountID})
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s/assign", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPost, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// AcknowledgeOpsAlert acknowledges an alert (POST /v1/alerts/{id}/acknowledge).
+func (c *Client) AcknowledgeOpsAlert(cloudID, alertID string) (*OpsAsyncSuccessResponse, error) {
+	u := fmt.Sprintf("%s/%s/acknowledge", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPost, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// CloseOpsAlert closes an alert (POST /v1/alerts/{id}/close).
+func (c *Client) CloseOpsAlert(cloudID, alertID string) (*OpsAsyncSuccessResponse, error) {
+	u := fmt.Sprintf("%s/%s/close", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPost, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// PatchOpsAlertPriority updates alert priority (PATCH /v1/alerts/{id}/priority).
+func (c *Client) PatchOpsAlertPriority(cloudID, alertID, priority string) (*OpsAsyncSuccessResponse, error) {
+	payload, err := json.Marshal(map[string]string{"priority": strings.TrimSpace(priority)})
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s/priority", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPatch, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// PatchOpsAlertMessage updates the alert message (PATCH /v1/alerts/{id}/message).
+func (c *Client) PatchOpsAlertMessage(cloudID, alertID, message string) (*OpsAsyncSuccessResponse, error) {
+	payload, err := json.Marshal(map[string]string{"message": message})
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s/message", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPatch, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// PatchOpsAlertDescription updates the alert description (PATCH /v1/alerts/{id}/description).
+func (c *Client) PatchOpsAlertDescription(cloudID, alertID, description string) (*OpsAsyncSuccessResponse, error) {
+	payload, err := json.Marshal(map[string]string{"description": description})
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s/description", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPatch, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	return parseOpsAsyncSuccess(body)
+}
+
+// AddOpsAlertNote adds a note (POST /v1/alerts/{id}/notes).
+func (c *Client) AddOpsAlertNote(cloudID, alertID, note string) (map[string]any, error) {
+	payload, err := json.Marshal(map[string]string{"note": note})
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("%s/%s/notes", c.opsAlertsBasePath(cloudID), url.PathEscape(strings.TrimSpace(alertID)))
+	body, err := c.execOpsAlertJSON(http.MethodPost, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("parse add alert note response: %w", err)
+	}
+	return out, nil
+}
+
+// PatchOpsAlertNote updates an existing note (PATCH /v1/alerts/{alertId}/notes/{id}).
+func (c *Client) PatchOpsAlertNote(cloudID, alertID, noteID, note string) (map[string]any, error) {
+	payload, err := json.Marshal(map[string]string{"note": note})
+	if err != nil {
+		return nil, err
+	}
+	base := c.opsAlertsBasePath(cloudID)
+	u := fmt.Sprintf(
+		"%s/%s/notes/%s",
+		base,
+		url.PathEscape(strings.TrimSpace(alertID)),
+		url.PathEscape(strings.TrimSpace(noteID)),
+	)
+	body, err := c.execOpsAlertJSON(http.MethodPatch, u, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("parse update alert note response: %w", err)
+	}
+	return out, nil
+}
+
+type opsListAlertsEnvelope struct {
+	Values []map[string]any `json:"values"`
+}
+
+// ListOpsAlerts returns recent Ops alerts from GET /v1/alerts (newest batches only; capped by size).
+func (c *Client) ListOpsAlerts(cloudID string, size int) ([]map[string]any, error) {
+	if size <= 0 || size > 100 {
+		size = 100
+	}
+	u := fmt.Sprintf("%s?size=%d", c.opsAlertsBasePath(cloudID), size)
+	body, err := c.execOpsAlertJSON(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	var env opsListAlertsEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("parse list alerts response: %w", err)
+	}
+	if env.Values == nil {
+		env.Values = []map[string]any{}
+	}
+	return env.Values, nil
+}
+
+// GetOpsAlertRequestStatus returns async request status GET /v1/alerts/requests/{id}.
+func (c *Client) GetOpsAlertRequestStatus(cloudID, requestID string) (map[string]any, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return nil, fmt.Errorf("request id is required")
+	}
+	u := fmt.Sprintf("%s/requests/%s", c.opsAlertsBasePath(cloudID), url.PathEscape(requestID))
+	body, err := c.execOpsAlertJSON(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("parse alert request status: %w", err)
+	}
+	return out, nil
+}
+
+func opsAlertStringField(m map[string]any, key string) string {
+	raw, ok := m[key]
+	if !ok || raw == nil {
+		return ""
+	}
+	switch s := raw.(type) {
+	case string:
+		return strings.TrimSpace(s)
+	default:
+		return strings.TrimSpace(fmt.Sprint(s))
+	}
+}
+
+func opsAlertStatusIsSuccessful(status map[string]any) bool {
+	v, ok := status["isSuccess"]
+	if !ok {
+		return false
+	}
+	switch b := v.(type) {
+	case bool:
+		return b
+	default:
+		return false
+	}
+}
+
+func opsAlertStatusIsProcessed(status map[string]any) bool {
+	return opsAlertStringField(status, "processedAt") != ""
+}
+
+func opsAlertStatusAlertID(status map[string]any) string {
+	return opsAlertStringField(status, "alertId")
+}
+
+// opsAlertRequestStatusIndicatesFailure reports API-level failure once a request is processed.
+func opsAlertRequestStatusIndicatesFailure(status map[string]any) bool {
+	if !opsAlertStatusIsSuccessful(status) {
+		return true
+	}
+	msg := strings.ToLower(opsAlertStringField(status, "status"))
+	if msg == "" {
+		return false
+	}
+	for _, frag := range []string{
+		"fail",
+		"error",
+		"invalid",
+		"reject",
+		"does not exist",
+		"not found",
+		"unable",
+		"denied",
+	} {
+		if strings.Contains(msg, frag) {
+			return true
+		}
+	}
+	return false
+}
+
+func opsAlertAsyncRequestError(status map[string]any, requestID string) error {
+	detail := opsAlertStringField(status, "status")
+	if detail == "" {
+		detail = "request did not succeed"
+	}
+	return fmt.Errorf("async Ops alert request %s failed: %s", requestID, detail)
+}
+
+// ResolveAlertIDAfterOpsRequest polls GET alerts/requests until the async request is fully processed.
+func (c *Client) ResolveAlertIDAfterOpsRequest(cloudID, requestID, knownAlertID string) (string, error) {
+	requestID = strings.TrimSpace(requestID)
+	knownAlertID = strings.TrimSpace(knownAlertID)
+
+	if requestID == "" {
+		if knownAlertID == "" {
+			return "", fmt.Errorf("no async request id to resolve Ops alert outcome")
+		}
+		return knownAlertID, nil
+	}
+
+	for attempt := range opsAlertPollMaxAttempts {
+		if attempt > 0 {
+			time.Sleep(opsAlertPollInterval)
+		}
+
+		status, err := c.GetOpsAlertRequestStatus(cloudID, requestID)
+		if err != nil {
+			return "", err
+		}
+
+		if !opsAlertStatusIsProcessed(status) {
+			continue
+		}
+
+		if opsAlertRequestStatusIndicatesFailure(status) {
+			return "", opsAlertAsyncRequestError(status, requestID)
+		}
+
+		if knownAlertID != "" {
+			return knownAlertID, nil
+		}
+
+		aid := opsAlertStatusAlertID(status)
+		if aid == "" {
+			return "", fmt.Errorf(
+				"async Ops alert request %s finished without an alert id (status: %s)",
+				requestID,
+				opsAlertStringField(status, "status"),
+			)
+		}
+		return aid, nil
+	}
+
+	return "", fmt.Errorf(
+		"timed out waiting for Ops alert async request %s to finish processing",
+		requestID,
+	)
 }

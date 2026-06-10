@@ -2,8 +2,15 @@
 
 import * as Headless from "@headlessui/react";
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../Icon";
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+}
 
 export function MultiCombobox<T extends { id: string }>({
   options,
@@ -48,14 +55,32 @@ export function MultiCombobox<T extends { id: string }>({
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [justAddedTag, setJustAddedTag] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0, width: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const optionsPortalRef = useRef<HTMLDivElement>(null);
+
+  const updateDropdownPosition = useCallback(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const rect = containerRef.current.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target) || optionsPortalRef.current?.contains(target)) {
+        return;
       }
+
+      setIsOpen(false);
     };
 
     if (isOpen) {
@@ -65,6 +90,21 @@ export function MultiCombobox<T extends { id: string }>({
       };
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    updateDropdownPosition();
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [isOpen, updateDropdownPosition]);
 
   const filteredOptions =
     query === ""
@@ -268,28 +308,40 @@ export function MultiCombobox<T extends { id: string }>({
           )}
         </span>
 
-        {isOpen && (query === "" || hasMatches) && (
-          <Headless.ComboboxOptions
-            static
-            className={clsx(
-              "absolute top-full left-0 right-0 z-10 mt-1",
-              "scroll-py-1 rounded-xl p-1 select-none empty:invisible w-full",
-              "outline outline-transparent focus:outline-hidden",
-              "max-h-60 overflow-y-auto overscroll-contain",
-              "bg-white dark:bg-gray-800",
-              "shadow-lg ring-1 ring-gray-950/10 dark:ring-white/10",
-              "transition-opacity duration-100 ease-in",
-            )}
-          >
-            {allOptions
-              .filter((option) => option && option.id)
-              .map((option) => (
-                <MultiComboboxOption key={option.id} value={option}>
-                  {children(option, false)}
-                </MultiComboboxOption>
-              ))}
-          </Headless.ComboboxOptions>
-        )}
+        {isOpen &&
+          (query === "" || hasMatches) &&
+          createPortal(
+            <div
+              ref={optionsPortalRef}
+              className="fixed z-[9999]"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`,
+              }}
+            >
+              <Headless.ComboboxOptions
+                static
+                className={clsx(
+                  "scroll-py-1 rounded-xl p-1 select-none empty:invisible w-full",
+                  "outline outline-transparent focus:outline-hidden",
+                  "max-h-60 overflow-y-auto overscroll-contain",
+                  "bg-white dark:bg-gray-800",
+                  "shadow-lg ring-1 ring-gray-950/10 dark:ring-white/10",
+                  "transition-opacity duration-100 ease-in",
+                )}
+              >
+                {allOptions
+                  .filter((option) => option && option.id)
+                  .map((option) => (
+                    <MultiComboboxOption key={option.id} value={option}>
+                      {children(option, false)}
+                    </MultiComboboxOption>
+                  ))}
+              </Headless.ComboboxOptions>
+            </div>,
+            document.body,
+          )}
       </Headless.Combobox>
     </div>
   );

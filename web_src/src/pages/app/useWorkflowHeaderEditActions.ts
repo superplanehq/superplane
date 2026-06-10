@@ -84,9 +84,14 @@ function useAutoEditMode(
     triggeredRef.current = true;
 
     void handleToggleEditMode().then(() => {
-      const next = new URLSearchParams(searchParams);
-      next.delete("edit");
-      setSearchParams(next, { replace: true });
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("edit");
+          return next;
+        },
+        { replace: true },
+      );
     });
   }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
 }

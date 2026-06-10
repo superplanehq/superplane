@@ -55,7 +55,7 @@ export function ChatComposer({
     dismiss,
   } = useMentions();
 
-  const candidates = useMentionCandidates(nodes, runs, filter);
+  const candidates = useMentionCandidates(nodes, runs, filter, showDropdown);
   const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
@@ -102,6 +102,10 @@ export function ChatComposer({
     [canSend, handleSend],
   );
 
+  const handleToolbarSend = useStableCallback(() => {
+    void handleSend();
+  });
+
   return (
     <footer className="px-3 pb-3 pt-2">
       <div
@@ -127,17 +131,26 @@ export function ChatComposer({
           statusLabel={statusLabel}
           canSend={canSend}
           onStop={onStop}
-          onSend={() => void handleSend()}
+          onSend={handleToolbarSend}
         />
       </div>
-      <MentionDropdown
-        items={candidates}
-        visible={showDropdown}
-        anchorEl={containerRef.current}
-        onSelect={handleMentionSelect}
-        onDismiss={handleDismiss}
-        keyboardRef={mentionKeyboardRef}
-      />
+      {showDropdown ? (
+        <MentionDropdown
+          items={candidates}
+          visible={showDropdown}
+          anchorEl={containerRef.current}
+          onSelect={handleMentionSelect}
+          onDismiss={handleDismiss}
+          keyboardRef={mentionKeyboardRef}
+        />
+      ) : null}
     </footer>
   );
+}
+
+function useStableCallback(callback: () => void): () => void {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  return useCallback(() => callbackRef.current(), []);
 }

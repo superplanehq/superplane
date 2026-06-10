@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
@@ -31,7 +32,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -459,6 +462,59 @@ The expression has access to:
 }
 ```
 
+<a id="for-each"></a>
+
+## For Each
+
+**Component key:** `forEach`
+
+The For Each component reads an array from the upstream payload and emits one downstream event per element.
+
+### Use Cases
+
+- Iterate over a list of results and process each one independently
+- Split runner output arrays into per-item workflow paths
+- Process each page, service, or record with the same downstream steps
+
+### How It Works
+
+1. Evaluates the configured array expression against the incoming event data
+2. Emits one `foreach.item` event to the `item` channel for each element
+3. If the array is empty, passes without emitting any events
+
+### Limits
+
+- At most 500 items per execution. Larger arrays fail with an error.
+
+### Output Fields (per item)
+
+- **item**: The array element value
+- **index**: Zero-based index of the element
+- **totalCount**: Total number of items in the array
+
+### Expression Environment
+
+- **$**: The run context data
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "index": 0,
+    "item": {
+      "cost_usd": 42.5,
+      "service": "EC2"
+    },
+    "totalCount": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "foreach.item"
+}
+```
+
 <a id="graph-ql-request"></a>
 
 ## GraphQL Request
@@ -804,6 +860,68 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 }
 ```
 
+<a id="run-bash"></a>
+
+## Run Bash
+
+**Component key:** `runnerBash`
+
+Runs a Bash script on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Bash on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**).
+
+### Script contract
+Your script runs as-is. The runner sets:
+
+- `SUPERPLANE_PAYLOAD_FILE` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
+- `SUPERPLANE_RESULT_FILE` — path where your script must write a JSON-serializable **result**
+
+Stdout and stderr (for example `echo`) stream to **View logs**. Write the structured **result** to `SUPERPLANE_RESULT_FILE`; it is emitted on the finished event as **result**.
+
+Example:
+
+```bash
+##!/usr/bin/env bash
+set -euo pipefail
+
+num=$(jq -r '."GitHub PR".data.number' "$SUPERPLANE_PAYLOAD_FILE")
+echo "Processing PR #$num"
+printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Debian image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: Bash source executed by the runner.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerBash.finished"
+}
+```
+
 <a id="run-java-script"></a>
 
 ## Run JavaScript
@@ -855,6 +973,59 @@ function main() {
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerJS.finished"
+}
+```
+
+<a id="run-python"></a>
+
+## Run Python
+
+**Component key:** `runnerPython`
+
+Runs Python on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Python 3 on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Python image (for example **Python 3.12 (slim)**) so `python3` is available.
+
+### Script contract
+Your script must define `def main(payload):`. The runner passes upstream canvas data as the `payload` argument (same shape as workflow expressions). Return a JSON-serializable value from `main()`; it is emitted on the finished event as **result**.
+
+Example:
+
+```python
+def main(payload):
+    return {"pr": payload["GitHub PR"]["data"]["number"]}
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Python image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: Python source executed by Python 3.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerPython.finished"
 }
 ```
 

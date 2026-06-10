@@ -21,15 +21,20 @@ interface NodePanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
 /**
  * Single-node panel: node name + optional manual-run button. Resolves the
  * node reference (id or name) through {@link ConsoleContext}.
  */
-export function NodePanelCard({ panel, readOnly, onDelete, onChange }: NodePanelCardProps) {
+export function NodePanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: NodePanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -37,14 +42,14 @@ export function NodePanelCard({ panel, readOnly, onDelete, onChange }: NodePanel
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <NodePanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<NodePanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="node"
         initialContent={content}

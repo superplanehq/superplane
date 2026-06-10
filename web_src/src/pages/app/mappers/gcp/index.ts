@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import { baseMapper, cloudBuildBaseMapper } from "./base";
+import { cloudBuildBaseMapper, computeBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
@@ -20,16 +20,31 @@ import {
 import { onMessageTriggerRenderer } from "./on_message";
 import { cloudDNSMapper } from "./clouddns";
 import { deleteVMInstanceMapper } from "./delete_vm_instance";
+import { getVMInstanceMapper } from "./get_vm_instance";
 import { manageVMInstancePowerMapper, MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY } from "./manage_vm_instance_power";
 import { updateVMInstanceTypeMapper } from "./update_vm_instance_type";
 import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } from "./get_vm_instance_metrics";
+import {
+  createAlertingPolicyMapper,
+  getAlertingPolicyMapper,
+  deleteAlertingPolicyMapper,
+  updateAlertingPolicyMapper,
+} from "./monitoring";
+import { createImageMapper } from "./create_image";
+import { updateImageMapper } from "./update_image";
+import { deleteImageMapper } from "./delete_image";
+import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  createVM: baseMapper,
+  createVM: computeBaseMapper,
   deleteVMInstance: deleteVMInstanceMapper,
+  getVMInstance: getVMInstanceMapper,
   manageVMInstancePower: manageVMInstancePowerMapper,
   updateVMInstanceType: updateVMInstanceTypeMapper,
   getVMInstanceMetrics: getVMInstanceMetricsMapper,
+  createImage: createImageMapper,
+  updateImage: updateImageMapper,
+  deleteImage: deleteImageMapper,
   "cloudbuild.createBuild": cloudBuildBaseMapper,
   "cloudbuild.getBuild": cloudBuildBaseMapper,
   "cloudbuild.runTrigger": runTriggerMapper,
@@ -44,6 +59,13 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "clouddns.createRecord": cloudDNSMapper,
   "clouddns.deleteRecord": cloudDNSMapper,
   "clouddns.updateRecord": cloudDNSMapper,
+  "monitoring.createAlertingPolicy": createAlertingPolicyMapper,
+  "monitoring.getAlertingPolicy": getAlertingPolicyMapper,
+  "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
+  "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
+  "compute.createStaticIP": createStaticIPMapper,
+  "compute.deleteStaticIP": deleteStaticIPMapper,
+  "compute.manageStaticIP": manageStaticIPMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -57,9 +79,13 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVM: buildActionStateRegistry("completed"),
   deleteVMInstance: buildActionStateRegistry("completed"),
+  getVMInstance: buildActionStateRegistry("completed"),
   manageVMInstancePower: MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY,
   updateVMInstanceType: buildActionStateRegistry("completed"),
   getVMInstanceMetrics: GET_VM_INSTANCE_METRICS_STATE_REGISTRY,
+  createImage: buildActionStateRegistry("created"),
+  updateImage: buildActionStateRegistry("updated"),
+  deleteImage: buildActionStateRegistry("deleted"),
   "cloudbuild.createBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.getBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
@@ -74,6 +100,13 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "clouddns.createRecord": buildActionStateRegistry("completed"),
   "clouddns.deleteRecord": buildActionStateRegistry("completed"),
   "clouddns.updateRecord": buildActionStateRegistry("completed"),
+  "monitoring.createAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.getAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.deleteAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.updateAlertingPolicy": buildActionStateRegistry("completed"),
+  "compute.createStaticIP": buildActionStateRegistry("completed"),
+  "compute.deleteStaticIP": buildActionStateRegistry("completed"),
+  "compute.manageStaticIP": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

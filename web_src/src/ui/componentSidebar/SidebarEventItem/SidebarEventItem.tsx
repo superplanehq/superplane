@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Button } from "@/components/ui/button";
 import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isCancelledError } from "@tanstack/react-query";
@@ -609,13 +610,16 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
               <div className="flex items-center gap-2">
                 <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
-                  <button
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
                     onClick={() => copyPayloadToClipboard(modalPayload)}
-                    className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
                   >
                     {React.createElement(resolveIcon("copy"), { size: 14 })}
                     Copy
-                  </button>
+                  </Button>
                 </SimpleTooltip>
                 <button
                   onClick={() => {

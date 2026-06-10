@@ -435,17 +435,20 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 		return nil, err
 	}
 	if len(executionsInChain) > 0 {
-		executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-		for _, execution := range executionsInChain {
-			executionIDs = append(executionIDs, execution.ID)
-		}
-
-		events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+		linearExecutions, err := b.listLinearExecutionsInChain()
 		if err != nil {
 			return nil, err
 		}
 
-		latestByExecution := latestEventByExecution(events, executionIDs)
+		outputs, err := newExecutionOutputLookup(
+			b.tx,
+			linearExecutions,
+			executionIDsFromExecutions(executionsInChain),
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		for i := len(executionsInChain) - 1; i >= 0; i-- {
 			execution := executionsInChain[i]
 			name, ok := nodeIDToName[execution.NodeID]
@@ -453,8 +456,11 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 				continue
 			}
 
-			event, ok := latestByExecution[execution.ID]
-			if !ok {
+			event, found, err := outputs.outputEvent(execution.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
 				continue
 			}
 
@@ -860,14 +866,30 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		executionIDByRef[nodeRef] = execution.ID
 	}
 
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	chainExecutions, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
+	referencedExecutionIDs := make([]uuid.UUID, 0, len(executionIDByRef))
+	for _, executionID := range executionIDByRef {
+		referencedExecutionIDs = append(referencedExecutionIDs, executionID)
+	}
+
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		chainExecutions,
+		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+	)
+	if err != nil {
+		return err
+	}
+
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok := latestByExecution[executionID]
+		event, ok, err := outputs.outputEvent(executionID)
+		if err != nil {
+			return fmt.Errorf("node %s: %w", nodeRef, err)
+		}
 		if !ok {
 			return fmt.Errorf("node %s has no outputs", nodeRef)
 		}
@@ -876,27 +898,6 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	}
 
 	return nil
-}
-
-func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
-	latestByExecution := make(map[uuid.UUID]models.CanvasEvent, len(executionIDs))
-	for _, event := range events {
-		if event.ExecutionID == nil {
-			continue
-		}
-
-		latest, ok := latestByExecution[*event.ExecutionID]
-		if !ok || event.CreatedAt == nil {
-			latestByExecution[*event.ExecutionID] = event
-			continue
-		}
-
-		if latest.CreatedAt == nil || event.CreatedAt.After(*latest.CreatedAt) {
-			latestByExecution[*event.ExecutionID] = event
-		}
-	}
-
-	return latestByExecution
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
@@ -1008,25 +1009,26 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		startIndex = 1
 	}
 
-	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-	for _, execution := range executionsInChain {
-		executionIDs = append(executionIDs, execution.ID)
-	}
-
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		executionsInChain,
+		executionIDsFromExecutions(executionsInChain),
+	)
 	if err != nil {
 		return step, nil, err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
 	for _, execution := range executionsInChain[startIndex:] {
 		step++
 		if step < depth {
 			continue
 		}
 
-		event, exists := latestByExecution[execution.ID]
-		if !exists {
+		event, ok, err := outputs.outputEvent(execution.ID)
+		if err != nil {
+			return step, nil, err
+		}
+		if !ok {
 			continue
 		}
 

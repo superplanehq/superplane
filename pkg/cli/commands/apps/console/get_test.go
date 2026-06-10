@@ -11,8 +11,63 @@ const (
 	testCanvasID       = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	testCanvasName     = "my-canvas"
 	testDescribeCanvas = "/api/v1/canvases/" + testCanvasID
-	testConsolePath    = "/api/v1/canvases/" + testCanvasID + "/console"
+	testMePath         = "/api/v1/me"
+	cliTestUserID      = "user-1"
 )
+
+func repositoryConsoleFilePath(canvasID string) string {
+	return "/api/v1/canvases/" + canvasID + "/repository/file"
+}
+
+const sampleConsoleYAMLBody = "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\n  name: " + testCanvasName + "\nspec:\n  panels:\n    - id: notes\n      type: markdown\n      content:\n        body: Hello\n  layout:\n    - i: notes\n      x: 0\n      y: 0\n      w: 4\n      h: 2\n"
+
+func draftVersionsPath(canvasID string) string {
+	return "/api/v1/canvases/" + canvasID + "/versions"
+}
+
+func expectMe() requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   testMePath,
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"` + cliTestUserID + `"}}`))
+		},
+	}
+}
+
+func expectListUserDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","owner":{"id":"` + cliTestUserID + `"}}}]}`))
+		},
+	}
+}
+
+func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"versions":[]}`))
+		},
+	}
+}
+
+func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodPost,
+		path:   draftVersionsPath(canvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
+		},
+	}
+}
 
 func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 	t.Helper()
@@ -22,16 +77,10 @@ func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request
 
 func liveConsoleResponse(t *testing.T, w http.ResponseWriter, r *http.Request) {
 	t.Helper()
-	require.Empty(t, r.URL.Query().Get("versionId"))
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{
-        "console": {
-            "canvasId": "` + testCanvasID + `",
-            "versionId": "live-version-1",
-            "panels": [{"id": "notes", "type": "markdown", "content": {"body": "Hello"}}],
-            "layout": [{"i": "notes", "x": 0, "y": 0, "w": 4, "h": 2}]
-        }
-    }`))
+	require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
+	require.Empty(t, r.URL.Query().Get("version_id"))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(sampleConsoleYAMLBody))
 }
 
 func TestGetLiveYAMLOutput(t *testing.T) {
@@ -44,7 +93,7 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testConsolePath,
+			path:   repositoryConsoleFilePath(testCanvasID),
 			handle: liveConsoleResponse,
 		},
 	)
@@ -67,7 +116,7 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " " + testDescribeCanvas,
-		http.MethodGet + " " + testConsolePath,
+		http.MethodGet + " " + repositoryConsoleFilePath(testCanvasID),
 	})
 }
 
@@ -81,7 +130,7 @@ func TestGetTextOutputSummary(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testConsolePath,
+			path:   repositoryConsoleFilePath(testCanvasID),
 			handle: liveConsoleResponse,
 		},
 	)
@@ -95,7 +144,6 @@ func TestGetTextOutputSummary(t *testing.T) {
 	require.Contains(t, out, "App: "+testCanvasName)
 	require.Contains(t, out, "App ID: "+testCanvasID)
 	require.Contains(t, out, "Source: live")
-	require.Contains(t, out, "Version ID: live-version-1")
 	require.Contains(t, out, "Panels: 1")
 	require.Contains(t, out, "Layout items: 1")
 }
@@ -118,25 +166,20 @@ func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
+			path:   draftVersionsPath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{
-                    "versions": [
-                        {"metadata":{"id":"pub-1","state":"STATE_PUBLISHED","owner":{"id":"user-1"}}},
-                        {"metadata":{"id":"draft-1","state":"STATE_DRAFT","owner":{"id":"user-1"}}}
-                    ],
-                    "hasNextPage": false
-                }`))
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}}]}`))
 			},
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testConsolePath,
+			path:   repositoryConsoleFilePath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, "draft-1", r.URL.Query().Get("versionId"))
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"console":{"canvasId":"` + testCanvasID + `","versionId":"draft-1","panels":[],"layout":[]}}`))
+				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
+				require.Equal(t, "draft-1", r.URL.Query().Get("version_id"))
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				_, _ = w.Write([]byte("apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\nspec:\n  panels: []\n  layout: []\n"))
 			},
 		},
 	)
@@ -162,7 +205,7 @@ func TestGetUsesActiveCanvasWhenNoArg(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   testConsolePath,
+			path:   repositoryConsoleFilePath(testCanvasID),
 			handle: liveConsoleResponse,
 		},
 	)
@@ -210,10 +253,10 @@ func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
+			path:   draftVersionsPath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"pub-1","state":"STATE_PUBLISHED","owner":{"id":"user-1"}}}],"hasNextPage":false}`))
+				_, _ = w.Write([]byte(`{"versions":[]}`))
 			},
 		},
 	)

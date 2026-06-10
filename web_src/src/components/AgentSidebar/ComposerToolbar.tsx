@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ArrowUp, Loader2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AgentMode } from "./agentMode";
@@ -15,7 +16,7 @@ interface ComposerToolbarProps {
   onSend: () => void;
 }
 
-export function ComposerToolbar({
+export const ComposerToolbar = memo(function ComposerToolbar({
   agentMode,
   onModeSwitch,
   modeDisabled,
@@ -65,4 +66,4 @@ export function ComposerToolbar({
       </div>
     </div>
   );
-}
+});
