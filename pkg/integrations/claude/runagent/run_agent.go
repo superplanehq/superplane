@@ -167,12 +167,16 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v", session.ID, err)
 		}
 
+		out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
+		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+			return emitErr
+		}
+
+		// Delete session only after successful emit
 		if err := client.DeleteManagedSession(session.ID); err != nil {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
 		}
-
-		out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+		return nil
 	}
 
 	ctx.Logger.Infof("Started Managed Agent session %s. Waiting for completion (polling)...", session.ID)

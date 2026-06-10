@@ -94,13 +94,16 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 			ctx.Logger.Warnf("No final agent message found for managed session %s", metadata.Session.ID)
 		}
 
-		// Clean up the session
+		out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
+		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+			return emitErr
+		}
+
+		// Delete session only after successful emit
 		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
 		}
-
-		out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+		return nil
 	}
 
 	return a.scheduleNextPoll(ctx, attempt+1, 0)
