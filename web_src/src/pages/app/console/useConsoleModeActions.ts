@@ -6,6 +6,7 @@ interface ConsoleModeActionsConfig {
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsVersionsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
   setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
@@ -17,6 +18,7 @@ export function useConsoleModeActions({
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
   setIsRunsMode,
+  setIsVersionsMode,
   setIsMemoryMode,
   setIsFilesMode,
   setSelectedRunId,
@@ -25,11 +27,20 @@ export function useConsoleModeActions({
   const handleSelectConsoleMode = useCallback(() => {
     setIsConsoleMode(true);
     setIsRunsMode(false);
+    setIsVersionsMode(false);
     setIsMemoryMode(false);
     setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toConsoleSearchParams, { replace: true });
-  }, [setIsConsoleMode, setIsFilesMode, setIsMemoryMode, setIsRunsMode, setSearchParams, setSelectedRunId]);
+  }, [
+    setIsConsoleMode,
+    setIsFilesMode,
+    setIsMemoryMode,
+    setIsRunsMode,
+    setIsVersionsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitConsoleMode = useCallback(() => {
     setIsConsoleMode(false);
