@@ -115,6 +115,9 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
+	if ctx.Integration == nil {
+		return fmt.Errorf("a connected GCP integration is required to set up the On Alert trigger")
+	}
 	if err := ctx.Integration.RequestWebhook(struct{}{}); err != nil {
 		return err
 	}
@@ -125,10 +128,11 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to set up webhook URL: %w", err)
 	}
+	previousURL := metadata.WebhookURL
 	metadata.WebhookURL = webhookURL
 
-	// Idempotent: the channel only needs to be created once per node.
 	if metadata.NotificationChannel == "" {
+		// First setup for this node: create the webhook channel.
 		client, err := getClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return fmt.Errorf("failed to create GCP client: %w", err)
@@ -138,6 +142,17 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 			return err
 		}
 		metadata.NotificationChannel = channelName
+	} else if previousURL != webhookURL {
+		// The node webhook URL changed (e.g. the instance's public URL moved):
+		// point the existing channel at the new URL so Cloud Monitoring keeps
+		// delivering incidents instead of POSTing to the stale URL.
+		client, err := getClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create GCP client: %w", err)
+		}
+		if err := updateWebhookChannelURL(client, metadata.NotificationChannel, webhookURL); err != nil {
+			return err
+		}
 	}
 
 	if ctx.Metadata == nil {
@@ -235,6 +250,20 @@ func createWebhookChannel(client Client, webhookURL string) (string, error) {
 	return created.Name, nil
 }
 
+// updateWebhookChannelURL points an existing webhook notification channel at a
+// new node webhook URL, so a changed URL doesn't leave Cloud Monitoring posting
+// incidents to a stale endpoint.
+func updateWebhookChannelURL(client Client, channelName, webhookURL string) error {
+	body := map[string]any{
+		"labels": map[string]any{"url": webhookURL},
+	}
+	url := fmt.Sprintf("%s/%s?updateMask=labels.url", monitoringBaseURL, channelName)
+	if _, err := client.PatchURL(context.Background(), url, body); err != nil {
+		return fmt.Errorf("%s", apiErrorMessage("failed to update notification channel URL", roleHintChannelEditor, err))
+	}
+	return nil
+}
+
 type incidentWebhookPayload struct {
 	Version  string    `json:"version"`
 	Incident *incident `json:"incident"`
@@ -303,7 +332,10 @@ func parseOnAlertConfiguration(cfg any) (OnAlertConfiguration, error) {
 		states = append(states, s)
 	}
 	if len(states) == 0 {
-		return OnAlertConfiguration{}, fmt.Errorf("at least one state must be selected")
+		// No states configured — fall back to the documented default ("open"),
+		// matching the field schema's Default so a node saved without an explicit
+		// selection still emits on fired incidents.
+		states = []string{incidentStateOpen}
 	}
 	config.States = states
 	return config, nil

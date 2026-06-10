@@ -65,13 +65,19 @@ export const onAlertTriggerRenderer: TriggerRenderer = {
     const eventTitleAndSubtitle = lastEvent
       ? onAlertTriggerRenderer.getTitleAndSubtitle({ event: lastEvent })
       : undefined;
+    // Surface the auto-created Cloud Monitoring notification channel on the node.
+    const nodeMetadata = node.metadata as { notificationChannel?: string } | undefined;
+    const metadata: { icon: string; label: string }[] = [];
+    if (nodeMetadata?.notificationChannel) {
+      metadata.push({ icon: "bell", label: lastSegment(nodeMetadata.notificationChannel) });
+    }
     return {
       title: node.name || definition.label || "On Alert",
       iconSrc: gcpIcon,
       iconSlug: definition.icon || "bell",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "blue"),
-      metadata: [],
+      metadata,
       ...(lastEvent && {
         lastEventData: {
           title: eventTitleAndSubtitle?.title ?? "Alerting incident",

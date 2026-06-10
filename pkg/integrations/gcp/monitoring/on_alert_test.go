@@ -47,18 +47,28 @@ func Test__OnAlert__Setup(t *testing.T) {
 		assert.Equal(t, stored.WebhookURL, postBody["labels"].(map[string]any)["url"])
 	})
 
-	t.Run("does not recreate the channel when metadata already has one", func(t *testing.T) {
-		called := false
+	t.Run("updates the existing channel URL instead of creating a second channel", func(t *testing.T) {
+		postCalled := false
+		var patchURL string
+		var patchBody map[string]any
 		mc := &mockClient{
 			projectID: "my-project",
 			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
-				called = true
+				postCalled = true
 				return []byte(`{"name":"x"}`), nil
+			},
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchURL = url
+				patchBody, _ = body.(map[string]any)
+				return []byte(`{}`), nil
 			},
 		}
 		withFactory(mc)
 
-		meta := &contexts.MetadataContext{Metadata: OnAlertMetadata{NotificationChannel: "projects/my-project/notificationChannels/existing"}}
+		meta := &contexts.MetadataContext{Metadata: OnAlertMetadata{
+			NotificationChannel: "projects/my-project/notificationChannels/existing",
+			WebhookURL:          "https://old.example/api/v1/webhooks/abc",
+		}}
 		err := tr.Setup(core.TriggerContext{
 			Configuration: map[string]any{"states": []string{"open"}},
 			Integration:   &contexts.IntegrationContext{},
@@ -67,18 +77,59 @@ func Test__OnAlert__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.False(t, called, "should not create a second channel")
+		assert.False(t, postCalled, "should not create a second channel")
+		// The existing channel is patched to the node's (new) webhook URL.
+		assert.Contains(t, patchURL, "/notificationChannels/existing?updateMask=labels.url")
+		stored := OnAlertMetadata{}
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Equal(t, stored.WebhookURL, patchBody["labels"].(map[string]any)["url"])
 	})
 
-	t.Run("invalid states -> error", func(t *testing.T) {
+	t.Run("requires a connected GCP integration", func(t *testing.T) {
 		withFactory(&mockClient{projectID: "my-project"})
 		err := tr.Setup(core.TriggerContext{
-			Configuration: map[string]any{"states": []string{}},
+			Configuration: map[string]any{"states": []string{"open"}},
+			Integration:   nil,
+			Webhook:       &contexts.NodeWebhookContext{},
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "GCP integration is required")
+	})
+
+	t.Run("rejects an invalid state", func(t *testing.T) {
+		withFactory(&mockClient{projectID: "my-project"})
+		err := tr.Setup(core.TriggerContext{
+			Configuration: map[string]any{"states": []string{"sideways"}},
 			Integration:   &contexts.IntegrationContext{},
 			Webhook:       &contexts.NodeWebhookContext{},
 			Metadata:      &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "at least one state")
+		require.ErrorContains(t, err, "invalid state")
+	})
+}
+
+func Test__parseOnAlertConfiguration(t *testing.T) {
+	t.Run("defaults to open when states is missing", func(t *testing.T) {
+		cfg, err := parseOnAlertConfiguration(map[string]any{})
+		require.NoError(t, err)
+		assert.Equal(t, []string{incidentStateOpen}, cfg.States)
+	})
+
+	t.Run("defaults to open when states is empty", func(t *testing.T) {
+		cfg, err := parseOnAlertConfiguration(map[string]any{"states": []string{}})
+		require.NoError(t, err)
+		assert.Equal(t, []string{incidentStateOpen}, cfg.States)
+	})
+
+	t.Run("normalizes and dedupes provided states", func(t *testing.T) {
+		cfg, err := parseOnAlertConfiguration(map[string]any{"states": []string{"OPEN", "open", "Closed"}})
+		require.NoError(t, err)
+		assert.Equal(t, []string{incidentStateOpen, incidentStateClosed}, cfg.States)
+	})
+
+	t.Run("rejects an invalid state", func(t *testing.T) {
+		_, err := parseOnAlertConfiguration(map[string]any{"states": []string{"bogus"}})
+		require.ErrorContains(t, err, "invalid state")
 	})
 }
 
