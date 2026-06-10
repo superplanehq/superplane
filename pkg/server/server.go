@@ -203,6 +203,20 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	var workerUsageService usage.Service
+	getWorkerUsageService := func() usage.Service {
+		if workerUsageService != nil {
+			return workerUsageService
+		}
+
+		service, err := usage.NewServiceFromEnv()
+		if err != nil {
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+		}
+		workerUsageService = service
+		return workerUsageService
+	}
+
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
@@ -218,6 +232,7 @@ func startWorkers(
 				Registry:       registry,
 				WebhookBaseURL: getWebhookBaseURL(baseURL),
 				AuthService:    authService,
+				UsageService:   getWorkerUsageService(),
 			}),
 			agenttools.NewSuperPlaneComponentSchemaTool(registry),
 		))
@@ -225,10 +240,7 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService, err := usage.NewServiceFromEnv()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
+		usageService := getWorkerUsageService()
 
 		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Event Retention Worker")
