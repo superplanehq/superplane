@@ -35,7 +35,7 @@ func (a *RunAgent) HandleHook(ctx core.ActionHookContext) error {
 
 func (a *RunAgent) stream(ctx core.ActionHookContext) error {
 	metadata := ExecutionMetadata{}
-	if err := mapstructure.Decode(ctx.Metadata, &metadata); err != nil {
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	if metadata.Session.ID == "" {
