@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -53,6 +54,7 @@ type CanvasPublisher struct {
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
+	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -457,12 +459,13 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
-		Configuration: node.Configuration.Data(),
-		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
-		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),
-		Requests:      contexts.NewNodeRequestContext(p.tx, node),
-		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
-		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
+		Configuration:   node.Configuration.Data(),
+		HTTP:            p.options.Registry.HTTPContextInTransaction(p.tx),
+		Metadata:        contexts.NewNodeMetadataContext(p.tx, node),
+		Requests:        contexts.NewNodeRequestContext(p.tx, node),
+		Webhook:         contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
+		Auth:            contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
+		Files: contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
 	}
 
 	if node.AppInstallationID != nil {
