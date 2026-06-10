@@ -18,6 +18,16 @@ export type MarkdownRunSelect = (typeof MARKDOWN_RUN_SELECTS)[number];
 export const MARKDOWN_VARIABLE_DIRECTIONS = ["asc", "desc"] as const;
 export type MarkdownVariableDirection = (typeof MARKDOWN_VARIABLE_DIRECTIONS)[number];
 
+/**
+ * How a memory variable resolves the rows it selected:
+ *  - `single` (default): return the first sorted row, so authors can write
+ *    `{{ name.field }}` directly.
+ *  - `list`: return the full sorted array, unlocking CEL list macros like
+ *    `name.map(r, r.field)` / `name.filter(r, r.passed)` inside `{{ }}`.
+ */
+export const MARKDOWN_VARIABLE_MODES = ["single", "list"] as const;
+export type MarkdownVariableMode = (typeof MARKDOWN_VARIABLE_MODES)[number];
+
 /** One property-equality match clause for memory variable selection. */
 export interface MarkdownVariableMatch {
   field: string;
@@ -34,6 +44,13 @@ export interface MarkdownMemoryVariableSource {
   direction?: MarkdownVariableDirection;
   /** Optional property-equality filter applied before sorting. */
   matches?: MarkdownVariableMatch[];
+  /** Resolution mode — defaults to `single` when omitted for back-compat. */
+  mode?: MarkdownVariableMode;
+  /**
+   * Maximum number of rows to expose when `mode === "list"`. Omitted (or
+   * unset) means return every matching row. Ignored when `mode !== "list"`.
+   */
+  limit?: number;
 }
 
 export interface MarkdownRunVariableSource {
@@ -122,7 +139,27 @@ function validateMarkdownMemorySource(source: Record<string, unknown>, index: nu
   }
   const directionError = validateMemoryDirection(source.direction, index);
   if (directionError) return directionError;
-  return validateMemoryMatches(source.matches, index);
+  const matchesError = validateMemoryMatches(source.matches, index);
+  if (matchesError) return matchesError;
+  const modeError = validateMemoryMode(source.mode, index);
+  if (modeError) return modeError;
+  return validateMemoryLimit(source.limit, index);
+}
+
+function validateMemoryMode(mode: unknown, index: number): string | null {
+  if (mode === undefined || mode === null) return null;
+  if (typeof mode !== "string" || !(MARKDOWN_VARIABLE_MODES as readonly string[]).includes(mode)) {
+    return `content.variables[${index}].source.mode must be "single" or "list".`;
+  }
+  return null;
+}
+
+function validateMemoryLimit(limit: unknown, index: number): string | null {
+  if (limit === undefined || limit === null) return null;
+  if (typeof limit !== "number" || !Number.isFinite(limit) || !Number.isInteger(limit) || limit <= 0) {
+    return `content.variables[${index}].source.limit must be a positive integer.`;
+  }
+  return null;
 }
 
 function validateMemoryDirection(direction: unknown, index: number): string | null {

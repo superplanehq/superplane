@@ -14,11 +14,23 @@ const TEMPLATE_RE = /\{\{[\s\S]*?\}\}/;
  */
 const RUN_NODE_REF_RE = /\$\s*\[/;
 
-/** Stringify a CEL-evaluated value for inline insertion into markdown. */
+/**
+ * Stringify a CEL-evaluated value for inline insertion into markdown / HTML.
+ *
+ * Arrays are concatenated element-by-element with no separator rather than
+ * JSON-encoded. This makes the common list pattern
+ * `{{ tags.map(t, "<p>" + t.name + "</p>") }}` render its joined fragments
+ * directly instead of leaking JSON delimiters (`["…","…"]`) into the output.
+ * Authors who want a separator between elements use the `join(list, sep)`
+ * builtin explicitly. Non-array objects still fall back to JSON so a stray
+ * `{{ row }}` reference shows something inspectable instead of `[object
+ * Object]`.
+ */
 function stringifyMarkdownValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(stringifyMarkdownValue).join("");
   try {
     return JSON.stringify(value);
   } catch {
