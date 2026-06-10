@@ -181,9 +181,6 @@ func toolUseID(raw anthropicEvent) string {
 }
 
 func customToolUseID(raw anthropicEvent) string {
-	if raw.ToolUseID != "" {
-		return raw.ToolUseID
-	}
 	return raw.ID
 }
 
