@@ -4,11 +4,13 @@ import { ActionItem, CanvasListItems } from "./items";
 import { BookOpen, ChevronLeft, ChevronRight, Key, Link2, LogOut, Palette, Plug, Plus, UserPlus } from "lucide-react";
 import type { CanvasCommandListProps, PaletteAction } from "./types";
 
-type IntegrationItem = {
+export type IntegrationStatus = "ready" | "pending" | "error";
+
+export type IntegrationItem = {
   id: string;
   name: string;
   providerName: string;
-  status: "ready" | "pending" | "error";
+  status: IntegrationStatus;
 };
 
 export type CommandPalettePageProps = {

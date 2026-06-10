@@ -65,7 +65,7 @@ export function buildRootActions({
       onSelect: () => createCanvas(),
       keywords: ["new", "create", "canvas", "project", "workflow"],
     },
-    ...buildOrganizationRootActions(organizationId, organizationName, accountEmail, goTo),
+    ...buildOrganizationRootActions(organizationId, accountEmail, goTo),
     {
       id: "change-organization",
       label: "Change Organization",
@@ -208,7 +208,6 @@ export function buildAdminActions(goTo: (href: string) => void): PaletteAction[]
 
 function buildOrganizationRootActions(
   organizationId: string | null,
-  _organizationName: string,
   accountEmail: string,
   goTo: (href: string) => void,
 ): PaletteAction[] {
