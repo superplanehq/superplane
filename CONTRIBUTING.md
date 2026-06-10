@@ -77,11 +77,13 @@ When `make dev.server` reports the app as healthy, open SuperPlane at [http://lo
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
+- **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
 ### Adding new integrations to SuperPlane
 
+- **[Building an Integration](docs/contributing/building-an-integration.md)** — High-level overview of the steps to add a new integration (claim a ticket, research, build, open a PR)
 - **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
 - **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
