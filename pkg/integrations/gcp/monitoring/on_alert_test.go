@@ -2,6 +2,8 @@ package monitoring
 
 import (
 	"context"
+	"encoding/base64"
+	"net/http"
 	"testing"
 
 	"github.com/mitchellh/mapstructure"
@@ -22,7 +24,7 @@ func Test__OnAlert__Setup(t *testing.T) {
 			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
 				postURL = url
 				postBody, _ = body.(map[string]any)
-				return []byte(`{"name":"projects/my-project/notificationChannels/123","type":"webhook_tokenauth"}`), nil
+				return []byte(`{"name":"projects/my-project/notificationChannels/123","type":"webhook_basicauth"}`), nil
 			},
 		}
 		withFactory(mc)
@@ -31,20 +33,24 @@ func Test__OnAlert__Setup(t *testing.T) {
 		err := tr.Setup(core.TriggerContext{
 			Configuration: map[string]any{"states": []string{"open"}},
 			Integration:   &contexts.IntegrationContext{},
-			Webhook:       &contexts.NodeWebhookContext{},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-webhook-secret"},
 			Metadata:      meta,
 		})
 
 		require.NoError(t, err)
 		assert.Contains(t, postURL, "/v3/projects/my-project/notificationChannels")
-		assert.Equal(t, "webhook_tokenauth", postBody["type"])
+		// Signed delivery: a Basic-auth channel carrying the node's webhook secret.
+		assert.Equal(t, "webhook_basicauth", postBody["type"])
+		labels := postBody["labels"].(map[string]any)
+		assert.Equal(t, webhookAuthUsername, labels["username"])
+		assert.Equal(t, "test-webhook-secret", labels["password"])
 
 		stored := OnAlertMetadata{}
 		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
 		assert.Equal(t, "projects/my-project/notificationChannels/123", stored.NotificationChannel)
 		assert.NotEmpty(t, stored.WebhookURL)
 		// The channel points at the node's webhook URL.
-		assert.Equal(t, stored.WebhookURL, postBody["labels"].(map[string]any)["url"])
+		assert.Equal(t, stored.WebhookURL, labels["url"])
 	})
 
 	t.Run("updates the existing channel URL instead of creating a second channel", func(t *testing.T) {
@@ -189,6 +195,55 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 200, code)
+		assert.Empty(t, events.Payloads)
+	})
+
+	t.Run("accepts a request signed with the node's webhook secret", func(t *testing.T) {
+		const secret = "test-webhook-secret"
+		headers := http.Header{}
+		headers.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(webhookAuthUsername+":"+secret)))
+
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"open"}},
+			Body:          openIncident,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: secret},
+			Events:        events,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 200, code)
+		require.Len(t, events.Payloads, 1)
+	})
+
+	t.Run("rejects a request with an invalid Basic-auth secret", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(webhookAuthUsername+":wrong-secret")))
+
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"open"}},
+			Body:          openIncident,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-webhook-secret"},
+			Events:        events,
+		})
+		require.Error(t, err)
+		assert.Equal(t, http.StatusUnauthorized, code)
+		assert.Empty(t, events.Payloads)
+	})
+
+	t.Run("rejects a request that is missing credentials", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"open"}},
+			Body:          openIncident,
+			Headers:       http.Header{},
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-webhook-secret"},
+			Events:        events,
+		})
+		require.Error(t, err)
+		assert.Equal(t, http.StatusUnauthorized, code)
 		assert.Empty(t, events.Payloads)
 	})
 }

@@ -2,6 +2,8 @@ package monitoring
 
 import (
 	"context"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -132,12 +134,18 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 	metadata.WebhookURL = webhookURL
 
 	if metadata.NotificationChannel == "" {
-		// First setup for this node: create the webhook channel.
+		// First setup for this node: create the webhook channel signed with the
+		// node's webhook secret (Basic auth), so Cloud Monitoring authenticates
+		// every delivery.
+		secret, err := ctx.Webhook.GetSecret()
+		if err != nil {
+			return fmt.Errorf("failed to read webhook secret: %w", err)
+		}
 		client, err := getClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return fmt.Errorf("failed to create GCP client: %w", err)
 		}
-		channelName, err := createWebhookChannel(client, webhookURL)
+		channelName, err := createWebhookChannel(client, webhookURL, string(secret))
 		if err != nil {
 			return err
 		}
@@ -193,6 +201,10 @@ func (t *OnAlert) HandleHook(ctx core.TriggerHookContext) (map[string]any, error
 }
 
 func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	if err := authenticateWebhook(ctx); err != nil {
+		return http.StatusUnauthorized, nil, err
+	}
+
 	config, err := parseOnAlertConfiguration(ctx.Configuration)
 	if err != nil {
 		return http.StatusInternalServerError, nil, err
@@ -220,15 +232,57 @@ func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	return http.StatusOK, nil, nil
 }
 
-// createWebhookChannel creates a webhook_tokenauth notification channel pointing
-// at the SuperPlane node webhook URL and returns its resource name.
-func createWebhookChannel(client Client, webhookURL string) (string, error) {
+// authenticateWebhook verifies the HTTP Basic credentials that Cloud Monitoring
+// sends (configured on the webhook_basicauth channel) against the node's webhook
+// secret, so only Cloud Monitoring can deliver incidents to this node.
+func authenticateWebhook(ctx core.WebhookRequestContext) error {
+	if ctx.Webhook == nil {
+		return nil
+	}
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil || len(secret) == 0 {
+		// No secret to verify against (e.g. a legacy channel) — don't block.
+		return nil
+	}
+
+	const prefix = "Basic "
+	authHeader := ctx.Headers.Get("Authorization")
+	if !strings.HasPrefix(authHeader, prefix) {
+		return fmt.Errorf("missing webhook credentials")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(authHeader[len(prefix):]))
+	if err != nil {
+		return fmt.Errorf("invalid webhook credentials encoding")
+	}
+	_, password, ok := strings.Cut(string(decoded), ":")
+	if !ok {
+		return fmt.Errorf("invalid webhook credentials format")
+	}
+	if subtle.ConstantTimeCompare([]byte(password), secret) != 1 {
+		return fmt.Errorf("invalid webhook credentials")
+	}
+	return nil
+}
+
+// webhookAuthUsername is the fixed Basic-auth username configured on the
+// notification channel; only the password (the node webhook secret) is verified.
+const webhookAuthUsername = "superplane"
+
+// createWebhookChannel creates a webhook_basicauth notification channel pointing
+// at the SuperPlane node webhook URL and returns its resource name. The node
+// webhook secret is stored as the channel's Basic-auth password so Cloud
+// Monitoring signs every incident delivery, which HandleWebhook verifies.
+func createWebhookChannel(client Client, webhookURL, secret string) (string, error) {
 	body := map[string]any{
-		"type":        "webhook_tokenauth",
+		"type":        "webhook_basicauth",
 		"displayName": "SuperPlane On Alert trigger",
 		"description": "Auto-created by SuperPlane to deliver Cloud Monitoring incidents to a workflow.",
-		"labels":      map[string]any{"url": webhookURL},
-		"enabled":     true,
+		"labels": map[string]any{
+			"url":      webhookURL,
+			"username": webhookAuthUsername,
+			"password": secret,
+		},
+		"enabled": true,
 	}
 	respBody, err := client.PostURL(
 		context.Background(),
