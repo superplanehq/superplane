@@ -255,5 +255,6 @@ func parseSSEData(line string) (agents.ProviderEvent, bool) {
 
 func isTerminalEvent(t agents.ProviderEventType) bool {
 	return t == agents.ProviderEventTurnCompleted ||
+		t == agents.ProviderEventCustomToolResultsRequired ||
 		t == agents.ProviderEventSessionFailed
 }
