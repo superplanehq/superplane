@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
-import { requestPullRequestReviewerMapper } from "./request_pull_request_reviewer";
+import { addPullRequestReviewersMapper } from "./add_pull_request_reviewers";
 
-describe("requestPullRequestReviewerMapper", () => {
-  it("shows a curated reviewer request summary", () => {
-    const details = requestPullRequestReviewerMapper.getExecutionDetails(
+describe("addPullRequestReviewersMapper", () => {
+  it("shows a curated reviewer summary", () => {
+    const details = addPullRequestReviewersMapper.getExecutionDetails(
       buildDetailsContext({
         configuration: {
           repository: "hello",
@@ -44,8 +44,8 @@ describe("requestPullRequestReviewerMapper", () => {
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
   const node: NodeInfo = {
     id: "node-1",
-    name: "Request pull request reviewer",
-    componentName: "github.requestPullRequestReviewer",
+    name: "Add pull request reviewers",
+    componentName: "github.addPullRequestReviewers",
     isCollapsed: false,
     metadata: {
       repository: {

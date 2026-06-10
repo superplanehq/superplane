@@ -28,8 +28,8 @@ var exampleOutputCreatePullRequestBytes []byte
 //go:embed payloads/merge_pull_request.json
 var exampleOutputMergePullRequestBytes []byte
 
-//go:embed payloads/request_pull_request_reviewer.json
-var exampleOutputRequestPullRequestReviewerBytes []byte
+//go:embed payloads/add_pull_request_reviewers.json
+var exampleOutputAddPullRequestReviewersBytes []byte
 
 var exampleOutputAddReactionOnce sync.Once
 var exampleOutputAddReaction map[string]any
@@ -43,8 +43,8 @@ var exampleOutputCreatePullRequest map[string]any
 var exampleOutputMergePullRequestOnce sync.Once
 var exampleOutputMergePullRequest map[string]any
 
-var exampleOutputRequestPullRequestReviewerOnce sync.Once
-var exampleOutputRequestPullRequestReviewer map[string]any
+var exampleOutputAddPullRequestReviewersOnce sync.Once
+var exampleOutputAddPullRequestReviewers map[string]any
 
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
@@ -103,10 +103,10 @@ func (c *MergePullRequest) ExampleOutput() map[string]any {
 	)
 }
 
-func (c *RequestPullRequestReviewer) ExampleOutput() map[string]any {
+func (c *AddPullRequestReviewers) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputRequestPullRequestReviewerOnce,
-		exampleOutputRequestPullRequestReviewerBytes,
-		&exampleOutputRequestPullRequestReviewer,
+		&exampleOutputAddPullRequestReviewersOnce,
+		exampleOutputAddPullRequestReviewersBytes,
+		&exampleOutputAddPullRequestReviewers,
 	)
 }

@@ -133,7 +133,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &pulls.AddReaction{}},
 					{ReadOnly: false, Action: &pulls.CreatePullRequest{}},
 					{ReadOnly: false, Action: &pulls.MergePullRequest{}},
-					{ReadOnly: false, Action: &pulls.RequestPullRequestReviewer{}},
+					{ReadOnly: false, Action: &pulls.AddPullRequestReviewers{}},
 				},
 			},
 		},

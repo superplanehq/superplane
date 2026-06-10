@@ -14,36 +14,36 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
-type RequestPullRequestReviewer struct{}
+type AddPullRequestReviewers struct{}
 
-type RequestPullRequestReviewerConfiguration struct {
+type AddPullRequestReviewersConfiguration struct {
 	Repository    string   `mapstructure:"repository" json:"repository"`
 	PullNumber    any      `mapstructure:"pullNumber" json:"pullNumber"`
 	Reviewers     []string `mapstructure:"reviewers" json:"reviewers"`
 	TeamReviewers []string `mapstructure:"teamReviewers" json:"teamReviewers"`
 }
 
-type requestPullRequestReviewerInput struct {
+type addPullRequestReviewersInput struct {
 	Repository    string
 	PullNumber    int
 	Reviewers     []string
 	TeamReviewers []string
 }
 
-func (c *RequestPullRequestReviewer) Name() string {
-	return "github.requestPullRequestReviewer"
+func (c *AddPullRequestReviewers) Name() string {
+	return "github.addPullRequestReviewers"
 }
 
-func (c *RequestPullRequestReviewer) Label() string {
-	return "Request Pull Request Reviewer"
+func (c *AddPullRequestReviewers) Label() string {
+	return "Add Pull Request Reviewers"
 }
 
-func (c *RequestPullRequestReviewer) Description() string {
-	return "Request reviewers on a GitHub pull request"
+func (c *AddPullRequestReviewers) Description() string {
+	return "Add reviewers to a GitHub pull request"
 }
 
-func (c *RequestPullRequestReviewer) Documentation() string {
-	return `The Request Pull Request Reviewer component requests individual users and/or teams to review a GitHub pull request.
+func (c *AddPullRequestReviewers) Documentation() string {
+	return `The Add Pull Request Reviewers component adds individual users and/or teams as reviewers on a GitHub pull request.
 
 ## Use Cases
 
@@ -54,7 +54,7 @@ func (c *RequestPullRequestReviewer) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository containing the pull request
-- **Pull Request Number**: Pull request number to request reviewers on. Expressions are supported.
+- **Pull Request Number**: Pull request number to add reviewers to. Expressions are supported.
 - **Reviewers**: GitHub usernames to request as reviewers
 - **Team Reviewers**: Team slugs to request as team reviewers (optional)
 
@@ -65,19 +65,19 @@ At least one reviewer or team reviewer is required.
 Returns the updated pull request object with the current requested reviewers.`
 }
 
-func (c *RequestPullRequestReviewer) Icon() string {
+func (c *AddPullRequestReviewers) Icon() string {
 	return "github"
 }
 
-func (c *RequestPullRequestReviewer) Color() string {
+func (c *AddPullRequestReviewers) Color() string {
 	return "gray"
 }
 
-func (c *RequestPullRequestReviewer) OutputChannels(configuration any) []core.OutputChannel {
+func (c *AddPullRequestReviewers) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *RequestPullRequestReviewer) Configuration() []configuration.Field {
+func (c *AddPullRequestReviewers) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "repository",
@@ -97,7 +97,7 @@ func (c *RequestPullRequestReviewer) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "42 or {{event.data.pull_request.number}}",
-			Description: "Pull request number to request reviewers on. Supports expressions.",
+			Description: "Pull request number to add reviewers to. Supports expressions.",
 		},
 		{
 			Name:        "reviewers",
@@ -132,13 +132,13 @@ func (c *RequestPullRequestReviewer) Configuration() []configuration.Field {
 	}
 }
 
-func (c *RequestPullRequestReviewer) Setup(ctx core.SetupContext) error {
-	var config RequestPullRequestReviewerConfiguration
+func (c *AddPullRequestReviewers) Setup(ctx core.SetupContext) error {
+	var config AddPullRequestReviewersConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := validateRequestPullRequestReviewerSetup(config); err != nil {
+	if err := validateAddPullRequestReviewersSetup(config); err != nil {
 		return err
 	}
 
@@ -150,13 +150,13 @@ func (c *RequestPullRequestReviewer) Setup(ctx core.SetupContext) error {
 	)
 }
 
-func (c *RequestPullRequestReviewer) Execute(ctx core.ExecutionContext) error {
-	var config RequestPullRequestReviewerConfiguration
+func (c *AddPullRequestReviewers) Execute(ctx core.ExecutionContext) error {
+	var config AddPullRequestReviewersConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	input, err := buildRequestPullRequestReviewerInput(config)
+	input, err := buildAddPullRequestReviewersInput(config)
 	if err != nil {
 		return err
 	}
@@ -171,14 +171,14 @@ func (c *RequestPullRequestReviewer) Execute(ctx core.ExecutionContext) error {
 		TeamReviewers: input.TeamReviewers,
 	}
 
-	pullRequest, _, err := client.RequestPullRequestReviewers(
+	pullRequest, _, err := client.AddPullRequestReviewers(
 		context.Background(),
 		input.Repository,
 		input.PullNumber,
 		request,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to request pull request reviewers: %w", explainGitHubError(err))
+		return fmt.Errorf("failed to add pull request reviewers: %w", explainGitHubError(err))
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -188,31 +188,31 @@ func (c *RequestPullRequestReviewer) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *RequestPullRequestReviewer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *AddPullRequestReviewers) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *RequestPullRequestReviewer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *AddPullRequestReviewers) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
 
-func (c *RequestPullRequestReviewer) Hooks() []core.Hook {
+func (c *AddPullRequestReviewers) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (c *RequestPullRequestReviewer) HandleHook(ctx core.ActionHookContext) error {
+func (c *AddPullRequestReviewers) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func (c *RequestPullRequestReviewer) Cancel(ctx core.ExecutionContext) error {
+func (c *AddPullRequestReviewers) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *RequestPullRequestReviewer) Cleanup(ctx core.SetupContext) error {
+func (c *AddPullRequestReviewers) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func validateRequestPullRequestReviewerSetup(config RequestPullRequestReviewerConfiguration) error {
+func validateAddPullRequestReviewersSetup(config AddPullRequestReviewersConfiguration) error {
 	if strings.TrimSpace(config.Repository) == "" {
 		return errors.New("repository is required")
 	}
@@ -233,7 +233,7 @@ func validateRequestPullRequestReviewerSetup(config RequestPullRequestReviewerCo
 	return err
 }
 
-func buildRequestPullRequestReviewerInput(config RequestPullRequestReviewerConfiguration) (*requestPullRequestReviewerInput, error) {
+func buildAddPullRequestReviewersInput(config AddPullRequestReviewersConfiguration) (*addPullRequestReviewersInput, error) {
 	if strings.TrimSpace(config.Repository) == "" {
 		return nil, errors.New("repository is required")
 	}
@@ -248,7 +248,7 @@ func buildRequestPullRequestReviewerInput(config RequestPullRequestReviewerConfi
 		return nil, err
 	}
 
-	return &requestPullRequestReviewerInput{
+	return &addPullRequestReviewersInput{
 		Repository:    strings.TrimSpace(config.Repository),
 		PullNumber:    pullNumber,
 		Reviewers:     reviewers,

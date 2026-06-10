@@ -12,8 +12,8 @@ import (
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
-func Test__RequestPullRequestReviewer__Setup(t *testing.T) {
-	component := RequestPullRequestReviewer{}
+func Test__AddPullRequestReviewers__Setup(t *testing.T) {
+	component := AddPullRequestReviewers{}
 
 	validConfig := func(overrides map[string]any) map[string]any {
 		config := map[string]any{
@@ -118,8 +118,8 @@ func Test__RequestPullRequestReviewer__Setup(t *testing.T) {
 	})
 }
 
-func Test__RequestPullRequestReviewer__Execute(t *testing.T) {
-	component := RequestPullRequestReviewer{}
+func Test__AddPullRequestReviewers__Execute(t *testing.T) {
+	component := AddPullRequestReviewers{}
 
 	t.Run("fails when configuration decode fails", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{

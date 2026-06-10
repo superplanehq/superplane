@@ -12,7 +12,7 @@ import { baseProps } from "./base";
 import type { BaseNodeMetadata } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
-interface RequestPullRequestReviewerConfiguration {
+interface AddPullRequestReviewersConfiguration {
   repository?: string;
   pullNumber?: string | number;
   reviewers?: string[];
@@ -26,7 +26,7 @@ interface PullRequestOutput {
   html_url?: string;
 }
 
-export const requestPullRequestReviewerMapper: ComponentBaseMapper = {
+export const addPullRequestReviewersMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
@@ -36,8 +36,8 @@ export const requestPullRequestReviewerMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const configuration = requestPullRequestReviewerConfiguration(context);
-    const pullRequest = requestPullRequestReviewerOutput(context);
+    const configuration = addPullRequestReviewersConfiguration(context);
+    const pullRequest = addPullRequestReviewersOutput(context);
     const repositoryURL = repositoryUrl(context);
     const pullNumber = configuration.pullNumber ?? pullRequest?.number;
 
@@ -54,17 +54,17 @@ export const requestPullRequestReviewerMapper: ComponentBaseMapper = {
   },
 };
 
-function requestPullRequestReviewerConfiguration(
+function addPullRequestReviewersConfiguration(
   context: ExecutionDetailsContext,
-): RequestPullRequestReviewerConfiguration {
+): AddPullRequestReviewersConfiguration {
   return (
     ((context.execution.configuration || context.node.configuration || {}) as
-      | RequestPullRequestReviewerConfiguration
+      | AddPullRequestReviewersConfiguration
       | undefined) || {}
   );
 }
 
-function requestPullRequestReviewerOutput(context: ExecutionDetailsContext): PullRequestOutput | undefined {
+function addPullRequestReviewersOutput(context: ExecutionDetailsContext): PullRequestOutput | undefined {
   const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
   return outputs?.default?.[0]?.data as PullRequestOutput | undefined;
 }

@@ -44,7 +44,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
-  <LinkCard title="Request Pull Request Reviewer" href="#request-pull-request-reviewer" description="Request reviewers on a GitHub pull request" />
+  <LinkCard title="Add Pull Request Reviewers" href="#add-pull-request-reviewers" description="Add reviewers to a GitHub pull request" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
@@ -2869,13 +2869,13 @@ Returns GitHub's merge result, including whether the pull request was merged, th
 }
 ```
 
-<a id="request-pull-request-reviewer"></a>
+<a id="add-pull-request-reviewers"></a>
 
-## Request Pull Request Reviewer
+## Add Pull Request Reviewers
 
-**Component key:** `github.requestPullRequestReviewer`
+**Component key:** `github.addPullRequestReviewers`
 
-The Request Pull Request Reviewer component requests individual users and/or teams to review a GitHub pull request.
+The Add Pull Request Reviewers component adds individual users and/or teams as reviewers on a GitHub pull request.
 
 ### Use Cases
 
@@ -2886,7 +2886,7 @@ The Request Pull Request Reviewer component requests individual users and/or tea
 ### Configuration
 
 - **Repository**: Select the GitHub repository containing the pull request
-- **Pull Request Number**: Pull request number to request reviewers on. Expressions are supported.
+- **Pull Request Number**: Pull request number to add reviewers to. Expressions are supported.
 - **Reviewers**: GitHub usernames to request as reviewers
 - **Team Reviewers**: Team slugs to request as team reviewers (optional)
 
