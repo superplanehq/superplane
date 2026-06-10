@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -153,28 +154,19 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
-	// Refresh status after work may have already progressed.
-	refreshed, err := client.GetManagedSession(session.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
-	}
-	mergeSessionIntoMetadata(&metadata, refreshed)
-	_ = ctx.Metadata.Set(metadata)
-
-	if refreshed != nil && isSessionTerminal(refreshed.Status) {
-		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(session.ID, finalMessageReads, finalMessageDelay)
-		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", session.ID, err)
-		}
-		if err == nil && lastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", session.ID, managedSessionEventTypes(events))
-		}
-		out := buildOutput(refreshed.Status, session.ID, lastMessage)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+	// Stream session events until completion.
+	// This captures agent messages in real-time, avoiding the eventual
+	// consistency issue with the events list API.
+	ctx.Logger.Infof("Started Managed Agent session %s. Streaming events...", session.ID)
+	streamCtx := context.Background()
+	status, lastMessage, streamErr := client.StreamSessionUntilIdle(streamCtx, session.ID)
+	if streamErr != nil {
+		ctx.Logger.Warnf("Stream failed for session %s: %v. Falling back to poll.", session.ID, streamErr)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
 	}
 
-	ctx.Logger.Infof("Started Managed Agent session %s. Waiting for completion (polling)...", session.ID)
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	out := buildOutput(status, session.ID, lastMessage)
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
