@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("gcp", &GCP{})
+	registry.RegisterIntegrationWithWebhookHandler("gcp", &GCP{}, &WebhookHandler{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	})
