@@ -2119,6 +2119,35 @@ function resolveAbsoluteNodeRect(
   };
 }
 
+type ComponentSidebarTab = "latest" | "settings" | "docs";
+
+type NodeConfigurationWarningData = {
+  component?: { error?: string };
+  composite?: { error?: string };
+  trigger?: { error?: string };
+} | null;
+
+function shouldOpenSidebarSettingsTab(nodeData: NodeConfigurationWarningData, isEditMode: boolean): boolean {
+  return Boolean(nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error) || isEditMode;
+}
+
+function applySidebarTabOnNodeOpen(
+  setCurrentTab: ((tab: ComponentSidebarTab) => void) | undefined,
+  wasSidebarOpen: boolean,
+  shouldOpenSettings: boolean,
+): void {
+  if (!setCurrentTab) {
+    return;
+  }
+  if (!wasSidebarOpen) {
+    setCurrentTab(shouldOpenSettings ? "settings" : "latest");
+    return;
+  }
+  if (shouldOpenSettings) {
+    setCurrentTab("settings");
+  }
+}
+
 function CanvasContent({
   state,
   onNodeEdit,
@@ -2399,27 +2428,9 @@ function CanvasContent({
         const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
         stateRef.current.componentSidebar.open(nodeId);
 
-        const nodeData = clickedNode?.data as {
-          component?: { error?: string };
-          composite?: { error?: string };
-          trigger?: { error?: string };
-        } | null;
-        const hasConfigurationWarning = Boolean(
-          nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
-        );
-        const shouldOpenSettings = hasConfigurationWarning || isEditMode;
-
-        if (setCurrentTab) {
-          if (!wasSidebarOpen) {
-            setCurrentTab(shouldOpenSettings ? "settings" : "latest");
-          } else if (shouldOpenSettings) {
-            setCurrentTab("settings");
-          }
-        }
-
-        if (onBuildingBlocksSidebarToggle) {
-          onBuildingBlocksSidebarToggle(false);
-        }
+        const nodeData = clickedNode?.data as NodeConfigurationWarningData;
+        applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, shouldOpenSidebarSettingsTab(nodeData, isEditMode));
+        onBuildingBlocksSidebarToggle?.(false);
       }
 
       stateRef.current.setNodes((nodes) =>
