@@ -27,6 +27,27 @@ describe("interpolateMarkdownTemplate", () => {
     expect(out).toBe("## Deploy prod\n\n- run: failed\n- by: build");
   });
 
+  it("concatenates a mapped array of fragments without JSON delimiters", () => {
+    // `tags.map(...)` returns a list; rendering it inline should join the
+    // string fragments directly, not emit `["…","…"]`.
+    const out = interpolateMarkdownTemplate('<div>{{ tags.map(t, "<p>" + t.name + "</p>") }}</div>', {
+      tags: [{ name: "a" }, { name: "b" }, { name: "c" }],
+    });
+    expect(out).toBe("<div><p>a</p><p>b</p><p>c</p></div>");
+  });
+
+  it("renders a bare array variable as its concatenated string elements", () => {
+    const out = interpolateMarkdownTemplate("Tags: {{ tags }}", { tags: ["a", "b", "c"] });
+    expect(out).toBe("Tags: abc");
+  });
+
+  it("still supports join() for a custom separator", () => {
+    const out = interpolateMarkdownTemplate('Tags: {{ join(tags.map(t, t.name), ", ") }}', {
+      tags: [{ name: "a" }, { name: "b" }],
+    });
+    expect(out).toBe("Tags: a, b");
+  });
+
   it("renders the run dollar-node accessor via the CEL rewrite alias", () => {
     const dollar = { Deploy: { data: { url: "https://example.com" } } };
     const out = interpolateMarkdownTemplate('Deployed to {{ run.$["Deploy"].data.url }}', {
