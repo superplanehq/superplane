@@ -49,8 +49,7 @@ export const onAlertTriggerRenderer: TriggerRenderer = {
       ...(lastEvent && {
         lastEventData: {
           title: "Alerting incident",
-          subtitle:
-            alertSummary(lastEvent.data as AlertEventData) || renderTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: alertSummary(lastEvent.data as AlertEventData) || renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,
