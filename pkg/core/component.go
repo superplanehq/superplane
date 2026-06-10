@@ -41,7 +41,7 @@ type ExecutionContext struct {
 	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
-	RepositoryFiles RepositoryFilesContext
+	Files RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 }
@@ -75,7 +75,7 @@ type SetupContext struct {
 	Auth            AuthReader
 	Integration     IntegrationContext
 	Webhook         NodeWebhookContext
-	RepositoryFiles RepositoryFilesContext
+	Files RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {

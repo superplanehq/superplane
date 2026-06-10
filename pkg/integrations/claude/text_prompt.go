@@ -162,12 +162,6 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
-	if raw, ok := ctx.Configuration.(map[string]any); ok {
-		if v, ok := raw["files"]; ok {
-			spec.Files = decodeStringList(v)
-		}
-	}
-
 	if spec.Model == "" {
 		return fmt.Errorf("model is required")
 	}
@@ -178,10 +172,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 
 	// Validate that configured files exist in the repository
 	if len(spec.Files) > 0 {
-		if ctx.RepositoryFiles == nil {
-			return fmt.Errorf("files configured but app repository is not available")
-		}
-		available, err := ctx.RepositoryFiles.List()
+		available, err := ctx.Files.List()
 		if err != nil {
 			return fmt.Errorf("failed to list repository files: %v", err)
 		}
@@ -204,12 +195,6 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
-	if raw, ok := ctx.Configuration.(map[string]any); ok {
-		if v, ok := raw["files"]; ok {
-			spec.Files = decodeStringList(v)
-		}
-	}
-
 	if spec.Model == "" {
 		return fmt.Errorf("model is required")
 	}
@@ -318,14 +303,10 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 		return spec.Prompt, nil
 	}
 
-	if ctx.RepositoryFiles == nil {
-		return nil, fmt.Errorf("files configured but repository files context is not available")
-	}
-
 	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
 
 	for _, path := range spec.Files {
-		reader, err := ctx.RepositoryFiles.Read(path)
+		reader, err := ctx.Files.Read(normalizeFilePath(path))
 		if err != nil {
 			return nil, fmt.Errorf("read file %q: %w", path, err)
 		}
@@ -340,7 +321,7 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 			return nil, fmt.Errorf("file %q exceeds maximum size of %d bytes", path, maxFileSize)
 		}
 
-		mediaType := mediaTypeForPath(path)
+		mediaType := "text/plain"
 		blocks = append(blocks, ContentBlock{
 			Type: "document",
 			Source: &ContentBlockSource{
@@ -360,15 +341,14 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 	return blocks, nil
 }
 
-func mediaTypeForPath(path string) string {
-	return "text/plain"
-}
 
 // normalizeFilePath cleans up a file path for consistent comparison.
 func normalizeFilePath(p string) string {
 	p = pathpkg.Clean(p)
 	p = strings.TrimPrefix(p, "/")
-	p = strings.TrimPrefix(p, "./")
+	if p == "." {
+		return ""
+	}
 	return p
 }
 
@@ -380,21 +360,3 @@ func (c *TextPrompt) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func decodeStringList(v any) []string {
-	switch x := v.(type) {
-	case nil:
-		return nil
-	case []string:
-		return x
-	case []any:
-		out := make([]string, 0, len(x))
-		for _, e := range x {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
-}

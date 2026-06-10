@@ -383,7 +383,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:    contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		RepositoryFiles: contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
+		Files: contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
 		Webhook:         contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions:    contexts.NewExpressionContext(builder),
 	}

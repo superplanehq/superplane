@@ -149,7 +149,7 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:    NewCanvasMemoryContext(tx, execution.WorkflowID),
-			RepositoryFiles: repoFiles,
+			Files: repoFiles,
 		}, nil
 	}
 
@@ -267,7 +267,7 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:    NewCanvasMemoryContext(tx, execution.WorkflowID),
-			RepositoryFiles: repoFiles,
+			Files: repoFiles,
 		}, nil
 	}
 

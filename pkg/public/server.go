@@ -1269,7 +1269,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:   contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 				CanvasMemory:    contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-				RepositoryFiles: contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
+				Files: contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 			}, nil
 		},
 	})
