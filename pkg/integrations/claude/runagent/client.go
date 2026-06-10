@@ -235,16 +235,19 @@ func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, at
 	var events []ManagedSessionEvent
 	for i := 0; i < attempts; i++ {
 		var err error
-		message, events, err := c.GetLastManagedSessionAgentMessage(sessionID)
+		var message string
+		message, events, err = c.GetLastManagedSessionAgentMessage(sessionID)
 		if err != nil {
 			return "", events, err
 		}
 
-		if message != "" || i == attempts-1 {
+		if message != "" {
 			return message, events, nil
 		}
 
-		time.Sleep(delay)
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
 	}
 	return "", events, nil
 }
