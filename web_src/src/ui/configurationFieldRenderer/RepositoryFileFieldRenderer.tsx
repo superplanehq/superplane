@@ -1,6 +1,7 @@
 import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canvasesListCanvasRepositoryFiles } from "@/api-client/sdk.gen";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { toTestId } from "@/lib/testID";
@@ -13,9 +14,11 @@ export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ fiel
     queryKey: ["repository-files", appId],
     queryFn: async () => {
       if (!appId) return [];
-      const response = await canvasesListCanvasRepositoryFiles({
-        path: { canvasId: appId },
-      });
+      const response = await canvasesListCanvasRepositoryFiles(
+        withOrganizationHeader({
+          path: { canvasId: appId },
+        }),
+      );
       return response.data?.files?.map((f) => f.path ?? "").filter(Boolean) ?? [];
     },
     enabled: !!appId,
