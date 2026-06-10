@@ -3,12 +3,14 @@ import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 
-export type CanvasMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectConsole?: () => void;
+  onSelectRuns?: () => void;
+  onSelectVersions?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
@@ -18,9 +20,10 @@ interface CanvasModeToggleProps {
 
 const CANVAS_TAB = "canvas";
 const CONSOLE_TAB = "console";
+const RUNS_TAB = "runs";
+const VERSIONS_TAB = "versions";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
-const RUNS_MODE = "runs";
 
 const BASE_TAB_CLASSES =
   "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
@@ -32,9 +35,10 @@ const EDITING_INACTIVE_CLASSES = "bg-transparent text-blue-800/80 hover:text-blu
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
+  runs: RUNS_TAB,
+  versions: VERSIONS_TAB,
   memory: MEMORY_TAB,
   files: FILES_TAB,
-  runs: RUNS_MODE,
 };
 
 /** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
@@ -61,10 +65,23 @@ function tabClasses(selected: string, value: string, editing: boolean) {
   return cn(BASE_TAB_CLASSES, stateClass);
 }
 
+function GroupDivider() {
+  return (
+    <span
+      aria-hidden="true"
+      role="separator"
+      className="mx-2 h-7 w-px shrink-0 bg-slate-950/15"
+      data-testid="canvas-view-mode-group-divider"
+    />
+  );
+}
+
 export function CanvasModeToggle({
   mode,
   onSelectLive,
   onSelectConsole,
+  onSelectRuns,
+  onSelectVersions,
   onSelectMemory,
   onSelectFiles,
   editing = false,
@@ -73,8 +90,11 @@ export function CanvasModeToggle({
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
+  const showRuns = Boolean(onSelectRuns);
+  const showVersions = Boolean(onSelectVersions);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
+  const showSecondaryGroup = showConsole || showMemory || showFiles;
   const selected = modeToTab(mode);
   const baseHref = organizationId && appId ? appPath(organizationId, appId) : "#";
   const tabHref = (view?: string) => (view ? `${baseHref}?view=${view}` : baseHref);
@@ -87,6 +107,44 @@ export function CanvasModeToggle({
         editing ? "bg-blue-50" : "bg-slate-100",
       )}
     >
+      <Link
+        to={tabHref()}
+        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
+        className={tabClasses(selected, CANVAS_TAB, editing)}
+        data-testid="canvas-view-mode-live"
+        aria-label={editing ? "Canvas (editing)" : "Canvas"}
+        aria-current={selected === CANVAS_TAB ? "page" : undefined}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          Canvas
+          <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
+        </span>
+      </Link>
+      {showRuns ? (
+        <Link
+          to={tabHref("runs")}
+          onClick={(e) => handleTabClick(e, selected === RUNS_TAB, () => void onSelectRuns?.())}
+          className={tabClasses(selected, RUNS_TAB, editing)}
+          data-testid="canvas-view-mode-runs"
+          aria-label="Runs"
+          aria-current={selected === RUNS_TAB ? "page" : undefined}
+        >
+          Runs
+        </Link>
+      ) : null}
+      {showVersions ? (
+        <Link
+          to={tabHref("versions")}
+          onClick={(e) => handleTabClick(e, selected === VERSIONS_TAB, () => void onSelectVersions?.())}
+          className={tabClasses(selected, VERSIONS_TAB, editing)}
+          data-testid="canvas-view-mode-versions"
+          aria-label="Versions"
+          aria-current={selected === VERSIONS_TAB ? "page" : undefined}
+        >
+          Versions
+        </Link>
+      ) : null}
+      {showSecondaryGroup ? <GroupDivider /> : null}
       {showConsole ? (
         <Link
           to={tabHref("console")}
@@ -102,19 +160,6 @@ export function CanvasModeToggle({
           </span>
         </Link>
       ) : null}
-      <Link
-        to={tabHref()}
-        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
-        className={tabClasses(selected, CANVAS_TAB, editing)}
-        data-testid="canvas-view-mode-live"
-        aria-label={editing ? "Canvas (editing)" : "Canvas"}
-        aria-current={selected === CANVAS_TAB ? "page" : undefined}
-      >
-        <span className="inline-flex items-center gap-1.5">
-          Canvas
-          <DraftDot show={hasDraft} editing={editing} testId="canvas-view-mode-live-draft-dot" />
-        </span>
-      </Link>
       {showMemory ? (
         <Link
           to={tabHref("memory")}

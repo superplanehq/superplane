@@ -226,7 +226,7 @@ export const ComponentSidebar = ({
   const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
   const setRightResizing = useSidebarLayoutStore((state) => state.setRightResizing);
   const resizeRight = useSidebarLayoutStore((state) => state.resizeRight);
-  useSidebarMount("right");
+  useSidebarMount("right", Boolean(isOpen));
   useSidebarLayoutViewport();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeResizePointerIdRef = useRef<number | null>(null);
