@@ -25,9 +25,9 @@ export function pageTitle(page: CommandPage): string {
     case "organization-settings":
       return "Search organization settings";
     case "canvas-settings":
-      return "Search canvas settings";
+      return "Search app settings";
     case "open-canvas":
-      return "Search canvases";
+      return "Search apps";
     case "admin":
       return "Search admin pages";
     default:
