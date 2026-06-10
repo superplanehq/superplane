@@ -41,6 +41,23 @@ export interface WorkspaceNodeMetadata {
   workspaceAlias?: string;
 }
 
+export interface QueryConfiguration {
+  region?: string;
+  workspace?: string;
+  query?: string;
+}
+
+export interface QueryRangeConfiguration extends QueryConfiguration {
+  start?: string;
+  end?: string;
+  step?: string;
+}
+
+export interface PrometheusQueryPayload {
+  resultType?: string;
+  result?: unknown[];
+}
+
 export function buildPrometheusComponentProps(
   context: ComponentBaseContext,
   metadata: MetadataItem[],
@@ -142,6 +159,52 @@ export function formatExecutionTimestamp(
 export function workspaceAliasFromMetadata(node: NodeInfo): string | undefined {
   const metadata = node.metadata as WorkspaceNodeMetadata | undefined;
   return metadata?.workspaceAlias?.trim() || undefined;
+}
+
+export function queryMetadataList(node: NodeInfo, range = false): MetadataItem[] {
+  const config = node.configuration as QueryRangeConfiguration | undefined;
+  const items: MetadataItem[] = [];
+  const alias = workspaceAliasFromMetadata(node);
+
+  if (alias || config?.workspace) {
+    items.push({ icon: "activity", label: alias ?? config?.workspace ?? "" });
+  }
+  if (config?.query) {
+    items.push({ icon: "search", label: config.query });
+  }
+  if (range && config?.start) {
+    items.push({ icon: "clock", label: `Start: ${config.start}` });
+  }
+  if (!range && config?.region) {
+    items.push({ icon: "globe", label: config.region });
+  }
+
+  return items.slice(0, MAX_METADATA_ITEMS);
+}
+
+export function queryDetails(
+  execution: ExecutionInfo,
+  node: NodeInfo,
+  payload: PrometheusQueryPayload | undefined,
+): Record<string, string> {
+  const config = node.configuration as QueryRangeConfiguration | undefined;
+  const details: Record<string, string> = {
+    "Executed At": stringOrDash(formatExecutionTimestamp(execution)),
+    Alias: stringOrDash(workspaceAliasFromMetadata(node) ?? config?.workspace),
+  };
+
+  details["Result Type"] = stringOrDash(payload?.resultType);
+  details.Results = resultCount(payload);
+
+  return details;
+}
+
+function resultCount(payload: PrometheusQueryPayload | undefined): string {
+  if (payload?.result === undefined) {
+    return "-";
+  }
+
+  return String(Array.isArray(payload.result) ? payload.result.length : 0);
 }
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
