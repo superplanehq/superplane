@@ -42,14 +42,20 @@ export function FileMonacoEditor({ path, content, language, readOnly, onChange }
 
   const handleChange = useCallback(
     (value: string | undefined) => {
+      const next = value ?? "";
       if (suppressNextChangeRef.current) {
         suppressNextChangeRef.current = false;
-        return;
+        // Monaco often does not emit an onChange when the controlled value is
+        // applied after a path switch, so the flag would otherwise swallow the
+        // user's first real edit. Only ignore echoes of the current value.
+        if (next === content) {
+          return;
+        }
       }
 
-      onChange(value ?? "");
+      onChange(next);
     },
-    [onChange],
+    [content, onChange],
   );
 
   return (

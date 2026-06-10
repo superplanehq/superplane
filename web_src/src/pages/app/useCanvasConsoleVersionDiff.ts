@@ -96,7 +96,7 @@ export function useCanvasConsoleVersionDiff({
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
-    hasLatestDraftVersion: !!versionIds.draft,
+    hasLatestDraftVersion: !!(versionIds.active || versionIds.draft),
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
     hasDraftDiffVersusLive,
