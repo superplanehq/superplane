@@ -52,7 +52,7 @@ func TestListMode_ValidateRequiresSource(t *testing.T) {
 }
 
 func TestListMode_ValidateRejectsReservedAndInvalidNames(t *testing.T) {
-	cases := []string{"$", "memory", "1bad", "with space", ""}
+	cases := []string{"$", "memory", "config", "root", "previous", "run", "ctx", "1bad", "with space", ""}
 	for _, name := range cases {
 		t.Run(fmt.Sprintf("rejects %q", name), func(t *testing.T) {
 			err := ListMode{IterateList: true, ListSource: "list", ItemVariable: name}.Validate()
