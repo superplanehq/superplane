@@ -29,6 +29,9 @@ func NewRepositoryFilesContext(
 	gitProvider gitprovider.Provider,
 	canvasID uuid.UUID,
 ) core.RepositoryFilesContext {
+	if gitProvider == nil {
+		return nil
+	}
 	return &repositoryFilesContext{
 		gitProvider: gitProvider,
 		canvasID:    canvasID,
