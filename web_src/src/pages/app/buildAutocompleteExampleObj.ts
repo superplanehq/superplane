@@ -10,8 +10,6 @@ export type AutocompleteExampleContext = {
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   allComponentsByName: Map<string | undefined, SuperplaneActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
-  organizationId?: string;
-  canvasId?: string;
 };
 
 // Representative run id used purely to preview the shape of run() in the editor;
@@ -20,12 +18,15 @@ const EXAMPLE_RUN_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
 
 // buildRunExample mirrors the server's run() payload so the autocomplete can
 // surface run().id / run().url / run().started_at and show a representative preview.
-function buildRunExample(organizationId?: string, canvasId?: string): Record<string, unknown> {
-  const base = typeof window !== "undefined" ? window.location.origin : "";
-  const url =
-    base && organizationId && canvasId
-      ? `${base}/${organizationId}/apps/${canvasId}?view=runs&run=${EXAMPLE_RUN_ID}`
-      : "";
+// The example url is derived from the current app page location
+// (`/{org}/apps/{appId}`), which matches the real run link format.
+function buildRunExample(): Record<string, unknown> {
+  let url = "";
+  if (typeof window !== "undefined") {
+    const { origin, pathname } = window.location;
+    const appPath = pathname.match(/^\/[^/]+\/apps\/[^/]+/)?.[0] ?? pathname;
+    url = `${origin}${appPath}?view=runs&run=${EXAMPLE_RUN_ID}`;
+  }
 
   return {
     id: EXAMPLE_RUN_ID,
@@ -315,7 +316,7 @@ export function buildAutocompleteExampleObj(
     nodeNamesById,
     nodeMetadata,
     previousByDepth,
-    runExample: buildRunExample(context.organizationId, context.canvasId),
+    runExample: buildRunExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });
