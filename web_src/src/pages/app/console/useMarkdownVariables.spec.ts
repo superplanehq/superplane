@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { pickMemoryRows } from "./useMarkdownVariables";
+import { pickMemoryRows, resolveMemoryVariable } from "./useMarkdownVariables";
+import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import type { MarkdownMemoryVariableSource } from "./markdownVariables";
 
 function memorySource(extra: Partial<MarkdownMemoryVariableSource>): MarkdownMemoryVariableSource {
@@ -47,5 +48,41 @@ describe("pickMemoryRows", () => {
     // outer `resolveMemoryVariable` empty-array branch instead of using
     // this helper for the no-rows path.
     expect(pickMemoryRows([], memorySource({}))).toBeUndefined();
+  });
+});
+
+describe("resolveMemoryVariable loading state", () => {
+  it("resolves a single-row variable to null while loading", () => {
+    expect(resolveMemoryVariable([], memorySource({}), true)).toEqual({ value: null });
+  });
+
+  it("resolves a list-mode variable to null while loading (not an empty list)", () => {
+    // Regression: returning `[]` here let `VariablePreview` skip its
+    // `loading && value == null` guard and flash "List · 0 items" before the
+    // memory query settled. Both modes must resolve to null mid-flight.
+    expect(resolveMemoryVariable([], memorySource({ mode: "list" }), true)).toEqual({ value: null });
+    expect(resolveMemoryVariable([], memorySource({ mode: "list", limit: 5 }), true)).toEqual({ value: null });
+  });
+
+  it("resolves a list-mode variable to an empty array once loading settles with no rows", () => {
+    expect(resolveMemoryVariable([], memorySource({ mode: "list" }), false)).toEqual({ value: [] });
+  });
+
+  it("surfaces a no-rows error for a single-row variable once loading settles", () => {
+    const result = resolveMemoryVariable([], memorySource({}), false);
+    expect(result.value).toBeNull();
+    expect(result.error).toMatch(/No memory rows/);
+  });
+
+  it("resolves the full list once rows arrive even if still flagged loading", () => {
+    // Once matching entries exist the backing query has produced data, so the
+    // list resolves normally regardless of the loading flag.
+    const entries: CanvasMemoryEntry[] = [
+      { id: "1", namespace: "ns", values: { name: "a" }, source: "node", createdAt: "2026-06-01T00:00:00Z" },
+      { id: "2", namespace: "ns", values: { name: "b" }, source: "node", createdAt: "2026-06-02T00:00:00Z" },
+    ];
+    const result = resolveMemoryVariable(entries, memorySource({ mode: "list" }), true);
+    expect(Array.isArray(result.value)).toBe(true);
+    expect((result.value as unknown[]).length).toBe(2);
   });
 });

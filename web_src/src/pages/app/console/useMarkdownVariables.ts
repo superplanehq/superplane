@@ -306,7 +306,7 @@ function noRunFoundMessage(select: MarkdownRunVariableSource["select"]): string 
  * a false empty state before the fetch settles — mirroring how run variables
  * wait on their query's `isLoading`.
  */
-function resolveMemoryVariable(
+export function resolveMemoryVariable(
   entries: CanvasMemoryEntry[],
   source: MarkdownMemoryVariableSource,
   loading: boolean,
@@ -318,7 +318,12 @@ function resolveMemoryVariable(
   const isList = source.mode === "list";
   const filtered = entries.filter((entry) => entry.namespace === namespace);
   if (filtered.length === 0) {
-    if (loading) return { value: isList ? [] : null };
+    // While the backing query is in flight, resolve to `null` for both modes
+    // (not `[]` for list) so the editor preview shows its shared "Loading
+    // preview…" state — gated on `value == null` — instead of flashing an
+    // empty list ("List · 0 items"). The settled empty state (`[]` for list,
+    // an error for single) only applies once loading completes.
+    if (loading) return { value: null };
     if (isList) return { value: [] };
     return { value: null, error: `No memory rows in namespace ${JSON.stringify(namespace)}.` };
   }
