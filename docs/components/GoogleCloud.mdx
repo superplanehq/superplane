@@ -42,6 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
   <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
   <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications" />
+  <LinkCard title="Managed Prometheus • Query" href="#managed-prometheus-•-query" description="Run a PromQL query against Google Cloud Managed Service for Prometheus" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
@@ -1479,6 +1480,67 @@ Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **co
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.monitoring.alertingPolicy.updated"
+}
+```
+
+<a id="managed-prometheus-•-query"></a>
+
+## Managed Prometheus • Query
+
+**Component key:** `gcp.prometheus.query`
+
+The Query component runs a PromQL query against Google Cloud Managed Service for Prometheus (GMP).
+
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. By default this component runs an **instant** query (the value at "now"); choosing a **Lookback Period** instead runs a **range** query from `now - lookback` to `now`.
+
+### Use Cases
+
+- **Threshold checks**: Evaluate an expression (e.g. `up` or `rate(...)`) and branch on the value
+- **Spot readings**: Read the current value of a metric to enrich a workflow
+- **Trend analysis**: Pull a metric over a window to summarise or chart it downstream
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `up`
+- **Lookback Period**: `Instant` (default) evaluates at a single point in time. A window (5 minutes to 14 days) runs a range query; the component derives the start/end and a sensible resolution step automatically.
+
+### Output
+
+Emits one `gcp.prometheus.query` payload:
+- **resultType**: `vector` / `scalar` for instant queries, `matrix` for range queries
+- **result**: the Prometheus result (series with their labels and value(s))
+- **seriesCount**: number of series returned
+- For a range query, also **lookbackPeriod**, **start**, **end**, **step**: the resolved query window
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- An invalid PromQL expression fails the action with the Prometheus error message
+- When querying Google Cloud metrics whose type spans multiple resource types, GMP requires a `monitored_resource` label matcher (e.g. `{__name__="...", monitored_resource="consumed_api"}`)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "value": [
+          1767225600,
+          "1"
+        ]
+      }
+    ],
+    "resultType": "vector",
+    "seriesCount": 1
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "gcp.prometheus.query"
 }
 ```
 
