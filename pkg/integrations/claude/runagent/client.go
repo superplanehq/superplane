@@ -1,7 +1,9 @@
 package runagent
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,6 +208,91 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 		return nil, "", fmt.Errorf("failed to unmarshal session events: %w", err)
 	}
 	return out.Data, out.NextPage, nil
+}
+
+// StreamSessionUntilIdle opens an SSE stream on the session and processes
+// events in real-time. It captures the last agent.message text and returns
+// it along with the terminal status when the session reaches idle or terminated.
+func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (status string, lastMessage string, err error) {
+	if sessionID == "" {
+		return "", "", fmt.Errorf("session id is required")
+	}
+
+	streamURL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/events/stream"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("build stream request: %w", err)
+	}
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersionValue)
+	req.Header.Set("anthropic-beta", anthropicBetaManagedAgents)
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("open stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", "", fmt.Errorf("stream request failed (%d): %s", resp.StatusCode, string(body))
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		if ctx.Err() != nil {
+			return "", lastMessage, ctx.Err()
+		}
+
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		payload := strings.TrimPrefix(line, "data: ")
+		if payload == "" {
+			continue
+		}
+
+		var event ManagedSessionEvent
+		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			continue
+		}
+
+		// Capture agent messages — always keep the latest one
+		if event.Type == "agent.message" || event.Type == "assistant.message" {
+			text := extractTextFromContent(event.Content)
+			if text != "" {
+				lastMessage = text
+			}
+		}
+
+		// Terminal events
+		if event.Type == "session.status_idle" {
+			return "idle", lastMessage, nil
+		}
+		if event.Type == "session.status_terminated" {
+			return "terminated", lastMessage, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", lastMessage, fmt.Errorf("stream read: %w", err)
+	}
+	// Stream ended without terminal event
+	return "", lastMessage, fmt.Errorf("stream ended unexpectedly")
+}
+
+func extractTextFromContent(content []ManagedSessionContentBlock) string {
+	parts := make([]string, 0)
+	for _, block := range content {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			parts = append(parts, block.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, []ManagedSessionEvent, error) {
