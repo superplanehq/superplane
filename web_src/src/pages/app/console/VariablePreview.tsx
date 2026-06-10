@@ -45,8 +45,143 @@ export function VariablePreview({
     return <p className="text-[11px] text-slate-400">No data resolved yet.</p>;
   }
 
+  // List-mode memory variables resolve to an array. Render a dedicated block
+  // so authors see it is a list and get insert snippets that use the
+  // `join(name.map(...), sep)` pattern instead of a bare `{{ name }}` that
+  // would stringify the whole array to JSON.
+  if (Array.isArray(value)) {
+    return <ListVariablePreviewBlock name={name} items={value} onInsertSnippet={onInsertSnippet} />;
+  }
+
   const fields = previewableFields(value);
   return <VariablePreviewBlock name={name} fields={fields} onInsertSnippet={onInsertSnippet} />;
+}
+
+/**
+ * Preview block for a list-mode variable. Shows the item count, the fields of
+ * the first row (so authors know what each element looks like), and insert
+ * snippets that wrap the list in `join(name.map(item, …), ", ")` — the
+ * canonical way to render a list since cel-js can't chain `.method()` after a
+ * function call and a bare `{{ name }}` would dump raw JSON.
+ */
+function ListVariablePreviewBlock({
+  name,
+  items,
+  onInsertSnippet,
+}: {
+  name: string;
+  items: unknown[];
+  onInsertSnippet: (snippet: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const fieldKeys = listItemFieldKeys(items);
+  const countSnippet = `{{ size(${name}) }}`;
+
+  return (
+    <div className="min-w-0 space-y-1 rounded border border-slate-100 bg-slate-50 p-2">
+      <div className="flex min-w-0 items-center gap-2 text-[11px] text-slate-500">
+        <button
+          type="button"
+          onClick={() => setCollapsed((prev) => !prev)}
+          aria-expanded={!collapsed}
+          className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-200/60"
+          data-testid="markdown-variable-preview-toggle"
+        >
+          {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
+          <span className="font-semibold uppercase tracking-wide">Preview</span>
+        </button>
+        <span className="rounded bg-slate-200/70 px-1 text-[10px] font-medium text-slate-600">
+          List · {items.length} {items.length === 1 ? "item" : "items"}
+        </span>
+        <span className="min-w-0 flex-1" />
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-5 shrink-0 px-1.5 text-[11px]"
+          onClick={() => onInsertSnippet(countSnippet)}
+          title={`Insert ${countSnippet}`}
+        >
+          Count
+        </Button>
+      </div>
+      {!collapsed ? (
+        <ListVariablePreviewBody name={name} items={items} fieldKeys={fieldKeys} onInsertSnippet={onInsertSnippet} />
+      ) : null}
+    </div>
+  );
+}
+
+function ListVariablePreviewBody({
+  name,
+  items,
+  fieldKeys,
+  onInsertSnippet,
+}: {
+  name: string;
+  items: unknown[];
+  fieldKeys: string[];
+  onInsertSnippet: (snippet: string) => void;
+}) {
+  if (items.length === 0) {
+    return <p className="text-[11px] text-slate-500">No rows matched yet. The list resolves to an empty array.</p>;
+  }
+  // Scalar lists (strings, numbers) have no fields to map over, so offer a
+  // direct join of the whole list.
+  if (fieldKeys.length === 0) {
+    const joinSnippet = `{{ join(${name}, ", ") }}`;
+    return (
+      <div className="space-y-1">
+        <p className="text-[11px] text-slate-500" title={shortPreviewString(items[0])}>
+          e.g. {shortPreviewString(items[0])}
+        </p>
+        <button
+          type="button"
+          onClick={() => onInsertSnippet(joinSnippet)}
+          className="truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
+          title={`Insert ${joinSnippet}`}
+        >
+          {joinSnippet}
+        </button>
+      </div>
+    );
+  }
+  const first = items[0] as Record<string, unknown>;
+  return (
+    <ul className="max-h-40 space-y-0.5 overflow-y-auto pr-1">
+      {fieldKeys.map((key) => {
+        const snippet = `{{ join(${name}.map(item, item.${key}), ", ") }}`;
+        return (
+          <li key={key} className="flex min-w-0 items-start gap-2">
+            <button
+              type="button"
+              onClick={() => onInsertSnippet(snippet)}
+              className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline"
+              title={`Insert ${snippet}`}
+            >
+              {key}
+            </button>
+            <span className="min-w-0 flex-1 truncate text-[11px] text-slate-600" title={shortPreviewString(first[key])}>
+              {shortPreviewString(first[key])}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Field keys to offer for a list variable: the own keys of the first
+ * object-shaped element, minus internal CEL aliases. Returns `[]` for scalar
+ * lists (or an empty list) so the caller falls back to a whole-list `join`.
+ */
+function listItemFieldKeys(items: unknown[]): string[] {
+  const first = items[0];
+  if (!first || typeof first !== "object" || Array.isArray(first)) return [];
+  return Object.keys(first as Record<string, unknown>)
+    .filter((key) => !INTERNAL_PREVIEW_KEYS.has(key) && key !== "$")
+    .slice(0, 12);
 }
 
 /**
