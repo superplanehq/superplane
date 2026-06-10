@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
@@ -38,10 +39,16 @@ func agentModeFromProto(mode pb.AgentMode) string {
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
 	org, err = uuid.Parse(orgID)
 	if err != nil {
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("agent request received an invalid organization id")
 		return uuid.Nil, uuid.Nil, status.Error(codes.Internal, "invalid organization")
 	}
 	user, err = uuid.Parse(userID)
 	if err != nil {
+		log.WithError(err).
+			WithField("user_id", userID).
+			Error("agent request received an invalid user id")
 		return uuid.Nil, uuid.Nil, status.Error(codes.Internal, "invalid user")
 	}
 	return org, user, nil
@@ -52,6 +59,10 @@ func ensureCanvas(orgID, canvasID uuid.UUID) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return status.Error(codes.NotFound, "canvas not found")
 		}
+		log.WithError(err).
+			WithField("organization_id", orgID.String()).
+			WithField("canvas_id", canvasID.String()).
+			Error("failed to load canvas for agent request")
 		return status.Error(codes.Internal, "failed to load canvas")
 	}
 	return nil
