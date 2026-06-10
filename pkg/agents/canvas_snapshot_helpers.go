@@ -30,21 +30,21 @@ func ownedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error
 	return nil, nil
 }
 
-func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) *models.CanvasVersion {
+func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) (*models.CanvasVersion, error) {
 	if source == "draft" {
-		return draft
+		return draft, nil
 	}
 
 	if canvas == nil || canvas.LiveVersionID == nil {
-		return nil
+		return nil, nil
 	}
 
 	version, err := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	return version
+	return version, nil
 }
 
 func summarizeNodes(nodes []models.Node, limit int) []superPlaneCanvasNodeSummary {

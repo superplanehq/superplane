@@ -377,8 +377,16 @@ func buildCanvasSnapshot(session *models.AgentSession) string {
 		return strings.TrimRight(builder.String(), "\n")
 	}
 
-	version := selectedVersion(canvas, draft, snapshotSource)
+	version, err := selectedVersion(canvas, draft, snapshotSource)
+	if err != nil {
+		log.WithError(err).Warn("failed to load canvas version for agent snapshot")
+		builder.WriteString("snapshot_source: unavailable\n")
+		builder.WriteString("nodes: unavailable\n")
+		return strings.TrimRight(builder.String(), "\n")
+	}
+
 	if version == nil {
+		builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
 		builder.WriteString("nodes: unavailable\n")
 		return strings.TrimRight(builder.String(), "\n")
 	}
