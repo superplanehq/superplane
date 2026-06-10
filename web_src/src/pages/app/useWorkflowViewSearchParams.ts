@@ -7,7 +7,7 @@ import type { SetURLSearchParams } from "react-router-dom";
  * in-flight links) and silently rewritten to the canonical `console` value.
  */
 const CONSOLE_VIEW = "console";
-const LEGACY_CONSOLE_VIEW = "console";
+const LEGACY_CONSOLE_VIEW = "dashboard";
 
 function isConsoleView(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;

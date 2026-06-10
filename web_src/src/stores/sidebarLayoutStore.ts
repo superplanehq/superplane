@@ -187,10 +187,13 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
  * (component / building-blocks). When unmounted the store decrements the mount
  * count so its constraints reflect the actual on-screen geometry.
  */
-export function useSidebarMount(side: "left" | "right"): void {
+export function useSidebarMount(side: "left" | "right", active = true): void {
   const registerLeft = useSidebarLayoutStore((s) => s.registerLeft);
   const registerRight = useSidebarLayoutStore((s) => s.registerRight);
-  useEffect(() => (side === "left" ? registerLeft() : registerRight()), [side, registerLeft, registerRight]);
+  useEffect(() => {
+    if (!active) return;
+    return side === "left" ? registerLeft() : registerRight();
+  }, [active, side, registerLeft, registerRight]);
 }
 
 /**

@@ -41,4 +41,20 @@ describe("useWorkflowViewSearchParams", () => {
 
     expect(result.current.selectedRunId).toBe("run-42");
   });
+
+  it("accepts legacy dashboard view links and migrates them to console", () => {
+    const setSearchParams = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkflowViewSearchParams(makeSearchParams({ view: "dashboard" }), setSearchParams),
+    );
+
+    expect(result.current.isConsoleMode).toBe(true);
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const next = updater(makeSearchParams({ view: "dashboard", run: "run-42" }));
+
+    expect(next.get("view")).toBe("console");
+    expect(next.get("run")).toBe("run-42");
+  });
 });
