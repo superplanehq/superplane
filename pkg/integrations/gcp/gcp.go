@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/clouddns"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudsql"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/monitoring"
@@ -40,6 +41,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	cloudsql.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudsql.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
@@ -106,7 +110,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -195,6 +199,9 @@ func (g *GCP) Actions() []core.Action {
 		&monitoring.GetAlertingPolicy{},
 		&monitoring.DeleteAlertingPolicy{},
 		&monitoring.UpdateAlertingPolicy{},
+		&cloudsql.CreateDatabase{},
+		&cloudsql.GetDatabase{},
+		&cloudsql.DeleteDatabase{},
 	}
 }
 
@@ -994,6 +1001,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return gcppubsub.ListTopicResources(reqCtx, client)
 	case gcppubsub.ResourceTypeSubscription:
 		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
+	case cloudsql.ResourceTypeInstance:
+		return cloudsql.ListInstanceResources(reqCtx, client)
+	case cloudsql.ResourceTypeDatabase:
+		return cloudsql.ListDatabaseResources(reqCtx, client, p["instance"])
 	default:
 		return nil, nil
 	}
