@@ -33,6 +33,7 @@ const (
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
+var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
@@ -102,10 +103,9 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 	}
 }
 
-// dispatch acquires a concurrency slot (back-pressures the consumer when N
-// streams are in flight), spawns the worker, and returns so the message can
-// be ACKed. A panic in the goroutine is recovered and logged so one bad
-// stream can't kill the worker.
+// dispatch acquires a concurrency slot and the per-session stream lock before
+// ACKing the queue message. If another worker already owns the session lock,
+// it returns an error so the message can be retried instead of dropped.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	select {
 	case w.slots <- struct{}{}:
@@ -113,14 +113,25 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 		return ctx.Err()
 	}
 
+	request, err := prepareAgentStreamRequest(ctx, body)
+	if err != nil {
+		<-w.slots
+		return err
+	}
+	if request == nil {
+		<-w.slots
+		return nil
+	}
+
 	go func() {
 		defer func() {
+			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
 				log.WithField("panic", r).Error("agent stream handler panicked")
 			}
 		}()
-		if err := w.handle(ctx, body); err != nil {
+		if err := w.handleLocked(ctx, request.req, request.sessionID); err != nil {
 			log.WithError(err).Error("agent stream handler error")
 		}
 	}()
@@ -173,32 +184,53 @@ func (w *AgentStreamWorker) cleanupStuckSessions() {
 
 // Handle is exported only so tests can drive the worker without RabbitMQ.
 func (w *AgentStreamWorker) Handle(parentCtx context.Context, body []byte) error {
-	return w.handle(parentCtx, body)
+	request, err := prepareAgentStreamRequest(parentCtx, body)
+	if err != nil {
+		return err
+	}
+	if request == nil {
+		return nil
+	}
+	defer request.unlock()
+	return w.handleLocked(parentCtx, request.req, request.sessionID)
 }
 
-func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error {
+type lockedAgentStreamRequest struct {
+	req       messages.AgentStreamRequest
+	sessionID uuid.UUID
+	unlock    func()
+}
+
+func prepareAgentStreamRequest(parentCtx context.Context, body []byte) (*lockedAgentStreamRequest, error) {
 	var req messages.AgentStreamRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.WithError(err).Error("agent stream: invalid request body, dropping")
-		return nil
+		return nil, nil
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)
 	if err != nil {
 		log.WithField("session_id", req.SessionID).Warn("agent stream: invalid session id, dropping")
-		return nil
+		return nil, nil
 	}
 
 	unlock, locked, err := tryAgentStreamLock(parentCtx, sessionID)
 	if err != nil {
-		return fmt.Errorf("agent stream: acquire session lock: %w", err)
+		return nil, fmt.Errorf("agent stream: acquire session lock: %w", err)
 	}
 	if !locked {
-		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, dropping duplicate request")
-		return nil
+		log.WithField("session_id", sessionID).Info("agent stream: stream already in progress, retrying request later")
+		return nil, errAgentStreamAlreadyLocked
 	}
-	defer unlock()
 
+	return &lockedAgentStreamRequest{
+		req:       req,
+		sessionID: sessionID,
+		unlock:    unlock,
+	}, nil
+}
+
+func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages.AgentStreamRequest, sessionID uuid.UUID) error {
 	session, err := models.FindAgentSession(sessionID)
 	if err != nil {
 		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: session not found, dropping")

@@ -135,12 +135,17 @@ func (t *SuperPlaneCanvasTool) read(ctx context.Context, session agents.AgentSes
 		return superPlaneCanvasReadResult{}, fmt.Errorf("read canvas yaml: %w", err)
 	}
 
+	version, err := selectedVersion(canvas, draft, source)
+	if err != nil {
+		return superPlaneCanvasReadResult{}, err
+	}
+
 	result := superPlaneCanvasReadResult{
 		Action:     "read",
 		CanvasID:   session.CanvasID,
 		Source:     source,
 		VersionID:  versionID,
-		Summary:    summarizeCanvasVersion(canvas, selectedVersion(canvas, draft, source)),
+		Summary:    summarizeCanvasVersion(canvas, version),
 		CanvasYAML: canvasYAML,
 	}
 
@@ -299,18 +304,18 @@ func ensureOwnedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion,
 	return draft, nil
 }
 
-func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) *models.CanvasVersion {
+func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) (*models.CanvasVersion, error) {
 	if source == "draft" {
-		return draft
+		return draft, nil
 	}
 	if canvas == nil || canvas.LiveVersionID == nil {
-		return nil
+		return nil, nil
 	}
 	version, err := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("load live canvas version summary: %w", err)
 	}
-	return version
+	return version, nil
 }
 
 func summarizeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion) superPlaneCanvasSummary {

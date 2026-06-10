@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +33,9 @@ type scriptedProvider struct {
 	sentResults  []agents.CustomToolResult
 	err          error
 	sendErr      error
+	streamOnce   sync.Once
+	streamReady  chan struct{}
+	release      chan struct{}
 }
 
 func (p *scriptedProvider) Name() string { return p.name }
@@ -48,6 +52,17 @@ func (p *scriptedProvider) DefineOutcome(context.Context, string, agents.DefineO
 	return errors.New("not used")
 }
 func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, cb func(agents.ProviderEvent) error) error {
+	if p.streamReady != nil {
+		p.streamOnce.Do(func() { close(p.streamReady) })
+	}
+	if p.release != nil {
+		select {
+		case <-p.release:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
 	events := p.events
 	if len(p.eventBatches) > 0 {
 		index := p.streamCalls
@@ -99,6 +114,38 @@ func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.
 		return models.CreateAgentSessionInTransaction(tx, session)
 	}))
 	return session
+}
+
+func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+		events: []agents.ProviderEvent{
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	firstDone := make(chan error, 1)
+	go func() {
+		firstDone <- w.Handle(context.Background(), body)
+	}()
+	<-provider.streamReady
+
+	err := w.Handle(context.Background(), body)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already in progress")
+
+	close(provider.release)
+	require.NoError(t, <-firstDone)
 }
 
 func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {

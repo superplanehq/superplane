@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -92,6 +93,21 @@ func TestSummarizeNodes_UsesYamlComponentFieldName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"component":"slack.sendTextMessage"`)
 	assert.NotContains(t, string(data), `"ref"`)
+}
+
+func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	missingVersionID := uuid.New()
+	canvas.LiveVersionID = &missingVersionID
+
+	version, err := selectedVersion(canvas, nil, "live")
+
+	require.Error(t, err)
+	assert.Nil(t, version)
+	assert.Contains(t, err.Error(), "load live canvas version summary")
 }
 
 func TestSuperPlaneCanvasTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
