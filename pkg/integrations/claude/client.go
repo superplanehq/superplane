@@ -21,9 +21,12 @@ type Client struct {
 	http    core.HTTPContext
 }
 
+// Message represents a Claude API message.
+// Content can be a plain string (for simple text) or []ContentBlock
+// (for multi-part content with documents and text).
 type Message struct {
 	Role    string `json:"role"`
-	Content any    `json:"content"` // string or []ContentBlock
+	Content any    `json:"content"`
 }
 
 // ContentBlock represents a content block in a Claude message.

@@ -149,7 +149,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "File path",
 					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
+						Type: configuration.FieldTypeRepositoryFile,
 					},
 				},
 			},
@@ -294,6 +294,7 @@ func extractMessageText(response *CreateMessageResponse) string {
 }
 
 const maxFileSize = 100 * 1024 // 100KB per file
+const maxTotalFileSize = 500 * 1024 // 500KB total across all files
 
 // buildUserContent creates the message content for the user message.
 // When files are specified, it returns an array of content blocks
@@ -303,7 +304,12 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 		return spec.Prompt, nil
 	}
 
+	if ctx.Files == nil {
+		return nil, fmt.Errorf("files configured but file access is not available in this execution context")
+	}
+
 	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
+	totalSize := 0
 
 	for _, path := range spec.Files {
 		reader, err := ctx.Files.Read(normalizeFilePath(path))
@@ -319,6 +325,10 @@ func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, erro
 
 		if len(data) > maxFileSize {
 			return nil, fmt.Errorf("file %q exceeds maximum size of %d bytes", path, maxFileSize)
+		}
+		totalSize += len(data)
+		if totalSize > maxTotalFileSize {
+			return nil, fmt.Errorf("total file size exceeds maximum of %d bytes", maxTotalFileSize)
 		}
 
 		mediaType := "text/plain"
