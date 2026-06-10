@@ -56,7 +56,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 
 	if attempt > maxPollAttempts {
 		ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", metadata.Session.ID)
-		out := buildOutput("timeout", metadata.Session.ID)
+		out := buildOutput("timeout", metadata.Session.ID, "", nil)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
@@ -70,7 +70,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		errs++
 		if errs >= maxPollErrors {
 			ctx.Logger.Errorf("Managed session %s: polling failed repeatedly: %v", metadata.Session.ID, err)
-			out := buildOutput("error", metadata.Session.ID)
+			out := buildOutput("error", metadata.Session.ID, "", nil)
 			return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
@@ -90,7 +90,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if err == nil && lastMessage == "" {
 			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", metadata.Session.ID, managedSessionEventTypes(events))
 		}
-		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage)
+		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage, nil)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
