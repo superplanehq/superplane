@@ -100,6 +100,11 @@ type ExecutionStateContext interface {
 	Emit(channel, payloadType string, payloads []any) error
 
 	/*
+	 * Emit a payload but keep the execution active for further work.
+	 */
+	EmitAndContinue(channel, payloadType string, payloads []any) error
+
+	/*
 	 * Pass the execution, without emitting any payloads from it.
 	 */
 	Pass() error

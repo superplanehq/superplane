@@ -25,6 +25,7 @@ type NodeConfigurationBuilder struct {
 	workflowID          uuid.UUID
 	nodeID              string
 	previousExecutionID *uuid.UUID
+	incomingEventID     *uuid.UUID
 	rootEventID         *uuid.UUID
 	rootPayload         any
 	input               any
@@ -63,6 +64,11 @@ func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurati
 
 func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uuid.UUID) *NodeConfigurationBuilder {
 	b.previousExecutionID = previousExecutionID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithIncomingEventID(incomingEventID *uuid.UUID) *NodeConfigurationBuilder {
+	b.incomingEventID = incomingEventID
 	return b
 }
 
@@ -436,6 +442,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 			b.tx,
 			linearExecutions,
 			executionIDsFromExecutions(executionsInChain),
+			b.incomingEventID,
 		)
 		if err != nil {
 			return nil, err
@@ -811,6 +818,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		b.tx,
 		chainExecutions,
 		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+		b.incomingEventID,
 	)
 	if err != nil {
 		return err
@@ -943,6 +951,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		b.tx,
 		executionsInChain,
 		executionIDsFromExecutions(executionsInChain),
+		b.incomingEventID,
 	)
 	if err != nil {
 		return step, nil, err

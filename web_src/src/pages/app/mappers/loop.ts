@@ -46,7 +46,8 @@ function isWaitingBetweenIterations(execution: ExecutionInfo): boolean {
     return false;
   }
 
-  return isIterationExecutionMetadata(execution.metadata);
+  const metadata = execution.metadata as LoopMetadata | undefined;
+  return metadata?.waitingBetweenIterations === true;
 }
 
 export const loopStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
@@ -103,12 +104,9 @@ type DelaySpec = {
 
 type LoopMetadata = {
   iteration?: number;
-  active?: boolean;
-};
-
-type IterationExecutionMetadata = {
-  iteration?: number;
   maxIterations?: number;
+  active?: boolean;
+  waitingBetweenIterations?: boolean;
 };
 
 export const loopMapper: ComponentBaseMapper = {
@@ -136,9 +134,6 @@ export const loopMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string | number | boolean> {
     const configuration = context.execution.configuration as LoopConfiguration;
     const sessionMetadata = isLoopSessionMetadata(context.execution.metadata) ? context.execution.metadata : undefined;
-    const iterationMetadata = isIterationExecutionMetadata(context.execution.metadata)
-      ? context.execution.metadata
-      : undefined;
     const details: Record<string, string | number | boolean> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       "Until expression": configuration.untilExpression ?? "-",
@@ -151,8 +146,8 @@ export const loopMapper: ComponentBaseMapper = {
     if (typeof sessionMetadata?.active === "boolean") {
       details.Active = sessionMetadata.active;
     }
-    if (typeof iterationMetadata?.iteration === "number") {
-      details.Iteration = iterationMetadata.iteration;
+    if (sessionMetadata?.waitingBetweenIterations) {
+      details["Waiting between iterations"] = true;
     }
 
     const doneOutput = (context.execution.outputs as LoopOutputs | undefined)?.done?.[0]?.data as
@@ -187,10 +182,6 @@ export const loopMapper: ComponentBaseMapper = {
 
 function isLoopSessionMetadata(metadata: unknown): metadata is LoopMetadata {
   return typeof metadata === "object" && metadata !== null && "active" in metadata;
-}
-
-function isIterationExecutionMetadata(metadata: unknown): metadata is IterationExecutionMetadata {
-  return typeof metadata === "object" && metadata !== null && "maxIterations" in metadata;
 }
 
 function getLoopEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {

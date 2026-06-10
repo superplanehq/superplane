@@ -62,14 +62,11 @@ type DelaySpec struct {
 }
 
 type ExecutionMetadata struct {
-	Iteration int       `json:"iteration"`
-	Active    bool      `json:"active"`
-	StartedAt time.Time `json:"startedAt"`
-}
-
-type IterationExecutionMetadata struct {
-	Iteration     int `json:"iteration"`
-	MaxIterations int `json:"maxIterations"`
+	Iteration                int       `json:"iteration"`
+	MaxIterations            int       `json:"maxIterations"`
+	Active                   bool      `json:"active"`
+	StartedAt                time.Time `json:"startedAt"`
+	WaitingBetweenIterations bool      `json:"waitingBetweenIterations,omitempty"`
 }
 
 func (c *Loop) Name() string {
@@ -256,68 +253,79 @@ func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 		return nil, err
 	}
 
-	anchor, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find loop session: %w", err)
-	}
-
-	if anchor == nil {
-		return c.startLoop(ctx, spec)
-	}
-
-	return c.handleFeedback(ctx, spec, anchor)
-}
-
-func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, error) {
-	executionCtx, err := ctx.CreateExecution()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create loop execution: %w", err)
-	}
-
-	if err := executionCtx.ExecutionState.SetKV(loopSessionKey, ctx.RootEventID); err != nil {
-		return nil, fmt.Errorf("failed to store loop session: %w", err)
-	}
-
-	md := ExecutionMetadata{
-		Iteration: 1,
-		Active:    true,
-		StartedAt: time.Now(),
-	}
-	if err := executionCtx.Metadata.Set(md); err != nil {
-		return nil, fmt.Errorf("failed to set loop metadata: %w", err)
-	}
-
-	if err := ctx.DequeueItem(); err != nil {
-		return nil, fmt.Errorf("failed to dequeue item: %w", err)
-	}
-
-	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
-		return nil, fmt.Errorf("failed to update node state: %w", err)
-	}
-
-	return &executionCtx.ID, executionCtx.ExecutionState.Emit(
-		ChannelNameNext,
-		PayloadTypeNext,
-		[]any{nextPayload(md.Iteration, spec.MaxIterations)},
-	)
-}
-
-func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, anchor *core.ExecutionContext) (*uuid.UUID, error) {
-	if anchor.ExecutionState.IsFinished() == false {
-		return nil, fmt.Errorf("loop session execution is still running")
-	}
-
-	md, err := readMetadata(anchor)
+	executionCtx, isNew, err := c.findOrCreateSession(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
 
+	if executionCtx.ExecutionState.IsFinished() {
+		if err := ctx.DequeueItem(); err != nil {
+			return nil, fmt.Errorf("failed to dequeue item: %w", err)
+		}
+		return nil, nil
+	}
+
 	if err := ctx.DequeueItem(); err != nil {
 		return nil, fmt.Errorf("failed to dequeue item: %w", err)
 	}
 
 	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
 		return nil, fmt.Errorf("failed to update node state: %w", err)
+	}
+
+	if isNew {
+		md, err := readMetadata(executionCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		return &executionCtx.ID, executionCtx.ExecutionState.EmitAndContinue(
+			ChannelNameNext,
+			PayloadTypeNext,
+			[]any{nextPayload(md.Iteration, spec.MaxIterations)},
+		)
+	}
+
+	return c.handleFeedback(ctx, spec, executionCtx)
+}
+
+func (c *Loop) findOrCreateSession(ctx core.ProcessQueueContext, spec Spec) (*core.ExecutionContext, bool, error) {
+	executionCtx, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to find loop session: %w", err)
+	}
+
+	if executionCtx != nil {
+		return executionCtx, false, nil
+	}
+
+	executionCtx, err = ctx.CreateExecution()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create loop execution: %w", err)
+	}
+
+	if err := executionCtx.ExecutionState.SetKV(loopSessionKey, ctx.RootEventID); err != nil {
+		return nil, false, fmt.Errorf("failed to store loop session: %w", err)
+	}
+
+	md := ExecutionMetadata{
+		Iteration:     1,
+		MaxIterations: spec.MaxIterations,
+		Active:        true,
+		StartedAt:     time.Now(),
+	}
+	if err := executionCtx.Metadata.Set(md); err != nil {
+		return nil, false, fmt.Errorf("failed to set loop metadata: %w", err)
+	}
+
+	return executionCtx, true, nil
+}
+
+func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, anchor *core.ExecutionContext) (*uuid.UUID, error) {
+
+	md, err := readMetadata(anchor)
+	if err != nil {
+		return nil, err
 	}
 
 	if !md.Active {
@@ -342,51 +350,39 @@ func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, anchor *c
 		return nil, fmt.Errorf("failed to update loop metadata: %w", err)
 	}
 
-	executionCtx, err := ctx.CreateExecution()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create loop iteration execution: %w", err)
-	}
-
-	return c.emitNextIteration(executionCtx, spec, md.Iteration)
+	return c.emitNextIteration(anchor, spec, md)
 }
 
-func (c *Loop) emitNextIteration(executionCtx *core.ExecutionContext, spec Spec, iteration int) (*uuid.UUID, error) {
-	delay := iterationDelay(spec.DelayBetweenIterations, iteration)
+func (c *Loop) emitNextIteration(anchor *core.ExecutionContext, spec Spec, md ExecutionMetadata) (*uuid.UUID, error) {
+	delay := iterationDelay(spec.DelayBetweenIterations, md.Iteration)
 	if delay <= 0 {
-		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+		return &anchor.ID, anchor.ExecutionState.EmitAndContinue(
 			ChannelNameNext,
 			PayloadTypeNext,
-			[]any{nextPayload(iteration, spec.MaxIterations)},
+			[]any{nextPayload(md.Iteration, spec.MaxIterations)},
 		)
 	}
 
-	iterMd := IterationExecutionMetadata{
-		Iteration:     iteration,
-		MaxIterations: spec.MaxIterations,
-	}
-	if err := executionCtx.Metadata.Set(iterMd); err != nil {
-		return nil, fmt.Errorf("failed to set iteration metadata: %w", err)
+	md.WaitingBetweenIterations = true
+	if err := anchor.Metadata.Set(md); err != nil {
+		return nil, fmt.Errorf("failed to set loop waiting metadata: %w", err)
 	}
 
-	if err := executionCtx.Requests.ScheduleActionCall(nextIterationHook, map[string]any{}, delay); err != nil {
+	if err := anchor.Requests.ScheduleActionCall(nextIterationHook, map[string]any{}, delay); err != nil {
 		return nil, fmt.Errorf("failed to schedule next iteration: %w", err)
 	}
 
-	return &executionCtx.ID, nil
+	return &anchor.ID, nil
 }
 
-func (c *Loop) completeLoop(ctx core.ProcessQueueContext, anchor *core.ExecutionContext, md ExecutionMetadata, stopReason string) (*uuid.UUID, error) {
+func (c *Loop) completeLoop(_ core.ProcessQueueContext, anchor *core.ExecutionContext, md ExecutionMetadata, stopReason string) (*uuid.UUID, error) {
 	md.Active = false
+	md.WaitingBetweenIterations = false
 	if err := anchor.Metadata.Set(md); err != nil {
 		return nil, fmt.Errorf("failed to update loop metadata: %w", err)
 	}
 
-	executionCtx, err := ctx.CreateExecution()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create loop completion execution: %w", err)
-	}
-
-	return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+	return &anchor.ID, anchor.ExecutionState.Emit(
 		ChannelNameDone,
 		PayloadTypeDone,
 		[]any{donePayload(md.Iteration, stopReason, loopElapsedMilliseconds(md))},
@@ -524,16 +520,34 @@ func (c *Loop) handleNextIteration(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	var iterMd IterationExecutionMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &iterMd); err != nil {
-		return fmt.Errorf("failed to decode iteration metadata: %w", err)
+	md, err := readHookMetadata(ctx)
+	if err != nil {
+		return err
 	}
 
-	return ctx.ExecutionState.Emit(
+	md.WaitingBetweenIterations = false
+	if err := ctx.Metadata.Set(md); err != nil {
+		return fmt.Errorf("failed to update loop metadata: %w", err)
+	}
+
+	return ctx.ExecutionState.EmitAndContinue(
 		ChannelNameNext,
 		PayloadTypeNext,
-		[]any{nextPayload(iterMd.Iteration, iterMd.MaxIterations)},
+		[]any{nextPayload(md.Iteration, md.MaxIterations)},
 	)
+}
+
+func readHookMetadata(ctx core.ActionHookContext) (ExecutionMetadata, error) {
+	raw, err := json.Marshal(ctx.Metadata.Get())
+	if err != nil {
+		return ExecutionMetadata{}, fmt.Errorf("failed to marshal loop metadata: %w", err)
+	}
+
+	md := ExecutionMetadata{}
+	if err := json.Unmarshal(raw, &md); err != nil {
+		return ExecutionMetadata{}, fmt.Errorf("failed to decode loop metadata: %w", err)
+	}
+	return md, nil
 }
 
 func iterationDelay(delay *DelaySpec, iteration int) time.Duration {

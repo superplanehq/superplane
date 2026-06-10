@@ -110,7 +110,7 @@ func TestLoopStartLoop(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, md.Iteration)
 	assert.True(t, md.Active)
-	assert.True(t, execState.Passed)
+	assert.False(t, execState.Finished)
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 }
 
@@ -135,19 +135,19 @@ func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 	component := &Loop{}
 	anchorMetadata := &contexts.MetadataContext{
 		Metadata: ExecutionMetadata{
-			Iteration: 2,
-			Active:    true,
-			StartedAt: time.Now().Add(-2 * time.Second),
+			Iteration:     2,
+			MaxIterations: 100,
+			Active:        true,
+			StartedAt:     time.Now().Add(-2 * time.Second),
 		},
 	}
-	iterationExecState := &contexts.ExecutionStateContext{}
-	iterationID := uuid.New()
+	anchorExecState := &contexts.ExecutionStateContext{}
 	anchorID := uuid.New()
 
 	anchor := &core.ExecutionContext{
 		ID:             anchorID,
 		Metadata:       anchorMetadata,
-		ExecutionState: &finishedExecutionState{},
+		ExecutionState: anchorExecState,
 	}
 
 	ctx := core.ProcessQueueContext{
@@ -160,10 +160,8 @@ func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 		},
 		Expressions: &contexts.ExpressionContext{Output: true},
 		CreateExecution: func() (*core.ExecutionContext, error) {
-			return &core.ExecutionContext{
-				ID:             iterationID,
-				ExecutionState: iterationExecState,
-			}, nil
+			t.Fatal("feedback must reuse the session execution")
+			return nil, nil
 		},
 		DequeueItem:     func() error { return nil },
 		UpdateNodeState: func(state string) error { return nil },
@@ -172,11 +170,12 @@ func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, id)
-	assert.Equal(t, iterationID, *id)
-	assert.Equal(t, ChannelNameDone, iterationExecState.Channel)
-	assert.Equal(t, PayloadTypeDone, iterationExecState.Type)
+	assert.Equal(t, anchorID, *id)
+	assert.Equal(t, ChannelNameDone, anchorExecState.Channel)
+	assert.Equal(t, PayloadTypeDone, anchorExecState.Type)
+	assert.True(t, anchorExecState.Finished)
 
-	donePayload := iterationExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
+	donePayload := anchorExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
 	assert.Equal(t, 2, donePayload["iterations"])
 	assert.Equal(t, StopReasonConditionMet, donePayload["stopReason"])
 	elapsedMs, ok := donePayload["elapsedMs"].(int64)
@@ -190,15 +189,15 @@ func TestLoopHandleFeedbackCompletesWhenUntilIsTrue(t *testing.T) {
 func TestLoopHandleFeedbackRepeatsNextWhenUntilIsFalse(t *testing.T) {
 	component := &Loop{}
 	anchorMetadata := &contexts.MetadataContext{
-		Metadata: ExecutionMetadata{Iteration: 1, Active: true},
+		Metadata: ExecutionMetadata{Iteration: 1, MaxIterations: 5, Active: true},
 	}
-	iterationExecState := &contexts.ExecutionStateContext{}
-	iterationID := uuid.New()
+	anchorExecState := &contexts.ExecutionStateContext{}
+	anchorID := uuid.New()
 
 	anchor := &core.ExecutionContext{
-		ID:             uuid.New(),
+		ID:             anchorID,
 		Metadata:       anchorMetadata,
-		ExecutionState: &finishedExecutionState{},
+		ExecutionState: anchorExecState,
 	}
 
 	ctx := core.ProcessQueueContext{
@@ -212,10 +211,8 @@ func TestLoopHandleFeedbackRepeatsNextWhenUntilIsFalse(t *testing.T) {
 		},
 		Expressions: &contexts.ExpressionContext{Output: false},
 		CreateExecution: func() (*core.ExecutionContext, error) {
-			return &core.ExecutionContext{
-				ID:             iterationID,
-				ExecutionState: iterationExecState,
-			}, nil
+			t.Fatal("feedback must reuse the session execution")
+			return nil, nil
 		},
 		DequeueItem:     func() error { return nil },
 		UpdateNodeState: func(state string) error { return nil },
@@ -224,7 +221,9 @@ func TestLoopHandleFeedbackRepeatsNextWhenUntilIsFalse(t *testing.T) {
 	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, id)
-	assert.Equal(t, ChannelNameNext, iterationExecState.Channel)
+	assert.Equal(t, anchorID, *id)
+	assert.Equal(t, ChannelNameNext, anchorExecState.Channel)
+	assert.False(t, anchorExecState.Finished)
 	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
 	require.True(t, ok)
 	assert.Equal(t, 2, md.Iteration)
@@ -233,16 +232,16 @@ func TestLoopHandleFeedbackRepeatsNextWhenUntilIsFalse(t *testing.T) {
 func TestLoopHandleFeedbackSchedulesDelayBeforeNextIteration(t *testing.T) {
 	component := &Loop{}
 	anchorMetadata := &contexts.MetadataContext{
-		Metadata: ExecutionMetadata{Iteration: 1, Active: true},
+		Metadata: ExecutionMetadata{Iteration: 1, MaxIterations: 5, Active: true},
 	}
-	iterationMetadata := &contexts.MetadataContext{}
 	scheduled := &scheduledRequestContext{}
-	iterationID := uuid.New()
+	anchorID := uuid.New()
 
 	anchor := &core.ExecutionContext{
-		ID:             uuid.New(),
+		ID:             anchorID,
 		Metadata:       anchorMetadata,
-		ExecutionState: &finishedExecutionState{},
+		Requests:       scheduled,
+		ExecutionState: &contexts.ExecutionStateContext{},
 	}
 
 	ctx := core.ProcessQueueContext{
@@ -261,11 +260,8 @@ func TestLoopHandleFeedbackSchedulesDelayBeforeNextIteration(t *testing.T) {
 		},
 		Expressions: &contexts.ExpressionContext{Output: false},
 		CreateExecution: func() (*core.ExecutionContext, error) {
-			return &core.ExecutionContext{
-				ID:       iterationID,
-				Metadata: iterationMetadata,
-				Requests: scheduled,
-			}, nil
+			t.Fatal("feedback must reuse the session execution")
+			return nil, nil
 		},
 		DequeueItem:     func() error { return nil },
 		UpdateNodeState: func(state string) error { return nil },
@@ -274,14 +270,44 @@ func TestLoopHandleFeedbackSchedulesDelayBeforeNextIteration(t *testing.T) {
 	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, id)
+	assert.Equal(t, anchorID, *id)
 	assert.True(t, scheduled.called)
 	assert.Equal(t, nextIterationHook, scheduled.actionName)
 	assert.Equal(t, 15*time.Second, scheduled.interval)
 
-	iterMd, ok := iterationMetadata.Metadata.(IterationExecutionMetadata)
+	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
 	require.True(t, ok)
-	assert.Equal(t, 2, iterMd.Iteration)
-	assert.Equal(t, 5, iterMd.MaxIterations)
+	assert.Equal(t, 2, md.Iteration)
+	assert.True(t, md.WaitingBetweenIterations)
+}
+
+func TestLoopHandleFeedbackIgnoresStaleFeedbackWhenFinished(t *testing.T) {
+	component := &Loop{}
+	anchor := &core.ExecutionContext{
+		ID:             uuid.New(),
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: &finishedExecutionState{},
+	}
+
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+		},
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return anchor, nil
+		},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			t.Fatal("stale feedback must not create a new execution")
+			return nil, nil
+		},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
+	}
+
+	id, err := component.ProcessQueueItem(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, id)
 }
 
 func TestLoopHandleNextIterationHook(t *testing.T) {
@@ -291,9 +317,10 @@ func TestLoopHandleNextIterationHook(t *testing.T) {
 	err := component.HandleHook(core.ActionHookContext{
 		Name: nextIterationHook,
 		Metadata: &contexts.MetadataContext{
-			Metadata: IterationExecutionMetadata{
+			Metadata: ExecutionMetadata{
 				Iteration:     3,
 				MaxIterations: 10,
+				Active:        true,
 			},
 		},
 		ExecutionState: execState,
@@ -301,6 +328,7 @@ func TestLoopHandleNextIterationHook(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 	assert.Equal(t, PayloadTypeNext, execState.Type)
+	assert.False(t, execState.Finished)
 
 	payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)["next"].(map[string]any)
 	assert.Equal(t, 3, payload["iteration"])
@@ -328,18 +356,19 @@ func TestLoopHandleFeedbackCompletesAtMaxIterations(t *testing.T) {
 	component := &Loop{}
 	anchorMetadata := &contexts.MetadataContext{
 		Metadata: ExecutionMetadata{
-			Iteration: 3,
-			Active:    true,
-			StartedAt: time.Now().Add(-1500 * time.Millisecond),
+			Iteration:     3,
+			MaxIterations: 3,
+			Active:        true,
+			StartedAt:     time.Now().Add(-1500 * time.Millisecond),
 		},
 	}
-	doneExecState := &contexts.ExecutionStateContext{}
-	doneExecutionID := uuid.New()
+	anchorExecState := &contexts.ExecutionStateContext{}
+	anchorID := uuid.New()
 
 	anchor := &core.ExecutionContext{
-		ID:             uuid.New(),
+		ID:             anchorID,
 		Metadata:       anchorMetadata,
-		ExecutionState: &finishedExecutionState{},
+		ExecutionState: anchorExecState,
 	}
 
 	ctx := core.ProcessQueueContext{
@@ -353,10 +382,8 @@ func TestLoopHandleFeedbackCompletesAtMaxIterations(t *testing.T) {
 		},
 		Expressions: &contexts.ExpressionContext{Output: false},
 		CreateExecution: func() (*core.ExecutionContext, error) {
-			return &core.ExecutionContext{
-				ID:             doneExecutionID,
-				ExecutionState: doneExecState,
-			}, nil
+			t.Fatal("feedback must reuse the session execution")
+			return nil, nil
 		},
 		DequeueItem:     func() error { return nil },
 		UpdateNodeState: func(state string) error { return nil },
@@ -365,10 +392,10 @@ func TestLoopHandleFeedbackCompletesAtMaxIterations(t *testing.T) {
 	id, err := component.ProcessQueueItem(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, id)
-	assert.Equal(t, doneExecutionID, *id)
-	assert.Equal(t, ChannelNameDone, doneExecState.Channel)
+	assert.Equal(t, anchorID, *id)
+	assert.Equal(t, ChannelNameDone, anchorExecState.Channel)
 
-	payload := doneExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
+	payload := anchorExecState.Payloads[0].(map[string]any)["data"].(map[string]any)["done"].(map[string]any)
 	assert.Equal(t, 3, payload["iterations"])
 	assert.Equal(t, StopReasonMaxIterations, payload["stopReason"])
 	elapsedMs, ok := payload["elapsedMs"].(int64)
@@ -394,6 +421,9 @@ func (f *finishedExecutionState) GetKV(key string) (string, error) {
 }
 func (f *finishedExecutionState) Emit(channel, payloadType string, payloads []any) error {
 	return f.ExecutionStateContext.Emit(channel, payloadType, payloads)
+}
+func (f *finishedExecutionState) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	return f.ExecutionStateContext.EmitAndContinue(channel, payloadType, payloads)
 }
 func (f *finishedExecutionState) Pass() error { return f.ExecutionStateContext.Pass() }
 func (f *finishedExecutionState) Fail(reason, message string) error {

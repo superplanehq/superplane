@@ -47,6 +47,7 @@ func BuildProcessQueueContext(
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
@@ -75,6 +76,7 @@ func BuildProcessQueueContext(
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
