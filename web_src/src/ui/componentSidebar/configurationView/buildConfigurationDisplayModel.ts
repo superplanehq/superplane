@@ -81,7 +81,8 @@ function appendConnectedIntegrationRows(
 ): void {
   const status = selectedIntegration.status?.state ?? "unknown";
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
-  const statusVariant = status === "ready" ? "ready" : status === "error" ? "error" : ("pending" as const);
+  const statusVariant: ConfigurationDisplayRow["integrationStatusVariant"] =
+    status === "ready" || status === "error" ? status : "pending";
 
   rows.push({
     key: "integration.type",
