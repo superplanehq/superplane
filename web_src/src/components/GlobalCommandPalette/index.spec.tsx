@@ -178,6 +178,19 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByText("Sign Out")).toBeInTheDocument();
   });
 
+  it("closes with CMD+K while the command input is focused", async () => {
+    renderPalette();
+
+    openPalette();
+    const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
+    input.focus();
+    fireEvent.keyDown(input, { key: "k", metaKey: true });
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
   it("does not open before the account is available", () => {
     accountState.account = null;
     renderPalette("/login");

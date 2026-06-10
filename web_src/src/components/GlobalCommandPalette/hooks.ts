@@ -80,7 +80,13 @@ export function useCommandPaletteShortcuts({
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
 
-      if (usesModifier && event.key === "k" && !canvasId && organizationId && !isEditableTarget(event.target)) {
+      if (
+        usesModifier &&
+        event.key === "k" &&
+        !canvasId &&
+        organizationId &&
+        (open || !isEditableTarget(event.target))
+      ) {
         event.preventDefault();
         setOpen((prev) => !prev);
         return;
