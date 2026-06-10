@@ -1495,9 +1495,9 @@ The Delete Load Balancer component deletes an Elastic Load Balancer (ELBv2) and 
 
 ### Output
 
-Emits a deletion payload on the default output channel:
+Emits a deletion payload on the default output channel once AWS confirms the load balancer is gone:
 - `loadBalancerArn` — ARN of the deleted load balancer
-- `state` — `deleting`
+- `state` — `deleted`
 
 ### Example Output
 
@@ -1505,7 +1505,7 @@ Emits a deletion payload on the default output channel:
 {
   "data": {
     "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
-    "state": "deleting"
+    "state": "deleted"
   },
   "timestamp": "2026-05-21T12:05:00Z",
   "type": "aws.ec2.loadBalancer.deleted"
