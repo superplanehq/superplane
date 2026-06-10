@@ -355,7 +355,7 @@ func TestStreamEvents_IgnoresUnknownMidTurnEvents(t *testing.T) {
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
 }
 
-func TestStreamEvents_StopsWhenCustomToolResultsAreRequired(t *testing.T) {
+func TestStreamEvents_StopsWhenCallbackRequestsCustomToolHandling(t *testing.T) {
 	const sse = "data: {\"id\":\"evt_custom\",\"type\":\"agent.custom_tool_use\",\"name\":\"superplane_canvas\",\"input\":{\"action\":\"read\"}}\n\n" +
 		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n" +
 		"data: {\"id\":\"message_after_pause\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after pause\"}]}\n\n"
@@ -368,11 +368,15 @@ func TestStreamEvents_StopsWhenCustomToolResultsAreRequired(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	err := p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
 		received = append(received, e)
+		if e.Type == agents.ProviderEventCustomToolResultsRequired {
+			return io.ErrUnexpectedEOF
+		}
 		return nil
-	}))
+	})
 
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	require.Len(t, received, 2)
 	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
 	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
