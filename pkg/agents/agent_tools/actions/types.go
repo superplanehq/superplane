@@ -1,0 +1,81 @@
+package actions
+
+// Input is the top-level JSON payload accepted by the superplane_app tool.
+type Input struct {
+	Action              string           `json:"action"`
+	CanvasID            string           `json:"canvas_id,omitempty"`
+	UseDraft            *bool            `json:"use_draft,omitempty"`
+	IncludeConsole      bool             `json:"include_console,omitempty"`
+	IncludeIntegrations bool             `json:"include_integrations,omitempty"`
+	CanvasYAML          string           `json:"canvas_yaml,omitempty"`
+	ConsoleYAML         string           `json:"console_yaml,omitempty"`
+	AutoLayout          *AutoLayoutInput `json:"auto_layout,omitempty"`
+}
+
+// AutoLayoutInput configures optional backend auto-layout for draft updates.
+type AutoLayoutInput struct {
+	Scope   string   `json:"scope,omitempty"`
+	NodeIDs []string `json:"node_ids,omitempty"`
+}
+
+type readResult struct {
+	Action       string              `json:"action"`
+	CanvasID     string              `json:"canvas_id"`
+	Source       string              `json:"source"`
+	VersionID    string              `json:"version_id,omitempty"`
+	Draft        *draftResult        `json:"draft,omitempty"`
+	Summary      summary             `json:"summary"`
+	CanvasYAML   string              `json:"canvas_yaml"`
+	ConsoleYAML  string              `json:"console_yaml,omitempty"`
+	Integrations []integrationResult `json:"integrations,omitempty"`
+}
+
+type updateResult struct {
+	Action     string      `json:"action"`
+	CanvasID   string      `json:"canvas_id"`
+	VersionID  string      `json:"version_id"`
+	Draft      draftResult `json:"draft"`
+	Summary    summary     `json:"summary"`
+	NodeIssues []nodeIssue `json:"node_issues,omitempty"`
+}
+
+type integrationsResult struct {
+	Action       string              `json:"action"`
+	CanvasID     string              `json:"canvas_id"`
+	Integrations []integrationResult `json:"integrations"`
+}
+
+type draftResult struct {
+	VersionID   string `json:"version_id"`
+	DisplayName string `json:"display_name,omitempty"`
+	BranchName  string `json:"branch_name,omitempty"`
+}
+
+type summary struct {
+	CanvasName string        `json:"canvas_name,omitempty"`
+	NodeCount  int           `json:"node_count"`
+	EdgeCount  int           `json:"edge_count"`
+	Nodes      []nodeSummary `json:"nodes,omitempty"`
+}
+
+type nodeSummary struct {
+	ID        string `json:"id"`
+	Name      string `json:"name,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Component string `json:"component,omitempty"`
+	Issue     string `json:"issue,omitempty"`
+}
+
+type nodeIssue struct {
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name,omitempty"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+}
+
+type integrationResult struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Vendor string `json:"vendor"`
+	State  string `json:"state"`
+}
