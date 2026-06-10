@@ -2,14 +2,12 @@ package agents
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.SendAgentChatMessageRequest) (*pb.SendAgentChatMessageResponse, error) {
@@ -27,11 +25,13 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 
 	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, agentModeFromProto(req.Mode))
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "agent chat not found")
+		translated := translateAgentServiceError(err, "failed to send agent chat message")
+		if status.Code(translated) == codes.Internal {
+			log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
+		} else {
+			log.WithError(err).WithField("chat_id", chatID).Warn("send agent chat message returned non-internal error")
 		}
-		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
-		return nil, status.Error(codes.Internal, "failed to send agent chat message")
+		return nil, translated
 	}
 	return &pb.SendAgentChatMessageResponse{Message: serializeMessage(persisted)}, nil
 }

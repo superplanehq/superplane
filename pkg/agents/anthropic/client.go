@@ -140,6 +140,13 @@ func (e *apiError) Error() string {
 	return fmt.Sprintf("anthropic API %d: %s", e.StatusCode, e.Message)
 }
 
+// HTTPStatusCode lets callers (e.g. gRPC handlers) classify the upstream
+// failure without taking a dependency on this internal type. It satisfies
+// agents.ProviderHTTPError.
+func (e *apiError) HTTPStatusCode() int {
+	return e.StatusCode
+}
+
 func (c *Client) getAgent(ctx context.Context, agentID string) (agentMetadata, error) {
 	data, err := c.executeHTTP(ctx, http.MethodGet, "/agents/"+url.PathEscape(agentID), nil)
 	if err != nil {

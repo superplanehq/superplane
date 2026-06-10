@@ -19,6 +19,16 @@ import (
 	"gorm.io/gorm"
 )
 
+func isContextCancellation(ctx context.Context, err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return true
+	}
+	return false
+}
+
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
 
 type Service struct {
@@ -176,7 +186,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 
 	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+		// Caller cancellations are not session failures; preserve the session
+		// state so the next attempt can pick up cleanly instead of leaving the
+		// chat stuck in "failed".
+		if !isContextCancellation(ctx, err) {
+			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+		}
 		return nil, fmt.Errorf("forward to provider: %w", err)
 	}
 

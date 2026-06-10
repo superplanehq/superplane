@@ -130,4 +130,14 @@ type ProviderSessionCleaner interface {
 	DeleteSession(ctx context.Context, providerSessionID string) error
 }
 
+// ProviderHTTPError is implemented by errors that originate from an upstream
+// provider HTTP response. Callers can use errors.As to detect these and map
+// the upstream status code to an appropriate gRPC code instead of returning
+// a generic Internal/HTTP 500 (which would otherwise generate Sentry noise
+// for transient upstream issues such as 429 throttling or 5xx outages).
+type ProviderHTTPError interface {
+	error
+	HTTPStatusCode() int
+}
+
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")
