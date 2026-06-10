@@ -56,6 +56,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(sseStream))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -84,13 +85,15 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "Done", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
 	assert.Equal(t, "", requestsCtx.Action)
 
-	require.Len(t, httpContext.Requests, 3)
+	require.Len(t, httpContext.Requests, 4)
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
 	assert.Equal(t, "GET", httpContext.Requests[2].Method)
 	assert.Contains(t, httpContext.Requests[2].URL.Path, "/events/stream")
+	assert.Equal(t, "DELETE", httpContext.Requests[3].Method)
+	assert.Contains(t, httpContext.Requests[3].URL.Path, "/sessions/sess_1")
 }
 
 func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {

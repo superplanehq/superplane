@@ -159,13 +159,18 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	// consistency issue with the events list API.
 	ctx.Logger.Infof("Started Managed Agent session %s. Streaming events...", session.ID)
 	streamCtx := context.Background()
-	status, lastMessage, streamErr := client.StreamSessionUntilIdle(streamCtx, session.ID)
+	status, lastMessage, messages, streamErr := client.StreamSessionUntilIdle(streamCtx, session.ID)
 	if streamErr != nil {
 		ctx.Logger.Warnf("Stream failed for session %s: %v. Falling back to poll.", session.ID, streamErr)
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
 	}
 
-	out := buildOutput(status, session.ID, lastMessage)
+	// Clean up the session on Anthropic's side
+	if err := client.DeleteManagedSession(session.ID); err != nil {
+		ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
+	}
+
+	out := buildOutput(status, session.ID, lastMessage, messages)
 	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 

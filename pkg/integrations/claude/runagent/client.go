@@ -185,6 +185,15 @@ func (c *Client) GetManagedSession(sessionID string) (*ManagedSession, error) {
 	return &out, nil
 }
 
+func (c *Client) DeleteManagedSession(sessionID string) error {
+	if sessionID == "" {
+		return fmt.Errorf("session id is required")
+	}
+	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID)
+	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
+	return err
+}
+
 func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]ManagedSessionEvent, string, error) {
 	if sessionID == "" {
 		return nil, "", fmt.Errorf("session id is required")
@@ -211,17 +220,17 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 }
 
 // StreamSessionUntilIdle opens an SSE stream on the session and processes
-// events in real-time. It captures the last agent.message text and returns
-// it along with the terminal status when the session reaches idle or terminated.
-func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (status string, lastMessage string, err error) {
+// events in real-time. It captures all agent.message texts and returns
+// the terminal status, last message, and all messages when the session completes.
+func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (status string, lastMessage string, messages []string, err error) {
 	if sessionID == "" {
-		return "", "", fmt.Errorf("session id is required")
+		return "", "", nil, fmt.Errorf("session id is required")
 	}
 
 	streamURL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/events/stream"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("build stream request: %w", err)
+		return "", "", nil, fmt.Errorf("build stream request: %w", err)
 	}
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
@@ -230,13 +239,13 @@ func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("open stream: %w", err)
+		return "", "", nil, fmt.Errorf("open stream: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
-		return "", "", fmt.Errorf("stream request failed (%d): %s", resp.StatusCode, string(body))
+		return "", "", nil, fmt.Errorf("stream request failed (%d): %s", resp.StatusCode, string(body))
 	}
 
 	scanner := bufio.NewScanner(resp.Body)
@@ -244,7 +253,7 @@ func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (
 
 	for scanner.Scan() {
 		if ctx.Err() != nil {
-			return "", lastMessage, ctx.Err()
+			return "", lastMessage, messages, ctx.Err()
 		}
 
 		line := scanner.Text()
@@ -261,28 +270,28 @@ func (c *Client) StreamSessionUntilIdle(ctx context.Context, sessionID string) (
 			continue
 		}
 
-		// Capture agent messages — always keep the latest one
+		// Capture all agent messages
 		if event.Type == "agent.message" || event.Type == "assistant.message" {
 			text := extractTextFromContent(event.Content)
 			if text != "" {
+				messages = append(messages, text)
 				lastMessage = text
 			}
 		}
 
 		// Terminal events
 		if event.Type == "session.status_idle" {
-			return "idle", lastMessage, nil
+			return "idle", lastMessage, messages, nil
 		}
 		if event.Type == "session.status_terminated" {
-			return "terminated", lastMessage, nil
+			return "terminated", lastMessage, messages, nil
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", lastMessage, fmt.Errorf("stream read: %w", err)
+		return "", lastMessage, messages, fmt.Errorf("stream read: %w", err)
 	}
-	// Stream ended without terminal event
-	return "", lastMessage, fmt.Errorf("stream ended unexpectedly")
+	return "", lastMessage, messages, fmt.Errorf("stream ended unexpectedly")
 }
 
 func extractTextFromContent(content []ManagedSessionContentBlock) string {
@@ -409,17 +418,6 @@ func (c *Client) SendManagedSessionInterrupt(sessionID string) error {
 		return fmt.Errorf("failed to marshal interrupt: %w", err)
 	}
 	_, err = c.execRequestWithBeta(http.MethodPost, URL, bytes.NewBuffer(b), anthropicBetaManagedAgents)
-	return err
-}
-
-// DeleteManagedSession removes a session (DELETE /v1/sessions/{id}).
-// The API does not allow deleting a running session without interrupting first.
-func (c *Client) DeleteManagedSession(sessionID string) error {
-	if sessionID == "" {
-		return fmt.Errorf("session id is required")
-	}
-	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID)
-	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
 	return err
 }
 
