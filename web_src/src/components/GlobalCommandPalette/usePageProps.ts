@@ -146,7 +146,7 @@ function buildSearchResults(
   for (const canvas of model.canvasListProps.canvases) {
     const name = canvas.metadata?.name ?? "";
     const description = canvas.metadata?.description ?? "";
-    if (matchesSearch(query, name, description, "Open app")) {
+    if (matchesSearch(query, name, description)) {
       results.push({
         id: `app-${canvas.metadata?.id}`,
         label: name,
@@ -164,7 +164,7 @@ function buildSearchResults(
   }
 
   for (const integration of integrations) {
-    if (matchesSearch(query, integration.name, integration.providerName, integration.status, "Integration")) {
+    if (matchesSearch(query, integration.name, integration.providerName, integration.status)) {
       results.push({
         id: `integration-${integration.id}`,
         label: integration.name,
@@ -178,7 +178,7 @@ function buildSearchResults(
 
   for (const sa of serviceAccounts) {
     const name = sa.name ?? "";
-    if (matchesSearch(query, name, sa.id, "Service Account")) {
+    if (matchesSearch(query, name, sa.id)) {
       results.push({
         id: `sa-${sa.id}`,
         label: name,

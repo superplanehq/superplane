@@ -313,6 +313,17 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByText("deploy-bot")).toBeInTheDocument();
   });
 
+  it("does not match every result by shared category labels", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "service");
+
+    expect(screen.queryByText("deploy-bot")).not.toBeInTheDocument();
+    expect(await screen.findByText("No results found.")).toBeInTheDocument();
+  });
+
   it("searches canvas nodes from the canvas page", async () => {
     const user = userEvent.setup();
     const selectNode = vi.fn();
