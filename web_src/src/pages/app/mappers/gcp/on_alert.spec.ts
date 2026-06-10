@@ -104,20 +104,22 @@ describe("onAlertTriggerRenderer", () => {
     expect(props.lastEventData).toBeUndefined();
   });
 
-  it("getTriggerProps surfaces the auto-created notification channel on the node", () => {
+  it("getTriggerProps surfaces the configured state filter on the node", () => {
     const context: TriggerRendererContext = {
       node: {
         id: "n1",
         name: "On Alert",
         componentName: "gcp.monitoring.onAlert",
         isCollapsed: false,
-        configuration: {},
+        configuration: { states: ["open", "closed"] },
         metadata: { notificationChannel: "projects/elffie/notificationChannels/4175146062038206967" },
       },
       definition,
       lastEvent: undefined,
     };
     const props = onAlertTriggerRenderer.getTriggerProps(context);
-    expect(props.metadata?.some((m) => m.label === "4175146062038206967")).toBe(true);
+    // Shows the selected filter, not internal setup metadata like the channel name.
+    expect(props.metadata?.some((m) => m.label === "Open, Closed")).toBe(true);
+    expect(props.metadata?.some((m) => m.label === "4175146062038206967")).toBe(false);
   });
 });

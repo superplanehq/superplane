@@ -21,6 +21,10 @@ function lastSegment(value: string | undefined): string {
   return idx >= 0 ? value.slice(idx + 1) : value;
 }
 
+function capitalize(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
 // Short, human label for the incident: the condition name, falling back to the
 // policy's last path segment.
 function incidentLabel(data: AlertEventData | undefined): string {
@@ -65,11 +69,13 @@ export const onAlertTriggerRenderer: TriggerRenderer = {
     const eventTitleAndSubtitle = lastEvent
       ? onAlertTriggerRenderer.getTitleAndSubtitle({ event: lastEvent })
       : undefined;
-    // Surface the auto-created Cloud Monitoring notification channel on the node.
-    const nodeMetadata = node.metadata as { notificationChannel?: string } | undefined;
+    // Surface the configured state filter (the incident states the user chose to
+    // emit on) on the node — not internal setup metadata like the channel name.
+    const config = node.configuration as { states?: string[] } | undefined;
+    const states = (config?.states ?? []).filter(Boolean).map(capitalize);
     const metadata: { icon: string; label: string }[] = [];
-    if (nodeMetadata?.notificationChannel) {
-      metadata.push({ icon: "bell", label: lastSegment(nodeMetadata.notificationChannel) });
+    if (states.length > 0) {
+      metadata.push({ icon: "filter", label: states.join(", ") });
     }
     return {
       title: node.name || definition.label || "On Alert",
