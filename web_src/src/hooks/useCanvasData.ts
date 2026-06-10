@@ -105,8 +105,6 @@ export const canvasKeys = {
   list: (orgId: string) => [...canvasKeys.lists(), orgId] as const,
   folders: () => [...canvasKeys.all, "folders"] as const,
   folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
-  templates: () => [...canvasKeys.all, "templates"] as const,
-  templateList: (orgId: string) => [...canvasKeys.templates(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
@@ -229,27 +227,9 @@ export const useCanvases = (organizationId: string) => {
       const response = await canvasesListCanvases(
         withOrganizationHeader({
           organizationId,
-          query: { includeTemplates: false },
         }),
       );
       return response.data?.canvases || [];
-    },
-    enabled: !!organizationId,
-  });
-};
-
-export const useCanvasTemplates = (organizationId: string) => {
-  return useQuery({
-    queryKey: canvasKeys.templateList(organizationId),
-    queryFn: async () => {
-      const response = await canvasesListCanvases(
-        withOrganizationHeader({
-          organizationId,
-          query: { includeTemplates: true },
-        }),
-      );
-      const canvases = response.data?.canvases || [];
-      return canvases.filter((canvas) => canvas.metadata?.isTemplate);
     },
     enabled: !!organizationId,
   });

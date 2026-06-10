@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -12,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func DeleteCanvas(ctx context.Context, registry *registry.Registry, organizationID uuid.UUID, id string) (*pb.DeleteCanvasResponse, error) {
@@ -23,16 +21,7 @@ func DeleteCanvas(ctx context.Context, registry *registry.Registry, organization
 
 	canvas, err := models.FindCanvas(organizationID, canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
-				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-			}
-		}
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	// Perform soft delete on the canvas with name suffix

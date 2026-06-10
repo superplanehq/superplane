@@ -9,7 +9,6 @@ const sampleWorkflow: CanvasesCanvas = {
     id: "canvas-123",
     name: "Deploy Pipeline",
     description: "Production deploy flow",
-    isTemplate: false,
   },
   spec: {
     nodes: [
@@ -145,7 +144,7 @@ spec:
     expect("target_id" in ((spec?.edges?.[0] as Record<string, unknown>) || {})).toBe(false);
 
     const rebuilt = buildCanvasYamlFromWorkflow({
-      metadata: { id: "id", name: "Alias test", description: "", isTemplate: false },
+      metadata: { id: "id", name: "Alias test", description: "" },
       spec: { nodes: spec?.nodes ?? [], edges: spec?.edges ?? [] },
     });
     expect(rebuilt).not.toContain("is_collapsed:");
