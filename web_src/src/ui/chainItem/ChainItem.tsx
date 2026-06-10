@@ -7,9 +7,10 @@ import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
-import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import { getComponentBaseMapper } from "@/pages/app/mappers";
+import { buildExecutionInfo, buildNodeInfo } from "@/pages/app/utils";
 import { ChainItemIcon } from "./ChainItemIcon";
 import type { ChainItemData } from "./types";
 
@@ -453,16 +454,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <DialogTitle>Payload</DialogTitle>
               <DialogDescription className="sr-only">Expanded payload viewer.</DialogDescription>
               <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyPayloadToClipboard(modalPayload);
                   }}
-                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
                 >
                   {React.createElement(resolveIcon("copy"), { size: 14 })}
                   Copy
-                </button>
+                </Button>
               </SimpleTooltip>
             </div>
             <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">

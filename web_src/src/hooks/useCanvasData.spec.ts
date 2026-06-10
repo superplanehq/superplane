@@ -2,12 +2,12 @@ import type { CanvasesCanvas } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesUpdateCanvasDashboard } = vi.hoisted(() => ({
+const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesCommitCanvasRepositoryFiles } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
-  canvasesUpdateCanvasDashboard: vi.fn(),
+  canvasesCommitCanvasRepositoryFiles: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -16,7 +16,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
-    canvasesUpdateCanvasDashboard,
+    canvasesCommitCanvasRepositoryFiles,
   };
 });
 
@@ -278,22 +278,39 @@ describe("useUpdateCanvasFolderMembership", () => {
   });
 });
 
+const emptyConsoleYaml =
+  "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels: []\n  layout: []\n";
+
+const afterConsoleYaml =
+  "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n";
+
+function mockConsoleRepositoryFileFetch(yamlBody: string) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/repository/file") && url.includes("console.yaml")) {
+        return new Response(yamlBody, { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    }),
+  );
+}
+
 describe("useUpdateCanvasConsole", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("registers a canvas version websocket echo before saving dashboard changes", async () => {
     const queryClient = createQueryClient();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
-    canvasesUpdateCanvasDashboard.mockResolvedValue({
-      data: {
-        dashboard: {
-          panels: [],
-          layout: [],
-        },
-      },
-    });
+    canvasesCommitCanvasRepositoryFiles.mockResolvedValue({ data: {} });
+    mockConsoleRepositoryFileFetch(emptyConsoleYaml);
 
     const { result } = renderHook(
       () =>
@@ -306,14 +323,23 @@ describe("useUpdateCanvasConsole", () => {
     await result.current.mutateAsync({ panels: [], layout: [] });
 
     expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
-    expect(canvasesUpdateCanvasDashboard).toHaveBeenCalledOnce();
+    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledOnce();
+    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1" },
+        body: expect.objectContaining({
+          versionId: "version-1",
+          operations: [expect.objectContaining({ path: "console.yaml" })],
+        }),
+      }),
+    );
   });
 
   it("releases the ignored canvas version echo when dashboard save fails", async () => {
     const queryClient = createQueryClient();
     const releaseCanvasVersionUpdatedEcho = vi.fn();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
-    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(
       () =>
@@ -331,7 +357,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
     let resolveSave: (value: unknown) => void = () => {};
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
@@ -341,8 +367,10 @@ describe("useUpdateCanvasConsole", () => {
       versionId: "version-1",
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      consoleYaml: emptyConsoleYaml,
     });
-    canvasesUpdateCanvasDashboard.mockReturnValue(savePromise);
+    canvasesCommitCanvasRepositoryFiles.mockReturnValue(savePromise);
+    mockConsoleRepositoryFileFetch(afterConsoleYaml);
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -361,30 +389,21 @@ describe("useUpdateCanvasConsole", () => {
       });
     });
 
-    resolveSave({
-      data: {
-        dashboard: {
-          canvasId: "canvas-1",
-          versionId: "version-1",
-          panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
-          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
-        },
-      },
-    });
+    resolveSave({ data: {} });
 
     await waitFor(() => expect(result.current.isPending).toBe(false));
   });
 
   it("rolls back the dashboard cache when console save fails", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
     });
-    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),

@@ -885,6 +885,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
+			"checks":                      "read",
 			"contents":                    "write",
 			"pull_requests":               "write",
 			"repository_hooks":            "write",

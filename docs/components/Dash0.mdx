@@ -29,6 +29,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
 
+## Instructions
+
+To connect Dash0 to Superplane:
+
+1. Go to **Settings → Auth Tokens → + Add** to create a new API token.
+2. Give the token a name, grant it access to the Default or all Datasets, all Signal types, and all Permissions.
+3. Click **Save** and copy the **Token** into the **API Token** field below.
+4. Go to **Settings → Endpoints → Prometheus API** and copy the **Endpoint** into the **Prometheus API Base URL** field below.
+5. Click **Connect** to finish setup.
+
 <a id="on-alert-notification"></a>
 
 ## On Alert Notification
@@ -39,9 +49,7 @@ The On Alert Notification trigger starts a workflow execution when Dash0 sends a
 
 ### Setup
 
-1. Configure the Dash0 integration in SuperPlane.
-2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure alert notifications to send HTTP POST requests to that URL.
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all alert check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
 
 ### Event Data
 
@@ -115,9 +123,7 @@ The On Synthetic Check Notification trigger starts a workflow execution when Das
 
 ### Setup
 
-1. Configure the Dash0 integration in SuperPlane.
-2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure synthetic check notifications to send HTTP POST requests to that URL.
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all synthetic check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
 
 ### Event Data
 

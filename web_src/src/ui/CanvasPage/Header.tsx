@@ -1,4 +1,5 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { useParams } from "react-router-dom";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
@@ -6,11 +7,11 @@ import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 
 export interface HeaderProps {
-  /** Shown centered in the top bar (canvas or template display name). */
-  canvasName: string;
+  /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
+  canvasName?: string;
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
@@ -50,7 +51,7 @@ export interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectDashboard?: () => void;
+  onSelectConsole?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
@@ -69,13 +70,22 @@ export interface HeaderProps {
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }
 
 export function Header(props: HeaderProps) {
-  const headerTitle = props.canvasName.trim() || "Canvas";
+  const headerTitle = (props.canvasName ?? "").trim() || "Canvas";
 
   return (
     <header>
@@ -93,6 +103,15 @@ export function Header(props: HeaderProps) {
         enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
         onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+        startEditingDrafts={props.startEditingDrafts}
+        startEditingDefaultDraft={props.startEditingDefaultDraft}
+        startEditingMenuOpen={props.startEditingMenuOpen}
+        onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
+        onContinueDraftBranch={props.onContinueDraftBranch}
+        onCreateDraftBranch={props.onCreateDraftBranch}
+        createDraftBranchPending={props.createDraftBranchPending}
+        activeDraftBranchLabel={props.activeDraftBranchLabel}
+        activeDraftBranchShortSha={props.activeDraftBranchShortSha}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
@@ -115,6 +134,15 @@ function PageHeader({
   enterEditModeDisabledTooltip,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
@@ -131,6 +159,15 @@ function PageHeader({
   enterEditModeDisabledTooltip?: string;
   onDiscardDraftAndStartEdit?: () => void;
   unpublishedDraftUpdatedAt?: string;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
 }) {
   const {
     workflowId,
@@ -163,7 +200,25 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {mode !== "runs" && !isEditing && onEnterEditMode ? (
+        {isEditing ? (
+          <div className="flex items-center">
+            {activeDraftBranchLabel ? (
+              <span
+                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
+                data-testid="active-draft-branch-chip"
+              >
+                Editing: {activeDraftBranchLabel}
+                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
+              </span>
+            ) : null}
+            <EditModeTopHeaderActions
+              onExitEditMode={onExitEditMode}
+              exitEditModeDisabled={exitEditModeDisabled}
+              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            />
+          </div>
+        ) : null}
+        {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -171,13 +226,13 @@ function PageHeader({
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
             unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-          />
-        ) : null}
-        {isEditing ? (
-          <EditModeTopHeaderActions
-            onExitEditMode={onExitEditMode}
-            exitEditModeDisabled={exitEditModeDisabled}
-            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            startEditingDrafts={startEditingDrafts}
+            startEditingDefaultDraft={startEditingDefaultDraft}
+            startEditingMenuOpen={startEditingMenuOpen}
+            onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
+            onContinueDraftBranch={onContinueDraftBranch}
+            onCreateDraftBranch={onCreateDraftBranch}
+            createDraftBranchPending={createDraftBranchPending}
           />
         ) : null}
       </div>
@@ -200,12 +255,12 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onSelectCanvasView}
-              onSelectDashboard={props.onSelectDashboard}
+              onSelectConsole={props.onSelectConsole}
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
               hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
-              hasDashboardDraft={!!props.hasUnpublishedConsoleDraftChanges}
+              hasConsoleDraft={!!props.hasUnpublishedConsoleDraftChanges}
             />
           ) : null}
         </div>
@@ -217,7 +272,7 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (!props.onSelectDashboard && !props.onSelectMemory && !props.onSelectFiles) {
+  if (!props.onSelectConsole && !props.onSelectMemory && !props.onSelectFiles) {
     return false;
   }
 
@@ -229,14 +284,14 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
     mode === "version-live" ||
     mode === "version-edit" ||
     mode === "runs" ||
-    mode === "dashboard" ||
+    mode === "console" ||
     mode === "memory" ||
     mode === "files"
   );
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files") {
+  if (mode === "runs" || mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 

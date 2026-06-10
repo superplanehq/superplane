@@ -46,6 +46,15 @@ type LiveLogAccessContext struct {
 	BrokerTaskID string
 }
 
+func isRunnerComponent(name string) bool {
+	switch strings.TrimSpace(name) {
+	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
+		return true
+	default:
+		return false
+	}
+}
+
 func BrokerTaskIDFromExecutionMetadata(meta map[string]any) string {
 	if meta == nil {
 		return ""
@@ -76,7 +85,7 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 	}
 
 	ref := node.Ref.Data()
-	if ref.Component == nil || ref.Component.Name != "runner" {
+	if ref.Component == nil || !isRunnerComponent(ref.Component.Name) {
 		return nil, ErrLiveLogNotRunner
 	}
 

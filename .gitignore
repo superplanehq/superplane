@@ -18,7 +18,9 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 .worktrees/
 coverage-go.out
 

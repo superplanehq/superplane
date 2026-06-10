@@ -46,3 +46,18 @@ func Test__toStructpbCompatible__ConvertsJSONNumbersOnly(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(0.0000001), nested["small"])
 }
+
+func Test__toStructpbCompatible(t *testing.T) {
+	in := map[string]any{
+		"arr": []any{float64(1), "two"},
+		"nested": map[string]any{
+			"k": true,
+		},
+	}
+	out := toStructpbCompatible(in)
+	m, ok := out.(map[string]any)
+	require.True(t, ok)
+	arr, ok := m["arr"].([]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), arr[0])
+}

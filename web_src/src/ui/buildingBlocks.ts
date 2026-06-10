@@ -11,8 +11,11 @@ export function buildBuildingBlockCategories(
   components: SuperplaneActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
+  const runnerCategory = runners(triggers, components);
+
   return [
     core(triggers, components),
+    ...(runnerCategory ? [runnerCategory] : []),
     debugging(triggers, components),
     memory(triggers, components),
     ...buildIntegrationCategories(integrations),
@@ -26,6 +29,24 @@ function core(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]
       ...triggers.filter((t) => isCoreComponent(t)).map((t) => toTriggerBlock(t)),
       ...components.filter((c) => isCoreComponent(c)).map((c) => toComponentBlock(c)),
     ],
+  };
+}
+
+function runners(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory | null {
+  const blocks: BuildingBlock[] = [
+    ...triggers.filter((t) => isRunnerBlock(t)).map((t) => toTriggerBlock(t)),
+    ...components.filter((c) => isRunnerBlock(c)).map((c) => toComponentBlock(c)),
+  ];
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  blocks.sort(sortRunnerBlocks);
+
+  return {
+    name: "Runners",
+    blocks,
   };
 }
 
@@ -121,6 +142,29 @@ function isDebuggingBlock(component: { name?: string }): boolean {
   return DEBUGGING_COMPONENT_NAMES.has((component.name || "").toLowerCase());
 }
 
+const RUNNER_BLOCK_ORDER: Record<string, number> = {
+  runner: 0,
+  runnerBash: 1,
+  runnerJS: 2,
+  runnerPython: 3,
+};
+
+function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
+  const aOrder = RUNNER_BLOCK_ORDER[a.name] ?? Number.POSITIVE_INFINITY;
+  const bOrder = RUNNER_BLOCK_ORDER[b.name] ?? Number.POSITIVE_INFINITY;
+
+  if (aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+
+  return (a.name || "").localeCompare(b.name || "");
+}
+
+function isRunnerBlock(component: { name?: string }): boolean {
+  const name = component.name || "";
+  return name === "runner" || name === "runnerJS" || name === "runnerBash" || name === "runnerPython";
+}
+
 function isCoreComponent(component: { name?: string }): boolean {
-  return !isMemoryBlock(component) && !isDebuggingBlock(component);
+  return !isMemoryBlock(component) && !isDebuggingBlock(component) && !isRunnerBlock(component);
 }
