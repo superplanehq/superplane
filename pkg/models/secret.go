@@ -67,6 +67,37 @@ func (s *Secret) UpdateName(name string) (*Secret, error) {
 	return s, nil
 }
 
+// UpdateNameAndData updates the secret name and data atomically. This is needed
+// when a secret is renamed and its data is encrypted with the previous name as
+// additional authenticated data, so the data must be re-encrypted with the new
+// name in the same transaction.
+func (s *Secret) UpdateNameAndData(name string, data []byte) (*Secret, error) {
+	now := time.Now()
+
+	err := database.Conn().
+		Model(s).
+		Clauses(clause.Returning{}).
+		Where("id = ?", s.ID).
+		Updates(map[string]any{
+			"name":       name,
+			"data":       data,
+			"updated_at": &now,
+		}).
+		Error
+
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+		return nil, err
+	}
+
+	s.Name = name
+	s.Data = data
+	s.UpdatedAt = &now
+	return s, nil
+}
+
 func (s *Secret) Delete() error {
 	return database.Conn().Delete(s).Error
 }
