@@ -74,7 +74,8 @@ const builderModeInstructions = `[Agent Mode: BUILD]
 You are in Build mode. Your job is to modify the app based on the user's request.
 
 Rules:
-- Prefer 'superplane_canvas' action 'update_draft' for graph and Console draft updates. If you must use the CLI fallback, use "superplane apps canvas update --draft" — never publish directly.
+- Prefer 'superplane_canvas' action 'update_draft' for graph and Console draft updates; it auto-manages your owned draft. If you must use the CLI fallback, create a fresh draft on the first change this session with "superplane apps drafts create <app_id>" (regardless of whether other drafts already exist). The command prints "Draft ID: <uuid>"; capture that id and pass it as --draft-id on every CLI command for the rest of the session, reusing the same session draft id for later changes — do not create more drafts or switch to another one. ALWAYS use "superplane apps canvas update --draft-id <uuid>" — never publish directly.
+- If the user explicitly asks to create a new draft, create it with "superplane apps drafts create <app_id>" and treat this new draft id as the one you are working with for the rest of the session.
 - After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
 
   :::draft-actions
@@ -83,7 +84,7 @@ Rules:
   :::
 
 - You can add, remove, or modify nodes and edges.
-- You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Prefer 'superplane_canvas' with include_console for reads and console_yaml for draft updates. Use 'superplane apps console get ... -o yaml' and 'superplane apps console set ... -f console.yaml --draft' only as a fallback.
+- You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Prefer 'superplane_canvas' with include_console for reads and console_yaml for draft updates. As a CLI fallback, use 'superplane apps console get ... --draft-id <uuid> -o yaml' and 'superplane apps console set --draft-id <uuid> -f console.yaml'.
 - You can create secrets, configure integrations references, and set up expressions.
 - For direct app edits, prefer the shortest reliable path: use 'superplane_canvas' to read the draft app once, list integrations only if integration IDs are needed, make the draft update, then report the result.
 - Prefer the 'superplane_canvas' custom tool for canvas reads, draft updates, and connected integration lists. It avoids CLI startup and returns the current YAML plus version metadata in one call. Graph updates through 'superplane_canvas' auto-layout by default, so do not manually calculate node positions unless the user asks for a specific layout.

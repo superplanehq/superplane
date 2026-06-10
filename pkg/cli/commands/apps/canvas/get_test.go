@@ -214,3 +214,71 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 	require.Contains(t, out, "id: "+testGetCanvasID)
 	require.Contains(t, out, "name: "+testGetCanvasName)
 }
+
+func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasMetadataResponse,
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + testGetCanvasID + "/versions/draft-2",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
+			},
+		},
+		expectFetchCanvasYAML(
+			testGetCanvasID,
+			"draft-2",
+			sampleCanvasYAMLBody,
+		),
+	)
+
+	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{testGetCanvasID}
+
+	draftID := "draft-2"
+	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Source: draft")
+	require.Contains(t, stdout.String(), "Version ID: draft-2")
+}
+
+func TestGetDraftErrorsWhenMultipleDraftsWithoutID(t *testing.T) {
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasMetadataResponse,
+		},
+		expectMe(),
+		requestExpectation{
+			method: http.MethodGet,
+			path:   draftVersionsPath(testGetCanvasID),
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}},{"metadata":{"id":"draft-2","owner":{"id":"user-1"}}}]}`))
+			},
+		},
+	)
+
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{testGetCanvasID}
+
+	draft := true
+	err := (&getCommand{draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "multiple drafts found")
+}
