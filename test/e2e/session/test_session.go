@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -31,6 +33,14 @@ type TestSession struct {
 	OrgID   uuid.UUID
 	Account *models.Account
 }
+
+const (
+	resetDatabaseAttempts     = 5
+	resetDatabaseRetryBackoff = 200 * time.Millisecond
+
+	postgresDeadlockDetectedCode = "40P01"
+	postgresLockNotAvailableCode = "55P03"
+)
 
 func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
 	sess := &TestSession{
@@ -133,9 +143,38 @@ func (s *TestSession) resetDatabase() {
         END LOOP;
     END$$;`
 
-	if err := database.Conn().Exec(sql).Error; err != nil {
-		s.t.Fatalf("reset database: %v", err)
+	var lastErr error
+	for attempt := 1; attempt <= resetDatabaseAttempts; attempt++ {
+		lastErr = database.Conn().Exec(sql).Error
+		if lastErr == nil {
+			return
+		}
+
+		if !isRetryableResetDatabaseError(lastErr) {
+			break
+		}
+
+		if attempt == resetDatabaseAttempts {
+			break
+		}
+
+		s.t.Logf("retrying database reset after retryable database error on attempt %d/%d: %v", attempt, resetDatabaseAttempts, lastErr)
+		time.Sleep(time.Duration(attempt) * resetDatabaseRetryBackoff)
 	}
+
+	s.t.Fatalf("reset database: %v", lastErr)
+}
+
+func isRetryableResetDatabaseError(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == postgresDeadlockDetectedCode || pgErr.Code == postgresLockNotAvailableCode
+	}
+
+	message := err.Error()
+	return strings.Contains(message, "deadlock detected") ||
+		strings.Contains(message, "SQLSTATE "+postgresDeadlockDetectedCode) ||
+		strings.Contains(message, "SQLSTATE "+postgresLockNotAvailableCode)
 }
 
 func (s *TestSession) Login() {
