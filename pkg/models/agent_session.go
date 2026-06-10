@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -119,6 +120,19 @@ func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
 	return UpdateAgentSessionStatusInTransaction(database.Conn(), sessionID, status)
 }
 
+func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID, providerSessionID, status string) error {
+	now := time.Now()
+	return tx.Model(&AgentSession{}).
+		Where("id = ?", sessionID).
+		Updates(map[string]any{
+			"provider_session_id": providerSessionID,
+			"status":              status,
+			"last_active_at":      &now,
+			"updated_at":          &now,
+		}).
+		Error
+}
+
 func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canvasID uuid.UUID) error {
 	return tx.
 		Where("organization_id = ?", organizationID).
@@ -132,6 +146,19 @@ func DeleteAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID
 		Where("organization_id = ?", organizationID).
 		Delete(&AgentSession{}).
 		Error
+}
+
+func LockAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", sessionID).
+		First(&session).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose
