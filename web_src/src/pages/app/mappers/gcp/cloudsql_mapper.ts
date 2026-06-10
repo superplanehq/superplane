@@ -58,12 +58,23 @@ function databaseDetails(context: ExecutionDetailsContext): Record<string, strin
   return details;
 }
 
+// displayValue returns a trimmed string only when it is safe to show on the
+// node: empty values and unresolved expressions (e.g. "{{ $.x }}") are hidden,
+// matching the other GCP mappers.
+function displayValue(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed || trimmed.includes("{{")) return undefined;
+  return trimmed;
+}
+
 function cloudsqlMetadataList(node: NodeInfo): MetadataItem[] {
   const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const metadata: MetadataItem[] = [];
-  if (config.instance) metadata.push({ icon: "server", label: String(config.instance) });
-  const db = config.name || config.database;
-  if (db) metadata.push({ icon: "database", label: String(db) });
+  const instance = displayValue(config.instance);
+  if (instance) metadata.push({ icon: "server", label: instance });
+  const db = displayValue(config.name ?? config.database);
+  if (db) metadata.push({ icon: "database", label: db });
   return metadata;
 }
 

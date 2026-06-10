@@ -41,3 +41,34 @@ describe("cloudsql mappers getExecutionDetails", () => {
     expect(() => getDatabaseMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 });
+
+describe("cloudsql mappers props metadata", () => {
+  function propsCtx(configuration: Record<string, unknown>) {
+    return {
+      node: {
+        id: "n1",
+        name: "Create Database",
+        componentName: "gcp.cloudsql.createDatabase",
+        isCollapsed: false,
+        configuration,
+        metadata: {},
+      },
+      nodes: [],
+      lastExecutions: [],
+      componentDefinition: { name: "gcp.cloudsql.createDatabase", label: "Create Database", icon: "database" },
+    } as unknown as Parameters<typeof createDatabaseMapper.props>[0];
+  }
+
+  it("shows the instance and database as chips", () => {
+    const props = createDatabaseMapper.props(propsCtx({ instance: "my-instance", name: "app_db" }));
+    expect(props.metadata?.some((m) => m.label === "my-instance")).toBe(true);
+    expect(props.metadata?.some((m) => m.label === "app_db")).toBe(true);
+  });
+
+  it("hides unresolved expression values instead of rendering them raw", () => {
+    const props = getDatabaseMapper.props(propsCtx({ instance: "{{ $.inputs.instance }}", database: "app_db" }));
+    // The expression instance is hidden, leaving only the database chip.
+    expect(props.metadata?.length).toBe(1);
+    expect(props.metadata?.some((m) => m.label === "app_db")).toBe(true);
+  });
+});

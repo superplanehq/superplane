@@ -41,6 +41,13 @@ type Instance struct {
 	State           string `json:"state"`
 }
 
+// DatabaseNodeMetadata is the node metadata shared by the create/get/delete
+// database components so the collapsed node can show what it targets.
+type DatabaseNodeMetadata struct {
+	Instance string `json:"instance,omitempty" mapstructure:"instance"`
+	Database string `json:"database,omitempty" mapstructure:"database"`
+}
+
 type operation struct {
 	Name          string          `json:"name"`
 	Status        string          `json:"status"`

@@ -19,11 +19,6 @@ type CreateDatabaseSpec struct {
 	Name     string `json:"name" mapstructure:"name"`
 }
 
-type DatabaseNodeMetadata struct {
-	Instance string `json:"instance,omitempty" mapstructure:"instance"`
-	Database string `json:"database,omitempty" mapstructure:"database"`
-}
-
 func (c *CreateDatabase) Name() string {
 	return "gcp.cloudsql.createDatabase"
 }
