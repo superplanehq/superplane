@@ -158,7 +158,12 @@ func (c *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	client := NewClient(ctx.HTTP, creds, region)
 	if _, err := client.DeleteLoadBalancer(lbARN); err != nil {
 		if IsLoadBalancerNotFound(err) {
-			return ctx.ExecutionState.Fail("not-found", fmt.Sprintf("load balancer %s not found: it may have already been deleted", lbARN))
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteLoadBalancerPayloadType, []any{
+				map[string]any{
+					"loadBalancerArn": lbARN,
+					"state":           LoadBalancerStateDeleted,
+				},
+			})
 		}
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete load balancer: %v", err))
 	}

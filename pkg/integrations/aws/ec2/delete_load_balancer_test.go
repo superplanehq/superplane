@@ -94,7 +94,7 @@ func Test__DeleteLoadBalancer__Setup(t *testing.T) {
 func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 	component := &DeleteLoadBalancer{}
 
-	t.Run("load balancer not found -> fails execution", func(t *testing.T) {
+	t.Run("load balancer not found -> emits deleted (idempotent)", func(t *testing.T) {
 		lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/50dc6c495c0c9188"
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -132,10 +132,12 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.True(t, executionState.Finished)
-		assert.False(t, executionState.Passed)
-		assert.Equal(t, "not-found", executionState.FailureReason)
-		assert.Contains(t, executionState.FailureMessage, "not found")
+		assert.True(t, executionState.Passed)
+		assert.Equal(t, DeleteLoadBalancerPayloadType, executionState.Type)
+		require.Len(t, executionState.Payloads, 1)
+		data := executionState.Payloads[0].(map[string]any)["data"].(map[string]any)
+		assert.Equal(t, lbARN, data["loadBalancerArn"])
+		assert.Equal(t, LoadBalancerStateDeleted, data["state"])
 	})
 
 	t.Run("delete load balancer -> schedules poll", func(t *testing.T) {
