@@ -43,9 +43,9 @@ describe("syncCommittedCanvasDraftState", () => {
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
     const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));
-    const updateCanvasDetail = setQueryData.mock.calls.find(
-      ([key]) => JSON.stringify(key) === detailKey,
-    )?.[1] as (current: CanvasesCanvas | undefined) => CanvasesCanvas | undefined;
+    const updateCanvasDetail = setQueryData.mock.calls.find(([key]) => JSON.stringify(key) === detailKey)?.[1] as (
+      current: CanvasesCanvas | undefined,
+    ) => CanvasesCanvas | undefined;
 
     expect(
       updateCanvasDetail({

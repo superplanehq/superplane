@@ -86,6 +86,42 @@ function resolveEditingStagingFlags({
   return { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges };
 }
 
+function getServerStagingFlags(stagedPaths: string[] | undefined) {
+  const paths = stagedPaths ?? [];
+  return {
+    serverHasCanvasStaging: paths.includes(CANVAS_YAML_PATH),
+    serverHasConsoleStaging: paths.includes(CONSOLE_YAML_PATH),
+    serverHasFilesStaging: paths.some((path) => path !== CANVAS_YAML_PATH && path !== CONSOLE_YAML_PATH),
+  };
+}
+
+function buildDraftChangeFlags({
+  isEditing,
+  hasStagingChanges,
+  hasCanvasStagingChanges,
+  hasConsoleStagingChanges,
+  hasFilesStagingChanges,
+  draftChangeIndicators,
+}: {
+  isEditing: boolean;
+  hasStagingChanges: boolean;
+  hasCanvasStagingChanges: boolean;
+  hasConsoleStagingChanges: boolean;
+  hasFilesStagingChanges: boolean;
+  draftChangeIndicators: ConsoleVersionDiff["draftChangeIndicators"];
+}) {
+  return {
+    editTabTone: draftEditTabToneFromStaging(hasStagingChanges, isEditing),
+    hasUncommittedCanvasDraftChanges: isEditing && hasCanvasStagingChanges,
+    hasUncommittedConsoleDraftChanges: isEditing && hasConsoleStagingChanges,
+    hasUncommittedFilesDraftChanges: isEditing && hasFilesStagingChanges,
+    hasCommittedCanvasDraftChanges:
+      isEditing && !hasCanvasStagingChanges && draftChangeIndicators.hasUnpublishedCanvasDraftChanges,
+    hasCommittedConsoleDraftChanges:
+      isEditing && !hasConsoleStagingChanges && draftChangeIndicators.hasUnpublishedConsoleDraftChanges,
+  };
+}
+
 type UseDraftStagingIndicatorsOptions = {
   isEditing: boolean;
   canvasId?: string;
@@ -168,10 +204,8 @@ export function useDraftStagingIndicators({
     [committedBaselines.console, effectiveConsole],
   );
 
-  const serverHasCanvasStaging = (canvasVersionStagingQuery.data?.stagedPaths ?? []).includes(CANVAS_YAML_PATH);
-  const serverHasConsoleStaging = (canvasVersionStagingQuery.data?.stagedPaths ?? []).includes(CONSOLE_YAML_PATH);
-  const serverHasFilesStaging = (canvasVersionStagingQuery.data?.stagedPaths ?? []).some(
-    (path) => path !== CANVAS_YAML_PATH && path !== CONSOLE_YAML_PATH,
+  const { serverHasCanvasStaging, serverHasConsoleStaging, serverHasFilesStaging } = getServerStagingFlags(
+    canvasVersionStagingQuery.data?.stagedPaths,
   );
   const serverHasStagingChanges = !!canvasVersionStagingQuery.data?.hasStaging;
 
@@ -214,14 +248,21 @@ export function useDraftStagingIndicators({
     publishableChangesByVersionId,
   });
 
-  const editTabTone = draftEditTabToneFromStaging(hasStagingChanges, isEditing);
-  const hasUncommittedCanvasDraftChanges = isEditing && hasCanvasStagingChanges;
-  const hasUncommittedConsoleDraftChanges = isEditing && hasConsoleStagingChanges;
-  const hasUncommittedFilesDraftChanges = isEditing && hasFilesStagingChanges;
-  const hasCommittedCanvasDraftChanges =
-    isEditing && !hasCanvasStagingChanges && draftChangeIndicators.hasUnpublishedCanvasDraftChanges;
-  const hasCommittedConsoleDraftChanges =
-    isEditing && !hasConsoleStagingChanges && draftChangeIndicators.hasUnpublishedConsoleDraftChanges;
+  const {
+    editTabTone,
+    hasUncommittedCanvasDraftChanges,
+    hasUncommittedConsoleDraftChanges,
+    hasUncommittedFilesDraftChanges,
+    hasCommittedCanvasDraftChanges,
+    hasCommittedConsoleDraftChanges,
+  } = buildDraftChangeFlags({
+    isEditing,
+    hasStagingChanges,
+    hasCanvasStagingChanges,
+    hasConsoleStagingChanges,
+    hasFilesStagingChanges,
+    draftChangeIndicators,
+  });
 
   return {
     effectiveConsole,
