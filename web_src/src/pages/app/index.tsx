@@ -1049,9 +1049,6 @@ export function AppPage() {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
     } else if (activeCanvasVersionId) {
-      // Drop the preserved spec — the user just finished or discarded
-      // their local edits, so Effect 1 must absorb the refetched server
-      // spec rather than keep showing the ref-cached version.
       draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
     }
@@ -2082,17 +2079,11 @@ export function AppPage() {
           return true;
         }
 
-        // Defer when the user is mid-edit on the version that just changed
-        // remotely — line 1036 absorbs the update once they save/discard.
         if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
           setRemoteCanvasUpdatePending(true);
           return true;
         }
 
-        // Drop the preserved-spec ref entry so Effect 1 falls through to
-        // the freshly-fetched server spec instead of pinning the old one.
-        // Also covers the "not in edit mode" case: when the user later
-        // toggles into this version, the ref won't shadow the new spec.
         draftCanvasSpecsRef.current.delete(payload.versionId);
         invalidateCanvasVersionData(canvasId, payload.versionId);
         return true;
