@@ -457,6 +457,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	source := q.TestID("building-block-approval")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-approval")
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
@@ -474,6 +475,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	startSource := q.TestID("building-block-start")
 	s.addBlockFromSidebar(startSource, pos)
+	s.openComponentSidebarForLatestBlock("building-block-start")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
 }
@@ -484,6 +486,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	source := q.TestID("building-block-wait")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-wait")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
 	modeSelector := q.TestID("field-mode-select")
@@ -506,6 +509,7 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	source := q.TestID("building-block-filter")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-filter")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
 	s.session.Sleep(300)
@@ -517,6 +521,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 }
@@ -527,6 +532,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
@@ -541,6 +547,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
+	s.session.Sleep(500)
+	s.openComponentSidebarForLatestBlock(blockTestID)
 }
 
 func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Position) {
@@ -548,14 +556,22 @@ func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Posit
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 }
 
-func (s *CanvasSteps) selectLatestNoopNode() {
-	headers := s.session.Page().Locator(`.react-flow__node [data-testid^="node-noop"][data-testid$="-header"]`)
+func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
+	slug := strings.ToLower(strings.TrimPrefix(blockTestID, "building-block-"))
+	headers := s.session.Page().Locator(fmt.Sprintf(
+		`.react-flow__node [data-testid^="node-%s"][data-testid$="-header"]`,
+		slug,
+	))
 	count, err := headers.Count()
 	require.NoError(s.t, err)
-	require.Greater(s.t, count, 0, "expected at least one noop node after adding a noop block")
+	require.Greater(s.t, count, 0, "expected at least one %s node after dropping block", slug)
 
 	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(150)
+}
+
+func (s *CanvasSteps) selectLatestNoopNode() {
+	s.openComponentSidebarForLatestBlock("building-block-noop")
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
