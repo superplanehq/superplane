@@ -80,4 +80,71 @@ describe("validateMarkdownVariables", () => {
       validateMarkdownVariables([{ name: "bad", source: { kind: "run", select: "first" as unknown as never } }]),
     ).toMatch(/select/);
   });
+
+  describe("memory list mode", () => {
+    it("accepts mode: list with no limit", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "memory", namespace: "n", mode: "list" } }]),
+      ).toBeNull();
+    });
+
+    it("accepts mode: list with a positive integer limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "memory", namespace: "n", mode: "list", limit: 10 } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("accepts explicit mode: single", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "memory", namespace: "n", mode: "single" } }]),
+      ).toBeNull();
+    });
+
+    it("rejects an unknown mode", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "many" as unknown as never } },
+        ]),
+      ).toMatch(/mode/);
+    });
+
+    it("rejects a non-numeric limit", () => {
+      expect(
+        validateMarkdownVariables([
+          {
+            name: "bad",
+            source: {
+              kind: "memory",
+              namespace: "n",
+              mode: "list",
+              limit: "5" as unknown as never,
+            },
+          },
+        ]),
+      ).toMatch(/limit/);
+    });
+
+    it("rejects a non-integer limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: 1.5 } },
+        ]),
+      ).toMatch(/limit/);
+    });
+
+    it("rejects a zero / negative limit", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: 0 } },
+        ]),
+      ).toMatch(/limit/);
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "memory", namespace: "n", mode: "list", limit: -3 } },
+        ]),
+      ).toMatch(/limit/);
+    });
+  });
 });

@@ -44,7 +44,7 @@ func NewCanvasService(
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvases(ctx, s.registry, organizationID, req.IncludeTemplates)
+	return canvases.ListCanvases(ctx, s.registry, organizationID)
 }
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
@@ -153,6 +153,7 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 		ctx,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
@@ -199,6 +200,7 @@ func (s *CanvasService) ActOnCanvasChangeRequest(ctx context.Context, req *pb.Ac
 		s.authService,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.ChangeRequestId,

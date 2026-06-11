@@ -116,7 +116,7 @@ func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.
 	return session
 }
 
-func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
+func TestAgentStreamWorker_ContinuesWhenSessionChangesDuringStream(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -126,8 +126,14 @@ func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
 		name:        testProvider,
 		streamReady: make(chan struct{}),
 		release:     make(chan struct{}),
-		events: []agents.ProviderEvent{
-			{Type: agents.ProviderEventTurnCompleted},
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+			{
+				{ProviderEventID: "msg-follow-up", Type: agents.ProviderEventAssistantMessage, Text: "second turn"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
 		},
 	}
 
@@ -140,12 +146,16 @@ func TestAgentStreamWorker_ReturnsErrorWhenSessionLockIsHeld(t *testing.T) {
 	}()
 	<-provider.streamReady
 
-	err := w.Handle(context.Background(), body)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already in progress")
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
 
 	close(provider.release)
 	require.NoError(t, <-firstDone)
+	assert.Equal(t, 2, provider.streamCalls)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	assert.Equal(t, "second turn", stored[0].Content)
 }
 
 func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {

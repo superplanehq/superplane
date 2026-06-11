@@ -200,7 +200,6 @@ metadata:
   id: ` + canvas.ID.String() + `
   name: ` + canvas.Name + `
   description: ""
-  isTemplate: false
 spec:
   nodes:
     - id: start-start-abc

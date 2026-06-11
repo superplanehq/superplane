@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
+  <LinkCard title="Add Pull Request Reviewers" href="#add-pull-request-reviewers" description="Add reviewers to a GitHub pull request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a GitHub deployment for a ref and environment (enables the PR deployment UI)" />
   <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitHub deployment (success, failure, inactive, etc.)" />
@@ -1944,6 +1945,78 @@ Returns the full list of labels currently on the issue after the addition.
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.labels"
+}
+```
+
+<a id="add-pull-request-reviewers"></a>
+
+## Add Pull Request Reviewers
+
+**Component key:** `github.addPullRequestReviewers`
+
+The Add Pull Request Reviewers component adds individual users and/or teams as reviewers on a GitHub pull request.
+
+### Use Cases
+
+- **Automated reviewer assignment**: Request review from the relevant team when a pull request is opened
+- **Escalation workflows**: Add additional reviewers when a pull request needs attention
+- **On-call routing**: Request review from the current on-call engineer after checks pass
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to add reviewers to. Expressions are supported.
+- **Reviewers**: GitHub usernames to request as reviewers
+- **Team Reviewers**: Team slugs to request as team reviewers (optional)
+
+At least one reviewer or team reviewer is required.
+
+### Output
+
+Returns the updated pull request object with the current requested reviewers.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "requested_reviewers": [
+      {
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      }
+    ],
+    "requested_teams": [
+      {
+        "html_url": "https://github.com/orgs/acme/teams/justice-league",
+        "id": 1,
+        "slug": "justice-league"
+      }
+    ],
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
 }
 ```
 

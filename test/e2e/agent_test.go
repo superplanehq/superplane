@@ -200,22 +200,10 @@ func (s *agentSteps) openAgent() {
 	s.waitForToolSidebarOpen()
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.clickAgentTab()
 	s.waitForAgentInput()
 	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
 		return isAgentSystemMessage(call.Message)
 	})
-}
-
-func (s *agentSteps) clickAgentTab() {
-	tab := q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`).Run(s.session)
-	require.Eventually(s.t, func() bool {
-		visible, err := tab.IsVisible()
-		if err != nil || !visible {
-			return false
-		}
-		return tab.Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)}) == nil
-	}, agentWaitTimeout, agentPollInterval)
 }
 
 func (s *agentSteps) waitForAgentInput() {

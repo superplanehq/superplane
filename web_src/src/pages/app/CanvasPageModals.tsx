@@ -1,5 +1,4 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { CreateCanvasModal } from "@/components/CreateCanvasModal";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,12 +12,6 @@ import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 import type { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
-  organizationId: string;
-  canvas?: CanvasesCanvas | null;
-  isUseTemplateOpen: boolean;
-  onCloseUseTemplate: () => void;
-  onUseTemplateSubmit: (data: { name: string; description?: string; templateId?: string }) => Promise<void>;
-  isCreateCanvasPending: boolean;
   isCreateChangeRequestMode: boolean;
   onCreateChangeRequestModeChange: (open: boolean) => void;
   isCreateChangeRequestPending: boolean;
@@ -35,12 +28,6 @@ interface CanvasPageModalsProps {
 }
 
 export function CanvasPageModals({
-  organizationId,
-  canvas,
-  isUseTemplateOpen,
-  onCloseUseTemplate,
-  onUseTemplateSubmit,
-  isCreateCanvasPending,
   isCreateChangeRequestMode,
   onCreateChangeRequestModeChange,
   isCreateChangeRequestPending,
@@ -57,25 +44,6 @@ export function CanvasPageModals({
 }: CanvasPageModalsProps) {
   return (
     <>
-      {canvas ? (
-        <CreateCanvasModal
-          organizationId={organizationId}
-          isOpen={isUseTemplateOpen}
-          onClose={onCloseUseTemplate}
-          onSubmit={onUseTemplateSubmit}
-          isLoading={isCreateCanvasPending}
-          templates={[
-            {
-              id: canvas.metadata?.id || "",
-              name: canvas.metadata?.name || "Untitled template",
-              description: canvas.metadata?.description,
-            },
-          ]}
-          defaultTemplateId={canvas.metadata?.id || ""}
-          mode="create"
-          fromTemplate
-        />
-      ) : null}
       <CreateChangeRequestModal
         open={isCreateChangeRequestMode}
         onOpenChange={onCreateChangeRequestModeChange}

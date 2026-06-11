@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 type RunAgent struct{}
@@ -97,6 +99,21 @@ func (a *RunAgent) Configuration() []configuration.Field {
 			},
 			Description: "Optional vault IDs for MCP authentication (see Managed Agents docs)",
 		},
+		{
+			Name:        "files",
+			Label:       "Files",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "File paths from the Files tab to mount into the agent's working directory",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "File path",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeRepositoryFile,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -105,7 +122,36 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateSpec(spec)
+	if err := validateSpec(spec); err != nil {
+		return err
+	}
+
+	if len(spec.Files) > 0 {
+		if ctx.Files == nil {
+			return fmt.Errorf("files configured but file access is not available")
+		}
+		available, err := ctx.Files.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %v", err)
+		}
+		fileSet := make(map[string]bool, len(available))
+		for _, f := range available {
+			if norm, err := gitprovider.NormalizePath(f); err == nil {
+				fileSet[norm] = true
+			}
+		}
+		for _, f := range spec.Files {
+			norm, err := gitprovider.ValidateUserPath(f)
+			if err != nil {
+				return fmt.Errorf("invalid file path %q: %v", f, err)
+			}
+			if !fileSet[norm] {
+				return fmt.Errorf("file %q not found in app repository", f)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (a *RunAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -126,16 +172,44 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Upload files and prepare resources for session mounting
+	var resources []FileResource
+	if len(spec.Files) > 0 {
+		if ctx.Files == nil {
+			return fmt.Errorf("files configured but file access is not available in this execution context")
+		}
+		resources, err = uploadRepositoryFiles(client, ctx, spec.Files)
+		if err != nil {
+			return fmt.Errorf("failed to upload files: %w", err)
+		}
+	}
+
+	// Store file IDs early so cleanup works on any later error path.
+	if len(resources) > 0 {
+		fileIDs := make([]string, len(resources))
+		for i, r := range resources {
+			fileIDs[i] = r.FileID
+			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
+		}
+		encoded, _ := json.Marshal(fileIDs)
+		if err := ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded)); err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
+			return fmt.Errorf("failed to persist uploaded file IDs: %w", err)
+		}
+	}
+
 	aid := strings.TrimSpace(spec.Agent)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
 		AgentVersion:  spec.Version,
 		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
 		VaultIDs:      spec.VaultIDs,
+		Resources:     resources,
 	}
 
 	session, err := client.CreateManagedSession(createReq)
 	if err != nil {
+		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to create managed agent session: %w", err)
 	}
 
@@ -153,24 +227,33 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
-	// Refresh status after work may have already progressed.
+	// Check if session already finished (fast tasks).
+	// Don't write terminal status to metadata yet — only after emit.
 	refreshed, err := client.GetManagedSession(session.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
-	mergeSessionIntoMetadata(&metadata, refreshed)
-	_ = ctx.Metadata.Set(metadata)
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
-		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(session.ID, finalMessageReads, finalMessageDelay)
+		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", session.ID, err)
+			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
+		} else if sm != nil && sm.Complete {
+			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
+			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+				return emitErr
+			}
+			// Persist terminal status only after successful emit
+			mergeSessionIntoMetadata(&metadata, refreshed)
+			_ = ctx.Metadata.Set(metadata)
+			if err := client.DeleteManagedSession(session.ID); err != nil {
+				ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
+			}
+			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+			return nil
+		} else {
+			ctx.Logger.Warnf("Events not complete for session %s after retries. Scheduling poll.", session.ID)
 		}
-		if err == nil && lastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", session.ID, managedSessionEventTypes(events))
-		}
-		out := buildOutput(refreshed.Status, session.ID, lastMessage)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
 	ctx.Logger.Infof("Started Managed Agent session %s. Waiting for completion (polling)...", session.ID)
@@ -178,6 +261,66 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
+
+// getUploadedFileIDs retrieves uploaded file IDs from execution state.
+func getUploadedFileIDs(state core.ExecutionStateContext) []string {
+	raw, err := state.GetKV("uploaded_file_ids")
+	if err != nil || raw == "" {
+		return nil
+	}
+	var fileIDs []string
+	if err := json.Unmarshal([]byte(raw), &fileIDs); err != nil {
+		return nil
+	}
+	return fileIDs
+}
+
+func cleanupUploadedFiles(client *Client, ctx core.ExecutionContext, logWarn func(string, ...any)) {
+	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
+func cleanupUploadedFilesFromHook(client *Client, ctx core.ActionHookContext, logWarn func(string, ...any)) {
+	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
+func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []string) ([]FileResource, error) {
+	resources := make([]FileResource, 0, len(files))
+	for _, path := range files {
+		normalized, err := gitprovider.ValidateUserPath(path)
+		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
+			return nil, fmt.Errorf("invalid file path %q: %w", path, err)
+		}
+
+		reader, err := ctx.Files.Read(normalized)
+		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
+			return nil, fmt.Errorf("read file %q: %w", path, err)
+		}
+
+		fileID, err := client.UploadFile(reader, normalized)
+		reader.Close()
+		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
+			return nil, fmt.Errorf("upload file %q: %w", path, err)
+		}
+
+		resources = append(resources, FileResource{
+			FileID:    fileID,
+			MountPath: normalized,
+		})
+	}
+	return resources, nil
+}
+
+// cleanupFileResources deletes already-uploaded files on partial failure.
+func cleanupFileResources(client *Client, resources []FileResource, logWarn func(string, ...any)) {
+	for _, r := range resources {
+		if err := client.DeleteFile(r.FileID); err != nil && logWarn != nil {
+			logWarn("Failed to delete uploaded file %s: %v", r.FileID, err)
+		}
+	}
+}
 
 func decodeSpec(config any) (Spec, error) {
 	var spec Spec
@@ -187,6 +330,9 @@ func decodeSpec(config any) (Spec, error) {
 	if raw, ok := config.(map[string]any); ok {
 		if v, ok := raw["vaultIds"]; ok {
 			spec.VaultIDs = decodeStringList(v)
+		}
+		if v, ok := raw["files"]; ok {
+			spec.Files = decodeStringList(v)
 		}
 	}
 	return spec, nil

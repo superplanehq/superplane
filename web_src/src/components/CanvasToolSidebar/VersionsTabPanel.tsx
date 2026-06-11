@@ -22,7 +22,6 @@ export interface VersionsTabPanelProps {
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
-  isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
@@ -58,7 +57,6 @@ export function VersionsTabPanel({
   liveVersions,
   liveVersionChangeRequestsByVersionId,
   canUpdateCanvas,
-  isTemplate,
   canvasDeletedRemotely,
   onUseVersion,
   onVersionNodeDiffContextChange,
@@ -108,11 +106,7 @@ export function VersionsTabPanel({
         data-testid="versions-sidebar-scroll"
         onScroll={handleScroll}
       >
-        <VersionsNotices
-          canUpdateCanvas={canUpdateCanvas}
-          canvasDeletedRemotely={canvasDeletedRemotely}
-          isTemplate={isTemplate}
-        />
+        <VersionsNotices canUpdateCanvas={canUpdateCanvas} canvasDeletedRemotely={canvasDeletedRemotely} />
 
         <DraftBranchesSection
           drafts={draftBranches ?? []}
@@ -256,11 +250,9 @@ function DraftBranchesSection({
 function VersionsNotices({
   canUpdateCanvas,
   canvasDeletedRemotely,
-  isTemplate,
 }: {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
-  isTemplate: boolean;
 }) {
   return (
     <>
@@ -270,7 +262,6 @@ function VersionsNotices({
       {canvasDeletedRemotely ? (
         <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
-      {isTemplate ? <p className="px-4 py-2 text-xs text-slate-600">Template canvases are read-only.</p> : null}
     </>
   );
 }

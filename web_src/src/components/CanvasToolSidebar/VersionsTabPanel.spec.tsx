@@ -21,7 +21,6 @@ describe("VersionsTabPanel", () => {
       <VersionsTabPanel
         liveVersions={[]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -39,7 +38,6 @@ describe("VersionsTabPanel", () => {
         liveCanvasVersionId="version-2"
         liveVersions={[makePublishedVersion("version-2"), makePublishedVersion("version-1")]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -63,7 +61,6 @@ describe("VersionsTabPanel", () => {
         selectedCanvasVersion={null}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -79,7 +76,6 @@ describe("VersionsTabPanel", () => {
         selectedCanvasVersion={makePublishedVersion("version-9")}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -99,7 +95,6 @@ describe("VersionsTabPanel", () => {
       liveCanvasVersionId: "version-12",
       liveVersions,
       canUpdateCanvas: true,
-      isTemplate: false,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
       onVersionNodeDiffContextChange: vi.fn(),
@@ -125,7 +120,6 @@ describe("VersionsTabPanel", () => {
       selectedCanvasVersion: null,
       liveVersions,
       canUpdateCanvas: true,
-      isTemplate: false,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
       onVersionNodeDiffContextChange: vi.fn(),

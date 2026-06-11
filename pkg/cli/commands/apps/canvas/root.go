@@ -63,11 +63,14 @@ configured with "superplane apps active" is used.`,
 	initCmd := &cobra.Command{
 		Use:   "init",
 		Short: "Generate a starter canvas YAML definition",
-		Long:  "Print a starter canvas YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
-		Args:  cobra.NoArgs,
+		Long: `Print a starter canvas YAML definition to stdout.
+
+By default, prints a blank canvas. Use --template to start from a built-in
+example (currently: health-check-monitor), or --list-templates to see options.`,
+		Args: cobra.NoArgs,
 	}
-	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
-	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available template names")
+	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a built-in template (e.g. health-check-monitor)")
+	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available built-in templates")
 	initCmd.Flags().StringVar(&initOutputFile, "output-file", "", "write to a file instead of stdout")
 	core.Bind(initCmd, &initCommand{
 		template:      &initTemplate,

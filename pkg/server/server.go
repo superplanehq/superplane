@@ -10,8 +10,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
-	agenttools "github.com/superplanehq/superplane/pkg/agents/tools"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -27,7 +27,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
@@ -138,7 +137,7 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -161,7 +160,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -241,16 +240,14 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agents.NewCustomToolRouter(
-			agenttools.NewSuperPlaneCanvasTool(agenttools.SuperPlaneCanvasToolOptions{
-				Encryptor:      encryptor,
-				Registry:       registry,
-				WebhookBaseURL: getWebhookBaseURL(baseURL),
-				AuthService:    authService,
-				UsageService:   getOptionalWorkerUsageService(),
-			}),
-			agenttools.NewSuperPlaneComponentSchemaTool(registry),
-		))
+		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
+			Encryptor:         encryptor,
+			ComponentRegistry: registry,
+			WebhookBaseURL:    getWebhookBaseURL(baseURL),
+			AuthService:       authService,
+			UsageService:      getOptionalWorkerUsageService(),
+		})
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agentToolRegistry)
 		go w.Start(context.Background())
 	}
 
@@ -562,8 +559,6 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-
-	templates.Setup(registry)
 
 	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
 
