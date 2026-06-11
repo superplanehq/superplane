@@ -20,6 +20,7 @@ export interface ConsoleViewProps {
   errorMessage?: string;
   readOnly: boolean;
   onChange: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
+  onEffectiveChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
   /** When provided with `onAddPanelDialogOpenChange`, the add-panel dialog is controlled by the parent (e.g. header). */
   addPanelDialogOpen?: boolean;
   onAddPanelDialogOpenChange?: (open: boolean) => void;
@@ -36,6 +37,7 @@ export function ConsoleView({
   errorMessage,
   readOnly,
   onChange,
+  onEffectiveChange,
   addPanelDialogOpen: addPanelDialogOpenProp,
   onAddPanelDialogOpenChange,
   visualDiff,
@@ -52,7 +54,7 @@ export function ConsoleView({
   );
 
   const { localPanels, localLayout, handleAddPanel, handleDeletePanel, handlePanelContentChange, handleLayoutChange } =
-    useConsolePanelState(panels, layout, onChange);
+    useConsolePanelState(panels, layout, onChange, onEffectiveChange);
   const visualDiffWithLocalDeletes = useMemo(
     () => withLocalDeletedPanels(visualDiff, panels, layout, localPanels, localLayout),
     [visualDiff, panels, layout, localPanels, localLayout],
