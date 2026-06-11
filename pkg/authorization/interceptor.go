@@ -83,6 +83,13 @@ func canvasResourceResolver(req any) []string {
 }
 
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
+	return &AuthorizationInterceptor{
+		authService: authService,
+		rules:       DefaultAuthorizationRules(),
+	}
+}
+
+func DefaultAuthorizationRules() map[string]AuthorizationRule {
 	rules := map[string]AuthorizationRule{
 		// Secrets rules
 		pbSecrets.Secrets_CreateSecret_FullMethodName:     {Resource: "secrets", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -463,10 +470,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
-	return &AuthorizationInterceptor{
-		authService: authService,
-		rules:       rules,
-	}
+	return rules
 }
 
 func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
