@@ -24,7 +24,6 @@ func TestCanvasMultiDraft(t *testing.T) {
 		steps.whenIOpenDraftBranch("Draft #1")
 		steps.thenNodeIsVisible("AlphaNode")
 		steps.thenNodeIsHidden("BetaNode")
-		steps.whenIExitEditMode()
 		steps.whenIOpenDraftBranch("Draft #2")
 		steps.thenNodeIsVisible("BetaNode")
 		steps.thenNodeIsHidden("AlphaNode")
