@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git/inmemory"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -54,6 +56,7 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
+	GitProvider  git.Provider
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -86,6 +89,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
+		GitProvider: inmemory.NewProvider(),
 	}
 
 	//
@@ -238,7 +242,7 @@ func EmitCanvasEventForNodeWithData(
 		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](data),
+		Data:        models.NewJSONValue(data),
 		State:       models.CanvasEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,
@@ -552,6 +556,38 @@ func VerifyNodeRequestCount(t require.TestingT, workflowID uuid.UUID, expected i
 
 	require.NoError(t, err)
 	require.Equal(t, expected, int(actual))
+}
+
+func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string, register bool) (*models.Canvas, *models.Repository) {
+	t.Helper()
+
+	canvas, _ := CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
+		OrganizationID: canvas.OrganizationID,
+		CanvasID:       canvas.ID,
+	})
+
+	require.NoError(t, canvas.CreatePendingRepository(r.GitProvider.Name(), repoID))
+
+	if register {
+		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)
+		require.NoError(t, err)
+	}
+
+	repository, err := models.FindRepository(r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+
+	switch status {
+	case models.RepositoryStatusReady:
+		require.NoError(t, repository.MarkReady(database.Conn()))
+	case models.RepositoryStatusError:
+		require.NoError(t, repository.MarkError(database.Conn()))
+	}
+
+	repository, err = models.FindRepository(r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+
+	return canvas, repository
 }
 
 func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID string) {

@@ -1,0 +1,8 @@
+{
+  "type": "gcp.compute.vmInstance.deleted",
+  "data": {
+    "instanceName": "my-vm",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

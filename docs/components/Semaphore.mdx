@@ -23,6 +23,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Pipeline Done
 
+**Trigger key:** `semaphore.onPipelineDone`
+
 The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeline completes.
 
 ### Use Cases
@@ -135,6 +137,8 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
 
 ## Get Pipeline
 
+**Component key:** `semaphore.getPipeline`
+
 The Get Pipeline component fetches a Semaphore pipeline by its ID and returns its current state, result, and metadata.
 
 ### Use Cases
@@ -188,6 +192,8 @@ Returns the pipeline object including:
 <a id="run-workflow"></a>
 
 ## Run Workflow
+
+**Component key:** `semaphore.runWorkflow`
 
 The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
 

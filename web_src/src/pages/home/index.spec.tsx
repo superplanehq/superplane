@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import type { ReactNode } from "react";
 import { showErrorToast } from "@/lib/toast";
 
@@ -110,18 +110,18 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 import { HomePage } from "./index";
+import { NewAppPage } from "./NewAppPage";
 
-function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvas {
+function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvasSummary {
   return {
-    metadata: {
-      id,
-      name,
-      folderId: canvasFolderId,
-      createdAt: "2026-05-05T00:00:00Z",
-      createdBy: { name: "Ada Lovelace" },
-    },
-    spec: { nodes: [], edges: [] },
-  } as CanvasesCanvas;
+    id,
+    name,
+    folderId: canvasFolderId,
+    createdAt: "2026-05-05T00:00:00Z",
+    createdBy: { name: "Ada Lovelace" },
+    nodes: [],
+    edges: [],
+  } as CanvasesCanvasSummary;
 }
 
 function makeFolder(
@@ -148,7 +148,10 @@ function renderHome() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/org-123"]}>
         <Routes>
-          <Route path="/:organizationId" element={<HomePage />} />
+          <Route path="/:organizationId">
+            <Route index element={<HomePage />} />
+            <Route path="apps/new" element={<NewAppPage />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -184,7 +187,7 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the toolbar as the canvas creation entrypoint", async () => {
+  it("uses the zero-state as the canvas creation entrypoint", async () => {
     const user = userEvent.setup();
     mutationMocks.createCanvasAsync.mockResolvedValue({
       data: { canvas: { metadata: { id: "canvas-new" } } },
@@ -194,21 +197,16 @@ describe("HomePage canvas folders", () => {
 
     renderHome();
 
-    await user.click(screen.getByRole("button", { name: /new app/i }));
-    expect(screen.getByRole("dialog", { name: /new app/i })).toBeInTheDocument();
-    expect(screen.getByLabelText("App name")).toHaveValue("Untitled App 1");
-
-    await user.click(screen.getByTestId("create-app-save-button"));
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
 
     await waitFor(() => {
-      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
-        name: "Untitled App 1",
-        method: "ui",
-      });
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+          method: "ui",
+        }),
+      );
     });
-    expect(screen.queryByText("Point & Click")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Grid view")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("List view")).not.toBeInTheDocument();
   });
 
   it("renders folders before free canvases using the manual folder order", () => {

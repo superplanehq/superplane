@@ -18,6 +18,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func canvasSpecFromVersionYAML(ctx context.Context, t *testing.T, orgID, canvasID, versionID string) *pb.Canvas_Spec {
+	t.Helper()
+	yamlText, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	canvas, err := canvasFromYAMLText(yamlText)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.GetSpec())
+	return canvas.GetSpec()
+}
+
 func Test__UpdateCanvasVersion(t *testing.T) {
 	r := support.Setup(t)
 
@@ -48,11 +58,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("valid draft version id -> updates draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
+		version, err := UpdateCanvasVersion(
 			ctx,
 			r.Encryptor,
 			r.Registry,
@@ -66,14 +76,13 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
+		require.NotNil(t, version)
 	})
 
 	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		service := &fakeCanvasUsageService{
@@ -114,7 +123,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("invalid source output channel -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -173,11 +182,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("invalid node field type -> serialized node carries error_message", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
+		version, err := UpdateCanvasVersion(
 			ctx,
 			r.Encryptor,
 			r.Registry,
@@ -210,11 +219,10 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-		require.NotNil(t, response.Version.Spec)
-		require.Len(t, response.Version.Spec.Nodes, 1)
-		errMsg := response.Version.Spec.Nodes[0].GetErrorMessage()
+		require.NotNil(t, version)
+		spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), version.ID.String())
+		require.Len(t, spec.Nodes, 1)
+		errMsg := spec.Nodes[0].GetErrorMessage()
 		require.NotEmpty(t, errMsg)
 		assert.Contains(t, errMsg, "waitFor")
 	})
@@ -222,7 +230,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("integration component with enabled capability -> updates without node error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
@@ -230,7 +238,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		})
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
+		version, err := UpdateCanvasVersion(
 			ctx,
 			r.Encryptor,
 			r.Registry,
@@ -244,12 +252,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-		require.NotNil(t, response.Version.Spec)
-		require.Len(t, response.Version.Spec.Nodes, 1)
+		require.NotNil(t, version)
+		spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), version.ID.String())
+		require.Len(t, spec.Nodes, 1)
 
-		node := response.Version.Spec.Nodes[0]
+		node := spec.Nodes[0]
 		assert.Empty(t, node.GetErrorMessage())
 		require.NotNil(t, node.GetIntegration())
 		require.NotNil(t, node.GetIntegration().Id)
@@ -259,7 +266,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 	t.Run("integration component with disabled capability -> serialized node carries error_message", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
 		require.NoError(t, err)
 
 		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
@@ -267,7 +274,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		})
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
+		version, err := UpdateCanvasVersion(
 			ctx,
 			r.Encryptor,
 			r.Registry,
@@ -281,12 +288,11 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-		require.NotNil(t, response.Version.Spec)
-		require.Len(t, response.Version.Spec.Nodes, 1)
+		require.NotNil(t, version)
+		spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), version.ID.String())
+		require.Len(t, spec.Nodes, 1)
 
-		errMsg := response.Version.Spec.Nodes[0].GetErrorMessage()
+		errMsg := spec.Nodes[0].GetErrorMessage()
 		require.NotEmpty(t, errMsg)
 		assert.Contains(t, errMsg, "github.getIssue is not enabled for integration "+integration.InstallationName)
 		assert.Contains(t, errMsg, integration.InstallationName)

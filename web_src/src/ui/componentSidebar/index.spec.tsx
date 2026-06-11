@@ -2,11 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const TabsContext = createContext<{ value: string }>({ value: "latest" });
+import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
-vi.mock("../CanvasPage", () => ({
-  COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY: "component-sidebar-width",
-}));
+const TabsContext = createContext<{ value: string }>({ value: "latest" });
 
 vi.mock("@/components/ui/tabs", () => ({
   Tabs: ({ value, children }: { value: string; children?: ReactNode }) => (
@@ -119,45 +117,65 @@ vi.mock("./pages", () => ({
   PageHeader: () => <div data-testid="page-header" />,
 }));
 
-vi.mock("@/pages/workflowv2/utils", () => ({
+vi.mock("@/pages/app/utils", () => ({
   mapTriggerEventToSidebarEvent: vi.fn(),
 }));
 
 import { ComponentSidebar } from "./index";
 
+function defaultSidebarProps(
+  props?: Partial<React.ComponentProps<typeof ComponentSidebar>>,
+): React.ComponentProps<typeof ComponentSidebar> {
+  return {
+    isOpen: true,
+    canvasMode: "live",
+    latestEvents: [],
+    nextInQueueEvents: [],
+    totalInQueueCount: 0,
+    totalInHistoryCount: 0,
+    showSettingsTab: true,
+    nodeName: "Node",
+    nodeConfiguration: {},
+    nodeConfigurationFields: [],
+    workflowNodes: [],
+    actions: [],
+    triggers: [],
+    ...props,
+  };
+}
+
 function renderSidebar(props?: Partial<React.ComponentProps<typeof ComponentSidebar>>) {
-  return render(
-    <ComponentSidebar
-      isOpen={true}
-      canvasMode="live"
-      latestEvents={[]}
-      nextInQueueEvents={[]}
-      totalInQueueCount={0}
-      totalInHistoryCount={0}
-      showSettingsTab={true}
-      nodeName="Node"
-      nodeConfiguration={{}}
-      nodeConfigurationFields={[]}
-      workflowNodes={[]}
-      actions={[]}
-      triggers={[]}
-      {...props}
-    />,
-  );
+  return render(<ComponentSidebar {...defaultSidebarProps(props)} />);
 }
 
 describe("ComponentSidebar", () => {
   beforeEach(() => {
     localStorage.clear();
+    useSidebarLayoutStore.getState().hydrateFromStorage();
   });
 
   it("uses clamped default width when local storage value is invalid", () => {
-    localStorage.setItem("component-sidebar-width", "not-a-number");
+    localStorage.setItem("componentSidebarWidth", "not-a-number");
+    useSidebarLayoutStore.getState().hydrateFromStorage();
     const { container } = renderSidebar();
 
     const sidebar = container.firstElementChild as HTMLElement | null;
     expect(sidebar).toBeTruthy();
     expect(sidebar?.style.width).toBe("380px");
+  });
+
+  it("does not reserve layout width while closed", async () => {
+    const { rerender } = renderSidebar({ isOpen: false });
+
+    await waitFor(() => {
+      expect(useSidebarLayoutStore.getState().rightMountCount).toBe(0);
+    });
+
+    rerender(<ComponentSidebar {...defaultSidebarProps({ isOpen: true })} />);
+
+    await waitFor(() => {
+      expect(useSidebarLayoutStore.getState().rightMountCount).toBe(1);
+    });
   });
 
   it("keeps width within resize bounds when pointer resize events fire", async () => {

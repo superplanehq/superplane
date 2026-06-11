@@ -17,7 +17,7 @@ import {
 } from "react";
 import { CanvasFolderActionsMenu } from "./CanvasFolderActionsMenu";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
-import { FOLDER_COLOR_OPTIONS } from "./canvasFolderStyles";
+import { FOLDER_COLOR_OPTIONS, CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 interface CanvasFolderSectionProps {
@@ -212,7 +212,9 @@ export function CanvasFolderSection({
     });
 
   return (
-    <section className={cn("w-full rounded-md p-4", FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}>
+    <section
+      className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <CanvasFolderTitle

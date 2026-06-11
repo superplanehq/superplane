@@ -46,6 +46,10 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	if version.UpdatedAt != nil {
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
+	if version.BranchName != nil {
+		metadata.BranchName = *version.BranchName
+	}
+	metadata.DisplayName = version.DisplayName
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,
@@ -54,5 +58,12 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 			Edges:            actions.EdgesToProto(version.Edges),
 			ChangeManagement: serializeChangeManagement(version.ChangeManagementEnabled, version.EffectiveChangeRequestApprovers()),
 		},
+	}
+}
+
+func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string) *pb.CanvasVersion {
+	full := SerializeCanvasVersion(version, organizationID)
+	return &pb.CanvasVersion{
+		Metadata: full.GetMetadata(),
 	}
 }

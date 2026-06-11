@@ -1,12 +1,13 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder, canvasesListRuns } = vi.hoisted(() => ({
+const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesCommitCanvasRepositoryFiles } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
+  canvasesCommitCanvasRepositoryFiles: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -15,10 +16,16 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
+    canvasesCommitCanvasRepositoryFiles,
   };
 });
 
-import { canvasKeys, useInfiniteCanvasRuns, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
+import {
+  canvasKeys,
+  useInfiniteCanvasRuns,
+  useUpdateCanvasConsole,
+  useUpdateCanvasFolderMembership,
+} from "@/hooks/useCanvasData";
 
 type TestCanvasFolder = {
   metadata?: { id?: string };
@@ -155,15 +162,12 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
-function makeCanvas(id: string, folderId?: string): CanvasesCanvas {
+function makeCanvas(id: string, folderId?: string): CanvasesCanvasSummary {
   return {
-    metadata: {
-      id,
-      name: id,
-      folderId,
-    },
-    spec: {},
-  } as CanvasesCanvas;
+    id,
+    name: id,
+    folderId,
+  } as CanvasesCanvasSummary;
 }
 
 function makeFolder(id: string, canvasIds: string[] = []): TestCanvasFolder {
@@ -189,9 +193,9 @@ function createDeferred<T>() {
 }
 
 function getCanvasFolderId(queryClient: QueryClient, organizationId: string, canvasId: string) {
-  const canvases = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId)) || [];
-  const canvas = canvases.find((item) => item.metadata?.id === canvasId);
-  return (canvas?.metadata as { folderId?: string } | undefined)?.folderId;
+  const canvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId)) || [];
+  const canvas = canvases.find((item) => item.id === canvasId);
+  return canvas?.folderId;
 }
 
 function getFolderCanvasIds(queryClient: QueryClient, organizationId: string, folderId: string) {
@@ -268,5 +272,149 @@ describe("useUpdateCanvasFolderMembership", () => {
     expect(getCanvasFolderId(queryClient, organizationId, "canvas-1")).toBe("folder-1");
     expect(getFolderCanvasIds(queryClient, organizationId, "folder-1")).toEqual(["canvas-1"]);
     expect(getFolderCanvasIds(queryClient, organizationId, "folder-2")).toEqual([]);
+  });
+});
+
+const emptyConsoleYaml =
+  "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels: []\n  layout: []\n";
+
+const afterConsoleYaml =
+  "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n";
+
+function mockConsoleRepositoryFileFetch(yamlBody: string) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/repository/file") && url.includes("console.yaml")) {
+        return new Response(yamlBody, { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    }),
+  );
+}
+
+describe("useUpdateCanvasConsole", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("registers a canvas version websocket echo before saving dashboard changes", async () => {
+    const queryClient = createQueryClient();
+    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
+    canvasesCommitCanvasRepositoryFiles.mockResolvedValue({ data: {} });
+    mockConsoleRepositoryFileFetch(emptyConsoleYaml);
+
+    const { result } = renderHook(
+      () =>
+        useUpdateCanvasConsole("canvas-1", "version-1", {
+          registerIgnoredCanvasVersionUpdatedEcho,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await result.current.mutateAsync({ panels: [], layout: [] });
+
+    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
+    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledOnce();
+    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1" },
+        body: expect.objectContaining({
+          versionId: "version-1",
+          operations: [expect.objectContaining({ path: "console.yaml" })],
+        }),
+      }),
+    );
+  });
+
+  it("releases the ignored canvas version echo when dashboard save fails", async () => {
+    const queryClient = createQueryClient();
+    const releaseCanvasVersionUpdatedEcho = vi.fn();
+    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
+    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
+
+    const { result } = renderHook(
+      () =>
+        useUpdateCanvasConsole("canvas-1", "version-1", {
+          registerIgnoredCanvasVersionUpdatedEcho,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await expect(result.current.mutateAsync({ panels: [], layout: [] })).rejects.toThrow("request failed");
+
+    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
+    expect(releaseCanvasVersionUpdatedEcho).toHaveBeenCalledOnce();
+  });
+
+  it("optimistically updates the dashboard cache while console changes are saving", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
+    let resolveSave: (value: unknown) => void = () => {};
+    const savePromise = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      consoleYaml: emptyConsoleYaml,
+    });
+    canvasesCommitCanvasRepositoryFiles.mockReturnValue(savePromise);
+    mockConsoleRepositoryFileFetch(afterConsoleYaml);
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      result.current.mutate({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      });
+    });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+      });
+    });
+
+    resolveSave({ data: {} });
+
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+
+  it("rolls back the dashboard cache when console save fails", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    });
+    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      }),
+    ).rejects.toThrow("request failed");
+
+    expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+    });
   });
 });

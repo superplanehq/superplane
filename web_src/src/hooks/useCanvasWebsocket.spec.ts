@@ -166,4 +166,24 @@ describe("useCanvasWebsocket", () => {
       });
     });
   });
+
+  it("invalidates version and console queries for canvas version updates", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("canvas_version_updated", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    await waitFor(() => {
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: canvasKeys.versionList(testCanvasId),
+      });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: canvasKeys.consoleAll(testCanvasId),
+      });
+    });
+  });
 });

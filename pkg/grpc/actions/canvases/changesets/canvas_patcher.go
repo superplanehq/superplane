@@ -68,6 +68,10 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		ChangeManagementEnabled: p.originalVersion.ChangeManagementEnabled,
 		ChangeRequestApprovers:  datatypes.NewJSONSlice(p.originalVersion.EffectiveChangeRequestApprovers()),
 		PublishedAt:             p.originalVersion.PublishedAt,
+		ConsolePanels:           p.originalVersion.ConsolePanels,
+		ConsoleLayout:           p.originalVersion.ConsoleLayout,
+		BranchName:              p.originalVersion.BranchName,
+		DisplayName:             p.originalVersion.DisplayName,
 		CreatedAt:               p.originalVersion.CreatedAt,
 		UpdatedAt:               p.originalVersion.UpdatedAt,
 	}

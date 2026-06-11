@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -406,6 +407,88 @@ func Test__Client__GetProjectIssueTypes(t *testing.T) {
 	})
 }
 
+func Test__Client__GetWorkflowSchemeForProject(t *testing.T) {
+	t.Run("custom scheme with id resolves full details", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF"}}
+						]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id":"42","name":"Custom Scheme","defaultWorkflow":"Custom WF",
+						"issueTypeMappings":{"10001":"Bug WF"}
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Custom Scheme", scheme.Name)
+		assert.Equal(t, "Bug WF", scheme.IssueTypeMappings["10001"])
+		// Both endpoints were hit: project assignment, then full scheme by id.
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/rest/api/3/workflowscheme/42")
+	})
+
+	t.Run("default scheme without id falls back to inlined default workflow", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"projectIds":["10000"],"workflowScheme":{"name":"Default Workflow Scheme","defaultWorkflow":"jira","issueTypeMappings":{"10001":"Bug WF"}}}
+						]
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		require.NotNil(t, scheme)
+		assert.Equal(t, "Default Workflow Scheme", scheme.Name)
+		assert.Equal(t, "jira", scheme.DefaultWorkflow)
+		// Per-issue-type mappings inlined in the project response are preserved,
+		// not discarded in favour of the default workflow.
+		assert.Equal(t, "Bug WF", scheme.IssueTypeMappings["10001"])
+		// No id means no second request to resolve full details.
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("team-managed project with empty list returns nil", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		scheme, err := client.GetWorkflowSchemeForProject("10000")
+		require.NoError(t, err)
+		assert.Nil(t, scheme)
+	})
+}
+
 func Test__WrapInADF(t *testing.T) {
 	t.Run("wraps text in ADF format", func(t *testing.T) {
 		result := WrapInADF("Hello world")
@@ -643,6 +726,212 @@ func Test__Client__IncidentsAPI(t *testing.T) {
 	})
 }
 
+func Test__Client__HeartbeatsAPI(t *testing.T) {
+	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
+	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
+
+	appCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"siteUrl":  "https://test.atlassian.net",
+			"email":    "test@example.com",
+			"apiToken": "test-token",
+		},
+	}
+
+	t.Run("list ops teams array response", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"teamId":"` + teamID + `","teamName":"On-call"}]`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		teams, err := client.ListOpsTeams(cloudID)
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, "On-call", teams[0].TeamName)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/jsm/ops/api/"+cloudID+"/v1/teams")
+	})
+
+	t.Run("list ops teams wrapped response", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"platformTeams":[{"teamId":"` + teamID + `","teamName":"On-call"}]}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		teams, err := client.ListOpsTeams(cloudID)
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, teams[0].TeamID)
+	})
+
+	t.Run("create heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"name":"DNS Checker","interval":5,"intervalUnit":"minutes","enabled":true}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		enabled := true
+		resp, err := client.CreateHeartbeat(cloudID, teamID, &CreateHeartbeatRequest{
+			Name:         "DNS Checker",
+			Interval:     5,
+			IntervalUnit: "minutes",
+			Enabled:      &enabled,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "DNS Checker", resp.Name)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/teams/"+teamID+"/heartbeats")
+	})
+
+	t.Run("ping heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"PONG - Heartbeat received"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		resp, err := client.PingHeartbeat(cloudID, teamID, "DNS Checker")
+		require.NoError(t, err)
+		assert.Equal(t, "PONG - Heartbeat received", resp.Message)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/heartbeats/ping")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "name=DNS+Checker")
+	})
+
+	t.Run("update heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"name":"DNS Checker","interval":10,"intervalUnit":"minutes","enabled":false}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		interval := 10
+		enabled := false
+		resp, err := client.UpdateHeartbeat(cloudID, teamID, "DNS Checker", &UpdateHeartbeatRequest{
+			Interval: &interval,
+			Enabled:  &enabled,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 10, resp.Interval)
+		assert.Equal(t, http.MethodPatch, httpContext.Requests[0].Method)
+	})
+
+	t.Run("delete heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader("")),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.DeleteHeartbeat(cloudID, teamID, "DNS Checker")
+		require.NoError(t, err)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	})
+
+	t.Run("list heartbeats follows links.next pagination", func(t *testing.T) {
+		page2URL := fmt.Sprintf("/jsm/ops/api/%s/v1/teams/%s/heartbeats?offset=1&size=1", cloudID, teamID)
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-1"}],"links":{"next":"` + page2URL + `"}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-2"}]}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+		require.NoError(t, err)
+		require.Len(t, heartbeats, 2)
+		assert.Equal(t, "HB-1", heartbeats[0].Name)
+		assert.Equal(t, "HB-2", heartbeats[1].Name)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "offset=1")
+	})
+
+	t.Run("list heartbeats single page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-1"},{"name":"HB-2"}]}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+		require.NoError(t, err)
+		require.Len(t, heartbeats, 2)
+		require.Len(t, httpContext.Requests, 1)
+	})
+}
+
+func Test__parseOpsTeamsResponse(t *testing.T) {
+	t.Run("array", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`[{"teamId":"abc","teamName":"Ops"}]`))
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, "abc", teams[0].TeamID)
+		assert.Equal(t, "Ops", teams[0].TeamName)
+	})
+
+	t.Run("wrapped platformTeams", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`{"platformTeams":[{"teamId":"abc","teamName":"Ops"}]}`))
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`[]`))
+		require.NoError(t, err)
+		assert.Empty(t, teams)
+	})
+}
+
 func Test__Client__ResolveNumericIssueID(t *testing.T) {
 	t.Run("numeric passthrough", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{}}
@@ -678,5 +967,192 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 		id, err := client.ResolveNumericIssueID("ITSM-1")
 		require.NoError(t, err)
 		assert.Equal(t, "999", id)
+	})
+}
+
+func Test__GetWorkflowStatusesByName(t *testing.T) {
+	t.Run("returns statuses for an exact-name match", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[{"id":{"name":"task-workflow"},"statuses":[
+						{"id":"10001","name":"To Do","statusCategory":"TODO"},
+						{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
+						{"id":"10003","name":"Done","statusCategory":"DONE"}
+					]}]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		statuses, err := client.GetWorkflowStatusesByName("task-workflow")
+		require.NoError(t, err)
+		require.Len(t, statuses, 3)
+		assert.Equal(t, Status{ID: "10001", Name: "To Do", Category: "TODO"}, statuses[0])
+		assert.Equal(t, Status{ID: "10002", Name: "In Progress", Category: "IN_PROGRESS"}, statuses[1])
+		assert.Equal(t, Status{ID: "10003", Name: "Done", Category: "DONE"}, statuses[2])
+	})
+
+	t.Run("filters out workflows whose name does not match exactly", func(t *testing.T) {
+		// Jira's workflow/search does a prefix match, so a query for
+		// "task" can return "task-workflow-old" too. We must not return
+		// that one's statuses as if they belonged to the requested
+		// workflow.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[{"id":{"name":"task-workflow-old"},"statuses":[
+						{"id":"99","name":"Stale","statusCategory":"TODO"}
+					]}]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.GetWorkflowStatusesByName("task-workflow")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `workflow "task-workflow" not found`)
+	})
+}
+
+func Test__Client__OpsAlertsAPI(t *testing.T) {
+	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
+	appCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"siteUrl":  "https://test.atlassian.net",
+			"email":    "test@example.com",
+			"apiToken": "test-token",
+		},
+	}
+
+	t.Run("create alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"result":"Request will be processed","requestId":"r1","took":0.1}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.CreateOpsAlert(cloudID, &OpsCreateAlertRequest{Message: "Hi"})
+		require.NoError(t, err)
+		assert.Equal(t, "r1", out.RequestID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "api.atlassian.com/jsm/ops/api/"+cloudID+"/v1/alerts")
+	})
+
+	t.Run("get alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"a1","message":"m"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		m, err := client.GetOpsAlert(cloudID, "a1")
+		require.NoError(t, err)
+		assert.Equal(t, "m", m["message"])
+	})
+
+	t.Run("assign alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"as1"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.AssignOpsAlert(cloudID, "a1", "bb4d9938-c3c2-455d-aaab-727aa701c0d8")
+		require.NoError(t, err)
+		assert.Equal(t, "as1", out.RequestID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/assign")
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+	})
+
+	t.Run("resolve request ignores premature alertId until processed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"alertId":"stale-id","isSuccess":true}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","alertId":"new-id","isSuccess":true,"status":"Created"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		id, err := client.ResolveAlertIDAfterOpsRequest(cloudID, "req-1", "")
+		require.NoError(t, err)
+		assert.Equal(t, "new-id", id)
+		require.Len(t, httpContext.Requests, 2)
+	})
+
+	t.Run("resolve request fails when processed but not successful", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","isSuccess":false,"status":"Invalid priority"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		_, err = client.ResolveAlertIDAfterOpsRequest(cloudID, "req-2", "")
+		require.ErrorContains(t, err, "failed")
+		require.ErrorContains(t, err, "Invalid priority")
+	})
+
+	t.Run("resolve request fails on success flag with error status text", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","isSuccess":true,"status":"Alert does not exist","alertId":"old-1"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		_, err = client.ResolveAlertIDAfterOpsRequest(cloudID, "req-3", "")
+		require.ErrorContains(t, err, "Alert does not exist")
+	})
+
+	t.Run("delete alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"d1"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.DeleteOpsAlert(cloudID, "a1")
+		require.NoError(t, err)
+		assert.Equal(t, "d1", out.RequestID)
 	})
 }

@@ -46,28 +46,22 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	userUUID := uuid.MustParse(userID)
 	if version.State == models.CanvasVersionStatePublished {
 		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersion(version, organizationID),
+			Version: SerializeCanvasVersionMetadata(version, organizationID),
 		}, nil
 	}
 
 	canAccess := false
 	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
+		if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 			canAccess = true
 			return nil
-		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-			return draftErr
 		}
 
-		request, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID)
-		if requestErr != nil {
-			if errors.Is(requestErr, gorm.ErrRecordNotFound) {
-				return nil
-			}
-			return requestErr
-		}
-		if request.OwnerID != nil && *request.OwnerID == userUUID {
+		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
 			canAccess = true
+			return nil
+		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
+			return requestErr
 		}
 		return nil
 	}); err != nil {
@@ -79,6 +73,6 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersionMetadata(version, organizationID),
 	}, nil
 }

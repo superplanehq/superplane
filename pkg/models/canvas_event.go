@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -21,7 +20,7 @@ type CanvasEvent struct {
 	NodeID      string
 	Channel     string
 	CustomName  *string
-	Data        datatypes.JSONType[any]
+	Data        JSONValue
 	ExecutionID *uuid.UUID
 	RunID       uuid.UUID
 	State       string
@@ -120,6 +119,20 @@ func FindCanvasEventInTransaction(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, erro
 	}
 
 	return &event, nil
+}
+
+func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasEvent, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var events []CanvasEvent
+	err := tx.Where("id IN ?", ids).Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func ListCanvasEvents(canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {

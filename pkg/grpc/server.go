@@ -12,6 +12,7 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -66,6 +67,7 @@ func RunServer(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	gitProvider git.Provider,
 	agentService agentsActions.AgentsService,
 	port int,
 ) {
@@ -145,7 +147,7 @@ func RunServer(
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
+	canvasService := NewCanvasService(authService, registry, encryptor, gitProvider, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	canvasFolderService := NewCanvasFolderService()

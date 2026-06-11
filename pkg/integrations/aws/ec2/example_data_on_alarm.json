@@ -1,0 +1,51 @@
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "alarmName": "high cpu usage",
+      "configuration": {
+        "description": "The alarm",
+        "metrics": [
+          {
+            "id": "56cf46e9-e800-a52b-b55b-7f3c770c24ef",
+            "metricStat": {
+              "metric": {
+                "dimensions": {
+                  "InstanceId": "i-1234567890abcdef0"
+                },
+                "name": "CPUUtilization",
+                "namespace": "AWS/EC2"
+              },
+              "period": 30,
+              "stat": "Average"
+            },
+            "returnData": true
+          }
+        ]
+      },
+      "previousState": {
+        "reason": "Threshold Crossed: 1 datapoint [0.3166666666666666 (03/06/26 14:15:00)] was not greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T14:15:45.660+0000\",\"startDate\":\"2026-06-03T14:15:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[0.3166666666666666],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T14:15:00.000+0000\",\"sampleCount\":1.0,\"value\":0.3166666666666666}]}",
+        "timestamp": "2026-06-03T14:15:45.663+0000",
+        "value": "OK"
+      },
+      "state": {
+        "reason": "Threshold Crossed: 1 datapoint [31.3283485070315 (03/06/26 15:45:00)] was greater than the threshold (20.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-03T15:46:15.660+0000\",\"startDate\":\"2026-06-03T15:45:00.000+0000\",\"statistic\":\"Average\",\"period\":30,\"recentDatapoints\":[31.3283485070315],\"threshold\":20.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-06-03T15:45:00.000+0000\",\"sampleCount\":2.0,\"value\":31.3283485070315}]}",
+        "timestamp": "2026-06-03T15:46:15.662+0000",
+        "value": "ALARM"
+      }
+    },
+    "detail-type": "CloudWatch Alarm State Change",
+    "id": "ccc0350a-524d-2f57-068b-1cebb2a4b6c0",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:high cpu usage"
+    ],
+    "source": "aws.cloudwatch",
+    "time": "2026-06-03T15:46:15Z",
+    "version": "0"
+  },
+  "timestamp": "2026-06-03T15:46:16.233981639Z",
+  "type": "aws.ec2.alarm"
+}

@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -40,12 +41,14 @@ type ExecutionContext struct {
 	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
+	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 }
 
 type ExpressionContext interface {
 	Run(expression string) (any, error)
+	RunWithExtraVariables(expression string, variables map[string]any) (any, error)
 }
 
 /*
@@ -72,12 +75,23 @@ type SetupContext struct {
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
+	Files         RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
+}
+
+type RepositoryFilesContext interface {
+	List() ([]string, error)
+	Read(path string) (io.ReadCloser, error)
+}
+
+type CanvasMemoryRecord struct {
+	ID     uuid.UUID
+	Values any
 }
 
 /*

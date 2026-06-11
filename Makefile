@@ -1,11 +1,16 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 MAKE=make
+MAKEFLAGS+=--no-print-directory
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
 
-export BUILDKIT_PROGRESS ?= plain
+ifeq ($(DEBUG),1)
+export BUILDKIT_PROGRESS := plain
+else
+export BUILDKIT_PROGRESS := quiet
+endif
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
@@ -179,9 +184,6 @@ check.lint.ui.knip:
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
 
-check.templates:
-	$(COMPOSE) exec app go run ./scripts/check_canvases_templates/main.go
-
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
 
@@ -326,10 +328,16 @@ cli.build.m1:
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+VITE_ASSET_BASE_URL?=
+FRONTEND_PREBUILT?=0
 # pb.gen runs in the compose app container; run `make dev.up` first.
 image.build:
 	$(MAKE) pb.gen
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner \
+	  --build-arg BASE_URL=$(BASE_URL) \
+	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
+	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
+	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
 	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin

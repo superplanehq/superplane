@@ -1,6 +1,7 @@
 package installation
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,11 +10,28 @@ import (
 )
 
 func TestBuildPreviewUsesCanvasMetadata(t *testing.T) {
-	preview, err := BuildPreview("github.com/superplanehq/preview-env-github-digitalocean")
+	repo := &Repository{Owner: "superplanehq", Name: "preview-env-github-digitalocean"}
+	stubHTTP(t, map[string]stubResponse{
+		rawFileURL(repo, "main", canvasFileName): {
+			status: http.StatusOK,
+			body: `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Preview Environments
+  description: StoreJS preview environments
+spec:
+  nodes:
+    - name: start
+  edges: []
+`,
+		},
+	})
+
+	preview, err := BuildPreview(repo.String())
 	require.NoError(t, err)
 
-	assert.NotEmpty(t, preview.CanvasName)
-	assert.NotEmpty(t, preview.Description)
+	assert.Equal(t, "Preview Environments", preview.CanvasName)
+	assert.Equal(t, "StoreJS preview environments", preview.Description)
 	assert.Equal(t, "Install "+preview.CanvasName, preview.Title)
 	assert.Equal(t, preview.CanvasName, preview.DefaultName)
 }

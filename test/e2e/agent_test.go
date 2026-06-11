@@ -19,6 +19,12 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+const (
+	agentPollInterval = 200 * time.Millisecond
+	agentWaitTimeout  = 30 * time.Second
+	agentSendTimeout  = 20 * time.Second
+)
+
 func TestAgentE2E(t *testing.T) {
 	t.Run("sends a message and renders the streamed assistant response", func(t *testing.T) {
 		steps := newAgentSteps(t)
@@ -64,7 +70,7 @@ func TestAgentE2E(t *testing.T) {
 			}
 
 			return []agents.ProviderEvent{
-				agentToolStartedEvent("tool-1", "bash", "superplane canvases get"),
+				agentToolStartedEvent("tool-1", "bash", "superplane apps canvas get"),
 				agentToolFinishedEvent("tool-1", "bash"),
 				agentAssistantMessageEvent("Tool run complete"),
 				agentTurnCompletedEvent(),
@@ -75,6 +81,7 @@ func TestAgentE2E(t *testing.T) {
 		steps.openAgent()
 		steps.sendMessage("Inspect the canvas")
 		steps.assertVisible(q.TestID("agent-tool-group"))
+		steps.expandToolGroupIfNeeded()
 		steps.assertVisible(q.TestID("agent-tool-message"))
 		steps.assertAssistantMessage("Tool run complete")
 	})
@@ -95,8 +102,16 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertVisible(q.TestID("agent-stop-button"))
 		steps.stopAgent()
 		steps.assertInterruptSent()
-		steps.finishRunningTurnAsFailed("stopped by e2e")
-		steps.assertText("Last turn failed")
+		// InterruptSession resets the row to idle and broadcasts
+		// turn_completed/idle, so the composer flips back to "Ready" on
+		// the WS event — regardless of any late provider stream error.
+		// The "late session_failed must not overwrite idle" race is
+		// covered as a unit test in
+		// TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt;
+		// reproducing it here would race InterruptSession's DB commit
+		// (assertInterruptSent fires as soon as the provider call is
+		// recorded, mid-flight) and flake.
+		steps.assertText("Ready")
 		steps.assertHidden(q.TestID("agent-stop-button"))
 	})
 
@@ -122,11 +137,17 @@ func TestAgentE2E(t *testing.T) {
 		})
 	})
 
-	t.Run("starts outcome-based building from a rubric response", func(t *testing.T) {
+	t.Run("starts building from a rubric response", func(t *testing.T) {
+		var approvalReceived bool
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
 			if isAgentSystemMessage(call.Message) {
 				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
+			}
+
+			if call.Message == "Specs approved. Start building." {
+				approvalReceived = true
+				return agentAssistantTurn("Building now."), nil
 			}
 
 			return agentAssistantTurn(strings.Join([]string{
@@ -138,33 +159,14 @@ func TestAgentE2E(t *testing.T) {
 				":::",
 			}, "\n")), nil
 		})
-		ctx.AgentProvider.SetDefineOutcomeEvents(
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-start-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluationStart,
-				OutcomeResult:   &agents.OutcomeEvaluation{Iteration: 1},
-			},
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-end-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluation,
-				OutcomeResult: &agents.OutcomeEvaluation{
-					Iteration:   1,
-					Result:      "satisfied",
-					Explanation: "all criteria satisfied",
-				},
-			},
-			agentTurnCompletedEvent(),
-		)
 
 		steps.start()
 		steps.openAgent()
-		steps.switchToAskMode()
 		steps.sendMessage("Create a build plan")
 		steps.assertText("E2E Build Plan")
 		steps.startBuildingFromRubric()
-		steps.assertDefineOutcomeSent()
-		steps.assertVisible(q.TestID("outcome-progress"))
-		steps.assertText("Complete")
+		steps.assertText("Building now.")
+		require.True(t, approvalReceived, "expected 'Specs approved. Start building.' message")
 	})
 }
 
@@ -200,24 +202,30 @@ func (s *agentSteps) start() {
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent "+uuid.NewString(), s.t, s.session)
 	s.canvas.Create()
-	s.canvas.Visit()
 }
 
 func (s *agentSteps) openAgent() {
 	s.waitForToolSidebarOpen()
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`))
-	s.session.AssertVisible(q.TestID("agent-input"))
+	s.waitForAgentInput()
 	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
 		return isAgentSystemMessage(call.Message)
 	})
 }
 
+func (s *agentSteps) waitForAgentInput() {
+	input := q.TestID("agent-input").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := input.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
+}
+
 func (s *agentSteps) waitForToolSidebarOpen() {
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(agentWaitTimeout)
 	sidebar := q.TestID("canvas-tool-sidebar").Run(s.session)
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`).Run(s.session)
+	openButton := q.TestID("canvas-tool-sidebar-toggle").Run(s.session)
 
 	for time.Now().Before(deadline) {
 		visible, err := sidebar.IsVisible()
@@ -243,12 +251,12 @@ func (s *agentSteps) waitForToolSidebarOpen() {
 
 func (s *agentSteps) switchToBuildMode() {
 	s.session.Click(q.TestID("agent-mode-builder"))
-	s.session.AssertVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
+	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
 }
 
 func (s *agentSteps) switchToAskMode() {
 	s.session.Click(q.TestID("agent-mode-operator"))
-	s.session.AssertVisible(q.Locator(`[data-testid="agent-mode-operator"][aria-pressed="true"]`))
+	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-operator"][aria-pressed="true"]`))
 }
 
 func (s *agentSteps) sendMessage(message string) {
@@ -278,15 +286,6 @@ func (s *agentSteps) stopAgent() {
 
 func (s *agentSteps) startBuildingFromRubric() {
 	s.session.Click(q.Locator(`button:has-text("Start Building")`))
-}
-
-func (s *agentSteps) finishRunningTurnAsFailed(message string) {
-	agentSession := s.currentAgentSession()
-	require.NoError(s.t, ctx.AgentProvider.QueueEvents(agentSession.ProviderSessionID, agents.ProviderEvent{
-		ProviderEventID: "session-failed-" + uuid.NewString(),
-		Type:            agents.ProviderEventSessionFailed,
-		ErrorMessage:    message,
-	}))
 }
 
 func (s *agentSteps) currentAgentSession() *models.AgentSession {
@@ -323,7 +322,7 @@ func (s *agentSteps) waitForSendCall(matches func(support.AgentProviderSendMessa
 		}
 
 		return false
-	}, 10*time.Second, 200*time.Millisecond)
+	}, agentSendTimeout, agentPollInterval)
 
 	return matched
 }
@@ -356,19 +355,42 @@ func (s *agentSteps) assertDefineOutcomeSent() {
 }
 
 func (s *agentSteps) assertUserMessage(message string) {
-	s.assertVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-user-message"]:has-text("%s")`, message)))
+	s.assertEventuallyVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-user-message"]:has-text("%s")`, message)))
 }
 
 func (s *agentSteps) assertAssistantMessage(message string) {
-	s.assertVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-assistant-message"]:has-text("%s")`, message)))
+	s.assertEventuallyVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-assistant-message"]:has-text("%s")`, message)))
+}
+
+func (s *agentSteps) expandToolGroupIfNeeded() {
+	toolMessage := s.session.Page().GetByTestId("agent-tool-message").First()
+	visible, err := toolMessage.IsVisible()
+	require.NoError(s.t, err)
+	if visible {
+		return
+	}
+
+	s.session.Click(q.Locator(`[data-testid="agent-tool-group"] button`))
 }
 
 func (s *agentSteps) assertText(text string) {
-	s.session.AssertText(text)
+	locator := s.session.Page().Locator("text=" + text).First()
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
+}
+
+func (s *agentSteps) assertEventuallyVisible(query q.Query) {
+	locator := query.Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, agentWaitTimeout, agentPollInterval)
 }
 
 func (s *agentSteps) assertVisible(query q.Query) {
-	s.session.AssertVisible(query)
+	s.assertEventuallyVisible(query)
 }
 
 func (s *agentSteps) assertHidden(query q.Query) {

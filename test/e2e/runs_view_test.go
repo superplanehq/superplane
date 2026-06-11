@@ -15,7 +15,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -95,7 +94,7 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
@@ -125,7 +124,7 @@ func (s *runsViewSteps) givenFinishedRuns(count int) {
 			NodeID:     triggerID,
 			Channel:    "default",
 			CustomName: &customName,
-			Data:       datatypes.NewJSONType[any](map[string]any{}),
+			Data:       models.NewJSONValue(map[string]any{}),
 			RunID:      run.ID,
 			State:      models.CanvasEventStateRouted,
 			CreatedAt:  &createdAt,
@@ -162,15 +161,15 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Runs")`))
+	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-runs"][aria-current="page"]`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
 	s.session.AssertURLContains("view=runs")
 	s.session.AssertURLContains("run=" + s.run.ID.String())
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
-	s.session.AssertText("SUCCESS")
+	s.session.AssertText("success")
 	s.session.AssertHidden(q.Locator(`button[aria-label^="Add next component"]`))
 }
 
@@ -189,24 +188,22 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	// The Agent tab is feature-flagged; switch back through another always-visible tool tab.
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
+	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Click(q.TestID("canvas-edit-button"))
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.session.Click(q.TestID("canvas-view-mode-versions"))
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 }
 
 func (s *runsViewSteps) thenRunsLoadMoreButtonIsHidden() {
-	s.session.AssertHidden(q.Locator(`[data-testid="canvas-tool-sidebar"] button:has-text("Load more")`))
+	s.session.AssertHidden(q.Locator(`[data-testid="canvas-runs-sidebar"] button:has-text("Load more")`))
 }
 
 func (s *runsViewSteps) thenVersionsLoadMoreButtonIsHidden() {
-	s.session.AssertHidden(q.Locator(`[data-testid="canvas-tool-sidebar"] button:has-text("Load older versions")`))
+	s.session.AssertHidden(q.Locator(`[data-testid="canvas-versions-sidebar"] button:has-text("Load older versions")`))
 }
 
 func (s *runsViewSteps) thenRunsSidebarRowCountIsAtLeast(expected int) {

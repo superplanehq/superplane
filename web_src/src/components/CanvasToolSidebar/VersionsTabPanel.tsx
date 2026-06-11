@@ -1,11 +1,11 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
-import { ChevronDown, ChevronRight, GitBranch } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
-import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
-import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useState } from "react";
+import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { DraftBranchRow } from "./DraftBranchRow";
+import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
-
-const persistedScrollPositions = new Map<string, number>();
 
 export interface VersionsTabPanelProps {
   scrollPersistenceKey?: string;
@@ -22,7 +22,6 @@ export interface VersionsTabPanelProps {
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
-  isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
@@ -30,6 +29,11 @@ export interface VersionsTabPanelProps {
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
   changeRequestApprovalConfig?: CanvasChangeManagement;
+  draftBranches?: CanvasesCanvasVersion[];
+  activeDraftBranch?: string | null;
+  onOpenDraftBranch?: (branchName: string) => void;
+  onDeleteDraftBranch?: (versionId: string) => void;
+  deleteDraftBranchPending?: boolean;
 }
 
 type VersionRowItem = {
@@ -53,7 +57,6 @@ export function VersionsTabPanel({
   liveVersions,
   liveVersionChangeRequestsByVersionId,
   canUpdateCanvas,
-  isTemplate,
   canvasDeletedRemotely,
   onUseVersion,
   onVersionNodeDiffContextChange,
@@ -61,6 +64,11 @@ export function VersionsTabPanel({
   loadMoreLiveVersionsDisabled,
   loadMoreLiveVersionsPending,
   changeRequestApprovalConfig,
+  draftBranches,
+  activeDraftBranch,
+  onOpenDraftBranch,
+  onDeleteDraftBranch,
+  deleteDraftBranchPending,
 }: VersionsTabPanelProps) {
   const {
     hasNoVersions,
@@ -82,71 +90,36 @@ export function VersionsTabPanel({
     onLoadMoreLiveVersions,
     onVersionNodeDiffContextChange,
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+  const { scrollRef, handleScroll } = useVersionsTabScroll({
+    scrollPersistenceKey,
     hasMore: Boolean(onLoadMoreLiveVersions) && !loadMoreLiveVersionsDisabled,
     isLoading: loadMoreLiveVersionsPending,
     onLoadMore: onLoadMoreLiveVersions,
+    itemCount: liveItems.length + pendingItems.length + rejectedItems.length,
   });
-  const handleScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      if (scrollPersistenceKey) {
-        persistedScrollPositions.set(scrollPersistenceKey, event.currentTarget.scrollTop);
-      }
-
-      loadMoreIfNeeded(event.currentTarget);
-    },
-    [loadMoreIfNeeded, scrollPersistenceKey],
-  );
-
-  useLayoutEffect(() => {
-    const element = scrollRef.current;
-    if (!element || !scrollPersistenceKey) return;
-
-    const scrollTop = persistedScrollPositions.get(scrollPersistenceKey);
-    if (scrollTop == null) return;
-
-    element.scrollTop = scrollTop;
-  }, [scrollPersistenceKey]);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-
-    return () => {
-      if (!element || !scrollPersistenceKey) return;
-
-      persistedScrollPositions.set(scrollPersistenceKey, element.scrollTop);
-    };
-  }, [scrollPersistenceKey]);
-
-  useEffect(() => {
-    loadMoreIfNeeded(scrollRef.current);
-  }, [liveItems.length, pendingItems.length, rejectedItems.length, loadMoreIfNeeded]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
-          <GitBranch className="h-4 w-4" />
-          Versions
-        </span>
-      </div>
-
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto p-3"
+        className="min-h-0 flex-1 overflow-auto"
         data-testid="versions-sidebar-scroll"
         onScroll={handleScroll}
       >
-        <VersionsNotices
+        <VersionsNotices canUpdateCanvas={canUpdateCanvas} canvasDeletedRemotely={canvasDeletedRemotely} />
+
+        <DraftBranchesSection
+          drafts={draftBranches ?? []}
+          activeDraftBranch={activeDraftBranch}
           canUpdateCanvas={canUpdateCanvas}
-          canvasDeletedRemotely={canvasDeletedRemotely}
-          isTemplate={isTemplate}
+          deleteDraftBranchPending={deleteDraftBranchPending}
+          onOpenDraftBranch={onOpenDraftBranch}
+          onDeleteDraftBranch={onDeleteDraftBranch}
         />
 
-        <section className="mt-3 rounded-md">
+        <section>
           {hasNoVersions ? (
-            <p className="mt-2 text-xs text-slate-600">No published history yet.</p>
+            <p className="px-4 py-2 text-xs text-slate-600">No published history yet.</p>
           ) : (
             <VersionHistorySection
               items={[...pendingItems, ...liveItems]}
@@ -229,24 +202,66 @@ function useVersionsPanelData({
   };
 }
 
+function DraftBranchesSection({
+  drafts,
+  activeDraftBranch,
+  canUpdateCanvas,
+  deleteDraftBranchPending,
+  onOpenDraftBranch,
+  onDeleteDraftBranch,
+}: {
+  drafts: CanvasesCanvasVersion[];
+  activeDraftBranch?: string | null;
+  canUpdateCanvas: boolean;
+  deleteDraftBranchPending?: boolean;
+  onOpenDraftBranch?: (branchName: string) => void;
+  onDeleteDraftBranch?: (versionId: string) => void;
+}) {
+  if (drafts.length === 0) {
+    return (
+      <section className="border-b border-slate-200 pb-2">
+        <h3 className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Drafts</h3>
+        <p className="px-4 pb-2 text-xs text-slate-600">No draft branches yet.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border-b border-slate-200 pb-2" data-testid="canvas-drafts-section">
+      <h3 className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Drafts</h3>
+      {drafts.map((draft) => {
+        const branchName = draftBranchName(draft);
+        return (
+          <DraftBranchRow
+            key={branchName || draftVersionId(draft)}
+            draft={draft}
+            isActive={branchName === activeDraftBranch}
+            canUpdateCanvas={canUpdateCanvas}
+            deletePending={deleteDraftBranchPending}
+            onOpen={(nextBranchName) => onOpenDraftBranch?.(nextBranchName)}
+            onDelete={onDeleteDraftBranch}
+          />
+        );
+      })}
+    </section>
+  );
+}
+
 function VersionsNotices({
   canUpdateCanvas,
   canvasDeletedRemotely,
-  isTemplate,
 }: {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
-  isTemplate: boolean;
 }) {
   return (
     <>
       {!canUpdateCanvas && !canvasDeletedRemotely ? (
-        <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+        <p className="px-4 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
       ) : null}
       {canvasDeletedRemotely ? (
-        <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
+        <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
-      {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
     </>
   );
 }
@@ -267,16 +282,12 @@ function VersionHistorySection({
   ) => void;
 }) {
   return (
-    <>
-      <div className="-mt-4 space-y-1">
-        <VersionRowList
-          items={items}
-          changeRequestApprovalConfig={changeRequestApprovalConfig}
-          onUseVersion={onUseVersion}
-          onViewDiff={onViewDiff}
-        />
-      </div>
-    </>
+    <VersionRowList
+      items={items}
+      changeRequestApprovalConfig={changeRequestApprovalConfig}
+      onUseVersion={onUseVersion}
+      onViewDiff={onViewDiff}
+    />
   );
 }
 
@@ -337,10 +348,10 @@ function RejectedVersionsSection({
   if (count === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-slate-200 pt-3">
+    <div className="border-t border-slate-200">
       <button
         type="button"
-        className="flex w-full items-center gap-1 rounded-md py-1.5 text-left text-xs font-medium text-slate-500"
+        className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-slate-500"
         onClick={onToggleExpanded}
         aria-expanded={expanded}
       >
@@ -352,14 +363,12 @@ function RejectedVersionsSection({
         <span>Rejected ({count})</span>
       </button>
       {expanded ? (
-        <div className="mt-1 space-y-1">
-          <VersionRowList
-            items={items}
-            changeRequestApprovalConfig={changeRequestApprovalConfig}
-            onUseVersion={onUseVersion}
-            onViewDiff={onViewDiff}
-          />
-        </div>
+        <VersionRowList
+          items={items}
+          changeRequestApprovalConfig={changeRequestApprovalConfig}
+          onUseVersion={onUseVersion}
+          onViewDiff={onViewDiff}
+        />
       ) : null}
     </div>
   );

@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -132,7 +132,8 @@ CREATE TABLE public.agent_sessions (
     status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    heartbeat_at timestamp with time zone
 );
 
 
@@ -230,18 +231,6 @@ CREATE TABLE public.blueprints (
 
 
 --
--- Name: canvas_dashboards; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.canvas_dashboards (
-    canvas_id uuid NOT NULL,
-    panels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    layout jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -267,7 +256,8 @@ CREATE TABLE public.canvas_memories (
     "values" jsonb NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source text DEFAULT 'node'::text NOT NULL
 );
 
 
@@ -413,6 +403,22 @@ CREATE TABLE public.organizations (
     usage_limits_synced_at timestamp with time zone,
     change_management_enabled boolean DEFAULT false NOT NULL,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+);
+
+
+--
+-- Name: repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repositories (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    repo_id text NOT NULL,
+    status character varying(64) DEFAULT 'pending'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -688,7 +694,12 @@ CREATE TABLE public.workflow_versions (
     name character varying(128) DEFAULT ''::character varying NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     change_management_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL
+    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    branch_name text,
+    display_name text DEFAULT ''::text NOT NULL,
+    CONSTRAINT workflow_versions_draft_branch_check CHECK (((((state)::text = 'draft'::text) AND (branch_name IS NOT NULL)) OR (((state)::text <> 'draft'::text) AND (branch_name IS NULL))))
 );
 
 
@@ -704,9 +715,9 @@ CREATE TABLE public.workflows (
     updated_at timestamp without time zone NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    folder_id uuid
+    folder_id uuid,
+    next_draft_display_number integer DEFAULT 1 NOT NULL
 );
 
 
@@ -854,14 +865,6 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvas_dashboards canvas_dashboards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_dashboards
-    ADD CONSTRAINT canvas_dashboards_pkey PRIMARY KEY (canvas_id);
-
-
---
 -- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -979,6 +982,22 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repositories repositories_canvas_id_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_canvas_id_provider_repo_id_key UNIQUE (canvas_id, provider, repo_id);
+
+
+--
+-- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
 
 
 --
@@ -1360,6 +1379,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 
 
 --
+-- Name: idx_repositories_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
+
+
+--
 -- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1591,17 +1617,17 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
+-- Name: idx_workflow_versions_draft_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workflow_versions_draft_branch ON public.workflow_versions USING btree (workflow_id, branch_name) WHERE (((state)::text = 'draft'::text) AND (branch_name IS NOT NULL));
+
+
+--
 -- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
-
-
---
--- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_workflow_versions_unique_draft ON public.workflow_versions USING btree (workflow_id, owner_id) WHERE ((state)::text = 'draft'::text);
 
 
 --
@@ -1623,13 +1649,6 @@ CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_a
 --
 
 CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
-
-
---
--- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
 
 
 --
@@ -1741,14 +1760,6 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: canvas_dashboards canvas_dashboards_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_dashboards
-    ADD CONSTRAINT canvas_dashboards_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1834,6 +1845,22 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repositories repositories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -2145,7 +2172,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2164,7 +2191,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260520171949	f
+20260611153001	f
 \.
 
 
@@ -2181,7 +2208,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
