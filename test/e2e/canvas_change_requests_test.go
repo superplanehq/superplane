@@ -179,26 +179,7 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 	s.canvas.OpenVersionsSidebar()
 
-	deadline := time.Now().Add(30 * time.Second)
-	var previewRow pw.Locator
-	for time.Now().Before(deadline) {
-		previewRow = s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
-		count, err := previewRow.Count()
-		if err == nil && count > 0 {
-			viewDiff := previewRow.First().Locator(`[aria-label="View Diff"]`)
-			visible, viewErr := viewDiff.IsVisible()
-			if viewErr == nil && visible {
-				require.NoError(s.t, viewDiff.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-				dialogTitle := s.session.Page().Locator(`[role=dialog] [data-slot="dialog-title"]`)
-				require.NoError(s.t, dialogTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
-				s.session.AssertText("Review Actions")
-				return
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	previewRow = s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
+	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
 	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
 	viewDiff := previewRow.First().Locator(`[aria-label="View Diff"]`)
 	require.NoError(s.t, viewDiff.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))

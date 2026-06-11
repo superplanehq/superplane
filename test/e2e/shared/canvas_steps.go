@@ -76,7 +76,6 @@ func (s *CanvasSteps) ExitEditMode() {
 
 // OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.ensureNotEditingForVersionsSidebar()
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
@@ -99,12 +98,19 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 	s.session.Sleep(300)
 }
 
-func (s *CanvasSteps) ensureNotEditingForVersionsSidebar() {
-	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	visible, err := exitEditButton.IsVisible()
-	if err == nil && visible {
-		s.ExitEditMode()
+// SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
+func (s *CanvasSteps) SelectRunInSidebar(runID string) {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)).Run(s.session)
+		if visible, err := runLink.IsVisible(); err == nil && visible {
+			s.session.Click(runLink)
+			s.session.Sleep(300)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
+	s.session.Click(q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)))
 }
 
 func (s *CanvasSteps) waitForToolSidebarOpen() {

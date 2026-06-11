@@ -561,7 +561,10 @@ export function AppPage() {
   const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
   const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
-  const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
+  const runApiFilters = useMemo(
+    () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
+    [isRunInspectionMode, selectedRunId, runStatusFilters],
+  );
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
@@ -5162,7 +5165,7 @@ export function AppPage() {
     !urlViewFlags.isFilesMode &&
     !urlViewFlags.isVersionsMode;
 
-  const showVersionsSidebar = urlViewFlags.isVersionsMode && !isEditing;
+  const showVersionsSidebar = urlViewFlags.isVersionsMode;
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -5191,6 +5194,7 @@ export function AppPage() {
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
     liveCanvasVersionId: effectiveLiveCanvasVersionId,
+    liveCanvasVersion,
     selectedCanvasVersion,
     pendingApprovalVersions,
     liveVersions,
