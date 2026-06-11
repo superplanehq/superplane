@@ -9,6 +9,7 @@ import { Link as LinkIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
@@ -17,7 +18,6 @@ interface RunRowProps {
   status: RunStatusKey;
   triggerNode?: ComponentsNode;
   isSelected: boolean;
-  hideBottomBorder?: boolean;
   componentIconMap: Record<string, string>;
   onSelectRun: (runId: string) => void;
 }
@@ -29,21 +29,20 @@ export function RunRow({
   status,
   triggerNode,
   isSelected,
-  hideBottomBorder = false,
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
-  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
 
   return (
     <div
       data-testid="runs-sidebar-row"
       className={cn(
-        "group relative flex w-full items-center gap-1.5 px-3 py-2 transition-colors",
-        !hideBottomBorder && "border-b border-b-slate-950/10",
+        RUNS_SIDEBAR_ROW_CLASS,
+        "group relative w-full transition-colors",
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
@@ -58,35 +57,39 @@ export function RunRow({
         className="absolute inset-0 z-0"
         aria-label={title}
       />
-      <span className="pointer-events-none relative z-0 flex w-full items-center gap-1.5">
-        <RunNodeIcon
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          alt={triggerName}
-          size={RUN_NODE_ICON_SIZE}
-          className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
-        />
-        <span
-          aria-label={RUN_STATUS_META[status].label}
-          title={RUN_STATUS_META[status].label}
-          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
-        />
-        <span
-          className={cn(
-            "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
-            isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
-          )}
-        >
-          {triggerName}
-        </span>
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-xs",
-            isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
-          )}
-        >
-          {title}
-        </span>
+      <RunNodeIcon
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        alt={triggerName}
+        size={RUN_NODE_ICON_SIZE}
+        className={cn(
+          "pointer-events-none relative z-0 h-3.5 w-3.5 shrink-0",
+          isSelected ? "text-gray-800" : "text-gray-500",
+        )}
+      />
+      <span
+        aria-label={RUN_STATUS_META[status].label}
+        title={RUN_STATUS_META[status].label}
+        className={cn(
+          "pointer-events-none relative z-0 inline-block h-2 w-2 shrink-0 rounded-full",
+          RUN_STATUS_META[status].dotClassName,
+        )}
+      />
+      <span
+        className={cn(
+          "pointer-events-none relative z-0 max-w-[35%] min-w-0 shrink truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+          isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
+        )}
+      >
+        {triggerName}
+      </span>
+      <span
+        className={cn(
+          "pointer-events-none relative z-0 min-w-0 flex-1 truncate text-[13px]",
+          isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
+        )}
+      >
+        {title}
       </span>
       <button
         type="button"
