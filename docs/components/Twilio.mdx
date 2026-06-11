@@ -1,0 +1,150 @@
+---
+title: "Twilio"
+---
+
+Make phone calls, send SMS, and receive inbound messages with Twilio
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Inbound SMS" href="#on-inbound-sms" description="Receive inbound SMS messages via Twilio webhook" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Make Call" href="#make-call" description="Place an outbound phone call with a text-to-speech message" />
+  <LinkCard title="Send SMS" href="#send-sms" description="Send an outbound SMS message" />
+</CardGrid>
+
+## Instructions
+
+To set up the Twilio integration:
+
+1. Log in to the **Twilio Console** (https://console.twilio.com)
+2. Copy your **Account SID** and **Auth Token** from the dashboard
+3. Get or buy a **Twilio phone number** with Voice and SMS capabilities
+4. Paste all three values in the fields below
+
+The phone number must be in E.164 format (e.g. +15551234567).
+
+<a id="on-inbound-sms"></a>
+
+## On Inbound SMS
+
+**Trigger key:** `twilio.onInboundSMS`
+
+The **On Inbound SMS** trigger fires when an SMS is received on your Twilio phone number.
+
+### Setup
+
+1. Configure this trigger on your canvas
+2. Copy the webhook URL shown after publishing
+3. In the Twilio Console, go to your phone number settings
+4. Set the **Messaging** webhook URL to the copied URL
+
+### Event Data
+
+Each inbound SMS includes:
+- **from**: Sender phone number
+- **to**: Your Twilio phone number that received the message
+- **body**: The SMS message text
+- **messageSid**: Twilio message ID
+- **numMedia**: Number of media attachments
+
+### Use Cases
+
+- **Chatbot workflows**: Respond to inbound text messages
+- **Acknowledgment flows**: On-call engineers can reply to alerts via SMS
+- **Data collection**: Collect responses via text message
+
+### Example Data
+
+```json
+{
+  "body": "ACK - I'm looking into it",
+  "from": "+15551234567",
+  "messageSid": "SM1234567890abcdef1234567890abcdef",
+  "numMedia": "0",
+  "to": "+15559876543"
+}
+```
+
+<a id="make-call"></a>
+
+## Make Call
+
+**Component key:** `twilio.makeCall`
+
+The **Make Call** component places an outbound phone call and speaks a text-to-speech message to the recipient.
+
+### Use Cases
+
+- **Incident alerting**: Call the on-call engineer when a critical alert fires
+- **Escalation**: Call a backup contact if the primary doesn't answer
+- **Notifications**: Voice notifications for time-sensitive events
+
+### Configuration
+
+- **To**: Destination phone number in E.164 format (e.g. +15551234567)
+- **Message**: The text message to speak via TTS when the call is answered
+- **Timeout**: How many seconds to ring before giving up (default: 30)
+
+### Output Channels
+
+- **answered**: The call was answered (status = completed)
+- **no-answer**: The call was not answered (status = no-answer, busy, or failed)
+
+### Output
+
+Returns the call SID, final status, destination number, and call duration.
+
+### Example Output
+
+```json
+{
+  "callSid": "CA1234567890abcdef1234567890abcdef",
+  "duration": "12",
+  "from": "+15559876543",
+  "status": "completed",
+  "to": "+15551234567"
+}
+```
+
+<a id="send-sms"></a>
+
+## Send SMS
+
+**Component key:** `twilio.sendSMS`
+
+The **Send SMS** component sends a text message to a phone number.
+
+### Use Cases
+
+- **Alert fallback**: Send an SMS when a phone call goes unanswered
+- **Notifications**: Quick status updates via text
+- **Confirmations**: Send confirmation codes or summaries
+
+### Configuration
+
+- **To**: Destination phone number in E.164 format (e.g. +15551234567)
+- **Body**: The SMS message text (max 1600 characters)
+
+### Output
+
+Returns the message SID, delivery status, and message details.
+
+### Example Output
+
+```json
+{
+  "body": "Alert: Production database CPU at 95%",
+  "from": "+15559876543",
+  "messageSid": "SM1234567890abcdef1234567890abcdef",
+  "status": "queued",
+  "to": "+15551234567"
+}
+```
+
