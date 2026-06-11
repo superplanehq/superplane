@@ -98,8 +98,8 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
 import { resolveFilesHeaderVersionActions, useFilesHeaderState } from "./files/useFilesHeaderState";
-import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useMemoryModeActions } from "./useMemoryModeActions";
+import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
@@ -142,6 +142,7 @@ import {
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
+  isCanvasWorkflowTab,
   useWorkflowUrlViewFlags,
   readStoredBoolean,
 } from "./viewState";
@@ -181,32 +182,20 @@ export function AppPage() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
-    isRunsMode,
-    setIsRunsMode,
-    isVersionsMode,
-    setIsVersionsMode,
-    setIsConsoleMode,
+    isRunInspectionMode,
     isMemoryMode,
-    setIsMemoryMode,
-    setIsFilesMode,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
     setIsConsoleYamlOpen,
     selectedRunId,
-    setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
   const { handleSelectVersionsMode, handleExitVersionsMode } = useVersionsModeActions({
-    setIsVersionsMode,
-    setIsConsoleMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
-    setIsRunsMode,
-    setIsMemoryMode,
-    setIsFilesMode,
-    setSelectedRunId,
     setSearchParams,
   });
+  const preserveRunDetailNodeOnNextRunChangeRef = useRef(false);
   const {
     openRunDetailOnMount,
     runDetailNodeId,
@@ -216,7 +205,7 @@ export function AppPage() {
     clearDismissedRunDetail,
     detailDismissedForRunId,
     handleBackToRunList,
-  } = useRunsDetailState(searchParams, isRunsMode, selectedRunId);
+  } = useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, preserveRunDetailNodeOnNextRunChangeRef);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
@@ -567,6 +556,8 @@ export function AppPage() {
   });
 
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
+  const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
+  const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -607,7 +598,7 @@ export function AppPage() {
     organizationId: organizationId!,
     canvasId: canvasId!,
     selectedRun,
-    isRunsMode,
+    isRunInspectionMode,
     liveCanvasVersionId,
     canvas,
     liveCanvas,
@@ -1821,7 +1812,7 @@ export function AppPage() {
   );
 
   const runCanvasData = useRunCanvasData({
-    isRunsMode,
+    isRunInspectionMode,
     selectedRun,
     selectedRunCanvas,
     canvasLoading,
@@ -1842,7 +1833,7 @@ export function AppPage() {
     edges: renderedEdges,
     runCanvasLoading,
   } = useRunCanvasPresentation({
-    isRunsMode,
+    isRunInspectionMode,
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
@@ -1850,7 +1841,7 @@ export function AppPage() {
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
-  const runsViewportKey = isRunsMode ? "runs" : null;
+  const runsViewportKey = isRunInspectionMode ? "runs" : null;
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
     runsHasFitToViewRef.current = false;
     runsViewportRef.current = undefined;
@@ -1858,15 +1849,22 @@ export function AppPage() {
   }
 
   const runCanvasFitKey = useMemo(() => {
-    if (!isRunsMode || !selectedRunId || !runCanvasData) return null;
+    if (!isRunInspectionMode || !selectedRunId || !runCanvasData) return null;
     return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
-  }, [isRunsMode, selectedRunId, runCanvasData]);
+  }, [isRunInspectionMode, selectedRunId, runCanvasData]);
 
   useEffect(() => {
-    if (!isRunsMode) return;
+    if (!isRunInspectionMode) return;
     if (!runCanvasFitKey) return;
     setRunsFitAllNonce((n) => n + 1);
-  }, [isRunsMode, runCanvasFitKey]);
+  }, [isRunInspectionMode, runCanvasFitKey]);
+
+  useEffect(() => {
+    if (wasRunInspectionModeRef.current && !isRunInspectionMode) {
+      setCanvasFitAllNonce((n) => n + 1);
+    }
+    wasRunInspectionModeRef.current = isRunInspectionMode;
+  }, [isRunInspectionMode]);
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -4651,14 +4649,10 @@ export function AppPage() {
   const handleSelectRun = useCallback(
     (runId: string) => {
       clearDismissedRunDetail();
-      setSelectedRunId(runId);
-      setIsRunsMode(true);
-      setIsFilesMode(false);
       setRunDetailNodeId(null);
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
-          next.set("view", "runs");
           next.set("run", runId);
           next.delete("sidebar");
           next.delete("node");
@@ -4668,88 +4662,59 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, setIsFilesMode, setIsRunsMode, setSearchParams, setSelectedRunId, setRunDetailNodeId],
+    [clearDismissedRunDetail, setSearchParams, setRunDetailNodeId],
   );
 
-  const handleSelectRunsMode = useCallback(() => {
-    if (hasEditableVersion && liveCanvasVersionId) {
-      handleUseVersion(liveCanvasVersionId);
-    }
+  const handleNavigateRun = useCallback(
+    (runId: string) => {
+      preserveRunDetailNodeOnNextRunChangeRef.current = true;
+      clearDismissedRunDetail();
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("run", runId);
+          next.delete("sidebar");
+          next.delete("node");
+          next.delete("file");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [clearDismissedRunDetail, setSearchParams],
+  );
 
-    setIsRunsMode(true);
-    setIsVersionsMode(false);
-    setIsMemoryMode(false);
-    setIsFilesMode(false);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.set("view", "runs");
-        next.delete("sidebar");
-        next.delete("node");
-        next.delete("file");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
-    setIsFilesMode,
-    setIsMemoryMode,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setSearchParams,
-  ]);
-
-  const handleExitRunsMode = useCallback(() => {
-    setIsRunsMode(false);
-    setSelectedRunId(null);
+  const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
-        next.delete("view");
         next.delete("run");
         return next;
       },
       { replace: true },
     );
-  }, [setIsRunsMode, setSearchParams, setSelectedRunId, setRunDetailNodeId]);
+  }, [setSearchParams, setRunDetailNodeId]);
+
+  const handleSelectLiveCanvas = useCallback(() => {
+    handleClearRunInspection();
+  }, [handleClearRunInspection]);
 
   const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
-    setIsConsoleMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setIsMemoryMode,
-    setIsFilesMode,
     setSearchParams,
-    setSelectedRunId,
   });
 
   const { handleSelectMemoryMode, handleExitMemoryMode } = useMemoryModeActions({
-    setIsMemoryMode,
-    setIsConsoleMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setIsFilesMode,
     setSearchParams,
-    setSelectedRunId,
   });
 
   const { handleSelectFilesMode, handleExitFilesMode } = useFilesModeActions({
-    setIsFilesMode,
-    setIsConsoleMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setIsMemoryMode,
-    setSelectedRunId,
     setSearchParams,
   });
 
@@ -4767,80 +4732,39 @@ export function AppPage() {
     handleExitConsoleMode,
     handleExitMemoryMode,
     handleExitFilesMode,
-    handleExitRunsMode,
     handleExitVersionsMode,
+    handleClearRunInspection,
     handleToggleEditMode,
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
   });
 
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
-    isRunsMode,
-    isVersionsMode,
-    handleExitRunsMode,
+    isRunInspectionMode,
+    isVersionsMode: urlViewFlags.isVersionsMode,
+    handleClearRunInspection,
     handleExitVersionsMode,
     handleToggleEditMode,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setSelectedRunId,
     setRunDetailNodeId,
     setSearchParams,
     startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
   });
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
-      if (!isRunsMode || !selectedRun) return;
+      if (!isRunInspectionMode || !selectedRun) return;
       const participants = runCanvasData?.participantNodeIds;
       if (participants && participants.length > 0 && !participants.includes(nodeId)) {
         return;
       }
       setRunDetailNodeId(nodeId);
     },
-    [isRunsMode, selectedRun, runCanvasData, setRunDetailNodeId],
+    [isRunInspectionMode, selectedRun, runCanvasData, setRunDetailNodeId],
   );
 
   useEffect(() => {
-    if (!isRunsMode || selectedRunId) return;
-    const latestRunId = runsData.runs[0]?.id;
-    if (!latestRunId) return;
-    handleSelectRun(latestRunId);
-  }, [handleSelectRun, isRunsMode, runsData.runs, selectedRunId]);
-
-  useEffect(() => {
-    if (!isRunsMode || !selectedRunId || selectedRun || infiniteRunsQuery.isLoading) return;
-
-    const latestRunId = runsData.runs[0]?.id;
-    if (latestRunId) {
-      handleSelectRun(latestRunId);
-      return;
-    }
-
-    setSelectedRunId(null);
-    setRunDetailNodeId(null);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.delete("run");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [
-    handleSelectRun,
-    infiniteRunsQuery.isLoading,
-    isRunsMode,
-    runsData.runs,
-    selectedRun,
-    selectedRunId,
-    setSearchParams,
-    setSelectedRunId,
-    setRunDetailNodeId,
-  ]);
-
-  useEffect(() => {
-    if (!isRunsMode || isViewingLiveVersion || !liveCanvasVersionId) return;
+    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId) return;
     handleUseVersion(liveCanvasVersionId);
-  }, [handleUseVersion, isRunsMode, isViewingLiveVersion, liveCanvasVersionId]);
+  }, [handleUseVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
 
   const handleDiscardDraftAndStartEdit = useCallback(async () => {
     if (!canUpdateCanvas) {
@@ -5116,7 +5040,7 @@ export function AppPage() {
   const canvasRenderKey = [
     canvasViewKey,
     isDraftCanvasLoading ? "draft-loading" : "draft-ready",
-    isRunsMode ? "runs" : "canvas",
+    isRunInspectionMode ? "runs" : "canvas",
   ].join(":");
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
@@ -5202,12 +5126,24 @@ export function AppPage() {
         ? resolvedActiveBranch
         : undefined;
 
+  const showRunsSidebar =
+    isCanvasWorkflowTab(headerMode) &&
+    !isEditing &&
+    !urlViewFlags.isConsoleMode &&
+    !urlViewFlags.isMemoryMode &&
+    !urlViewFlags.isFilesMode &&
+    !urlViewFlags.isVersionsMode;
+
+  const showVersionsSidebar = urlViewFlags.isVersionsMode && !isEditing;
+
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
-    isOpen: isRunsMode,
+    isOpen: showRunsSidebar,
     canvasId: canvasId!,
     runs: runsData.runs,
     selectedRunId,
     onSelectRun: handleSelectRun,
+    onNavigateRun: handleNavigateRun,
+    onSelectLiveCanvas: handleSelectLiveCanvas,
     onBackToRunList: handleBackToRunList,
     initialOpenDetail: openRunDetailOnMount,
     detailDismissedForRunId,
@@ -5224,7 +5160,7 @@ export function AppPage() {
     onStatusFiltersChange: setRunStatusFilters,
   });
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
-    isOpen: isVersionsMode,
+    isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
     liveCanvasVersionId: effectiveLiveCanvasVersionId,
     selectedCanvasVersion,
@@ -5317,7 +5253,6 @@ export function AppPage() {
           showBottomStatusControls={showBottomStatusControls}
           hideAddControls={hideAddControls}
           onSelectMemory={handleSelectMemoryMode}
-          onSelectVersions={handleSelectVersionsMode}
           nodes={nodes}
           edges={renderedEdges}
           organizationId={organizationId}
@@ -5360,24 +5295,25 @@ export function AppPage() {
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
-          hasFitToViewRef={isRunsMode ? runsHasFitToViewRef : hasFitToViewRef}
+          hasFitToViewRef={isRunInspectionMode ? runsHasFitToViewRef : hasFitToViewRef}
+          isRunInspectionMode={isRunInspectionMode}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
-          viewportRef={isRunsMode ? runsViewportRef : viewportRef}
+          viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunsMode ? runsFitAllNonce : null}
+          fitAllRequest={isRunInspectionMode ? runsFitAllNonce : canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
           fitAllFocusNodeIds={
-            isRunsMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+            isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
               : undefined
           }
           runParticipantNodeIds={
-            isRunsMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+            isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
               : undefined
           }
           runCanvasLoading={runCanvasLoading}
-          runNodeDetailRun={isRunsMode ? selectedRun : null}
+          runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           onRunNodeDetailClose={() => setRunDetailNodeId(null)}
@@ -5409,8 +5345,8 @@ export function AppPage() {
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
-          onSelectRuns={handleSelectRunsMode}
           onSelectConsole={handleSelectConsoleMode}
+          onSelectVersions={handleSelectVersionsMode}
           onSelectFiles={handleSelectFilesMode}
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
@@ -5447,7 +5383,7 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
-          onNodeClick={isRunsMode ? handleRunCanvasNodeClick : undefined}
+          onNodeClick={isRunInspectionMode ? handleRunCanvasNodeClick : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
