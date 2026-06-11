@@ -114,15 +114,72 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
+// InterruptSession honors the user's stop intent by authoritatively resetting
+// local state, treating the upstream interrupt as best-effort. Without this,
+// a stuck "streaming" row (e.g. when the stream worker died mid-turn) had no
+// manual recovery path — the row sat there until FailStuckStreamingSessions
+// timed it out 30 min later.
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+
 	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
-		return fmt.Errorf("interrupt: %w", err)
+		// ErrProviderSessionUnavailable means the upstream is already gone — a
+		// no-op interrupt. Any other provider error we log and still proceed,
+		// because leaving the local row stuck would defeat the whole point of
+		// the stop button; SendMessage's recovery paths will reconcile next.
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, resetting locally")
+		} else {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: provider returned error, resetting locally anyway")
+		}
+	}
+
+	closeOpenToolsForSession(sessionID)
+
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle); err != nil {
+		return fmt.Errorf("mark session idle: %w", err)
+	}
+
+	if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "turn_completed",
+		Status:    models.AgentSessionStatusIdle,
+	}); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish status event")
 	}
 	return nil
+}
+
+// closeOpenToolsForSession mirrors agent_stream_worker.closeOpenTools — kept
+// duplicated to avoid a circular import (workers depends on agents).
+func closeOpenToolsForSession(sessionID uuid.UUID) {
+	closed, err := models.CloseOpenToolMessages(sessionID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to close open tools")
+		return
+	}
+	for i := range closed {
+		row := &closed[i]
+		if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+			SessionID: sessionID.String(),
+			Event:     "tool_finished",
+			MessageID: row.ID.String(),
+			Message: &messages.AgentMessage{
+				ID:         row.ID.String(),
+				Role:       row.Role,
+				Content:    row.Content,
+				ToolCallID: row.ToolCallID,
+				ToolName:   row.ToolName,
+				ToolStatus: row.ToolStatus,
+				CreatedAt:  row.CreatedAt,
+			},
+		}); err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish tool_finished")
+		}
+	}
 }
 
 func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
