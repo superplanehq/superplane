@@ -112,6 +112,38 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
   });
 
+  it("shows View Diff for pending change requests before live history loads", () => {
+    const liveCanvasVersion = makePublishedVersion("live-version");
+    const pendingVersion = {
+      metadata: {
+        id: "pending-version",
+        owner: { name: "Alice" },
+        createdAt: "2026-05-19T12:00:00Z",
+        state: "STATE_PENDING_APPROVAL",
+      },
+    };
+
+    render(
+      <VersionsTabPanel
+        liveCanvasVersionId="live-version"
+        liveCanvasVersion={liveCanvasVersion}
+        liveVersions={[]}
+        pendingApprovalVersions={[
+          {
+            version: pendingVersion,
+            changeRequest: { metadata: { id: "cr-1", title: "Pending change" } },
+          },
+        ]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onVersionNodeDiffContextChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("View Diff")).toBeInTheDocument();
+  });
+
   it("loads older versions when the sidebar scroll reaches the end", () => {
     const onLoadMoreLiveVersions = vi.fn();
     const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];
