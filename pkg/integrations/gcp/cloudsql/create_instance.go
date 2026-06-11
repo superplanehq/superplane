@@ -15,6 +15,11 @@ import (
 
 const instancePayloadType = "gcp.cloudsql.instance"
 
+// minDiskSizeGb is the smallest data disk Cloud SQL accepts.
+const minDiskSizeGb = 10
+
+func minDiskSizePtr() *int { v := minDiskSizeGb; return &v }
+
 var databaseVersionOptions = []configuration.FieldOption{
 	{Label: "PostgreSQL 16", Value: "POSTGRES_16"},
 	{Label: "PostgreSQL 15", Value: "POSTGRES_15"},
@@ -136,8 +141,11 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Label:       "Disk Size (GB)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Default:     10,
+			Default:     minDiskSizeGb,
 			Description: "The data disk size in GB (minimum 10)",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{Min: minDiskSizePtr()},
+			},
 		},
 		{
 			Name:        "edition",
@@ -191,9 +199,12 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", "name is required")
 	}
 
+	// Cloud SQL rejects disks below 10 GB, so clamp anything under the minimum
+	// (including the 0 default) up to it rather than forwarding a value the API
+	// will reject.
 	diskSize := spec.DiskSizeGb
-	if diskSize <= 0 {
-		diskSize = 10
+	if diskSize < minDiskSizeGb {
+		diskSize = minDiskSizeGb
 	}
 	settings := map[string]any{
 		"tier":           strings.TrimSpace(spec.Tier),
@@ -219,7 +230,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 
 	op, err := createInstance(context.Background(), client, client.ProjectID(), body)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create instance", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create instance", err, roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{

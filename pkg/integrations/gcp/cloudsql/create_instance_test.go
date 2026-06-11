@@ -70,6 +70,34 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.Equal(t, "PENDING_CREATE", data["state"])
 	})
 
+	t.Run("clamps a sub-minimum disk size up to the minimum", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return []byte(`{"name":"op-1","status":"PENDING","targetId":"my-instance"}`), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name": "my-instance", "databaseVersion": "POSTGRES_16",
+				"region": "us-central1", "tier": "db-f1-micro", "diskSizeGb": 5,
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		// 5 GB is below Cloud SQL's 10 GB minimum, so it is clamped rather than
+		// forwarded to the API.
+		settings := postBody["settings"].(map[string]any)
+		assert.Equal(t, "10", settings["dataDiskSizeGb"])
+	})
+
 	t.Run("missing name fails the execution", func(t *testing.T) {
 		withFactory(&mockClient{projectID: "my-project"})
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}

@@ -111,7 +111,7 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 
 	op, err := deleteInstance(context.Background(), client, client.ProjectID(), instance)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete instance", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete instance", err, roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{

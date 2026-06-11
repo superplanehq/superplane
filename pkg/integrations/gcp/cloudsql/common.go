@@ -11,8 +11,12 @@ import (
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
-// roleHintAdmin is the IAM role required to manage Cloud SQL instances.
-const roleHintAdmin = "roles/cloudsql.admin (or roles/cloudsql.editor)"
+// roleHintAdmin is the IAM role required to manage (create/delete) Cloud SQL
+// instances; roleHintViewer is the read-only role sufficient for Get Instance.
+const (
+	roleHintAdmin  = "roles/cloudsql.admin (or roles/cloudsql.editor)"
+	roleHintViewer = "roles/cloudsql.viewer (or roles/cloudsql.admin)"
+)
 
 // Instance models the subset of a Cloud SQL instance resource the components use.
 type Instance struct {
@@ -156,12 +160,13 @@ func instancePayload(i *Instance) map[string]any {
 	return payload
 }
 
-// apiErrorMessage formats an API error for the execution state, appending an IAM
-// hint on 403 since a missing Cloud SQL admin role is the most common cause.
-func apiErrorMessage(action string, err error) string {
+// apiErrorMessage formats an API error for the execution state, appending the
+// IAM role the component needs on a 403 (a missing role is the most common
+// cause). Callers pass the role appropriate to the operation (read vs. write).
+func apiErrorMessage(action string, err error, roleHint string) string {
 	var apiErr *gcpcommon.GCPAPIError
 	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
-		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHintAdmin)
+		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHint)
 	}
 	return fmt.Sprintf("%s: %v", action, err)
 }

@@ -110,7 +110,7 @@ func (g *GetInstance) Execute(ctx core.ExecutionContext) error {
 
 	inst, err := getInstance(context.Background(), client, client.ProjectID(), instance)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get instance", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get instance", err, roleHintViewer))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{instancePayload(inst)})
