@@ -37,7 +37,10 @@ const (
 	DelayMaxIntervalSeconds = 300
 )
 
-const defaultMaxIterations = 100
+const (
+	defaultMaxIterations = 10
+	MaxIterationsLimit   = 100
+)
 
 const (
 	// DefaultTimeoutSeconds caps the total wall-clock time of a single loop run
@@ -128,7 +131,7 @@ Edges back into Loop are allowed so downstream steps can return control for the 
 
 ## Limits
 
-- **Max Iterations** caps how many iterations are allowed (default ` + fmt.Sprintf("%d", defaultMaxIterations) + `, maximum ` + fmt.Sprintf("%d", core.MaxEmitCount) + `)
+- **Max Iterations** caps how many iterations are allowed (default ` + fmt.Sprintf("%d", defaultMaxIterations) + `, maximum ` + fmt.Sprintf("%d", MaxIterationsLimit) + `)
 - **Timeout** caps the total wall-clock time of a single run (default ` + fmt.Sprintf("%d", DefaultTimeoutSeconds) + `s, maximum ` + fmt.Sprintf("%d", TimeoutMaxSeconds) + `s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
 
 ## Delay Between Iterations
@@ -181,7 +184,7 @@ func (c *Loop) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(1),
-					Max: intPtr(core.MaxEmitCount),
+					Max: intPtr(MaxIterationsLimit),
 				},
 			},
 		},
@@ -537,8 +540,8 @@ func validateSpec(spec Spec) error {
 	if spec.MaxIterations < 1 {
 		return fmt.Errorf("maxIterations must be at least 1")
 	}
-	if spec.MaxIterations > core.MaxEmitCount {
-		return fmt.Errorf("maxIterations cannot exceed %d", core.MaxEmitCount)
+	if spec.MaxIterations > MaxIterationsLimit {
+		return fmt.Errorf("maxIterations cannot exceed %d", MaxIterationsLimit)
 	}
 	if spec.TimeoutSeconds < TimeoutMinSeconds {
 		return fmt.Errorf("timeoutSeconds must be at least %d", TimeoutMinSeconds)

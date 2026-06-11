@@ -714,7 +714,7 @@ Edges back into Loop are allowed so downstream steps can return control for the 
 
 ### Limits
 
-- **Max Iterations** caps how many iterations are allowed (default 100, maximum 500)
+- **Max Iterations** caps how many iterations are allowed (default 10, maximum 100)
 - **Timeout** caps the total wall-clock time of a single run (default 3600s, maximum 86400s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
 
 ### Delay Between Iterations
