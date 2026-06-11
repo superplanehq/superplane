@@ -12,7 +12,14 @@ export function applyPendingContentUpdate(
   }
 
   if (originalContent === undefined) {
-    return current;
+    if (value === "") {
+      return current;
+    }
+
+    return {
+      ...current,
+      [selectedPath]: { type: "modified", path: selectedPath, content: value },
+    };
   }
 
   if (value === originalContent) {
@@ -40,21 +47,4 @@ export function applyPendingDelete(
     ...current,
     [path]: { type: "deleted", path },
   };
-}
-
-export function mergeLoadedContentAfterPublish(
-  current: Record<string, string>,
-  pendingChanges: PendingFileChange[],
-): Record<string, string> {
-  const next = { ...current };
-  for (const change of pendingChanges) {
-    if (change.type === "deleted") {
-      delete next[change.path];
-      continue;
-    }
-
-    next[change.path] = change.content;
-  }
-
-  return next;
 }
