@@ -285,14 +285,17 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	metadata := ExecutionMetadata{}
 	mergeSessionIntoMetadata(&metadata, session)
 	if err := ctx.Metadata.Set(metadata); err != nil {
+		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
 	if err := ctx.ExecutionState.SetKV("managed_session_id", session.ID); err != nil {
+		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to set managed_session_id: %w", err)
 	}
 
 	if err := client.SendManagedSessionUserMessage(session.ID, spec.Prompt); err != nil {
+		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
@@ -300,6 +303,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	// Don't write terminal status to metadata yet — only after emit.
 	refreshed, err := client.GetManagedSession(session.ID)
 	if err != nil {
+		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 
@@ -310,6 +314,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		} else if sm != nil && sm.Complete {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 				return emitErr
 			}
 			// Persist terminal status only after successful emit
