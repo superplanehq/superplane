@@ -125,7 +125,9 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const files = imageFilesFromClipboard(e);
       if (files.length === 0) return;
-      e.preventDefault();
+      // Only suppress the default paste when the clipboard is image-only, so a
+      // mixed text-and-image paste still inserts its text.
+      if (e.clipboardData.getData("text/plain").length === 0) e.preventDefault();
       void addFiles(files);
     },
     [addFiles],
