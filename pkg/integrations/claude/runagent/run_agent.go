@@ -1,6 +1,7 @@
 package runagent
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -208,6 +209,17 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set managed_session_id: %w", err)
 	}
 
+	if len(resources) > 0 {
+		fileIDs := make([]string, len(resources))
+		for i, r := range resources {
+			fileIDs[i] = r.FileID
+		}
+		encoded, _ := json.Marshal(fileIDs)
+		if err := ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded)); err != nil {
+			return fmt.Errorf("failed to store uploaded file IDs: %w", err)
+		}
+	}
+
 	if err := client.SendManagedSessionUserMessage(session.ID, spec.Prompt); err != nil {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
@@ -234,6 +246,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			if err := client.DeleteManagedSession(session.ID); err != nil {
 				ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
 			}
+			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			return nil
 		} else {
 			ctx.Logger.Warnf("Events not complete for session %s after retries. Scheduling poll.", session.ID)
@@ -248,6 +261,29 @@ func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
 
 // uploadRepositoryFiles reads files from the canvas repository, uploads them
 // to the Anthropic Files API, and returns FileResource entries for session mounting.
+// cleanupUploadedFiles deletes any files uploaded to the Anthropic Files API
+// for this execution. File IDs are retrieved from execution state.
+// getUploadedFileIDs retrieves uploaded file IDs from execution state.
+func getUploadedFileIDs(state core.ExecutionStateContext) []string {
+	raw, err := state.GetKV("uploaded_file_ids")
+	if err != nil || raw == "" {
+		return nil
+	}
+	var fileIDs []string
+	if err := json.Unmarshal([]byte(raw), &fileIDs); err != nil {
+		return nil
+	}
+	return fileIDs
+}
+
+func cleanupUploadedFiles(client *Client, ctx core.ExecutionContext, logWarn func(string, ...any)) {
+	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
+func cleanupUploadedFilesFromHook(client *Client, ctx core.ActionHookContext, logWarn func(string, ...any)) {
+	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
 func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []string) ([]FileResource, error) {
 	resources := make([]FileResource, 0, len(files))
 	for _, path := range files {

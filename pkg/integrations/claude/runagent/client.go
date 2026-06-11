@@ -498,6 +498,27 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 	return err
 }
 
+// DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
+func (c *Client) DeleteFile(fileID string) error {
+	if fileID == "" {
+		return nil
+	}
+	URL := c.BaseURL + "/files/" + url.PathEscape(fileID)
+	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
+	return err
+}
+
+// CleanupFiles deletes a list of uploaded files, logging failures.
+func (c *Client) CleanupFiles(fileIDs []string, logWarn func(string, ...any)) {
+	for _, id := range fileIDs {
+		if err := c.DeleteFile(id); err != nil {
+			if logWarn != nil {
+				logWarn("Failed to delete uploaded file %s: %v", id, err)
+			}
+		}
+	}
+}
+
 func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
