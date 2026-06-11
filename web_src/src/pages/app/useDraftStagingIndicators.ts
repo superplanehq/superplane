@@ -17,6 +17,75 @@ type CanvasVersionStagingQuery = ReturnType<typeof useCanvasVersionStaging>;
 type ConsoleVersionDiff = ReturnType<typeof useCanvasConsoleVersionDiff>;
 type ConsoleQueryData = ConsoleVersionDiff["consoleQuery"]["data"];
 
+function buildPublishableChangesByVersionId({
+  activeCanvasVersionId,
+  draftVersionForGraphDiff,
+  draftVersionsFromBranches,
+  liveVersionForGraphDiff,
+}: {
+  activeCanvasVersionId: string;
+  draftVersionForGraphDiff: CanvasesCanvasVersion | undefined;
+  draftVersionsFromBranches: CanvasesCanvasVersion[];
+  liveVersionForGraphDiff: CanvasesCanvasVersion | undefined;
+}) {
+  const map = new Map<string, boolean>();
+  for (const draft of draftVersionsFromBranches) {
+    const versionId = draft.metadata?.id;
+    if (!versionId) {
+      continue;
+    }
+    const draftForDiff =
+      versionId === activeCanvasVersionId && draftVersionForGraphDiff ? draftVersionForGraphDiff : draft;
+    map.set(versionId, hasDraftVersusLiveGraphDiff(liveVersionForGraphDiff, draftForDiff));
+  }
+  if (activeCanvasVersionId && !map.has(activeCanvasVersionId) && draftVersionForGraphDiff) {
+    map.set(activeCanvasVersionId, hasDraftVersusLiveGraphDiff(liveVersionForGraphDiff, draftVersionForGraphDiff));
+  }
+  return map;
+}
+
+function resolveEditingStagingFlags({
+  isEditing,
+  committedBaselinesReady,
+  localHasCanvasStaging,
+  localHasConsoleStaging,
+  serverHasCanvasStaging,
+  serverHasConsoleStaging,
+  serverHasStagingChanges,
+  filesLocalStagingActive,
+  localHasFilesStaging,
+  serverHasFilesStaging,
+}: {
+  isEditing: boolean;
+  committedBaselinesReady: boolean;
+  localHasCanvasStaging: boolean;
+  localHasConsoleStaging: boolean;
+  serverHasCanvasStaging: boolean;
+  serverHasConsoleStaging: boolean;
+  serverHasStagingChanges: boolean;
+  filesLocalStagingActive: boolean;
+  localHasFilesStaging: boolean;
+  serverHasFilesStaging: boolean;
+}) {
+  if (!isEditing) {
+    return {
+      hasCanvasStagingChanges: false,
+      hasConsoleStagingChanges: false,
+      hasFilesStagingChanges: false,
+      hasStagingChanges: false,
+    };
+  }
+
+  const hasCanvasStagingChanges = committedBaselinesReady ? localHasCanvasStaging : serverHasCanvasStaging;
+  const hasConsoleStagingChanges = committedBaselinesReady ? localHasConsoleStaging : serverHasConsoleStaging;
+  const hasFilesStagingChanges = filesLocalStagingActive ? localHasFilesStaging : serverHasFilesStaging;
+  const hasStagingChanges = committedBaselinesReady
+    ? localHasCanvasStaging || localHasConsoleStaging || hasFilesStagingChanges
+    : serverHasStagingChanges;
+
+  return { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges };
+}
+
 type UseDraftStagingIndicatorsOptions = {
   isEditing: boolean;
   canvasId?: string;
@@ -106,43 +175,30 @@ export function useDraftStagingIndicators({
   );
   const serverHasStagingChanges = !!canvasVersionStagingQuery.data?.hasStaging;
 
-  const hasCanvasStagingChanges = isEditing
-    ? committedBaselines.ready
-      ? localHasCanvasStaging
-      : serverHasCanvasStaging
-    : false;
-  const hasConsoleStagingChanges = isEditing
-    ? committedBaselines.ready
-      ? localHasConsoleStaging
-      : serverHasConsoleStaging
-    : false;
-  const hasFilesStagingChanges = isEditing
-    ? filesLocalStagingActive
-      ? localHasFilesStaging
-      : serverHasFilesStaging
-    : false;
-  const hasStagingChanges = isEditing
-    ? committedBaselines.ready
-      ? localHasCanvasStaging || localHasConsoleStaging || hasFilesStagingChanges
-      : serverHasStagingChanges
-    : false;
+  const { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges } =
+    resolveEditingStagingFlags({
+      isEditing,
+      committedBaselinesReady: committedBaselines.ready,
+      localHasCanvasStaging,
+      localHasConsoleStaging,
+      serverHasCanvasStaging,
+      serverHasConsoleStaging,
+      serverHasStagingChanges,
+      filesLocalStagingActive,
+      localHasFilesStaging,
+      serverHasFilesStaging,
+    });
 
-  const publishableChangesByVersionId = useMemo(() => {
-    const map = new Map<string, boolean>();
-    for (const draft of draftVersionsFromBranches) {
-      const versionId = draft.metadata?.id;
-      if (!versionId) {
-        continue;
-      }
-      const draftForDiff =
-        versionId === activeCanvasVersionId && draftVersionForGraphDiff ? draftVersionForGraphDiff : draft;
-      map.set(versionId, hasDraftVersusLiveGraphDiff(liveVersionForGraphDiff, draftForDiff));
-    }
-    if (activeCanvasVersionId && !map.has(activeCanvasVersionId) && draftVersionForGraphDiff) {
-      map.set(activeCanvasVersionId, hasDraftVersusLiveGraphDiff(liveVersionForGraphDiff, draftVersionForGraphDiff));
-    }
-    return map;
-  }, [activeCanvasVersionId, draftVersionForGraphDiff, draftVersionsFromBranches, liveVersionForGraphDiff]);
+  const publishableChangesByVersionId = useMemo(
+    () =>
+      buildPublishableChangesByVersionId({
+        activeCanvasVersionId,
+        draftVersionForGraphDiff,
+        draftVersionsFromBranches,
+        liveVersionForGraphDiff,
+      }),
+    [activeCanvasVersionId, draftVersionForGraphDiff, draftVersionsFromBranches, liveVersionForGraphDiff],
+  );
 
   const activeHasPublishableChanges = isEditing && hasDraftDiffVersusLive;
 
