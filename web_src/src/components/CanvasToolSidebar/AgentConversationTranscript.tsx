@@ -196,6 +196,7 @@ const MessageRow = memo(function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
+        <MessageImages images={message.images} />
         <RichMessage
           content={message.content}
           onAction={isUser ? undefined : onAction}
@@ -210,6 +211,29 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+function MessageImages({ images }: { images: AgentMessage["images"] }) {
+  if (!images || images.length === 0) return null;
+
+  return (
+    <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
+      {images.map((image, index) => {
+        const url = `data:${image.mediaType};base64,${image.data}`;
+        return (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="block overflow-hidden rounded-md border border-slate-200"
+          >
+            <img src={url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 function shouldRenderMessage(message: AgentMessage): boolean {
   return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));

@@ -9,6 +9,11 @@ export type AgentChat = {
   updatedAt: string | null;
 };
 
+export type AgentMessageImage = {
+  mediaType: string;
+  data: string;
+};
+
 export type AgentMessage = {
   id: string;
   role: string;
@@ -16,6 +21,7 @@ export type AgentMessage = {
   toolName: string;
   toolCallId: string;
   toolStatus: string;
+  images?: AgentMessageImage[];
   createdAt: string | null;
 };
 
@@ -63,6 +69,9 @@ export function fromApiMessage(input: AgentsAgentChatMessage | undefined): Agent
     toolName: input.toolName ?? "",
     toolCallId: input.toolCallId ?? "",
     toolStatus: input.toolStatus ?? "",
+    images: (input.images ?? [])
+      .filter((image) => Boolean(image.mediaType) && Boolean(image.data))
+      .map((image) => ({ mediaType: image.mediaType ?? "", data: image.data ?? "" })),
     createdAt: input.createdAt ?? null,
   };
 }
