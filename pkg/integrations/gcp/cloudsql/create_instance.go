@@ -36,13 +36,23 @@ var editionOptions = []configuration.FieldOption{
 type CreateInstance struct{}
 
 type CreateInstanceSpec struct {
-	Name            string `json:"name" mapstructure:"name"`
-	DatabaseVersion string `json:"databaseVersion" mapstructure:"databaseVersion"`
-	Region          string `json:"region" mapstructure:"region"`
-	Tier            string `json:"tier" mapstructure:"tier"`
-	DiskSizeGb      int    `json:"diskSizeGb" mapstructure:"diskSizeGb"`
-	Edition         string `json:"edition" mapstructure:"edition"`
-	RootPassword    string `json:"rootPassword" mapstructure:"rootPassword"`
+	Name               string   `json:"name" mapstructure:"name"`
+	DatabaseVersion    string   `json:"databaseVersion" mapstructure:"databaseVersion"`
+	Region             string   `json:"region" mapstructure:"region"`
+	Tier               string   `json:"tier" mapstructure:"tier"`
+	DiskSizeGb         int      `json:"diskSizeGb" mapstructure:"diskSizeGb"`
+	Edition            string   `json:"edition" mapstructure:"edition"`
+	RootPassword       string   `json:"rootPassword" mapstructure:"rootPassword"`
+	PublicIP           *bool    `json:"publicIp" mapstructure:"publicIp"`
+	SSLMode            string   `json:"sslMode" mapstructure:"sslMode"`
+	AuthorizedNetworks []string `json:"authorizedNetworks" mapstructure:"authorizedNetworks"`
+	DeletionProtection *bool    `json:"deletionProtection" mapstructure:"deletionProtection"`
+}
+
+var sslModeOptions = []configuration.FieldOption{
+	{Label: "Allow unencrypted and encrypted", Value: "ALLOW_UNENCRYPTED_AND_ENCRYPTED"},
+	{Label: "Encrypted only", Value: "ENCRYPTED_ONLY"},
+	{Label: "Trusted client certificate required", Value: "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"},
 }
 
 func (c *CreateInstance) Name() string {
@@ -70,11 +80,15 @@ func (c *CreateInstance) Documentation() string {
 
 - **Name**: The instance ID (required)
 - **Database Version**: The database engine and version (required)
-- **Region**: The region to create the instance in (e.g. ` + "`us-central1`" + `)
-- **Tier**: The machine type (e.g. ` + "`db-f1-micro`" + ` for dev/test, ` + "`db-custom-2-7680`" + ` for production)
+- **Region**: The region to create the instance in, chosen from the regions where Cloud SQL is available
+- **Tier**: The machine tier (size), chosen from the predefined tiers available in the selected region. Custom machine types (` + "`db-custom-*`" + `) are not listed.
 - **Disk Size (GB)**: The data disk size (minimum 10)
 - **Edition**: Enterprise or Enterprise Plus
 - **Root Password**: Initial password for the default admin user (optional, stored as a secret)
+- **Assign Public IP**: Whether to give the instance a public IPv4 address (default yes)
+- **SSL Mode**: How the instance enforces SSL/TLS on incoming connections (optional)
+- **Authorized Networks**: CIDR ranges allowed to connect over the public IP (optional)
+- **Deletion Protection**: Prevent the instance from being deleted until protection is removed (optional)
 
 ## Output
 
@@ -83,6 +97,8 @@ Emits a ` + "`gcp.cloudsql.instance`" + ` payload with the ready instance's ` + 
 ## Important Notes
 
 - **Instance creation is asynchronous and takes several minutes.** This component polls the instance until it reaches ` + "`RUNNABLE`" + ` (or times out) before emitting, so downstream steps run only once the instance is ready.
+- A public IP with no **Authorized Networks** is reachable only through the Cloud SQL Auth Proxy or private access; add CIDR ranges to allow direct external clients.
+- With **Deletion Protection** enabled, the Delete Instance component will fail until protection is removed.
 - Requires the ` + "`roles/cloudsql.admin`" + ` (or ` + "`roles/cloudsql.editor`" + `) IAM role, and the **Cloud SQL Admin API** enabled.`
 }
 
@@ -122,20 +138,31 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 		{
 			Name:        "region",
 			Label:       "Region",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Default:     "us-central1",
 			Description: "The region to create the instance in",
-			Placeholder: "us-central1",
+			Placeholder: "Select a region",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeRegion,
+				},
+			},
 		},
 		{
 			Name:        "tier",
 			Label:       "Tier",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Default:     "db-f1-micro",
-			Description: "The machine type (e.g. db-f1-micro for dev/test)",
-			Placeholder: "db-f1-micro",
+			Description: "The machine tier (size). Select a region first; custom machine types are not listed.",
+			Placeholder: "Select a tier",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeTier,
+					Parameters: []configuration.ParameterRef{
+						{Name: "region", ValueFrom: &configuration.ParameterValueFrom{Field: "region"}},
+					},
+				},
+			},
 		},
 		{
 			Name:        "diskSizeGb",
@@ -167,7 +194,62 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "Initial password for the default admin user (optional)",
 		},
+		{
+			Name:        "publicIp",
+			Label:       "Assign Public IP",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "Assign a public IPv4 address to the instance. Disable only if you configure private connectivity.",
+		},
+		{
+			Name:        "sslMode",
+			Label:       "SSL Mode",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "How the instance enforces SSL/TLS on incoming connections",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{Options: sslModeOptions},
+			},
+		},
+		{
+			Name:        "authorizedNetworks",
+			Label:       "Authorized Networks",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "CIDR ranges allowed to connect over the public IP (e.g. 203.0.113.0/24)",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "CIDR",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
+			Name:        "deletionProtection",
+			Label:       "Deletion Protection",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Prevent the instance from being deleted until protection is removed",
+		},
 	}
+}
+
+// authorizedNetworkEntries maps CIDR strings to Cloud SQL ACL entries, skipping
+// blanks.
+func authorizedNetworkEntries(cidrs []string) []map[string]any {
+	entries := make([]map[string]any, 0, len(cidrs))
+	for _, c := range cidrs {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		entries = append(entries, map[string]any{"value": c})
+	}
+	return entries
 }
 
 func (c *CreateInstance) Setup(ctx core.SetupContext) error {
@@ -214,6 +296,23 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 	if edition := strings.TrimSpace(spec.Edition); edition != "" {
 		settings["edition"] = edition
 	}
+
+	// IP / SSL connection security. Public IP defaults to on, matching Cloud SQL.
+	ipConfig := map[string]any{
+		"ipv4Enabled": spec.PublicIP == nil || *spec.PublicIP,
+	}
+	if sslMode := strings.TrimSpace(spec.SSLMode); sslMode != "" {
+		ipConfig["sslMode"] = sslMode
+	}
+	if nets := authorizedNetworkEntries(spec.AuthorizedNetworks); len(nets) > 0 {
+		ipConfig["authorizedNetworks"] = nets
+	}
+	settings["ipConfiguration"] = ipConfig
+
+	if spec.DeletionProtection != nil {
+		settings["deletionProtectionEnabled"] = *spec.DeletionProtection
+	}
+
 	body := map[string]any{
 		"name":            name,
 		"region":          strings.TrimSpace(spec.Region),

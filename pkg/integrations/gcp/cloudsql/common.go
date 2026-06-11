@@ -65,6 +65,17 @@ type ipMapping struct {
 	IPAddress string `json:"ipAddress"`
 }
 
+// Tier models a Cloud SQL machine tier from the tiers.list endpoint. RAM and
+// DiskQuota are returned as int64-formatted strings; Region lists the regions
+// where the tier is offered. Note the API does not enumerate custom machine
+// types (db-custom-*) here.
+type Tier struct {
+	Tier      string   `json:"tier"`
+	RAM       int64    `json:"RAM,string"`
+	DiskQuota int64    `json:"DiskQuota,string"`
+	Region    []string `json:"region"`
+}
+
 // operation models the long-running operation envelope returned by instance
 // create/delete. These operations take minutes, so the components return the
 // operation reference rather than waiting.
@@ -86,6 +97,10 @@ func instancesURL(project string) string {
 
 func instanceURL(project, instance string) string {
 	return fmt.Sprintf("%s/projects/%s/instances/%s", sqlAdminBaseURL, project, instance)
+}
+
+func tiersURL(project string) string {
+	return fmt.Sprintf("%s/projects/%s/tiers", sqlAdminBaseURL, project)
 }
 
 // createInstance starts provisioning a Cloud SQL instance and returns the
@@ -150,6 +165,23 @@ func ListInstances(ctx context.Context, client Client, project string) ([]Instan
 		}
 		pageToken = resp.NextPageToken
 	}
+}
+
+// ListTiers lists the predefined machine tiers available to the project. The
+// tiers.list endpoint is not paginated and does not include custom machine
+// types (db-custom-*).
+func ListTiers(ctx context.Context, client Client, project string) ([]Tier, error) {
+	respBody, err := client.GetURL(ctx, tiersURL(project))
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Items []Tier `json:"items"`
+	}
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("parse tiers list: %w", err)
+	}
+	return resp.Items, nil
 }
 
 func parseOperation(body []byte) (*operation, error) {

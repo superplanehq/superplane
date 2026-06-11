@@ -118,6 +118,79 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.Equal(t, "10", settings["dataDiskSizeGb"])
 	})
 
+	t.Run("maps the security and SSL settings into the request body", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return []byte(`{"name":"op-2","status":"PENDING","targetId":"my-instance"}`), nil
+			},
+		}
+		withFactory(mc)
+
+		requests := &contexts.RequestContext{}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name": "my-instance", "databaseVersion": "POSTGRES_16",
+				"region": "us-central1", "tier": "db-f1-micro",
+				"publicIp": false, "sslMode": "ENCRYPTED_ONLY",
+				"authorizedNetworks": []any{"203.0.113.0/24", "  ", "198.51.100.7/32"},
+				"deletionProtection": true,
+			},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requests,
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, pollHookName, requests.Action)
+
+		settings := postBody["settings"].(map[string]any)
+		assert.Equal(t, true, settings["deletionProtectionEnabled"])
+		ipConfig := settings["ipConfiguration"].(map[string]any)
+		assert.Equal(t, false, ipConfig["ipv4Enabled"])
+		assert.Equal(t, "ENCRYPTED_ONLY", ipConfig["sslMode"])
+		// Blank CIDRs are dropped; the rest become ACL entries.
+		nets := ipConfig["authorizedNetworks"].([]map[string]any)
+		require.Len(t, nets, 2)
+		assert.Equal(t, "203.0.113.0/24", nets[0]["value"])
+		assert.Equal(t, "198.51.100.7/32", nets[1]["value"])
+	})
+
+	t.Run("defaults public IP on and omits unset security settings", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return []byte(`{"name":"op-3","status":"PENDING","targetId":"my-instance"}`), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name": "my-instance", "databaseVersion": "POSTGRES_16",
+				"region": "us-central1", "tier": "db-f1-micro",
+			},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		settings := postBody["settings"].(map[string]any)
+		ipConfig := settings["ipConfiguration"].(map[string]any)
+		assert.Equal(t, true, ipConfig["ipv4Enabled"])
+		_, hasSSL := ipConfig["sslMode"]
+		assert.False(t, hasSSL)
+		_, hasNets := ipConfig["authorizedNetworks"]
+		assert.False(t, hasNets)
+		_, hasDP := settings["deletionProtectionEnabled"]
+		assert.False(t, hasDP)
+	})
+
 	t.Run("missing name fails the execution", func(t *testing.T) {
 		withFactory(&mockClient{projectID: "my-project"})
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}

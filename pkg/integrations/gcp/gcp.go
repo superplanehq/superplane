@@ -1003,6 +1003,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
 	case cloudsql.ResourceTypeInstance:
 		return cloudsql.ListInstanceResources(reqCtx, client)
+	case cloudsql.ResourceTypeRegion:
+		return cloudsql.ListRegionResources(reqCtx, client)
+	case cloudsql.ResourceTypeTier:
+		return cloudsql.ListTierResources(reqCtx, client, p["region"])
 	default:
 		return nil, nil
 	}
