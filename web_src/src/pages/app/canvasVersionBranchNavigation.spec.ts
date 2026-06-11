@@ -24,4 +24,15 @@ describe("applyVersionSelectionSearchParams", () => {
 
     expect(next.get("view")).toBe("versions");
   });
+
+  it("keeps versions view when previewing a published version", () => {
+    const next = applyVersionSelectionSearchParams(new URLSearchParams("view=versions"), {
+      isCurrentLive: false,
+      versionID: "published-version",
+      branchName: "",
+    });
+
+    expect(next.get("view")).toBe("versions");
+    expect(next.get("version")).toBe("published-version");
+  });
 });
