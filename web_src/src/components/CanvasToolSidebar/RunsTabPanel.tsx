@@ -128,11 +128,16 @@ export function RunsTabPanel({
     canNavigateOlder,
     atOlderPaginationBoundary,
   } = useMemo(
-    () => getRunSidebarNavigation(filterState.orderedRuns, selectedRunId, !!hasNextPage),
-    [filterState.orderedRuns, hasNextPage, selectedRunId],
+    () =>
+      getRunSidebarNavigation(filterState.orderedRuns, selectedRunId, {
+        hasNextPage: !!hasNextPage,
+        hasActiveFilters: filterState.hasAnyFilter,
+      }),
+    [filterState.hasAnyFilter, filterState.orderedRuns, hasNextPage, selectedRunId],
   );
 
   const olderNavigationLoadRequestedRef = useRef(false);
+  const filteredRunIdsLengthAtFetchStartRef = useRef(0);
   const [pendingOlderNavigation, setPendingOlderNavigation] = useState(false);
 
   const handleNavigateRun = useCallback(
@@ -180,10 +185,17 @@ export function RunsTabPanel({
       return;
     }
 
+    if (sidebarRunIds.length === filteredRunIdsLengthAtFetchStartRef.current) {
+      olderNavigationLoadRequestedRef.current = false;
+      setPendingOlderNavigation(false);
+      return;
+    }
+
     if (olderNavigationLoadRequestedRef.current) {
       return;
     }
 
+    filteredRunIdsLengthAtFetchStartRef.current = sidebarRunIds.length;
     olderNavigationLoadRequestedRef.current = true;
     onLoadMore();
   }, [

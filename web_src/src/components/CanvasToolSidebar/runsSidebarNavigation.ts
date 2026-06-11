@@ -33,15 +33,26 @@ export function isAtOlderRunPaginationBoundary(runIds: string[], currentRunId: s
   return runIds.indexOf(currentRunId) === runIds.length - 1;
 }
 
-export function canNavigateToOlderRun(runIds: string[], currentRunId: string, hasNextPage = false): boolean {
+export function canNavigateToOlderRun(
+  runIds: string[],
+  currentRunId: string,
+  hasNextPage = false,
+  allowPagedNavigation = true,
+): boolean {
   if (getAdjacentSidebarRunId(runIds, currentRunId, "next")) {
     return true;
   }
 
-  return hasNextPage && isAtOlderRunPaginationBoundary(runIds, currentRunId);
+  return allowPagedNavigation && hasNextPage && isAtOlderRunPaginationBoundary(runIds, currentRunId);
 }
 
-export function getRunSidebarNavigation(orderedRuns: OrderedRuns, currentRunId: string | null, hasNextPage = false) {
+export function getRunSidebarNavigation(
+  orderedRuns: OrderedRuns,
+  currentRunId: string | null,
+  options: { hasNextPage?: boolean; hasActiveFilters?: boolean } = {},
+) {
+  const hasNextPage = options.hasNextPage ?? false;
+  const allowPagedNavigation = !options.hasActiveFilters;
   const runIds = buildSidebarRunIds(orderedRuns);
 
   if (!currentRunId) {
@@ -62,7 +73,7 @@ export function getRunSidebarNavigation(orderedRuns: OrderedRuns, currentRunId: 
     runIds,
     newerRunId,
     olderRunId,
-    canNavigateOlder: canNavigateToOlderRun(runIds, currentRunId, hasNextPage),
+    canNavigateOlder: canNavigateToOlderRun(runIds, currentRunId, hasNextPage, allowPagedNavigation),
     atOlderPaginationBoundary,
   };
 }
