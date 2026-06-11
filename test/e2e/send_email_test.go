@@ -19,7 +19,7 @@ func TestSendEmailComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Send Email User")
 		steps.addSendEmailWithUser("Notify User", "Test Subject", "Test Body")
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertSendEmailSavedToDB("Notify User", "Test Subject")
 	})
 
@@ -117,7 +117,7 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 	s.canvas.Connect("Send Email", "Output")
 
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) {

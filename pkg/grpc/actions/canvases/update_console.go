@@ -23,6 +23,7 @@ func UpdateConsole(
 	versionID string,
 	modelPanels []models.ConsolePanel,
 	modelLayout []models.ConsoleLayoutItem,
+	discardStaging bool,
 ) (*models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
@@ -77,6 +78,11 @@ func UpdateConsole(
 		}
 
 		newVersion = v
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
 		return nil
 	})
 
