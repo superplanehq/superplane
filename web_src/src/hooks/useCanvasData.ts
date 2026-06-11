@@ -182,6 +182,13 @@ export const canvasKeys = {
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
+  // Staged reads overlay uncommitted edits on the committed version. They must
+  // not share the committed `versionDetail` cache entry, otherwise a committed
+  // (stage=false) fetch for the same version overwrites the staged content and
+  // the editor loses pending edits. Kept as a prefix-extension of versionDetail
+  // so prefix invalidations of versionDetail also refresh the staged read.
+  versionStagedDetail: (canvasId: string, versionId: string) =>
+    [...canvasKeys.versionDetails(), canvasId, versionId, "staged"] as const,
   versionStaging: (canvasId: string, versionId: string) =>
     [...canvasKeys.versions(), "staging", canvasId, versionId] as const,
   draftBranches: (canvasId: string) => [...canvasKeys.all, "draftBranches", canvasId] as const,
@@ -245,6 +252,12 @@ export const canvasKeys = {
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
   console: (canvasId: string, versionId?: string) =>
     [...canvasKeys.all, "console", canvasId, versionId ?? "live"] as const,
+  // Staged console overlays uncommitted edits; kept separate from the committed
+  // `console` entry so a committed (stage=false) refetch cannot overwrite the
+  // editor's pending edits. Prefix-extends `console`, so invalidating `console`
+  // (or `consoleAll`) also refreshes the staged read.
+  consoleStaged: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.console(canvasId, versionId), "staged"] as const,
   consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
@@ -413,7 +426,9 @@ export const useCanvasVersion = (
   stage = false,
 ) => {
   return useQuery({
-    queryKey: canvasKeys.versionDetail(canvasId, versionId),
+    queryKey: stage
+      ? canvasKeys.versionStagedDetail(canvasId, versionId)
+      : canvasKeys.versionDetail(canvasId, versionId),
     queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, stage),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
   });
@@ -1074,7 +1089,10 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       }
 
       if (variables.versionId) {
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+        // `version` carries the effective staged spec (fetched with stage=true),
+        // so it belongs to the staged cache entry the editor reads — not the
+        // committed `versionDetail` used by the draft branch list.
+        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, variables.versionId), version);
       }
 
       queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
@@ -1849,7 +1867,7 @@ export const useCanvasConsole = (
   stage = false,
 ) => {
   return useQuery({
-    queryKey: canvasKeys.console(canvasId, versionId),
+    queryKey: stage ? canvasKeys.consoleStaged(canvasId, versionId) : canvasKeys.console(canvasId, versionId),
     queryFn: async () => {
       const spec = await fetchConsoleSpecFromRepository(canvasId, versionId, stage);
       if (!spec) {
@@ -1864,6 +1882,7 @@ export const useCanvasConsole = (
 
 type UseUpdateCanvasConsoleOptions = {
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+  getMutationGeneration?: () => number;
 };
 
 function toCanvasConsole(
@@ -1898,9 +1917,11 @@ export const useUpdateCanvasConsole = (
   const queryClient = useQueryClient();
   return useMutation({
     onMutate: async (input) => {
-      const queryKey = canvasKeys.console(canvasId, versionId);
+      // Console edits are stage-only; write to the staged cache the editor reads.
+      const queryKey = canvasKeys.consoleStaged(canvasId, versionId);
+      const mutationGeneration = options?.getMutationGeneration?.() ?? 0;
       if (input.panels === undefined || input.layout === undefined) {
-        return { previous: queryClient.getQueryData<CanvasConsoleData>(queryKey), queryKey };
+        return { previous: queryClient.getQueryData<CanvasConsoleData>(queryKey), queryKey, mutationGeneration };
       }
 
       await queryClient.cancelQueries({ queryKey });
@@ -1909,7 +1930,7 @@ export const useUpdateCanvasConsole = (
         queryKey,
         toCanvasConsole(canvasId, versionId, { panels: input.panels, layout: input.layout }, previous),
       );
-      return { previous, queryKey };
+      return { previous, queryKey, mutationGeneration };
     },
     mutationFn: async (input: { panels?: ConsolePanel[]; layout?: ConsoleLayoutItem[]; consoleYaml?: string }) => {
       if (!versionId) {
@@ -1960,11 +1981,19 @@ export const useUpdateCanvasConsole = (
     },
     onError: (_error, _input, context) => {
       if (!context) return;
+      const latestGeneration = options?.getMutationGeneration?.() ?? context.mutationGeneration;
+      if (context.mutationGeneration !== latestGeneration) {
+        return;
+      }
       queryClient.setQueryData(context.queryKey, context.previous);
     },
-    onSuccess: (result) => {
+    onSuccess: (result, _input, context) => {
+      const latestGeneration = options?.getMutationGeneration?.() ?? context?.mutationGeneration;
+      if (context && context.mutationGeneration !== latestGeneration) {
+        return;
+      }
       if (result.consoleData) {
-        queryClient.setQueryData(canvasKeys.console(canvasId, versionId), result.consoleData);
+        queryClient.setQueryData(canvasKeys.consoleStaged(canvasId, versionId), result.consoleData);
       }
       if (versionId) {
         queryClient.setQueryData(

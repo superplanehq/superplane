@@ -811,6 +811,10 @@ export function AppPage() {
   const isDrainingCanvasSaveQueueRef = useRef(false);
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
+  // Guards async console mutation callbacks from writing stale staged data after
+  // a Commit/Reset remount. Incremented before version actions that should
+  // invalidate pre-existing console save responses.
+  const consoleMutationGenerationRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const setLastSavedWorkflowSnapshot = useCallback((workflow: CanvasesCanvas | null) => {
@@ -856,7 +860,7 @@ export function AppPage() {
         current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: updatedWorkflow.spec } : current,
       );
       queryClient.setQueryData<CanvasesCanvasVersion | undefined>(
-        canvasKeys.versionDetail(canvasId, activeCanvasVersionId),
+        canvasKeys.versionStagedDetail(canvasId, activeCanvasVersionId),
         (current) => (current ? { ...current, spec: updatedWorkflow.spec } : current),
       );
     },
@@ -1247,6 +1251,7 @@ export function AppPage() {
     suppressUnpublishedDraftDiscard,
     enabled: true,
     registerIgnoredCanvasVersionUpdatedEcho,
+    getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
   });
   const { consoleQuery, updateConsoleMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
     canvasConsoleVersionDiff;
@@ -1260,8 +1265,17 @@ export function AppPage() {
     setEffectiveConsole(next);
   }, []);
   const handleLocalFilesStagingChange = useCallback((hasStaging: boolean) => {
-    setFilesLocalStagingActive(true);
     setLocalHasFilesStaging(hasStaging);
+    // Local files detection only knows about in-session edits (pending changes),
+    // so it must not override the authoritative server staging flag until it has
+    // actually observed a staged edit. On a fresh mount (e.g. after refresh) it
+    // reports `false` before any file is inspected; switching to local detection
+    // then would incorrectly hide persisted server-side staging (orange -> blue).
+    // Once a local edit is seen we keep trusting local detection for the session
+    // so reverting an edit back to committed clears the indicator immediately.
+    if (hasStaging) {
+      setFilesLocalStagingActive(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -4191,6 +4205,7 @@ export function AppPage() {
 
       // Publish operates on the committed draft row, so flush any staged spec
       // edits into the version before promoting it to live.
+      consoleMutationGenerationRef.current += 1;
       await commitCanvasStagingMutation.mutateAsync();
 
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
@@ -4234,6 +4249,7 @@ export function AppPage() {
         return;
       }
 
+      consoleMutationGenerationRef.current += 1;
       await commitCanvasStagingMutation.mutateAsync();
       // Refresh repository files so committed arbitrary files reload from git,
       // then remount the canvas builder and files/console editors to clear any
@@ -4264,6 +4280,7 @@ export function AppPage() {
 
     setIsPreparingVersionAction(true);
     try {
+      consoleMutationGenerationRef.current += 1;
       await discardCanvasStagingMutation.mutateAsync(undefined);
       // Refetch repository file content (including arbitrary non-spec paths) so the
       // Files tab reloads committed git content instead of the staged snapshot cached

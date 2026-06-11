@@ -46,6 +46,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+  getConsoleMutationGeneration?: () => number;
 };
 
 export function useCanvasConsoleVersionDiff({
@@ -55,8 +56,12 @@ export function useCanvasConsoleVersionDiff({
   suppressUnpublishedDraftDiscard,
   enabled,
   registerIgnoredCanvasVersionUpdatedEcho,
+  getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled);
+  // The active console drives the editor, so it must include uncommitted staged
+  // edits (stage=true). The draft-vs-live diff below intentionally uses the
+  // committed console (stage=false) since only committed changes are publishable.
+  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, true);
   const draftDiffVersionId = versionIds.active || versionIds.draft;
   const draftConsoleQuery = useCanvasConsole(
     canvasId,
@@ -103,6 +108,7 @@ export function useCanvasConsoleVersionDiff({
   });
   const updateConsoleMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
     registerIgnoredCanvasVersionUpdatedEcho,
+    getMutationGeneration: getConsoleMutationGeneration,
   });
 
   return {
