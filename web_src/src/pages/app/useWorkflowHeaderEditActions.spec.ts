@@ -6,14 +6,9 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 
 function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof useWorkflowHeaderEditActions>[0]> = {}) {
   const config = {
-    isRunsMode: false,
-    isVersionsMode: false,
-    handleExitRunsMode: vi.fn(),
-    handleExitVersionsMode: vi.fn(),
+    isRunInspectionMode: false,
+    handleClearRunInspection: vi.fn(),
     handleToggleEditMode: vi.fn().mockResolvedValue(undefined),
-    setIsRunsMode: vi.fn(),
-    setIsVersionsMode: vi.fn(),
-    setSelectedRunId: vi.fn(),
     setRunDetailNodeId: vi.fn(),
     setSearchParams: vi.fn() as unknown as SetURLSearchParams,
     ...overrides,
@@ -25,7 +20,7 @@ function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof us
 }
 
 describe("useWorkflowHeaderEditActions", () => {
-  it("does not clear the current view when entering edit mode outside runs", async () => {
+  it("does not clear the current view when entering edit mode outside run inspection", async () => {
     const { result, config } = renderWorkflowHeaderEditActions();
 
     await act(async () => {
@@ -36,7 +31,7 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setSearchParams).not.toHaveBeenCalled();
   });
 
-  it("does not clear the current view when exiting edit mode outside runs", async () => {
+  it("does not clear the current view when exiting edit mode outside run inspection", async () => {
     const { result, config } = renderWorkflowHeaderEditActions();
 
     await act(async () => {
@@ -47,15 +42,13 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setSearchParams).not.toHaveBeenCalled();
   });
 
-  it("clears runs view before entering edit mode", async () => {
-    const { result, config } = renderWorkflowHeaderEditActions({ isRunsMode: true });
+  it("clears run inspection before entering edit mode", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isRunInspectionMode: true });
 
     await act(async () => {
       await result.current.handleEnterEditModeFromHeader();
     });
 
-    expect(config.setIsRunsMode).toHaveBeenCalledWith(false);
-    expect(config.setSelectedRunId).toHaveBeenCalledWith(null);
     expect(config.setRunDetailNodeId).toHaveBeenCalledWith(null);
     expect(config.setSearchParams).toHaveBeenCalledTimes(1);
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
@@ -68,14 +61,9 @@ describe("useWorkflowHeaderEditActions", () => {
 
     renderHook(() =>
       useWorkflowHeaderEditActions({
-        isRunsMode: false,
-        isVersionsMode: false,
-        handleExitRunsMode: vi.fn(),
-        handleExitVersionsMode: vi.fn(),
+        isRunInspectionMode: false,
+        handleClearRunInspection: vi.fn(),
         handleToggleEditMode,
-        setIsRunsMode: vi.fn(),
-        setIsVersionsMode: vi.fn(),
-        setSelectedRunId: vi.fn(),
         setRunDetailNodeId: vi.fn(),
         setSearchParams: setSearchParams as unknown as SetURLSearchParams,
         startup: {

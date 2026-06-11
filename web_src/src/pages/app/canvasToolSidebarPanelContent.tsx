@@ -17,6 +17,8 @@ export interface CanvasRunsSidebarPanelConfig {
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onNavigateRun?: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
   detailDismissedForRunId?: string | null;

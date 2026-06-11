@@ -62,7 +62,7 @@ export function RunsTabListView({
 }: RunsTabListViewProps) {
   return (
     <div
-      className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
+      className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out ${
         isActive ? "translate-x-0" : "-translate-x-full"
       } ${isActive ? "pointer-events-auto" : "pointer-events-none"}`}
     >
@@ -78,7 +78,7 @@ export function RunsTabListView({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
         data-testid="runs-sidebar-scroll"
         onScroll={onScroll}
       >
