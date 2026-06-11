@@ -76,7 +76,7 @@ func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "load live canvas version summary")
 }
 
-func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
+func TestAppAgentTool_UpdateDraftCommitsEdits(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -90,6 +90,25 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	// Pre-stage an edit so we can assert update_draft's commit discards any
+	// pending staging instead of leaving it behind.
+	draft, err := ensureOwnedDraftVersion(canvas.ID, r.User)
+	require.NoError(t, err)
+	require.NotNil(t, draft)
+	_, err = canvasRepository.StageRepositorySpecFileOperations(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		draft.ID.String(),
+		[]*pb.CanvasRepositoryFileOperation{{
+			Path:    canvasRepository.CanvasYAMLRepositoryPath,
+			Content: []byte(canvasYAML),
+		}},
+	)
+	require.NoError(t, err)
+
 	registry := NewDefaultRegistry(Dependencies{
 		Encryptor:      r.Encryptor,
 		Registry:       r.Registry,
@@ -97,7 +116,6 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 		WebhookBaseURL: "https://hooks.example.test",
 	})
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	result, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
@@ -108,12 +126,32 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 		CanvasYAML: canvasYAML,
 	})
 
-	// Agents stage onto their private draft without committing; usage limits
-	// are enforced when the user commits, not at stage time.
 	require.NoError(t, err)
 	update, ok := result.(updateResult)
 	require.True(t, ok)
 	assert.Equal(t, "update_draft", update.Action)
+	require.NotEmpty(t, update.VersionID)
+
+	// update_draft commits into the draft version row and drops any pending
+	// staging, so the agent's committed reads observe exactly what it wrote.
+	committed, err := canvasRepository.ReadRepositorySpecFile(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		update.VersionID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+	assert.NotEmpty(t, committed)
+
+	described, err := canvasRepository.DescribeCanvasVersion(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		update.VersionID,
+	)
+	require.NoError(t, err)
+	assert.False(t, described.GetStagingState().GetHasStaging())
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {

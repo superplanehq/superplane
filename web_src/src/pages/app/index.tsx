@@ -1993,6 +1993,10 @@ export function AppPage() {
   const invalidateCanvasVersionData = useCallback(
     (targetCanvasId: string, targetVersionId?: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
+      // Drafts shown in the versions list come from the draftBranches query, so a
+      // remote create/delete/update of a draft (e.g. via CLI) must refresh it too;
+      // otherwise the new draft never appears and a deleted one lingers.
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(targetCanvasId) });
       if (targetVersionId) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });

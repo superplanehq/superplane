@@ -221,7 +221,7 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 		},
 		pbCanvases.Canvases_CommitCanvasRepositoryFiles_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

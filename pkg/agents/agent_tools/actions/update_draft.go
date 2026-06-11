@@ -55,29 +55,26 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("canvas_yaml or console_yaml is required for update_draft")
 	}
 
-	// Agents may only stage edits onto their private draft; commit and publish
-	// stay user-driven. This mirrors the human `--stage-only` CLI flow: stage
-	// the spec files, then auto-layout the staged canvas when the graph changed.
-	if _, err := canvasRepository.StageRepositorySpecFileOperations(
+	// Commit edits straight into the agent's private draft version row and drop
+	// any pending staging in the same write. The agent's reads (the `read`
+	// action and this action's returned summary) come from the committed version
+	// row, so committing keeps writes and reads consistent. Publishing stays
+	// user-driven. This matches the CLI `apps canvas update --draft-id` flow.
+	if err := canvasRepository.ApplyRepositorySpecFileOperations(
 		ctx,
+		a.deps.UsageService,
+		a.deps.Encryptor,
+		a.deps.Registry,
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
+		a.deps.WebhookBaseURL,
+		a.deps.AuthService,
+		resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate),
+		true,
 		operations,
 	); err != nil {
 		return updateResult{}, err
-	}
-
-	if autoLayout := resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate); autoLayout != nil {
-		if _, err := canvasRepository.ApplyCanvasAutoLayout(
-			ctx,
-			session.OrganizationID,
-			session.CanvasID,
-			draft.ID.String(),
-			autoLayout,
-		); err != nil {
-			return updateResult{}, err
-		}
 	}
 
 	updated, err := models.FindCanvasVersion(canvasID, draft.ID)
