@@ -100,13 +100,19 @@ func (s *runsViewSteps) whenIVisitRunsView() {
 
 func (s *runsViewSteps) whenIVisitRunInspection() {
 	require.NotNil(s.t, s.run, "expected run to be created before visiting run inspection")
+	s.whenIVisitRunsView()
 	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?run=" + s.run.ID.String())
 	s.waitForRunInspectionReady()
 }
 
 func (s *runsViewSteps) waitForRunInspectionReady() {
 	deadline := time.Now().Add(30 * time.Second)
+	runID := s.run.ID.String()
 	for time.Now().Before(deadline) {
+		url := s.session.Page().URL()
+		if !strings.Contains(url, "run="+runID) {
+			break
+		}
 		startHeader := q.TestID("node-start-header").Run(s.session)
 		outputHeader := q.TestID("node-output-header").Run(s.session)
 		startVisible, startErr := startHeader.IsVisible()
@@ -116,6 +122,7 @@ func (s *runsViewSteps) waitForRunInspectionReady() {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	require.Contains(s.t, s.session.Page().URL(), "run="+runID)
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
 }
