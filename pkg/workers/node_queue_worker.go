@@ -255,7 +255,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		// we create a failed execution and delete the queue item.
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
-		executions, err := w.handleNodeConfigurationError(tx, logger, configErr)
+		executions, err := w.handleNodeConfigurationError(tx, logger, configErr, onNewEvents)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -329,7 +329,7 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 	return action.ProcessQueueItem(*ctx)
 }
 
-func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
+func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
 	if err != nil {
 		return nil, err
@@ -366,6 +366,11 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 	if err != nil {
 		return nil, err
 	}
+
+	//
+	// The errored node could not execute, so notify the canvas' On Error nodes.
+	//
+	contexts.DispatchOnError(tx, &execution, onNewEvents)
 
 	if parentExecutionID == nil {
 		if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
