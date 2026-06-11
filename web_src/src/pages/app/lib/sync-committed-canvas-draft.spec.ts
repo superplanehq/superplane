@@ -42,8 +42,9 @@ describe("syncCommittedCanvasDraftState", () => {
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionList("canvas-1"), expect.any(Function));
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
+    const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));
     const updateCanvasDetail = setQueryData.mock.calls.find(
-      ([key]) => key === canvasKeys.detail("org-1", "canvas-1"),
+      ([key]) => JSON.stringify(key) === detailKey,
     )?.[1] as (current: CanvasesCanvas | undefined) => CanvasesCanvas | undefined;
 
     expect(
