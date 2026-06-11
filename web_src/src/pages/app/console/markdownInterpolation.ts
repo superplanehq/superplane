@@ -14,7 +14,17 @@ const TEMPLATE_RE = /\{\{[\s\S]*?\}\}/;
  */
 const RUN_NODE_REF_RE = /\$\s*\[/;
 
-/** Stringify a CEL-evaluated value for inline insertion into markdown. */
+/**
+ * Stringify a CEL-evaluated value for inline insertion into markdown / HTML.
+ *
+ * Arrays (and other non-scalar objects) fall back to JSON so a stray
+ * `{{ tags }}` or `{{ row }}` reference shows something inspectable
+ * (`["a","b"]`) instead of a silently flattened blob or `[object Object]`.
+ * Authors who want to splice list elements into the output do so explicitly
+ * with the `join(list, sep)` builtin — `join(list, "")` for seamless fragment
+ * concatenation (e.g. `{{ join(tags.map(t, "<p>" + t.name + "</p>"), "") }}`)
+ * or any other separator they choose.
+ */
 function stringifyMarkdownValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
