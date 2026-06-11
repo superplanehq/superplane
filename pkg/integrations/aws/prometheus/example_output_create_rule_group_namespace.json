@@ -1,0 +1,11 @@
+{
+  "data": {
+    "ruleGroupNamespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-33333333-3333-4333-8333-333333333333/example-rule-group-namespace",
+      "name": "example-rule-group-namespace"
+    },
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:25:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace"
+}

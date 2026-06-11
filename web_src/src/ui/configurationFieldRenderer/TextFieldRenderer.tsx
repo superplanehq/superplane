@@ -81,12 +81,13 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   value,
   onChange,
   autocompleteExampleObj,
+  allowExpressions = false,
   language,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
-    autocompleteExampleObj,
+    autocompleteExampleObj: allowExpressions ? autocompleteExampleObj : undefined,
     languageId: language,
   });
 

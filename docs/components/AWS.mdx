@@ -59,9 +59,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="ECS • Update Service" href="#ecs-•-update-service" description="Update an AWS ECS service configuration" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="Prometheus • Create Rule Group Namespace" href="#prometheus-•-create-rule-group-namespace" description="Create a rule group namespace in an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Create Workspace" href="#prometheus-•-create-workspace" description="Create an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Delete Rule Group Namespace" href="#prometheus-•-delete-rule-group-namespace" description="Delete a rule group namespace from an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Delete Workspace" href="#prometheus-•-delete-workspace" description="Delete an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Get Rule Group Namespace" href="#prometheus-•-get-rule-group-namespace" description="Get a rule group namespace from an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Get Workspace" href="#prometheus-•-get-workspace" description="Get an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Update Rule Group Namespace" href="#prometheus-•-update-rule-group-namespace" description="Update a rule group namespace in an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Update Workspace" href="#prometheus-•-update-workspace" description="Update a Prometheus workspace alias" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
@@ -2399,6 +2403,39 @@ The Run Lambda component invokes a Lambda function.
 }
 ```
 
+<a id="prometheus-•-create-rule-group-namespace"></a>
+
+## Prometheus • Create Rule Group Namespace
+
+**Component key:** `aws.prometheus.createRuleGroupNamespace`
+
+The Create Rule Group Namespace component creates a rule group namespace in an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Namespace Name**: Name for the new rule group namespace
+- **Rule Groups YAML**: Prometheus rule groups YAML file content
+- **Client Token**: Optional idempotency token
+- **Tags**: Optional rule group namespace tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "ruleGroupNamespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-33333333-3333-4333-8333-333333333333/example-rule-group-namespace",
+      "name": "example-rule-group-namespace"
+    },
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:25:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace"
+}
+```
+
 <a id="prometheus-•-create-workspace"></a>
 
 ## Prometheus • Create Workspace
@@ -2437,6 +2474,36 @@ The Create Workspace component creates an Amazon Managed Service for Prometheus 
 }
 ```
 
+<a id="prometheus-•-delete-rule-group-namespace"></a>
+
+## Prometheus • Delete Rule Group Namespace
+
+**Component key:** `aws.prometheus.deleteRuleGroupNamespace`
+
+The Delete Rule Group Namespace component deletes one rule group namespace and its rule groups definition.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Rule Group Namespace**: Target rule group namespace
+- **Client Token**: Optional idempotency token
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "namespace": "example-rule-group-namespace",
+    "workspaceAlias": "example-workspace",
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:30:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace.deleted"
+}
+```
+
 <a id="prometheus-•-delete-workspace"></a>
 
 ## Prometheus • Delete Workspace
@@ -2465,6 +2532,42 @@ AWS does not immediately delete metrics data that has already been ingested. It 
   },
   "timestamp": "2026-01-01T00:15:00.000000000Z",
   "type": "aws.prometheus.workspace.deleted"
+}
+```
+
+<a id="prometheus-•-get-rule-group-namespace"></a>
+
+## Prometheus • Get Rule Group Namespace
+
+**Component key:** `aws.prometheus.getRuleGroupNamespace`
+
+The Get Rule Group Namespace component retrieves one rule group namespace from an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Rule Group Namespace**: Target rule group namespace
+
+### Example Output
+
+```json
+{
+  "data": {
+    "ruleGroupNamespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-33333333-3333-4333-8333-333333333333/example-rule-group-namespace",
+      "createdAt": "2026-01-01T00:35:00Z",
+      "data": "Z3JvdXBzOgogIC0gbmFtZTogZXhhbXBsZV9yZWNvcmRpbmdfcnVsZXMKICAgIGludGVydmFsOiAzMHMKICAgIHJ1bGVzOgogICAgICAtIHJlY29yZDogZXhhbXBsZTpyZXF1ZXN0c19wZXJfc2Vjb25kOnJhdGUxbQogICAgICAgIGV4cHI6IHwKICAgICAgICAgIHN1bShyYXRlKGV4YW1wbGVfcmVxdWVzdHNfdG90YWxbMW1dKSkKCiAgLSBuYW1lOiBleGFtcGxlX2FsZXJ0aW5nX3J1bGVzCiAgICBpbnRlcnZhbDogMzBzCiAgICBydWxlczoKICAgICAgLSBhbGVydDogRXhhbXBsZUhpZ2hSZXF1ZXN0UmF0ZQogICAgICAgIGV4cHI6IHwKICAgICAgICAgIHN1bShyYXRlKGV4YW1wbGVfcmVxdWVzdHNfdG90YWxbMW1dKSkgPiAxMDAKICAgICAgICBmb3I6IDFtCiAgICAgICAgbGFiZWxzOgogICAgICAgICAgc2V2ZXJpdHk6IHdhcm5pbmcKICAgICAgICAgIHNlcnZpY2U6IGV4YW1wbGUKICAgICAgICBhbm5vdGF0aW9uczoKICAgICAgICAgIHN1bW1hcnk6ICJFeGFtcGxlIGhpZ2ggcmVxdWVzdCByYXRlIgogICAgICAgICAgZGVzY3JpcHRpb246ICJUaGUgZXhhbXBsZSBzZXJ2aWNlIGlzIHJlY2VpdmluZyBtb3JlIHRoYW4gMTAwIHJlcXVlc3RzIHBlciBzZWNvbmQuIgo=",
+      "modifiedAt": "2026-01-01T00:40:00Z",
+      "name": "example-rule-group-namespace",
+      "status": {
+        "statusCode": "ACTIVE"
+      }
+    },
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:45:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace"
 }
 ```
 
@@ -2502,6 +2605,38 @@ The Get Workspace component retrieves details for an Amazon Managed Service for 
   },
   "timestamp": "2026-01-01T00:05:00.000000000Z",
   "type": "aws.prometheus.workspace"
+}
+```
+
+<a id="prometheus-•-update-rule-group-namespace"></a>
+
+## Prometheus • Update Rule Group Namespace
+
+**Component key:** `aws.prometheus.updateRuleGroupNamespace`
+
+The Update Rule Group Namespace component updates the rule groups YAML for an existing Amazon Managed Service for Prometheus rule group namespace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Rule Group Namespace**: Target rule group namespace
+- **Rule Groups YAML**: New Prometheus rule groups YAML file content
+- **Client Token**: Optional idempotency token
+
+### Example Output
+
+```json
+{
+  "data": {
+    "ruleGroupNamespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-33333333-3333-4333-8333-333333333333/example-rule-group-namespace",
+      "name": "example-rule-group-namespace"
+    },
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:50:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace.updated"
 }
 ```
 
