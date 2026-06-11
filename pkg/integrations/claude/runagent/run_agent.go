@@ -3,7 +3,6 @@ package runagent
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -191,7 +190,13 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		AgentVersion:  spec.Version,
 		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
 		VaultIDs:      spec.VaultIDs,
-		Resources:     resources,
+	}
+
+	if len(resources) > 0 {
+		createReq.Resources = resources
+		for _, r := range resources {
+			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
+		}
 	}
 
 	session, err := client.CreateManagedSession(createReq)
@@ -305,7 +310,7 @@ func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []st
 
 		resources = append(resources, FileResource{
 			FileID:    fileID,
-			MountPath: filepath.Base(normalized),
+			MountPath: normalized,
 		})
 	}
 	return resources, nil

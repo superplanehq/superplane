@@ -437,6 +437,26 @@ func (c *Client) SendManagedSessionInterrupt(sessionID string) error {
 
 // UploadFile uploads a file to the Anthropic Files API and returns its ID.
 // The file can then be mounted into a session via CreateManagedSessionRequest.Resources.
+// AddSessionResource attaches a file resource to an existing session.
+// POST /v1/sessions/{id}/resources
+func (c *Client) AddSessionResource(sessionID string, resource FileResource) error {
+	if sessionID == "" {
+		return fmt.Errorf("session id is required")
+	}
+	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/resources"
+	body := map[string]string{
+		"type":       "file",
+		"file_id":    resource.FileID,
+		"mount_path": resource.MountPath,
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal resource: %w", err)
+	}
+	_, err = c.execRequestWithBeta(http.MethodPost, URL, bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	return err
+}
+
 func (c *Client) UploadFile(content io.Reader, filename string) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
