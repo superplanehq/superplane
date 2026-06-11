@@ -33,6 +33,7 @@ func Test__AWS__Sync(t *testing.T) {
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Create Identity Provider")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "IAM Role")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "aps:ListWorkspaces")
 	})
 
 	t.Run("role arn -> sets secrets, metadata, and schedules resync", func(t *testing.T) {
@@ -587,6 +588,52 @@ func Test__AWS__ListResources(t *testing.T) {
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://sns.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("prometheus.workspace returns workspaces", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"workspaces": [
+								{
+									"alias": "metrics",
+									"arn": "arn:aws:aps:us-east-1:123456789012:workspace/ws-abc123",
+									"status": {"statusCode": "ACTIVE"},
+									"workspaceId": "ws-abc123"
+								}
+							]
+						}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("prometheus.workspace", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "prometheus.workspace", resources[0].Type)
+		assert.Equal(t, "metrics", resources[0].Name)
+		assert.Equal(t, "ws-abc123", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://aps.us-east-1.amazonaws.com/workspaces?maxResults=1000", httpContext.Requests[0].URL.String())
 	})
 }
 

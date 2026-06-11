@@ -1,0 +1,9 @@
+{
+  "data": {
+    "alias": "example-workspace-updated",
+    "updated": true,
+    "workspaceId": "ws-22222222-2222-4222-8222-222222222222"
+  },
+  "timestamp": "2026-01-01T00:20:00.000000000Z",
+  "type": "aws.prometheus.workspace.updated"
+}
