@@ -1,7 +1,9 @@
 package agents_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/google/uuid"
@@ -165,4 +167,22 @@ func TestSendAgentChatMessage_RejectsInvalidImages(t *testing.T) {
 			assert.Equal(t, codes.InvalidArgument, status.Code(err))
 		})
 	}
+}
+
+func TestSendAgentChatMessage_RejectsImagesOverPayloadLimit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{}
+
+	// Two 2 MiB images decode to 4 MiB combined, over the per-message budget.
+	big := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0}, 2*1024*1024))
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId: uuid.NewString(),
+		Images: []*pb.AgentChatImage{
+			{MediaType: "image/png", Data: big},
+			{MediaType: "image/png", Data: big},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }

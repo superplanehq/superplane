@@ -16,8 +16,12 @@ import (
 )
 
 const (
-	maxChatImages     = 8
-	maxChatImageBytes = 10 * 1024 * 1024
+	maxChatImages = 8
+
+	// maxChatImagePayloadBytes caps the combined decoded image bytes per message
+	// so the base64-encoded request stays under the gRPC server's 4 MiB receive
+	// limit.
+	maxChatImagePayloadBytes = 3 * 1000 * 1000
 )
 
 var allowedChatImageMediaTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
@@ -62,6 +66,7 @@ func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, 
 	}
 
 	out := make([]agentservice.MessageImage, 0, len(images))
+	total := 0
 	for _, image := range images {
 		if !slices.Contains(allowedChatImageMediaTypes, image.MediaType) {
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported image media type: %q", image.MediaType)
@@ -73,8 +78,9 @@ func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, 
 		if len(decoded) == 0 {
 			return nil, status.Error(codes.InvalidArgument, "image data is empty")
 		}
-		if len(decoded) > maxChatImageBytes {
-			return nil, status.Errorf(codes.InvalidArgument, "image exceeds the %d byte limit", maxChatImageBytes)
+		total += len(decoded)
+		if total > maxChatImagePayloadBytes {
+			return nil, status.Errorf(codes.InvalidArgument, "images exceed the %d byte limit per message", maxChatImagePayloadBytes)
 		}
 		out = append(out, agentservice.MessageImage{MediaType: image.MediaType, Data: image.Data})
 	}
