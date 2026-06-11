@@ -147,42 +147,45 @@ describe("CanvasModeToggle", () => {
       wrapper: routerWrapper,
     });
 
-    expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
   });
 
-  it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
-    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} hasConsoleDraft />, {
-      wrapper: routerWrapper,
-    });
-
-    expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toBeInTheDocument();
-    expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
-  });
-
-  it("uses blue tab styling in edit mode and shows blue draft dots", () => {
+  it("shows orange uncommitted dots and orange tab styling when edits are uncommitted", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
         onSelectConsole={vi.fn()}
         editing
-        hasDraft
-        hasConsoleDraft
+        hasCanvasUncommitted
+        hasConsoleUncommitted
+        editTabTone="uncommitted"
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    const tabList = screen.getByRole("navigation", { name: "Canvas view" });
+    expect(tabList.className).toContain("bg-orange-50");
+    expect(screen.getByTestId("canvas-view-mode-live-uncommitted-dot")).toHaveClass("bg-orange-500");
+    expect(screen.getByTestId("canvas-view-mode-console-uncommitted-dot")).toHaveClass("bg-orange-500");
+  });
+
+  it("shows blue committed dots and blue tab styling when ready to publish", () => {
+    render(
+      <CanvasModeToggle
+        mode="version-live"
+        onSelectLive={vi.fn()}
+        onSelectConsole={vi.fn()}
+        editing
+        hasCanvasCommitted
+        editTabTone="ready"
       />,
       { wrapper: routerWrapper },
     );
 
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-blue-50");
-    expect(tabList.className).not.toContain("bg-slate-100");
-    expect(tabList.className).not.toContain("purple");
-
-    // Inactive tabs get editing-specific styling
-    const consoleTab = screen.getByRole("link", { name: "Console" });
-    expect(consoleTab.className).toContain("text-blue-800/80");
-
-    expect(screen.getByTestId("canvas-view-mode-live-draft-dot")).toHaveClass("bg-blue-500");
-    expect(screen.getByTestId("canvas-view-mode-console-draft-dot")).toHaveClass("bg-blue-500");
+    expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toHaveClass("bg-blue-500");
   });
 
   it("invokes onSelectFiles when clicking the Files tab", async () => {
