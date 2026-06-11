@@ -119,16 +119,28 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 // dispatch acquires a concurrency slot before ACKing the queue message. If
 // another worker already owns the session lock, it durably reschedules the
 // message for the retry queue instead of dropping the follow-up turn.
+//
+// The heartbeat is started as soon as the message arrives (before the slot
+// wait) so the row's last_active_at stays fresh while dispatch is blocked
+// queuing for a slot — under heavy load that wait can outlast
+// stuckStreamGrace, and we don't want cleanup to fail a healthy queued
+// turn. The heartbeat is a no-op when the row isn't in 'streaming' state,
+// so drop/requeue paths and stale messages don't accidentally resurrect
+// idle rows.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
+	stopHeartbeat := startDispatchHeartbeat(ctx, body)
+
 	select {
 	case w.slots <- struct{}{}:
 	case <-ctx.Done():
+		stopHeartbeat()
 		return ctx.Err()
 	}
 
 	request, err := prepareAgentStreamRequest(ctx, body)
 	if err != nil {
 		<-w.slots
+		stopHeartbeat()
 		if errors.Is(err, errAgentStreamAlreadyLocked) {
 			return w.rescheduleLockedRequest(ctx, body)
 		}
@@ -136,11 +148,13 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	}
 	if request == nil {
 		<-w.slots
+		stopHeartbeat()
 		return nil
 	}
 
 	go func() {
 		defer func() {
+			stopHeartbeat()
 			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
@@ -152,6 +166,24 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 		}
 	}()
 	return nil
+}
+
+// startDispatchHeartbeat parses the session id out of the queue body and, if
+// it's well-formed, spawns a heartbeat goroutine. Returns a no-op stopper
+// when the body is unparseable so the dispatch return paths can always call
+// stop() unconditionally.
+func startDispatchHeartbeat(ctx context.Context, body []byte) func() {
+	var req messages.AgentStreamRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return func() {}
+	}
+	sessionID, err := uuid.Parse(req.SessionID)
+	if err != nil {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go runStreamHeartbeat(heartbeatCtx, sessionID)
+	return cancel
 }
 
 func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
@@ -319,10 +351,6 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 			log.WithError(err).Warn("agent stream: failed to publish event")
 		}
 	}
-
-	heartbeatCtx, stopHeartbeat := context.WithCancel(parentCtx)
-	defer stopHeartbeat()
-	go runStreamHeartbeat(heartbeatCtx, sessionID)
 
 	for {
 		turnStartedAt := session.UpdatedAt
