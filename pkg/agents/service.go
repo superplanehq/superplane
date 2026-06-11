@@ -467,12 +467,7 @@ func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (strin
 		Subject: userID,
 		OrgID:   organizationID,
 		Purpose: "agent-builder",
-		Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
-			{ResourceType: "org", Action: "read"},
-			{ResourceType: "integrations", Action: "read"},
-			{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-			{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
-		}),
+		Scopes:  AgentTokenScopes(canvasID),
 	}
 	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
 	if err != nil {

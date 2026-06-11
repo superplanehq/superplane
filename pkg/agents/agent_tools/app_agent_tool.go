@@ -59,7 +59,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Read and update the current SuperPlane app canvas without invoking the SuperPlane CLI. Use this tool before shell commands when you need the canvas YAML, console YAML, connected integration IDs, or when you need to save draft graph or console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft only creates or updates the caller's private draft and returns the draft version ID plus validation issues."
+	return "Inspect access, read, and update the current SuperPlane app canvas without invoking the SuperPlane CLI. Use access to check the current agent token's interceptor-backed API permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft only creates or updates the caller's private draft and returns the draft version ID plus validation issues."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -69,7 +69,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use read for current YAML, update_draft to save canvas_yaml and/or console_yaml to a draft, and list_integrations for connected integration IDs.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, update_draft to save canvas_yaml and/or console_yaml to a draft, and list_integrations for connected integration IDs.",
 			},
 			"canvas_id": {
 				Type:        "string",
@@ -108,6 +108,45 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 						Items: &agents.CustomToolInputSchema{Type: "string"},
 					},
 				},
+			},
+			"resource": {
+				Type:        "string",
+				Enum:        []string{"memory", "runs", "canvas_events", "event_executions", "node_executions", "node_queue_items", "node_events", "child_executions"},
+				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read.",
+			},
+			"namespace": {
+				Type:        "string",
+				Description: "For read_runtime resource memory. Optional client-side namespace filter, matching the CLI behavior.",
+			},
+			"node_id": {
+				Type:        "string",
+				Description: "For read_runtime resources node_executions, node_queue_items, and node_events.",
+			},
+			"event_id": {
+				Type:        "string",
+				Description: "For read_runtime resource event_executions.",
+			},
+			"execution_id": {
+				Type:        "string",
+				Description: "For read_runtime resource child_executions.",
+			},
+			"limit": {
+				Type:        "integer",
+				Description: "For read_runtime paginated resources. Backend defaults apply when omitted.",
+			},
+			"before": {
+				Type:        "string",
+				Description: "For read_runtime paginated resources. RFC3339 timestamp cursor.",
+			},
+			"states": {
+				Type:        "array",
+				Description: "For read_runtime resources runs and node_executions. Use started/finished for runs; pending/started/finished for node executions.",
+				Items:       &agents.CustomToolInputSchema{Type: "string"},
+			},
+			"results": {
+				Type:        "array",
+				Description: "For read_runtime resources runs and node_executions. Use passed/failed/cancelled for runs; passed/failed for node executions.",
+				Items:       &agents.CustomToolInputSchema{Type: "string"},
 			},
 		},
 		Required: []string{"action"},
