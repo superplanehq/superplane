@@ -144,4 +144,26 @@ describe("RunDetailPanel", () => {
     expect(onNavigateRun).toHaveBeenNthCalledWith(1, "run-newer");
     expect(onNavigateRun).toHaveBeenNthCalledWith(2, "run-older");
   });
+
+  it("loads more runs when navigating older at the paginated boundary", async () => {
+    const user = userEvent.setup();
+    const onNavigateOlder = vi.fn();
+
+    render(
+      <RunDetailPanel
+        canvasId="canvas-1"
+        run={makeRun()}
+        workflowNodes={workflowNodes}
+        componentIconMap={{}}
+        selectedNodeId={null}
+        onSelectNode={() => {}}
+        onBack={() => {}}
+        onNavigateRun={() => {}}
+        onNavigateOlder={onNavigateOlder}
+      />,
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onNavigateOlder).toHaveBeenCalledTimes(1);
+  });
 });

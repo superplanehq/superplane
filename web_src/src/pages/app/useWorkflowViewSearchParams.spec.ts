@@ -44,6 +44,28 @@ describe("useWorkflowViewSearchParams", () => {
     expect(setSearchParams).not.toHaveBeenCalled();
   });
 
+  it("ignores run inspection when a non-canvas view is active", () => {
+    const setSearchParams = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkflowViewSearchParams(makeSearchParams({ view: "console", run: "run-42" }), setSearchParams),
+    );
+
+    expect(result.current.isRunInspectionMode).toBe(false);
+    expect(result.current.selectedRunId).toBeNull();
+  });
+
+  it("migrates conflicting run params on non-canvas views", async () => {
+    const setSearchParams = vi.fn();
+    renderHook(() => useWorkflowViewSearchParams(makeSearchParams({ view: "memory", run: "run-42" }), setSearchParams));
+
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+
+    expect(next.get("view")).toBe("memory");
+    expect(next.get("run")).toBeNull();
+  });
+
   it("accepts legacy dashboard view links and migrates them to console", async () => {
     const setSearchParams = vi.fn();
     const { result } = renderHook(() =>
