@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSidebarRunIds, getAdjacentSidebarRunId } from "./runsSidebarNavigation";
+import {
+  buildSidebarRunIds,
+  canNavigateToOlderRun,
+  getAdjacentSidebarRunId,
+  getRunSidebarNavigation,
+  isAtOlderRunPaginationBoundary,
+} from "./runsSidebarNavigation";
 
 describe("runsSidebarNavigation", () => {
   const orderedRuns = {
@@ -25,5 +31,31 @@ describe("runsSidebarNavigation", () => {
     const runIds = buildSidebarRunIds(orderedRuns);
     expect(getAdjacentSidebarRunId(runIds, "run-running", "prev")).toBeNull();
     expect(getAdjacentSidebarRunId(runIds, "run-older", "next")).toBeNull();
+  });
+
+  it("detects the older pagination boundary", () => {
+    const runIds = buildSidebarRunIds(orderedRuns);
+    expect(isAtOlderRunPaginationBoundary(runIds, "run-older")).toBe(true);
+    expect(isAtOlderRunPaginationBoundary(runIds, "run-newer")).toBe(false);
+  });
+
+  it("allows older navigation at the pagination boundary when more runs exist", () => {
+    const runIds = buildSidebarRunIds(orderedRuns);
+    expect(canNavigateToOlderRun(runIds, "run-older", false)).toBe(false);
+    expect(canNavigateToOlderRun(runIds, "run-older", true)).toBe(true);
+    expect(canNavigateToOlderRun(runIds, "run-newer", true)).toBe(true);
+  });
+
+  it("includes pagination in sidebar navigation state", () => {
+    expect(getRunSidebarNavigation(orderedRuns, "run-older", false)).toMatchObject({
+      olderRunId: null,
+      canNavigateOlder: false,
+      atOlderPaginationBoundary: true,
+    });
+    expect(getRunSidebarNavigation(orderedRuns, "run-older", true)).toMatchObject({
+      olderRunId: null,
+      canNavigateOlder: true,
+      atOlderPaginationBoundary: true,
+    });
   });
 });

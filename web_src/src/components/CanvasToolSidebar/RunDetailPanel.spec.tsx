@@ -135,6 +135,7 @@ describe("RunDetailPanel", () => {
         onBack={() => {}}
         newerRunId="run-newer"
         olderRunId="run-older"
+        canNavigateOlder
         onNavigateRun={onNavigateRun}
       />,
     );
@@ -158,6 +159,7 @@ describe("RunDetailPanel", () => {
         selectedNodeId={null}
         onSelectNode={() => {}}
         onBack={() => {}}
+        canNavigateOlder
         onNavigateRun={() => {}}
         onNavigateOlder={onNavigateOlder}
       />,
