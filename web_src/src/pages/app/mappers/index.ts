@@ -123,6 +123,7 @@ import {
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
   componentMappers as jfrogArtifactoryComponentMappers,
@@ -331,6 +332,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  coolify: coolifyComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,

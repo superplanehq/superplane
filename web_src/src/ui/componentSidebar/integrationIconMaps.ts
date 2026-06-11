@@ -13,6 +13,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import coolifyIcon from "@/assets/icons/integrations/coolify.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
@@ -68,6 +69,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   circleci: circleciIcon,
   azure: azureIcon,
   cloudflare: cloudflareIcon,
+  coolify: coolifyIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
@@ -117,6 +119,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   bitbucket: bitbucketIcon,
   circleci: circleciIcon,
   cloudflare: cloudflareIcon,
+  coolify: coolifyIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
