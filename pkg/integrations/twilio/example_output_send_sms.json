@@ -1,0 +1,7 @@
+{
+  "messageSid": "SM1234567890abcdef1234567890abcdef",
+  "status": "queued",
+  "to": "+15551234567",
+  "from": "+15559876543",
+  "body": "Alert: Production database CPU at 95%"
+}
