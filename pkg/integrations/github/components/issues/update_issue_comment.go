@@ -160,7 +160,7 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"github.issueComment.updated",
+		"github.issueComment",
 		[]any{updatedComment},
 	)
 }
