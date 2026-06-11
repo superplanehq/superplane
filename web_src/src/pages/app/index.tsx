@@ -4741,7 +4741,9 @@ export function AppPage() {
 
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isRunInspectionMode,
+    isVersionsMode: urlViewFlags.isVersionsMode,
     handleClearRunInspection,
+    handleExitVersionsMode,
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,

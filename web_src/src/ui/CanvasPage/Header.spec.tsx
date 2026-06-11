@@ -36,7 +36,7 @@ const toolSidebarState = {
 } satisfies CanvasToolSidebarState;
 
 function renderHeader(
-  mode: "version-live" | "version-edit",
+  mode: "version-live" | "version-edit" | "versions",
   options?: {
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
@@ -71,6 +71,12 @@ describe("Header", () => {
     renderHeader("version-live");
 
     expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
+  });
+
+  it("hides enter edit actions on the versions tab", () => {
+    renderHeader("versions");
+
+    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 
   it("renders without crashing when canvasName is undefined", () => {
