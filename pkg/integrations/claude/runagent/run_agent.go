@@ -192,7 +192,10 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
 		}
 		encoded, _ := json.Marshal(fileIDs)
-		_ = ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded))
+		if err := ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded)); err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
+			return fmt.Errorf("failed to persist uploaded file IDs: %w", err)
+		}
 	}
 
 	aid := strings.TrimSpace(spec.Agent)
