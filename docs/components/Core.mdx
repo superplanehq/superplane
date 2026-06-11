@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
@@ -670,6 +671,77 @@ The expression has access to:
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "if.executed"
+}
+```
+
+<a id="loop"></a>
+
+## Loop
+
+**Component key:** `loop`
+
+The Loop component runs downstream steps repeatedly until an exit condition becomes true.
+
+### Use Cases
+
+- Poll an API until a resource reaches a ready state
+- Retry a workflow segment until validation passes
+- Paginate through results until all pages are processed
+- Run approval or review cycles until consensus is reached
+
+### How It Works
+
+1. On the first run, Loop emits to the **Next** channel and starts the loop session
+2. Connect downstream nodes to the Next output and wire the last step back to Loop
+3. When those steps finish, Loop evaluates the **Until Expression**
+4. If the expression is `true`, Loop emits on **Done** and the loop ends
+5. If the expression is `false`, Loop emits on **Next** again for another iteration
+
+### Wiring
+
+```
+Trigger → Loop → Step A → Step B ──┐
+              ↑                    │
+              └────────────────────┘
+```
+
+Edges back into Loop are allowed so downstream steps can return control for the next condition check.
+
+### Output Channels
+
+- **Done**: Emitted once when the loop stops. Payload is under `data.done` with `iterations`, `stopReason` (`conditionTrue` or `max_iterations`), and `elapsedMs`
+- **Next**: Emitted at the start of each iteration. Payload is under `data.next` with `iteration` and `maxIterations`
+
+### Limits
+
+- **Max Iterations** caps how many iterations are allowed (default 100, maximum 500)
+- **Timeout** caps the total wall-clock time of a single run (default 3600s, maximum 86400s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
+
+### Delay Between Iterations
+
+Optionally wait before starting the next iteration. Uses the same fixed or exponential backoff strategies as the HTTP component retry settings. The first iteration always starts immediately; delays apply between subsequent iterations only.
+
+### Expression Environment
+
+The until expression has access to:
+
+- **$**: The run context data, including outputs from the latest iteration
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "done": {
+      "elapsedMs": 4521,
+      "iterations": 3,
+      "stopReason": "conditionTrue"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "loop.done"
 }
 ```
 
