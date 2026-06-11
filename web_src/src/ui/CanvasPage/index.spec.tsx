@@ -500,7 +500,7 @@ describe("CanvasPage connection drop", () => {
     vi.useRealTimers();
   });
 
-  it("closes the run node detail pane when the canvas background is clicked in runs mode", () => {
+  it("keeps the run node detail pane open when the canvas background is clicked in runs mode", () => {
     const onRunNodeDetailClose = vi.fn();
 
     render(
@@ -533,6 +533,6 @@ describe("CanvasPage connection drop", () => {
       reactFlowPropsRef.current?.onPaneClick?.();
     });
 
-    expect(onRunNodeDetailClose).toHaveBeenCalledTimes(1);
+    expect(onRunNodeDetailClose).not.toHaveBeenCalled();
   });
 });
