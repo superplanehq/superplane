@@ -562,6 +562,49 @@ func TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt(t *testi
 		"a stream error that arrives after Stop must not overwrite the user's interrupt")
 }
 
+func TestAgentStreamWorker_DropsAssistantEventsAfterInterrupt(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// The user reported seeing a new message appear in the transcript
+	// AFTER clicking Stop. This guards the race: InterruptSession flips
+	// the row to idle, then late events arrive from the still-open SSE
+	// (Anthropic flushing already-generated content). handleProviderEvent
+	// must check status per event and exit the stream without persisting
+	// or broadcasting anything to the UI.
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+		events: []agents.ProviderEvent{
+			{ProviderEventID: "msg-late", Type: agents.ProviderEventAssistantMessage, Text: "late content that must not appear"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	done := make(chan error, 1)
+	go func() { done <- w.Handle(context.Background(), body) }()
+
+	<-provider.streamReady
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	close(provider.release)
+	require.NoError(t, <-done)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	assert.Empty(t, stored, "no assistant rows must be persisted once the session has been reset; late SSE content must be discarded")
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"the worker must exit cleanly without overwriting the user's stop with an idle/failed transition of its own")
+}
+
 func TestAgentStreamWorker_MarksFailedOnSessionError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

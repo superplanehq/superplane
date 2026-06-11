@@ -50,6 +50,7 @@ const (
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
+var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
@@ -432,6 +433,12 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		if errors.Is(err, errCustomToolResultsRequired) {
 			err = nil
 		}
+		if errors.Is(err, errSessionAlreadyReset) {
+			// The row was reset out from under us (Stop/cleanup/fail).
+			// Exit with no streamErr so handleLocked's IfUnchanged checks
+			// see the existing terminal state and return cleanly.
+			return nil
+		}
 		if streamErr == nil && err != nil && !isContextCancel(err) {
 			streamErr = err
 		}
@@ -452,6 +459,20 @@ func handleProviderEvent(
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
+	// Drop any event arriving after the row has been reset (interrupt,
+	// failure, cleanup) so late content from a stopped turn doesn't pop
+	// into the transcript or fire WS broadcasts. The per-event DB check
+	// is cheap (single indexed lookup) and is the only way to close the
+	// race between InterruptSession's commit and Anthropic's in-flight
+	// SSE bytes — a status-flagged-but-already-queued event would
+	// otherwise slip through.
+	streaming, err := models.IsAgentSessionStreaming(sessionID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: status check failed; processing event anyway")
+	} else if !streaming {
+		return errSessionAlreadyReset
+	}
+
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
 		return persistAssistantEvent(sessionID, evt, publish)

@@ -125,6 +125,22 @@ func UpdateAgentSessionStatusIfUnchanged(sessionID uuid.UUID, status string, unc
 	return UpdateAgentSessionStatusIfUnchangedInTransaction(database.Conn(), sessionID, status, unchangedSince)
 }
 
+// IsAgentSessionStreaming is a focused check the worker uses to drop
+// events that arrive after the row has been reset (interrupt, failure,
+// cleanup). Returns true only when a row exists and its status is
+// AgentSessionStatusStreaming — anything else means the worker should
+// stop processing this stream.
+func IsAgentSessionStreaming(sessionID uuid.UUID) (bool, error) {
+	var count int64
+	if err := database.Conn().Model(&AgentSession{}).
+		Where("id = ?", sessionID).
+		Where("status = ?", AgentSessionStatusStreaming).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // TouchAgentSessionHeartbeat bumps heartbeat_at without touching status or
 // updated_at, so the cleanup loop can distinguish "worker is still alive"
 // from "row leaked". heartbeat_at is a dedicated column so cleanup can

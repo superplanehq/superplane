@@ -119,22 +119,16 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 // a stuck "streaming" row (e.g. when the stream worker died mid-turn) had no
 // manual recovery path — the row sat there until FailStuckStreamingSessions
 // timed it out 30 min later.
+//
+// Local reset runs *before* the provider HTTP call so the stream worker
+// (which checks status per event) starts dropping late events while we
+// wait on the network roundtrip to the provider — otherwise Anthropic
+// can keep emitting already-generated tokens for tens of ms and the UI
+// shows new content even though the user stopped.
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
-	}
-
-	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
-		// ErrProviderSessionUnavailable means the upstream is already gone — a
-		// no-op interrupt. Any other provider error we log and still proceed,
-		// because leaving the local row stuck would defeat the whole point of
-		// the stop button; SendMessage's recovery paths will reconcile next.
-		if errors.Is(err, ErrProviderSessionUnavailable) {
-			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, resetting locally")
-		} else {
-			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: provider returned error, resetting locally anyway")
-		}
 	}
 
 	closeOpenToolsForSession(sessionID)
@@ -149,6 +143,18 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 		Status:    models.AgentSessionStatusIdle,
 	}); err != nil {
 		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish status event")
+	}
+
+	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
+		// ErrProviderSessionUnavailable means the upstream is already gone — a
+		// no-op interrupt. Any other provider error we log and still proceed,
+		// because leaving the local row stuck would defeat the whole point of
+		// the stop button; SendMessage's recovery paths will reconcile next.
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, local reset already done")
+		} else {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: provider returned error, local reset already done")
+		}
 	}
 	return nil
 }
