@@ -59,6 +59,19 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "comment ID is not a valid number")
 	})
 
+	t.Run("handles scientific notation comment ID", func(t *testing.T) {
+		// Large GitHub IDs can arrive as scientific notation through expressions
+		id, err := parseCommentID("1.234567890e+09")
+		require.NoError(t, err)
+		require.Equal(t, int64(1234567890), id)
+	})
+
+	t.Run("handles plain integer comment ID", func(t *testing.T) {
+		id, err := parseCommentID("1234567890")
+		require.NoError(t, err)
+		require.Equal(t, int64(1234567890), id)
+	})
+
 	t.Run("fails when configuration decode fails", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration:    &contexts.IntegrationContext{},

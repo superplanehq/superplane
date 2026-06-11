@@ -139,7 +139,7 @@ func (c *UpdateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	commentID, err := strconv.ParseInt(config.CommentID, 10, 64)
+	commentID, err := parseCommentID(config.CommentID)
 	if err != nil {
 		return fmt.Errorf("comment ID is not a valid number: %v", err)
 	}
@@ -173,3 +173,19 @@ func (c *UpdateIssueComment) Cancel(ctx core.ExecutionContext) error      { retu
 func (c *UpdateIssueComment) Cleanup(ctx core.SetupContext) error         { return nil }
 func (c *UpdateIssueComment) Hooks() []core.Hook                          { return []core.Hook{} }
 func (c *UpdateIssueComment) HandleHook(ctx core.ActionHookContext) error { return nil }
+
+// parseCommentID handles both plain integer strings and scientific notation
+// (e.g. "1.234567e+09") which can occur when large GitHub IDs pass through
+// JSON expression evaluation.
+func parseCommentID(s string) (int64, error) {
+	// Try integer first
+	if id, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return id, nil
+	}
+	// Fall back to float parsing for scientific notation
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int64(f), nil
+}

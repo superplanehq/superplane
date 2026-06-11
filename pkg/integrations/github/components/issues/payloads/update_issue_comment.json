@@ -1,13 +1,14 @@
 {
-  "id": 1234567890,
-  "node_id": "IC_kwDOExample",
-  "url": "https://api.github.com/repos/superplanehq/superplane/issues/comments/1234567890",
-  "html_url": "https://github.com/superplanehq/superplane/issues/42#issuecomment-1234567890",
-  "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal.",
-  "user": {
-    "login": "superplane-bot",
-    "id": 12345678
+  "data": {
+    "id": 5001,
+    "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal refactors with no user-facing impact.",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "user": {
+      "login": "superplane-app[bot]"
+    },
+    "created_at": "2026-01-16T17:56:16Z",
+    "updated_at": "2026-01-16T18:30:00Z"
   },
-  "created_at": "2026-06-11T12:00:00Z",
-  "updated_at": "2026-06-11T14:30:00Z"
+  "timestamp": "2026-01-16T18:30:00.680755501Z",
+  "type": "github.issueComment"
 }
