@@ -442,9 +442,29 @@ func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.L
 	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
 }
 
-func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.StageCanvasRepositoryFileRequest) (*pb.StageCanvasRepositoryFileResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CommitCanvasRepositoryFiles(
+	state, err := canvases.StageRepositorySpecFileOperations(
+		ctx,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		req.Operations,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.StageCanvasRepositoryFileResponse{StagingState: state}, nil
+}
+
+func (s *CanvasService) DiscardCanvasStaging(ctx context.Context, req *pb.DiscardCanvasStagingRequest) (*pb.DiscardCanvasStagingResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DiscardCanvasStaging(ctx, organizationID, req.CanvasId, req.VersionId, req.Paths)
+}
+
+func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasStaging(
 		ctx,
 		s.gitProvider,
 		s.usageService,
@@ -452,12 +472,13 @@ func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb
 		s.registry,
 		organizationID,
 		req.CanvasId,
-		req.GetVersionId(),
-		req.ExpectedHeadSha,
-		req.Message,
-		req.Operations,
-		req.AutoLayout,
+		req.VersionId,
 		s.webhookBaseURL,
 		s.authService,
 	)
+}
+
+func (s *CanvasService) ApplyCanvasAutoLayout(ctx context.Context, req *pb.ApplyCanvasAutoLayoutRequest) (*pb.ApplyCanvasAutoLayoutResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ApplyCanvasAutoLayout(ctx, organizationID, req.CanvasId, req.VersionId, req.AutoLayout)
 }

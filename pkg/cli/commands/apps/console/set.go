@@ -68,15 +68,13 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if err := common.CommitRepositorySpecFile(
+	if err := common.StageCommitRepositorySpecFile(
 		ctx,
 		canvasID,
 		versionID,
 		common.ConsoleYAMLRepositoryPath,
 		yamlBytes,
-		"Update console.yaml",
 		nil,
-		false,
 	); err != nil {
 		return err
 	}
