@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import {
-  SIDEBAR_MIN_WIDTH,
+  AUX_SIDEBAR_MIN_WIDTH,
   useAuxLeftSidebarMount,
   useSidebarLayoutStore,
   useSidebarLayoutViewport,
@@ -30,7 +30,7 @@ export function useAuxiliarySidebarWidth(isOpen: boolean, storageKey: string, de
     const handleMouseMove = (event: MouseEvent) => {
       const rect = sidebarRef.current?.getBoundingClientRect();
       const left = rect?.left ?? 0;
-      resizeAuxLeft(Math.max(SIDEBAR_MIN_WIDTH, Math.round(event.clientX - left)));
+      resizeAuxLeft(Math.max(AUX_SIDEBAR_MIN_WIDTH, Math.round(event.clientX - left)));
     };
 
     const handleMouseUp = () => setAuxLeftResizing(false);

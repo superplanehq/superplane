@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
+import { isWorkflowCanvasViewParam } from "./viewState";
 
 /**
  * The user-facing console feature is keyed by `?view=console` in the URL.
@@ -8,9 +9,42 @@ import type { SetURLSearchParams } from "react-router-dom";
  */
 const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
+const LEGACY_RUNS_VIEW = "runs";
 
 function isConsoleView(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
+}
+
+function migrateLegacyViewParams(view: string, params: URLSearchParams): URLSearchParams | null {
+  if (view === LEGACY_CONSOLE_VIEW) {
+    const next = new URLSearchParams(params);
+    next.set("view", CONSOLE_VIEW);
+    return next;
+  }
+
+  if (view === LEGACY_RUNS_VIEW) {
+    const next = new URLSearchParams(params);
+    next.delete("view");
+    return next;
+  }
+
+  return null;
+}
+
+function migrateConflictingRunParam(view: string, params: URLSearchParams): URLSearchParams | null {
+  if (!params.get("run")) {
+    return null;
+  }
+
+  if (isWorkflowCanvasViewParam(view)) {
+    return null;
+  }
+
+  const next = new URLSearchParams(params);
+  next.delete("run");
+  next.delete("sidebar");
+  next.delete("node");
+  return next;
 }
 
 /**
@@ -23,12 +57,12 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   const runParam = searchParams.get("run") ?? "";
   const consoleViewActive = isConsoleView(viewParam);
 
-  const isRunsMode = viewParam === "runs";
-  const isVersionsMode = viewParam === "versions";
   const isMemoryMode = viewParam === "memory";
   const isFilesMode = viewParam === "files";
+  const isVersionsMode = viewParam === "versions";
   const isConsoleMode = consoleViewActive;
-  const selectedRunId = runParam || null;
+  const isRunInspectionMode = Boolean(runParam) && isWorkflowCanvasViewParam(viewParam);
+  const selectedRunId = isRunInspectionMode ? runParam : null;
 
   const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
   const [isConsoleYamlOpen, setIsConsoleYamlOpen] = useState(false);
@@ -37,43 +71,39 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   setSearchParamsRef.current = setSearchParams;
 
   useEffect(() => {
-    if (consoleViewActive) {
-      // Migrate legacy `?view=dashboard` to the canonical `?view=console`
-      // in-place so the address bar and any future link sharing reflect
-      // the renamed feature without breaking existing bookmarks.
-      if (viewParam === LEGACY_CONSOLE_VIEW) {
-        setSearchParamsRef.current(
-          (current) => {
-            const next = new URLSearchParams(current);
-            if (next.get("view") !== LEGACY_CONSOLE_VIEW) {
-              return current;
-            }
-            next.set("view", CONSOLE_VIEW);
-            return next;
-          },
-          { replace: true },
-        );
-      }
-    } else {
-      setIsConsoleAddPanelOpen(false);
-      setIsConsoleYamlOpen(false);
+    const migrated = migrateLegacyViewParams(viewParam, searchParams);
+    if (migrated) {
+      setSearchParamsRef.current(migrated, { replace: true });
+      return;
     }
-  }, [viewParam, consoleViewActive]);
+
+    const runMigrated = migrateConflictingRunParam(viewParam, searchParams);
+    if (runMigrated) {
+      setSearchParamsRef.current(runMigrated, { replace: true });
+      return;
+    }
+
+    if (consoleViewActive) {
+      return;
+    }
+
+    setIsConsoleAddPanelOpen(false);
+    setIsConsoleYamlOpen(false);
+  }, [viewParam, consoleViewActive, searchParams]);
 
   const noopSetBoolean = useCallback((_value: boolean) => {}, []);
   const noopSetSelectedRunId = useCallback((_value: string | null) => {}, []);
 
   return {
-    isRunsMode,
-    setIsRunsMode: noopSetBoolean,
-    isVersionsMode,
-    setIsVersionsMode: noopSetBoolean,
+    isRunInspectionMode,
     isConsoleMode,
     setIsConsoleMode: noopSetBoolean,
     isMemoryMode,
     setIsMemoryMode: noopSetBoolean,
     isFilesMode,
     setIsFilesMode: noopSetBoolean,
+    isVersionsMode,
+    setIsVersionsMode: noopSetBoolean,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
