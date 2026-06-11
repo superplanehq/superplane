@@ -20,6 +20,7 @@ export interface RunDetailPanelProps {
   onBack: () => void;
   newerRunId?: string | null;
   olderRunId?: string | null;
+  canNavigateOlder?: boolean;
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
 }
@@ -34,6 +35,7 @@ export function RunDetailPanel({
   onBack,
   newerRunId = null,
   olderRunId = null,
+  canNavigateOlder = false,
   onNavigateRun,
   onNavigateOlder,
 }: RunDetailPanelProps) {
@@ -103,7 +105,7 @@ export function RunDetailPanel({
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      disabled={!olderRunId && !onNavigateOlder}
+                      disabled={!canNavigateOlder}
                       aria-label="Older Run"
                       data-testid="run-detail-older"
                       onClick={() => {

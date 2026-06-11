@@ -4,7 +4,7 @@ import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunDetailPanel } from "./RunDetailPanel";
 import { RunsTabListView } from "./RunsTabListView";
-import { buildSidebarRunIds, getAdjacentSidebarRunId } from "./runsSidebarNavigation";
+import { getAdjacentSidebarRunId, getRunSidebarNavigation } from "./runsSidebarNavigation";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { useRunFilters } from "./useRunFilters";
 
@@ -96,8 +96,12 @@ export function RunsTabPanel({
   }, [detailDismissedForRunId, initialOpenDetail, selectedRunId]);
 
   useEffect(() => {
+    if (sidebarView === "detail" && selectedRunId) {
+      return;
+    }
+
     loadMoreIfNeeded(scrollRef.current);
-  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
+  }, [filterState.filteredRuns.length, loadMoreIfNeeded, selectedRunId, sidebarView]);
 
   const handleRunSelect = useCallback(
     (runId: string) => {
@@ -117,26 +121,19 @@ export function RunsTabPanel({
     onSelectLiveCanvas();
   }, [onSelectLiveCanvas]);
 
-  const sidebarRunIds = useMemo(() => buildSidebarRunIds(filterState.orderedRuns), [filterState.orderedRuns]);
-
-  const newerRunId = useMemo(
-    () => (selectedRunId ? getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "prev") : null),
-    [selectedRunId, sidebarRunIds],
+  const {
+    runIds: sidebarRunIds,
+    newerRunId,
+    olderRunId,
+    canNavigateOlder,
+    atOlderPaginationBoundary,
+  } = useMemo(
+    () => getRunSidebarNavigation(filterState.orderedRuns, selectedRunId, !!hasNextPage),
+    [filterState.orderedRuns, hasNextPage, selectedRunId],
   );
 
-  const olderRunId = useMemo(
-    () => (selectedRunId ? getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "next") : null),
-    [selectedRunId, sidebarRunIds],
-  );
-
-  const isAtLoadedOlderBoundary = useMemo(() => {
-    if (!selectedRunId || olderRunId || sidebarRunIds.length === 0) {
-      return false;
-    }
-    return sidebarRunIds[sidebarRunIds.length - 1] === selectedRunId;
-  }, [olderRunId, selectedRunId, sidebarRunIds]);
-
-  const pendingOlderNavigationRef = useRef(false);
+  const olderNavigationLoadRequestedRef = useRef(false);
+  const [pendingOlderNavigation, setPendingOlderNavigation] = useState(false);
 
   const handleNavigateRun = useCallback(
     (runId: string) => {
@@ -152,38 +149,58 @@ export function RunsTabPanel({
       return;
     }
 
-    if (!isAtLoadedOlderBoundary || !hasNextPage || !onLoadMore) {
+    if (!atOlderPaginationBoundary || !hasNextPage) {
       return;
     }
 
-    pendingOlderNavigationRef.current = true;
-    onLoadMore();
-  }, [handleNavigateRun, hasNextPage, isAtLoadedOlderBoundary, olderRunId, onLoadMore]);
+    setPendingOlderNavigation(true);
+  }, [atOlderPaginationBoundary, handleNavigateRun, hasNextPage, olderRunId]);
 
   useEffect(() => {
-    if (!pendingOlderNavigationRef.current || isFetchingNextPage) {
+    if (!pendingOlderNavigation || isFetchingNextPage || !onLoadMore) {
       return;
     }
 
     if (!selectedRunId) {
-      pendingOlderNavigationRef.current = false;
+      setPendingOlderNavigation(false);
       return;
     }
 
     const nextOlderRunId = getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "next");
     if (nextOlderRunId) {
-      pendingOlderNavigationRef.current = false;
+      olderNavigationLoadRequestedRef.current = false;
+      setPendingOlderNavigation(false);
       handleNavigateRun(nextOlderRunId);
       return;
     }
 
-    if (hasNextPage && onLoadMore) {
-      onLoadMore();
+    if (!hasNextPage) {
+      olderNavigationLoadRequestedRef.current = false;
+      setPendingOlderNavigation(false);
       return;
     }
 
-    pendingOlderNavigationRef.current = false;
-  }, [handleNavigateRun, hasNextPage, isFetchingNextPage, onLoadMore, selectedRunId, sidebarRunIds]);
+    if (olderNavigationLoadRequestedRef.current) {
+      return;
+    }
+
+    olderNavigationLoadRequestedRef.current = true;
+    onLoadMore();
+  }, [
+    handleNavigateRun,
+    hasNextPage,
+    isFetchingNextPage,
+    onLoadMore,
+    pendingOlderNavigation,
+    selectedRunId,
+    sidebarRunIds,
+  ]);
+
+  useEffect(() => {
+    if (!isFetchingNextPage) {
+      olderNavigationLoadRequestedRef.current = false;
+    }
+  }, [isFetchingNextPage]);
 
   const isDetailView = sidebarView === "detail" && !!selectedRun;
   const isLiveCanvasSelected = !selectedRunId;
@@ -233,8 +250,9 @@ export function RunsTabPanel({
               onBack={handleBack}
               newerRunId={newerRunId}
               olderRunId={olderRunId}
+              canNavigateOlder={canNavigateOlder}
               onNavigateRun={handleNavigateRun}
-              onNavigateOlder={isAtLoadedOlderBoundary && hasNextPage ? handleNavigateOlder : undefined}
+              onNavigateOlder={atOlderPaginationBoundary && hasNextPage ? handleNavigateOlder : undefined}
             />
           ) : null}
         </div>

@@ -20,3 +20,49 @@ export function getAdjacentSidebarRunId(
   const nextIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
   return runIds[nextIndex] ?? null;
 }
+
+export function isAtOlderRunPaginationBoundary(runIds: string[], currentRunId: string): boolean {
+  if (runIds.length === 0) {
+    return false;
+  }
+
+  if (getAdjacentSidebarRunId(runIds, currentRunId, "next")) {
+    return false;
+  }
+
+  return runIds.indexOf(currentRunId) === runIds.length - 1;
+}
+
+export function canNavigateToOlderRun(runIds: string[], currentRunId: string, hasNextPage = false): boolean {
+  if (getAdjacentSidebarRunId(runIds, currentRunId, "next")) {
+    return true;
+  }
+
+  return hasNextPage && isAtOlderRunPaginationBoundary(runIds, currentRunId);
+}
+
+export function getRunSidebarNavigation(orderedRuns: OrderedRuns, currentRunId: string | null, hasNextPage = false) {
+  const runIds = buildSidebarRunIds(orderedRuns);
+
+  if (!currentRunId) {
+    return {
+      runIds,
+      newerRunId: null as string | null,
+      olderRunId: null as string | null,
+      canNavigateOlder: false,
+      atOlderPaginationBoundary: false,
+    };
+  }
+
+  const newerRunId = getAdjacentSidebarRunId(runIds, currentRunId, "prev");
+  const olderRunId = getAdjacentSidebarRunId(runIds, currentRunId, "next");
+  const atOlderPaginationBoundary = isAtOlderRunPaginationBoundary(runIds, currentRunId);
+
+  return {
+    runIds,
+    newerRunId,
+    olderRunId,
+    canNavigateOlder: canNavigateToOlderRun(runIds, currentRunId, hasNextPage),
+    atOlderPaginationBoundary,
+  };
+}
