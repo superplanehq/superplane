@@ -8,27 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
-
-func TestResolveCommitCanvasAutoLayout(t *testing.T) {
-	t.Run("not specified -> nil", func(t *testing.T) {
-		assert.Nil(t, resolveCommitCanvasAutoLayout(false, nil))
-	})
-
-	t.Run("explicit disable -> nil", func(t *testing.T) {
-		assert.Nil(t, resolveCommitCanvasAutoLayout(true, &pb.CanvasAutoLayout{}))
-	})
-
-	t.Run("explicit layout -> preserved", func(t *testing.T) {
-		layout := &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
-		}
-		assert.Equal(t, layout, resolveCommitCanvasAutoLayout(true, layout))
-	})
-}
 
 func TestReadRepositorySpecFileEmptyDraftIncludesNodeList(t *testing.T) {
 	r := support.Setup(t)

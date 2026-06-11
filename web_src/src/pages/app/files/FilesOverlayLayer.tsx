@@ -1,7 +1,7 @@
 import { FilesView } from "./FilesView";
-import type { AppFile, FilesHeaderActionsState } from "./types";
+import type { AppFile } from "./types";
 
-export type { AppFile, FilesHeaderActionsState } from "./types";
+export type { AppFile } from "./types";
 
 interface FilesOverlayLayerProps {
   isFilesMode: boolean;
@@ -11,8 +11,10 @@ interface FilesOverlayLayerProps {
   canWrite?: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  stagingResetNonce?: number;
+  suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
+  onLocalFilesStagingChange?: (hasStaging: boolean) => void;
 }
 
 export function FilesOverlayLayer({
@@ -23,8 +25,10 @@ export function FilesOverlayLayer({
   canWrite = false,
   files,
   headerActionsSlotId,
-  onHeaderActionsChange,
+  stagingResetNonce,
+  suspendRepositoryFileStaging,
   onSpecFileChange,
+  onLocalFilesStagingChange,
 }: FilesOverlayLayerProps) {
   if (!isFilesMode) return null;
 
@@ -36,8 +40,10 @@ export function FilesOverlayLayer({
       canWrite={canWrite}
       files={files}
       headerActionsSlotId={headerActionsSlotId}
-      onHeaderActionsChange={onHeaderActionsChange}
+      stagingResetNonce={stagingResetNonce}
+      suspendRepositoryFileStaging={suspendRepositoryFileStaging}
       onSpecFileChange={onSpecFileChange}
+      onLocalFilesStagingChange={onLocalFilesStagingChange}
     />
   );
 }
