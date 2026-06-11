@@ -185,6 +185,10 @@ func (a *AWS) Actions() []core.Action {
 		&prometheus.GetWorkspace{},
 		&prometheus.UpdateWorkspace{},
 		&prometheus.DeleteWorkspace{},
+		&prometheus.CreateRuleGroupNamespace{},
+		&prometheus.GetRuleGroupNamespace{},
+		&prometheus.UpdateRuleGroupNamespace{},
+		&prometheus.DeleteRuleGroupNamespace{},
 		&lambda.RunFunction{},
 		&sqs.SendMessage{},
 		&sqs.GetQueue{},
@@ -365,7 +369,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
 - Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
-- Add permissions for Amazon Managed Service for Prometheus workspaces if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**; the workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, and **aps:DeleteWorkspace** for their respective operations.
+- Add permissions for Amazon Managed Service for Prometheus if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**. Workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, and **aps:DeleteWorkspace**. Rule group namespace components need **aps:CreateRuleGroupsNamespace**, **aps:DescribeRuleGroupsNamespace**, **aps:ListRuleGroupsNamespaces**, **aps:PutRuleGroupsNamespace**, and **aps:DeleteRuleGroupsNamespace**.
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
