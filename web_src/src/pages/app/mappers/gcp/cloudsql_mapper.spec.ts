@@ -5,7 +5,9 @@ import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 describe("cloudsql instance mappers getExecutionDetails", () => {
   it("createInstance surfaces the operation result", () => {
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({ name: "my-instance", operation: "op-1", state: "PENDING_CREATE" })] } },
+      execution: {
+        outputs: { default: [buildOutput({ name: "my-instance", operation: "op-1", state: "PENDING_CREATE" })] },
+      },
     });
     const details = createInstanceMapper.getExecutionDetails(ctx);
     expect(details["Instance"]).toBe("my-instance");
