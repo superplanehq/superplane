@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { CommandItem, CommandSeparator, CommandShortcut, CommandGroup } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ChevronRight, FileText, type LucideIcon } from "lucide-react";
@@ -88,12 +88,12 @@ export function CanvasListItems({
   icon,
   onSelect,
 }: {
-  canvases: CanvasesCanvas[];
+  canvases: CanvasesCanvasSummary[];
   canvasesLoading: boolean;
   description: string;
   emptyLabel: string;
   icon: LucideIcon;
-  onSelect: (canvas: CanvasesCanvas) => void;
+  onSelect: (canvas: CanvasesCanvasSummary) => void;
 }) {
   if (canvasesLoading) {
     return (
@@ -114,17 +114,17 @@ export function CanvasListItems({
   }
 
   return canvases
-    .filter((canvas) => canvas.metadata?.id)
+    .filter((canvas) => canvas.id)
     .map((canvas) => (
       <ActionItem
-        key={canvas.metadata?.id}
+        key={canvas.id}
         action={{
-          id: canvas.metadata?.id || "",
-          label: canvas.metadata?.name || "Untitled canvas",
+          id: canvas.id || "",
+          label: canvas.name || "Untitled canvas",
           description,
           icon,
           onSelect: () => onSelect(canvas),
-          keywords: [canvas.metadata?.description || ""],
+          keywords: [canvas.description || ""],
         }}
       />
     ));
