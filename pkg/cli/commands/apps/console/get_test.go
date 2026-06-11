@@ -58,6 +58,20 @@ func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
 	}
 }
 
+// expectValidateDraftVersion mocks the describe-version call used by
+// common.ResolveDraftVersionID to validate an explicit --draft-id. It
+// returns a draft version owned by the test user.
+func expectValidateDraftVersion(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   "/api/v1/canvases/" + canvasID + "/versions/" + versionID,
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","state":"STATE_DRAFT","canvasId":"` + canvasID + `","owner":{"id":"` + cliTestUserID + `"}}}}`))
+		},
+	}
+}
+
 func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
 	return requestExpectation{
 		method: http.MethodPost,
@@ -101,8 +115,7 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 	ctx, stdout := newConsoleCommandContext(t, server.server, "yaml", nil)
 	ctx.Args = []string{testCanvasID}
 
-	noDraft := false
-	err := (&getCommand{draft: &noDraft}).Execute(ctx)
+	err := (&getCommand{}).Execute(ctx)
 	require.NoError(t, err)
 
 	out := stdout.String()
@@ -137,8 +150,7 @@ func TestGetTextOutputSummary(t *testing.T) {
 
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
 	ctx.Args = []string{testCanvasID}
-	noDraft := false
-	require.NoError(t, (&getCommand{draft: &noDraft}).Execute(ctx))
+	require.NoError(t, (&getCommand{}).Execute(ctx))
 
 	out := stdout.String()
 	require.Contains(t, out, "App: "+testCanvasName)
@@ -146,51 +158,6 @@ func TestGetTextOutputSummary(t *testing.T) {
 	require.Contains(t, out, "Source: live")
 	require.Contains(t, out, "Panels: 1")
 	require.Contains(t, out, "Layout items: 1")
-}
-
-func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/me",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   draftVersionsPath(testCanvasID),
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}}]}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   repositoryConsoleFilePath(testCanvasID),
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
-				require.Equal(t, "draft-1", r.URL.Query().Get("version_id"))
-				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				_, _ = w.Write([]byte("apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\nspec:\n  panels: []\n  layout: []\n"))
-			},
-		},
-	)
-
-	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Args = []string{testCanvasID}
-
-	draft := true
-	require.NoError(t, (&getCommand{draft: &draft}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Source: draft")
-	require.Contains(t, stdout.String(), "Version ID: draft-1")
 }
 
 // TestGetUsesActiveCanvasWhenNoArg confirms `console get` (no positional
@@ -214,8 +181,7 @@ func TestGetUsesActiveCanvasWhenNoArg(t *testing.T) {
 	ctx.Config = &fakeConfig{activeApp: testCanvasID}
 	ctx.Args = []string{}
 
-	noDraft := false
-	require.NoError(t, (&getCommand{draft: &noDraft}).Execute(ctx))
+	require.NoError(t, (&getCommand{}).Execute(ctx))
 	require.Contains(t, stdout.String(), "App ID: "+testCanvasID)
 }
 
@@ -229,13 +195,12 @@ func TestGetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 	ctx.Config = &fakeConfig{}
 	ctx.Args = []string{}
 
-	noDraft := false
-	err := (&getCommand{draft: &noDraft}).Execute(ctx)
+	err := (&getCommand{}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "app-name-or-id")
 }
 
-func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
+func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
 	server := newAPITestServer(
 		t,
 		requestExpectation{
@@ -245,7 +210,7 @@ func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/me",
+			path:   testMePath,
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
@@ -253,18 +218,28 @@ func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodGet,
-			path:   draftVersionsPath(testCanvasID),
+			path:   "/api/v1/canvases/" + testCanvasID + "/versions/draft-2",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[]}`))
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   repositoryConsoleFilePath(testCanvasID),
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
+				require.Equal(t, "draft-2", r.URL.Query().Get("version_id"))
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				_, _ = w.Write([]byte(sampleConsoleYAMLBody))
 			},
 		},
 	)
 
-	ctx, _ := newConsoleCommandContext(t, server.server, "text", nil)
+	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
 	ctx.Args = []string{testCanvasID}
-	draft := true
-	err := (&getCommand{draft: &draft}).Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "draft version not found")
+
+	draftID := "draft-2"
+	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Version ID: draft-2")
 }

@@ -110,7 +110,6 @@ func TestSetFromFileFlag(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
@@ -135,7 +134,6 @@ func TestSetFromPositionalFile(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
@@ -155,7 +153,6 @@ func TestSetFromStdin(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
@@ -177,7 +174,6 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		expectMe(),
 		expectListDraftBranchesEmpty(testCanvasID),
 		expectCreateDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
@@ -190,7 +186,6 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
 	server.AssertCalls(t, []string{
 		http.MethodGet + " " + testDescribeCanvas,
-		http.MethodGet + " " + testMePath,
 		http.MethodGet + " " + draftVersionsPath(testCanvasID),
 		http.MethodPost + " " + draftVersionsPath(testCanvasID),
 		http.MethodPost + " " + repositoryCommitsPath(testCanvasID),
@@ -210,7 +205,6 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
@@ -252,7 +246,6 @@ func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasCMEnabledResponse,
 		},
-		expectMe(),
 		expectListUserDraftBranch(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
@@ -275,14 +268,14 @@ func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
 	ctx.Args = []string{testCanvasID}
 
-	require.NoError(t, (&setCommand{file: strPtr(path), draftOnly: boolPtr(false)}).Execute(ctx))
+	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
 	out := stdout.String()
 	require.Contains(t, out, "Change request: cr-42")
 }
 
-// TestSetSkipsChangeRequestWithDraftFlag ensures `--draft` opts out of
+// TestSetSkipsChangeRequestWithDraftID ensures `--draft-id` opts out of
 // the auto change-request creation even when change management is on.
-func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
+func TestSetSkipsChangeRequestWithDraftID(t *testing.T) {
 	path := writeSampleConsoleYAML(t)
 
 	server := newAPITestServer(
@@ -293,7 +286,7 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 			handle: describeCanvasCMEnabledResponse,
 		},
 		expectMe(),
-		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectValidateDraftVersion(testCanvasID, "draft-1"),
 		expectCommitConsoleYAML("draft-1"),
 		expectFetchConsoleYAML("draft-1"),
 	)
@@ -301,7 +294,7 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
 	ctx.Args = []string{testCanvasID}
 
-	require.NoError(t, (&setCommand{file: strPtr(path), draftOnly: boolPtr(true)}).Execute(ctx))
+	require.NoError(t, (&setCommand{file: strPtr(path), draftID: strPtr("draft-1")}).Execute(ctx))
 	out := stdout.String()
 	require.NotContains(t, out, "Change request:")
 	require.Contains(t, out, "superplane apps change-requests create")
@@ -355,4 +348,3 @@ func TestSetRequiresYAMLSource(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
-func boolPtr(b bool) *bool    { return &b }

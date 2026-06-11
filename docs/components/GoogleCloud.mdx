@@ -42,6 +42,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
   <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
   <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications" />
+  <LinkCard title="Managed Prometheus • Query" href="#managed-prometheus-•-query" description="Run an instant PromQL query against Google Cloud Managed Service for Prometheus" />
+  <LinkCard title="Managed Prometheus • Query Range" href="#managed-prometheus-•-query-range" description="Run a PromQL range query against Google Cloud Managed Service for Prometheus" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
@@ -1479,6 +1481,141 @@ Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **co
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.monitoring.alertingPolicy.updated"
+}
+```
+
+<a id="managed-prometheus-•-query"></a>
+
+## Managed Prometheus • Query
+
+**Component key:** `gcp.prometheus.query`
+
+The Query component runs an instant PromQL query against Google Cloud Managed Service for Prometheus (GMP).
+
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query` and returns the result at a single point in time.
+
+### Use Cases
+
+- **Threshold checks**: Evaluate an expression (e.g. `up` or `rate(...)`) and branch on the value
+- **Spot readings**: Read the current value of a metric to enrich a workflow
+- **Chaining**: Feed a metric value into a downstream notification or decision node
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `up`
+
+The expression is evaluated at execution time ("now").
+
+### Output
+
+Emits one `gcp.prometheus.query` payload:
+- **resultType**: `vector`, `scalar`, etc.
+- **result**: the Prometheus result (series with their labels and value)
+- **seriesCount**: number of series returned
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- An invalid PromQL expression fails the action with the Prometheus error message
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "value": [
+          1767225600,
+          "1"
+        ]
+      }
+    ],
+    "resultType": "vector",
+    "seriesCount": 1
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "gcp.prometheus.query"
+}
+```
+
+<a id="managed-prometheus-•-query-range"></a>
+
+## Managed Prometheus • Query Range
+
+**Component key:** `gcp.prometheus.queryRange`
+
+The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over an explicit time range.
+
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range` and returns a matrix of samples between `start` and `end` at the given `step` resolution.
+
+### Use Cases
+
+- **Trend analysis**: Pull a metric over a window to summarise or chart it downstream
+- **Incident investigation**: Fetch samples for a specific time range when responding to an alert
+- **Anomaly checks**: Evaluate an expression across time before acting
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `rate(prometheus_http_requests_total[5m])`
+- **Start**: Required start timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step (e.g. `15s`, `1m`)
+
+### Output
+
+Emits one `gcp.prometheus.queryRange` payload:
+- **resultType**: typically `matrix`
+- **result**: the Prometheus result (series with their labels and `values` over time)
+- **seriesCount**: number of series returned
+- **start**, **end**, **step**: the query window
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- An invalid PromQL expression fails the action with the Prometheus error message
+
+### Example Output
+
+```json
+{
+  "data": {
+    "end": "2026-01-01T01:00:00Z",
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [
+            1767225600,
+            "1"
+          ],
+          [
+            1767225660,
+            "1"
+          ],
+          [
+            1767225720,
+            "0"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix",
+    "seriesCount": 1,
+    "start": "2026-01-01T00:00:00Z",
+    "step": "60s"
+  },
+  "timestamp": "2026-01-01T01:00:00Z",
+  "type": "gcp.prometheus.queryRange"
 }
 ```
 
