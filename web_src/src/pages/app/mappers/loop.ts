@@ -138,7 +138,7 @@ export const loopMapper: ComponentBaseMapper = {
     const details: Record<string, string | number | boolean> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       "Until expression": configuration.untilExpression ?? "-",
-      "Max iterations": configuration.maxIterations ?? 100,
+      "Max iterations": configuration.maxIterations ?? 10,
       "Timeout (s)": configuration.timeoutSeconds ?? 3600,
     };
 

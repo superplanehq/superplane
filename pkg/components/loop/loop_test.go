@@ -81,6 +81,17 @@ func TestLoopSetup(t *testing.T) {
 		assert.ErrorContains(t, err, "timeoutSeconds cannot exceed")
 	})
 
+	t.Run("rejects maxIterations above maximum", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"untilExpression": `$["Checker"].ready == true`,
+				"maxIterations":   MaxIterationsLimit + 1,
+			},
+		})
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "maxIterations cannot exceed")
+	})
+
 	t.Run("rejects invalid delay strategy", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
