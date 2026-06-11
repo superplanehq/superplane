@@ -11,8 +11,8 @@ import (
 )
 
 type setCommand struct {
-	file      *string
-	draftOnly *bool
+	file    *string
+	draftID *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -33,7 +33,11 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		flagValue = strings.TrimSpace(*c.file)
 	}
-	draftOnly := c.draftOnly != nil && *c.draftOnly
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+	draftOnly := draftID != ""
 
 	yamlBytes, source, err := resolveYAMLSource(ctx.Cmd.InOrStdin(), flagValue, positional)
 	if err != nil {
@@ -54,7 +58,12 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	var versionID string
+	if draftOnly {
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
+	} else {
+		versionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
@@ -85,7 +94,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	// When change management is enabled, drafts are not visible from the
 	// UI on their own; the user can only see/approve them via a change
 	// request. Auto-create one so the operator sees the result of the
-	// command in the UI without a follow-up call. Pass --draft to skip.
+	// command in the UI without a follow-up call. Pass --draft-id to skip.
 	var createdChangeRequestID string
 	if changeManagementEnabled && !draftOnly {
 		createdChangeRequestID, err = createChangeRequestForDraft(ctx, canvasID, versionID)
@@ -111,7 +120,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 			_, err := fmt.Fprintln(stdout, "Run `superplane apps change-requests create` to open a change request for this draft.")
 			return err
 		}
-		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft) to publish a draft that includes this console.")
+		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft-id) to publish a draft that includes this console.")
 		return err
 	})
 }

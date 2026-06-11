@@ -15,7 +15,7 @@ import (
 
 type updateCommand struct {
 	file            *string
-	draft           *bool
+	draftID         *string
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -63,7 +63,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
 
-	draftMode := c.draft != nil && *c.draft
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+	draftMode := draftID != ""
 
 	canvasID, _, err := resolveCanvasForFileUpdate(filePath)
 	if err != nil {
@@ -81,10 +85,15 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if changeManagementEnabled && !draftMode {
-		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
+		return fmt.Errorf("change management is enabled for this canvas; pass --draft-id <id> to update a draft (create one with `superplane apps drafts create`), then publish with `superplane apps change-requests create`")
 	}
 
-	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	var targetVersionID string
+	if draftMode {
+		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
+	} else {
+		targetVersionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
