@@ -547,18 +547,15 @@ func TestLoopExampleOutput(t *testing.T) {
 	component := &Loop{}
 	output := component.ExampleOutput()
 
-	next, ok := output["next"].(map[string]any)
-	require.True(t, ok)
-	nextData, ok := next["data"].(map[string]any)["next"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, PayloadTypeNext, next["type"])
-	assert.Equal(t, 1, nextData["iteration"])
+	// The example output is a single payload in the standard envelope format
+	assert.Equal(t, PayloadTypeDone, output["type"])
+	assert.NotEmpty(t, output["timestamp"])
 
-	done, ok := output["done"].(map[string]any)
+	data, ok := output["data"].(map[string]any)
 	require.True(t, ok)
-	doneData, ok := done["data"].(map[string]any)["done"].(map[string]any)
+
+	doneData, ok := data["done"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, PayloadTypeDone, done["type"])
 	assert.Equal(t, 3, doneData["iterations"])
 	assert.Equal(t, StopReasonConditionMet, doneData["stopReason"])
 	assert.Equal(t, int64(4521), doneData["elapsedMs"])
