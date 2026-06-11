@@ -1,11 +1,10 @@
 package actions
 
 import (
-	"fmt"
-	"regexp"
 	"testing"
+	"time"
 
-	"github.com/expr-lang/expr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +15,7 @@ import (
 	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 var _ = registryimports.Loaded
@@ -153,28 +153,18 @@ func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
 	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", runTitle.GetDefaultValue())
 }
 
-func TestDefaultRunTitleExpressionsCompile(t *testing.T) {
-	templateExpression := regexp.MustCompile(`\{\{\s*(.*?)\s*\}\}`)
+func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
 
-	for triggerName, template := range defaultRunTitleExpressions {
+	for triggerName, exampleData := range builtInTriggerExamples(reg) {
 		t.Run(triggerName, func(t *testing.T) {
-			for _, match := range templateExpression.FindAllStringSubmatch(template, -1) {
-				require.Len(t, match, 2)
-				_, err := expr.Compile(
-					match[1],
-					expr.AsAny(),
-					expr.Function("root", func(params ...any) (any, error) {
-						if len(params) != 0 {
-							return nil, fmt.Errorf("root() takes no arguments")
-						}
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(rootPayloadFromExample(triggerName, exampleData)).
+				ResolveTemplateExpressions(defaultRunTitleExpression(triggerName))
 
-						return map[string]any{
-							"data": map[string]any{},
-						}, nil
-					}),
-				)
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
+			require.NotEmpty(t, resolved)
 		})
 	}
 }
@@ -196,13 +186,23 @@ func TestBuiltInTriggersHaveDefaultRunTitleExpressions(t *testing.T) {
 func builtInTriggerNames(reg *registry.Registry) []string {
 	names := []string{}
 
+	for triggerName := range builtInTriggerExamples(reg) {
+		names = append(names, triggerName)
+	}
+
+	return names
+}
+
+func builtInTriggerExamples(reg *registry.Registry) map[string]map[string]any {
+	examples := map[string]map[string]any{}
+
 	for _, trigger := range reg.ListTriggers() {
-		names = append(names, trigger.Name())
+		examples[trigger.Name()] = trigger.ExampleData()
 	}
 
 	for _, integration := range reg.ListIntegrations() {
 		for _, trigger := range integration.Triggers() {
-			names = append(names, trigger.Name())
+			examples[trigger.Name()] = trigger.ExampleData()
 		}
 
 		setupProvider := reg.SetupProviders[integration.Name()]
@@ -213,13 +213,73 @@ func builtInTriggerNames(reg *registry.Registry) []string {
 		for _, group := range setupProvider.CapabilityGroups() {
 			for _, capability := range group.Capabilities {
 				if capability.Type == core.IntegrationCapabilityTypeTrigger {
-					names = append(names, capability.Name)
+					if len(capability.ExampleData) > 0 {
+						examples[capability.Name] = capability.ExampleData
+					} else if _, ok := examples[capability.Name]; !ok {
+						examples[capability.Name] = nil
+					}
 				}
 			}
 		}
 	}
 
-	return names
+	return examples
+}
+
+func rootPayloadFromExample(triggerName string, exampleData map[string]any) map[string]any {
+	if exampleData == nil {
+		return map[string]any{
+			"type":      triggerName,
+			"timestamp": time.Now(),
+			"data":      map[string]any{},
+		}
+	}
+
+	if isRootEventExample(exampleData) {
+		payload := cloneExampleData(exampleData)
+		if _, ok := payload["timestamp"].(time.Time); !ok {
+			payload["timestamp"] = time.Now()
+		}
+
+		return payload
+	}
+
+	return map[string]any{
+		"type":      triggerName,
+		"timestamp": time.Now(),
+		"data":      cloneExampleData(exampleData),
+	}
+}
+
+func isRootEventExample(exampleData map[string]any) bool {
+	_, hasType := exampleData["type"]
+	_, hasData := exampleData["data"]
+	return hasType && hasData
+}
+
+func cloneExampleData(exampleData map[string]any) map[string]any {
+	clone := make(map[string]any, len(exampleData))
+	for key, value := range exampleData {
+		clone[key] = cloneExampleValue(value)
+	}
+
+	return clone
+}
+
+func cloneExampleValue(value any) any {
+	switch typedValue := value.(type) {
+	case map[string]any:
+		return cloneExampleData(typedValue)
+	case []any:
+		clone := make([]any, len(typedValue))
+		for i, item := range typedValue {
+			clone[i] = cloneExampleValue(item)
+		}
+
+		return clone
+	default:
+		return value
+	}
 }
 
 type testTriggerDefinition struct {
