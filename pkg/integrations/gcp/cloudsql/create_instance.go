@@ -2,6 +2,7 @@ package cloudsql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -77,11 +78,11 @@ func (c *CreateInstance) Documentation() string {
 
 ## Output
 
-Emits a ` + "`gcp.cloudsql.instance`" + ` payload with the instance ` + "`name`" + `, the ` + "`operation`" + ` id, and ` + "`status`" + `.
+Emits a ` + "`gcp.cloudsql.instance`" + ` payload with the ready instance's ` + "`name`" + `, ` + "`state`" + `, ` + "`databaseVersion`" + `, ` + "`region`" + `, ` + "`tier`" + `, ` + "`connectionName`" + `, ` + "`ipAddress`" + `, and ` + "`selfLink`" + `.
 
 ## Important Notes
 
-- **Instance creation is asynchronous and takes several minutes.** This component returns once the operation is accepted; use **Get Instance** to poll until the instance reaches ` + "`RUNNABLE`" + `.
+- **Instance creation is asynchronous and takes several minutes.** This component polls the instance until it reaches ` + "`RUNNABLE`" + ` (or times out) before emitting, so downstream steps run only once the instance is ready.
 - Requires the ` + "`roles/cloudsql.admin`" + ` (or ` + "`roles/cloudsql.editor`" + `) IAM role, and the **Cloud SQL Admin API** enabled.`
 }
 
@@ -228,19 +229,68 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	op, err := createInstance(context.Background(), client, client.ProjectID(), body)
-	if err != nil {
+	if _, err := createInstance(context.Background(), client, client.ProjectID(), body); err != nil {
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create instance", err, roleHintAdmin))
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{
-		map[string]any{
-			"name":      name,
-			"operation": op.Name,
-			"status":    op.Status,
-			"state":     "PENDING_CREATE",
-		},
-	})
+	// Instance creation takes minutes, so record what to poll and schedule the
+	// first poll instead of blocking this execution until the instance is ready.
+	if err := ctx.Metadata.Set(instanceExecMetadata{Instance: name}); err != nil {
+		return err
+	}
+	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+}
+
+// poll re-checks the instance until it reaches RUNNABLE (then emits it), fails,
+// or the attempt/error budget is exhausted; otherwise it re-schedules itself.
+func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var md instanceExecMetadata
+	if err := mapstructure.WeakDecode(ctx.Metadata.Get(), &md); err != nil {
+		return fmt.Errorf("failed to decode poll metadata: %w", err)
+	}
+	if md.Instance == "" {
+		return errors.New("poll metadata is missing the instance name")
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	inst, err := getInstance(context.Background(), client, client.ProjectID(), md.Instance)
+	if err != nil {
+		md.PollErrors++
+		ctx.Logger.Warnf("failed to get instance %s (attempt %d/%d): %v", md.Instance, md.PollErrors, maxPollErrors, err)
+		if md.PollErrors >= maxPollErrors {
+			return fmt.Errorf("giving up polling instance %s after %d consecutive errors: %w", md.Instance, maxPollErrors, err)
+		}
+		if err := ctx.Metadata.Set(md); err != nil {
+			return err
+		}
+		return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+	}
+
+	md.PollErrors = 0
+	md.PollAttempts++
+	if err := ctx.Metadata.Set(md); err != nil {
+		return err
+	}
+
+	switch inst.State {
+	case instanceStateRunnable:
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{instancePayload(inst)})
+	case instanceStateFailed:
+		return fmt.Errorf("instance %s entered state %s", md.Instance, inst.State)
+	default:
+		if md.PollAttempts >= instanceMaxPollAttempts {
+			return fmt.Errorf("timed out waiting for instance %s to reach RUNNABLE after %d polls (state: %s)", md.Instance, md.PollAttempts, inst.State)
+		}
+		return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+	}
 }
 
 func (c *CreateInstance) Cancel(ctx core.ExecutionContext) error {
@@ -260,9 +310,12 @@ func (c *CreateInstance) Cleanup(ctx core.SetupContext) error {
 }
 
 func (c *CreateInstance) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{{Name: pollHookName, Type: core.HookTypeInternal}}
 }
 
 func (c *CreateInstance) HandleHook(ctx core.ActionHookContext) error {
-	return nil
+	if ctx.Name != pollHookName {
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+	return c.poll(ctx)
 }

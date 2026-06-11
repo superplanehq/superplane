@@ -2,12 +2,14 @@ package cloudsql
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -29,31 +31,53 @@ func Test__DeleteInstance__Setup(t *testing.T) {
 func Test__DeleteInstance__Execute(t *testing.T) {
 	d := &DeleteInstance{}
 
-	t.Run("deletes the instance and emits the operation", func(t *testing.T) {
+	t.Run("starts deletion and schedules a poll that emits once the instance is gone", func(t *testing.T) {
 		var deleteURL string
+		stillExists := true
 		mc := &mockClient{
 			projectID: "my-project",
 			deleteFunc: func(ctx context.Context, url string) ([]byte, error) {
 				deleteURL = url
 				return []byte(`{"name":"op-456","status":"PENDING","targetId":"my-instance"}`), nil
 			},
+			getFunc: func(ctx context.Context, url string) ([]byte, error) {
+				if stillExists {
+					return []byte(`{"name":"my-instance","state":"PENDING_DELETE"}`), nil
+				}
+				return nil, &gcpcommon.GCPAPIError{StatusCode: http.StatusNotFound, Message: "not found"}
+			},
 		}
 		withFactory(mc)
 
+		metadata := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
 		err := d.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{"instance": "my-instance"},
+			Metadata:       metadata,
+			Requests:       requests,
 			ExecutionState: state,
 		})
-
 		require.NoError(t, err)
-		assert.True(t, state.Passed)
-		assert.Equal(t, "gcp.cloudsql.instance", state.Type)
+		// Execute starts the delete and schedules a poll rather than emitting.
+		assert.Equal(t, pollHookName, requests.Action)
+		assert.False(t, state.Passed)
 		assert.True(t, strings.HasSuffix(deleteURL, "/projects/my-project/instances/my-instance"))
 
+		// First poll: instance still present -> re-schedules, no emit.
+		reqs := &contexts.RequestContext{}
+		require.NoError(t, d.HandleHook(core.ActionHookContext{Name: pollHookName, Metadata: metadata, Requests: reqs, ExecutionState: state}))
+		assert.Equal(t, pollHookName, reqs.Action)
+		assert.Empty(t, state.Payloads)
+
+		// Next poll: instance gone (404) -> emits the deletion confirmation.
+		stillExists = false
+		require.NoError(t, d.HandleHook(core.ActionHookContext{Name: pollHookName, Metadata: metadata, Requests: &contexts.RequestContext{}, ExecutionState: state}))
+		assert.True(t, state.Passed)
+		assert.Equal(t, "gcp.cloudsql.instance", state.Type)
 		data := firstData(t, state)
 		assert.Equal(t, "my-instance", data["name"])
-		assert.Equal(t, "op-456", data["operation"])
-		assert.Equal(t, true, data["deleting"])
+		assert.Equal(t, true, data["deleted"])
 	})
 }

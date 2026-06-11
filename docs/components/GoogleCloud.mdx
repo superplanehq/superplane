@@ -787,11 +787,11 @@ The Create Instance component provisions a new Cloud SQL instance.
 
 ### Output
 
-Emits a `gcp.cloudsql.instance` payload with the instance `name`, the `operation` id, and `status`.
+Emits a `gcp.cloudsql.instance` payload with the ready instance's `name`, `state`, `databaseVersion`, `region`, `tier`, `connectionName`, `ipAddress`, and `selfLink`.
 
 ### Important Notes
 
-- **Instance creation is asynchronous and takes several minutes.** This component returns once the operation is accepted; use **Get Instance** to poll until the instance reaches `RUNNABLE`.
+- **Instance creation is asynchronous and takes several minutes.** This component polls the instance until it reaches `RUNNABLE` (or times out) before emitting, so downstream steps run only once the instance is ready.
 - Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
 
 ### Example Output
@@ -799,10 +799,16 @@ Emits a `gcp.cloudsql.instance` payload with the instance `name`, the `operation
 ```json
 {
   "data": {
+    "connectionName": "my-project:us-central1:my-instance",
+    "databaseVersion": "POSTGRES_16",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "ipAddress": "34.41.10.20",
     "name": "my-instance",
-    "operation": "400d82dd-5a29-4530-8fea-bcf800000032",
-    "state": "PENDING_CREATE",
-    "status": "PENDING"
+    "region": "us-central1",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance",
+    "state": "RUNNABLE",
+    "tier": "db-f1-micro"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.cloudsql.instance"
@@ -828,12 +834,12 @@ The Delete Instance component permanently deletes a Cloud SQL instance.
 
 ### Output
 
-Emits a `gcp.cloudsql.instance` payload with the instance `name`, the `operation` id, `status`, and `deleting: true`.
+Emits a `gcp.cloudsql.instance` payload with the instance `name` and `deleted: true`.
 
 ### Important Notes
 
 - **This permanently deletes the instance and all its databases and data — it is irreversible.**
-- Instance deletion is asynchronous; this component returns once the operation is accepted.
+- Instance deletion is asynchronous and takes several minutes; this component polls until the instance is fully deleted (or times out) before emitting.
 - Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
 
 ### Example Output
@@ -841,10 +847,8 @@ Emits a `gcp.cloudsql.instance` payload with the instance `name`, the `operation
 ```json
 {
   "data": {
-    "deleting": true,
-    "name": "my-instance",
-    "operation": "9b3f1a2c-7d40-4a10-bb31-aa2200000045",
-    "status": "PENDING"
+    "deleted": true,
+    "name": "my-instance"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.cloudsql.instance"

@@ -7,9 +7,33 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
+
+// Cloud SQL instance lifecycle states the poll loop branches on.
+const (
+	instanceStateRunnable = "RUNNABLE"
+	instanceStateFailed   = "FAILED"
+)
+
+// Instance create/delete are long-running (minutes), so the components poll via
+// scheduled internal "poll" hooks instead of blocking a single execution.
+const (
+	pollHookName            = "poll"
+	instancePollInterval    = 15 * time.Second
+	instanceMaxPollAttempts = 80 // ~20 minutes at the 15s interval
+	maxPollErrors           = 10 // consecutive fetch errors before giving up
+)
+
+// instanceExecMetadata is the per-execution state the poll hook reads to track a
+// long-running instance operation across scheduled invocations.
+type instanceExecMetadata struct {
+	Instance     string `json:"instance" mapstructure:"instance"`
+	PollAttempts int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	PollErrors   int    `json:"pollErrors" mapstructure:"pollErrors"`
+}
 
 // roleHintAdmin is the IAM role required to manage (create/delete) Cloud SQL
 // instances; roleHintViewer is the read-only role sufficient for Get Instance.

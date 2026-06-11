@@ -2,6 +2,7 @@ package cloudsql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type DeleteInstance struct{}
@@ -44,12 +46,12 @@ func (d *DeleteInstance) Documentation() string {
 
 ## Output
 
-Emits a ` + "`gcp.cloudsql.instance`" + ` payload with the instance ` + "`name`" + `, the ` + "`operation`" + ` id, ` + "`status`" + `, and ` + "`deleting: true`" + `.
+Emits a ` + "`gcp.cloudsql.instance`" + ` payload with the instance ` + "`name`" + ` and ` + "`deleted: true`" + `.
 
 ## Important Notes
 
 - **This permanently deletes the instance and all its databases and data — it is irreversible.**
-- Instance deletion is asynchronous; this component returns once the operation is accepted.
+- Instance deletion is asynchronous and takes several minutes; this component polls until the instance is fully deleted (or times out) before emitting.
 - Requires the ` + "`roles/cloudsql.admin`" + ` (or ` + "`roles/cloudsql.editor`" + `) IAM role, and the **Cloud SQL Admin API** enabled.`
 }
 
@@ -109,19 +111,68 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	op, err := deleteInstance(context.Background(), client, client.ProjectID(), instance)
-	if err != nil {
+	if _, err := deleteInstance(context.Background(), client, client.ProjectID(), instance); err != nil {
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete instance", err, roleHintAdmin))
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{
-		map[string]any{
-			"name":      instance,
-			"operation": op.Name,
-			"status":    op.Status,
-			"deleting":  true,
-		},
-	})
+	// Instance deletion takes minutes, so poll until the instance is gone instead
+	// of blocking this execution.
+	if err := ctx.Metadata.Set(instanceExecMetadata{Instance: instance}); err != nil {
+		return err
+	}
+	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+}
+
+// poll re-checks the instance until it no longer exists (then emits a deletion
+// confirmation), or the attempt/error budget is exhausted; otherwise it
+// re-schedules itself.
+func (d *DeleteInstance) poll(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var md instanceExecMetadata
+	if err := mapstructure.WeakDecode(ctx.Metadata.Get(), &md); err != nil {
+		return fmt.Errorf("failed to decode poll metadata: %w", err)
+	}
+	if md.Instance == "" {
+		return errors.New("poll metadata is missing the instance name")
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	_, err = getInstance(context.Background(), client, client.ProjectID(), md.Instance)
+	if err != nil {
+		if gcpcommon.IsNotFoundError(err) {
+			// The instance is gone — deletion is complete.
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{
+				map[string]any{"name": md.Instance, "deleted": true},
+			})
+		}
+		md.PollErrors++
+		ctx.Logger.Warnf("failed to get instance %s (attempt %d/%d): %v", md.Instance, md.PollErrors, maxPollErrors, err)
+		if md.PollErrors >= maxPollErrors {
+			return fmt.Errorf("giving up polling instance %s after %d consecutive errors: %w", md.Instance, maxPollErrors, err)
+		}
+		if err := ctx.Metadata.Set(md); err != nil {
+			return err
+		}
+		return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+	}
+
+	// Still present — keep waiting until it's gone.
+	md.PollErrors = 0
+	md.PollAttempts++
+	if err := ctx.Metadata.Set(md); err != nil {
+		return err
+	}
+	if md.PollAttempts >= instanceMaxPollAttempts {
+		return fmt.Errorf("timed out waiting for instance %s to be deleted after %d polls", md.Instance, md.PollAttempts)
+	}
+	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
 }
 
 func (d *DeleteInstance) Cancel(ctx core.ExecutionContext) error {
@@ -141,9 +192,12 @@ func (d *DeleteInstance) Cleanup(ctx core.SetupContext) error {
 }
 
 func (d *DeleteInstance) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{{Name: pollHookName, Type: core.HookTypeInternal}}
 }
 
 func (d *DeleteInstance) HandleHook(ctx core.ActionHookContext) error {
-	return nil
+	if ctx.Name != pollHookName {
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+	return d.poll(ctx)
 }

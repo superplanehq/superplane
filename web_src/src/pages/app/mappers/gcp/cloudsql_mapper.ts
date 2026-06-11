@@ -33,12 +33,9 @@ type InstanceOutputs = {
       name?: string;
       state?: string;
       databaseVersion?: string;
-      region?: string;
-      tier?: string;
       connectionName?: string;
       ipAddress?: string;
-      operation?: string;
-      deleting?: boolean;
+      deleted?: boolean;
     };
   }>;
 };
@@ -58,16 +55,22 @@ function displayValue(value: unknown): string | undefined {
 
 function instanceDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
+  // Timestamp first, then at most a handful of the most useful fields.
   const completedAt = formatLocalDateTime(context.execution.updatedAt || context.execution.createdAt);
   if (completedAt) details["Completed At"] = completedAt;
 
   const item = (context.execution.outputs as InstanceOutputs | undefined)?.default?.[0]?.data;
   if (!item) return details;
-  if (item.name) details["Instance"] = item.name;
+
+  // Delete emits a small confirmation payload.
+  if (item.deleted) {
+    if (item.name) details["Instance"] = item.name;
+    details["Deleted"] = "true";
+    return details;
+  }
+
   if (item.state) details["State"] = item.state;
   if (item.databaseVersion) details["Version"] = item.databaseVersion;
-  if (item.region) details["Region"] = item.region;
-  if (item.tier) details["Tier"] = item.tier;
   if (item.connectionName) details["Connection"] = item.connectionName;
   if (item.ipAddress) details["IP Address"] = item.ipAddress;
   return details;

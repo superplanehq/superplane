@@ -1,9 +1,7 @@
 {
   "data": {
     "name": "my-instance",
-    "operation": "9b3f1a2c-7d40-4a10-bb31-aa2200000045",
-    "status": "PENDING",
-    "deleting": true
+    "deleted": true
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.cloudsql.instance"

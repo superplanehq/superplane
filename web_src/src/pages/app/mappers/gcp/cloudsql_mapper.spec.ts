@@ -3,16 +3,29 @@ import { createInstanceMapper, getInstanceMapper, deleteInstanceMapper } from ".
 import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 
 describe("cloudsql instance mappers getExecutionDetails", () => {
-  it("createInstance surfaces the operation result", () => {
+  it("createInstance surfaces the ready instance with the timestamp first", () => {
     const ctx = buildDetailsCtx({
       execution: {
-        outputs: { default: [buildOutput({ name: "my-instance", operation: "op-1", state: "PENDING_CREATE" })] },
+        outputs: {
+          default: [
+            buildOutput({
+              name: "my-instance",
+              state: "RUNNABLE",
+              databaseVersion: "POSTGRES_16",
+              connectionName: "p:us-central1:my-instance",
+              ipAddress: "34.41.10.20",
+            }),
+          ],
+        },
       },
     });
     const details = createInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Instance"]).toBe("my-instance");
-    expect(details["State"]).toBe("PENDING_CREATE");
-    expect(details["Completed At"]).toBeDefined();
+    // Timestamp first, then at most five fields total.
+    expect(Object.keys(details)[0]).toBe("Completed At");
+    expect(Object.keys(details).length).toBeLessThanOrEqual(5);
+    expect(details["State"]).toBe("RUNNABLE");
+    expect(details["Version"]).toBe("POSTGRES_16");
+    expect(details["IP Address"]).toBe("34.41.10.20");
   });
 
   it("getInstance surfaces the instance details", () => {
@@ -23,8 +36,7 @@ describe("cloudsql instance mappers getExecutionDetails", () => {
             buildOutput({
               name: "my-instance",
               state: "RUNNABLE",
-              region: "us-central1",
-              tier: "db-f1-micro",
+              databaseVersion: "POSTGRES_16",
               connectionName: "p:us-central1:my-instance",
               ipAddress: "34.41.10.20",
             }),
@@ -33,17 +45,19 @@ describe("cloudsql instance mappers getExecutionDetails", () => {
       },
     });
     const details = getInstanceMapper.getExecutionDetails(ctx);
+    expect(Object.keys(details).length).toBeLessThanOrEqual(5);
     expect(details["State"]).toBe("RUNNABLE");
-    expect(details["Tier"]).toBe("db-f1-micro");
+    expect(details["Connection"]).toBe("p:us-central1:my-instance");
     expect(details["IP Address"]).toBe("34.41.10.20");
   });
 
-  it("deleteInstance marks the instance as deleting", () => {
+  it("deleteInstance confirms the deletion", () => {
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({ name: "my-instance", operation: "op-2", deleting: true })] } },
+      execution: { outputs: { default: [buildOutput({ name: "my-instance", deleted: true })] } },
     });
     const details = deleteInstanceMapper.getExecutionDetails(ctx);
     expect(details["Instance"]).toBe("my-instance");
+    expect(details["Deleted"]).toBe("true");
   });
 
   it("does not throw when outputs are missing", () => {
