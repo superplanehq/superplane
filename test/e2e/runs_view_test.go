@@ -24,7 +24,7 @@ func TestRunsView(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndNoop()
 		steps.whenTheManualTriggerRuns()
-		steps.whenIVisitRunsView()
+		steps.whenIVisitRunInspection()
 		steps.thenTheFinishedRunIsVisible()
 		steps.whenIOpenRunNodeDetails()
 		steps.thenRunNodeDetailsModalIsVisible()
@@ -94,7 +94,12 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.canvas.Visit()
+}
+
+func (s *runsViewSteps) whenIVisitRunInspection() {
+	require.NotNil(s.t, s.run, "expected run to be created before visiting run inspection")
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?run=" + s.run.ID.String())
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
@@ -162,11 +167,11 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
 	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-runs"][aria-current="page"]`))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-live"][aria-current="page"]`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
-	s.session.AssertURLContains("view=runs")
 	s.session.AssertURLContains("run=" + s.run.ID.String())
+	require.NotContains(s.t, s.session.Page().URL(), "view=runs")
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
 	s.session.AssertText("success")
@@ -188,7 +193,6 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Click(q.TestID("canvas-edit-button"))
 }
 
@@ -294,7 +298,7 @@ func (s *runsViewSteps) thenEditModeIsVisible() {
 
 	for time.Now().Before(deadline) {
 		url := s.session.Page().URL()
-		if !strings.Contains(url, "view=runs") && !strings.Contains(url, "run="+s.run.ID.String()) {
+		if !strings.Contains(url, "run="+s.run.ID.String()) {
 			return
 		}
 
@@ -302,7 +306,6 @@ func (s *runsViewSteps) thenEditModeIsVisible() {
 	}
 
 	url := s.session.Page().URL()
-	require.NotContains(s.t, url, "view=runs")
 	require.NotContains(s.t, url, "run="+s.run.ID.String())
 }
 

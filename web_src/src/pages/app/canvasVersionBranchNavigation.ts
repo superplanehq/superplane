@@ -29,6 +29,8 @@ export function applyVersionSelectionSearchParams(
     next.delete("version");
     next.delete("branch");
   } else {
+    next.delete("view");
+    next.delete("run");
     next.set("version", options.versionID);
     if (options.branchName) {
       next.set("branch", options.branchName);
