@@ -51,7 +51,7 @@ func Test__UpdateCanvasFolderMembership__CanBeAssignedAndRemoved(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listResponse.Canvases, 2)
 	for _, listedCanvas := range listResponse.Canvases {
-		assert.Equal(t, folderID, listedCanvas.Metadata.FolderId)
+		assert.Equal(t, folderID, listedCanvas.FolderId)
 	}
 
 	removeResponse, err := UpdateCanvasFolder(

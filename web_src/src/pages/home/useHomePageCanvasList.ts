@@ -1,4 +1,4 @@
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import {
   CANVAS_FOLDER_COLORS,
   DEFAULT_CANVAS_FOLDER_COLOR,
@@ -21,13 +21,8 @@ function formatCanvasDate(value?: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
-  const metadata = canvas.metadata;
-  if (!metadata) {
-    return null;
-  }
-
-  const { id, name, createdBy } = metadata;
+function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null {
+  const { id, name, createdBy } = canvas;
   const createdByName = createdBy?.name;
   if (!id || !name || !createdByName) {
     return null;
@@ -36,12 +31,12 @@ function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
   return {
     id,
     name,
-    description: metadata.description,
-    createdAt: formatCanvasDate(metadata.createdAt),
-    canvasFolderId: metadata.folderId || undefined,
+    description: canvas.description,
+    createdAt: formatCanvasDate(canvas.createdAt),
+    canvasFolderId: canvas.folderId || undefined,
     createdBy: { name: createdByName },
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
+    nodes: canvas.nodes || [],
+    edges: canvas.edges || [],
   };
 }
 
