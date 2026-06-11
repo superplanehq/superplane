@@ -1,0 +1,17 @@
+{
+  "data": {
+    "workspace": {
+      "alias": "example-workspace-created",
+      "arn": "arn:aws:aps:us-east-1:123456789012:workspace/ws-22222222-2222-4222-8222-222222222222",
+      "status": {
+        "statusCode": "CREATING"
+      },
+      "tags": {
+        "purpose": "example"
+      },
+      "workspaceId": "ws-22222222-2222-4222-8222-222222222222"
+    }
+  },
+  "timestamp": "2026-01-01T00:10:00.000000000Z",
+  "type": "aws.prometheus.workspace"
+}

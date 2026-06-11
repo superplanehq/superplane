@@ -144,16 +144,16 @@ function buildSearchResults(
   const results: PaletteAction[] = [...model.canvasNodeSearchActions];
 
   for (const canvas of model.canvasListProps.canvases) {
-    const name = canvas.metadata?.name ?? "";
-    const description = canvas.metadata?.description ?? "";
+    const name = canvas.name ?? "";
+    const description = canvas.description ?? "";
     if (matchesSearch(query, name, description)) {
       results.push({
-        id: `app-${canvas.metadata?.id}`,
+        id: `app-${canvas.id}`,
         label: name,
         description: "Open app",
         icon: Palette,
         onSelect: () => {
-          const id = canvas.metadata?.id;
+          const id = canvas.id;
           if (organizationId && id) {
             goTo(appPath(organizationId, id));
           }
