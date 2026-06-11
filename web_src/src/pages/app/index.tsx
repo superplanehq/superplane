@@ -1049,6 +1049,7 @@ export function AppPage() {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
     } else if (activeCanvasVersionId) {
+      draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
     }
 
@@ -2073,13 +2074,18 @@ export function AppPage() {
         // Notify agent sidebar draft-actions hook
         window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
         invalidateCanvasVersionData(canvasId);
-        if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
-          if (hasPendingLocalCanvasState) {
-            setRemoteCanvasUpdatePending(true);
-            return true;
-          }
-          invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
+
+        if (!payload.versionId) {
+          return true;
         }
+
+        if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
+          setRemoteCanvasUpdatePending(true);
+          return true;
+        }
+
+        draftCanvasSpecsRef.current.delete(payload.versionId);
+        invalidateCanvasVersionData(canvasId, payload.versionId);
         return true;
       }
 
