@@ -105,6 +105,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &issues.CreateIssue{}},
 					{ReadOnly: false, Action: &issues.UpdateIssue{}},
 					{ReadOnly: false, Action: &issues.CreateIssueComment{}},
+				{ReadOnly: false, Action: &issues.UpdateIssueComment{}},
 					{ReadOnly: false, Action: &issues.RemoveIssueLabel{}},
 					{ReadOnly: false, Action: &issues.RemoveIssueAssignee{}},
 					{ReadOnly: false, Action: &issues.AddIssueLabel{}},
