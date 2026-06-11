@@ -543,6 +543,55 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	return events, nil
 }
 
+func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
+	now := time.Now()
+
+	events := []CanvasEvent{}
+	for channel, outputs := range channelOutputs {
+		for _, event := range outputs {
+			events = append(events, CanvasEvent{
+				WorkflowID:  e.WorkflowID,
+				NodeID:      e.NodeID,
+				Channel:     channel,
+				Data:        NewJSONValue(event),
+				ExecutionID: &e.ID,
+				RunID:       e.RunID,
+				State:       CanvasEventStatePending,
+				CreatedAt:   &now,
+			})
+		}
+	}
+
+	if len(events) > 0 {
+		err := tx.Create(&events).Error
+		if err != nil {
+			return nil, fmt.Errorf("failed to create events: %w", err)
+		}
+	}
+
+	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if node != nil {
+		if node.State != CanvasNodeStatePaused {
+			err = node.UpdateState(tx, CanvasNodeStateReady)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if e.State == CanvasNodeExecutionStatePending {
+		if err := e.StartInTransaction(tx); err != nil {
+			return nil, err
+		}
+	}
+
+	return events, nil
+}
+
 func (e *CanvasNodeExecution) Fail(reason, message string) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		return e.FailInTransaction(tx, reason, message)
