@@ -79,9 +79,13 @@ export function useWorkflowViewModeActions({
 
   const handleConsoleAddPanelDialogOpenChange = useCallback(
     (open: boolean) => {
-      setIsConsoleAddPanelOpen(open);
+      if (open) {
+        void handleConsoleAddPanelRequest();
+        return;
+      }
+      setIsConsoleAddPanelOpen(false);
     },
-    [setIsConsoleAddPanelOpen],
+    [handleConsoleAddPanelRequest, setIsConsoleAddPanelOpen],
   );
 
   const onConsoleAddPanel = useCallback(() => {

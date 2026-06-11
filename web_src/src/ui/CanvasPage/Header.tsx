@@ -159,6 +159,7 @@ interface PageHeaderBarProps {
 function PageHeader({
   organizationId,
   headerTitle,
+  mode,
   isEditing = false,
   hasUnpublishedDraftChanges,
   onExitEditMode,
@@ -229,7 +230,7 @@ function PageHeader({
             />
           </div>
         ) : null}
-        {!isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
+        {!isEditing && mode !== "versions" && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}

@@ -7,7 +7,9 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof useWorkflowHeaderEditActions>[0]> = {}) {
   const config = {
     isRunInspectionMode: false,
+    isVersionsMode: false,
     handleClearRunInspection: vi.fn(),
+    handleExitVersionsMode: vi.fn(),
     handleToggleEditMode: vi.fn().mockResolvedValue(undefined),
     setRunDetailNodeId: vi.fn(),
     setSearchParams: vi.fn() as unknown as SetURLSearchParams,
@@ -54,6 +56,28 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
 
+  it("exits versions mode before entering edit mode", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isVersionsMode: true });
+
+    await act(async () => {
+      await result.current.handleEnterEditModeFromHeader();
+    });
+
+    expect(config.handleExitVersionsMode).toHaveBeenCalledTimes(1);
+    expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("still exits edit mode when a run is in the URL", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isRunInspectionMode: true });
+
+    await act(async () => {
+      await result.current.handleExitEditModeFromHeader();
+    });
+
+    expect(config.handleClearRunInspection).toHaveBeenCalledTimes(1);
+    expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
+  });
+
   it("auto edit mode removes only the edit param from the current URL", async () => {
     const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
     const setSearchParams = vi.fn();
@@ -62,7 +86,9 @@ describe("useWorkflowHeaderEditActions", () => {
     renderHook(() =>
       useWorkflowHeaderEditActions({
         isRunInspectionMode: false,
+        isVersionsMode: false,
         handleClearRunInspection: vi.fn(),
+        handleExitVersionsMode: vi.fn(),
         handleToggleEditMode,
         setRunDetailNodeId: vi.fn(),
         setSearchParams: setSearchParams as unknown as SetURLSearchParams,

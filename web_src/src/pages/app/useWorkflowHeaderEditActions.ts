@@ -19,7 +19,9 @@ interface WorkflowStartupActionsConfig {
 
 interface WorkflowHeaderEditActionsConfig {
   isRunInspectionMode: boolean;
+  isVersionsMode: boolean;
   handleClearRunInspection: () => void;
+  handleExitVersionsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
@@ -28,7 +30,9 @@ interface WorkflowHeaderEditActionsConfig {
 
 export function useWorkflowHeaderEditActions({
   isRunInspectionMode,
+  isVersionsMode,
   handleClearRunInspection,
+  handleExitVersionsMode,
   handleToggleEditMode,
   setRunDetailNodeId,
   setSearchParams,
@@ -38,15 +42,23 @@ export function useWorkflowHeaderEditActions({
     if (isRunInspectionMode) {
       setRunDetailNodeId(null);
       setSearchParams(clearRunInspectionSearchParams, { replace: true });
+    } else if (isVersionsMode) {
+      handleExitVersionsMode();
     }
 
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+  }, [
+    handleExitVersionsMode,
+    handleToggleEditMode,
+    isRunInspectionMode,
+    isVersionsMode,
+    setRunDetailNodeId,
+    setSearchParams,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
     if (isRunInspectionMode) {
       handleClearRunInspection();
-      return;
     }
     await handleToggleEditMode();
   }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
