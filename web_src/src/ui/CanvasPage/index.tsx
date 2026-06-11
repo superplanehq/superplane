@@ -1069,7 +1069,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
-        void await props.onNodeAdd({
+        await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
