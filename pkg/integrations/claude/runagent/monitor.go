@@ -54,7 +54,13 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	if attempt > maxPollAttempts {
 		ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", metadata.Session.ID)
 		out := buildOutput("timeout", metadata.Session.ID)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+			return emitErr
+		}
+		if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
+			cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
+		}
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -68,7 +74,11 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if errs >= maxPollErrors {
 			ctx.Logger.Errorf("Managed session %s: polling failed repeatedly: %v", metadata.Session.ID, err)
 			out := buildOutput("error", metadata.Session.ID)
-			return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+				return emitErr
+			}
+			cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+			return nil
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}

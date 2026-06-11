@@ -184,23 +184,29 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	// Store file IDs early so cleanup works on any later error path.
+	if len(resources) > 0 {
+		fileIDs := make([]string, len(resources))
+		for i, r := range resources {
+			fileIDs[i] = r.FileID
+			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
+		}
+		encoded, _ := json.Marshal(fileIDs)
+		_ = ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded))
+	}
+
 	aid := strings.TrimSpace(spec.Agent)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
 		AgentVersion:  spec.Version,
 		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
 		VaultIDs:      spec.VaultIDs,
-	}
-
-	if len(resources) > 0 {
-		createReq.Resources = resources
-		for _, r := range resources {
-			ctx.Logger.Infof("Mounting file: %s (file_id: %s)", r.MountPath, r.FileID)
-		}
+		Resources:     resources,
 	}
 
 	session, err := client.CreateManagedSession(createReq)
 	if err != nil {
+		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to create managed agent session: %w", err)
 	}
 
@@ -212,17 +218,6 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 
 	if err := ctx.ExecutionState.SetKV("managed_session_id", session.ID); err != nil {
 		return fmt.Errorf("failed to set managed_session_id: %w", err)
-	}
-
-	if len(resources) > 0 {
-		fileIDs := make([]string, len(resources))
-		for i, r := range resources {
-			fileIDs[i] = r.FileID
-		}
-		encoded, _ := json.Marshal(fileIDs)
-		if err := ctx.ExecutionState.SetKV("uploaded_file_ids", string(encoded)); err != nil {
-			return fmt.Errorf("failed to store uploaded file IDs: %w", err)
-		}
 	}
 
 	if err := client.SendManagedSessionUserMessage(session.ID, spec.Prompt); err != nil {
@@ -264,10 +259,6 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
 
-// uploadRepositoryFiles reads files from the canvas repository, uploads them
-// to the Anthropic Files API, and returns FileResource entries for session mounting.
-// cleanupUploadedFiles deletes any files uploaded to the Anthropic Files API
-// for this execution. File IDs are retrieved from execution state.
 // getUploadedFileIDs retrieves uploaded file IDs from execution state.
 func getUploadedFileIDs(state core.ExecutionStateContext) []string {
 	raw, err := state.GetKV("uploaded_file_ids")
@@ -294,17 +285,20 @@ func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []st
 	for _, path := range files {
 		normalized, err := gitprovider.ValidateUserPath(path)
 		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
 			return nil, fmt.Errorf("invalid file path %q: %w", path, err)
 		}
 
 		reader, err := ctx.Files.Read(normalized)
 		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
 			return nil, fmt.Errorf("read file %q: %w", path, err)
 		}
 
 		fileID, err := client.UploadFile(reader, normalized)
 		reader.Close()
 		if err != nil {
+			cleanupFileResources(client, resources, ctx.Logger.Warnf)
 			return nil, fmt.Errorf("upload file %q: %w", path, err)
 		}
 
@@ -314,6 +308,15 @@ func uploadRepositoryFiles(client *Client, ctx core.ExecutionContext, files []st
 		})
 	}
 	return resources, nil
+}
+
+// cleanupFileResources deletes already-uploaded files on partial failure.
+func cleanupFileResources(client *Client, resources []FileResource, logWarn func(string, ...any)) {
+	for _, r := range resources {
+		if err := client.DeleteFile(r.FileID); err != nil && logWarn != nil {
+			logWarn("Failed to delete uploaded file %s: %v", r.FileID, err)
+		}
+	}
 }
 
 func decodeSpec(config any) (Spec, error) {
