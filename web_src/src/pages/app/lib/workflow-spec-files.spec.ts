@@ -17,7 +17,6 @@ const sampleWorkflow: CanvasesCanvas = {
     id: "canvas-abc",
     name: "My Workflow",
     description: "",
-    isTemplate: false,
   },
   spec: {
     nodes: [

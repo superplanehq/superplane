@@ -44,6 +44,9 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
 		}
+		if errors.Is(err, agentservice.ErrSessionBusy) {
+			return nil, status.Error(codes.FailedPrecondition, "agent is still processing the previous turn")
+		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
 		return nil, status.Error(codes.Internal, "failed to send agent chat message")
 	}

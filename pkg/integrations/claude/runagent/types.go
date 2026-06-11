@@ -23,6 +23,7 @@ type Spec struct {
 	EnvironmentID string   `json:"environmentId" mapstructure:"environmentId"`
 	Prompt        string   `json:"prompt" mapstructure:"prompt"`
 	VaultIDs      []string `json:"vaultIds" mapstructure:"vaultIds"`
+	Files         []string `json:"files" mapstructure:"files"`
 }
 
 // ExecutionMetadata is persisted for the run.
@@ -38,13 +39,26 @@ type SessionMetadata struct {
 
 // OutputPayload is emitted on the default channel when the run completes.
 type OutputPayload struct {
-	Status      string `json:"status"`
-	SessionID   string `json:"sessionId"`
-	LastMessage string `json:"lastMessage"`
+	Status      string   `json:"status"`
+	SessionID   string   `json:"sessionId"`
+	LastMessage string   `json:"lastMessage"`
+	Messages    []string `json:"messages"`
 }
 
 func isSessionTerminal(status string) bool {
 	return status == sessionStatusIdle || status == sessionStatusTerminated
+}
+
+func buildOutputFromSessionMessages(status, sessionID string, sm *SessionMessages) OutputPayload {
+	out := OutputPayload{
+		Status:    status,
+		SessionID: sessionID,
+	}
+	if sm != nil {
+		out.LastMessage = sm.LastMessage
+		out.Messages = sm.Messages
+	}
+	return out
 }
 
 func buildOutput(status, sessionID string, lastMessage ...string) OutputPayload {

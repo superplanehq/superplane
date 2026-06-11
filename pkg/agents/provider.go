@@ -55,6 +55,39 @@ type CustomToolResult struct {
 	IsError         bool
 }
 
+type CustomToolInputSchema struct {
+	Type        string                           `json:"type"`
+	Description string                           `json:"description,omitempty"`
+	Enum        []string                         `json:"enum,omitempty"`
+	Properties  map[string]CustomToolInputSchema `json:"properties,omitempty"`
+	Items       *CustomToolInputSchema           `json:"items,omitempty"`
+	Required    []string                         `json:"required,omitempty"`
+}
+
+func (s CustomToolInputSchema) Map() map[string]any {
+	result := map[string]any{"type": s.Type}
+	if s.Description != "" {
+		result["description"] = s.Description
+	}
+	if len(s.Enum) > 0 {
+		result["enum"] = append([]string(nil), s.Enum...)
+	}
+	if len(s.Properties) > 0 {
+		properties := make(map[string]any, len(s.Properties))
+		for name, property := range s.Properties {
+			properties[name] = property.Map()
+		}
+		result["properties"] = properties
+	}
+	if s.Items != nil {
+		result["items"] = s.Items.Map()
+	}
+	if len(s.Required) > 0 {
+		result["required"] = append([]string(nil), s.Required...)
+	}
+	return result
+}
+
 type CustomToolExecutor interface {
 	ExecuteCustomTool(ctx context.Context, session AgentSessionContext, toolUse CustomToolUse) CustomToolResult
 }
@@ -141,3 +174,5 @@ type ProviderSessionCleaner interface {
 }
 
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")
+var ErrSessionBusy = errors.New("agent session is still processing")
+var ErrProviderSessionUnavailable = errors.New("provider session is unavailable")

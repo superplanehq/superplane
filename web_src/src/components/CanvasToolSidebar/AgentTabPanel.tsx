@@ -42,6 +42,7 @@ type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  initialStatus: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
@@ -93,6 +94,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       chatId={chatId}
       canvasId={canvasId}
       organizationId={organizationId}
+      initialStatus={chatQuery.data?.status ?? "idle"}
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
@@ -104,6 +106,7 @@ function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  initialStatus,
   agentMode,
   onModeSwitch,
   isEditing,
@@ -112,13 +115,17 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
-  const [status, setStatus] = useState<string>("idle");
+  const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
   const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+
+  useEffect(() => {
+    setStatus(initialStatus || "idle");
+  }, [initialStatus]);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {

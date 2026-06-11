@@ -123,25 +123,29 @@ vi.mock("@/pages/app/utils", () => ({
 
 import { ComponentSidebar } from "./index";
 
+function defaultSidebarProps(
+  props?: Partial<React.ComponentProps<typeof ComponentSidebar>>,
+): React.ComponentProps<typeof ComponentSidebar> {
+  return {
+    isOpen: true,
+    canvasMode: "live",
+    latestEvents: [],
+    nextInQueueEvents: [],
+    totalInQueueCount: 0,
+    totalInHistoryCount: 0,
+    showSettingsTab: true,
+    nodeName: "Node",
+    nodeConfiguration: {},
+    nodeConfigurationFields: [],
+    workflowNodes: [],
+    actions: [],
+    triggers: [],
+    ...props,
+  };
+}
+
 function renderSidebar(props?: Partial<React.ComponentProps<typeof ComponentSidebar>>) {
-  return render(
-    <ComponentSidebar
-      isOpen={true}
-      canvasMode="live"
-      latestEvents={[]}
-      nextInQueueEvents={[]}
-      totalInQueueCount={0}
-      totalInHistoryCount={0}
-      showSettingsTab={true}
-      nodeName="Node"
-      nodeConfiguration={{}}
-      nodeConfigurationFields={[]}
-      workflowNodes={[]}
-      actions={[]}
-      triggers={[]}
-      {...props}
-    />,
-  );
+  return render(<ComponentSidebar {...defaultSidebarProps(props)} />);
 }
 
 describe("ComponentSidebar", () => {
@@ -158,6 +162,20 @@ describe("ComponentSidebar", () => {
     const sidebar = container.firstElementChild as HTMLElement | null;
     expect(sidebar).toBeTruthy();
     expect(sidebar?.style.width).toBe("380px");
+  });
+
+  it("does not reserve layout width while closed", async () => {
+    const { rerender } = renderSidebar({ isOpen: false });
+
+    await waitFor(() => {
+      expect(useSidebarLayoutStore.getState().rightMountCount).toBe(0);
+    });
+
+    rerender(<ComponentSidebar {...defaultSidebarProps({ isOpen: true })} />);
+
+    await waitFor(() => {
+      expect(useSidebarLayoutStore.getState().rightMountCount).toBe(1);
+    });
   });
 
   it("keeps width within resize bounds when pointer resize events fire", async () => {
