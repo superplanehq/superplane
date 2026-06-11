@@ -14,8 +14,7 @@
     "scopingProjectId": "my-project",
     "metricType": "compute.googleapis.com/instance/cpu/utilization",
     "metricDisplayName": "CPU utilization",
-    "startedAt": 1767225600,
-    "endedAt": 0
+    "startedAt": 1767225600
   },
   "timestamp": "2026-01-01T00:00:00Z"
 }

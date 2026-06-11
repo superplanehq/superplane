@@ -167,6 +167,40 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "compute.googleapis.com/instance/cpu/utilization", data["metricType"])
 	})
 
+	t.Run("handles a null ended_at on an open incident and omits it from the payload", func(t *testing.T) {
+		// Cloud Monitoring sends "ended_at": null while an incident is still open.
+		// This must parse and emit, not fail the whole body.
+		body := []byte(`{"version":"1.2","incident":{"incident_id":"0.def","state":"open","policy_name":"projects/my-project/alertPolicies/1","started_at":1767225600,"ended_at":null}}`)
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"open"}},
+			Body:          body,
+			Events:        events,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 200, code)
+		require.Len(t, events.Payloads, 1)
+		data := events.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, int64(1767225600), data["startedAt"])
+		_, hasEnded := data["endedAt"]
+		assert.False(t, hasEnded, "open incident should omit endedAt")
+	})
+
+	t.Run("includes ended_at once the incident has resolved", func(t *testing.T) {
+		body := []byte(`{"version":"1.2","incident":{"incident_id":"0.ghi","state":"closed","policy_name":"projects/my-project/alertPolicies/1","started_at":1767225600,"ended_at":1767229200}}`)
+		events := &contexts.EventContext{}
+		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{
+			Configuration: map[string]any{"states": []string{"closed"}},
+			Body:          body,
+			Events:        events,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 200, code)
+		require.Len(t, events.Payloads, 1)
+		data := events.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, int64(1767229200), data["endedAt"])
+	})
+
 	t.Run("ignores a closed incident when only open is selected", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		code, _, err := tr.HandleWebhook(core.WebhookRequestContext{

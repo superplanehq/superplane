@@ -338,12 +338,15 @@ type incidentWebhookPayload struct {
 }
 
 type incident struct {
-	IncidentID          string          `json:"incident_id"`
-	ScopingProjectID    string          `json:"scoping_project_id"`
-	URL                 string          `json:"url"`
-	State               string          `json:"state"`
-	StartedAt           int64           `json:"started_at"`
-	EndedAt             int64           `json:"ended_at"`
+	IncidentID       string `json:"incident_id"`
+	ScopingProjectID string `json:"scoping_project_id"`
+	URL              string `json:"url"`
+	State            string `json:"state"`
+	StartedAt        int64  `json:"started_at"`
+	// EndedAt is nullable: Cloud Monitoring sends "ended_at": null for incidents
+	// that are still open, so decode it as a pointer and omit it from the emitted
+	// payload when absent rather than reporting a misleading epoch (0) timestamp.
+	EndedAt             *int64          `json:"ended_at"`
 	Summary             string          `json:"summary"`
 	ResourceName        string          `json:"resource_name"`
 	ResourceDisplayName string          `json:"resource_display_name"`
@@ -373,7 +376,10 @@ func buildAlertPayload(i *incident) map[string]any {
 		"thresholdValue":      i.ThresholdValue,
 		"scopingProjectId":    i.ScopingProjectID,
 		"startedAt":           i.StartedAt,
-		"endedAt":             i.EndedAt,
+	}
+	// Only present once the incident has resolved; open incidents have no end.
+	if i.EndedAt != nil {
+		payload["endedAt"] = *i.EndedAt
 	}
 	if i.Metric != nil {
 		payload["metricType"] = i.Metric.Type
