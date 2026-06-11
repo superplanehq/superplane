@@ -60,8 +60,22 @@ describe("RunsTabPanel", () => {
   const baseProps = {
     canvasId: "canvas-1",
     onSelectRun: () => {},
+    onSelectLiveCanvas: () => {},
     workflowNodes: nodes,
   };
+
+  it("shows the Live Canvas row and selects it when no run is active", () => {
+    const onSelectLiveCanvas = vi.fn();
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} onSelectLiveCanvas={onSelectLiveCanvas} />, {
+      wrapper: routerWrapper,
+    });
+
+    const liveCanvas = screen.getByTestId("runs-sidebar-live-canvas");
+    expect(liveCanvas).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(liveCanvas);
+    expect(onSelectLiveCanvas).toHaveBeenCalledTimes(1);
+  });
 
   it("shows an empty state when there are no runs", () => {
     render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />, { wrapper: routerWrapper });
@@ -242,5 +256,30 @@ describe("RunsTabPanel", () => {
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
+  });
+
+  it("navigates between runs from the detail header", async () => {
+    const user = userEvent.setup();
+    const onNavigateRun = vi.fn();
+    localStorage.clear();
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({
+        id: "run-2",
+        createdAt: "2026-05-01T11:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Second run" },
+      }),
+    ];
+
+    render(
+      <RunsTabPanel runs={runs} selectedRunId="run-2" initialOpenDetail {...baseProps} onNavigateRun={onNavigateRun} />,
+      { wrapper: routerWrapper },
+    );
+
+    expect(screen.getByTestId("run-detail-newer")).toBeEnabled();
+    expect(screen.getByTestId("run-detail-older")).toBeDisabled();
+
+    await user.click(screen.getByTestId("run-detail-newer"));
+    expect(onNavigateRun).toHaveBeenCalledWith("run-1");
   });
 });
