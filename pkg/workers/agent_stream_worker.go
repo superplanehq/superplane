@@ -27,12 +27,22 @@ const (
 	maxConcurrentStreams       = 10
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
-	// stuckStreamGrace pads the per-turn timeout before the cleanup loop
-	// considers a "streaming" row leaked. A turn that legitimately ran for
-	// the full timeout should have been transitioned to idle or failed by
-	// then; anything still streaming past 2× is stuck.
-	stuckStreamGrace    = 2 * agentStreamTimeout
-	stuckCleanupCadence = 5 * time.Minute
+	// streamHeartbeatInterval is how often a live worker refreshes
+	// last_active_at while a stream is open. Short enough that a dead
+	// worker is detected quickly; long enough that the write rate stays
+	// negligible (~2/min/session).
+	streamHeartbeatInterval = 30 * time.Second
+	// stuckStreamGrace is the heartbeat staleness threshold cleanup uses
+	// to declare a streaming row leaked. Sized above the worst-case
+	// "enqueue → first heartbeat" gap: SendMessage refreshes
+	// last_active_at at enqueue time, but the worker may sit in
+	// dispatch's slot queue for minutes when all concurrent streams are
+	// busy. A tighter cutoff would risk failing healthy sessions that
+	// simply hadn't been picked up yet. 5m × 30s heartbeat = 10 missed
+	// ticks before declaring death, which still bounds worst-case stuck
+	// time to ~6 min vs. the previous 30+.
+	stuckStreamGrace    = 5 * time.Minute
+	stuckCleanupCadence = 1 * time.Minute
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
@@ -109,16 +119,28 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 // dispatch acquires a concurrency slot before ACKing the queue message. If
 // another worker already owns the session lock, it durably reschedules the
 // message for the retry queue instead of dropping the follow-up turn.
+//
+// The heartbeat is started as soon as the message arrives (before the slot
+// wait) so the row's last_active_at stays fresh while dispatch is blocked
+// queuing for a slot — under heavy load that wait can outlast
+// stuckStreamGrace, and we don't want cleanup to fail a healthy queued
+// turn. The heartbeat is a no-op when the row isn't in 'streaming' state,
+// so drop/requeue paths and stale messages don't accidentally resurrect
+// idle rows.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
+	stopHeartbeat := startDispatchHeartbeat(ctx, body)
+
 	select {
 	case w.slots <- struct{}{}:
 	case <-ctx.Done():
+		stopHeartbeat()
 		return ctx.Err()
 	}
 
 	request, err := prepareAgentStreamRequest(ctx, body)
 	if err != nil {
 		<-w.slots
+		stopHeartbeat()
 		if errors.Is(err, errAgentStreamAlreadyLocked) {
 			return w.rescheduleLockedRequest(ctx, body)
 		}
@@ -126,11 +148,13 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	}
 	if request == nil {
 		<-w.slots
+		stopHeartbeat()
 		return nil
 	}
 
 	go func() {
 		defer func() {
+			stopHeartbeat()
 			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
@@ -142,6 +166,24 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 		}
 	}()
 	return nil
+}
+
+// startDispatchHeartbeat parses the session id out of the queue body and, if
+// it's well-formed, spawns a heartbeat goroutine. Returns a no-op stopper
+// when the body is unparseable so the dispatch return paths can always call
+// stop() unconditionally.
+func startDispatchHeartbeat(ctx context.Context, body []byte) func() {
+	var req messages.AgentStreamRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return func() {}
+	}
+	sessionID, err := uuid.Parse(req.SessionID)
+	if err != nil {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go runStreamHeartbeat(heartbeatCtx, sessionID)
+	return cancel
 }
 
 func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
@@ -318,13 +360,25 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		closeOpenTools(sessionID, publish)
 
 		if streamErr != nil {
-			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-			publish(messages.AgentSessionEventMessage{
-				Event:  "session_failed",
-				Status: models.AgentSessionStatusFailed,
-				Error:  streamErr.Error(),
-			})
-			log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			// Conditional on turnStartedAt so a stream that errors out
+			// after the user already hit Stop (InterruptSession bumps
+			// updated_at when it resets to idle) can't flip the row from
+			// idle back to failed and spook the UI.
+			markedFailed, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusFailed, turnStartedAt)
+			if err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: failed to mark session failed")
+				return nil
+			}
+			if markedFailed {
+				publish(messages.AgentSessionEventMessage{
+					Event:  "session_failed",
+					Status: models.AgentSessionStatusFailed,
+					Error:  streamErr.Error(),
+				})
+				log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			} else {
+				log.WithError(streamErr).WithField("session_id", sessionID).Info("agent stream: stream errored but session was already reset; dropping failed event")
+			}
 			return nil
 		}
 
@@ -751,6 +805,29 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 		ToolName:   m.ToolName,
 		ToolStatus: m.ToolStatus,
 		CreatedAt:  m.CreatedAt,
+	}
+}
+
+// runStreamHeartbeat keeps last_active_at fresh while the worker owns a
+// stream. It writes once up front so cleanup can't race the first tick
+// (e.g. a backed-up queue could otherwise let the cutoff elapse before
+// the worker had a chance to claim the session), then ticks at the
+// configured interval until the caller cancels.
+func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
+	if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: initial heartbeat failed")
+	}
+	ticker := time.NewTicker(streamHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: heartbeat failed")
+			}
+		}
 	}
 }
 

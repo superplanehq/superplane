@@ -124,6 +124,23 @@ func UpdateAgentSessionStatusIfUnchanged(sessionID uuid.UUID, status string, unc
 	return UpdateAgentSessionStatusIfUnchangedInTransaction(database.Conn(), sessionID, status, unchangedSince)
 }
 
+// TouchAgentSessionHeartbeat bumps last_active_at without touching status or
+// updated_at, so the cleanup loop can distinguish "worker is still alive"
+// from "row leaked". Guarded on status='streaming' so a goroutine that
+// survives past a reset (e.g. interrupt or another replica taking over)
+// can't keep an already-idle row looking active. Uses UpdateColumn so GORM
+// doesn't auto-bump updated_at — the worker's per-turn idle transition
+// keys on updated_at as an optimistic concurrency check, and a heartbeat
+// must not invalidate it.
+func TouchAgentSessionHeartbeat(sessionID uuid.UUID) error {
+	now := time.Now()
+	return database.Conn().Model(&AgentSession{}).
+		Where("id = ?", sessionID).
+		Where("status = ?", AgentSessionStatusStreaming).
+		UpdateColumn("last_active_at", &now).
+		Error
+}
+
 func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID, providerSessionID, status string) error {
 	now := time.Now()
 	return tx.Model(&AgentSession{}).
@@ -186,14 +203,17 @@ func LockAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) (*AgentSess
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose
-// last update predates cutoff as failed and returns the affected rows so
-// the caller can fan out session_failed events.
+// last heartbeat predates cutoff as failed and returns the affected rows so
+// the caller can fan out session_failed events. Driven by last_active_at
+// (refreshed by the stream worker every heartbeat tick) rather than
+// updated_at, so a legitimately long-running turn keeps the row alive
+// without status churn.
 func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
 	var stuck []AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.
 			Where("status = ?", AgentSessionStatusStreaming).
-			Where("updated_at < ?", cutoff).
+			Where("last_active_at < ?", cutoff).
 			Find(&stuck).Error; err != nil {
 			return err
 		}
