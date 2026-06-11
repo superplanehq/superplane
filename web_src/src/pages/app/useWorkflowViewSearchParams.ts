@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
+import { isWorkflowCanvasViewParam } from "./viewState";
 
 /**
  * The user-facing console feature is keyed by `?view=console` in the URL.
@@ -30,6 +31,22 @@ function migrateLegacyViewParams(view: string, params: URLSearchParams): URLSear
   return null;
 }
 
+function migrateConflictingRunParam(view: string, params: URLSearchParams): URLSearchParams | null {
+  if (!params.get("run")) {
+    return null;
+  }
+
+  if (isWorkflowCanvasViewParam(view)) {
+    return null;
+  }
+
+  const next = new URLSearchParams(params);
+  next.delete("run");
+  next.delete("sidebar");
+  next.delete("node");
+  return next;
+}
+
 /**
  * Keeps console UI state and selected run in sync with `view` and `run` search params.
  * View mode flags are derived directly from the URL so they match header chrome on the
@@ -44,8 +61,8 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   const isFilesMode = viewParam === "files";
   const isVersionsMode = viewParam === "versions";
   const isConsoleMode = consoleViewActive;
-  const isRunInspectionMode = Boolean(runParam);
-  const selectedRunId = runParam || null;
+  const isRunInspectionMode = Boolean(runParam) && isWorkflowCanvasViewParam(viewParam);
+  const selectedRunId = isRunInspectionMode ? runParam : null;
 
   const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
   const [isConsoleYamlOpen, setIsConsoleYamlOpen] = useState(false);
@@ -57,6 +74,12 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
     const migrated = migrateLegacyViewParams(viewParam, searchParams);
     if (migrated) {
       setSearchParamsRef.current(migrated, { replace: true });
+      return;
+    }
+
+    const runMigrated = migrateConflictingRunParam(viewParam, searchParams);
+    if (runMigrated) {
+      setSearchParamsRef.current(runMigrated, { replace: true });
       return;
     }
 

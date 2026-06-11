@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -40,22 +41,24 @@ export function RunFiltersPopover({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           className={cn(
-            "relative inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-gray-100",
+            "relative shrink-0 hover:bg-gray-100",
             hasTriggerFilter || hasStatusFilter ? "text-sky-700 hover:bg-sky-100" : "text-gray-500 hover:text-gray-700",
           )}
           aria-label="Filter runs"
           title="Filter runs"
         >
-          <ListFilter className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <ListFilter className="size-3.5 shrink-0" aria-hidden />
           {hasTriggerFilter || hasStatusFilter ? (
             <span className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-sky-500 px-0.5 text-[8px] font-semibold leading-none text-white">
               {totalFilters}
             </span>
           ) : null}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 border-slate-950/20 bg-white p-0 shadow-md" sideOffset={4}>
         <div className="flex items-center justify-between px-3 py-2">
