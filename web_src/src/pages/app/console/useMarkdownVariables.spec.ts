@@ -37,6 +37,8 @@ describe("pickMemoryRows", () => {
     // instead of an empty one.
     expect(pickMemoryRows(rows, memorySource({ mode: "list", limit: 0 }))).toEqual(rows);
     expect(pickMemoryRows(rows, memorySource({ mode: "list", limit: -1 }))).toEqual(rows);
+    // A fractional limit must not be silently floored by `slice` (1.5 -> 1 row).
+    expect(pickMemoryRows(rows, memorySource({ mode: "list", limit: 1.5 }))).toEqual(rows);
   });
 
   it("returns an empty array when the sorted set is empty in list mode", () => {

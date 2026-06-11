@@ -347,7 +347,10 @@ export function resolveMemoryVariable(
  */
 export function pickMemoryRows(sorted: Record<string, unknown>[], source: MarkdownMemoryVariableSource): unknown {
   if (source.mode !== "list") return sorted[0];
-  if (typeof source.limit === "number" && source.limit > 0) {
+  // Only a positive integer caps the list. A fractional limit would otherwise
+  // be floored by `Array.prototype.slice` (e.g. 1.5 -> 1 row), so fail soft to
+  // "no cap" and let the validator surface the real error on save.
+  if (typeof source.limit === "number" && Number.isInteger(source.limit) && source.limit > 0) {
     return sorted.slice(0, source.limit);
   }
   return sorted;
