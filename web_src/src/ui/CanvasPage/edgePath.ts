@@ -2,7 +2,7 @@ import { Position, getBezierPath, getSmoothStepPath } from "@xyflow/react";
 
 const BACKWARD_ROUTE_OFFSET = 80;
 const BACKWARD_ROUTE_TARGET_BIAS = 0.75;
-const CANVAS_NODE_HEIGHT = 200;
+const CANVAS_NODE_HEIGHT = 280;
 const MIN_DISTANCE_FROM_TARGET_TOP = 50;
 const MIN_DISTANCE_FROM_SOURCE_BOTTOM = 50;
 const SAME_ROW_TOLERANCE = 40;
