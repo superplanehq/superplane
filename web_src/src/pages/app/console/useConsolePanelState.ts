@@ -9,6 +9,7 @@ export function useConsolePanelState(
   panels: ConsolePanel[],
   layout: ConsoleLayoutItem[],
   onChange: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void,
+  onEffectiveChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void,
 ) {
   const [localPanels, setLocalPanels] = useState<ConsolePanel[]>(panels);
   const [localLayout, setLocalLayout] = useState<ConsoleLayoutItem[]>(layout);
@@ -22,6 +23,10 @@ export function useConsolePanelState(
       setLocalLayout(layout);
     }
   }, [panels, layout]);
+
+  useEffect(() => {
+    onEffectiveChange?.({ panels: localPanels, layout: localLayout });
+  }, [localLayout, localPanels, onEffectiveChange]);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<{ panels: ConsolePanel[]; layout: ConsoleLayoutItem[] } | null>(null);
