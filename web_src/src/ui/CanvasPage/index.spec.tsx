@@ -500,8 +500,17 @@ describe("CanvasPage connection drop", () => {
     vi.useRealTimers();
   });
 
-  it("closes the run node detail pane when the canvas background is clicked in runs mode", () => {
+  it("keeps the run node detail pane open and selected when the canvas background is clicked in runs mode", async () => {
     const onRunNodeDetailClose = vi.fn();
+    const selectedRunNode = () =>
+      (
+        reactFlowPropsRef.current?.nodes as
+          | Array<{
+              id: string;
+              selected?: boolean;
+            }>
+          | undefined
+      )?.find((node) => node.id === "run-node-1");
 
     render(
       <MemoryRouter>
@@ -529,10 +538,15 @@ describe("CanvasPage connection drop", () => {
       </MemoryRouter>,
     );
 
+    await waitFor(() => {
+      expect(selectedRunNode()?.selected).toBe(true);
+    });
+
     act(() => {
       reactFlowPropsRef.current?.onPaneClick?.();
     });
 
-    expect(onRunNodeDetailClose).toHaveBeenCalledTimes(1);
+    expect(onRunNodeDetailClose).not.toHaveBeenCalled();
+    expect(selectedRunNode()?.selected).toBe(true);
   });
 });

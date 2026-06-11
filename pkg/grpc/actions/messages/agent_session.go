@@ -18,6 +18,7 @@ type AgentStreamRequest struct {
 	SessionID      string `json:"session_id"`
 	OrganizationID string `json:"organization_id"`
 	UserID         string `json:"user_id"`
+	LockRetryCount int    `json:"lock_retry_count,omitempty"`
 }
 
 func PublishAgentStreamRequested(req AgentStreamRequest) error {

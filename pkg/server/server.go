@@ -137,7 +137,7 @@ func startWorkers(
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -160,7 +160,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 

@@ -5,6 +5,7 @@ import type { editor as MonacoEditor } from "monaco-editor";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
@@ -104,6 +105,15 @@ export function HtmlPanelEditor({
 
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
+  // Variables rail collapses automatically when the parent widget is narrow.
+  // The manual toggle wins until the breakpoint flips again, at which point
+  // the auto behavior takes over so resizes always honor the current width.
+  const {
+    containerRef: gridRef,
+    collapsed: variablesCollapsed,
+    toggle: toggleVariablesCollapsed,
+  } = useResponsiveRailCollapse();
+
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
       <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
@@ -118,7 +128,13 @@ export function HtmlPanelEditor({
           data-testid="console-html-title-editor"
         />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+      <div
+        ref={gridRef}
+        className={cn(
+          "grid min-h-0 flex-1 grid-cols-1 gap-0",
+          variablesCollapsed ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_minmax(220px,320px)]",
+        )}
+      >
         <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10">
           <HtmlCodeEditor
             ref={codeEditorRef}
@@ -144,6 +160,8 @@ export function HtmlPanelEditor({
           errors={errors}
           isLoading={isLoading}
           onInsertSnippet={(snippet) => codeEditorRef.current?.insertAtCursor(snippet)}
+          collapsed={variablesCollapsed}
+          onToggleCollapsed={toggleVariablesCollapsed}
         />
       </div>
       <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">

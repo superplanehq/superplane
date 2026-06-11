@@ -10,7 +10,7 @@ import (
 )
 
 type CreateCommand struct {
-	versionID   *string
+	draftID     *string
 	title       *string
 	description *string
 }
@@ -31,8 +31,8 @@ func (c *CreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	versionID := ""
-	if c.versionID != nil {
-		versionID = strings.TrimSpace(*c.versionID)
+	if c.draftID != nil {
+		versionID = strings.TrimSpace(*c.draftID)
 	}
 
 	if versionID == "" {
@@ -49,7 +49,7 @@ func (c *CreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane apps canvas update --draft -f <file>` first")
+			return fmt.Errorf("no draft version found; run `superplane apps drafts create` then `superplane apps canvas update --draft-id <id> -f <file>` first")
 		}
 	}
 

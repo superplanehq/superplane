@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -119,6 +120,43 @@ func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
 	return UpdateAgentSessionStatusInTransaction(database.Conn(), sessionID, status)
 }
 
+func UpdateAgentSessionStatusIfUnchanged(sessionID uuid.UUID, status string, unchangedSince *time.Time) (bool, error) {
+	return UpdateAgentSessionStatusIfUnchangedInTransaction(database.Conn(), sessionID, status, unchangedSince)
+}
+
+func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID, providerSessionID, status string) error {
+	now := time.Now()
+	return tx.Model(&AgentSession{}).
+		Where("id = ?", sessionID).
+		Updates(map[string]any{
+			"provider_session_id": providerSessionID,
+			"status":              status,
+			"last_active_at":      &now,
+			"updated_at":          &now,
+		}).
+		Error
+}
+
+func UpdateAgentSessionStatusIfUnchangedInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string, unchangedSince *time.Time) (bool, error) {
+	now := time.Now()
+	query := tx.Model(&AgentSession{}).Where("id = ?", sessionID)
+	if unchangedSince == nil {
+		query = query.Where("updated_at IS NULL")
+	} else {
+		query = query.Where("updated_at = ?", *unchangedSince)
+	}
+
+	result := query.Updates(map[string]any{
+		"status":         status,
+		"last_active_at": &now,
+		"updated_at":     &now,
+	})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
 func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canvasID uuid.UUID) error {
 	return tx.
 		Where("organization_id = ?", organizationID).
@@ -132,6 +170,19 @@ func DeleteAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID
 		Where("organization_id = ?", organizationID).
 		Delete(&AgentSession{}).
 		Error
+}
+
+func LockAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", sessionID).
+		First(&session).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose

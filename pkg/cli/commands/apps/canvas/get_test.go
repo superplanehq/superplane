@@ -144,53 +144,6 @@ func TestGetErrorsWhenNoAppAndNoActive(t *testing.T) {
 	require.Contains(t, err.Error(), "app-name-or-id")
 }
 
-func TestGetDraftResolvesUserDraftVersion(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasMetadataResponse,
-		},
-		expectMe(),
-		expectListUserDraftBranch(testGetCanvasID, "draft-1"),
-		expectFetchCanvasYAML(
-			testGetCanvasID,
-			"draft-1",
-			"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+testGetCanvasID+"\n  name: "+testGetCanvasName+"\nspec:\n  nodes:\n    - id: node-1\n      name: Trigger\n  edges: []\n",
-		),
-	)
-
-	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
-	ctx.Args = []string{testGetCanvasID}
-
-	draft := true
-	require.NoError(t, (&getCommand{draft: &draft}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Nodes: 1")
-	require.Contains(t, stdout.String(), "Edges: 0")
-}
-
-func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasMetadataResponse,
-		},
-		expectMe(),
-		expectListDraftBranchesEmpty(testGetCanvasID),
-	)
-
-	ctx, _ := cli.NewCommandContext(t, server.server, "text")
-	ctx.Args = []string{testGetCanvasID}
-
-	draft := true
-	err := (&getCommand{draft: &draft}).Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "draft version not found")
-}
-
 func TestGetLiveYAMLOutput(t *testing.T) {
 	server := newAPITestServer(
 		t,
@@ -205,12 +158,51 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 	ctx, stdout := cli.NewCommandContext(t, server.server, "yaml")
 	ctx.Args = []string{testGetCanvasID}
 
-	noDraft := false
-	require.NoError(t, (&getCommand{draft: &noDraft}).Execute(ctx))
+	require.NoError(t, (&getCommand{}).Execute(ctx))
 
 	out := stdout.String()
 	require.Contains(t, out, "apiVersion: v1")
 	require.Contains(t, out, "kind: Canvas")
 	require.Contains(t, out, "id: "+testGetCanvasID)
 	require.Contains(t, out, "name: "+testGetCanvasName)
+}
+
+func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   testDescribeCanvas,
+			handle: describeCanvasMetadataResponse,
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + testGetCanvasID + "/versions/draft-2",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
+			},
+		},
+		expectFetchCanvasYAML(
+			testGetCanvasID,
+			"draft-2",
+			sampleCanvasYAMLBody,
+		),
+	)
+
+	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{testGetCanvasID}
+
+	draftID := "draft-2"
+	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
+	require.Contains(t, stdout.String(), "Source: draft")
+	require.Contains(t, stdout.String(), "Version ID: draft-2")
 }
