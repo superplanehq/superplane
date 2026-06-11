@@ -111,7 +111,12 @@ describe("CanvasToolSidebar", () => {
     await user.type(screen.getByTestId("agent-input"), "retry");
     await user.click(screen.getByTestId("agent-send-message-button"));
 
-    expect(sendMutation.mutateAsync).toHaveBeenCalledWith({ chatId: "chat-1", content: "retry", mode: "operator" });
+    expect(sendMutation.mutateAsync).toHaveBeenCalledWith({
+      chatId: "chat-1",
+      content: "retry",
+      mode: "operator",
+      images: [],
+    });
   });
 
   it("does not render when managed agents are disabled", () => {

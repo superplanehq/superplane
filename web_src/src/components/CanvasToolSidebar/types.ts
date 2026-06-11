@@ -9,6 +9,19 @@ export type AgentChat = {
   updatedAt: string | null;
 };
 
+// Image attached to a stored message. Bytes are served out-of-band by the
+// image endpoint, so the message carries a URL rather than inline base64.
+export type AgentMessageImage = {
+  mediaType: string;
+  url: string;
+};
+
+// Image being composed/sent by the client, carrying the base64 payload.
+export type AgentOutgoingImage = {
+  mediaType: string;
+  data: string;
+};
+
 export type AgentMessage = {
   id: string;
   role: string;
@@ -16,6 +29,7 @@ export type AgentMessage = {
   toolName: string;
   toolCallId: string;
   toolStatus: string;
+  images?: AgentMessageImage[];
   createdAt: string | null;
 };
 
@@ -54,15 +68,38 @@ export function fromApiChat(input: AgentsAgentChatInfo | undefined): AgentChat |
   };
 }
 
-export function fromApiMessage(input: AgentsAgentChatMessage | undefined): AgentMessage | null {
+export function fromApiMessage(
+  input: AgentsAgentChatMessage | undefined,
+  chatId: string,
+  organizationId: string | undefined,
+): AgentMessage | null {
   if (!input || !input.id) return null;
+  const messageId = input.id;
   return {
-    id: input.id,
+    id: messageId,
     role: input.role ?? "",
     content: input.content ?? "",
     toolName: input.toolName ?? "",
     toolCallId: input.toolCallId ?? "",
     toolStatus: input.toolStatus ?? "",
+    images: (input.images ?? [])
+      // Index matches the image's position in the stored message, which the
+      // server endpoint uses to address it; map before filtering to preserve it.
+      .map((image, index) => ({
+        mediaType: image.mediaType ?? "",
+        url: agentMessageImageUrl(chatId, messageId, index, organizationId),
+      }))
+      .filter((image) => Boolean(image.mediaType)),
     createdAt: input.createdAt ?? null,
   };
+}
+
+function agentMessageImageUrl(
+  chatId: string,
+  messageId: string,
+  index: number,
+  organizationId: string | undefined,
+): string {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return `/api/v1/agents/chats/${chatId}/messages/${messageId}/images/${index}${query}`;
 }

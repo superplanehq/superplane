@@ -114,7 +114,8 @@ CREATE TABLE public.agent_session_messages (
     tool_call_id text DEFAULT ''::text NOT NULL,
     tool_name text DEFAULT ''::text NOT NULL,
     tool_status character varying(20) DEFAULT ''::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    images jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
