@@ -6,13 +6,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type listCommand struct {
-	full *bool
-}
+type listCommand struct{}
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
 	response, _, err := ctx.API.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
@@ -21,30 +18,22 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	canvases := response.GetCanvases()
-	resources := make([]models.Canvas, 0, len(canvases))
-	for _, canvas := range canvases {
-		resources = append(resources, models.CanvasResourceFromCanvas(canvas))
-	}
-
 	if !ctx.Renderer.IsText() {
-		if c.full != nil && *c.full {
-			return ctx.Renderer.Render(resources)
-		}
-
-		summary := make([]map[string]string, len(canvases))
+		apps := make([]map[string]any, len(canvases))
 		for i, canvas := range canvases {
-			metadata := canvas.GetMetadata()
-			createdAt := ""
-			if metadata.HasCreatedAt() {
-				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
-			}
-			summary[i] = map[string]string{
-				"id":        metadata.GetId(),
-				"name":      metadata.GetName(),
-				"createdAt": createdAt,
+			apps[i] = map[string]any{
+				"id":          canvas.GetId(),
+				"name":        canvas.GetName(),
+				"description": canvas.GetDescription(),
+				"createdBy":   canvas.GetCreatedBy().Name,
+				"createdAt":   canvas.GetCreatedAt().Format(time.RFC3339),
+				"updatedAt":   canvas.GetUpdatedAt().Format(time.RFC3339),
+				"folderId":    canvas.GetFolderId(),
+				"nodes":       len(canvas.GetNodes()),
+				"edges":       len(canvas.GetEdges()),
 			}
 		}
-		return ctx.Renderer.Render(summary)
+		return ctx.Renderer.Render(apps)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -54,15 +43,18 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		}
 
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
+		_, _ = fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT\tUPDATED_AT")
 
 		for _, canvas := range canvases {
-			metadata := canvas.GetMetadata()
 			createdAt := ""
-			if metadata.HasCreatedAt() {
-				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
+			if canvas.HasCreatedAt() {
+				createdAt = canvas.GetCreatedAt().Format(time.RFC3339)
 			}
-			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", metadata.GetId(), metadata.GetName(), createdAt)
+			updatedAt := ""
+			if canvas.HasUpdatedAt() {
+				updatedAt = canvas.GetUpdatedAt().Format(time.RFC3339)
+			}
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\t%s\n", canvas.GetId(), canvas.GetName(), createdAt, updatedAt)
 		}
 
 		return writer.Flush()

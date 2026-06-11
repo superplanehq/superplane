@@ -28,6 +28,8 @@ type Canvas struct {
 	Description             string                                           `gorm:"column:description;->"`
 	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`
 	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover] `gorm:"column:change_request_approvers;->"`
+	Nodes                   datatypes.JSONSlice[Node]                        `gorm:"column:nodes;->"`
+	Edges                   datatypes.JSONSlice[Edge]                        `gorm:"column:edges;->"`
 	CreatedBy               *uuid.UUID
 	NextDraftDisplayNumber  int `gorm:"column:next_draft_display_number;not null;default:1"`
 	CreatedAt               *time.Time
@@ -71,6 +73,8 @@ func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 			"live_version.description AS description",
 			"live_version.change_management_enabled AS change_management_enabled",
 			"live_version.change_request_approvers AS change_request_approvers",
+			"live_version.nodes AS nodes",
+			"live_version.edges AS edges",
 		)
 }
 

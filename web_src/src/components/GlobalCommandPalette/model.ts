@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { useCanvases, useCreateCanvas } from "@/hooks/useCanvasData";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
@@ -96,7 +96,7 @@ type PaletteData = {
   canManageInviteLink: boolean;
   canReadCanvas: boolean;
   canUpdateCanvas: boolean;
-  canvases: CanvasesCanvas[];
+  canvases: CanvasesCanvasSummary[];
   canvasesLoading: boolean;
   createCanvasDisabled: boolean;
   createCanvasMutation: ReturnType<typeof useCreateCanvas>;
@@ -118,7 +118,7 @@ function useCommandPaletteData(
   const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId);
   const permissionState = usePalettePermissions(organizationId, hasAccount);
   const createCanvasMutation = useCreateCanvas(queryOrganizationId);
-  const currentCanvas = canvases.find((canvas) => canvas.metadata?.id === canvasId);
+  const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");
   const canManageInviteLink = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
   const canReadCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "read");
@@ -150,8 +150,8 @@ function canUsePermission(
   return canAct(resource, action);
 }
 
-function currentCanvasNameFor(canvas: CanvasesCanvas | undefined) {
-  return canvas?.metadata?.name ?? "Current app";
+function currentCanvasNameFor(canvas: CanvasesCanvasSummary | undefined) {
+  return canvas?.name ?? "Current app";
 }
 
 function isUsageEnabled(enabled: boolean, error: unknown) {
