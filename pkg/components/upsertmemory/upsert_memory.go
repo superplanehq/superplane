@@ -132,7 +132,7 @@ func (c *UpsertMemory) Configuration() []configuration.Field {
 			Name:        "iterateList",
 			Label:       "Input is a list",
 			Type:        configuration.FieldTypeBool,
-			Description: "When enabled, iterate over a list expression and upsert once per element (matchList stays global)",
+			Description: "When enabled, iterate over a list expression and upsert once per element. Both matchList and valueList values are evaluated per element with the iteration variable in scope (e.g. item.uuid)",
 		},
 		{
 			Name:        "listSource",

@@ -167,7 +167,8 @@ func (c *Client) Verify() error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return c.parseError(resp)
 	}
