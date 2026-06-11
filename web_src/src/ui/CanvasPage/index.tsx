@@ -2570,6 +2570,10 @@ function CanvasContent({
 
     previouslySelectedRef.current = new Set();
 
+    if (headerMode === "runs" && runSelectedNodeId) {
+      return;
+    }
+
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -2585,7 +2589,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [onBuildingBlocksSidebarToggle]);
+  }, [headerMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
