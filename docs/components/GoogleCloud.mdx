@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Artifact Registry • On Artifact Push" href="#artifact-registry-•-on-artifact-push" description="Trigger a workflow when an artifact is pushed to GCP Artifact Registry" />
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
+  <LinkCard title="Monitoring • On Alert" href="#monitoring-•-on-alert" description="Trigger a workflow when a Cloud Monitoring alerting policy opens or closes an incident" />
   <LinkCard title="Pub/Sub • On Message" href="#pub/sub-•-on-message" description="Trigger a workflow when a message is published to a GCP Pub/Sub topic" />
 </CardGrid>
 
@@ -278,6 +279,58 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance"
+}
+```
+
+<a id="monitoring-•-on-alert"></a>
+
+## Monitoring • On Alert
+
+**Trigger key:** `gcp.monitoring.onAlert`
+
+The On Alert trigger starts a workflow execution when a Cloud Monitoring alerting policy fires (opens) or resolves (closes) an incident.
+
+### Trigger behavior
+
+When this trigger is set up, SuperPlane automatically creates a **webhook notification channel** in Cloud Monitoring that points back at SuperPlane. Cloud Monitoring POSTs the incident to SuperPlane whenever a policy attached to that channel changes state.
+
+To route a policy's incidents here, attach this trigger's notification channel to the policy via the **Create Alerting Policy** or **Update Alerting Policy** component's *Notification Channels* field. The channel's resource name is shown on the node after setup.
+
+### Configuration
+
+- **States**: Which incident states to emit on — `open` (fired) and/or `closed` (resolved). Defaults to `open`.
+
+### Event Data
+
+Emits one `gcp.monitoring.alert` event per matching incident, including the incident id, state, policy and condition names, the affected resource and metric, the observed/threshold values, and the incident URL.
+
+### Important Notes
+
+- Requires the `roles/monitoring.notificationChannelEditor` (or `roles/monitoring.editor`) IAM role so SuperPlane can create the webhook channel.
+- Removing the trigger deletes the webhook notification channel it created.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "conditionName": "CPU utilization above threshold",
+    "incidentId": "0.abcdef1234567890",
+    "metricDisplayName": "CPU utilization",
+    "metricType": "compute.googleapis.com/instance/cpu/utilization",
+    "observedValue": "0.93",
+    "policyName": "projects/my-project/alertPolicies/1234567890123456789",
+    "resourceDisplayName": "my-vm",
+    "resourceName": "my-vm",
+    "scopingProjectId": "my-project",
+    "startedAt": 1767225600,
+    "state": "open",
+    "summary": "CPU utilization for gce_instance my-vm is above the threshold of 0.8 with a value of 0.93.",
+    "thresholdValue": "0.8",
+    "url": "https://console.cloud.google.com/monitoring/alerting/incidents/0.abcdef1234567890?project=my-project"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "gcp.monitoring.alert"
 }
 ```
 
