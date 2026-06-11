@@ -571,8 +571,16 @@ export function AppPage() {
     stagingResetNonce,
   });
   const { draftVersionForGraphDiff, hasDraftGraphDiffVersusLive, liveVersionForGraphDiff } = useDraftVersionGraphDiff({
-    organizationId: organizationId!, canvasId: canvasId!, isEditing, activeCanvasVersionId, liveCanvasVersionId: liveCanvasVersionId || "",
-    liveCanvasVersion, draftVersionsFromBranches, selectedCanvasVersion, latestDraftVersion, committedBaselines,
+    organizationId: organizationId!,
+    canvasId: canvasId!,
+    isEditing,
+    activeCanvasVersionId,
+    liveCanvasVersionId: liveCanvasVersionId || "",
+    liveCanvasVersion,
+    draftVersionsFromBranches,
+    selectedCanvasVersion,
+    latestDraftVersion,
+    committedBaselines,
   });
   const commitCanvasStagingMutation = useCommitCanvasStaging(organizationId!, canvasId!, activeCanvasVersionId);
   const discardCanvasStagingMutation = useDiscardCanvasStaging(organizationId!, canvasId!, activeCanvasVersionId);
