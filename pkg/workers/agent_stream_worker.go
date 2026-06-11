@@ -27,23 +27,10 @@ const (
 	maxConcurrentStreams       = 10
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
-	// streamHeartbeatInterval is how often a live worker refreshes
-	// heartbeat_at while a stream is open. Short enough that a dead
-	// worker is detected quickly; long enough that the write rate stays
-	// negligible (~2/min/session).
-	streamHeartbeatInterval = 30 * time.Second
-	// stuckHeartbeatGrace is the cutoff for rows that already carry a
-	// heartbeat_at (i.e. were touched by a heartbeat-aware worker). 5m
-	// of silence ≈ 10 missed 30s ticks — enough to ride out GC pauses
-	// and DB blips without prematurely failing a healthy worker.
-	stuckHeartbeatGrace = 5 * time.Minute
-	// stuckLegacyGrace is the cutoff for rows where heartbeat_at is
-	// NULL — typically because they were created by a binary that
-	// predates the heartbeat code, or in the first moments after
-	// enqueue before the worker's first heartbeat lands. Must stay
-	// above agentStreamTimeout so a legitimate long turn isn't
-	// force-failed mid-flight; the 2× factor is the same shape the
-	// pre-heartbeat cleanup used.
+	streamHeartbeatInterval    = 30 * time.Second
+	stuckHeartbeatGrace        = 5 * time.Minute
+	// Must stay above agentStreamTimeout so long-but-healthy turns
+	// without a heartbeat yet aren't force-failed mid-flight.
 	stuckLegacyGrace    = 2 * agentStreamTimeout
 	stuckCleanupCadence = 1 * time.Minute
 )
@@ -122,15 +109,9 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 
 // dispatch acquires a concurrency slot before ACKing the queue message. If
 // another worker already owns the session lock, it durably reschedules the
-// message for the retry queue instead of dropping the follow-up turn.
-//
-// The heartbeat is started as soon as the message arrives (before the slot
-// wait) so the row's last_active_at stays fresh while dispatch is blocked
-// queuing for a slot — under heavy load that wait can outlast
-// stuckStreamGrace, and we don't want cleanup to fail a healthy queued
-// turn. The heartbeat is a no-op when the row isn't in 'streaming' state,
-// so drop/requeue paths and stale messages don't accidentally resurrect
-// idle rows.
+// message for the retry queue instead of dropping the follow-up turn. The
+// heartbeat starts before the slot wait so a backed-up queue can't let
+// the cleanup cutoff elapse before the worker claims the session.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	stopHeartbeat := startDispatchHeartbeat(ctx, body)
 
@@ -172,10 +153,8 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	return nil
 }
 
-// startDispatchHeartbeat parses the session id out of the queue body and, if
-// it's well-formed, spawns a heartbeat goroutine. Returns a no-op stopper
-// when the body is unparseable so the dispatch return paths can always call
-// stop() unconditionally.
+// startDispatchHeartbeat returns a no-op stopper when the body is
+// unparseable so dispatch's return paths can call stop() unconditionally.
 func startDispatchHeartbeat(ctx context.Context, body []byte) func() {
 	var req messages.AgentStreamRequest
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -434,9 +413,6 @@ func (w *AgentStreamWorker) streamProviderTurn(
 			err = nil
 		}
 		if errors.Is(err, errSessionAlreadyReset) {
-			// The row was reset out from under us (Stop/cleanup/fail).
-			// Exit with no streamErr so handleLocked's IfUnchanged checks
-			// see the existing terminal state and return cleanly.
 			return nil
 		}
 		if streamErr == nil && err != nil && !isContextCancel(err) {
@@ -459,13 +435,9 @@ func handleProviderEvent(
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
-	// Drop any event arriving after the row has been reset (interrupt,
-	// failure, cleanup) so late content from a stopped turn doesn't pop
-	// into the transcript or fire WS broadcasts. The per-event DB check
-	// is cheap (single indexed lookup) and is the only way to close the
-	// race between InterruptSession's commit and Anthropic's in-flight
-	// SSE bytes — a status-flagged-but-already-queued event would
-	// otherwise slip through.
+	// Drop late events from a turn the user has already stopped — closes
+	// the race between InterruptSession's commit and provider SSE bytes
+	// already in flight.
 	streaming, err := models.IsAgentSessionStreaming(sessionID)
 	if err != nil {
 		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: status check failed; processing event anyway")
@@ -834,11 +806,8 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 	}
 }
 
-// runStreamHeartbeat keeps last_active_at fresh while the worker owns a
-// stream. It writes once up front so cleanup can't race the first tick
-// (e.g. a backed-up queue could otherwise let the cutoff elapse before
-// the worker had a chance to claim the session), then ticks at the
-// configured interval until the caller cancels.
+// runStreamHeartbeat writes once up front so cleanup can't race the first
+// tick, then ticks until the caller cancels.
 func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
 	if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
 		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: initial heartbeat failed")

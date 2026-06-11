@@ -741,6 +741,34 @@ func TestAgentStreamWorker_HeartbeatKeepsSessionAlive(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestAgentStreamWorker_StatusTransitionClearsHeartbeat(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Stale heartbeat lingering from a previous turn. Once the row goes
+	// idle and then back to streaming for a new turn, cleanup must NOT
+	// see the old heartbeat — otherwise a healthy queued turn gets
+	// failed before the worker's first heartbeat lands.
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", session.ID).
+		UpdateColumn("heartbeat_at", time.Now().Add(-10*time.Minute)).Error)
+
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Nil(t, refreshed.HeartbeatAt, "status transitions must clear heartbeat_at so a new turn starts in the legacy cutoff branch")
+
+	heartbeatCutoff := time.Now().Add(-2 * time.Minute)
+	legacyCutoff := time.Now().Add(-30 * time.Minute)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
+	require.NoError(t, err)
+	assert.Empty(t, closed, "a freshly-restarted streaming row must not be flagged on the strength of its previous turn's heartbeat")
+}
+
 func TestAgentStreamWorker_HeartbeatSkipsNonStreamingRows(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

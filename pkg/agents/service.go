@@ -114,17 +114,10 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
-// InterruptSession honors the user's stop intent by authoritatively resetting
-// local state, treating the upstream interrupt as best-effort. Without this,
-// a stuck "streaming" row (e.g. when the stream worker died mid-turn) had no
-// manual recovery path — the row sat there until FailStuckStreamingSessions
-// timed it out 30 min later.
-//
-// Local reset runs *before* the provider HTTP call so the stream worker
-// (which checks status per event) starts dropping late events while we
-// wait on the network roundtrip to the provider — otherwise Anthropic
-// can keep emitting already-generated tokens for tens of ms and the UI
-// shows new content even though the user stopped.
+// InterruptSession resets local state first and treats the provider call
+// as best-effort: the worker checks status per event, so flipping to idle
+// before the provider HTTP roundtrip lets late SSE events get dropped
+// during the network wait instead of after.
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
@@ -145,11 +138,10 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish status event")
 	}
 
+	// Best-effort: any provider error still leaves the row at idle so the
+	// stop button can't leave the UI gated; SendMessage's recovery paths
+	// reconcile on the next turn.
 	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
-		// ErrProviderSessionUnavailable means the upstream is already gone — a
-		// no-op interrupt. Any other provider error we log and still proceed,
-		// because leaving the local row stuck would defeat the whole point of
-		// the stop button; SendMessage's recovery paths will reconcile next.
 		if errors.Is(err, ErrProviderSessionUnavailable) {
 			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, local reset already done")
 		} else {
@@ -159,8 +151,8 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 	return nil
 }
 
-// closeOpenToolsForSession mirrors agent_stream_worker.closeOpenTools — kept
-// duplicated to avoid a circular import (workers depends on agents).
+// closeOpenToolsForSession mirrors agent_stream_worker.closeOpenTools;
+// duplicated to avoid a workers → agents → workers import cycle.
 func closeOpenToolsForSession(sessionID uuid.UUID) {
 	closed, err := models.CloseOpenToolMessages(sessionID)
 	if err != nil {
