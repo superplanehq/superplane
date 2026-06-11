@@ -500,11 +500,12 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		result := "[Draft Status]\n"
 		for _, draft := range drafts {
 			result += fmt.Sprintf(
-				"- Active draft: version %s (created %s)\n",
+				"- Existing draft: version %s (created %s)\n",
 				draft.ID.String(),
 				draftCreatedAt(draft),
 			)
 		}
+		result += "These drafts may belong to other sessions or users. To make changes, reuse the session draft you created earlier (pass its --draft-id), or create a new one with `superplane apps drafts create` if you have not yet this session. Do not reuse an unrelated draft.\n"
 		return result
 	}
 

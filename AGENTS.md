@@ -14,6 +14,7 @@
 ## Pull Request Guidelines
 
 - PR titles must follow Conventional Commits and include a release-type prefix: `feat:`, `fix:`, `chore:`, or `docs:` (CI enforces this).
+- All commits must include a DCO sign-off trailer (`Signed-off-by: Name <email>`). Use `git commit -s` or `git commit --amend -s` when creating or updating commits.
 
 ## Build, Test, and Development Commands
 

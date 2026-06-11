@@ -80,17 +80,6 @@ func expectMe() requestExpectation {
 	}
 }
 
-func expectListUserDraftBranch(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","owner":{"id":"` + cliTestUserID + `"}}}]}`))
-		},
-	}
-}
-
 func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
 	return requestExpectation{
 		method: http.MethodGet,
@@ -160,6 +149,20 @@ func expectDescribeCanvasVersion(canvasID, versionID string) requestExpectation 
 		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"}}}`))
+		},
+	}
+}
+
+// expectValidateDraftVersion mocks the describe-version call used by
+// common.ResolveDraftVersionID to validate an explicit --draft-id. It
+// returns a draft version owned by the test user.
+func expectValidateDraftVersion(canvasID, versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   describeVersionPath(canvasID, versionID),
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","state":"STATE_DRAFT","canvasId":"` + canvasID + `","owner":{"id":"` + cliTestUserID + `"}}}}`))
 		},
 	}
 }
@@ -253,7 +256,7 @@ func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
 			},
 		},
 		expectMe(),
-		expectListUserDraftBranch(canvasID, "draft-1"),
+		expectValidateDraftVersion(canvasID, "draft-1"),
 		expectCommitCanvasYAML(canvasID, "draft-1", nil),
 		expectDescribeCanvasVersion(canvasID, "draft-1"),
 		expectFetchCanvasYAML(canvasID, "draft-1", "apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+canvasID+"\n  name: parse-check\nspec:\n  nodes: []\n  edges: []\n"),
@@ -261,17 +264,17 @@ func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithMetadataID(t, "json-out", canvasID)
 	file := filePath
-	draft := true
+	draftID := "draft-1"
 	ctx, stdout := cli.NewCommandContext(t, server.server, "json")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `"metadata"`)
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
 		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
@@ -292,7 +295,6 @@ func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		expectMe(),
 		expectListDraftBranchesEmpty(canvasID),
 		expectCreateDraftBranch(canvasID, "ver-1"),
 		expectCommitCanvasYAML(canvasID, "ver-1", nil),
@@ -310,16 +312,14 @@ func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
 	file := filePath
-	draft := false
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "draft was updated but publish failed"), err.Error())
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/me",
 		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPost + " " + draftVersionsPath(canvasID),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
@@ -344,7 +344,7 @@ func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
 			},
 		},
 		expectMe(),
-		expectListUserDraftBranch(canvasID, "draft-1"),
+		expectValidateDraftVersion(canvasID, "draft-1"),
 		requestExpectation{
 			method: http.MethodPost,
 			path:   repositoryCommitsPath(canvasID),
@@ -357,16 +357,16 @@ func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
 	file := filePath
-	draft := true
+	draftID := "draft-1"
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
 	require.Error(t, err)
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
 	})
 }
@@ -386,7 +386,7 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 			},
 		},
 		expectMe(),
-		expectListUserDraftBranch(canvasID, "draft-1"),
+		expectValidateDraftVersion(canvasID, "draft-1"),
 		expectCommitCanvasYAML(canvasID, "draft-1", nil),
 		expectDescribeCanvasVersion(canvasID, "draft-1"),
 		expectFetchCanvasYAML(
@@ -403,17 +403,17 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 	require.NoError(t, os.WriteFile(filePath, []byte(yaml), 0o644))
 
 	file := filePath
-	draft := true
+	draftID := "draft-1"
 	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "Integrations: 1")
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
 		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
@@ -450,7 +450,6 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
-		expectMe(),
 		expectListDraftBranchesEmpty(canvasID),
 		expectCreateDraftBranch(canvasID, "ver-1"),
 		expectCommitCanvasYAML(canvasID, "ver-1", func(t *testing.T, yaml string) {
@@ -471,15 +470,13 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
 	file := filePath
-	draft := false
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.NoError(t, err)
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/me",
 		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPost + " " + draftVersionsPath(canvasID),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
@@ -509,15 +506,14 @@ func TestUpdateFromFileRequiresDraftWhenLiveChangeManagementIsEnabled(t *testing
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
 	file := filePath
-	draft := false
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(
 		t,
 		err.Error(),
-		"change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`",
+		"change management is enabled for this canvas; pass --draft-id <id> to update a draft (create one with `superplane apps drafts create`), then publish with `superplane apps change-requests create`",
 	)
 
 	server.AssertCalls(t, []string{
@@ -541,7 +537,7 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 			},
 		},
 		expectMe(),
-		expectListUserDraftBranch(canvasID, "draft-1"),
+		expectValidateDraftVersion(canvasID, "draft-1"),
 		expectCommitCanvasYAML(canvasID, "draft-1", func(t *testing.T, yaml string) {
 			require.Contains(t, yaml, "changeManagement:")
 			require.Contains(t, yaml, "enabled: true")
@@ -552,16 +548,16 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
 	file := filePath
-	draft := true
+	draftID := "draft-1"
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
 	require.NoError(t, err)
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " " + draftVersionsPath(canvasID),
+		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodPost + " " + repositoryCommitsPath(canvasID),
 		http.MethodGet + " " + describeVersionPath(canvasID, "draft-1"),
 		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
@@ -587,10 +583,9 @@ func TestUpdateFromFileDisableChangeManagementRequiresDraftWhenLiveChangeManagem
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
 	file := filePath
-	draft := false
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "change management is enabled for this canvas")
 

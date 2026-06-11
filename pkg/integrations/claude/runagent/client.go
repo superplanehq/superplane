@@ -539,6 +539,71 @@ func (c *Client) CleanupFiles(fileIDs []string, logWarn func(string, ...any)) {
 	}
 }
 
+// CreateVault creates a temporary vault and returns its ID.
+func (c *Client) CreateVault(displayName string, metadata map[string]string) (string, error) {
+	payload := map[string]any{"display_name": displayName}
+	if len(metadata) > 0 {
+		payload["metadata"] = metadata
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal vault request: %w", err)
+	}
+	respBody, err := c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/vaults", bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	if err != nil {
+		return "", err
+	}
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("decode vault response: %w", err)
+	}
+	if result.ID == "" {
+		return "", fmt.Errorf("vault creation returned empty ID")
+	}
+	return result.ID, nil
+}
+
+// CreateEnvVarCredential adds an environment_variable credential to a vault.
+// The secret is injected at the network egress layer; the agent never sees the raw value.
+func (c *Client) CreateEnvVarCredential(vaultID, displayName, envName, secretValue string, allowedHosts []string) error {
+	if vaultID == "" || envName == "" || secretValue == "" {
+		return fmt.Errorf("vaultID, envName, and secretValue are required")
+	}
+	networking := map[string]any{"type": "unrestricted"}
+	if len(allowedHosts) > 0 {
+		networking = map[string]any{
+			"type":          "limited",
+			"allowed_hosts": allowedHosts,
+		}
+	}
+	payload := map[string]any{
+		"display_name": displayName,
+		"auth": map[string]any{
+			"type":         "environment_variable",
+			"secret_name":  envName,
+			"secret_value": secretValue,
+			"networking":   networking,
+		},
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal credential request: %w", err)
+	}
+	_, err = c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/vaults/"+url.PathEscape(vaultID)+"/credentials", bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	return err
+}
+
+// DeleteVault removes a vault and its credentials.
+func (c *Client) DeleteVault(vaultID string) error {
+	if vaultID == "" {
+		return nil
+	}
+	_, err := c.execRequestWithBeta(http.MethodDelete, c.BaseURL+"/vaults/"+url.PathEscape(vaultID), nil, anthropicBetaManagedAgents)
+	return err
+}
+
 func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
