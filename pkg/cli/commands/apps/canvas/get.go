@@ -11,7 +11,7 @@ import (
 )
 
 type getCommand struct {
-	draft *bool
+	draftID *string
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -41,10 +41,15 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	canvasName := strings.TrimSpace(described.Metadata.GetName())
 	organizationID := strings.TrimSpace(described.Metadata.GetOrganizationId())
 
-	useDraft := c.draft != nil && *c.draft
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+
+	useDraft := draftID != ""
 	versionID := ""
 	if useDraft {
-		versionID, err = resolveCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
 		if err != nil {
 			return err
 		}
@@ -83,10 +88,18 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		source := "live"
+		if useDraft {
+			source = "draft"
+		}
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
 		if url := common.BuildAppURL(ctx, organizationID, canvasID); url != "" {
 			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
+		}
+		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
+		if versionID != "" {
+			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
 		}
 		nodeCount := 0
 		edgeCount := 0
@@ -98,24 +111,4 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)
 		return err
 	})
-}
-
-func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", fmt.Errorf("draft version not found for current user")
-	}
-	return versionID, nil
 }

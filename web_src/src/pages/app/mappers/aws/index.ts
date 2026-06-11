@@ -37,9 +37,12 @@ import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./codepipeline/r
 import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
+import { onEc2AlarmTriggerRenderer } from "./ec2/on_alarm";
+import { createAlarmMapper } from "./ec2/create_alarm";
 import { createImageMapper } from "./ec2/create_image";
 import { createInstanceMapper } from "./ec2/create_instance";
 import { deleteInstanceMapper } from "./ec2/delete_instance";
+import { getAlarmMapper } from "./ec2/get_alarm";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
 import { getInstanceMapper } from "./ec2/get_instance";
 import { getInstanceMetricsMapper } from "./ec2/get_instance_metrics";
@@ -51,6 +54,7 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
+import { createWorkspaceMapper, deleteWorkspaceMapper, getWorkspaceMapper, updateWorkspaceMapper } from "./prometheus";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -67,6 +71,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ecr.getImage": getImageMapper,
   "ecr.getImageScanFindings": getImageScanFindingsMapper,
   "ecr.scanImage": scanImageMapper,
+  "prometheus.createWorkspace": createWorkspaceMapper,
+  "prometheus.getWorkspace": getWorkspaceMapper,
+  "prometheus.updateWorkspace": updateWorkspaceMapper,
+  "prometheus.deleteWorkspace": deleteWorkspaceMapper,
   "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
   "codeArtifact.createRepository": createRepositoryMapper,
   "codeArtifact.deletePackageVersions": deletePackageVersionsMapper,
@@ -88,6 +96,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.deleteTopic": deleteTopicMapper,
   "sns.publishMessage": publishMessageMapper,
   "ec2.copyImage": copyImageMapper,
+  "ec2.createAlarm": createAlarmMapper,
   "ec2.createImage": createImageMapper,
   "ec2.createInstance": createInstanceMapper,
   "ec2.deregisterImage": deregisterImageMapper,
@@ -96,6 +105,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.disableImageDeprecation": disableImageDeprecationMapper,
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
+  "ec2.getAlarm": getAlarmMapper,
   "ec2.getImage": getEc2ImageMapper,
   "ec2.getInstance": getInstanceMapper,
   "ec2.getInstanceMetrics": getInstanceMetricsMapper,
@@ -110,6 +120,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
   "sns.onTopicMessage": onTopicMessageTriggerRenderer,
+  "ec2.onAlarm": onEc2AlarmTriggerRenderer,
   "ec2.onImage": onImageTriggerRenderer,
 };
 
@@ -127,6 +138,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ecr.getImage": buildActionStateRegistry("retrieved"),
   "ecr.getImageScanFindings": buildActionStateRegistry("retrieved"),
   "ecr.scanImage": buildActionStateRegistry("scanned"),
+  "prometheus.createWorkspace": buildActionStateRegistry("created"),
+  "prometheus.getWorkspace": buildActionStateRegistry("retrieved"),
+  "prometheus.updateWorkspace": buildActionStateRegistry("updated"),
+  "prometheus.deleteWorkspace": buildActionStateRegistry("deleted"),
   "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
   "codeArtifact.createRepository": buildActionStateRegistry("created"),
   "codeArtifact.deletePackageVersions": buildActionStateRegistry("deleted"),
@@ -148,6 +163,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.deleteTopic": buildActionStateRegistry("deleted"),
   "sns.publishMessage": buildActionStateRegistry("published"),
   "ec2.copyImage": buildActionStateRegistry("copied"),
+  "ec2.createAlarm": buildActionStateRegistry("created"),
   "ec2.createImage": buildActionStateRegistry("created"),
   "ec2.createInstance": buildActionStateRegistry("created"),
   "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
@@ -156,6 +172,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.disableImageDeprecation": buildActionStateRegistry("disabled"),
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
+  "ec2.getAlarm": buildActionStateRegistry("retrieved"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
   "ec2.getInstance": buildActionStateRegistry("retrieved"),
   "ec2.getInstanceMetrics": buildActionStateRegistry("retrieved"),
