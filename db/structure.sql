@@ -132,7 +132,8 @@ CREATE TABLE public.agent_sessions (
     status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    heartbeat_at timestamp with time zone
 );
 
 
@@ -2253,7 +2254,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260611001815	f
+20260611153001	f
 \.
 
 

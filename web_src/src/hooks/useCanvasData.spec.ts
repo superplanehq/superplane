@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
@@ -175,15 +175,12 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
-function makeCanvas(id: string, folderId?: string): CanvasesCanvas {
+function makeCanvas(id: string, folderId?: string): CanvasesCanvasSummary {
   return {
-    metadata: {
-      id,
-      name: id,
-      folderId,
-    },
-    spec: {},
-  } as CanvasesCanvas;
+    id,
+    name: id,
+    folderId,
+  } as CanvasesCanvasSummary;
 }
 
 function makeFolder(id: string, canvasIds: string[] = []): TestCanvasFolder {
@@ -209,9 +206,9 @@ function createDeferred<T>() {
 }
 
 function getCanvasFolderId(queryClient: QueryClient, organizationId: string, canvasId: string) {
-  const canvases = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId)) || [];
-  const canvas = canvases.find((item) => item.metadata?.id === canvasId);
-  return (canvas?.metadata as { folderId?: string } | undefined)?.folderId;
+  const canvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId)) || [];
+  const canvas = canvases.find((item) => item.id === canvasId);
+  return canvas?.folderId;
 }
 
 function getFolderCanvasIds(queryClient: QueryClient, organizationId: string, folderId: string) {

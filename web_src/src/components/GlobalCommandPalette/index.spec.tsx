@@ -85,18 +85,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases: () => ({
     data: [
       {
-        metadata: {
-          id: "canvas-1",
-          name: "Deploy API",
-          description: "Production deployment flow",
-        },
+        id: "canvas-1",
+        name: "Deploy API",
+        description: "Production deployment flow",
       },
       {
-        metadata: {
-          id: "canvas-2",
-          name: "Database Backups",
-          description: "Nightly backup flow",
-        },
+        id: "canvas-2",
+        name: "Database Backups",
+        description: "Nightly backup flow",
       },
     ],
     isLoading: false,

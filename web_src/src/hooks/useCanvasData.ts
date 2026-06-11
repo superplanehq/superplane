@@ -45,6 +45,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasSummary,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -800,12 +801,8 @@ type UpdateCanvasFolderMembershipInput = {
   canvasIds: string[];
 };
 
-type CanvasMetadataWithFolder = CanvasesCanvas["metadata"] & {
-  folderId?: string;
-};
-
 function updateCanvasListFolderMembership(
-  canvases: CanvasesCanvas[] | undefined,
+  canvases: CanvasesCanvasSummary[] | undefined,
   data: UpdateCanvasFolderMembershipInput,
 ) {
   if (!canvases) {
@@ -815,8 +812,7 @@ function updateCanvasListFolderMembership(
   const targetCanvasIds = new Set(data.canvasIds);
 
   return canvases.map((canvas) => {
-    const metadata = canvas.metadata as CanvasMetadataWithFolder | undefined;
-    const canvasId = metadata?.id;
+    const canvasId = canvas.id;
     if (!canvasId) {
       return canvas;
     }
@@ -824,23 +820,17 @@ function updateCanvasListFolderMembership(
     if (targetCanvasIds.has(canvasId)) {
       return {
         ...canvas,
-        metadata: {
-          ...metadata,
-          folderId: data.folderId,
-        },
+        folderId: data.folderId,
       };
     }
 
-    if (metadata.folderId !== data.folderId) {
+    if (canvas.folderId !== data.folderId) {
       return canvas;
     }
 
     return {
       ...canvas,
-      metadata: {
-        ...metadata,
-        folderId: undefined,
-      },
+      folderId: undefined,
     };
   });
 }
@@ -917,12 +907,12 @@ export const useUpdateCanvasFolderMembership = (organizationId: string) => {
         queryClient.cancelQueries({ queryKey: canvasKeys.folderList(organizationId) }),
       ]);
 
-      const previousCanvases = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
+      const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
       const previousFolders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(
         canvasKeys.folderList(organizationId),
       );
 
-      queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvas[] | undefined) =>
+      queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvasSummary[] | undefined) =>
         updateCanvasListFolderMembership(current, data),
       );
       queryClient.setQueryData(
@@ -1308,9 +1298,9 @@ export const useDeleteCanvas = (organizationId: string) => {
       // Capture node count before removing from cache.
       // Fall back to the list cache if the detail page was never opened.
       const cachedDetail = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      const cachedList = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
-      const cachedCanvas = cachedDetail ?? cachedList?.find((c) => c.metadata?.id === canvasId);
-      const nodeCount = cachedCanvas?.spec?.nodes?.length ?? 0;
+      const cachedList = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
+      const cachedSummary = cachedList?.find((canvas) => canvas.id === canvasId);
+      const nodeCount = cachedDetail?.spec?.nodes?.length ?? cachedSummary?.nodes?.length ?? 0;
 
       // Remove from cache immediately before deletion to prevent 404 flash
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });

@@ -517,7 +517,7 @@ message ListCanvasesRequest {
 }
 
 message ListCanvasesResponse {
-  repeated Canvas canvases = 1;
+  repeated CanvasSummary canvases = 1;
 }
 
 message DescribeCanvasRequest {
@@ -827,6 +827,23 @@ message DeleteCanvasResponse {}
 message UserRef {
   string id = 1;
   string name = 2;
+}
+
+message CanvasSummary {
+  message Node {
+    string id = 1;
+    Components.Position position = 2;
+  }
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  UserRef created_by = 7;
+  string folder_id = 8;
+  repeated Node nodes = 9;
+  repeated Components.Edge edges = 10;
 }
 
 message Canvas {

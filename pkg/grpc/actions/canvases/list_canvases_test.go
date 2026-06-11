@@ -72,7 +72,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// Verify both canvases are returned
 	//
-	canvasIDs := []string{response.Canvases[0].Metadata.Id, response.Canvases[1].Metadata.Id}
+	canvasIDs := []string{response.Canvases[0].Id, response.Canvases[1].Id}
 	assert.Contains(t, canvasIDs, canvas1.ID.String())
 	assert.Contains(t, canvasIDs, canvas2.ID.String())
 
@@ -81,7 +81,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	canvasNames := make([]string, len(response.Canvases))
 	for i, canvas := range response.Canvases {
-		canvasNames[i] = canvas.Metadata.Name
+		canvasNames[i] = canvas.Name
 	}
 
 	assert.True(t, sort.StringsAreSorted(canvasNames), "canvases should be sorted by name in ascending order")
@@ -142,9 +142,8 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	// Should only return the canvas from the original organization
 	//
 	assert.Len(t, response.Canvases, 1)
-	assert.Equal(t, canvas.ID.String(), response.Canvases[0].Metadata.Id)
-	assert.Equal(t, r.Organization.ID.String(), response.Canvases[0].Metadata.OrganizationId)
-	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Metadata.Id)
+	assert.Equal(t, canvas.ID.String(), response.Canvases[0].Id)
+	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Id)
 }
 
 func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
@@ -185,14 +184,9 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
-
-	//
-	// Verify status is nil (not loaded)
-	//
-	assert.Nil(t, response.Canvases[0].Status)
 }
 
-func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
+func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	r := support.Setup(t)
 
 	//
@@ -240,34 +234,15 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	listedCanvas := response.Canvases[0]
 
 	//
-	// Verify metadata is present
+	// Verify summary is returned
 	//
-	require.NotNil(t, listedCanvas.Metadata)
-	assert.Equal(t, canvas.ID.String(), listedCanvas.Metadata.Id)
-	assert.Equal(t, r.Organization.ID.String(), listedCanvas.Metadata.OrganizationId)
-	assert.Equal(t, canvas.Name, listedCanvas.Metadata.Name)
-	assert.Equal(t, canvas.Description, listedCanvas.Metadata.Description)
-	assert.NotNil(t, listedCanvas.Metadata.CreatedAt)
-	assert.NotNil(t, listedCanvas.Metadata.UpdatedAt)
-	assert.NotNil(t, listedCanvas.Metadata.CreatedBy)
-
-	//
-	// Verify spec is present with nodes and edges
-	//
-	require.NotNil(t, listedCanvas.Spec)
-	assert.Len(t, listedCanvas.Spec.Nodes, 2)
-	assert.Equal(t, "node-1", listedCanvas.Spec.Nodes[0].Id)
-	assert.Equal(t, "First Node", listedCanvas.Spec.Nodes[0].Name)
-	assert.Equal(t, "node-2", listedCanvas.Spec.Nodes[1].Id)
-	assert.Equal(t, "Second Node", listedCanvas.Spec.Nodes[1].Name)
-
-	assert.Len(t, listedCanvas.Spec.Edges, 1)
-	assert.Equal(t, "node-1", listedCanvas.Spec.Edges[0].SourceId)
-	assert.Equal(t, "node-2", listedCanvas.Spec.Edges[0].TargetId)
-	assert.Equal(t, "default", listedCanvas.Spec.Edges[0].Channel)
-
-	//
-	// Verify status is NOT present
-	//
-	assert.Nil(t, listedCanvas.Status)
+	require.NotNil(t, listedCanvas)
+	assert.Equal(t, canvas.ID.String(), listedCanvas.Id)
+	assert.Equal(t, canvas.Name, listedCanvas.Name)
+	assert.Equal(t, canvas.Description, listedCanvas.Description)
+	assert.NotNil(t, listedCanvas.CreatedAt)
+	assert.NotNil(t, listedCanvas.UpdatedAt)
+	assert.NotNil(t, listedCanvas.CreatedBy.Id)
+	assert.NotNil(t, listedCanvas.CreatedBy.Name)
+	assert.NotNil(t, listedCanvas.FolderId)
 }
