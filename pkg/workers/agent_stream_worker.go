@@ -33,11 +33,15 @@ const (
 	// negligible (~2/min/session).
 	streamHeartbeatInterval = 30 * time.Second
 	// stuckStreamGrace is the heartbeat staleness threshold cleanup uses
-	// to declare a streaming row leaked. 2 min allows ~4 missed
-	// heartbeats — enough to ride out a GC pause or transient DB blip
-	// without prematurely failing a healthy worker, while keeping the
-	// worst-case stuck time bounded.
-	stuckStreamGrace    = 2 * time.Minute
+	// to declare a streaming row leaked. Sized above the worst-case
+	// "enqueue → first heartbeat" gap: SendMessage refreshes
+	// last_active_at at enqueue time, but the worker may sit in
+	// dispatch's slot queue for minutes when all concurrent streams are
+	// busy. A tighter cutoff would risk failing healthy sessions that
+	// simply hadn't been picked up yet. 5m × 30s heartbeat = 10 missed
+	// ticks before declaring death, which still bounds worst-case stuck
+	// time to ~6 min vs. the previous 30+.
+	stuckStreamGrace    = 5 * time.Minute
 	stuckCleanupCadence = 1 * time.Minute
 )
 
@@ -328,13 +332,25 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		closeOpenTools(sessionID, publish)
 
 		if streamErr != nil {
-			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-			publish(messages.AgentSessionEventMessage{
-				Event:  "session_failed",
-				Status: models.AgentSessionStatusFailed,
-				Error:  streamErr.Error(),
-			})
-			log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			// Conditional on turnStartedAt so a stream that errors out
+			// after the user already hit Stop (InterruptSession bumps
+			// updated_at when it resets to idle) can't flip the row from
+			// idle back to failed and spook the UI.
+			markedFailed, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusFailed, turnStartedAt)
+			if err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: failed to mark session failed")
+				return nil
+			}
+			if markedFailed {
+				publish(messages.AgentSessionEventMessage{
+					Event:  "session_failed",
+					Status: models.AgentSessionStatusFailed,
+					Error:  streamErr.Error(),
+				})
+				log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			} else {
+				log.WithError(streamErr).WithField("session_id", sessionID).Info("agent stream: stream errored but session was already reset; dropping failed event")
+			}
 			return nil
 		}
 

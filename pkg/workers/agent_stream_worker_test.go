@@ -527,6 +527,41 @@ func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus, "open tool must be force-closed when the turn ends")
 }
 
+func TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Stream blocks on `release`, then returns an error — simulating
+	// "provider 500'd after the user already hit Stop". The interrupt
+	// path (UpdateAgentSessionStatus → idle) bumps updated_at, and the
+	// worker's failed-path must respect that and not flip the row from
+	// idle back to failed.
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+		err:         errors.New("provider blew up after interrupt"),
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	done := make(chan error, 1)
+	go func() { done <- w.Handle(context.Background(), body) }()
+
+	<-provider.streamReady
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
+	close(provider.release)
+	require.NoError(t, <-done)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"a stream error that arrives after Stop must not overwrite the user's interrupt")
+}
+
 func TestAgentStreamWorker_MarksFailedOnSessionError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
