@@ -1353,6 +1353,7 @@ export function AppPage() {
     canvasId,
     draftBranches,
     activeVersionId: activeCanvasVersionId || undefined,
+    liveVersionId: liveCanvasVersionId || undefined,
     useLocalActiveStatus: isEditing && committedBaselines.ready,
     activeHasUncommittedChanges: hasStagingChanges,
     activeServerHasUncommittedChanges: serverHasStagingChanges,
