@@ -4012,7 +4012,25 @@ export function AppPage() {
     exitToLive,
   ]);
 
+  const cancelPendingCanvasSaves = useCallback(() => {
+    canvasSaveSessionRef.current += 1;
+    clearQueuedCanvasSave();
+  }, [clearQueuedCanvasSave]);
+
+  const handleCanvasDraftRestoredToCommitted = useCallback(
+    (_version: CanvasesCanvasVersion) => {
+      const restoredWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId!, canvasId!));
+      if (restoredWorkflow) {
+        setLastSavedWorkflowSnapshot(restoredWorkflow);
+      }
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+    },
+    [canvasId, organizationId, queryClient, setLastSavedWorkflowSnapshot],
+  );
+
   const { handleCommitStaging, handleResetStaging } = useDraftStagingActions({
+    organizationId,
     canvasId,
     activeCanvasVersionId,
     hasEditableVersion,
@@ -4021,9 +4039,12 @@ export function AppPage() {
     discardCanvasStagingMutation,
     draftCanvasSpecsRef,
     setDraftCanvasSpec,
+    setActiveCanvasVersion,
     setStagingResetNonce,
     consoleMutationGenerationRef,
     setIsPreparingVersionAction,
+    cancelPendingCanvasSaves,
+    onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
   });
 
   const handleActOnChangeRequest = useCallback(
