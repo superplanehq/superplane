@@ -2,7 +2,9 @@ package agents
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"slices"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	maxChatImages     = 8
+	maxChatImageBytes = 10 * 1024 * 1024
+)
+
+var allowedChatImageMediaTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
+
 func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.SendAgentChatMessageRequest) (*pb.SendAgentChatMessageResponse, error) {
 	org, user, err := parseOrgUser(orgID, userID)
 	if err != nil {
@@ -22,11 +31,15 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
-	if req.Content == "" {
-		return nil, status.Error(codes.InvalidArgument, "content is required")
+	images, err := parseChatImages(req.Images)
+	if err != nil {
+		return nil, err
+	}
+	if req.Content == "" && len(images) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "content or an image is required")
 	}
 
-	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, agentModeFromProto(req.Mode))
+	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, images, agentModeFromProto(req.Mode))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
@@ -38,4 +51,32 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		return nil, status.Error(codes.Internal, "failed to send agent chat message")
 	}
 	return &pb.SendAgentChatMessageResponse{Message: serializeMessage(persisted)}, nil
+}
+
+func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, error) {
+	if len(images) == 0 {
+		return nil, nil
+	}
+	if len(images) > maxChatImages {
+		return nil, status.Errorf(codes.InvalidArgument, "at most %d images are allowed per message", maxChatImages)
+	}
+
+	out := make([]agentservice.MessageImage, 0, len(images))
+	for _, image := range images {
+		if !slices.Contains(allowedChatImageMediaTypes, image.MediaType) {
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported image media type: %q", image.MediaType)
+		}
+		decoded, err := base64.StdEncoding.DecodeString(image.Data)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "image data must be valid base64")
+		}
+		if len(decoded) == 0 {
+			return nil, status.Error(codes.InvalidArgument, "image data is empty")
+		}
+		if len(decoded) > maxChatImageBytes {
+			return nil, status.Errorf(codes.InvalidArgument, "image exceeds the %d byte limit", maxChatImageBytes)
+		}
+		out = append(out, agentservice.MessageImage{MediaType: image.MediaType, Data: image.Data})
+	}
+	return out, nil
 }
