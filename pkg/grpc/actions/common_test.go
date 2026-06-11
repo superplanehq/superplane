@@ -1,8 +1,11 @@
 package actions
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
 
+	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -131,6 +134,67 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
 }
+
+func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
+	triggers := SerializeTriggers([]core.Trigger{
+		&testTriggerDefinition{name: "github.onPush"},
+	})
+
+	require.Len(t, triggers, 1)
+	require.Len(t, triggers[0].Configuration, 1)
+
+	runTitle := triggers[0].Configuration[0]
+	require.Equal(t, "customName", runTitle.Name)
+	require.Equal(t, "{{ root().data.head_commit.message }}", runTitle.GetDefaultValue())
+}
+
+func TestDefaultRunTitleExpressionsCompile(t *testing.T) {
+	templateExpression := regexp.MustCompile(`\{\{\s*(.*?)\s*\}\}`)
+
+	for triggerName, template := range defaultRunTitleExpressions {
+		t.Run(triggerName, func(t *testing.T) {
+			for _, match := range templateExpression.FindAllStringSubmatch(template, -1) {
+				require.Len(t, match, 2)
+				_, err := expr.Compile(
+					match[1],
+					expr.AsAny(),
+					expr.Function("root", func(params ...any) (any, error) {
+						if len(params) != 0 {
+							return nil, fmt.Errorf("root() takes no arguments")
+						}
+
+						return map[string]any{
+							"data": map[string]any{},
+						}, nil
+					}),
+				)
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+type testTriggerDefinition struct {
+	name string
+}
+
+func (t *testTriggerDefinition) Name() string                         { return t.name }
+func (t *testTriggerDefinition) Label() string                        { return t.name }
+func (t *testTriggerDefinition) Description() string                  { return t.name }
+func (t *testTriggerDefinition) Documentation() string                { return "" }
+func (t *testTriggerDefinition) Icon() string                         { return "" }
+func (t *testTriggerDefinition) Color() string                        { return "" }
+func (t *testTriggerDefinition) ExampleData() map[string]any          { return nil }
+func (t *testTriggerDefinition) Configuration() []configuration.Field { return nil }
+func (t *testTriggerDefinition) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (t *testTriggerDefinition) Setup(core.TriggerContext) error { return nil }
+func (t *testTriggerDefinition) Hooks() []core.Hook              { return nil }
+func (t *testTriggerDefinition) HandleHook(core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
+}
+func (t *testTriggerDefinition) Cleanup(core.TriggerContext) error { return nil }
 
 func TestCapabilityStateToProto(t *testing.T) {
 	tests := []struct {

@@ -115,7 +115,7 @@ func TestListIntegrationsAddsGlobalFieldsToLegacyTriggerCapabilities(t *testing.
 		Integrations: map[string]core.Integration{
 			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 				Triggers: []core.Trigger{
-					&testTrigger{name: "dummy.trigger"},
+					&testTrigger{name: "github.onPush"},
 				},
 			}),
 		},
@@ -131,6 +131,7 @@ func TestListIntegrationsAddsGlobalFieldsToLegacyTriggerCapabilities(t *testing.
 	require.Len(t, configuration, 1)
 	require.Equal(t, "customName", configuration[0].Name)
 	require.Equal(t, "Run title", configuration[0].Label)
+	require.Equal(t, "{{ root().data.head_commit.message }}", configuration[0].GetDefaultValue())
 }
 
 func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *testing.T) {
@@ -183,7 +184,7 @@ func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *t
 						Capabilities: []core.Capability{
 							{
 								Type: core.IntegrationCapabilityTypeTrigger,
-								Name: "dummy.trigger",
+								Name: "github.onPush",
 								Configuration: []configuration.Field{
 									{
 										Name:     "repository",
@@ -210,4 +211,5 @@ func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *t
 	require.Equal(t, "repository", configuration[0].Name)
 	require.Equal(t, "customName", configuration[1].Name)
 	require.Equal(t, "Run title", configuration[1].Label)
+	require.Equal(t, "{{ root().data.head_commit.message }}", configuration[1].GetDefaultValue())
 }
