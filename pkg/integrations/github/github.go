@@ -121,6 +121,7 @@ func (g *GitHub) Actions() []core.Action {
 		&issues.AddIssueLabel{},
 		&issues.CreateIssue{},
 		&issues.CreateIssueComment{},
+		&issues.UpdateIssueComment{},
 		&issues.GetIssue{},
 		&issues.RemoveIssueLabel{},
 		&issues.RemoveIssueAssignee{},
