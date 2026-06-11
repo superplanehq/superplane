@@ -2,25 +2,20 @@ package canvases
 
 import (
 	"context"
-	"slices"
 	"sort"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Canvases)
@@ -69,7 +64,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Canvases, 2)
@@ -139,7 +134,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// List canvases for original organization
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -186,7 +181,7 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -237,7 +232,7 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), false)
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -275,86 +270,4 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	// Verify status is NOT present
 	//
 	assert.Nil(t, listedCanvas.Status)
-}
-
-func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(t *testing.T) {
-	r := support.Setup(t)
-
-	activeCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-1",
-				Name:   "Node 1",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	deletedCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-2",
-				Name:   "Node 2",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	require.NoError(t, deletedCanvas.SoftDelete())
-
-	now := time.Now()
-	templateLiveVersionID := uuid.New()
-	templateCanvas := &models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: models.TemplateOrganizationID,
-		LiveVersionID:  &templateLiveVersionID,
-		IsTemplate:     true,
-		Name:           support.RandomName("template"),
-		Description:    "Template workflow",
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(templateCanvas).Error; err != nil {
-			return err
-		}
-
-		return tx.Create(&models.CanvasVersion{
-			ID:          templateLiveVersionID,
-			WorkflowID:  templateCanvas.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
-		}).Error
-	}))
-
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), true)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-
-	canvasIDs := make([]string, len(response.Canvases))
-	for i, canvas := range response.Canvases {
-		canvasIDs[i] = canvas.Metadata.Id
-	}
-
-	assert.True(t, slices.Contains(canvasIDs, activeCanvas.ID.String()))
-	assert.True(t, slices.Contains(canvasIDs, templateCanvas.ID.String()))
-	assert.False(t, slices.Contains(canvasIDs, deletedCanvas.ID.String()))
 }

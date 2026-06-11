@@ -9,12 +9,13 @@ import {
 } from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
-  it("includes the six supported types", () => {
-    expect(PANEL_TYPES).toEqual(["markdown", "node", "nodes", "table", "chart", "number"]);
+  it("includes the seven supported types", () => {
+    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number"]);
   });
 
   it("isPanelType narrows to the union", () => {
     expect(isPanelType("markdown")).toBe(true);
+    expect(isPanelType("html")).toBe(true);
     expect(isPanelType("node")).toBe(true);
     expect(isPanelType("nodes")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
@@ -68,6 +69,39 @@ describe("validatePanelContent — markdown and node", () => {
     expect(validatePanelContent("node", { node: 42 })).toMatch(/content\.node must be a string/);
     expect(validatePanelContent("node", { node: "" })).toBeNull();
     expect(validatePanelContent("node", { node: "deploy-prod" })).toBeNull();
+  });
+});
+
+describe("validatePanelContent — html", () => {
+  it("accepts a valid html body", () => {
+    expect(validatePanelContent("html", { body: "<p>Hello</p>" })).toBeNull();
+  });
+
+  it("rejects html body that is not a string", () => {
+    expect(validatePanelContent("html", { body: 42 })).toMatch(/content\.body must be a string/);
+  });
+
+  it("rejects html title that is not a string", () => {
+    expect(validatePanelContent("html", { title: 42 })).toMatch(/content\.title must be a string/);
+  });
+
+  it("validates html variables through the shared validator", () => {
+    expect(
+      validatePanelContent("html", {
+        body: "<p>{{ x.field }}</p>",
+        variables: [{ name: "1bad", source: { kind: "memory", namespace: "n" } }],
+      }),
+    ).toMatch(/content\.variables\[0\]\.name must be a valid identifier/);
+  });
+
+  it("accepts well-formed html content with memory variables", () => {
+    expect(
+      validatePanelContent("html", {
+        title: "Latest {{ rec.name }}",
+        body: '<div class="p-2"><strong>{{ rec.status }}</strong></div>',
+        variables: [{ name: "rec", source: { kind: "memory", namespace: "deploys" } }],
+      }),
+    ).toBeNull();
   });
 });
 

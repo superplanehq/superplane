@@ -22,7 +22,6 @@ type Canvas struct {
 	OrganizationID uuid.UUID
 	LiveVersionID  *uuid.UUID
 	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
-	IsTemplate     bool
 	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
@@ -189,26 +188,6 @@ func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid
 	return &canvas, nil
 }
 
-func FindCanvasTemplateByName(name string) (*Canvas, error) {
-	return FindCanvasTemplateByNameInTransaction(database.Conn(), name)
-}
-
-func FindCanvasTemplateByNameInTransaction(tx *gorm.DB, name string) (*Canvas, error) {
-	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.organization_id = ?", TemplateOrganizationID).
-		Where("workflows.is_template = ?", true).
-		Where("workflows.name = ?", name).
-		First(&canvas).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &canvas, nil
-}
-
 func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 	err := queryCanvasWithLiveVersion(tx).
@@ -290,21 +269,10 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 	return canvases, total, nil
 }
 
-func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
+func ListCanvases(orgID string) ([]Canvas, error) {
 	var canvases []Canvas
-	var query *gorm.DB
-	if includeTemplates {
-		query = queryCanvasWithLiveVersion(database.Conn()).Where(
-			"(workflows.organization_id = ?) OR (workflows.organization_id = ? AND workflows.is_template = ?)",
-			orgID,
-			TemplateOrganizationID,
-			true,
-		)
-	} else {
-		query = queryCanvasWithLiveVersion(database.Conn()).Where("workflows.organization_id = ?", orgID)
-	}
-
-	err := query.
+	err := queryCanvasWithLiveVersion(database.Conn()).
+		Where("workflows.organization_id = ?", orgID).
 		Order("live_version.name ASC").
 		Find(&canvases).
 		Error
@@ -314,25 +282,6 @@ func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
 	}
 
 	return canvases, nil
-}
-
-func FindCanvasTemplate(id uuid.UUID) (*Canvas, error) {
-	return FindCanvasTemplateInTransaction(database.Conn(), id)
-}
-
-func FindCanvasTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
-	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.id = ?", id).
-		Where("workflows.is_template = ?", true).
-		First(&canvas).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &canvas, nil
 }
 
 func ListDeletedCanvases() ([]Canvas, error) {
@@ -347,7 +296,6 @@ func ListDeletedCanvases() ([]Canvas, error) {
 			"workflows.organization_id",
 			"workflows.live_version_id",
 			"workflows.folder_id",
-			"workflows.is_template",
 			"workflows.name",
 			"workflows.created_by",
 			"workflows.created_at",
@@ -371,6 +319,8 @@ func ListDeletedCanvases() ([]Canvas, error) {
 func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Canvas, error) {
 	var canvases []Canvas
 
+	// Organization teardown must include every workflow for the org when deciding
+	// whether cleanup can continue.
 	err := queryCanvasWithLiveVersion(tx).
 		Unscoped().
 		Where("workflows.organization_id = ?", orgID).
@@ -395,7 +345,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.organization_id",
 			"workflows.live_version_id",
 			"workflows.folder_id",
-			"workflows.is_template",
 			"workflows.name",
 			"workflows.created_by",
 			"workflows.created_at",
@@ -468,8 +417,7 @@ func CountCanvasesByOrganization(orgID string) (int64, error) {
 
 func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
 	var count int64
-	err := tx.
-		Model(&Canvas{}).
+	err := tx.Model(&Canvas{}).
 		Where("organization_id = ?", orgID).
 		Count(&count).
 		Error

@@ -11,8 +11,8 @@ import (
 )
 
 type setCommand struct {
-	file      *string
-	draftOnly *bool
+	file    *string
+	draftID *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -33,15 +33,18 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		flagValue = strings.TrimSpace(*c.file)
 	}
-	draftOnly := c.draftOnly != nil && *c.draftOnly
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+	draftOnly := draftID != ""
 
 	yamlBytes, source, err := resolveYAMLSource(ctx.Cmd.InOrStdin(), flagValue, positional)
 	if err != nil {
 		return err
 	}
 
-	resource, err := ParseConsoleYAML(yamlBytes)
-	if err != nil {
+	if _, err := ParseConsoleYAML(yamlBytes); err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
@@ -55,33 +58,43 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	var versionID string
+	if draftOnly {
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
+	} else {
+		versionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
 
-	body := openapi_client.CanvasesUpdateConsoleBody{}
-	body.SetVersionId(versionID)
-	body.SetPanels(apiPanelsFromYAML(resource.Spec.Panels))
-	body.SetLayout(apiLayoutFromYAML(resource.Spec.Layout))
-
-	response, _, err := ctx.API.CanvasAPI.
-		CanvasesUpdateConsole(ctx.Context, canvasID).
-		Body(body).
-		Execute()
-	if err != nil {
+	if err := common.CommitRepositorySpecFile(
+		ctx,
+		canvasID,
+		versionID,
+		common.ConsoleYAMLRepositoryPath,
+		yamlBytes,
+		"Update console.yaml",
+		nil,
+		false,
+	); err != nil {
 		return err
 	}
-	if response.Console == nil {
-		return fmt.Errorf("update succeeded but server did not return a console")
+
+	updatedYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	if err != nil {
+		return fmt.Errorf("console draft updated but failed to read console.yaml: %w", err)
 	}
 
-	console := *response.Console
+	updatedResource, err := ParseConsoleYAML(updatedYAML)
+	if err != nil {
+		return fmt.Errorf("invalid console yaml from server: %w", err)
+	}
 
 	// When change management is enabled, drafts are not visible from the
 	// UI on their own; the user can only see/approve them via a change
 	// request. Auto-create one so the operator sees the result of the
-	// command in the UI without a follow-up call. Pass --draft to skip.
+	// command in the UI without a follow-up call. Pass --draft-id to skip.
 	var createdChangeRequestID string
 	if changeManagementEnabled && !draftOnly {
 		createdChangeRequestID, err = createChangeRequestForDraft(ctx, canvasID, versionID)
@@ -91,14 +104,14 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(consoleYAMLFromAPI(resource.Metadata.Name, console))
+		return ctx.Renderer.Render(updatedResource)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", strings.TrimSpace(console.GetVersionId()))
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.GetPanels()))
-		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(console.GetLayout()))
+		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", versionID)
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(updatedResource.Spec.Panels))
+		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
 		if createdChangeRequestID != "" {
 			_, err := fmt.Fprintf(stdout, "Change request: %s (open)\n", createdChangeRequestID)
 			return err
@@ -107,7 +120,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 			_, err := fmt.Fprintln(stdout, "Run `superplane apps change-requests create` to open a change request for this draft.")
 			return err
 		}
-		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft) to publish a draft that includes this console.")
+		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft-id) to publish a draft that includes this console.")
 		return err
 	})
 }

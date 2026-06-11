@@ -50,7 +50,8 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"user.message","content":[{"type":"text","text":"Hello"}]},{"type":"agent.message","content":[{"type":"text","text":"Done"}]}],"next_page":null}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done"}]},{"type":"user.message","content":[{"type":"text","text":"Hello"}]}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -79,7 +80,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "Done", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
 	assert.Equal(t, "", requestsCtx.Action)
 
-	require.Len(t, httpContext.Requests, 4)
+	require.Len(t, httpContext.Requests, 5) // create, send, get status, get events, delete
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
@@ -128,7 +129,8 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Final"}]},{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Final"}]},{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
@@ -154,6 +156,7 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	require.True(t, executionState.Finished)
 	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
 	assert.Equal(t, "Final", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
+	assert.Equal(t, []string{"Earlier", "Final"}, executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Messages)
 }
 
 func Test__RunAgent__poll__timeout(t *testing.T) {

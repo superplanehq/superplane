@@ -8,16 +8,14 @@
  */
 export function canEditCanvasMemory({
   canUpdateCanvas,
-  isTemplate,
   canvasDeletedRemotely,
   hasEditableVersion,
 }: {
   canUpdateCanvas: boolean;
-  isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   hasEditableVersion: boolean;
 }): boolean {
-  return canUpdateCanvas && !isTemplate && !canvasDeletedRemotely && hasEditableVersion;
+  return canUpdateCanvas && !canvasDeletedRemotely && hasEditableVersion;
 }
 
 /**

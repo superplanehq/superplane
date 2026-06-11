@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
+import {
+  buildDraftConsoleDiffSummary,
+  getDraftConsoleDiffCounts,
+  hasDraftVersusLiveConsoleDiff,
+} from "./draftConsoleDiff";
 
 describe("hasDraftVersusLiveConsoleDiff", () => {
   it("returns false when both consoles are empty", () => {
@@ -65,5 +69,71 @@ describe("getDraftConsoleDiffCounts", () => {
     };
 
     expect(getDraftConsoleDiffCounts(live, draft)).toEqual({ added: 1, updated: 1, removed: 1 });
+  });
+});
+
+describe("buildDraftConsoleDiffSummary", () => {
+  it("returns per-panel diff items for added, updated, and removed panels", () => {
+    const live = {
+      panels: [
+        { id: "updated", type: "markdown", content: { title: "Runbook", body: "before" } },
+        { id: "removed", type: "markdown", content: { title: "Old", body: "remove me" } },
+      ],
+      layout: [
+        { i: "updated", x: 0, y: 0, w: 4, h: 2 },
+        { i: "removed", x: 0, y: 2, w: 4, h: 2 },
+      ],
+    };
+    const draft = {
+      panels: [
+        { id: "updated", type: "markdown", content: { title: "Runbook", body: "after" } },
+        { id: "added", type: "markdown", content: { title: "New", body: "add me" } },
+      ],
+      layout: [
+        { i: "updated", x: 0, y: 0, w: 4, h: 3 },
+        { i: "added", x: 0, y: 2, w: 4, h: 2 },
+      ],
+    };
+
+    const summary = buildDraftConsoleDiffSummary(live, draft);
+
+    expect(summary.addedCount).toBe(1);
+    expect(summary.updatedCount).toBe(1);
+    expect(summary.removedCount).toBe(1);
+    expect(summary.items.map((item) => [item.id, item.changeType, item.title])).toEqual([
+      ["added", "added", "New"],
+      ["removed", "removed", "Old"],
+      ["updated", "updated", "Runbook"],
+    ]);
+    expect(summary.items.find((item) => item.id === "updated")?.lines).toEqual(
+      expect.arrayContaining([
+        { prefix: "-", text: "content:" },
+        { prefix: "+", text: "content:" },
+        { prefix: "-", text: "layout:" },
+        { prefix: "+", text: "layout:" },
+      ]),
+    );
+  });
+
+  it("marks layout-only panel changes as updated", () => {
+    const live = {
+      panels: [{ id: "panel-1", type: "markdown", content: { body: "same" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 4, h: 2 }],
+    };
+    const draft = {
+      panels: [{ id: "panel-1", type: "markdown", content: { body: "same" } }],
+      layout: [{ i: "panel-1", x: 6, y: 0, w: 4, h: 2 }],
+    };
+
+    const summary = buildDraftConsoleDiffSummary(live, draft);
+
+    expect(summary.items).toHaveLength(1);
+    expect(summary.items[0].changeType).toBe("updated");
+    expect(summary.items[0].lines).toEqual(
+      expect.arrayContaining([
+        { prefix: "-", text: "layout:" },
+        { prefix: "+", text: "layout:" },
+      ]),
+    );
   });
 });

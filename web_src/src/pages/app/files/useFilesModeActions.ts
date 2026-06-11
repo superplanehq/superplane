@@ -7,6 +7,7 @@ interface FilesModeActionsConfig {
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsVersionsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
@@ -18,6 +19,7 @@ export function useFilesModeActions({
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
   setIsRunsMode,
+  setIsVersionsMode,
   setIsMemoryMode,
   setSelectedRunId,
   setSearchParams,
@@ -28,6 +30,7 @@ export function useFilesModeActions({
     setIsConsoleAddPanelOpen(false);
     setIsConsoleYamlOpen(false);
     setIsRunsMode(false);
+    setIsVersionsMode(false);
     setIsMemoryMode(false);
     setSelectedRunId(null);
     setSearchParams(toFilesSearchParams, { replace: true });
@@ -38,6 +41,7 @@ export function useFilesModeActions({
     setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
+    setIsVersionsMode,
     setSearchParams,
     setSelectedRunId,
   ]);
@@ -62,5 +66,6 @@ function toFilesSearchParams(current: URLSearchParams): URLSearchParams {
 function removeFilesSearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
+  next.delete("file");
   return next;
 }

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
-import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, CodeXml, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,26 +7,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ConsolePanel, ConsoleLayoutItem } from "@/hooks/useCanvasData";
+import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
-import { MarkdownPanelCard } from "./MarkdownPanelCard";
-import { NodePanelCard } from "./NodePanelCard";
-import { NodesPanelCard } from "./NodesPanelCard";
-import { TablePanelCard } from "./TablePanelCard";
-import { ChartPanelCard } from "./ChartPanelCard";
-import { NumberPanelCard } from "./NumberPanelCard";
-import { useConsoleGridTransitionArming } from "./useConsoleGridTransitionArming";
+import { ConsoleGrid } from "./ConsoleGrid";
 import { useConsolePanelState } from "./useConsolePanelState";
 import { PANEL_TYPE_META, PANEL_TYPES, type PanelType } from "./panelTypes";
-
-import "react-grid-layout/css/styles.css";
-import "./console-grid.css";
-
-const ResponsiveGridLayout = WidthProvider(GridLayout);
-
-const DASHBOARD_GRID_COLS = 12;
-const DASHBOARD_ROW_HEIGHT = 40;
-const DASHBOARD_DEFAULT_MIN_W = 2;
-const DASHBOARD_DEFAULT_MIN_H = 2;
 
 export interface ConsoleViewProps {
   panels: ConsolePanel[];
@@ -39,6 +23,10 @@ export interface ConsoleViewProps {
   /** When provided with `onAddPanelDialogOpenChange`, the add-panel dialog is controlled by the parent (e.g. header). */
   addPanelDialogOpen?: boolean;
   onAddPanelDialogOpenChange?: (open: boolean) => void;
+  visualDiff?: {
+    enabled: boolean;
+    summary?: DraftConsoleDiffSummary;
+  };
 }
 
 export function ConsoleView({
@@ -50,6 +38,7 @@ export function ConsoleView({
   onChange,
   addPanelDialogOpen: addPanelDialogOpenProp,
   onAddPanelDialogOpenChange,
+  visualDiff,
 }: ConsoleViewProps) {
   const [internalAddPanelOpen, setInternalAddPanelOpen] = useState(false);
   const isAddPanelControlled = onAddPanelDialogOpenChange != null;
@@ -64,6 +53,10 @@ export function ConsoleView({
 
   const { localPanels, localLayout, handleAddPanel, handleDeletePanel, handlePanelContentChange, handleLayoutChange } =
     useConsolePanelState(panels, layout, onChange);
+  const visualDiffWithLocalDeletes = useMemo(
+    () => withLocalDeletedPanels(visualDiff, panels, layout, localPanels, localLayout),
+    [visualDiff, panels, layout, localPanels, localLayout],
+  );
 
   const confirmAddPanel = useCallback(
     (name: string, type: PanelType) => {
@@ -72,11 +65,6 @@ export function ConsoleView({
     },
     [handleAddPanel, setAddPanelOpen],
   );
-
-  const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
-
-  const gridVisible = !errorMessage && !isLoading && localPanels.length > 0;
-  const { transitionsArmed, gridWrapperRef } = useConsoleGridTransitionArming(gridVisible);
 
   if (errorMessage) {
     return (
@@ -95,7 +83,7 @@ export function ConsoleView({
     );
   }
 
-  if (localPanels.length === 0) {
+  if (localPanels.length === 0 && !hasRemovedDiffPanels(visualDiffWithLocalDeletes)) {
     return (
       <>
         <EmptyState onAddFirstPanel={() => setAddPanelOpen(true)} />
@@ -105,100 +93,99 @@ export function ConsoleView({
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-auto">
-      <div ref={gridWrapperRef} className="px-4 py-3">
-        <ResponsiveGridLayout
-          className={cn("console-grid", !transitionsArmed && "console-grid--instant")}
-          layout={layoutItems}
-          cols={DASHBOARD_GRID_COLS}
-          rowHeight={DASHBOARD_ROW_HEIGHT}
-          margin={[12, 12]}
-          containerPadding={[0, 0]}
-          isDraggable={!readOnly}
-          isResizable={!readOnly}
-          draggableHandle=".console-grid-drag-handle"
-          // Anything inside `console-grid-no-drag` (action buttons, the
-          // "click to edit" empty-state, etc.) is exempt from drag/resize so
-          // clicks reach the underlying control instead of starting a drag.
-          draggableCancel=".console-grid-no-drag"
-          resizeHandles={["se"]}
-          onLayoutChange={(next) => {
-            if (readOnly) return;
-            handleLayoutChange(toConsoleLayout(next));
-          }}
-          useCSSTransforms
-          compactType="vertical"
-          preventCollision={false}
-        >
-          {localPanels.map((panel) => (
-            <div key={panel.id} className="console-grid-item">
-              <PanelCardRouter
-                panel={panel}
-                readOnly={readOnly}
-                onDelete={() => handleDeletePanel(panel.id)}
-                onChange={(content) => handlePanelContentChange(panel.id, content)}
-              />
-            </div>
-          ))}
-        </ResponsiveGridLayout>
-      </div>
+    <>
+      <ConsoleGrid
+        panels={localPanels}
+        layout={localLayout}
+        readOnly={readOnly}
+        visualDiff={visualDiffWithLocalDeletes}
+        onDeletePanel={handleDeletePanel}
+        onPanelContentChange={handlePanelContentChange}
+        onLayoutChange={handleLayoutChange}
+      />
       <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
-    </div>
+    </>
   );
 }
 
-/**
- * Build the layout array consumed by react-grid-layout. Panels with no layout
- * entry get a sensible default position appended to the bottom of the grid, so
- * legacy or YAML-imported dashboards that omit `layout` still render.
- */
-function buildRGLLayout(panels: ConsolePanel[], layout: ConsoleLayoutItem[]): Layout[] {
-  const byId = new Map<string, ConsoleLayoutItem>();
-  for (const item of layout) byId.set(item.i, item);
-
-  let nextY = layout.reduce((acc, item) => Math.max(acc, item.y + item.h), 0);
-  const result: Layout[] = [];
-  for (const panel of panels) {
-    const existing = byId.get(panel.id);
-    if (existing) {
-      result.push({
-        i: existing.i,
-        x: existing.x,
-        y: existing.y,
-        w: existing.w,
-        h: existing.h,
-        minW: existing.minW ?? DASHBOARD_DEFAULT_MIN_W,
-        minH: existing.minH ?? DASHBOARD_DEFAULT_MIN_H,
-      });
-      continue;
-    }
-    result.push({
-      i: panel.id,
-      x: 0,
-      y: nextY,
-      w: 12,
-      h: 6,
-      minW: DASHBOARD_DEFAULT_MIN_W,
-      minH: DASHBOARD_DEFAULT_MIN_H,
-    });
-    nextY += 6;
-  }
-  return result;
+function hasRemovedDiffPanels(visualDiff?: ConsoleViewProps["visualDiff"]): boolean {
+  return !!visualDiff?.enabled && !!visualDiff.summary?.items.some((item) => item.changeType === "removed");
 }
 
-function toConsoleLayout(next: Layout[]): ConsoleLayoutItem[] {
-  return next.map((item) => {
-    const result: ConsoleLayoutItem = {
-      i: item.i,
-      x: item.x,
-      y: item.y,
-      w: item.w,
-      h: item.h,
-    };
-    if (typeof item.minW === "number") result.minW = item.minW;
-    if (typeof item.minH === "number") result.minH = item.minH;
-    return result;
+function withLocalDeletedPanels(
+  visualDiff: ConsoleViewProps["visualDiff"],
+  persistedPanels: ConsolePanel[],
+  persistedLayout: ConsoleLayoutItem[],
+  localPanels: ConsolePanel[],
+  localLayout: ConsoleLayoutItem[],
+): ConsoleViewProps["visualDiff"] {
+  if (!visualDiff?.enabled) return visualDiff;
+
+  const localDeletedItems = buildLocalDeletedDiffItems(
+    visualDiff.summary,
+    persistedPanels,
+    persistedLayout,
+    localPanels,
+    localLayout,
+  );
+  if (localDeletedItems.length === 0) return visualDiff;
+
+  const localDeletedIds = new Set(localDeletedItems.map((item) => item.id));
+  const existingItems = visualDiff.summary?.items ?? [];
+  const locallyRemovedItems = localDeletedItems.filter((item) => {
+    const existingItem = existingItems.find((existing) => existing.id === item.id);
+    return existingItem?.changeType !== "added";
   });
+  const items = [...existingItems.filter((item) => !localDeletedIds.has(item.id)), ...locallyRemovedItems].sort(
+    (left, right) => left.id.localeCompare(right.id),
+  );
+
+  return {
+    ...visualDiff,
+    summary: {
+      items,
+      addedCount: countDiffItems(items, "added"),
+      updatedCount: countDiffItems(items, "updated"),
+      removedCount: countDiffItems(items, "removed"),
+    },
+  };
+}
+
+function buildLocalDeletedDiffItems(
+  summary: DraftConsoleDiffSummary | undefined,
+  persistedPanels: ConsolePanel[],
+  persistedLayout: ConsoleLayoutItem[],
+  localPanels: ConsolePanel[],
+  localLayout: ConsoleLayoutItem[],
+): DraftConsoleDiffItem[] {
+  const persistedPanelsById = new Map(persistedPanels.map((panel) => [panel.id, panel]));
+  const persistedLayoutById = new Map(persistedLayout.map((item) => [item.i, item]));
+  const localIds = new Set([...localPanels.map((panel) => panel.id), ...localLayout.map((item) => item.i)]);
+  const existingItemsById = new Map((summary?.items ?? []).map((item) => [item.id, item]));
+
+  return Array.from(new Set([...persistedPanelsById.keys(), ...persistedLayoutById.keys()]))
+    .filter((id) => id && !localIds.has(id))
+    .map((id) => {
+      const existingItem = existingItemsById.get(id);
+      const panel = persistedPanelsById.get(id);
+      return {
+        id,
+        title: existingItem?.title ?? panelTitle(panel, id),
+        changeType: "removed",
+        panel,
+        layout: persistedLayoutById.get(id),
+        lines: existingItem?.lines ?? [],
+      };
+    });
+}
+
+function panelTitle(panel: ConsolePanel | undefined, id: string): string {
+  const title = panel?.content.title;
+  return typeof title === "string" && title.trim() ? title.trim() : id || "Untitled panel";
+}
+
+function countDiffItems(items: DraftConsoleDiffItem[], changeType: DraftConsoleDiffItem["changeType"]): number {
+  return items.filter((item) => item.changeType === changeType).length;
 }
 
 function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
@@ -256,40 +243,13 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
 
 const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   markdown: FileText,
+  html: CodeXml,
   node: Workflow,
   nodes: Network,
   table: Table2,
   chart: LineChart,
   number: Hash,
 };
-
-function PanelCardRouter({
-  panel,
-  readOnly,
-  onDelete,
-  onChange,
-}: {
-  panel: ConsolePanel;
-  readOnly: boolean;
-  onDelete: () => void;
-  onChange: (content: Record<string, unknown>) => void;
-}) {
-  switch (panel.type) {
-    case "node":
-      return <NodePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "nodes":
-      return <NodesPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "table":
-      return <TablePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "chart":
-      return <ChartPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "number":
-      return <NumberPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-    case "markdown":
-    default:
-      return <MarkdownPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
-  }
-}
 
 /**
  * Add Panel dialog with a type picker. The user picks one of the five panel

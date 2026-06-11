@@ -98,7 +98,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
-				IsTemplate:     canvas.IsTemplate,
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
@@ -151,7 +150,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
-			IsTemplate:     canvas.IsTemplate,
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
@@ -290,6 +288,10 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
+		}
+
+		if edge.Channel == "" {
+			edge.Channel = "default"
 		}
 
 		if !nodeIDs[edge.SourceId] {
