@@ -284,6 +284,24 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	return nil
 }
 
+func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	c.Finished = false
+	c.Passed = true
+	c.Channel = channel
+	c.Type = payloadType
+
+	wrappedPayloads := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		wrappedPayloads = append(wrappedPayloads, map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+	c.Payloads = wrappedPayloads
+	return nil
+}
+
 func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Finished = true
 	c.Passed = false

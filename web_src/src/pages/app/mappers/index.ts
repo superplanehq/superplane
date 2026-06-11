@@ -254,6 +254,7 @@ import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
+import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -280,6 +281,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   updateMemory: updateMemoryMapper,
   upsertMemory: upsertMemoryMapper,
   if: ifMapper,
+  loop: loopMapper,
   http: httpMapper,
   graphql: graphqlMapper,
   ssh: sshMapper,
@@ -449,6 +451,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   filter: FILTER_STATE_REGISTRY,
   forEach: FOR_EACH_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
+  loop: LOOP_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
