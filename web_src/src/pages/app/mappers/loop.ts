@@ -50,6 +50,16 @@ function isWaitingBetweenIterations(execution: ExecutionInfo): boolean {
   return metadata?.waitingBetweenIterations === true;
 }
 
+function resolveFinishedLoopState(outputs: LoopOutputs | undefined): EventState | null {
+  if (Array.isArray(outputs?.done) && outputs.done.length > 0) {
+    return "done";
+  }
+  if (Array.isArray(outputs?.next) && outputs.next.length > 0) {
+    return "next";
+  }
+  return null;
+}
+
 export const loopStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
@@ -73,12 +83,9 @@ export const loopStateFunction: StateFunction = (execution: ExecutionInfo): Even
   }
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const outputs = execution.outputs as LoopOutputs | undefined;
-    if (Array.isArray(outputs?.done) && outputs.done.length > 0) {
-      return "done";
-    }
-    if (Array.isArray(outputs?.next) && outputs.next.length > 0) {
-      return "next";
+    const finishedState = resolveFinishedLoopState(execution.outputs as LoopOutputs | undefined);
+    if (finishedState) {
+      return finishedState;
     }
   }
 
