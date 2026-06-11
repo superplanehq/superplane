@@ -49,19 +49,22 @@ func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.Pro
 const testProviderName = "test"
 
 type fakeProvider struct {
-	mu               sync.Mutex
-	createCalled     int
-	sendCalled       int
-	sentSessions     []string
-	defineSessions   []string
-	lastPreamble     string
-	lastOutcomeOpts  agents.DefineOutcomeOptions
-	createSessionErr error
-	createHook       func() error
-	sendErr          error
-	sendErrs         []error
-	defineOutcomeErr error
-	defineErrs       []error
+	mu                  sync.Mutex
+	createCalled        int
+	sendCalled          int
+	interruptCalled     int
+	interruptedSessions []string
+	sentSessions        []string
+	defineSessions      []string
+	lastPreamble        string
+	lastOutcomeOpts     agents.DefineOutcomeOptions
+	createSessionErr    error
+	createHook          func() error
+	sendErr             error
+	sendErrs            []error
+	interruptErr        error
+	defineOutcomeErr    error
+	defineErrs          []error
 }
 
 func (f *fakeProvider) Name() string { return testProviderName }
@@ -95,8 +98,12 @@ func (f *fakeProvider) SendMessage(_ context.Context, providerSessionID string, 
 	return f.sendErr
 }
 
-func (f *fakeProvider) InterruptSession(_ context.Context, _ string) error {
-	return nil
+func (f *fakeProvider) InterruptSession(_ context.Context, providerSessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.interruptCalled++
+	f.interruptedSessions = append(f.interruptedSessions, providerSessionID)
+	return f.interruptErr
 }
 
 func (f *fakeProvider) DefineOutcome(_ context.Context, providerSessionID string, opts agents.DefineOutcomeOptions) error {
@@ -586,4 +593,99 @@ func TestService_ListMessages_TailPagination(t *testing.T) {
 	oldest, err := svc.ListMessages(session.ID, older[0].ID, 10)
 	require.NoError(t, err)
 	require.Len(t, oldest, 1, "only one message remains before the second page")
+}
+
+func TestService_InterruptSession_ResetsStreamingRowToIdle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	require.NoError(t, svc.InterruptSession(context.Background(), r.Organization.ID, r.User, session.ID))
+
+	assert.Equal(t, 1, provider.interruptCalled)
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"stop button must bring the row back to idle so the UI un-gates the composer")
+}
+
+func TestService_InterruptSession_ResetsLocallyWhenProviderSessionUnavailable(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{interruptErr: agents.ErrProviderSessionUnavailable}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	require.NoError(t, svc.InterruptSession(context.Background(), r.Organization.ID, r.User, session.ID))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status,
+		"upstream-gone is logically already interrupted; local row must still reset")
+}
+
+func TestService_InterruptSession_ResetsLocallyEvenWhenProviderErrors(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{interruptErr: errors.New("anthropic 500: boom")}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	// Honor user intent: a flaky provider call must not strand the row in
+	// streaming. Reconciliation happens on the next SendMessage via
+	// recoverProviderSession / ErrSessionBusy handling.
+	require.NoError(t, svc.InterruptSession(context.Background(), r.Organization.ID, r.User, session.ID))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status)
+}
+
+func TestService_InterruptSession_ClosesStuckToolRows(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+
+	// Simulate a tool the worker started but never closed (e.g. worker died
+	// mid-turn). The interrupt path must flip it to finished so the UI stops
+	// showing "Running…" forever.
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID:  session.ID,
+		Role:       models.AgentMessageRoleTool,
+		ToolName:   "bash",
+		ToolCallID: "call-stuck",
+		ToolStatus: models.AgentToolStatusStarted,
+		Content:    "echo hi",
+	}))
+
+	require.NoError(t, svc.InterruptSession(context.Background(), r.Organization.ID, r.User, session.ID))
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
 }

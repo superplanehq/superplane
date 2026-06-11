@@ -27,12 +27,18 @@ const (
 	maxConcurrentStreams       = 10
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
-	// stuckStreamGrace pads the per-turn timeout before the cleanup loop
-	// considers a "streaming" row leaked. A turn that legitimately ran for
-	// the full timeout should have been transitioned to idle or failed by
-	// then; anything still streaming past 2× is stuck.
-	stuckStreamGrace    = 2 * agentStreamTimeout
-	stuckCleanupCadence = 5 * time.Minute
+	// streamHeartbeatInterval is how often a live worker refreshes
+	// last_active_at while a stream is open. Short enough that a dead
+	// worker is detected quickly; long enough that the write rate stays
+	// negligible (~2/min/session).
+	streamHeartbeatInterval = 30 * time.Second
+	// stuckStreamGrace is the heartbeat staleness threshold cleanup uses
+	// to declare a streaming row leaked. 2 min allows ~4 missed
+	// heartbeats — enough to ride out a GC pause or transient DB blip
+	// without prematurely failing a healthy worker, while keeping the
+	// worst-case stuck time bounded.
+	stuckStreamGrace    = 2 * time.Minute
+	stuckCleanupCadence = 1 * time.Minute
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
@@ -309,6 +315,10 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 			log.WithError(err).Warn("agent stream: failed to publish event")
 		}
 	}
+
+	heartbeatCtx, stopHeartbeat := context.WithCancel(parentCtx)
+	defer stopHeartbeat()
+	go runStreamHeartbeat(heartbeatCtx, sessionID)
 
 	for {
 		turnStartedAt := session.UpdatedAt
@@ -751,6 +761,29 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 		ToolName:   m.ToolName,
 		ToolStatus: m.ToolStatus,
 		CreatedAt:  m.CreatedAt,
+	}
+}
+
+// runStreamHeartbeat keeps last_active_at fresh while the worker owns a
+// stream. It writes once up front so cleanup can't race the first tick
+// (e.g. a backed-up queue could otherwise let the cutoff elapse before
+// the worker had a chance to claim the session), then ticks at the
+// configured interval until the caller cancels.
+func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
+	if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: initial heartbeat failed")
+	}
+	ticker := time.NewTicker(streamHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: heartbeat failed")
+			}
+		}
 	}
 }
 
