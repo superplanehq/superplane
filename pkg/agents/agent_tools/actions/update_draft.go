@@ -27,10 +27,6 @@ func (a updateDraftAction) Name() string {
 }
 
 func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.deps.Encryptor == nil || a.deps.Registry == nil || a.deps.AuthService == nil {
-		return updateResult{}, fmt.Errorf("custom tool executor is missing canvas update dependencies")
-	}
-
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
@@ -59,20 +55,29 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("canvas_yaml or console_yaml is required for update_draft")
 	}
 
-	if err := canvasRepository.ApplyRepositorySpecFileOperations(
+	// Agents may only stage edits onto their private draft; commit and publish
+	// stay user-driven. This mirrors the human `--stage-only` CLI flow: stage
+	// the spec files, then auto-layout the staged canvas when the graph changed.
+	if _, err := canvasRepository.StageRepositorySpecFileOperations(
 		ctx,
-		a.deps.UsageService,
-		a.deps.Encryptor,
-		a.deps.Registry,
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
-		a.deps.WebhookBaseURL,
-		a.deps.AuthService,
-		resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate),
 		operations,
 	); err != nil {
 		return updateResult{}, err
+	}
+
+	if autoLayout := resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate); autoLayout != nil {
+		if _, err := canvasRepository.ApplyCanvasAutoLayout(
+			ctx,
+			session.OrganizationID,
+			session.CanvasID,
+			draft.ID.String(),
+			autoLayout,
+		); err != nil {
+			return updateResult{}, err
+		}
 	}
 
 	updated, err := models.FindCanvasVersion(canvasID, draft.ID)
