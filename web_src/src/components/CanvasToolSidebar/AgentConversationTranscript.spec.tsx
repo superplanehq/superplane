@@ -73,6 +73,29 @@ describe("ConversationTranscript command groups", () => {
 });
 
 describe("ConversationTranscript user messages", () => {
+  it("renders attached images as linked thumbnails", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "fix this",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", data: "aGVsbG8=" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    const image = screen.getByRole("img", { name: "attachment" });
+    expect(image).toHaveAttribute("src", "data:image/png;base64,aGVsbG8=");
+  });
+
   it("keeps compact user messages sticky", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Build a release workflow")} />);
 
