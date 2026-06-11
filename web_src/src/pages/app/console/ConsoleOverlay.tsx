@@ -64,6 +64,7 @@ export type ConsoleOverlayProps = {
     enabled: boolean;
     summary?: DraftConsoleDiffSummary;
   };
+  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
 };
 
 export function ConsoleOverlay({
@@ -87,6 +88,7 @@ export function ConsoleOverlay({
   onConsoleOpenYaml,
   consoleYamlReadOnly,
   visualDiff,
+  onEffectiveConsoleChange,
 }: ConsoleOverlayProps) {
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
   updateConsoleMutationRef.current = updateConsoleMutation;
@@ -124,6 +126,7 @@ export function ConsoleOverlay({
             errorMessage={consoleQuery.error ? String(consoleQuery.error) : undefined}
             readOnly={readOnly}
             onChange={handleChange}
+            onEffectiveChange={onEffectiveConsoleChange}
             addPanelDialogOpen={addPanelDialogOpen}
             onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
             visualDiff={visualDiff}

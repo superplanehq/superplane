@@ -107,7 +107,7 @@ import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
-import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
+import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
 import {
@@ -118,6 +118,9 @@ import {
   versionSortValue,
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
+import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
+import { useDraftStagingActions } from "./useDraftStagingActions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
@@ -131,7 +134,7 @@ import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
-import { useCanvasConsoleVersionDiff, useDraftVisualDiff } from "./useDraftVisualDiff";
+import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -165,7 +168,6 @@ import {
   prepareSidebarData,
 } from "./workflowPageHelpers";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
-const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
@@ -218,7 +220,7 @@ export function AppPage() {
     handleBackToRunList,
   } = useRunsDetailState(searchParams, isRunsMode, selectedRunId);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
-  const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
+  const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -233,6 +235,7 @@ export function AppPage() {
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
+  const [stagingResetNonce, setStagingResetNonce] = useState(0);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -425,7 +428,7 @@ export function AppPage() {
     data: loadedCanvasVersion,
     isLoading: loadedCanvasVersionLoading,
     isFetching: loadedCanvasVersionFetching,
-  } = useCanvasVersion(organizationId!, canvasId!, activeCanvasVersionId, !!activeCanvasVersionId);
+  } = useCanvasVersion(organizationId!, canvasId!, activeCanvasVersionId, !!activeCanvasVersionId, true);
   const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
   const createChangeRequestVersion = useMemo(() => {
     const selectedVersionID = selectedCanvasVersion?.metadata?.id || "";
@@ -453,10 +456,6 @@ export function AppPage() {
     }
     return liveCreatedAt > draftCreatedAt;
   }, [liveCanvasVersion?.metadata?.createdAt, createChangeRequestVersion?.metadata?.createdAt]);
-  const hasDraftGraphDiffVersusLive = useMemo(
-    () => hasDraftVersusLiveGraphDiff(liveCanvasVersion, latestDraftVersion),
-    [liveCanvasVersion, latestDraftVersion],
-  );
   const selectedCanvasVersionID = selectedCanvasVersion?.metadata?.id || "";
   const isViewingPendingApprovalVersion =
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
@@ -754,6 +753,7 @@ export function AppPage() {
   const isDrainingCanvasSaveQueueRef = useRef(false);
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
+  const consoleMutationGenerationRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const setLastSavedWorkflowSnapshot = useCallback((workflow: CanvasesCanvas | null) => {
@@ -799,7 +799,7 @@ export function AppPage() {
         current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: updatedWorkflow.spec } : current,
       );
       queryClient.setQueryData<CanvasesCanvasVersion | undefined>(
-        canvasKeys.versionDetail(canvasId, activeCanvasVersionId),
+        canvasKeys.versionStagedDetail(canvasId, activeCanvasVersionId),
         (current) => (current ? { ...current, spec: updatedWorkflow.spec } : current),
       );
     },
@@ -1115,105 +1115,54 @@ export function AppPage() {
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas ?? undefined);
 
-  const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
-    const saveSession = canvasSaveSessionRef.current;
-    let released = false;
-    let timeoutId = 0;
-    const release = () => {
-      if (released) {
-        return;
-      }
-
-      released = true;
-      window.clearTimeout(timeoutId);
-      const releaseIndex = ignoredCanvasUpdatedEchoReleasesRef.current.indexOf(release);
-      if (releaseIndex >= 0) {
-        ignoredCanvasUpdatedEchoReleasesRef.current.splice(releaseIndex, 1);
-      }
-
-      if (canvasSaveSessionRef.current !== saveSession) {
-        return;
-      }
-    };
-
-    ignoredCanvasUpdatedEchoReleasesRef.current.push(release);
-    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
-
-    return release;
-  }, []);
-
-  const registerIgnoredCanvasVersionUpdatedEcho = useCallback((savingVersionId?: string) => {
-    if (!savingVersionId) {
-      return () => undefined;
-    }
-
-    const saveSession = canvasSaveSessionRef.current;
-    const currentReleases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId) || [];
-    let released = false;
-    let timeoutId = 0;
-    const release = () => {
-      if (released) {
-        return;
-      }
-
-      released = true;
-      window.clearTimeout(timeoutId);
-      const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId);
-      if (releases) {
-        const releaseIndex = releases.indexOf(release);
-        if (releaseIndex >= 0) {
-          releases.splice(releaseIndex, 1);
-        }
-        if (releases.length === 0) {
-          ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(savingVersionId);
-        }
-      }
-
-      if (canvasSaveSessionRef.current !== saveSession) {
-        return;
-      }
-    };
-
-    currentReleases.push(release);
-    ignoredCanvasVersionUpdatedEchoReleasesRef.current.set(savingVersionId, currentReleases);
-    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
-
-    return release;
-  }, []);
-  const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
-    canvasId: canvasId!,
-    versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
-    hasDraftGraphDiffVersusLive,
-    suppressUnpublishedDraftDiscard,
-    enabled: true,
+  const {
+    registerIgnoredCanvasUpdatedEcho,
     registerIgnoredCanvasVersionUpdatedEcho,
+    consumeIgnoredCanvasUpdatedEcho,
+    consumeIgnoredCanvasVersionUpdatedEcho,
+  } = useCanvasEchoReleaseGuards({
+    canvasSaveSessionRef,
+    ignoredCanvasUpdatedEchoReleasesRef,
+    ignoredCanvasVersionUpdatedEchoReleasesRef,
   });
-  const { consoleQuery, updateConsoleMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
-    canvasConsoleVersionDiff;
-  const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
-    const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
-    if (!release) return false;
-
-    release();
-    return true;
-  }, []);
-
-  const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
-    if (!versionId) return false;
-
-    const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
-    if (!releases) return false;
-
-    const release = releases.pop();
-    if (!release) return false;
-
-    if (releases.length === 0) {
-      ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
-    }
-
-    release();
-    return true;
-  }, []);
+  const {
+    commitCanvasStagingMutation,
+    discardCanvasStagingMutation,
+    consoleQuery,
+    updateConsoleMutation,
+    draftChangeIndicators,
+    hasDraftDiffVersusLive,
+    canvasConsoleVersionDiff,
+    handleEffectiveConsoleChange,
+    handleLocalFilesStagingChange,
+    hasStagingChanges,
+    draftBranchEditStatusByVersionId,
+    editTabTone,
+    hasUncommittedCanvasDraftChanges,
+    hasUncommittedConsoleDraftChanges,
+    hasUncommittedFilesDraftChanges,
+    hasCommittedCanvasDraftChanges,
+    hasCommittedConsoleDraftChanges,
+    hasFilesStagingChanges,
+  } = useAppDraftStagingData({
+    organizationId: organizationId!,
+    canvasId: canvasId!,
+    activeCanvasVersionId,
+    liveCanvasVersionId,
+    liveCanvasVersion,
+    latestDraftVersion,
+    isEditing,
+    hasEditableVersion,
+    stagingResetNonce,
+    draftSpecToRender,
+    canvas,
+    draftVersionsFromBranches,
+    selectedCanvasVersion,
+    draftBranches,
+    suppressUnpublishedDraftDiscard,
+    registerIgnoredCanvasVersionUpdatedEcho,
+    getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
+  });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
@@ -4029,6 +3978,11 @@ export function AppPage() {
         return;
       }
 
+      // Publish operates on the committed draft row, so flush any staged spec
+      // edits into the version before promoting it to live.
+      consoleMutationGenerationRef.current += 1;
+      await commitCanvasStagingMutation.mutateAsync();
+
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
       activeCanvasVersionIdRef.current = "";
       clearDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionIdToPublish);
@@ -4052,10 +4006,46 @@ export function AppPage() {
     activeCanvasVersionId,
     ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
+    commitCanvasStagingMutation,
     refreshLatestLiveCanvasData,
     setSearchParams,
     exitToLive,
   ]);
+
+  const cancelPendingCanvasSaves = useCallback(() => {
+    canvasSaveSessionRef.current += 1;
+    clearQueuedCanvasSave();
+  }, [clearQueuedCanvasSave]);
+
+  const handleCanvasDraftRestoredToCommitted = useCallback(
+    (_version: CanvasesCanvasVersion) => {
+      const restoredWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId!, canvasId!));
+      if (restoredWorkflow) {
+        setLastSavedWorkflowSnapshot(restoredWorkflow);
+      }
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+    },
+    [canvasId, organizationId, queryClient, setLastSavedWorkflowSnapshot],
+  );
+
+  const { handleCommitStaging, handleResetStaging } = useDraftStagingActions({
+    organizationId,
+    canvasId,
+    activeCanvasVersionId,
+    hasEditableVersion,
+    ensureVersionActionDraftReady,
+    commitCanvasStagingMutation,
+    discardCanvasStagingMutation,
+    draftCanvasSpecsRef,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setStagingResetNonce,
+    consoleMutationGenerationRef,
+    setIsPreparingVersionAction,
+    cancelPendingCanvasSaves,
+    onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
+  });
 
   const handleActOnChangeRequest = useCallback(
     async ({
@@ -5016,6 +5006,7 @@ export function AppPage() {
     applyLocalWorkflowUpdate,
     handleSaveWorkflow,
     updateConsoleMutation,
+    onEffectiveConsoleChange: handleEffectiveConsoleChange,
   });
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
@@ -5123,6 +5114,7 @@ export function AppPage() {
     canvasViewKey,
     isDraftCanvasLoading ? "draft-loading" : "draft-ready",
     isRunsMode ? "runs" : "canvas",
+    `reset-${stagingResetNonce}`,
   ].join(":");
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
@@ -5188,8 +5180,6 @@ export function AppPage() {
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
   const filesHeaderVersionActions = resolveFilesHeaderVersionActions({
-    useFilesHeaderActions: urlViewFlags.isFilesMode && isEditing,
-    filesHeaderActions,
     isChangeManagementDisabled,
     handlePublishVersion,
     handleCreateChangeRequest,
@@ -5248,6 +5238,7 @@ export function AppPage() {
     rejectedVersions,
     draftBranches,
     activeDraftBranch: resolvedActiveBranch,
+    draftBranchEditStatusByVersionId,
     onOpenDraftBranch: handleContinueDraftBranch,
     onDeleteDraftBranch: handleDeleteDraftBranch,
     deleteDraftBranchPending: deleteDraftBranchMutation.isPending,
@@ -5257,6 +5248,7 @@ export function AppPage() {
     <>
       <div className="relative h-full w-full">
         <WorkflowPageModeOverlays
+          key={`overlays:${canvasViewKey}:reset-${stagingResetNonce}`}
           urlViewFlags={urlViewFlags}
           console={{
             canActOnCanvas,
@@ -5281,6 +5273,7 @@ export function AppPage() {
               enabled: draftVisualDiff.visualDiffEnabled && isViewingDraftVersion,
               summary: canvasConsoleVersionDiff.draftConsoleDiffSummary,
             },
+            onEffectiveConsoleChange: handleEffectiveConsoleChange,
           }}
           memory={{
             canEdit: canEditCanvasMemory({
@@ -5301,8 +5294,10 @@ export function AppPage() {
             canWrite: canActOnCanvas,
             files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
-            onHeaderActionsChange: onFilesHeaderActionsChange,
+            stagingResetNonce,
+            suspendRepositoryFileStaging: isPreparingVersionAction,
             onSpecFileChange,
+            onLocalFilesStagingChange: handleLocalFilesStagingChange,
           }}
         />
         <CanvasPage
@@ -5425,6 +5420,19 @@ export function AppPage() {
           activeDraftBranchLabel={activeDraftBranchLabel}
           {...draftChangeIndicators}
           {...filesHeaderVersionActions}
+          hasStagingChanges={isEditing && hasStagingChanges}
+          hasUncommittedDraftChanges={isEditing && hasStagingChanges}
+          readyToPublishDraftChanges={isEditing && !hasStagingChanges && hasDraftDiffVersusLive}
+          editTabTone={editTabTone}
+          hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+          hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
+          hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
+          hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+          hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
+          onCommitStaging={handleCommitStaging}
+          commitStagingPending={isPreparingVersionAction || commitCanvasStagingMutation.isPending}
+          onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

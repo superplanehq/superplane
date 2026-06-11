@@ -13,45 +13,9 @@ import (
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
 )
-
-type rejectingCanvasUsageService struct{}
-
-func (rejectingCanvasUsageService) Enabled() bool { return true }
-func (rejectingCanvasUsageService) SetupAccount(context.Context, string) (*usagepb.SetupAccountResponse, error) {
-	return nil, nil
-}
-func (rejectingCanvasUsageService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*usagepb.SetupOrganizationResponse, error) {
-	return nil, nil
-}
-func (rejectingCanvasUsageService) DescribeAccountLimits(context.Context, string) (*usagepb.DescribeAccountLimitsResponse, error) {
-	return nil, nil
-}
-func (rejectingCanvasUsageService) DescribeOrganizationLimits(context.Context, string) (*usagepb.DescribeOrganizationLimitsResponse, error) {
-	return nil, nil
-}
-func (rejectingCanvasUsageService) DescribeOrganizationUsage(context.Context, string) (*usagepb.DescribeOrganizationUsageResponse, error) {
-	return nil, nil
-}
-func (rejectingCanvasUsageService) CheckAccountLimits(context.Context, string, *usagepb.AccountState) (*usagepb.CheckAccountLimitsResponse, error) {
-	return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
-}
-func (rejectingCanvasUsageService) CheckOrganizationLimits(context.Context, string, *usagepb.OrganizationState, *usagepb.CanvasState) (*usagepb.CheckOrganizationLimitsResponse, error) {
-	return &usagepb.CheckOrganizationLimitsResponse{
-		Allowed: false,
-		Violations: []*usagepb.LimitViolation{
-			{
-				Limit:           usagepb.LimitName_LIMIT_NAME_MAX_NODES_PER_CANVAS,
-				ConfiguredLimit: 1,
-				CurrentValue:    2,
-			},
-		},
-	}, nil
-}
 
 func TestResolveCustomToolAutoLayout_DefaultsGraphUpdatesToFullCanvas(t *testing.T) {
 	layout := resolveCustomToolAutoLayout(nil, true)
@@ -112,7 +76,7 @@ func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "load live canvas version summary")
 }
 
-func TestAppAgentTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
+func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -130,12 +94,11 @@ func TestAppAgentTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
 		Encryptor:      r.Encryptor,
 		Registry:       r.Registry,
 		AuthService:    r.AuthService,
-		UsageService:   rejectingCanvasUsageService{},
 		WebhookBaseURL: "https://hooks.example.test",
 	})
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	_, err = registry.Execute(ctx, agents.AgentSessionContext{
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
@@ -145,8 +108,12 @@ func TestAppAgentTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
 		CanvasYAML: canvasYAML,
 	})
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "canvas node limit exceeded")
+	// Agents stage onto their private draft without committing; usage limits
+	// are enforced when the user commits, not at stage time.
+	require.NoError(t, err)
+	update, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Equal(t, "update_draft", update.Action)
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
