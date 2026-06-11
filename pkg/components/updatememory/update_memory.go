@@ -86,13 +86,9 @@ func (c *UpdateMemory) Documentation() string {
 ## List Mode
 
 Enable "Input is a list" to iterate over a list expression and run one update per element.
-Both ` + "`matchList`" + ` and ` + "`valueList`" + ` field values are evaluated per element with the iteration
-variable in scope (defaults to ` + "`item`" + `), so expressions like ` + "`item.uuid`" + ` resolve to the current
-element's value on every iteration. This means each item updates only its own matched row.
-All resulting updates are reported in a single ` + "`memory.updated`" + ` event.
-
-To use a single global match across iterations, write a ` + "`{{ ... }}`" + ` template (resolved before
-iteration starts) instead of a bare expression.`
+The ` + "`matchList`" + ` is evaluated once (same matches for every iteration), while each
+` + "`valueList`" + ` field value is evaluated per element with the iteration variable in scope
+(defaults to ` + "`item`" + `). All resulting updates are reported in a single ` + "`memory.updated`" + ` event.`
 }
 
 func (c *UpdateMemory) Icon() string {
@@ -127,7 +123,7 @@ func (c *UpdateMemory) Configuration() []configuration.Field {
 			Name:        "iterateList",
 			Label:       "Input is a list",
 			Type:        configuration.FieldTypeBool,
-			Description: "When enabled, iterate over a list expression and update once per element. Both matchList and valueList values are evaluated per element with the iteration variable in scope (e.g. item.uuid)",
+			Description: "When enabled, iterate over a list expression and update once per element (matchList stays global)",
 		},
 		{
 			Name:        "listSource",
@@ -296,11 +292,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return err
 	}
 
-	resolvedMatches, err := memorywrite.ResolveAllItemMatches(items, mode, spec.MatchList, ctx.Expressions)
-	if err != nil {
-		return err
-	}
-
+	matches := buildPairs(spec.MatchList)
 	resolved, err := memorywrite.ResolveAllItemValues(items, mode, spec.ValueList, ctx.Expressions)
 	if err != nil {
 		return err
@@ -311,7 +303,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return fmt.Errorf("canvas memory record update operations are not supported")
 	}
 
-	return executeListModeWithRecords(ctx, spec, mode, recordCtx, items, resolvedMatches, resolved)
+	return executeListModeWithRecords(ctx, spec, mode, recordCtx, items, matches, resolved)
 }
 
 func executeListModeWithRecords(
@@ -320,32 +312,19 @@ func executeListModeWithRecords(
 	mode memorywrite.ListMode,
 	updateCtx canvasMemoryUpdateRecordsContext,
 	items []any,
-	resolvedMatches []map[string]any,
+	matches map[string]any,
 	resolved []map[string]any,
 ) error {
 	allUpdatedRecords := make([]core.CanvasMemoryRecord, 0)
 	updatedPositions := map[uuid.UUID]int{}
 	perItemValues := make([]any, 0, len(resolved))
-	itemResults := make([]any, 0, len(resolved))
 	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
-
-		var matches map[string]any
-		if i < len(resolvedMatches) {
-			matches = resolvedMatches[i]
-		}
-
 		updated, updateErr := updateCtx.UpdateRecords(spec.Namespace, matches, values)
 		if updateErr != nil {
 			return fmt.Errorf("failed to update canvas memory for list item %d: %w", i, updateErr)
 		}
 		allUpdatedRecords = memorywrite.AppendUniqueRecords(allUpdatedRecords, updatedPositions, updated)
-
-		itemResults = append(itemResults, map[string]any{
-			"matches": matches,
-			"values":  values,
-			"updated": memorywrite.RecordValues(updated),
-		})
 	}
 
 	allUpdated := memorywrite.RecordValues(allUpdatedRecords)
@@ -353,6 +332,7 @@ func executeListModeWithRecords(
 		"namespace":    spec.Namespace,
 		"matchFields":  memorywrite.FieldNames(spec.MatchList),
 		"valueFields":  memorywrite.FieldNames(spec.ValueList),
+		"matches":      matches,
 		"updatedCount": len(allUpdated),
 		"iterateList":  true,
 		"itemVariable": mode.ItemVariable,
@@ -375,8 +355,8 @@ func executeListModeWithRecords(
 			map[string]any{
 				"data": map[string]any{
 					"namespace": spec.Namespace,
+					"matches":   matches,
 					"values":    perItemValues,
-					"items":     itemResults,
 					"updated":   allUpdated,
 					"count":     len(allUpdated),
 				},

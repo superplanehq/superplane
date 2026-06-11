@@ -300,7 +300,7 @@ In addition to the standard CEL functions cel-js ships with, the dashboard expos
 | `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
 | `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
 | `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. Useful as a wholesale value (`{{ parseJson(blob) }}`), wrapped in another function (`size(parseJson(tags))`), or for equality checks (`parseJson(value) == null`). |
-| `join(list, sep)` | Concatenate the elements of a list into a single string with an explicit separator. Non-array `list` returns `""`; non-string `sep` collapses to `""`; `null`/`undefined` elements render as `""`. Required to splice a mapped list into the output — a bare array value renders as JSON (`["a","b"]`) so it stays inspectable. Use `join(list, "")` for seamless fragment concatenation or any other separator for delimited output. Pairs with the `.map`/`.filter` macros on list-mode memory variables (`join(rows.map(r, "- " + r.name), "\n")`) — see [List mode](#list-mode). |
+| `join(list, sep)` | Concatenate the elements of a list into a single string with an explicit separator. Non-array `list` returns `""`; non-string `sep` collapses to `""`; `null`/`undefined` elements render as `""`. Use it when you need a separator — a bare mapped list already concatenates with no separator. Pairs with the `.map`/`.filter` macros on list-mode memory variables (`join(rows.map(r, "- " + r.name), "\n")`) — see [List mode](#list-mode). |
 
 `parseJson` has a real limitation: **cel-js does not support postfix `.field` / `[i]` / `.method(...)` after a function call result.** That means expressions like `parseJson(blob).items[0].id` or `parseJson(tags).map(t, t)` will fail to parse. To iterate or dot-access parsed data, either shape it as a real list/map upstream (canvas memory values are JSON-typed, so storing `{"tags": ["a","b"]}` lets you write `tags.map(t, t)` natively) or compose with macros that take the parsed value as an argument (`size`, `string`, etc.).
 
@@ -562,13 +562,13 @@ variables:
 
 cel-js doesn't allow `.method()` postfix after a function-call result, so chain macros directly off the bound variable (`deploys.filter(...).map(...)`).
 
-When an interpolated expression resolves to an array, the renderer falls back to JSON (e.g. `["a","b"]`) so a stray `{{ deploys }}` or `{{ rows }}` reference stays inspectable instead of silently flattening. To splice a mapped list of HTML/Markdown fragments into the output, wrap it in the `join(list, sep)` builtin — use `""` for seamless concatenation:
+When an interpolated expression resolves to an array, the renderer concatenates the stringified elements with **no separator** — so a mapped list of HTML/Markdown fragments renders directly:
 
 ```html
-<div>{{ join(deploys.map(d, "<p>" + d.name + "</p>"), "") }}</div>
+<div>{{ deploys.map(d, "<p>" + d.name + "</p>") }}</div>
 ```
 
-renders `<div><p>web</p><p>api</p>…</div>`. When you want a separator between elements (newlines for a Markdown bullet list, commas for an inline summary), pass it as the second argument instead:
+renders `<div><p>web</p><p>api</p>…</div>`. When you need a separator between elements (newlines for a Markdown bullet list, commas for an inline summary), wrap the mapped list in the `join(list, sep)` builtin:
 
 ```markdown
 - Total deploys: {{ size(deploys) }}
@@ -577,7 +577,7 @@ renders `<div><p>web</p><p>api</p>…</div>`. When you want a separator between 
 {{ join(deploys.map(d, "- " + d.name + " @ " + d.createdAt), "\n") }}
 ```
 
-A bare `{{ deploys }}` renders the array as JSON for inspection; reach for `map` to shape each element and `join(..., "")` (or any separator) to splice the fragments into the output. Run-source variables always resolve to a single row today; pick the rows you need with `mode: list` on a memory namespace instead.
+A bare `{{ deploys }}` concatenates the rows the same way (each non-array object is JSON-encoded), so reach for `map` to shape each element before it renders. Run-source variables always resolve to a single row today; pick the rows you need with `mode: list` on a memory namespace instead.
 
 ## HTML Panels
 
