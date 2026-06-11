@@ -51,10 +51,6 @@ func loadOwnedDraftVersion(
 		return nil, nil, uuid.Nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
 	}
 
-	if canvas.IsTemplate {
-		return nil, nil, uuid.Nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
