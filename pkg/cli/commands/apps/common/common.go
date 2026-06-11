@@ -58,12 +58,12 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 		return "", err
 	}
 
-	var matches []openapi_client.CanvasesCanvas
+	var matches []openapi_client.CanvasesCanvasSummary
 	for _, canvas := range response.GetCanvases() {
-		if canvas.Metadata == nil || canvas.Metadata.Name == nil {
+		if canvas.Name == nil {
 			continue
 		}
-		if *canvas.Metadata.Name == name {
+		if *canvas.Name == name {
 			matches = append(matches, canvas)
 		}
 	}
@@ -76,11 +76,11 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 		return "", fmt.Errorf("multiple apps named %q found", name)
 	}
 
-	if matches[0].Metadata == nil || matches[0].Metadata.Id == nil {
+	if matches[0].Id == nil {
 		return "", fmt.Errorf("app %q is missing an id", name)
 	}
 
-	return *matches[0].Metadata.Id, nil
+	return *matches[0].Id, nil
 }
 
 // FindCurrentUserDraftVersionID returns the version id of the current user's
