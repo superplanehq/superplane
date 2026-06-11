@@ -4,7 +4,7 @@ export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "ver
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
-const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["runs", "versions", "memory", "files"]);
+const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory", "files"]);
 
 export function normalizeCanvasHeaderMode(headerMode: CanvasPageHeaderMode | undefined): WorkflowHeaderMode {
   if (!headerMode || headerMode === "default") {
@@ -23,11 +23,15 @@ export function blocksBuildingBlocksShortcut(headerMode: WorkflowHeaderMode): bo
 }
 
 export function allowsBuildingBlocksSidebar(headerMode: WorkflowHeaderMode): boolean {
-  return headerMode !== "console" && !isPanelHeaderMode(headerMode);
+  return headerMode !== "console" && headerMode !== "versions" && !isPanelHeaderMode(headerMode);
 }
 
-export function isRunsOrVersionsHeaderMode(headerMode: WorkflowHeaderMode): boolean {
-  return headerMode === "runs" || headerMode === "versions";
+export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined): boolean {
+  if (!headerMode || headerMode === "default") {
+    return true;
+  }
+
+  return headerMode === "version-live" || headerMode === "version-edit";
 }
 
 const CONSOLE_VIEW = "console";
@@ -40,8 +44,9 @@ function isConsoleViewParam(view: string): boolean {
 /** View flags read directly from the URL (source of truth for first paint and header tab selection). */
 export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams) {
   const view = searchParams.get("view") ?? "";
+  const run = searchParams.get("run") ?? "";
   return {
-    isRunsMode: view === "runs",
+    isRunInspectionMode: Boolean(run),
     isVersionsMode: view === "versions",
     isMemoryMode: view === "memory",
     isFilesMode: view === "files",
@@ -78,19 +83,21 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
 
 export function getWorkflowHeaderMode({
   isConsoleMode,
-  isRunsMode,
-  isVersionsMode,
   isMemoryMode,
   isFilesMode,
+  isVersionsMode,
 }: {
   isConsoleMode: boolean;
-  isRunsMode: boolean;
-  isVersionsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
+  isVersionsMode: boolean;
 }): WorkflowHeaderMode {
   if (isConsoleMode) {
     return "console";
+  }
+
+  if (isVersionsMode) {
+    return "versions";
   }
 
   if (isMemoryMode) {
@@ -99,14 +106,6 @@ export function getWorkflowHeaderMode({
 
   if (isFilesMode) {
     return "files";
-  }
-
-  if (isRunsMode) {
-    return "runs";
-  }
-
-  if (isVersionsMode) {
-    return "versions";
   }
 
   return "version-live";
@@ -138,27 +137,27 @@ export function getWorkflowCanvasStateMode({
 
 export function getWorkflowViewPresentation({
   isConsoleMode,
-  isRunsMode,
-  isVersionsMode,
+  isRunInspectionMode,
   isMemoryMode,
   isFilesMode,
+  isVersionsMode,
   hasEditableVersion,
   isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
 }: {
   isConsoleMode: boolean;
-  isRunsMode: boolean;
-  isVersionsMode: boolean;
+  isRunInspectionMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
+  isVersionsMode: boolean;
   hasEditableVersion: boolean;
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunsMode || isVersionsMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isRunsMode, isVersionsMode, isMemoryMode, isFilesMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode, isVersionsMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,
@@ -166,7 +165,7 @@ export function getWorkflowViewPresentation({
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunsMode || isVersionsMode || isFilesMode,
+    readOnlyViewModes: isRunInspectionMode || isFilesMode,
   };
 }
 
