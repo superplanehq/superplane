@@ -11,9 +11,7 @@ import (
 )
 
 type getCommand struct {
-	draft     *bool
-	draftID   *string
-	versionID *string
+	draftID *string
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -43,19 +41,15 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	canvasName := strings.TrimSpace(described.Metadata.GetName())
 	organizationID := strings.TrimSpace(described.Metadata.GetOrganizationId())
 
-	resolvedDraftID, err := common.MergeDraftOrVersionID(c.draftID, c.versionID)
-	if err != nil {
-		return err
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
 	}
 
-	useDraft := (c.draft != nil && *c.draft) || resolvedDraftID != ""
+	useDraft := draftID != ""
 	versionID := ""
 	if useDraft {
-		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, common.DraftResolveOptions{
-			DraftID:     resolvedDraftID,
-			UseDraft:    true,
-			AllowCreate: false,
-		})
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
 		if err != nil {
 			return err
 		}

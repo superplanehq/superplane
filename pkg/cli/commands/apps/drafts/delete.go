@@ -18,7 +18,12 @@ type deleteCommand struct{}
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	draftID := strings.TrimSpace(ctx.Args[0])
 
-	appID, err := common.ResolveAppForDraft(ctx, draftID)
+	appArg := ""
+	if len(ctx.Args) == 2 {
+		appArg = strings.TrimSpace(ctx.Args[1])
+	}
+
+	appID, err := common.ResolveAppNameOrIDArg(ctx, appArg)
 	if err != nil {
 		return err
 	}

@@ -151,18 +151,9 @@ func TestDeleteCommandPrintsConfirmation(t *testing.T) {
 	require.Contains(t, stdout.String(), "Draft deleted: draft-1")
 }
 
-func TestDeleteCommandResolvesAppFromDraftWhenAppOmitted(t *testing.T) {
+func TestDeleteCommandResolvesAppFromArgument(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"other-app","name":"other"}},{"metadata":{"id":"` + testAppID + `","name":"mine"}}]}`))
-		case r.Method == http.MethodGet && r.URL.Path == draftVersionsPath("other-app"):
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"someone-else-draft"}}]}`))
-		case r.Method == http.MethodGet && r.URL.Path == draftVersionsPath(testAppID):
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1"}}]}`))
 		case r.Method == http.MethodDelete && r.URL.Path == draftVersionsPath(testAppID)+"/draft-1":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{}`))
@@ -173,34 +164,25 @@ func TestDeleteCommandResolvesAppFromDraftWhenAppOmitted(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx, stdout := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"draft-1"}
+	ctx.Args = []string{"draft-1", testAppID}
 
 	err := (&deleteCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "Draft deleted: draft-1")
 }
 
-func TestDeleteCommandErrorsWhenDraftNotFoundInAnyApp(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"` + testAppID + `","name":"mine"}}]}`))
-		case r.Method == http.MethodGet && r.URL.Path == draftVersionsPath(testAppID):
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[]}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
+func TestDeleteCommandErrorsWhenNoAppAndNoActive(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
 	}))
 	t.Cleanup(server.Close)
 
 	ctx, _ := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"missing-draft"}
+	ctx.Args = []string{"draft-1"}
 
 	err := (&deleteCommand{}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "not found in any app")
+	require.Contains(t, err.Error(), "is required")
 }
 
 func TestDeleteCommandMapsPermissionDenied(t *testing.T) {
