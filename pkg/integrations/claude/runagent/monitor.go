@@ -59,6 +59,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		}
 		if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
 			cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
+			cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
 		}
 		return nil
 	}
@@ -78,6 +79,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 				return emitErr
 			}
 			cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+			cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 			return nil
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
@@ -112,6 +114,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
 		}
 		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 		return nil
 	}
 
@@ -149,5 +152,6 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	// Best effort cleanup; may fail if session is still running.
 	_ = client.DeleteManagedSession(metadata.Session.ID)
 	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 	return nil
 }

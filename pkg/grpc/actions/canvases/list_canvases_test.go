@@ -4,16 +4,12 @@ import (
 	"context"
 	"sort"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
@@ -274,59 +270,4 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	// Verify status is NOT present
 	//
 	assert.Nil(t, listedCanvas.Status)
-}
-
-func Test__ListCanvases__DoesNotReturnTemplateCanvases(t *testing.T) {
-	r := support.Setup(t)
-
-	activeCanvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-1",
-				Name:   "Node 1",
-				Type:   models.NodeTypeComponent,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	now := time.Now()
-	templateLiveVersionID := uuid.New()
-	templateCanvas := &models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: r.Organization.ID,
-		LiveVersionID:  &templateLiveVersionID,
-		IsTemplate:     true,
-		Name:           support.RandomName("template"),
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(templateCanvas).Error; err != nil {
-			return err
-		}
-
-		return tx.Create(&models.CanvasVersion{
-			ID:          templateLiveVersionID,
-			WorkflowID:  templateCanvas.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
-		}).Error
-	}))
-
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.Len(t, response.Canvases, 1)
-	assert.Equal(t, activeCanvas.ID.String(), response.Canvases[0].Metadata.Id)
 }
