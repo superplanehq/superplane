@@ -104,9 +104,11 @@ export function useEditor({
     stagingResetNonce,
   });
 
+  const { reconcilePendingWithCommitted } = pending;
+
   useEffect(() => {
-    pending.reconcilePendingWithCommitted(committedContentByPath);
-  }, [committedContentByPath, pending.reconcilePendingWithCommitted]);
+    reconcilePendingWithCommitted(committedContentByPath);
+  }, [committedContentByPath, reconcilePendingWithCommitted]);
 
   const hasLocalFilesStaging = useMemo(
     () => computeLocalFilesStaging(pendingChanges, committedContentByPath),
