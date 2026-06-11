@@ -310,8 +310,8 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 3. **Wait for user** — user clicks "Start Building" or says yes
 4. **Use cached schemas** — by approval time you should already have the YAML/component fields from `superplane_component_schema`, researchers, or the quick reference. Do not read reference files again unless validation returns an unfamiliar field/channel error.
 5. **Build** — write app YAML to /tmp/canvas.yaml and Console YAML to /tmp/console.yaml when needed
-6. **Apply** — prefer `superplane_app` action `update_draft`; graph updates auto-layout by default. Use `superplane apps canvas update --draft -f /tmp/canvas.yaml` and `superplane apps console set --draft -f /tmp/console.yaml` only as a fallback
-7. **Verify** — after updates, prefer `superplane_app` action `read` for the draft; use one CLI `apps canvas get --draft -o yaml` or `apps console get --draft -o yaml` only as a fallback
+6. **Apply** — prefer `superplane_app` action `update_draft`; graph updates auto-layout by default. Use `superplane apps canvas update --draft-id <draft-id> -f /tmp/canvas.yaml` and `superplane apps console set --draft-id <draft-id> -f /tmp/console.yaml` only as a fallback
+7. **Verify** — after updates, prefer `superplane_app` action `read` for the draft; use one CLI `apps canvas get --draft-id <draft-id> -o yaml` or `apps console get --draft-id <draft-id> -o yaml` only as a fallback
 8. **Output** — :::draft-actions with version ID and summary using node chips
 
 Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` for the complete workflow with positioning rules.
@@ -345,6 +345,6 @@ The rich-ui-widgets skill has the full syntax.
 
 ## App Update Rules
 
-- **ALWAYS** update drafts only. Prefer `superplane_app` action `update_draft`; if using CLI fallback, use `--draft`: `superplane apps canvas update <id> --draft -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft -f /tmp/console.yaml` for Console changes
+- **ALWAYS** update drafts only. Prefer `superplane_app` action `update_draft`; if using CLI fallback, use `--draft-id <draft-id>`: `superplane apps canvas update --draft-id <draft-id> -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft-id <draft-id> -f /tmp/console.yaml` for Console changes
 - After successful draft updates, output `:::draft-actions` with the version ID
 - After update, verify once with `superplane_app` action `read`; use CLI get commands only as fallback

@@ -69,7 +69,7 @@ If both sides changed the same node but resulting structure is identical (same J
 
 `superplane apps change-requests get <change-request-id> [name-or-id]`
 
-`superplane apps change-requests create [name-or-id] [--version-id <id>] [--title <text>] [--description <text>]`
+`superplane apps change-requests create [name-or-id] [--draft-id <id>] [--title <text>] [--description <text>]`
 
 `superplane apps change-requests approve <change-request-id> [name-or-id]`
 
