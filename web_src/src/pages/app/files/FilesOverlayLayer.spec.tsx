@@ -28,7 +28,13 @@ vi.mock("@/hooks/useCanvasData", () => ({
     isLoading: false,
     error: null,
   }),
-  useCommitCanvasRepositoryFiles: () => ({
+  useStageRepositoryFiles: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useDiscardRepositoryFilePaths: () => ({
+    mutate: vi.fn(),
     mutateAsync: vi.fn(),
     isPending: false,
   }),
@@ -108,6 +114,35 @@ describe("FilesOverlayLayer", () => {
 
     expect(screen.queryByRole("button", { name: "Close canvas.yaml" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("monaco-stub")).not.toBeInTheDocument();
+  });
+
+  it("keeps the first edit after switching away and back to a repository file", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <FilesOverlayLayer
+        isFilesMode
+        canvasId="canvas-1"
+        isEditing
+        canWrite
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+      { wrapper: MemoryRouter },
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
+    await user.type(screen.getByTestId("monaco-stub"), "!");
+
+    await user.click(screen.getByRole("button", { name: "canvas.yaml" }));
+    await user.click(screen.getAllByRole("button", { name: "README.md" }).at(-1)!);
+
+    expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme!");
   });
 
   it("keeps repository file content when switching to and from generated files", async () => {

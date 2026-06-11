@@ -75,6 +75,9 @@ func CommitCanvasRepositoryFiles(
 		}
 	}
 
+	// Direct commit: write the spec straight into the draft version row and drop
+	// any staged edits for that version in the same transaction as the write so a
+	// CLI/API commit always supersedes pending staging atomically.
 	if len(specOps) > 0 {
 		if err := ApplyRepositorySpecFileOperations(
 			ctx,
@@ -87,6 +90,7 @@ func CommitCanvasRepositoryFiles(
 			webhookBaseURL,
 			authService,
 			resolvedAutoLayout,
+			true,
 			specOps,
 		); err != nil {
 			return nil, err
