@@ -626,6 +626,61 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		assert.Equal(t, 2, metadata["updatedCount"])
 		assert.Equal(t, 0, metadata["createdCount"])
 	})
+
+	t.Run("list mode treats blank-name matchList as insert-only", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{}
+
+		items := []any{
+			map[string]any{"uuid": "A", "name": "api"},
+			map[string]any{"uuid": "B", "name": "worker"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "apps",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "", "value": "item.uuid"},
+				},
+				"valueList": []map[string]any{
+					{"name": "uuid", "value": "item.uuid"},
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: items,
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					item := variables["item"].(map[string]any)
+					switch expression {
+					case "item.uuid":
+						return item["uuid"], nil
+					case "item.name":
+						return item["name"], nil
+					}
+					return expression, nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.addCalls)
+		assert.Equal(t, 0, memoryCtx.updateCalls)
+		assert.Equal(t, 0, memoryCtx.namespaceUpdateCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 0, metadata["updatedCount"])
+		assert.Equal(t, 2, metadata["createdCount"])
+	})
 }
 
 func TestUpsertMemorySetup(t *testing.T) {

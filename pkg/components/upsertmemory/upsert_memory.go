@@ -304,7 +304,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return err
 	}
 
-	insertOnly := len(spec.MatchList) == 0
+	insertOnly := len(memorywrite.FieldNames(spec.MatchList)) == 0
 
 	resolvedMatches, err := memorywrite.ResolveAllItemMatches(items, mode, spec.MatchList, ctx.Expressions)
 	if err != nil {
