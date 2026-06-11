@@ -66,7 +66,7 @@ func ListCanvasFoldersInTransaction(tx *gorm.DB, organizationID uuid.UUID) ([]Ca
 	var folders []CanvasFolder
 	err := tx.
 		Preload("Canvases", func(tx *gorm.DB) *gorm.DB {
-			return scopeAppCanvases(tx).Order("name ASC").Order("id ASC")
+			return tx.Order("name ASC").Order("id ASC")
 		}).
 		Where("organization_id = ?", organizationID).
 		Order("sort_order ASC").
