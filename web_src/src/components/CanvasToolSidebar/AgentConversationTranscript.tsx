@@ -217,20 +217,17 @@ function MessageImages({ images }: { images: AgentMessage["images"] }) {
 
   return (
     <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
-      {images.map((image, index) => {
-        const url = `data:${image.mediaType};base64,${image.data}`;
-        return (
-          <a
-            key={index}
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="block overflow-hidden rounded-md border border-slate-200"
-          >
-            <img src={url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
-          </a>
-        );
-      })}
+      {images.map((image, index) => (
+        <a
+          key={index}
+          href={image.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-md border border-slate-200"
+        >
+          <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+        </a>
+      ))}
     </div>
   );
 }

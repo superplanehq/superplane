@@ -99,6 +99,18 @@ func AppendAgentSessionMessage(msg *AgentSessionMessage) error {
 	return AppendAgentSessionMessageInTransaction(database.Conn(), msg)
 }
 
+func FindAgentSessionMessageInTransaction(tx *gorm.DB, id uuid.UUID) (*AgentSessionMessage, error) {
+	var message AgentSessionMessage
+	if err := tx.Where("id = ?", id).First(&message).Error; err != nil {
+		return nil, err
+	}
+	return &message, nil
+}
+
+func FindAgentSessionMessage(id uuid.UUID) (*AgentSessionMessage, error) {
+	return FindAgentSessionMessageInTransaction(database.Conn(), id)
+}
+
 // ListAgentSessionMessagesPage returns up to `limit` messages strictly older
 // than `before` (or the most recent `limit` when `before` is nil), in
 // chronological order (oldest-first). Used for tail-paginated chat scroll.

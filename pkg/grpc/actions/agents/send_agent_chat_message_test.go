@@ -141,7 +141,9 @@ func TestSendAgentChatMessage_ForwardsAndSerializesImages(t *testing.T) {
 	require.Len(t, forwarded, 1)
 	assert.Equal(t, "image/png", forwarded[0].MediaType)
 	require.Len(t, resp.Message.Images, 1)
-	assert.Equal(t, "aGVsbG8=", resp.Message.Images[0].Data)
+	assert.Equal(t, "image/png", resp.Message.Images[0].MediaType)
+	// Image bytes are served out-of-band, never embedded in the response.
+	assert.Empty(t, resp.Message.Images[0].Data)
 }
 
 func TestSendAgentChatMessage_RejectsInvalidImages(t *testing.T) {

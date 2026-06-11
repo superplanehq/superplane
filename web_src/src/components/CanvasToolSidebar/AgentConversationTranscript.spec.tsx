@@ -84,7 +84,7 @@ describe("ConversationTranscript user messages", () => {
           toolName: "",
           toolCallId: "",
           toolStatus: "",
-          images: [{ mediaType: "image/png", data: "aGVsbG8=" }],
+          images: [{ mediaType: "image/png", url: "/api/v1/agents/chats/c-1/messages/user-with-image/images/0" }],
           createdAt: null,
         },
       },
@@ -93,7 +93,7 @@ describe("ConversationTranscript user messages", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
 
     const image = screen.getByRole("img", { name: "attachment" });
-    expect(image).toHaveAttribute("src", "data:image/png;base64,aGVsbG8=");
+    expect(image).toHaveAttribute("src", "/api/v1/agents/chats/c-1/messages/user-with-image/images/0");
   });
 
   it("keeps compact user messages sticky", () => {

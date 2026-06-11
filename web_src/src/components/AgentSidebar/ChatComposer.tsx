@@ -7,12 +7,12 @@ import { MentionDropdown } from "./MentionDropdown";
 import { MentionTextarea } from "./MentionTextarea";
 import { ImageAttachmentPreviews } from "./ImageAttachmentPreviews";
 import { MAX_IMAGE_ATTACHMENTS, isSupportedImageFile, useImageAttachments } from "./useImageAttachments";
-import type { AgentMessageImage } from "@/components/CanvasToolSidebar/types";
+import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 
 type ChatComposerProps = {
-  onSend: (content: string, images: AgentMessageImage[]) => Promise<void>;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
   sending: boolean;
   sendPending: boolean;
@@ -87,7 +87,7 @@ export function ChatComposer({
 }
 
 type ComposerControllerArgs = {
-  onSend: (content: string, images: AgentMessageImage[]) => Promise<void>;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   sendPending: boolean;
   nodes?: SuperplaneComponentsNode[];
   runs?: CanvasesCanvasRun[];
