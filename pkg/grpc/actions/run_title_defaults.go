@@ -5,9 +5,9 @@ func defaultRunTitleExpression(triggerName string) string {
 }
 
 var defaultRunTitleExpressions = map[string]string{
-	"start":    "Event emitted by trigger",
-	"schedule": "Schedule",
-	"webhook":  "Webhook event",
+	"start":    "Manual run {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
+	"schedule": "Schedule {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
+	"webhook":  "Webhook {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.alarmName }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",
@@ -47,14 +47,14 @@ var defaultRunTitleExpressions = map[string]string{
 	"gcp.pubsub.onMessage":                    "{{ root().data.message.messageId }}",
 
 	"github.onBranchCreated":   "{{ root().data.ref }}",
-	"github.onCheckRun":        "{{ root().data.check_run.name }} {{ root().data.check_run.conclusion }} - {{ root().data.check_run.head_sha }}",
-	"github.onCommitStatus":    "{{ root().data.context }} {{ root().data.state }} - {{ root().data.sha }}",
+	"github.onCheckRun":        "{{ root().data.check_run.name }} {{ root().data.check_run.conclusion }} - {{ root().data.check_run.head_sha[:7] }}",
+	"github.onCommitStatus":    "{{ root().data.context }} {{ root().data.state }} - {{ root().data.sha[:7] }}",
 	"github.onIssue":           "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onIssueComment":    "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onPRComment":       "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onPRReviewComment": "#{{ root().data.pull_request.number }} - {{ root().data.pull_request.title }}",
 	"github.onPullRequest":     "#{{ root().data.number }} - {{ root().data.pull_request.title }}",
-	"github.onPush":            "{{ root().data.head_commit.message }}",
+	"github.onPush":            "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}",
 	"github.onRelease":         "{{ root().data.release.name }}",
 	"github.onTagCreated":      "{{ root().data.ref }}",
 	"github.onWorkflowRun":     "{{ root().data.workflow_run.display_title }}",

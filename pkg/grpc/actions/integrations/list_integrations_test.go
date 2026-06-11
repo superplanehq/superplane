@@ -131,7 +131,7 @@ func TestListIntegrationsAddsGlobalFieldsToLegacyTriggerCapabilities(t *testing.
 	require.Len(t, configuration, 1)
 	require.Equal(t, "customName", configuration[0].Name)
 	require.Equal(t, "Run title", configuration[0].Label)
-	require.Equal(t, "{{ root().data.head_commit.message }}", configuration[0].GetDefaultValue())
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", configuration[0].GetDefaultValue())
 }
 
 func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *testing.T) {
@@ -211,5 +211,5 @@ func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *t
 	require.Equal(t, "repository", configuration[0].Name)
 	require.Equal(t, "customName", configuration[1].Name)
 	require.Equal(t, "Run title", configuration[1].Label)
-	require.Equal(t, "{{ root().data.head_commit.message }}", configuration[1].GetDefaultValue())
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", configuration[1].GetDefaultValue())
 }
