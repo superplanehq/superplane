@@ -71,9 +71,12 @@ func serializeCanvasSummaries(canvases []models.Canvas) ([]*pb.CanvasSummary, er
 			Description: canvas.Description,
 			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:   &pb.UserRef{Id: canvas.CreatedBy.String(), Name: user.Name},
 			Edges:       actions.EdgesToProto(canvas.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
+		}
+
+		if user != nil {
+			protoCanvases[i].CreatedBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 		}
 
 		for _, node := range canvas.Nodes {

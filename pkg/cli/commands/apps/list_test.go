@@ -11,15 +11,11 @@ import (
 const canvasesListResponse = `{
 	"canvases": [
 		{
-			"metadata": {
-				"id": "canvas-001",
-				"name": "my-canvas",
-				"createdAt": "2025-01-15T10:00:00Z"
-			},
-			"spec": {
-				"nodes": [{"id": "node-1"}],
-				"edges": [{"id": "edge-1"}]
-			}
+			"id": "canvas-001",
+			"name": "my-canvas",
+			"createdAt": "2025-01-15T10:00:00Z",
+			"nodes": [{"id": "node-1"}],
+			"edges": [{"id": "edge-1"}]
 		}
 	]
 }`
