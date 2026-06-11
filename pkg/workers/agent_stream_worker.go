@@ -27,16 +27,17 @@ const (
 	maxConcurrentStreams       = 10
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
-	// stuckStreamGrace pads the per-turn timeout before the cleanup loop
-	// considers a "streaming" row leaked. A turn that legitimately ran for
-	// the full timeout should have been transitioned to idle or failed by
-	// then; anything still streaming past 2× is stuck.
-	stuckStreamGrace    = 2 * agentStreamTimeout
-	stuckCleanupCadence = 5 * time.Minute
+	streamHeartbeatInterval    = 30 * time.Second
+	stuckHeartbeatGrace        = 5 * time.Minute
+	// Must stay above agentStreamTimeout so long-but-healthy turns
+	// without a heartbeat yet aren't force-failed mid-flight.
+	stuckLegacyGrace    = 2 * agentStreamTimeout
+	stuckCleanupCadence = 1 * time.Minute
 )
 
 var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
+var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
@@ -108,17 +109,23 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 
 // dispatch acquires a concurrency slot before ACKing the queue message. If
 // another worker already owns the session lock, it durably reschedules the
-// message for the retry queue instead of dropping the follow-up turn.
+// message for the retry queue instead of dropping the follow-up turn. The
+// heartbeat starts before the slot wait so a backed-up queue can't let
+// the cleanup cutoff elapse before the worker claims the session.
 func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
+	stopHeartbeat := startDispatchHeartbeat(ctx, body)
+
 	select {
 	case w.slots <- struct{}{}:
 	case <-ctx.Done():
+		stopHeartbeat()
 		return ctx.Err()
 	}
 
 	request, err := prepareAgentStreamRequest(ctx, body)
 	if err != nil {
 		<-w.slots
+		stopHeartbeat()
 		if errors.Is(err, errAgentStreamAlreadyLocked) {
 			return w.rescheduleLockedRequest(ctx, body)
 		}
@@ -126,11 +133,13 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 	}
 	if request == nil {
 		<-w.slots
+		stopHeartbeat()
 		return nil
 	}
 
 	go func() {
 		defer func() {
+			stopHeartbeat()
 			request.unlock()
 			<-w.slots
 			if r := recover(); r != nil {
@@ -142,6 +151,22 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 		}
 	}()
 	return nil
+}
+
+// startDispatchHeartbeat returns a no-op stopper when the body is
+// unparseable so dispatch's return paths can call stop() unconditionally.
+func startDispatchHeartbeat(ctx context.Context, body []byte) func() {
+	var req messages.AgentStreamRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return func() {}
+	}
+	sessionID, err := uuid.Parse(req.SessionID)
+	if err != nil {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go runStreamHeartbeat(heartbeatCtx, sessionID)
+	return cancel
 }
 
 func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
@@ -170,8 +195,10 @@ func (w *AgentStreamWorker) cleanupTickSafely() {
 }
 
 func (w *AgentStreamWorker) cleanupStuckSessions() {
-	cutoff := time.Now().Add(-stuckStreamGrace)
-	closed, err := models.FailStuckStreamingSessions(cutoff)
+	now := time.Now()
+	heartbeatCutoff := now.Add(-stuckHeartbeatGrace)
+	legacyCutoff := now.Add(-stuckLegacyGrace)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
 	if err != nil {
 		log.WithError(err).Warn("agent stream cleanup: query failed")
 		return
@@ -318,13 +345,25 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		closeOpenTools(sessionID, publish)
 
 		if streamErr != nil {
-			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-			publish(messages.AgentSessionEventMessage{
-				Event:  "session_failed",
-				Status: models.AgentSessionStatusFailed,
-				Error:  streamErr.Error(),
-			})
-			log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			// Conditional on turnStartedAt so a stream that errors out
+			// after the user already hit Stop (InterruptSession bumps
+			// updated_at when it resets to idle) can't flip the row from
+			// idle back to failed and spook the UI.
+			markedFailed, err := models.UpdateAgentSessionStatusIfUnchanged(sessionID, models.AgentSessionStatusFailed, turnStartedAt)
+			if err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: failed to mark session failed")
+				return nil
+			}
+			if markedFailed {
+				publish(messages.AgentSessionEventMessage{
+					Event:  "session_failed",
+					Status: models.AgentSessionStatusFailed,
+					Error:  streamErr.Error(),
+				})
+				log.WithError(streamErr).WithField("session_id", sessionID).Warn("agent stream: provider stream ended with error")
+			} else {
+				log.WithError(streamErr).WithField("session_id", sessionID).Info("agent stream: stream errored but session was already reset; dropping failed event")
+			}
 			return nil
 		}
 
@@ -373,6 +412,9 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		if errors.Is(err, errCustomToolResultsRequired) {
 			err = nil
 		}
+		if errors.Is(err, errSessionAlreadyReset) {
+			return nil
+		}
 		if streamErr == nil && err != nil && !isContextCancel(err) {
 			streamErr = err
 		}
@@ -393,6 +435,16 @@ func handleProviderEvent(
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
+	// Drop late events from a turn the user has already stopped — closes
+	// the race between InterruptSession's commit and provider SSE bytes
+	// already in flight.
+	streaming, err := models.IsAgentSessionStreaming(sessionID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: status check failed; processing event anyway")
+	} else if !streaming {
+		return errSessionAlreadyReset
+	}
+
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
 		return persistAssistantEvent(sessionID, evt, publish)
@@ -751,6 +803,26 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 		ToolName:   m.ToolName,
 		ToolStatus: m.ToolStatus,
 		CreatedAt:  m.CreatedAt,
+	}
+}
+
+// runStreamHeartbeat writes once up front so cleanup can't race the first
+// tick, then ticks until the caller cancels.
+func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
+	if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: initial heartbeat failed")
+	}
+	ticker := time.NewTicker(streamHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := models.TouchAgentSessionHeartbeat(sessionID); err != nil {
+				log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: heartbeat failed")
+			}
+		}
 	}
 }
 

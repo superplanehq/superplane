@@ -156,7 +156,7 @@ function ExpandedAppList({ goTo, organizationId, ...props }: CanvasCommandListPr
       emptyLabel="No apps available."
       icon={Palette}
       onSelect={(canvas) => {
-        const id = canvas.metadata?.id;
+        const id = canvas.id;
         if (organizationId && id) goTo(appPath(organizationId, id));
       }}
     />

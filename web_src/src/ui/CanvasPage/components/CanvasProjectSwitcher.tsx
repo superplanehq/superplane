@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { Input } from "@/components/Input/input";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
@@ -45,11 +45,11 @@ const ACTIONS_TRIGGER_CLASS_NAME = cn(
   TRIGGER_SURFACE_CLASS_NAME,
 );
 
-function toCanvasProjectOptions(canvases: CanvasesCanvas[]): CanvasProjectOption[] {
+function toCanvasProjectOptions(canvases: CanvasesCanvasSummary[]): CanvasProjectOption[] {
   return canvases
     .map((canvas) => {
-      const id = canvas.metadata?.id;
-      const name = canvas.metadata?.name;
+      const id = canvas.id;
+      const name = canvas.name;
       if (!id || !name) {
         return null;
       }
