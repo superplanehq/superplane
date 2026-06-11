@@ -1,7 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -159,17 +159,15 @@ function EditModePublishDiscardActions({
   if (showStagingActions) {
     return (
       <div className="flex items-center gap-1.5">
+        {commitStagingPending ? (
+          <Loader2
+            className="size-4 shrink-0 animate-spin text-slate-400"
+            aria-label="Committing changes"
+            data-testid="canvas-commit-staging-spinner"
+          />
+        ) : null}
         {onResetStaging ? (
-          <UIButton
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onResetStaging()}
-            disabled={!!commitStagingPending}
-            data-testid="canvas-reset-staging-button"
-          >
-            Reset to last commit
-          </UIButton>
+          <ResetStagingButton onReset={() => onResetStaging()} disabled={!!commitStagingPending} />
         ) : null}
         <CommitStagingButton onCommit={() => onCommitStaging?.()} pending={!!commitStagingPending} />
       </div>
@@ -196,6 +194,29 @@ function EditModePublishDiscardActions({
   );
 }
 
+function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabled: boolean }) {
+  return (
+    <Tooltip delayDuration={2000}>
+      <TooltipTrigger asChild>
+        <UIButton
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
+          disabled={disabled}
+          data-testid="canvas-reset-staging-button"
+        >
+          Reset
+        </UIButton>
+      </TooltipTrigger>
+      <TooltipContent side="top">Reset to last commit</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// The label stays fixed (no "Committing…") so the button keeps a constant
+// width while a commit is in flight; the progress spinner lives to the left of
+// the Reset button instead.
 function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
   return (
     <UIButton
@@ -207,7 +228,7 @@ function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pend
       disabled={pending}
       data-testid="canvas-commit-staging-button"
     >
-      {pending ? "Committing…" : "Commit"}
+      Commit
     </UIButton>
   );
 }
