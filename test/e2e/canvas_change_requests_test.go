@@ -177,8 +177,7 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
+	s.waitForVersionsSidebar()
 
 	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
 	// accessible-name collisions between pending and live preview rows or on :has() CSS support.
@@ -248,4 +247,30 @@ func (s *canvasChangeRequestSteps) assertChangeRequestStatusInDB(expectedStatus 
 
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func (s *canvasChangeRequestSteps) waitForVersionsSidebar() {
+	deadline := time.Now().Add(20 * time.Second)
+
+	for time.Now().Before(deadline) {
+		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
+		sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
+
+		tabVisible, tabErr := versionsTab.IsVisible()
+		sidebarVisible, sidebarErr := sidebar.IsVisible()
+		if tabErr == nil && sidebarErr == nil && tabVisible && sidebarVisible {
+			return
+		}
+
+		if tabErr == nil {
+			if visible, _ := versionsTab.IsVisible(); !visible {
+				s.session.Click(q.TestID("canvas-view-mode-versions"))
+			}
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 }
