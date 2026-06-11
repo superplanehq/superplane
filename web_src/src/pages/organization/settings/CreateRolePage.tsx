@@ -170,7 +170,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
   },
   {
     category: "Canvases",
-    icon: "dashboard",
+    icon: "console",
     permissions: [
       {
         id: "canvas.read",
@@ -195,6 +195,22 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         category: "Canvases",
         resource: "canvases",
         action: "update",
+      },
+      {
+        id: "canvas.update_version",
+        name: "Edit Drafts",
+        description: "Create, update, and discard canvas drafts",
+        category: "Canvases",
+        resource: "canvases",
+        action: "update_version",
+      },
+      {
+        id: "canvas.publish",
+        name: "Publish Drafts",
+        description: "Publish canvas drafts",
+        category: "Canvases",
+        resource: "canvases",
+        action: "publish",
       },
       {
         id: "canvas.delete",

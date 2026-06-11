@@ -4,7 +4,7 @@ import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
 import type { SuperplaneActionsAction, SuperplaneComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
-import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 
 interface LatestTabProps {
   latestEvents: SidebarEvent[];

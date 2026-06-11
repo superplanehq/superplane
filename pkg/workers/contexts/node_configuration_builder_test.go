@@ -1,8 +1,11 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -74,6 +77,74 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "login", result["action"])
 	assert.Equal(t, "true", result["success"])
 	assert.Equal(t, "42", result["count"])
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"id":    json.Number("14000000"),
+				"small": json.Number("0.0000001"),
+			},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"id":    "{{ previous().id }}",
+		"small": "{{ previous().small }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "14000000", result["id"])
+	assert.Equal(t, "0.0000001", result["small"])
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"count": json.Number("42"),
+				"price": json.Number("10.5"),
+				"items": []any{json.Number("2")},
+			},
+		})
+
+	result, err := builder.ResolveExpression(`previous().count > 10 && previous().price + previous().items[0] == 12.5`)
+
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"count":   json.Number("10"),
+				"divisor": json.Number("3"),
+			},
+		})
+
+	result, err := builder.ResolveExpression(`previous().count / 3`)
+	require.NoError(t, err)
+	assert.InDelta(t, 10.0/3.0, result, 1e-9)
+
+	resultBoth, err := builder.ResolveExpression(`previous().count / previous().divisor`)
+	require.NoError(t, err)
+	assert.InDelta(t, 10.0/3.0, resultBoth, 1e-9)
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberRootPayloadExpressionsUseNumericTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{
+			"count": json.Number("42"),
+			"nested": map[string]any{
+				"price": json.Number("10.5"),
+			},
+		})
+
+	result, err := builder.ResolveExpression(`root().count >= 42 && root().nested.price * 2 == 21`)
+
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
@@ -1625,4 +1696,96 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "start"
+	forEachNode := "forEach"
+	waitNode := "wait"
+	displayNode := "display"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: forEachNode,
+				Name:   forEachNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "forEach"}}),
+			},
+			{
+				NodeID: waitNode,
+				Name:   waitNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "wait"}}),
+			},
+			{
+				NodeID: displayNode,
+				Name:   displayNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "display"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: forEachNode, Channel: "default"},
+			{SourceID: forEachNode, TargetID: waitNode, Channel: "item"},
+			{SourceID: waitNode, TargetID: displayNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		triggerNode,
+		"default",
+		nil,
+		map[string]any{"items": []any{"a", "b", "c"}},
+	)
+
+	forEachExecution := support.CreateCanvasNodeExecution(t, canvas.ID, forEachNode, rootEvent.ID, rootEvent.ID, nil)
+
+	now := time.Now()
+	emitItem := func(item string, index int) *models.CanvasEvent {
+		return support.EmitCanvasEventForNodeWithData(
+			t,
+			canvas.ID,
+			forEachNode,
+			"item",
+			&forEachExecution.ID,
+			map[string]any{"item": item, "index": index, "totalCount": 3},
+		)
+	}
+
+	_ = emitItem("a", 0)
+	branchEvent := emitItem("b", 1)
+	_ = emitItem("c", 2)
+
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).
+		Where("execution_id = ?", forEachExecution.ID).
+		Update("created_at", now).Error)
+
+	waitInput := map[string]any{"item": "b", "index": 1, "totalCount": 3}
+	waitExecution := support.CreateNextNodeExecution(t, canvas.ID, waitNode, rootEvent.ID, branchEvent.ID, &forEachExecution.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&waitExecution.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{waitNode: waitInput})
+
+	result, err := builder.Build(map[string]any{
+		"item": "{{ $[\"" + forEachNode + "\"].item }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "b", result["item"])
 }

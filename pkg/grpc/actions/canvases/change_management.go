@@ -15,11 +15,6 @@ func isChangeManagementEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models
 		return false, nil
 	}
 
-	// Template canvases are read-only and never use change management.
-	if canvas.IsTemplate {
-		return false, nil
-	}
-
 	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabledInTransaction(tx, canvas.OrganizationID)
 	if err != nil {
 		return false, err

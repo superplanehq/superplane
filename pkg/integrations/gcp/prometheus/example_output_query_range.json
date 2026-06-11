@@ -1,0 +1,25 @@
+{
+  "type": "gcp.prometheus.queryRange",
+  "data": {
+    "resultType": "matrix",
+    "seriesCount": 1,
+    "start": "2026-01-01T00:00:00Z",
+    "end": "2026-01-01T01:00:00Z",
+    "step": "60s",
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [1767225600, "1"],
+          [1767225660, "1"],
+          [1767225720, "0"]
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-01-01T01:00:00Z"
+}

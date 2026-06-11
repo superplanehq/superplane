@@ -1,18 +1,31 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
+import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const sendMutation = {
-  isPending: false,
-  mutateAsync: vi.fn(),
-};
+const { sendMutation, chatState } = vi.hoisted(() => ({
+  sendMutation: {
+    isPending: false,
+    mutateAsync: vi.fn(),
+  },
+  chatState: {
+    status: "idle",
+  },
+}));
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: () => ({ data: { spec: { nodes: [] } } }),
+  useCanvasVersions: () => ({ data: [] }),
+  useCanvasVersion: () => ({ data: null }),
+  useInfiniteCanvasRuns: () => ({ data: { pages: [] } }),
+}));
 
 vi.mock("@/hooks/useAgentChats", () => ({
-  useCanvasAgentChat: () => ({ data: { id: "chat-1" }, isLoading: false }),
+  useCanvasAgentChat: () => ({ data: { id: "chat-1", status: chatState.status }, isLoading: false }),
   useAgentChatMessages: () => ({
     data: {
       pages: [
@@ -75,144 +88,54 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
+    chatState.status = "idle";
+    sendMutation.isPending = false;
+    sendMutation.mutateAsync.mockReset();
+    sendMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
   });
 
-  it("enters runs mode from the runs tab", () => {
-    const onSelectRuns = vi.fn();
+  it("renders the agent panel when the sidebar is open", async () => {
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState()}
-        mode="version-live"
-        onSelectRuns={onSelectRuns}
-        runsContent={<div>Runs content</div>}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Runs" }));
-
-    expect(onSelectRuns).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Runs content")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
 
-  it("exits runs mode when switching back to the agent tab", () => {
-    const onExitRunsMode = vi.fn();
+  it("allows retrying a failed session", async () => {
+    const user = userEvent.setup();
+    chatState.status = "failed";
 
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState()}
-        mode="runs"
-        onExitRunsMode={onExitRunsMode}
-        runsContent={<div>Runs content</div>}
-      />,
-    );
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    expect(screen.getByText("Runs content")).toBeInTheDocument();
+    expect(await screen.findByText("Last turn failed")).toBeInTheDocument();
+    await user.type(screen.getByTestId("agent-input"), "retry");
+    await user.click(screen.getByTestId("agent-send-message-button"));
 
-    fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
-
-    expect(onExitRunsMode).toHaveBeenCalledTimes(1);
-    expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(sendMutation.mutateAsync).toHaveBeenCalledWith({ chatId: "chat-1", content: "retry", mode: "operator" });
   });
 
-  it("hides the agent tab when managed agents are disabled", () => {
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
-        runsContent={<div>Runs content</div>}
-      />,
-    );
+  it("does not render when managed agents are disabled", () => {
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })} />);
 
-    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Runs" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Versions" })).toBeInTheDocument();
-    expect(screen.getByText("Runs content")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
   });
 
-  it("does not switch from runs mode to the agent tab when managed agents are disabled", () => {
-    const onExitRunsMode = vi.fn();
+  it("does not render while the sidebar is closed", () => {
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false })} />);
 
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
-        mode="runs"
-        onExitRunsMode={onExitRunsMode}
-        runsContent={<div>Runs content</div>}
-      />,
-    );
-
-    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
-    expect(screen.getByText("Runs content")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
   });
 
-  it("falls back to runs when version control closes and managed agents are disabled", () => {
-    const toolSidebarState = makeToolSidebarState({ isAgentEnabled: false });
-    const { rerender } = render(
-      <CanvasToolSidebar
-        toolSidebarState={toolSidebarState}
-        isVersionControlOpen={true}
-        runsContent={<div>Runs content</div>}
-        versionsContent={<div>Versions content</div>}
-      />,
-    );
-
-    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Versions content")).toBeInTheDocument();
-
-    rerender(
-      <CanvasToolSidebar
-        toolSidebarState={toolSidebarState}
-        isVersionControlOpen={false}
-        runsContent={<div>Runs content</div>}
-        versionsContent={<div>Versions content</div>}
-      />,
-    );
-
-    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Runs content")).toBeInTheDocument();
-  });
-
-  it("enters versions from the versions tab", () => {
-    const onToggleVersionControl = vi.fn();
+  it("opens the sidebar when the agent tab event is dispatched", () => {
+    const openToolSidebar = vi.fn();
 
     render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState()}
-        mode="version-live"
-        isVersionControlOpen={false}
-        onToggleVersionControl={onToggleVersionControl}
-        versionsContent={<div>Versions content</div>}
-      />,
+      <CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false, openToolSidebar })} />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Versions" }));
+    window.dispatchEvent(new CustomEvent(CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT, { detail: { tab: "agent" } }));
 
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Versions content")).toBeInTheDocument();
-  });
-
-  it("exits versions when switching back to the agent tab", () => {
-    const onToggleVersionControl = vi.fn();
-
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={makeToolSidebarState()}
-        mode="version-live"
-        isVersionControlOpen={true}
-        onToggleVersionControl={onToggleVersionControl}
-        versionsContent={<div>Versions content</div>}
-      />,
-    );
-
-    expect(screen.getByText("Versions content")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
-
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
-    expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(openToolSidebar).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-render agent messages while typing in the composer", async () => {
@@ -220,13 +143,11 @@ describe("CanvasToolSidebar", () => {
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    // Initial message render.
     const messages = await screen.findAllByTestId("rich-message");
     expect(messages).toHaveLength(2);
     expect(messages[1]).toHaveTextContent("Hello from the agent");
     expect(richMessageRenderSpy).toHaveBeenCalledTimes(2);
 
-    // Typing only updates local composer state, so the message list should not re-render.
     await user.type(screen.getByTestId("agent-input"), "typing...");
     expect(richMessageRenderSpy).toHaveBeenCalledTimes(2);
   });
@@ -247,36 +168,12 @@ describe("CanvasToolSidebar", () => {
     await user.type(input, "first");
     await user.click(screen.getByTestId("agent-send-message-button"));
 
-    // While the first send is still pending, user can type a new message.
     await user.type(input, "second");
     expect(input).toHaveValue("second");
 
-    // Resolve the first send; the new draft should remain.
     await act(async () => {
       resolveSend?.();
     });
     expect(input).toHaveValue("second");
-  });
-
-  it("allows sending while an outcome is still active after the chat turn ends", async () => {
-    const user = userEvent.setup();
-    sessionStorage.setItem(
-      "outcome-chat-1",
-      JSON.stringify({
-        title: "Build plan",
-        criteria: [],
-        iteration: 1,
-        maxIterations: 3,
-        phase: "building",
-        log: [{ phase: "building" }],
-      }),
-    );
-
-    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
-
-    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
-
-    await user.type(screen.getByTestId("agent-input"), "Keep going");
-    expect(screen.getByTestId("agent-send-message-button")).toBeEnabled();
   });
 });

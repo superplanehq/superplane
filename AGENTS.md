@@ -9,11 +9,12 @@
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
 - Integration component implementations: pkg/integrations/<integration>/
-- Workflow v2 UI component mappers: web_src/src/pages/workflowv2/mappers/<integration>/
+- UI component mappers: web_src/src/pages/app/mappers/<integration>/
 
 ## Pull Request Guidelines
 
 - PR titles must follow Conventional Commits and include a release-type prefix: `feat:`, `fix:`, `chore:`, or `docs:` (CI enforces this).
+- All commits must include a DCO sign-off trailer (`Signed-off-by: Name <email>`). Use `git commit -s` or `git commit --amend -s` when creating or updating commits.
 
 ## Build, Test, and Development Commands
 
@@ -43,6 +44,7 @@
 
 ## Coding Style & Naming Conventions
 
+- Always write clean code: work test-first by default, then keep names clear, functions focused, side effects explicit, control flow shallow, and error handling useful.
 - Tests end with \_test.go
 - Always prefer early returns over else blocks when possible
 - GoLang: prefer `any` over `interface{}` types
@@ -76,6 +78,18 @@ When working with database transactions, follow these rules to ensure data consi
   - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
 
 **Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
+
+### Model file layout (`pkg/models`)
+
+Order declarations in each model file as follows:
+
+1. **Struct** — package constants used by the model, then the struct type
+2. **Constructors** — `New…` functions that build values for the model (including name/ID helpers)
+3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors)
+4. **Conn wrappers** — functions that call `…InTransaction(database.Conn(), …)` (or start a transaction with `database.Conn().Transaction` when the whole operation must be atomic)
+5. **InTransaction methods** — functions whose first parameter is `tx *gorm.DB`
+
+List all conn wrappers before all `…InTransaction` methods (sections 4 then 5). Place private helpers after the public API in the file.
 
 ## Cursor Cloud specific instructions
 

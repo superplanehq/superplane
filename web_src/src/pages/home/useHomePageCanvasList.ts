@@ -1,4 +1,4 @@
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import {
   CANVAS_FOLDER_COLORS,
   DEFAULT_CANVAS_FOLDER_COLOR,
@@ -6,7 +6,6 @@ import {
   useCanvases,
   type CanvasFolderColor,
 } from "@/hooks/useCanvasData";
-import { generateUntitledAppName } from "@/lib/untitledAppName";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
@@ -22,13 +21,8 @@ function formatCanvasDate(value?: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
-  const metadata = canvas.metadata;
-  if (!metadata) {
-    return null;
-  }
-
-  const { id, name, createdBy } = metadata;
+function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null {
+  const { id, name, createdBy } = canvas;
   const createdByName = createdBy?.name;
   if (!id || !name || !createdByName) {
     return null;
@@ -37,12 +31,12 @@ function toCanvasCardData(canvas: CanvasesCanvas): CanvasCardData | null {
   return {
     id,
     name,
-    description: metadata.description,
-    createdAt: formatCanvasDate(metadata.createdAt),
-    canvasFolderId: metadata.folderId || undefined,
+    description: canvas.description,
+    createdAt: formatCanvasDate(canvas.createdAt),
+    canvasFolderId: canvas.folderId || undefined,
     createdBy: { name: createdByName },
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
+    nodes: canvas.nodes || [],
+    edges: canvas.edges || [],
   };
 }
 
@@ -74,11 +68,13 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
   const {
     data: canvasesData = [],
     isLoading: canvasesLoading,
+    isFetching: canvasesFetching,
     error: canvasesApiError,
   } = useCanvases(organizationId || "");
   const {
     data: canvasFoldersData = [],
     isLoading: canvasFoldersLoading,
+    isFetching: canvasFoldersFetching,
     error: canvasFoldersApiError,
   } = useCanvasFolders(organizationId || "");
 
@@ -96,7 +92,7 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
     canvasFolders,
     filteredCanvases: filterCanvasesByQuery(canvases, searchQuery),
     isLoading: canvasesLoading || canvasFoldersLoading,
+    isFetching: canvasesFetching || canvasFoldersFetching,
     canvasError: canvasesApiError || canvasFoldersApiError ? "Failed to fetch canvases. Please try again later." : null,
-    defaultAppName: generateUntitledAppName(canvases.map((canvas) => canvas.name)),
   };
 }

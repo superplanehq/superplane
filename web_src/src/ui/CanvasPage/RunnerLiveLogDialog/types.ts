@@ -1,4 +1,4 @@
-import type { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
+import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 
 export type RunnerLiveLogDialogProps = {
   title: string;
@@ -6,10 +6,14 @@ export type RunnerLiveLogDialogProps = {
   execution: ExecutionInfo | null;
 };
 
+export function isExecutionInFlight(execution: ExecutionInfo): boolean {
+  return execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED";
+}
+
 export type LiveLogRecord =
   | { type: "line"; text: string }
   | { type: "error"; message: string }
-  | { type: "cmd_start"; index: number; text: string }
+  | { type: "cmd_start"; index: number; text: string; started_at?: number }
   | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number };
 
 export type CommandSection = {
@@ -18,6 +22,7 @@ export type CommandSection = {
   lines: string[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
+  started_at: number | null;
   collapsed: boolean;
 };
 

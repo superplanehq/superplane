@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,7 +18,7 @@ import (
 const (
 	defaultBaseURL             = "https://api.anthropic.com/v1"
 	anthropicVersionValue      = "2023-06-01"
-	anthropicBetaManagedAgents = "managed-agents-2026-04-01"
+	anthropicBetaManagedAgents = "managed-agents-2026-04-01,files-api-2025-04-14"
 	sessionEventsPageLimit     = "20"
 )
 
@@ -40,6 +42,13 @@ type CreateManagedSessionRequest struct {
 	AgentVersion  *int
 	EnvironmentID string
 	VaultIDs      []string
+	Resources     []FileResource
+}
+
+// FileResource is a file uploaded via the Files API to mount into the session.
+type FileResource struct {
+	FileID    string
+	MountPath string
 }
 
 // ManagedSession is a subset of the session resource returned by the API.
@@ -58,11 +67,19 @@ type ManagedSessionContentBlock struct {
 	Text string `json:"text,omitempty"`
 }
 
+// sessionResourceBody is a file resource mounted into the session.
+type sessionResourceBody struct {
+	Type      string `json:"type"`
+	FileID    string `json:"file_id"`
+	MountPath string `json:"mount_path"`
+}
+
 // createManagedSessionBody is the JSON body for session creation.
 type createManagedSessionBody struct {
-	Agent         any      `json:"agent"`
-	EnvironmentID string   `json:"environment_id"`
-	VaultIDs      []string `json:"vault_ids,omitempty"`
+	Agent         any                   `json:"agent"`
+	EnvironmentID string                `json:"environment_id"`
+	VaultIDs      []string              `json:"vault_ids,omitempty"`
+	Resources     []sessionResourceBody `json:"resources,omitempty"`
 }
 
 type userMessageTextBlock struct {
@@ -122,11 +139,24 @@ func buildCreateSessionBody(req CreateManagedSessionRequest) (createManagedSessi
 		}
 	}
 
-	return createManagedSessionBody{
+	body := createManagedSessionBody{
 		Agent:         agent,
 		EnvironmentID: req.EnvironmentID,
 		VaultIDs:      nonEmptyStrings(req.VaultIDs),
-	}, nil
+	}
+
+	if len(req.Resources) > 0 {
+		body.Resources = make([]sessionResourceBody, len(req.Resources))
+		for i, r := range req.Resources {
+			body.Resources[i] = sessionResourceBody{
+				Type:      "file",
+				FileID:    r.FileID,
+				MountPath: r.MountPath,
+			}
+		}
+	}
+
+	return body, nil
 }
 
 func nonEmptyStrings(in []string) []string {
@@ -208,6 +238,86 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 	return out.Data, out.NextPage, nil
 }
 
+// SessionMessages holds all agent messages and completion status from a session's events.
+type SessionMessages struct {
+	Messages    []string // all agent.message texts in chronological order
+	LastMessage string   // the final agent.message text
+	Complete    bool     // true if session.status_idle or session.status_terminated is in the events
+}
+
+func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) {
+	result := &SessionMessages{}
+	page := ""
+	var allEvents []ManagedSessionEvent
+
+	// Fetch all events (desc order from API)
+	for {
+		events, nextPage, err := c.listManagedSessionEventsPage(sessionID, page)
+		if err != nil {
+			return nil, err
+		}
+		allEvents = append(allEvents, events...)
+		if nextPage == "" {
+			break
+		}
+		page = nextPage
+	}
+
+	// Check for terminal event (events are in desc order, so status_idle is first)
+	for _, e := range allEvents {
+		if e.Type == "session.status_idle" || e.Type == "session.status_terminated" {
+			result.Complete = true
+			break
+		}
+	}
+
+	// Collect agent messages in chronological order (reverse the desc list)
+	for i := len(allEvents) - 1; i >= 0; i-- {
+		e := allEvents[i]
+		if e.Type == "agent.message" || e.Type == "assistant.message" {
+			text := lastAgentMessageFromEvents([]ManagedSessionEvent{e})
+			if text != "" {
+				result.Messages = append(result.Messages, text)
+			}
+		}
+	}
+
+	if len(result.Messages) > 0 {
+		result.LastMessage = result.Messages[len(result.Messages)-1]
+	}
+
+	return result, nil
+}
+
+// GetSessionMessagesWithRetry polls until events are fully written
+// (session.status_idle present) or retries are exhausted.
+func (c *Client) GetSessionMessagesWithRetry(sessionID string, attempts int, delay time.Duration) (*SessionMessages, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var result *SessionMessages
+	for i := 0; i < attempts; i++ {
+		var err error
+		result, err = c.GetSessionMessages(sessionID)
+		if err != nil {
+			return nil, err
+		}
+
+		// If events are fully written, we have everything
+		if result.Complete {
+			return result, nil
+		}
+
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
+	}
+
+	return result, nil
+}
+
+// Deprecated: use GetSessionMessages instead.
 func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, []ManagedSessionEvent, error) {
 	seen := []ManagedSessionEvent{}
 	page := ""
@@ -235,16 +345,19 @@ func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, at
 	var events []ManagedSessionEvent
 	for i := 0; i < attempts; i++ {
 		var err error
-		message, events, err := c.GetLastManagedSessionAgentMessage(sessionID)
+		var message string
+		message, events, err = c.GetLastManagedSessionAgentMessage(sessionID)
 		if err != nil {
 			return "", events, err
 		}
 
-		if message != "" || i == attempts-1 {
+		if message != "" {
 			return message, events, nil
 		}
 
-		time.Sleep(delay)
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
 	}
 	return "", events, nil
 }
@@ -322,6 +435,78 @@ func (c *Client) SendManagedSessionInterrupt(sessionID string) error {
 	return err
 }
 
+// UploadFile uploads a file to the Anthropic Files API and returns its ID.
+// The file can then be mounted into a session via CreateManagedSessionRequest.Resources.
+// AddSessionResource attaches a file resource to an existing session.
+// POST /v1/sessions/{id}/resources
+func (c *Client) AddSessionResource(sessionID string, resource FileResource) error {
+	if sessionID == "" {
+		return fmt.Errorf("session id is required")
+	}
+	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/resources"
+	body := map[string]string{
+		"type":       "file",
+		"file_id":    resource.FileID,
+		"mount_path": resource.MountPath,
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal resource: %w", err)
+	}
+	_, err = c.execRequestWithBeta(http.MethodPost, URL, bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	return err
+}
+
+func (c *Client) UploadFile(content io.Reader, filename string) (string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filepath.Base(filename))
+	if err != nil {
+		return "", fmt.Errorf("create multipart file: %w", err)
+	}
+	if _, err := io.Copy(part, content); err != nil {
+		return "", fmt.Errorf("copy file content: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/files", &body)
+	if err != nil {
+		return "", fmt.Errorf("build upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersionValue)
+	req.Header.Set("anthropic-beta", anthropicBetaManagedAgents)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("upload file: %w", err)
+	}
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("read upload response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return "", fmt.Errorf("upload file failed (%d): %s", res.StatusCode, string(resBody))
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(resBody, &result); err != nil {
+		return "", fmt.Errorf("decode upload response: %w", err)
+	}
+	if result.ID == "" {
+		return "", fmt.Errorf("upload returned empty file ID")
+	}
+	return result.ID, nil
+}
+
 // DeleteManagedSession removes a session (DELETE /v1/sessions/{id}).
 // The API does not allow deleting a running session without interrupting first.
 func (c *Client) DeleteManagedSession(sessionID string) error {
@@ -330,6 +515,92 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 	}
 	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID)
 	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
+	return err
+}
+
+// DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
+func (c *Client) DeleteFile(fileID string) error {
+	if fileID == "" {
+		return nil
+	}
+	URL := c.BaseURL + "/files/" + url.PathEscape(fileID)
+	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
+	return err
+}
+
+// CleanupFiles deletes a list of uploaded files, logging failures.
+func (c *Client) CleanupFiles(fileIDs []string, logWarn func(string, ...any)) {
+	for _, id := range fileIDs {
+		if err := c.DeleteFile(id); err != nil {
+			if logWarn != nil {
+				logWarn("Failed to delete uploaded file %s: %v", id, err)
+			}
+		}
+	}
+}
+
+// CreateVault creates a temporary vault and returns its ID.
+func (c *Client) CreateVault(displayName string, metadata map[string]string) (string, error) {
+	payload := map[string]any{"display_name": displayName}
+	if len(metadata) > 0 {
+		payload["metadata"] = metadata
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal vault request: %w", err)
+	}
+	respBody, err := c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/vaults", bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	if err != nil {
+		return "", err
+	}
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("decode vault response: %w", err)
+	}
+	if result.ID == "" {
+		return "", fmt.Errorf("vault creation returned empty ID")
+	}
+	return result.ID, nil
+}
+
+// CreateEnvVarCredential adds an environment_variable credential to a vault.
+// The secret is injected at the network egress layer; the agent never sees the raw value.
+func (c *Client) CreateEnvVarCredential(vaultID, displayName, envName, secretValue string, allowedHosts []string) error {
+	if vaultID == "" || envName == "" || secretValue == "" {
+		return fmt.Errorf("vaultID, envName, and secretValue are required")
+	}
+	networking := map[string]any{"type": "unrestricted"}
+	if len(allowedHosts) > 0 {
+		networking = map[string]any{
+			"type":          "limited",
+			"allowed_hosts": allowedHosts,
+		}
+	}
+	payload := map[string]any{
+		"display_name": displayName,
+		"auth": map[string]any{
+			"type":         "environment_variable",
+			"secret_name":  envName,
+			"secret_value": secretValue,
+			"networking":   networking,
+		},
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal credential request: %w", err)
+	}
+	_, err = c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/vaults/"+url.PathEscape(vaultID)+"/credentials", bytes.NewBuffer(b), anthropicBetaManagedAgents)
+	return err
+}
+
+// DeleteVault removes a vault and its credentials.
+func (c *Client) DeleteVault(vaultID string) error {
+	if vaultID == "" {
+		return nil
+	}
+	_, err := c.execRequestWithBeta(http.MethodDelete, c.BaseURL+"/vaults/"+url.PathEscape(vaultID), nil, anthropicBetaManagedAgents)
 	return err
 }
 

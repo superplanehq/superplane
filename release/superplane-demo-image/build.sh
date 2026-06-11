@@ -18,12 +18,21 @@ ARCH="$2"
 
 IMAGE_REPO="${DEMO_IMAGE_REPO:-ghcr.io/superplanehq/superplane-demo}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.1}"
+
+cd "${REPO_ROOT}"
+
 if [ ! -f "pkg/protos/me/me.pb.go" ] || [ ! -f "pkg/protos/me/me.pb.gw.go" ]; then
   echo "Generating protobuf files"
   make dev.up
   make pb.gen.models
   make pb.gen.gateway
 fi
+
+bash "${SCRIPT_DIR}/download-supergit.sh" "${SUPERGIT_VERSION}" "${ARCH}"
 
 echo "Building SuperPlane demo image (${IMAGE_REPO})"
 
@@ -32,6 +41,7 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
+  --target demo \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
-  -f release/superplane-demo-image/Dockerfile \
+  -f Dockerfile \
   .

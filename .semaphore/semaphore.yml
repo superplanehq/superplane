@@ -61,7 +61,6 @@ blocks:
             - make check.components.docs
             - make check.format.go
             - make check.example.payloads
-            - make check.templates
             - make check.generated.artifacts
 
       epilogue:

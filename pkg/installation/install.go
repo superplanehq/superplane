@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -36,6 +37,7 @@ type Service struct {
 	Registry        *registry.Registry
 	Encryptor       crypto.Encryptor
 	AuthService     authorization.Authorization
+	GitProvider     git.Provider
 	WebhooksBaseURL string
 	UsageService    usage.Service
 }
@@ -84,6 +86,14 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, err
 	}
 
+	// Pre-parse the optional console.yaml from the same ref. Doing this
+	// before CreateCanvas means a malformed console aborts the install
+	// without leaving an orphan canvas behind.
+	console, err := FetchConsole(repo, repo.Ref)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
 	canvas.Metadata.Name = name
 
 	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
@@ -92,6 +102,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		s.Registry,
 		s.Encryptor,
 		s.AuthService,
+		s.GitProvider,
 		s.WebhooksBaseURL,
 		req.OrganizationID,
 		canvas,
@@ -111,10 +122,47 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, fmt.Errorf("failed to install app")
 	}
 
+	if err := persistInstalledConsole(canvasID, console); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to install console: %v", err)
+	}
+
 	return &InstallResult{
 		CanvasID:       canvasID,
 		OrganizationID: req.OrganizationID.String(),
 	}, nil
+}
+
+// persistInstalledConsole writes the optional console for a freshly created
+// canvas. A nil console is a no-op (the repo did not ship a console.yaml).
+//
+// Note: this runs after canvases.CreateCanvas, in its own transaction. If the
+// upsert fails, the canvas already exists; the user can re-import the console
+// from the UI. We accept that trade-off to avoid changing CreateCanvas's
+// signature just for this side-effect.
+func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error {
+	if console == nil {
+		return nil
+	}
+
+	canvasUUID, err := uuid.Parse(canvasID)
+	if err != nil {
+		return fmt.Errorf("invalid canvas id %q: %w", canvasID, err)
+	}
+
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		version, findErr := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
+		if findErr != nil {
+			return findErr
+		}
+
+		_, err := models.UpdateCanvasVersionConsoleInTransaction(
+			tx,
+			version,
+			console.Spec.Panels,
+			console.Spec.Layout,
+		)
+		return err
+	})
 }
 
 func FindActiveUserForAccountInOrganization(accountID, organizationID uuid.UUID) (*models.User, error) {

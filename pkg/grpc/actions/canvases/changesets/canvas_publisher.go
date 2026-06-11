@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -52,6 +54,7 @@ type CanvasPublisher struct {
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
+	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -214,6 +217,10 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	//
 	// TODO: handle blueprint nodes once blueprints are enabled again
 	//
+	appInstallationID, err := p.getNodeIntegrationID(node)
+	if err != nil {
+		return err
+	}
 
 	now := time.Now()
 	newNode := models.CanvasNode{
@@ -226,7 +233,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
-		AppInstallationID: p.getNodeIntegrationID(node),
+		AppInstallationID: appInstallationID,
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
 	}
@@ -248,7 +255,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	// so when we Setup() it, the contexts can create
 	// records pointing to the new workflow_node record.
 	//
-	err := p.tx.Create(&newNode).Error
+	err = p.tx.Create(&newNode).Error
 	if err != nil {
 		return err
 	}
@@ -299,6 +306,10 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	//
 	// TODO: handle blueprint nodes once blueprints are enabled again
 	//
+	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
+	if err != nil {
+		return err
+	}
 
 	//
 	// If node update led to an error, set the node to error state.
@@ -322,7 +333,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
-	existingNode.AppInstallationID = p.getNodeIntegrationID(updatedNode)
+	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 
 	//
@@ -339,7 +350,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	// we propagate that into the finalNodes that are
 	// going to be saved into workflow_versions.nodes.
 	//
-	err := p.setupNode(ctx, &existingNode)
+	err = p.setupNode(ctx, &existingNode)
 	if err != nil {
 		errorMsg := err.Error()
 		existingNode.State = models.CanvasNodeStateError
@@ -362,17 +373,30 @@ func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {
 	return models.DeleteCanvasNode(p.tx, existingNode)
 }
 
-func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) *uuid.UUID {
+func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, error) {
 	//
 	// Only integration-based nodes have an integration ID,
 	// so we must return nil for other node types.
 	//
 	if node.IntegrationID == nil || strings.TrimSpace(*node.IntegrationID) == "" {
-		return nil
+		return nil, nil
 	}
 
-	id := uuid.MustParse(*node.IntegrationID)
-	return &id
+	id, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
+	if err != nil {
+		return nil, nil
+	}
+
+	_, err = models.FindIntegrationInTransaction(p.tx, p.options.OrgID, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &id, nil
 }
 
 func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode) error {
@@ -441,6 +465,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
+		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
 	}
 
 	if node.AppInstallationID != nil {

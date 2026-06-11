@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -19,12 +20,26 @@ func NewCanvasMemoryContext(tx *gorm.DB, canvasID uuid.UUID) *CanvasMemoryContex
 }
 
 func (c *CanvasMemoryContext) Add(namespace string, values any) error {
+	_, err := c.AddRecord(namespace, values)
+	return err
+}
+
+func (c *CanvasMemoryContext) AddRecord(namespace string, values any) (core.CanvasMemoryRecord, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
-		return fmt.Errorf("namespace is required")
+		return core.CanvasMemoryRecord{}, fmt.Errorf("namespace is required")
 	}
 
-	return models.AddCanvasMemoryInTransaction(c.tx, c.canvasID, namespace, values)
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return core.CanvasMemoryRecord{}, err
+	}
+
+	record, err := models.AddCanvasMemoryRecordInTransaction(c.tx, c.canvasID, namespace, values)
+	if err != nil {
+		return core.CanvasMemoryRecord{}, err
+	}
+
+	return canvasMemoryRecord(record), nil
 }
 
 func (c *CanvasMemoryContext) Find(namespace string, matches map[string]any) ([]any, error) {
@@ -69,6 +84,10 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 		return nil, fmt.Errorf("namespace is required")
 	}
 
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
+	}
+
 	records, err := models.DeleteCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches)
 	if err != nil {
 		return nil, err
@@ -83,9 +102,22 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 }
 
 func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, values map[string]any) ([]any, error) {
+	records, err := c.UpdateRecords(namespace, matches, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasMemoryRecordValues(records), nil
+}
+
+func (c *CanvasMemoryContext) UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
+	}
+
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
 	}
 
 	records, err := models.UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches, values)
@@ -93,10 +125,70 @@ func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, v
 		return nil, err
 	}
 
-	updatedValues := make([]any, 0, len(records))
-	for _, record := range records {
-		updatedValues = append(updatedValues, record.Values.Data())
+	return canvasMemoryRecords(records), nil
+}
+
+func (c *CanvasMemoryContext) UpdateNamespace(namespace string, values map[string]any) ([]any, error) {
+	records, err := c.UpdateNamespaceRecords(namespace, values)
+	if err != nil {
+		return nil, err
 	}
 
-	return updatedValues, nil
+	return canvasMemoryRecordValues(records), nil
+}
+
+func (c *CanvasMemoryContext) UpdateNamespaceRecords(namespace string, values map[string]any) ([]core.CanvasMemoryRecord, error) {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
+	}
+
+	records, err := models.UpdateCanvasMemoriesByNamespaceInTransaction(c.tx, c.canvasID, namespace, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasMemoryRecords(records), nil
+}
+
+// ensureNodeWritable returns an error if the namespace is currently owned by
+// manually-created memory, preventing node executions from mutating it.
+func (c *CanvasMemoryContext) ensureNodeWritable(namespace string) error {
+	source, err := models.CanvasMemoryNamespaceSourceInTransaction(c.tx, c.canvasID, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to check memory namespace ownership: %w", err)
+	}
+
+	if source == models.CanvasMemorySourceManual {
+		return fmt.Errorf("cannot modify manually-managed memory namespace %q", namespace)
+	}
+
+	return nil
+}
+
+func canvasMemoryRecord(record models.CanvasMemory) core.CanvasMemoryRecord {
+	return core.CanvasMemoryRecord{
+		ID:     record.ID,
+		Values: record.Values.Data(),
+	}
+}
+
+func canvasMemoryRecords(records []models.CanvasMemory) []core.CanvasMemoryRecord {
+	out := make([]core.CanvasMemoryRecord, 0, len(records))
+	for _, record := range records {
+		out = append(out, canvasMemoryRecord(record))
+	}
+	return out
+}
+
+func canvasMemoryRecordValues(records []core.CanvasMemoryRecord) []any {
+	values := make([]any, 0, len(records))
+	for _, record := range records {
+		values = append(values, record.Values)
+	}
+	return values
 }

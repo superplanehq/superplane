@@ -38,7 +38,7 @@ export function RunnerLiveLogDialog({ title, canvasMode, execution }: RunnerLive
           </DialogHeader>
 
           <div className="min-h-0 flex-1 bg-slate-50">
-            <LiveLogStreamView executionId={execution.id} />
+            <LiveLogStreamView execution={execution} />
           </div>
         </DialogContent>
       </Dialog>

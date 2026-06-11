@@ -32,6 +32,9 @@ function resolveCategoryIcon(categoryName: string, integrationName: string) {
   if (categoryName === "Core") {
     return resolveIcon("zap");
   }
+  if (categoryName === "Runners") {
+    return resolveIcon("terminal");
+  }
   if (categoryName === "Debugging") {
     return resolveIcon("bug");
   }
@@ -93,7 +96,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
 
       <ItemContent>
         <div className="flex items-center gap-2 w-full min-w-0">
-          <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
+          <ItemTitle className="text-[13px] font-normal min-w-0 flex-1 w-0 overflow-hidden">
             <span className="block min-w-0 truncate">{block.label || block.name}</span>
           </ItemTitle>
           <span

@@ -83,6 +83,13 @@ func canvasResourceResolver(req any) []string {
 }
 
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
+	return &AuthorizationInterceptor{
+		authService: authService,
+		rules:       DefaultAuthorizationRules(),
+	}
+}
+
+func DefaultAuthorizationRules() map[string]AuthorizationRule {
 	rules := map[string]AuthorizationRule{
 		// Secrets rules
 		pbSecrets.Secrets_CreateSecret_FullMethodName:     {Resource: "secrets", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -200,6 +207,24 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: defaultResourceResolver,
 		},
+		pbCanvases.Canvases_GetCanvasRepository_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasRepositoryFiles_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_CommitCanvasRepositoryFiles_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update_version",
@@ -215,12 +240,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_DescribeCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
@@ -369,6 +388,18 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
+		pbCanvases.Canvases_CreateCanvasMemoryNamespace_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_UpdateCanvasMemoryNamespace_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 		pbCanvases.Canvases_CancelExecution_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
@@ -405,18 +436,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_GetCanvasDashboard_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_UpdateCanvasDashboard_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -427,10 +446,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbServiceAccounts.ServiceAccounts_RegenerateServiceAccountToken_FullMethodName: {Resource: "service_accounts", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
-	return &AuthorizationInterceptor{
-		authService: authService,
-		rules:       rules,
-	}
+	return rules
 }
 
 func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {

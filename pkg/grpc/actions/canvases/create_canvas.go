@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -32,6 +33,7 @@ func CreateCanvas(
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
+	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
 	pbCanvas *pb.Canvas,
@@ -44,10 +46,6 @@ func CreateCanvas(
 
 	if pbCanvas.GetMetadata() == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
-	}
-
-	if pbCanvas.Metadata.GetIsTemplate() {
-		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
 	}
 
 	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
@@ -120,7 +118,6 @@ func CreateCanvas(
 		ID:             canvasID,
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
-		IsTemplate:     false,
 		Name:           name,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
@@ -167,6 +164,15 @@ func CreateCanvas(
 			return err
 		}
 
+		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+			OrganizationID: organizationID,
+			CanvasID:       canvasID,
+		}))
+
+		if err != nil {
+			return err
+		}
+
 		//
 		// If this is a canvas creation with no nodes,
 		// nothing else to do here.
@@ -202,6 +208,7 @@ func CreateCanvas(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
+			GitProvider:    gitProvider,
 		})
 
 		if err != nil {
