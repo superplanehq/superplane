@@ -23,6 +23,7 @@ type Spec struct {
 	EnvironmentID string   `json:"environmentId" mapstructure:"environmentId"`
 	Prompt        string   `json:"prompt" mapstructure:"prompt"`
 	VaultIDs      []string `json:"vaultIds" mapstructure:"vaultIds"`
+	Files         []string `json:"files" mapstructure:"files"`
 }
 
 // ExecutionMetadata is persisted for the run.

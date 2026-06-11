@@ -101,6 +101,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
 			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
 		}
+		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 		return nil
 	}
 
@@ -137,5 +138,6 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	}
 	// Best effort cleanup; may fail if session is still running.
 	_ = client.DeleteManagedSession(metadata.Session.ID)
+	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 	return nil
 }
