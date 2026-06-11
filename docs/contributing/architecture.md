@@ -69,6 +69,16 @@ SuperPlane uses a multi-layered security model to authenticate users and enforce
 
 This architecture ensures that all API requests are authenticated and authorized before accessing any resources, with complete isolation between organizations.
 
+### Organization Invitation Authentication
+
+Organizations can control which sign-in methods are allowed to complete pending email invitations automatically.
+
+- `allowed_oauth_providers` (API field `allowedOauthProviders`) stores the OAuth provider IDs that may auto-accept pending email invitations after OAuth sign-in, such as `github` or `google`.
+- An empty OAuth provider list means no OAuth provider restriction, so any configured OAuth provider may complete a pending email invitation.
+- `allow_direct_email_invite_completion` (API field `allowDirectEmailInviteCompletion`) controls whether non-OAuth sign-in paths, including email, magic link, and password login, may auto-accept pending email invitations.
+- These settings do not apply to shareable invite-link acceptance, which remains a separate invitation path.
+- The controls are exposed through the organization API, organization settings UI, and `superplane organizations update`.
+
 ## Core Database Entities
 
 The database model follows a hierarchical structure that enables multi-tenancy and resource organization:
