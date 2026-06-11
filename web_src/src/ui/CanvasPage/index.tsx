@@ -1458,7 +1458,6 @@ function CanvasPage(props: CanvasPageProps) {
                   fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.headerMode === "runs" ? props.runNodeDetailNodeId : null}
-                  onRunNodeDetailClose={props.onRunNodeDetailClose}
                   runNodeDetailPaneOpen={
                     props.headerMode === "runs" &&
                     !!props.runNodeDetailRun &&
@@ -2111,7 +2110,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  onRunNodeDetailClose,
   runNodeDetailPaneOpen,
   runsEvents,
   runsNodes,
@@ -2171,7 +2169,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  onRunNodeDetailClose?: () => void;
   runNodeDetailPaneOpen?: boolean;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
@@ -2573,11 +2570,6 @@ function CanvasContent({
 
     previouslySelectedRef.current = new Set();
 
-    if (headerMode === "runs" && runSelectedNodeId) {
-      onRunNodeDetailClose?.();
-      return;
-    }
-
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -2593,7 +2585,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [headerMode, onBuildingBlocksSidebarToggle, onRunNodeDetailClose, runSelectedNodeId]);
+  }, [onBuildingBlocksSidebarToggle]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
