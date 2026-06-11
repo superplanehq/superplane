@@ -102,7 +102,8 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
-import { hasLoadedAllRuns, shouldClearRunDetailNode } from "./runInspectionSync";
+import { shouldClearRunDetailNode } from "./runInspectionSync";
+import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -4715,29 +4716,13 @@ export function AppPage() {
     );
   }, [setSearchParams, setRunDetailNodeId]);
 
-  useEffect(() => {
-    if (!selectedRunId || !isRunInspectionMode || selectedRun) return;
-    if (infiniteRunsQuery.isLoading || infiniteRunsQuery.isFetchingNextPage) return;
-    if (infiniteRunsQuery.data === undefined) return;
-
-    const pages = infiniteRunsQuery.data?.pages ?? [];
-    if (!hasLoadedAllRuns(pages, !!infiniteRunsQuery.hasNextPage)) {
-      void infiniteRunsQuery.fetchNextPage();
-      return;
-    }
-
-    handleClearRunInspection();
-  }, [
-    handleClearRunInspection,
-    infiniteRunsQuery.data?.pages,
-    infiniteRunsQuery.fetchNextPage,
-    infiniteRunsQuery.hasNextPage,
-    infiniteRunsQuery.isFetchingNextPage,
-    infiniteRunsQuery.isLoading,
+  useStaleRunInspectionUrlCleanup({
+    selectedRunId,
     isRunInspectionMode,
     selectedRun,
-    selectedRunId,
-  ]);
+    infiniteRunsQuery,
+    onClear: handleClearRunInspection,
+  });
 
   const handleSelectLiveCanvas = useCallback(() => {
     handleClearRunInspection();

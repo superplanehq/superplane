@@ -76,6 +76,7 @@ func (s *CanvasSteps) ExitEditMode() {
 
 // OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
+	s.ensureNotEditingForVersionsSidebar()
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
@@ -96,6 +97,14 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureNotEditingForVersionsSidebar() {
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+	visible, err := exitEditButton.IsVisible()
+	if err == nil && visible {
+		s.ExitEditMode()
+	}
 }
 
 func (s *CanvasSteps) waitForToolSidebarOpen() {
