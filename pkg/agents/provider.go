@@ -138,11 +138,21 @@ type CreateSessionResult struct {
 	ProviderSessionID string
 }
 
+// MessageImage is a base64-encoded image attached to a user message.
+type MessageImage struct {
+	// MediaType is the IANA media type, e.g. "image/png".
+	MediaType string
+	// Data is the base64-encoded image bytes, without a data URI prefix.
+	Data string
+}
+
 // SendMessageOptions.ContextPreamble is prepended to the user's message so
 // providers that need caller context inline (e.g. a CLI token on first turn)
 // receive it without a separate system message.
 type SendMessageOptions struct {
 	ContextPreamble string
+	// Images are attachments sent to the agent alongside the text content.
+	Images []MessageImage
 }
 
 type Provider interface {
