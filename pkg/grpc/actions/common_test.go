@@ -11,9 +11,14 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/registryimports"
 )
+
+var _ = registryimports.Loaded
 
 func TestConfigurationFieldToProto(t *testing.T) {
 	t.Run("roundtrip string default value does not introduce extra quotes", func(t *testing.T) {
@@ -172,6 +177,49 @@ func TestDefaultRunTitleExpressionsCompile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuiltInTriggersHaveDefaultRunTitleExpressions(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	missing := []string{}
+	for _, triggerName := range builtInTriggerNames(reg) {
+		if defaultRunTitleExpression(triggerName) == "" {
+			missing = append(missing, triggerName)
+		}
+	}
+
+	require.Empty(t, missing, "missing default run title expressions")
+}
+
+func builtInTriggerNames(reg *registry.Registry) []string {
+	names := []string{}
+
+	for _, trigger := range reg.ListTriggers() {
+		names = append(names, trigger.Name())
+	}
+
+	for _, integration := range reg.ListIntegrations() {
+		for _, trigger := range integration.Triggers() {
+			names = append(names, trigger.Name())
+		}
+
+		setupProvider := reg.SetupProviders[integration.Name()]
+		if setupProvider == nil {
+			continue
+		}
+
+		for _, group := range setupProvider.CapabilityGroups() {
+			for _, capability := range group.Capabilities {
+				if capability.Type == core.IntegrationCapabilityTypeTrigger {
+					names = append(names, capability.Name)
+				}
+			}
+		}
+	}
+
+	return names
 }
 
 type testTriggerDefinition struct {
