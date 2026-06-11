@@ -8,9 +8,26 @@ import type { SetURLSearchParams } from "react-router-dom";
  */
 const CONSOLE_VIEW = "console";
 const LEGACY_CONSOLE_VIEW = "dashboard";
+const LEGACY_RUNS_VIEW = "runs";
 
 function isConsoleView(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
+}
+
+function migrateLegacyViewParams(view: string, params: URLSearchParams): URLSearchParams | null {
+  if (view === LEGACY_CONSOLE_VIEW) {
+    const next = new URLSearchParams(params);
+    next.set("view", CONSOLE_VIEW);
+    return next;
+  }
+
+  if (view === LEGACY_RUNS_VIEW) {
+    const next = new URLSearchParams(params);
+    next.delete("view");
+    return next;
+  }
+
+  return null;
 }
 
 /**
@@ -23,11 +40,11 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   const runParam = searchParams.get("run") ?? "";
   const consoleViewActive = isConsoleView(viewParam);
 
-  const isRunsMode = viewParam === "runs";
-  const isVersionsMode = viewParam === "versions";
   const isMemoryMode = viewParam === "memory";
   const isFilesMode = viewParam === "files";
+  const isVersionsMode = viewParam === "versions";
   const isConsoleMode = consoleViewActive;
+  const isRunInspectionMode = Boolean(runParam);
   const selectedRunId = runParam || null;
 
   const [isConsoleAddPanelOpen, setIsConsoleAddPanelOpen] = useState(false);
@@ -37,43 +54,33 @@ export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSe
   setSearchParamsRef.current = setSearchParams;
 
   useEffect(() => {
-    if (consoleViewActive) {
-      // Migrate legacy `?view=dashboard` to the canonical `?view=console`
-      // in-place so the address bar and any future link sharing reflect
-      // the renamed feature without breaking existing bookmarks.
-      if (viewParam === LEGACY_CONSOLE_VIEW) {
-        setSearchParamsRef.current(
-          (current) => {
-            const next = new URLSearchParams(current);
-            if (next.get("view") !== LEGACY_CONSOLE_VIEW) {
-              return current;
-            }
-            next.set("view", CONSOLE_VIEW);
-            return next;
-          },
-          { replace: true },
-        );
-      }
-    } else {
-      setIsConsoleAddPanelOpen(false);
-      setIsConsoleYamlOpen(false);
+    const migrated = migrateLegacyViewParams(viewParam, searchParams);
+    if (migrated) {
+      setSearchParamsRef.current(migrated, { replace: true });
+      return;
     }
-  }, [viewParam, consoleViewActive]);
+
+    if (consoleViewActive) {
+      return;
+    }
+
+    setIsConsoleAddPanelOpen(false);
+    setIsConsoleYamlOpen(false);
+  }, [viewParam, consoleViewActive, searchParams]);
 
   const noopSetBoolean = useCallback((_value: boolean) => {}, []);
   const noopSetSelectedRunId = useCallback((_value: string | null) => {}, []);
 
   return {
-    isRunsMode,
-    setIsRunsMode: noopSetBoolean,
-    isVersionsMode,
-    setIsVersionsMode: noopSetBoolean,
+    isRunInspectionMode,
     isConsoleMode,
     setIsConsoleMode: noopSetBoolean,
     isMemoryMode,
     setIsMemoryMode: noopSetBoolean,
     isFilesMode,
     setIsFilesMode: noopSetBoolean,
+    isVersionsMode,
+    setIsVersionsMode: noopSetBoolean,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
