@@ -26,6 +26,7 @@ type AgentSession struct {
 	ProviderSessionID string
 	Status            string
 	LastActiveAt      *time.Time
+	HeartbeatAt       *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 }
@@ -124,20 +125,25 @@ func UpdateAgentSessionStatusIfUnchanged(sessionID uuid.UUID, status string, unc
 	return UpdateAgentSessionStatusIfUnchangedInTransaction(database.Conn(), sessionID, status, unchangedSince)
 }
 
-// TouchAgentSessionHeartbeat bumps last_active_at without touching status or
+// TouchAgentSessionHeartbeat bumps heartbeat_at without touching status or
 // updated_at, so the cleanup loop can distinguish "worker is still alive"
-// from "row leaked". Guarded on status='streaming' so a goroutine that
-// survives past a reset (e.g. interrupt or another replica taking over)
-// can't keep an already-idle row looking active. Uses UpdateColumn so GORM
-// doesn't auto-bump updated_at — the worker's per-turn idle transition
-// keys on updated_at as an optimistic concurrency check, and a heartbeat
-// must not invalidate it.
+// from "row leaked". heartbeat_at is a dedicated column so cleanup can
+// tell apart rows that have ever been heartbeated (tight cutoff) from
+// rows owned by binaries that don't write heartbeats yet (loose cutoff)
+// — critical during rolling deploys.
+//
+// Guarded on status='streaming' so a goroutine that survives past a
+// reset (e.g. interrupt or another replica taking over) can't keep an
+// already-idle row looking active. Uses UpdateColumn so GORM doesn't
+// auto-bump updated_at — the worker's per-turn idle transition keys on
+// updated_at as an optimistic concurrency check, and a heartbeat must
+// not invalidate it.
 func TouchAgentSessionHeartbeat(sessionID uuid.UUID) error {
 	now := time.Now()
 	return database.Conn().Model(&AgentSession{}).
 		Where("id = ?", sessionID).
 		Where("status = ?", AgentSessionStatusStreaming).
-		UpdateColumn("last_active_at", &now).
+		UpdateColumn("heartbeat_at", &now).
 		Error
 }
 
@@ -203,17 +209,22 @@ func LockAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) (*AgentSess
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose
-// last heartbeat predates cutoff as failed and returns the affected rows so
-// the caller can fan out session_failed events. Driven by last_active_at
-// (refreshed by the stream worker every heartbeat tick) rather than
-// updated_at, so a legitimately long-running turn keeps the row alive
-// without status churn.
-func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
+// activity signal predates the corresponding cutoff as failed and returns
+// the affected rows so the caller can fan out session_failed events.
+//
+// Two cutoffs because the activity signal is heterogeneous across binary
+// versions: rows written by a heartbeat-aware worker carry a fresh
+// heartbeat_at every tick (use heartbeatCutoff, tight); rows owned by an
+// older binary leave heartbeat_at NULL, so cleanup falls back to
+// updated_at with legacyCutoff (loose, sized above the max single turn).
+// This keeps rolling deploys safe — upgraded pods running cleanup can't
+// flag long-but-healthy turns held by not-yet-restarted pods.
+func FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff time.Time) ([]AgentSession, error) {
 	var stuck []AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.
 			Where("status = ?", AgentSessionStatusStreaming).
-			Where("last_active_at < ?", cutoff).
+			Where("(heartbeat_at IS NOT NULL AND heartbeat_at < ?) OR (heartbeat_at IS NULL AND updated_at < ?)", heartbeatCutoff, legacyCutoff).
 			Find(&stuck).Error; err != nil {
 			return err
 		}

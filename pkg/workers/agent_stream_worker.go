@@ -28,20 +28,23 @@ const (
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
 	// streamHeartbeatInterval is how often a live worker refreshes
-	// last_active_at while a stream is open. Short enough that a dead
+	// heartbeat_at while a stream is open. Short enough that a dead
 	// worker is detected quickly; long enough that the write rate stays
 	// negligible (~2/min/session).
 	streamHeartbeatInterval = 30 * time.Second
-	// stuckStreamGrace is the heartbeat staleness threshold cleanup uses
-	// to declare a streaming row leaked. Sized above the worst-case
-	// "enqueue → first heartbeat" gap: SendMessage refreshes
-	// last_active_at at enqueue time, but the worker may sit in
-	// dispatch's slot queue for minutes when all concurrent streams are
-	// busy. A tighter cutoff would risk failing healthy sessions that
-	// simply hadn't been picked up yet. 5m × 30s heartbeat = 10 missed
-	// ticks before declaring death, which still bounds worst-case stuck
-	// time to ~6 min vs. the previous 30+.
-	stuckStreamGrace    = 5 * time.Minute
+	// stuckHeartbeatGrace is the cutoff for rows that already carry a
+	// heartbeat_at (i.e. were touched by a heartbeat-aware worker). 5m
+	// of silence ≈ 10 missed 30s ticks — enough to ride out GC pauses
+	// and DB blips without prematurely failing a healthy worker.
+	stuckHeartbeatGrace = 5 * time.Minute
+	// stuckLegacyGrace is the cutoff for rows where heartbeat_at is
+	// NULL — typically because they were created by a binary that
+	// predates the heartbeat code, or in the first moments after
+	// enqueue before the worker's first heartbeat lands. Must stay
+	// above agentStreamTimeout so a legitimate long turn isn't
+	// force-failed mid-flight; the 2× factor is the same shape the
+	// pre-heartbeat cleanup used.
+	stuckLegacyGrace    = 2 * agentStreamTimeout
 	stuckCleanupCadence = 1 * time.Minute
 )
 
@@ -212,8 +215,10 @@ func (w *AgentStreamWorker) cleanupTickSafely() {
 }
 
 func (w *AgentStreamWorker) cleanupStuckSessions() {
-	cutoff := time.Now().Add(-stuckStreamGrace)
-	closed, err := models.FailStuckStreamingSessions(cutoff)
+	now := time.Now()
+	heartbeatCutoff := now.Add(-stuckHeartbeatGrace)
+	legacyCutoff := now.Add(-stuckLegacyGrace)
+	closed, err := models.FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff)
 	if err != nil {
 		log.WithError(err).Warn("agent stream cleanup: query failed")
 		return
