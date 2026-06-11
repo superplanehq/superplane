@@ -2574,19 +2574,41 @@ export function AppPage() {
     return () => window.removeEventListener("agent:open-integration", handler);
   }, []);
 
-  // Listen for "See in Editor" from draft-actions widget
+  // Listen for "See in Editor" from draft-actions widget.
+  // When the agent creates a draft, the version may not be loaded yet.
+  // We store the pending ID and pick it up once versions refetch.
+  const pendingViewVersionRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const handler = (e: Event) => {
+    const pending = pendingViewVersionRef.current;
+    if (pending) {
+      const version = selectableVersionsById.get(pending);
+      if (version) {
+        pendingViewVersionRef.current = null;
+        setActiveCanvasVersion(version);
+      }
+    }
+  }, [selectableVersionsById]);
+
+  useEffect(() => {
+    const handler = async (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
-      if (!versionId) return;
+      if (!versionId || !canvasId) return;
+
       const version = selectableVersionsById.get(versionId);
       if (version) {
         setActiveCanvasVersion(version);
+        return;
       }
+
+      // Version not loaded yet. Store pending ID and refetch.
+      pendingViewVersionRef.current = versionId;
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
     };
     window.addEventListener("agent:view-version", handler);
     return () => window.removeEventListener("agent:view-version", handler);
-  }, [selectableVersionsById]);
+  }, [selectableVersionsById, canvasId, queryClient]);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
