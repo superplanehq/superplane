@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -146,4 +147,106 @@ func TestAppAgentTool_UpdateDraftEnforcesUsageLimits(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "canvas node limit exceeded")
+}
+
+func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
+	organizationID := uuid.NewString()
+	userID := uuid.NewString()
+	canvasID := uuid.NewString()
+	action := accessAction{auth: allowingPermissionChecker{}}
+
+	payload, err := action.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: organizationID,
+		UserID:         userID,
+		CanvasID:       canvasID,
+	}, Input{})
+
+	require.NoError(t, err)
+	result, ok := payload.(accessResult)
+	require.True(t, ok)
+
+	assert.Equal(t, "access", result.Action)
+	assert.Equal(t, canvasID, result.CanvasID)
+	assert.ElementsMatch(t, []string{
+		"org:read",
+		"integrations:read",
+		"canvases:read:" + canvasID,
+		"canvases:update_version:" + canvasID,
+	}, result.TokenScopes)
+
+	accessible := apiAccessByMethod(result.Accessible)
+	unavailable := apiAccessByMethod(result.Unavailable)
+
+	assert.Contains(t, accessible, pb.Canvases_ListRuns_FullMethodName)
+	assert.Equal(t, []string{canvasID}, accessible[pb.Canvases_ListRuns_FullMethodName].Resources)
+	assert.Contains(t, accessible, pb.Canvases_CreateCanvasVersion_FullMethodName)
+	assert.Contains(t, unavailable, pb.Canvases_ListCanvases_FullMethodName)
+	assert.Contains(t, unavailable, pb.Canvases_PublishCanvasVersion_FullMethodName)
+
+	toolActions := toolAccessByAction(result.ToolActions)
+	require.Contains(t, toolActions, "update_draft")
+	assert.True(t, toolActions["update_draft"].Allowed)
+	require.Contains(t, toolActions, "read_runtime")
+	assert.True(t, toolActions["read_runtime"].Allowed)
+}
+
+func TestReadRuntimeAction_ParseFilters(t *testing.T) {
+	runStates, err := parseRunStates([]string{"started", "STATE_FINISHED"})
+	require.NoError(t, err)
+	assert.Equal(t, []pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED, pb.CanvasRun_STATE_FINISHED}, runStates)
+
+	runResults, err := parseRunResults([]string{"passed", "RESULT_CANCELLED"})
+	require.NoError(t, err)
+	assert.Equal(t, []pb.CanvasRun_Result{pb.CanvasRun_RESULT_PASSED, pb.CanvasRun_RESULT_CANCELLED}, runResults)
+
+	executionStates, err := parseExecutionStates([]string{"pending", "STATE_STARTED", "finished"})
+	require.NoError(t, err)
+	assert.Equal(t, []pb.CanvasNodeExecution_State{
+		pb.CanvasNodeExecution_STATE_PENDING,
+		pb.CanvasNodeExecution_STATE_STARTED,
+		pb.CanvasNodeExecution_STATE_FINISHED,
+	}, executionStates)
+
+	executionResults, err := parseExecutionResults([]string{"passed", "RESULT_FAILED"})
+	require.NoError(t, err)
+	assert.Equal(t, []pb.CanvasNodeExecution_Result{pb.CanvasNodeExecution_RESULT_PASSED, pb.CanvasNodeExecution_RESULT_FAILED}, executionResults)
+}
+
+func TestReadRuntimeAction_RejectsUnknownResource(t *testing.T) {
+	action := readRuntimeAction{
+		registry: &registry.Registry{},
+		auth:     allowingPermissionChecker{},
+	}
+
+	_, err := action.Execute(context.Background(), agents.AgentSessionContext{
+		OrganizationID: uuid.NewString(),
+		UserID:         uuid.NewString(),
+		CanvasID:       uuid.NewString(),
+	}, Input{Resource: "secrets"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported runtime resource")
+}
+
+type allowingPermissionChecker struct{}
+
+func (allowingPermissionChecker) CheckOrganizationPermission(_, _, _, _ string) (bool, error) {
+	return true, nil
+}
+
+func apiAccessByMethod(entries []apiAccessResult) map[string]apiAccessResult {
+	result := make(map[string]apiAccessResult, len(entries))
+	for _, entry := range entries {
+		result[entry.Method] = entry
+	}
+	return result
+}
+
+func toolAccessByAction(entries []toolAccessResult) map[string]toolAccessResult {
+	result := make(map[string]toolAccessResult, len(entries))
+	for _, entry := range entries {
+		result[entry.Action] = entry
+	}
+	return result
 }

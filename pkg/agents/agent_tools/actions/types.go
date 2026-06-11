@@ -10,6 +10,15 @@ type Input struct {
 	CanvasYAML          string           `json:"canvas_yaml,omitempty"`
 	ConsoleYAML         string           `json:"console_yaml,omitempty"`
 	AutoLayout          *AutoLayoutInput `json:"auto_layout,omitempty"`
+	Resource            string           `json:"resource,omitempty"`
+	Namespace           string           `json:"namespace,omitempty"`
+	NodeID              string           `json:"node_id,omitempty"`
+	EventID             string           `json:"event_id,omitempty"`
+	ExecutionID         string           `json:"execution_id,omitempty"`
+	Limit               uint32           `json:"limit,omitempty"`
+	Before              string           `json:"before,omitempty"`
+	States              []string         `json:"states,omitempty"`
+	Results             []string         `json:"results,omitempty"`
 }
 
 // AutoLayoutInput configures optional backend auto-layout for draft updates.
@@ -43,6 +52,42 @@ type integrationsResult struct {
 	Action       string              `json:"action"`
 	CanvasID     string              `json:"canvas_id"`
 	Integrations []integrationResult `json:"integrations"`
+}
+
+type runtimeReadResult struct {
+	Action   string `json:"action"`
+	CanvasID string `json:"canvas_id"`
+	Resource string `json:"resource"`
+	Payload  any    `json:"payload"`
+}
+
+type accessResult struct {
+	Action         string             `json:"action"`
+	CanvasID       string             `json:"canvas_id"`
+	OrganizationID string             `json:"organization_id"`
+	UserID         string             `json:"user_id"`
+	TokenScopes    []string           `json:"token_scopes"`
+	ToolActions    []toolAccessResult `json:"tool_actions"`
+	Accessible     []apiAccessResult  `json:"accessible"`
+	Unavailable    []apiAccessResult  `json:"unavailable,omitempty"`
+	Notes          []string           `json:"notes,omitempty"`
+}
+
+type toolAccessResult struct {
+	Action   string   `json:"action"`
+	Allowed  bool     `json:"allowed"`
+	Requires []string `json:"requires,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+}
+
+type apiAccessResult struct {
+	Method    string   `json:"method"`
+	Service   string   `json:"service,omitempty"`
+	RPC       string   `json:"rpc,omitempty"`
+	Resource  string   `json:"resource"`
+	Operation string   `json:"operation"`
+	Resources []string `json:"resources,omitempty"`
+	Reason    string   `json:"reason,omitempty"`
 }
 
 type draftResult struct {
