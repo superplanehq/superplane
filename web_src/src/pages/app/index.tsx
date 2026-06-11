@@ -110,6 +110,7 @@ import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
+import { syncCommittedCanvasDraftState } from "./lib/sync-committed-canvas-draft";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -2000,6 +2001,59 @@ export function AppPage() {
     [queryClient],
   );
 
+  // A remote `canvas_version_updated` (e.g. a CLI `apps canvas update`) commits
+  // canvas.yaml into the version row and discards the draft's staging. Refresh
+  // the committed/staged caches and clear the staging indicators so the UI does
+  // not keep showing stale "uncommitted changes" for content that no longer has
+  // any staging on the server.
+  const resyncDraftToCommitted = useCallback(
+    async (versionId: string) => {
+      if (!organizationId || !canvasId) {
+        return;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+
+      // Only the actively-edited draft drives the rendered graph and staging
+      // indicators, so the full committed-state resync (and canvas remount via
+      // stagingResetNonce) is reserved for it. Other branches just refresh their
+      // cached staging/version data.
+      if (activeCanvasVersionIdRef.current !== versionId) {
+        draftCanvasSpecsRef.current.delete(versionId);
+        return;
+      }
+
+      consoleMutationGenerationRef.current += 1;
+      const committedVersion = await syncCommittedCanvasDraftState({
+        queryClient,
+        organizationId,
+        canvasId,
+        versionId,
+      });
+
+      const committedSpec = committedVersion?.spec ?? null;
+      if (committedSpec) {
+        draftCanvasSpecsRef.current.set(versionId, committedSpec);
+      } else {
+        draftCanvasSpecsRef.current.delete(versionId);
+      }
+      setDraftCanvasSpec(committedSpec);
+      setActiveCanvasVersion((current) =>
+        current?.metadata?.id === versionId ? { ...current, spec: committedSpec ?? current.spec } : current,
+      );
+      const restored = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      if (restored) {
+        setLastSavedWorkflowSnapshot(restored);
+      }
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
+      setStagingResetNonce((nonce) => nonce + 1);
+    },
+    [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
+  );
+
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {
       if (eventName === "canvas_deleted") {
@@ -2033,8 +2087,8 @@ export function AppPage() {
           return true;
         }
 
-        draftCanvasSpecsRef.current.delete(payload.versionId);
         invalidateCanvasVersionData(canvasId, payload.versionId);
+        void resyncDraftToCommitted(payload.versionId);
         return true;
       }
 
@@ -2057,6 +2111,7 @@ export function AppPage() {
       consumeIgnoredCanvasVersionUpdatedEcho,
       hasPendingLocalCanvasState,
       invalidateCanvasVersionData,
+      resyncDraftToCommitted,
     ],
   );
 
