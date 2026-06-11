@@ -129,6 +129,15 @@ export function RunsTabPanel({
     [selectedRunId, sidebarRunIds],
   );
 
+  const isAtLoadedOlderBoundary = useMemo(() => {
+    if (!selectedRunId || olderRunId || sidebarRunIds.length === 0) {
+      return false;
+    }
+    return sidebarRunIds[sidebarRunIds.length - 1] === selectedRunId;
+  }, [olderRunId, selectedRunId, sidebarRunIds]);
+
+  const pendingOlderNavigationRef = useRef(false);
+
   const handleNavigateRun = useCallback(
     (runId: string) => {
       (onNavigateRun ?? onSelectRun)(runId);
@@ -136,6 +145,45 @@ export function RunsTabPanel({
     },
     [onNavigateRun, onSelectRun],
   );
+
+  const handleNavigateOlder = useCallback(() => {
+    if (olderRunId) {
+      handleNavigateRun(olderRunId);
+      return;
+    }
+
+    if (!isAtLoadedOlderBoundary || !hasNextPage || !onLoadMore) {
+      return;
+    }
+
+    pendingOlderNavigationRef.current = true;
+    onLoadMore();
+  }, [handleNavigateRun, hasNextPage, isAtLoadedOlderBoundary, olderRunId, onLoadMore]);
+
+  useEffect(() => {
+    if (!pendingOlderNavigationRef.current || isFetchingNextPage) {
+      return;
+    }
+
+    if (!selectedRunId) {
+      pendingOlderNavigationRef.current = false;
+      return;
+    }
+
+    const nextOlderRunId = getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "next");
+    if (nextOlderRunId) {
+      pendingOlderNavigationRef.current = false;
+      handleNavigateRun(nextOlderRunId);
+      return;
+    }
+
+    if (hasNextPage && onLoadMore) {
+      onLoadMore();
+      return;
+    }
+
+    pendingOlderNavigationRef.current = false;
+  }, [handleNavigateRun, hasNextPage, isFetchingNextPage, onLoadMore, selectedRunId, sidebarRunIds]);
 
   const isDetailView = sidebarView === "detail" && !!selectedRun;
   const isLiveCanvasSelected = !selectedRunId;
@@ -186,6 +234,7 @@ export function RunsTabPanel({
               newerRunId={newerRunId}
               olderRunId={olderRunId}
               onNavigateRun={handleNavigateRun}
+              onNavigateOlder={isAtLoadedOlderBoundary && hasNextPage ? handleNavigateOlder : undefined}
             />
           ) : null}
         </div>

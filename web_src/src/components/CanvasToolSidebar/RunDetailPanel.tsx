@@ -21,6 +21,7 @@ export interface RunDetailPanelProps {
   newerRunId?: string | null;
   olderRunId?: string | null;
   onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
 }
 
 export function RunDetailPanel({
@@ -34,6 +35,7 @@ export function RunDetailPanel({
   newerRunId = null,
   olderRunId = null,
   onNavigateRun,
+  onNavigateOlder,
 }: RunDetailPanelProps) {
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [run, nodeMap]);
@@ -101,10 +103,16 @@ export function RunDetailPanel({
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      disabled={!olderRunId}
+                      disabled={!olderRunId && !onNavigateOlder}
                       aria-label="Older Run"
                       data-testid="run-detail-older"
-                      onClick={() => olderRunId && onNavigateRun(olderRunId)}
+                      onClick={() => {
+                        if (olderRunId) {
+                          onNavigateRun?.(olderRunId);
+                          return;
+                        }
+                        onNavigateOlder?.();
+                      }}
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
