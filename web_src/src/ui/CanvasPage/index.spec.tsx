@@ -6,7 +6,7 @@ import type { BlockData } from "./Block";
 
 const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
-  fitViewMock: vi.fn(),
+  fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
@@ -180,6 +180,7 @@ describe("CanvasPage connection drop", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
     fitViewMock.mockClear();
+    fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
@@ -431,7 +432,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           nodes={[
             {
               id: "run-node-1",
@@ -470,7 +472,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           nodes={[
             {
               id: "run-node-1",
@@ -516,7 +519,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           runNodeDetailNodeId="run-node-1"
           onRunNodeDetailClose={onRunNodeDetailClose}
           nodes={[
