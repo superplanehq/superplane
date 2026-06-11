@@ -503,6 +503,84 @@ describe("CanvasPage connection drop", () => {
     vi.useRealTimers();
   });
 
+  it("refits when leaving run inspection with the same fit request nonce", () => {
+    vi.useFakeTimers();
+    const hasFitToViewRef = { current: true };
+    getNodesMock.mockReturnValue([
+      {
+        id: "live-node-1",
+        position: { x: 0, y: 0 },
+      },
+    ]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[
+            {
+              id: "live-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Live node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={1}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode={false}
+          nodes={[
+            {
+              id: "live-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Live node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={1}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it("keeps the run node detail pane open and selected when the canvas background is clicked in runs mode", async () => {
     const onRunNodeDetailClose = vi.fn();
     const selectedRunNode = () =>

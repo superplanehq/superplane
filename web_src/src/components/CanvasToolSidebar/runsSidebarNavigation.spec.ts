@@ -44,17 +44,25 @@ describe("runsSidebarNavigation", () => {
     expect(canNavigateToOlderRun(runIds, "run-older", false)).toBe(false);
     expect(canNavigateToOlderRun(runIds, "run-older", true)).toBe(true);
     expect(canNavigateToOlderRun(runIds, "run-newer", true)).toBe(true);
+    expect(canNavigateToOlderRun(runIds, "run-older", true, false)).toBe(false);
   });
 
   it("includes pagination in sidebar navigation state", () => {
-    expect(getRunSidebarNavigation(orderedRuns, "run-older", false)).toMatchObject({
+    expect(getRunSidebarNavigation(orderedRuns, "run-older", { hasNextPage: false })).toMatchObject({
       olderRunId: null,
       canNavigateOlder: false,
       atOlderPaginationBoundary: true,
     });
-    expect(getRunSidebarNavigation(orderedRuns, "run-older", true)).toMatchObject({
+    expect(getRunSidebarNavigation(orderedRuns, "run-older", { hasNextPage: true })).toMatchObject({
       olderRunId: null,
       canNavigateOlder: true,
+      atOlderPaginationBoundary: true,
+    });
+    expect(
+      getRunSidebarNavigation(orderedRuns, "run-older", { hasNextPage: true, hasActiveFilters: true }),
+    ).toMatchObject({
+      olderRunId: null,
+      canNavigateOlder: false,
       atOlderPaginationBoundary: true,
     });
   });
