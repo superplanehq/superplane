@@ -145,7 +145,7 @@ func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
 
 	runTitle := triggers[0].Configuration[0]
 	require.Equal(t, "customName", runTitle.Name)
-	require.Equal(t, "{{ root().data.head_commit.message }}", runTitle.GetDefaultValue())
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", runTitle.GetDefaultValue())
 }
 
 func TestDefaultRunTitleExpressionsCompile(t *testing.T) {
