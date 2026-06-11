@@ -34,7 +34,7 @@ import {
   useStoredOutcomeState,
   useThinkingIndicator,
 } from "./agentConversationState";
-import type { AgentMessage, AgentMessageImage } from "./types";
+import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
@@ -58,7 +58,7 @@ type DraftActionsBarProps = {
 };
 
 type ConversationHandlers = {
-  handleSend: (content: string, images?: AgentMessageImage[]) => Promise<void>;
+  handleSend: (content: string, images?: AgentOutgoingImage[]) => Promise<void>;
   handleStop: () => void;
   handleQuickAction: (action: string) => Promise<void>;
   handleStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => Promise<void>;
@@ -312,7 +312,7 @@ function useConversationHandlers({
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
 
   const handleSend = useCallback(
-    async (content: string, images?: AgentMessageImage[]) => {
+    async (content: string, images?: AgentOutgoingImage[]) => {
       const { sendMutation: send } = mutationsRef.current;
       if ((!content.trim() && (images?.length ?? 0) === 0) || send.isPending) return;
       setError(null);
@@ -407,7 +407,7 @@ function ComposerWithCanvasData({
 }: {
   canvasId: string;
   organizationId: string;
-  onSend: (content: string, images: AgentMessageImage[]) => Promise<void>;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
   sending: boolean;
   sendPending: boolean;

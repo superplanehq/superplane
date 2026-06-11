@@ -89,13 +89,18 @@ func serializeMessage(message *models.AgentSessionMessage) *pb.AgentChatMessage 
 	return out
 }
 
+// serializeImages returns image metadata only. The base64 bytes are served
+// out-of-band by the dedicated image endpoint (see handleAgentChatMessageImage)
+// and intentionally omitted here, so a history page with several attachments
+// stays under the gRPC/HTTP response size limits. The client builds the image
+// URL from the message id and the image's position in this slice.
 func serializeImages(images []models.AgentSessionImage) []*pb.AgentChatImage {
 	if len(images) == 0 {
 		return nil
 	}
 	out := make([]*pb.AgentChatImage, 0, len(images))
 	for _, image := range images {
-		out = append(out, &pb.AgentChatImage{MediaType: image.MediaType, Data: image.Data})
+		out = append(out, &pb.AgentChatImage{MediaType: image.MediaType})
 	}
 	return out
 }

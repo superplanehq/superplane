@@ -18,7 +18,7 @@ import {
   fromApiMessage,
   type AgentChat,
   type AgentMessage,
-  type AgentMessageImage,
+  type AgentOutgoingImage,
 } from "@/components/CanvasToolSidebar/types";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
@@ -66,7 +66,9 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
           query: { beforeId: pageParam || undefined, limit: PAGE_SIZE },
         }),
       );
-      const messages = (response.data?.messages ?? []).map(fromApiMessage).filter((m): m is AgentMessage => m !== null);
+      const messages = (response.data?.messages ?? [])
+        .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
+        .filter((m): m is AgentMessage => m !== null);
       return { messages, hasMore: Boolean(response.data?.hasMore) };
     },
     getNextPageParam: (lastPage) => {
@@ -88,7 +90,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, _can
       chatId: string;
       content: string;
       mode?: AgentMode;
-      images?: AgentMessageImage[];
+      images?: AgentOutgoingImage[];
     }) => {
       const response = await agentsSendAgentChatMessage(
         withOrganizationHeader({
@@ -101,7 +103,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, _can
           },
         }),
       );
-      return fromApiMessage(response.data?.message);
+      return fromApiMessage(response.data?.message, chatId, organizationId);
     },
     onSuccess: (data, variables) => {
       if (data) upsertAgentMessageInCache(queryClient, variables.chatId, data);

@@ -362,6 +362,13 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
 	).Methods(http.MethodGet)
 
+	// Registered before the /api/v1/agents gateway catch-all so the exact route
+	// matches first and serves image bytes out-of-band.
+	s.Router.Handle(
+		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
+		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
+	).Methods(http.MethodGet)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
