@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_FILTER_OPTIONS, type RunStatusFilter } from "@/ui/Runs/runPresentation";
-import { Filter } from "lucide-react";
+import { ListFilter } from "lucide-react";
 
 export interface TriggerOption {
   id: string;
@@ -44,23 +44,23 @@ export function RunFiltersPopover({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="icon-xs"
           className={cn(
-            "relative h-7 w-7 shrink-0 p-0",
-            (hasTriggerFilter || hasStatusFilter) && "bg-sky-50 text-sky-700 hover:bg-sky-100",
+            "relative shrink-0 hover:bg-gray-100",
+            hasTriggerFilter || hasStatusFilter ? "text-sky-700 hover:bg-sky-100" : "text-gray-500 hover:text-gray-700",
           )}
           aria-label="Filter runs"
           title="Filter runs"
         >
-          <Filter className="size-3.5 text-gray-800" />
+          <ListFilter className="size-3.5 shrink-0" aria-hidden />
           {hasTriggerFilter || hasStatusFilter ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-sky-500 px-0.5 text-[8px] font-semibold leading-none text-white">
               {totalFilters}
             </span>
           ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 border-slate-950/20 bg-white p-0 shadow-md" sideOffset={-24}>
+      <PopoverContent align="end" className="w-64 border-slate-950/20 bg-white p-0 shadow-md" sideOffset={4}>
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-[12px] font-medium text-gray-700">Filter by status</span>
           <button
