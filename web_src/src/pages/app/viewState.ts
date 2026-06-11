@@ -161,7 +161,7 @@ export function getWorkflowViewPresentation({
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode || isVersionsMode;
 
   return {
     headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode, isVersionsMode }),

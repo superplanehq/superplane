@@ -2233,7 +2233,7 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
-  const lastFitAllRequestRef = useRef<number | null>(null);
+  const lastFitAllRequestRef = useRef<{ nonce: number; runMode: boolean } | null>(null);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(() => {
     const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
     return saved !== null ? saved === "true" : false;
@@ -2644,9 +2644,10 @@ function CanvasContent({
       lastFitAllRequestRef.current = null;
       return;
     }
-    if (lastFitAllRequestRef.current === fitAllRequest) return;
+    const last = lastFitAllRequestRef.current;
+    if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
-    lastFitAllRequestRef.current = fitAllRequest;
+    lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
     const id = window.setTimeout(() => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
       const renderedNodes = getNodes();
