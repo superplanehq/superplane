@@ -66,6 +66,8 @@ func CommitCanvasStaging(
 			versionID,
 			webhookBaseURL,
 			authService,
+			nil,
+			false,
 			specOps,
 		); err != nil {
 			return nil, err

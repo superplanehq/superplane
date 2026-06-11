@@ -51,6 +51,8 @@ spec:
 		draftVersion.ID.String(),
 		"",
 		r.AuthService,
+		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},
@@ -114,6 +116,8 @@ spec:
 		draftVersion.ID.String(),
 		"",
 		r.AuthService,
+		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("true"))},
 		},
@@ -130,6 +134,8 @@ spec:
 		draftVersion.ID.String(),
 		"",
 		r.AuthService,
+		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("$"))},
 		},
@@ -176,6 +182,8 @@ spec:
 		draftVersion.ID.String(),
 		"",
 		r.AuthService,
+		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},
@@ -230,6 +238,8 @@ spec:
 		draftVersion.ID.String(),
 		"",
 		r.AuthService,
+		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},

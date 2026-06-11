@@ -81,83 +81,65 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 	return body, nil
 }
 
-// StageRepositorySpecFile writes a single canvas.yaml/console.yaml edit to the
-// draft version's staging layer without touching the committed version row.
-func StageRepositorySpecFile(
+func CommitRepositoryFiles(
+	ctx core.CommandContext,
+	canvasID string,
+	versionID string,
+	expectedHeadSHA string,
+	message string,
+	operations []openapi_client.CanvasesCanvasRepositoryFileOperation,
+	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
+	includeAutoLayout bool,
+) (*openapi_client.CanvasesCommitCanvasRepositoryFilesResponse, error) {
+	body := openapi_client.NewCanvasesCommitCanvasRepositoryFilesBody()
+	if trimmedVersionID := strings.TrimSpace(versionID); trimmedVersionID != "" {
+		body.SetVersionId(trimmedVersionID)
+	}
+	if trimmedHead := strings.TrimSpace(expectedHeadSHA); trimmedHead != "" {
+		body.SetExpectedHeadSha(trimmedHead)
+	}
+	if trimmedMessage := strings.TrimSpace(message); trimmedMessage != "" {
+		body.SetMessage(trimmedMessage)
+	}
+	body.SetOperations(operations)
+	if includeAutoLayout {
+		if autoLayout != nil {
+			body.SetAutoLayout(*autoLayout)
+		} else {
+			body.SetAutoLayout(openapi_client.CanvasesCanvasAutoLayout{})
+		}
+	}
+
+	response, _, err := ctx.API.CanvasRepositoryAPI.
+		CanvasesCommitCanvasRepositoryFiles(ctx.Context, canvasID).
+		Body(*body).
+		Execute()
+	return response, err
+}
+
+func CommitRepositorySpecFile(
 	ctx core.CommandContext,
 	canvasID string,
 	versionID string,
 	path string,
 	content []byte,
+	message string,
+	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
+	includeAutoLayout bool,
 ) error {
 	operation := openapi_client.NewCanvasesCanvasRepositoryFileOperation()
 	operation.SetPath(path)
 	operation.SetContent(base64.StdEncoding.EncodeToString(content))
 
-	body := openapi_client.NewCanvasesStageCanvasRepositoryFileBody()
-	body.SetOperations([]openapi_client.CanvasesCanvasRepositoryFileOperation{*operation})
-
-	_, _, err := ctx.API.CanvasRepositoryAPI.
-		CanvasesStageCanvasRepositoryFile(ctx.Context, canvasID, versionID).
-		Body(*body).
-		Execute()
+	_, err := CommitRepositoryFiles(
+		ctx,
+		canvasID,
+		versionID,
+		"",
+		message,
+		[]openapi_client.CanvasesCanvasRepositoryFileOperation{*operation},
+		autoLayout,
+		includeAutoLayout,
+	)
 	return err
-}
-
-// CommitCanvasStaging parses the staged canvas.yaml/console.yaml into the draft
-// version row and clears staging.
-func CommitCanvasStaging(ctx core.CommandContext, canvasID, versionID string) error {
-	_, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCommitCanvasStaging(ctx.Context, canvasID, versionID).
-		Body(map[string]any{}).
-		Execute()
-	return err
-}
-
-// ApplyCanvasAutoLayout lays out the staged canvas.yaml and re-stages it. A nil
-// or unspecified-algorithm layout is treated as "no layout" and skipped.
-func ApplyCanvasAutoLayout(
-	ctx core.CommandContext,
-	canvasID string,
-	versionID string,
-	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
-) error {
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.GetAlgorithm() == openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_UNSPECIFIED {
-		return nil
-	}
-
-	body := openapi_client.NewCanvasesApplyCanvasAutoLayoutBody()
-	body.SetAutoLayout(*autoLayout)
-
-	_, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesApplyCanvasAutoLayout(ctx.Context, canvasID, versionID).
-		Body(*body).
-		Execute()
-	return err
-}
-
-// StageCommitRepositorySpecFile stages a spec file, optionally lays out the
-// staged canvas, then commits staging into the draft version row.
-func StageCommitRepositorySpecFile(
-	ctx core.CommandContext,
-	canvasID string,
-	versionID string,
-	path string,
-	content []byte,
-	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
-) error {
-	if err := StageRepositorySpecFile(ctx, canvasID, versionID, path, content); err != nil {
-		return err
-	}
-
-	if path == CanvasYAMLRepositoryPath {
-		if err := ApplyCanvasAutoLayout(ctx, canvasID, versionID, autoLayout); err != nil {
-			return err
-		}
-	}
-
-	return CommitCanvasStaging(ctx, canvasID, versionID)
 }
