@@ -18,10 +18,11 @@ import (
 const (
 	maxChatImages = 8
 
-	// maxChatImagePayloadBytes caps the combined decoded image bytes per message
-	// so the base64-encoded request stays under the gRPC server's 4 MiB receive
-	// limit.
-	maxChatImagePayloadBytes = 3 * 1000 * 1000
+	// maxChatImagePayloadBytes caps the combined decoded image bytes per message.
+	// Images are sent as base64 (~4/3 larger) in the protobuf body, so this stays
+	// well under the gRPC server's 4 MiB receive limit, leaving room for the
+	// message text and framing.
+	maxChatImagePayloadBytes = 2_500_000
 )
 
 var allowedChatImageMediaTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}

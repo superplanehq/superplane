@@ -4,14 +4,13 @@ import { showErrorToast } from "@/lib/toast";
 export const MAX_IMAGE_ATTACHMENTS = 8;
 export const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
-// The gRPC server enforces a default 4 MiB receive limit on the whole request
-// (see pkg/grpc/server.go). Images travel as base64 (~4/3 larger than the raw
-// bytes) alongside the message text, so we cap the combined raw image bytes
-// below that ceiling — leaving headroom for the text and protobuf framing — to
-// avoid the request being rejected at the transport layer with an HTTP 429.
-const GRPC_MAX_REQUEST_BYTES = 4 * 1024 * 1024;
-const REQUEST_OVERHEAD_BYTES = 256 * 1024;
-export const MAX_TOTAL_IMAGE_BYTES = Math.floor(((GRPC_MAX_REQUEST_BYTES - REQUEST_OVERHEAD_BYTES) * 3) / 4);
+// Caps the combined raw image bytes per message. Images are sent as base64
+// (~4/3 larger) alongside the message text, so this stays well under the gRPC
+// server's 4 MiB receive limit and mirrors maxChatImagePayloadBytes in
+// pkg/grpc/actions/agents/send_agent_chat_message.go. Keeping it at or below the
+// backend cap means oversized attachments are rejected client-side with a clear
+// error instead of failing the request with an HTTP 429.
+export const MAX_TOTAL_IMAGE_BYTES = 2_500_000;
 // A single image may use the entire per-message budget.
 export const MAX_IMAGE_BYTES = MAX_TOTAL_IMAGE_BYTES;
 
