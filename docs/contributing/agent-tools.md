@@ -9,7 +9,7 @@ to the CLI for common app operations.
 Prefer adding an action to `superplane_app` when the capability is app-related:
 
 - reading app/canvas or Console YAML
-- updating the draft app
+- staging edits on the draft app (`workflow_staging`; agents never commit or publish)
 - listing connected integrations for the current app context
 - validating or preparing app-specific backend state
 - any operation naturally scoped to the current `AgentSessionContext.CanvasID`
@@ -63,7 +63,7 @@ Action rules:
 
 - Always stay scoped to the current `AgentSessionContext`.
 - Reject or ignore attempts to operate on another canvas.
-- Never publish drafts from an agent action.
+- Never commit or publish drafts from an agent action. Stage edits only; users commit and publish from the UI.
 - Return concise JSON payloads; avoid dumping large unrelated data.
 - Prefer backend APIs and model methods over invoking the CLI.
 

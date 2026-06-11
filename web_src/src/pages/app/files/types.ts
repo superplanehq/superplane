@@ -24,16 +24,6 @@ export type PendingFileChange =
       path: string;
     };
 
-export type FilesHeaderActionsState = {
-  hasPendingChanges: boolean;
-  publishDisabled: boolean;
-  publishDisabledTooltip?: string;
-  discardDisabled: boolean;
-  publishPending: boolean;
-  onPublish: () => void | Promise<void>;
-  onDiscardAll: () => void;
-};
-
 export const repositoryFileTreeStyle = {
   height: "100%",
   colorScheme: "light",
