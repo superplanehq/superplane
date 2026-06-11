@@ -6,7 +6,7 @@ import type { BlockData } from "./Block";
 
 const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
-  fitViewMock: vi.fn(),
+  fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
@@ -180,6 +180,7 @@ describe("CanvasPage connection drop", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
     fitViewMock.mockClear();
+    fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
@@ -431,7 +432,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           nodes={[
             {
               id: "run-node-1",
@@ -470,7 +472,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           nodes={[
             {
               id: "run-node-1",
@@ -500,6 +503,84 @@ describe("CanvasPage connection drop", () => {
     vi.useRealTimers();
   });
 
+  it("refits when leaving run inspection with the same fit request nonce", () => {
+    vi.useFakeTimers();
+    const hasFitToViewRef = { current: true };
+    getNodesMock.mockReturnValue([
+      {
+        id: "live-node-1",
+        position: { x: 0, y: 0 },
+      },
+    ]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[
+            {
+              id: "live-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Live node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={1}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode={false}
+          nodes={[
+            {
+              id: "live-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Live node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={1}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it("keeps the run node detail pane open and selected when the canvas background is clicked in runs mode", async () => {
     const onRunNodeDetailClose = vi.fn();
     const selectedRunNode = () =>
@@ -516,7 +597,8 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-live"
+          isRunInspectionMode
           runNodeDetailNodeId="run-node-1"
           onRunNodeDetailClose={onRunNodeDetailClose}
           nodes={[

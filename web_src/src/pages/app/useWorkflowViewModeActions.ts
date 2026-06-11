@@ -1,21 +1,19 @@
 import { useCallback } from "react";
 
-import { getConsoleHeaderActions } from "./console/consoleHeaderActions";
-
 interface WorkflowViewModeActionsConfig {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
-  isRunsMode: boolean;
   isVersionsMode: boolean;
+  isRunInspectionMode: boolean;
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   handleExitConsoleMode: () => void;
   handleExitMemoryMode: () => void;
   handleExitFilesMode: () => void;
-  handleExitRunsMode: () => void;
   handleExitVersionsMode: () => void;
+  handleClearRunInspection: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
@@ -25,16 +23,16 @@ export function useWorkflowViewModeActions({
   isConsoleMode,
   isMemoryMode,
   isFilesMode,
-  isRunsMode,
   isVersionsMode,
+  isRunInspectionMode,
   hasEditableVersion,
   canUpdateCanvas,
   canvasDeletedRemotely,
   handleExitConsoleMode,
   handleExitMemoryMode,
   handleExitFilesMode,
-  handleExitRunsMode,
   handleExitVersionsMode,
+  handleClearRunInspection,
   handleToggleEditMode,
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
@@ -52,24 +50,24 @@ export function useWorkflowViewModeActions({
       handleExitFilesMode();
       return;
     }
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
-    }
     if (isVersionsMode) {
       handleExitVersionsMode();
+      return;
+    }
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
     }
   }, [
+    handleClearRunInspection,
     handleExitConsoleMode,
     handleExitFilesMode,
     handleExitMemoryMode,
-    handleExitRunsMode,
     handleExitVersionsMode,
     isConsoleMode,
     isFilesMode,
     isMemoryMode,
-    isRunsMode,
     isVersionsMode,
+    isRunInspectionMode,
   ]);
 
   const handleConsoleAddPanelRequest = useCallback(async () => {
@@ -90,17 +88,21 @@ export function useWorkflowViewModeActions({
     [handleConsoleAddPanelRequest, setIsConsoleAddPanelOpen],
   );
 
+  const onConsoleAddPanel = useCallback(() => {
+    void handleConsoleAddPanelRequest();
+  }, [handleConsoleAddPanelRequest]);
+
+  const onConsoleOpenYaml = useCallback(() => {
+    setIsConsoleYamlOpen(true);
+  }, [setIsConsoleYamlOpen]);
+
+  const consoleYamlReadOnly = !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
+
   return {
     handleSelectCanvasView,
-    handleConsoleAddPanelRequest,
     handleConsoleAddPanelDialogOpenChange,
-    ...getConsoleHeaderActions({
-      isEditing: hasEditableVersion,
-      isConsoleMode,
-      canUpdateCanvas,
-      canvasDeletedRemotely,
-      openAddPanel: () => void handleConsoleAddPanelRequest(),
-      openYaml: () => setIsConsoleYamlOpen(true),
-    }),
+    onConsoleAddPanel,
+    onConsoleOpenYaml,
+    consoleYamlReadOnly,
   };
 }
