@@ -29,9 +29,7 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 		Short: "List apps",
 		Args:  cobra.NoArgs,
 	}
-	var listFull bool
-	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
-	core.Bind(listCmd, &listCommand{full: &listFull}, options)
+	core.Bind(listCmd, &listCommand{}, options)
 
 	activeCmd := &cobra.Command{
 		Use:   "active [app-id]",
