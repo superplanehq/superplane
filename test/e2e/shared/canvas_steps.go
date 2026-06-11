@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
+	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -202,6 +204,49 @@ func (s *CanvasSteps) WaitForStagingOnCurrentDraft() uuid.UUID {
 		return err == nil && hasStaging
 	}, 15*time.Second, 200*time.Millisecond)
 	return versionID
+}
+
+const canvasYAMLRepositoryPath = "canvas.yaml"
+
+// DraftEffectiveSpec returns nodes and edges from staged canvas.yaml when present,
+// otherwise from the committed draft version row.
+func (s *CanvasSteps) DraftEffectiveSpec() ([]models.Node, []models.Edge) {
+	draft := s.FindCurrentDraft()
+	if draft == nil {
+		return nil, nil
+	}
+
+	rows, err := models.ListWorkflowStaging(draft.ID)
+	require.NoError(s.t, err)
+
+	for _, row := range rows {
+		if row.Path == canvasYAMLRepositoryPath && !row.Deleted && row.Content != "" {
+			pbCanvas, err := canvasyaml.ParseCanvasResource([]byte(row.Content))
+			if err != nil {
+				break
+			}
+			return actions.ProtoToNodes(pbCanvas.GetSpec().GetNodes()), actions.ProtoToEdges(pbCanvas.GetSpec().GetEdges())
+		}
+	}
+
+	return draft.Nodes, draft.Edges
+}
+
+// DraftNodeByName returns a node from the effective draft state (staged or committed).
+func (s *CanvasSteps) DraftNodeByName(name string) (models.Node, bool) {
+	nodes, _ := s.DraftEffectiveSpec()
+	for _, node := range nodes {
+		if node.Name == name {
+			return node, true
+		}
+	}
+	return models.Node{}, false
+}
+
+// CommitAndPublish commits staged edits, then publishes the draft to live.
+func (s *CanvasSteps) CommitAndPublish() {
+	s.CommitStaging()
+	s.Publish()
 }
 
 // CommitStaging clicks the orange Commit button and waits for staging to clear.
@@ -521,16 +566,8 @@ func (s *CanvasSteps) AddNote() {
 
 	s.session.Click(q.TestID("add-note-button"))
 	require.Eventually(s.t, func() bool {
-		draft := s.FindCurrentDraft()
-		if draft == nil {
-			return false
-		}
-		for _, node := range draft.Nodes {
-			if node.Name == "Note" {
-				return true
-			}
-		}
-		return false
+		_, ok := s.DraftNodeByName("Note")
+		return ok
 	}, 10*time.Second, 200*time.Millisecond)
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
@@ -791,11 +828,8 @@ func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 
 func (s *CanvasSteps) waitForDraftEdgeCount(expected int) {
 	require.Eventually(s.t, func() bool {
-		draft := s.FindCurrentDraft()
-		if draft == nil {
-			return false
-		}
-		return len(draft.Edges) == expected
+		_, edges := s.DraftEffectiveSpec()
+		return len(edges) == expected
 	}, 10*time.Second, 200*time.Millisecond, "draft edge count to reach %d", expected)
 }
 
