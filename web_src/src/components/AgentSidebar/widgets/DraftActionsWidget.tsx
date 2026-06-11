@@ -1,6 +1,8 @@
 import { Eye, Rocket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { getResponseErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 
 export interface DraftActionsWidgetProps {
   versionId: string;
@@ -11,6 +13,13 @@ export interface DraftActionsWidgetProps {
   onDismiss?: () => void;
 }
 
+type DraftAction = "publish" | "discard";
+
+const ACTION_FALLBACK_MESSAGE: Record<DraftAction, string> = {
+  publish: "Failed to publish draft.",
+  discard: "Failed to discard draft.",
+};
+
 export function DraftActionsWidget({
   versionId,
   message,
@@ -19,13 +28,14 @@ export function DraftActionsWidget({
   isEditing,
   onDismiss,
 }: DraftActionsWidgetProps) {
-  const [busy, setBusy] = useState<"publish" | "discard" | null>(null);
+  const [busy, setBusy] = useState<DraftAction | null>(null);
 
   const handleViewInEditor = () => {
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
-  const callApi = async (method: string, url: string, action: "publish" | "discard") => {
+  const callApi = async (method: string, url: string, action: DraftAction) => {
+    const fallback = ACTION_FALLBACK_MESSAGE[action];
     setBusy(action);
     try {
       const response = await fetch(url, {
@@ -38,12 +48,15 @@ export function DraftActionsWidget({
       });
       if (response.ok) {
         onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
+        return;
       }
-    } catch (err) {
-      console.error(`Failed to ${action}:`, err);
+      // Surface a user-friendly toast and avoid logging raw response bodies
+      // (e.g. HTML 502 error pages) which would otherwise be forwarded to
+      // Sentry by the global console.error capture integration.
+      const reason = await getResponseErrorMessage(response, fallback);
+      showErrorToast(reason);
+    } catch {
+      showErrorToast(fallback);
     } finally {
       setBusy(null);
     }
