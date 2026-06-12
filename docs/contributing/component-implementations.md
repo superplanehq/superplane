@@ -209,3 +209,4 @@ When implementing a new component:
 - Use appropriate field renderers based on type, not field name
 - Implement validation in `Setup()` method
 - The Setup() and Execute() methods should always have unit tests written for them
+- For triggers, add a thoughtful default run title expression in `pkg/grpc/actions/run_title_defaults.go`
