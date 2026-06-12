@@ -15,6 +15,17 @@ function makePublishedVersion(id: string): CanvasesCanvasVersion {
   };
 }
 
+function makePendingApprovalVersion(id: string): CanvasesCanvasVersion {
+  return {
+    metadata: {
+      id,
+      owner: { name: "Alice" },
+      createdAt: "2026-05-19T12:00:00Z",
+      state: "STATE_DRAFT",
+    },
+  };
+}
+
 describe("VersionsTabPanel", () => {
   it("shows the empty state when there is no published history", () => {
     render(
@@ -114,14 +125,7 @@ describe("VersionsTabPanel", () => {
 
   it("shows View Diff for pending change requests before live history loads", () => {
     const liveCanvasVersion = makePublishedVersion("live-version");
-    const pendingVersion = {
-      metadata: {
-        id: "pending-version",
-        owner: { name: "Alice" },
-        createdAt: "2026-05-19T12:00:00Z",
-        state: "STATE_PENDING_APPROVAL",
-      },
-    };
+    const pendingVersion = makePendingApprovalVersion("pending-version");
 
     render(
       <VersionsTabPanel
