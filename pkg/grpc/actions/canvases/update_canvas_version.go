@@ -49,6 +49,7 @@ func UpdateCanvasVersion(
 		autoLayout,
 		webhookBaseURL,
 		authService,
+		false,
 	)
 }
 
@@ -64,6 +65,7 @@ func UpdateCanvasVersionWithUsage(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
+	discardStaging bool,
 ) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -181,7 +183,15 @@ func UpdateCanvasVersionWithUsage(
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 
-		return tx.Save(version).Error
+		if err := tx.Save(version).Error; err != nil {
+			return err
+		}
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
+		return nil
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
