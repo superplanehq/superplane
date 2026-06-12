@@ -160,6 +160,9 @@ func (c *AssociateElasticIP) Configuration() []configuration.Field {
 				{Field: "operation", Values: []string{elasticIPOperationAssociate}},
 				{Field: "region", Values: []string{"*"}},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "operation", Values: []string{elasticIPOperationAssociate}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "ec2.instance",
@@ -282,7 +285,11 @@ func (c *AssociateElasticIP) executeAssociate(ctx core.ExecutionContext, client 
 		return err
 	}
 
-	instanceID := strings.TrimSpace(config.InstanceID)
+	instanceID, err := requireInstanceID(config.InstanceID)
+	if err != nil {
+		return err
+	}
+
 	output, err := client.AssociateAddress(AssociateAddressInput{
 		AllocationID:       allocationID,
 		InstanceID:         instanceID,
@@ -295,10 +302,8 @@ func (c *AssociateElasticIP) executeAssociate(ctx core.ExecutionContext, client 
 	payload := map[string]any{
 		"associationId": output.AssociationID,
 		"allocationId":  allocationID,
+		"instanceId":    instanceID,
 		"region":        region,
-	}
-	if instanceID != "" {
-		payload["instanceId"] = instanceID
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -334,6 +339,9 @@ func validateAssociateElasticIPConfiguration(config AssociateElasticIPConfigurat
 	switch operation {
 	case elasticIPOperationAssociate:
 		if _, err := requireAllocationID(config.AllocationID); err != nil {
+			return err
+		}
+		if _, err := requireInstanceID(config.InstanceID); err != nil {
 			return err
 		}
 	case elasticIPOperationDisassociate:
