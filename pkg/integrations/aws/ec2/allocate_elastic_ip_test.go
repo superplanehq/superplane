@@ -132,6 +132,38 @@ func Test__AllocateElasticIP__Execute(t *testing.T) {
 		assert.Contains(t, string(body), "PublicIpv4Pool=ipv4pool-ec2-abc123")
 	})
 
+	t.Run("tags are sent as TagSpecification params", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(allocateAddressXML("eipalloc-abc123", "203.0.113.10")),
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"tags": []any{
+					map[string]any{"key": "env", "value": "prod"},
+					map[string]any{"key": "owner", "value": "team-a"},
+				},
+			},
+			HTTP:           httpContext,
+			ExecutionState: executionState,
+			Integration:    elasticIPIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "TagSpecification.1.ResourceType=elastic-ip")
+		assert.Contains(t, string(body), "TagSpecification.1.Tag.1.Key=env")
+		assert.Contains(t, string(body), "TagSpecification.1.Tag.1.Value=prod")
+		assert.Contains(t, string(body), "TagSpecification.1.Tag.2.Key=owner")
+		assert.Contains(t, string(body), "TagSpecification.1.Tag.2.Value=team-a")
+	})
+
 	t.Run("Amazon pool ignores stale address in configuration", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

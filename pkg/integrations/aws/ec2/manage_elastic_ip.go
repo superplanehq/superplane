@@ -23,9 +23,9 @@ var validElasticIPOperations = []string{
 	elasticIPOperationDisassociate,
 }
 
-type AssociateElasticIP struct{}
+type ManageElasticIP struct{}
 
-type AssociateElasticIPConfiguration struct {
+type ManageElasticIPConfiguration struct {
 	Region        string `json:"region" mapstructure:"region"`
 	Operation     string `json:"operation" mapstructure:"operation"`
 	AllocationID  string `json:"allocationId" mapstructure:"allocationId"`
@@ -33,26 +33,26 @@ type AssociateElasticIPConfiguration struct {
 	AssociationID string `json:"associationId" mapstructure:"associationId"`
 }
 
-type AssociateElasticIPNodeMetadata struct {
+type ManageElasticIPNodeMetadata struct {
 	Region       string `json:"region" mapstructure:"region"`
 	Operation    string `json:"operation" mapstructure:"operation"`
 	InstanceName string `json:"instanceName,omitempty" mapstructure:"instanceName"`
 }
 
-func (c *AssociateElasticIP) Name() string {
-	return "aws.ec2.associateElasticIP"
+func (c *ManageElasticIP) Name() string {
+	return "aws.ec2.manageElasticIP"
 }
 
-func (c *AssociateElasticIP) Label() string {
-	return "EC2 • Associate Elastic IP"
+func (c *ManageElasticIP) Label() string {
+	return "EC2 • Manage Elastic IP"
 }
 
-func (c *AssociateElasticIP) Description() string {
+func (c *ManageElasticIP) Description() string {
 	return "Associate or disassociate an Elastic IP address with an EC2 instance"
 }
 
-func (c *AssociateElasticIP) Documentation() string {
-	return `The Associate Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
+func (c *ManageElasticIP) Documentation() string {
+	return `The Manage Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
 
 ## Use Cases
 
@@ -82,19 +82,19 @@ Emits operation-specific details on the default output channel:
 `
 }
 
-func (c *AssociateElasticIP) Icon() string {
+func (c *ManageElasticIP) Icon() string {
 	return "aws"
 }
 
-func (c *AssociateElasticIP) Color() string {
+func (c *ManageElasticIP) Color() string {
 	return "gray"
 }
 
-func (c *AssociateElasticIP) OutputChannels(configuration any) []core.OutputChannel {
+func (c *ManageElasticIP) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *AssociateElasticIP) Configuration() []configuration.Field {
+func (c *ManageElasticIP) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "region",
@@ -207,8 +207,8 @@ func (c *AssociateElasticIP) Configuration() []configuration.Field {
 	}
 }
 
-func (c *AssociateElasticIP) Setup(ctx core.SetupContext) error {
-	config := AssociateElasticIPConfiguration{}
+func (c *ManageElasticIP) Setup(ctx core.SetupContext) error {
+	config := ManageElasticIPConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -223,11 +223,11 @@ func (c *AssociateElasticIP) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid operation %q: must be one of associate, disassociate", config.Operation)
 	}
 
-	if err := validateAssociateElasticIPConfiguration(config, operation); err != nil {
+	if err := validateManageElasticIPConfiguration(config, operation); err != nil {
 		return err
 	}
 
-	metadata := AssociateElasticIPNodeMetadata{
+	metadata := ManageElasticIPNodeMetadata{
 		Region:    region,
 		Operation: operation,
 	}
@@ -242,8 +242,8 @@ func (c *AssociateElasticIP) Setup(ctx core.SetupContext) error {
 	return ctx.Metadata.Set(metadata)
 }
 
-func (c *AssociateElasticIP) Execute(ctx core.ExecutionContext) error {
-	config := AssociateElasticIPConfiguration{}
+func (c *ManageElasticIP) Execute(ctx core.ExecutionContext) error {
+	config := ManageElasticIPConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -258,7 +258,7 @@ func (c *AssociateElasticIP) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid operation %q: must be one of associate, disassociate", config.Operation)
 	}
 
-	if err := validateAssociateElasticIPConfiguration(config, operation); err != nil {
+	if err := validateManageElasticIPConfiguration(config, operation); err != nil {
 		return err
 	}
 
@@ -279,7 +279,7 @@ func (c *AssociateElasticIP) Execute(ctx core.ExecutionContext) error {
 	}
 }
 
-func (c *AssociateElasticIP) executeAssociate(ctx core.ExecutionContext, client *Client, region string, config AssociateElasticIPConfiguration) error {
+func (c *ManageElasticIP) executeAssociate(ctx core.ExecutionContext, client *Client, region string, config ManageElasticIPConfiguration) error {
 	allocationID, err := requireAllocationID(config.AllocationID)
 	if err != nil {
 		return err
@@ -308,12 +308,12 @@ func (c *AssociateElasticIP) executeAssociate(ctx core.ExecutionContext, client 
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		AssociateElasticIPAssociatePayloadType,
+		ManageElasticIPAssociatePayloadType,
 		[]any{payload},
 	)
 }
 
-func (c *AssociateElasticIP) executeDisassociate(ctx core.ExecutionContext, client *Client, region string, config AssociateElasticIPConfiguration) error {
+func (c *ManageElasticIP) executeDisassociate(ctx core.ExecutionContext, client *Client, region string, config ManageElasticIPConfiguration) error {
 	associationID, err := requireAssociationID(config.AssociationID)
 	if err != nil {
 		return err
@@ -325,7 +325,7 @@ func (c *AssociateElasticIP) executeDisassociate(ctx core.ExecutionContext, clie
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		AssociateElasticIPDisassociatePayloadType,
+		ManageElasticIPDisassociatePayloadType,
 		[]any{
 			map[string]any{
 				"associationId": associationID,
@@ -335,7 +335,7 @@ func (c *AssociateElasticIP) executeDisassociate(ctx core.ExecutionContext, clie
 	)
 }
 
-func validateAssociateElasticIPConfiguration(config AssociateElasticIPConfiguration, operation string) error {
+func validateManageElasticIPConfiguration(config ManageElasticIPConfiguration, operation string) error {
 	switch operation {
 	case elasticIPOperationAssociate:
 		if _, err := requireAllocationID(config.AllocationID); err != nil {
@@ -353,26 +353,26 @@ func validateAssociateElasticIPConfiguration(config AssociateElasticIPConfigurat
 	return nil
 }
 
-func (c *AssociateElasticIP) Hooks() []core.Hook {
+func (c *ManageElasticIP) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (c *AssociateElasticIP) HandleHook(ctx core.ActionHookContext) error {
+func (c *ManageElasticIP) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func (c *AssociateElasticIP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *ManageElasticIP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *AssociateElasticIP) Cancel(ctx core.ExecutionContext) error {
+func (c *ManageElasticIP) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *AssociateElasticIP) Cleanup(ctx core.SetupContext) error {
+func (c *ManageElasticIP) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *AssociateElasticIP) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *ManageElasticIP) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

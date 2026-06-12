@@ -27,7 +27,7 @@ interface Configuration {
   associationId?: string;
 }
 
-interface AssociateElasticIPNodeMetadata {
+interface ManageElasticIPNodeMetadata {
   region?: string;
   operation?: string;
   instanceName?: string;
@@ -70,7 +70,7 @@ export const elasticIPAssociationStateMap: EventStateMap = {
 
 const elasticIPPayloadPrefix = "aws.ec2.elastic-ip.";
 
-export const ASSOCIATE_ELASTIC_IP_STATE_REGISTRY: EventStateRegistry = {
+export const MANAGE_ELASTIC_IP_STATE_REGISTRY: EventStateRegistry = {
   stateMap: elasticIPAssociationStateMap,
   getState: (execution: ExecutionInfo) => {
     const state = defaultStateFunction(execution);
@@ -86,7 +86,7 @@ export const ASSOCIATE_ELASTIC_IP_STATE_REGISTRY: EventStateRegistry = {
   },
 };
 
-export const associateElasticIPMapper: ComponentBaseMapper = {
+export const manageElasticIPMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
@@ -96,9 +96,9 @@ export const associateElasticIPMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? associateElasticIPEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? manageElasticIPEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: associateElasticIPMetadata(context.node),
+      metadata: manageElasticIPMetadata(context.node),
       eventStateMap: elasticIPAssociationStateMap,
     };
   },
@@ -145,9 +145,9 @@ function operationLabelForExecution(configuration: Configuration | undefined, pa
   return (operation && operationLabels[operation]) ?? operation ?? "-";
 }
 
-function associateElasticIPMetadata(node: NodeInfo): MetadataItem[] {
+function manageElasticIPMetadata(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as Configuration | undefined;
-  const nodeMetadata = node.metadata as AssociateElasticIPNodeMetadata | undefined;
+  const nodeMetadata = node.metadata as ManageElasticIPNodeMetadata | undefined;
 
   const operation = configuration?.operation ?? nodeMetadata?.operation;
   const region = configuration?.region ?? nodeMetadata?.region;
@@ -170,7 +170,7 @@ function associateElasticIPMetadata(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function associateElasticIPEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function manageElasticIPEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
@@ -180,7 +180,7 @@ function associateElasticIPEventSections(nodes: NodeInfo[], execution: Execution
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
-      eventState: ASSOCIATE_ELASTIC_IP_STATE_REGISTRY.getState(execution),
+      eventState: MANAGE_ELASTIC_IP_STATE_REGISTRY.getState(execution),
       eventId: execution.rootEvent?.id || "",
     },
   ];

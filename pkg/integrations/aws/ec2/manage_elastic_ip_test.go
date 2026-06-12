@@ -11,8 +11,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__AssociateElasticIP__Setup(t *testing.T) {
-	component := &AssociateElasticIP{}
+func Test__ManageElasticIP__Setup(t *testing.T) {
+	component := &ManageElasticIP{}
 
 	t.Run("missing region -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -84,15 +84,15 @@ func Test__AssociateElasticIP__Setup(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		stored, ok := metadata.Get().(AssociateElasticIPNodeMetadata)
+		stored, ok := metadata.Get().(ManageElasticIPNodeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "us-east-1", stored.Region)
 		assert.Equal(t, "associate", stored.Operation)
 	})
 }
 
-func Test__AssociateElasticIP__Execute_Associate_MissingInstance(t *testing.T) {
-	component := &AssociateElasticIP{}
+func Test__ManageElasticIP__Execute_Associate_MissingInstance(t *testing.T) {
+	component := &ManageElasticIP{}
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
@@ -105,8 +105,8 @@ func Test__AssociateElasticIP__Execute_Associate_MissingInstance(t *testing.T) {
 	require.ErrorContains(t, err, "instance ID is required")
 }
 
-func Test__AssociateElasticIP__Execute_Associate(t *testing.T) {
-	component := &AssociateElasticIP{}
+func Test__ManageElasticIP__Execute_Associate(t *testing.T) {
+	component := &ManageElasticIP{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{okResponse(associateAddressXML("eipassoc-xyz789"))},
 	}
@@ -126,7 +126,7 @@ func Test__AssociateElasticIP__Execute_Associate(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, executionState.Passed)
-	assert.Equal(t, AssociateElasticIPAssociatePayloadType, executionState.Type)
+	assert.Equal(t, ManageElasticIPAssociatePayloadType, executionState.Type)
 	require.Len(t, executionState.Payloads, 1)
 
 	wrapped, ok := executionState.Payloads[0].(map[string]any)
@@ -147,8 +147,8 @@ func Test__AssociateElasticIP__Execute_Associate(t *testing.T) {
 	assert.Contains(t, string(body), "AllowReassociation=true")
 }
 
-func Test__AssociateElasticIP__Execute_Disassociate(t *testing.T) {
-	component := &AssociateElasticIP{}
+func Test__ManageElasticIP__Execute_Disassociate(t *testing.T) {
+	component := &ManageElasticIP{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{okResponse(disassociateAddressXML())},
 	}
@@ -167,7 +167,7 @@ func Test__AssociateElasticIP__Execute_Disassociate(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, executionState.Passed)
-	assert.Equal(t, AssociateElasticIPDisassociatePayloadType, executionState.Type)
+	assert.Equal(t, ManageElasticIPDisassociatePayloadType, executionState.Type)
 	require.Len(t, executionState.Payloads, 1)
 
 	wrapped, ok := executionState.Payloads[0].(map[string]any)
