@@ -19,7 +19,7 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 	}
 
 	configFields := trigger.Configuration()
-	configFields = actions.AppendGlobalTriggerFields(configFields)
+	configFields = actions.AppendGlobalTriggerFields(trigger.Name(), configFields)
 	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)

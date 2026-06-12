@@ -32,7 +32,7 @@ describe("isBackwardEdge", () => {
 
 describe("getUpwardBackwardGutterY", () => {
   it("places the gutter just below the target row", () => {
-    expect(getUpwardBackwardGutterY(268, 118)).toBe(308);
+    expect(getUpwardBackwardGutterY(268, 118)).toBe(388);
   });
 });
 
@@ -104,7 +104,7 @@ describe("getCanvasEdgePath", () => {
 
     expect(path).not.toContain("C");
     expect(path).toContain("924,268");
-    expect(path).toContain("308");
+    expect(path).toContain("388");
     expect(path).toContain("200 118");
   });
 });
