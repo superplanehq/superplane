@@ -110,7 +110,7 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 
 func capabilityConfigurationFields(capability core.Capability) []configuration.Field {
 	if capability.Type == core.IntegrationCapabilityTypeTrigger {
-		return actions.AppendGlobalTriggerFields(capability.Configuration)
+		return actions.AppendGlobalTriggerFields(capability.Name, capability.Configuration)
 	}
 
 	return capability.Configuration
@@ -146,7 +146,7 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 	}
 
 	for _, trigger := range integration.Triggers() {
-		configFields := actions.AppendGlobalTriggerFields(trigger.Configuration())
+		configFields := actions.AppendGlobalTriggerFields(trigger.Name(), trigger.Configuration())
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = actions.ConfigurationFieldToProto(field)
