@@ -782,12 +782,16 @@ The Create Instance component provisions a new Cloud SQL instance.
 - **Region**: The region to create the instance in, chosen from the regions where Cloud SQL is available
 - **Tier**: The machine tier (size), chosen from the predefined tiers available in the selected region. Custom machine types (`db-custom-*`) are not listed.
 - **Disk Size (GB)**: The data disk size (minimum 10)
+- **Disk Type**: SSD (default) or HDD
 - **Edition**: Enterprise or Enterprise Plus
+- **Availability**: Zonal (single zone, default) or Regional (adds a standby in another zone for high availability)
 - **Root Password**: Initial password for the default admin user (optional, stored as a secret)
 - **Assign Public IP**: Whether to give the instance a public IPv4 address (default yes)
 - **SSL Mode**: How the instance enforces SSL/TLS on incoming connections (optional)
 - **Authorized Networks**: CIDR ranges allowed to connect over the public IP (optional)
+- **Automated Backups**: Enable daily automated backups (optional)
 - **Deletion Protection**: Prevent the instance from being deleted until protection is removed (optional)
+- **Labels**: Key-value labels applied to the instance (optional)
 
 ### Output
 

@@ -88,6 +88,39 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.Equal(t, "34.41.10.20", data["ipAddress"])
 	})
 
+	t.Run("fails the execution when the instance enters FAILED", func(t *testing.T) {
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				return []byte(`{"name":"op-9","status":"PENDING","targetId":"my-instance"}`), nil
+			},
+			getFunc: func(ctx context.Context, url string) ([]byte, error) {
+				return []byte(`{"name":"my-instance","state":"FAILED"}`), nil
+			},
+		}
+		withFactory(mc)
+
+		metadata := &contexts.MetadataContext{}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name": "my-instance", "databaseVersion": "POSTGRES_16",
+				"region": "us-central1", "tier": "db-f1-micro",
+			},
+			Metadata:       metadata,
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: state,
+		}))
+
+		// The poll must fail the execution (not return an error, which would roll
+		// back the request and leave the run in progress forever).
+		err := c.HandleHook(core.ActionHookContext{Name: pollHookName, Metadata: metadata, Requests: &contexts.RequestContext{}, ExecutionState: state})
+		require.NoError(t, err)
+		assert.True(t, state.Finished)
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "entered state FAILED")
+	})
+
 	t.Run("clamps a sub-minimum disk size up to the minimum", func(t *testing.T) {
 		var postBody map[string]any
 		mc := &mockClient{
@@ -135,9 +168,15 @@ func Test__CreateInstance__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"name": "my-instance", "databaseVersion": "POSTGRES_16",
 				"region": "us-central1", "tier": "db-f1-micro",
-				"publicIp": false, "sslMode": "ENCRYPTED_ONLY",
+				"dataDiskType": "PD_HDD", "availabilityType": "REGIONAL",
+				"automatedBackups": true,
+				"publicIp":         false, "sslMode": "ENCRYPTED_ONLY",
 				"authorizedNetworks": []any{"203.0.113.0/24", "  ", "198.51.100.7/32"},
 				"deletionProtection": true,
+				"labels": []any{
+					map[string]any{"key": "env", "value": "staging"},
+					map[string]any{"key": "  ", "value": "ignored"},
+				},
 			},
 			Metadata:       &contexts.MetadataContext{},
 			Requests:       requests,
@@ -148,6 +187,13 @@ func Test__CreateInstance__Execute(t *testing.T) {
 
 		settings := postBody["settings"].(map[string]any)
 		assert.Equal(t, true, settings["deletionProtectionEnabled"])
+		assert.Equal(t, "PD_HDD", settings["dataDiskType"])
+		assert.Equal(t, "REGIONAL", settings["availabilityType"])
+		backups := settings["backupConfiguration"].(map[string]any)
+		assert.Equal(t, true, backups["enabled"])
+		// Blank-key labels are dropped; the rest become userLabels.
+		labels := settings["userLabels"].(map[string]string)
+		assert.Equal(t, map[string]string{"env": "staging"}, labels)
 		ipConfig := settings["ipConfiguration"].(map[string]any)
 		assert.Equal(t, false, ipConfig["ipv4Enabled"])
 		assert.Equal(t, "ENCRYPTED_ONLY", ipConfig["sslMode"])
@@ -189,6 +235,10 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.False(t, hasNets)
 		_, hasDP := settings["deletionProtectionEnabled"]
 		assert.False(t, hasDP)
+		_, hasBackups := settings["backupConfiguration"]
+		assert.False(t, hasBackups)
+		_, hasLabels := settings["userLabels"]
+		assert.False(t, hasLabels)
 	})
 
 	t.Run("missing name fails the execution", func(t *testing.T) {

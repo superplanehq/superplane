@@ -2,7 +2,6 @@ package cloudsql
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -125,7 +124,9 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 
 // poll re-checks the instance until it no longer exists (then emits a deletion
 // confirmation), or the attempt/error budget is exhausted; otherwise it
-// re-schedules itself.
+// re-schedules itself. Terminal conditions fail the execution via
+// ExecutionState.Fail — returning a plain error would roll back the request and
+// leave the run in progress forever.
 func (d *DeleteInstance) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
@@ -133,10 +134,10 @@ func (d *DeleteInstance) poll(ctx core.ActionHookContext) error {
 
 	var md instanceExecMetadata
 	if err := mapstructure.WeakDecode(ctx.Metadata.Get(), &md); err != nil {
-		return fmt.Errorf("failed to decode poll metadata: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode poll metadata: %v", err))
 	}
 	if md.Instance == "" {
-		return errors.New("poll metadata is missing the instance name")
+		return ctx.ExecutionState.Fail("error", "poll metadata is missing the instance name")
 	}
 
 	client, err := getClient(ctx.HTTP, ctx.Integration)
@@ -155,7 +156,7 @@ func (d *DeleteInstance) poll(ctx core.ActionHookContext) error {
 		md.PollErrors++
 		ctx.Logger.Warnf("failed to get instance %s (attempt %d/%d): %v", md.Instance, md.PollErrors, maxPollErrors, err)
 		if md.PollErrors >= maxPollErrors {
-			return fmt.Errorf("giving up polling instance %s after %d consecutive errors: %w", md.Instance, maxPollErrors, err)
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("giving up polling instance %s after %d consecutive errors: %v", md.Instance, maxPollErrors, err))
 		}
 		if err := ctx.Metadata.Set(md); err != nil {
 			return err
@@ -170,7 +171,7 @@ func (d *DeleteInstance) poll(ctx core.ActionHookContext) error {
 		return err
 	}
 	if md.PollAttempts >= instanceMaxPollAttempts {
-		return fmt.Errorf("timed out waiting for instance %s to be deleted after %d polls", md.Instance, md.PollAttempts)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("timed out waiting for instance %s to be deleted after %d polls", md.Instance, md.PollAttempts))
 	}
 	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
 }
