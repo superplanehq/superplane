@@ -1,0 +1,29 @@
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "94.39090288589495"
+        ]
+      },
+      {
+        "metric": {
+          "component": "run_promql_range_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "72.52482929121066"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.query"
+}

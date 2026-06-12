@@ -1,0 +1,28 @@
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query"
+        },
+        "values": [
+          [
+            1781102220,
+            "0.620012400248005"
+          ],
+          [
+            1781102250,
+            "0.5400108002160044"
+          ],
+          [
+            1781105820,
+            "0.48"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.queryRange"
+}
