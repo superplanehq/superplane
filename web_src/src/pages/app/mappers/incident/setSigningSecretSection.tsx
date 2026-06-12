@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesCommitCanvasRepositoryFiles,
+  canvasesStageCanvasRepositoryFile,
+  canvasesCommitCanvasStaging,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
@@ -58,12 +59,10 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
-  await canvasesCommitCanvasRepositoryFiles(
+  await canvasesStageCanvasRepositoryFile(
     withOrganizationHeader({
-      path: { canvasId: params.canvasId },
+      path: { canvasId: params.canvasId, versionId: params.versionId },
       body: {
-        versionId: params.versionId,
-        message: "Update canvas.yaml",
         operations: [
           {
             path: CANVAS_YAML_PATH,
@@ -71,6 +70,12 @@ async function commitUpdatedCanvasVersionYaml(params: {
           },
         ],
       },
+    }),
+  );
+  await canvasesCommitCanvasStaging(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId, versionId: params.versionId },
+      body: {},
     }),
   );
   params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);

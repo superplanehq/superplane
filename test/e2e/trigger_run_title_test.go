@@ -71,7 +71,7 @@ func (s *triggerRunTitleSteps) waitForAutoSave() {
 
 func (s *triggerRunTitleSteps) saveAndPublish() {
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
@@ -128,27 +128,12 @@ func (s *triggerRunTitleSteps) findLatestRootEvent() *models.CanvasEvent {
 func (s *triggerRunTitleSteps) waitForNodeID() string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		draft := s.canvas.FindCurrentDraft()
-		if draft == nil {
-			time.Sleep(300 * time.Millisecond)
-			continue
-		}
-
-		for _, node := range draft.Nodes {
-			if node.Name == "Start" {
-				return node.ID
-			}
+		if node, ok := s.canvas.DraftNodeByName("Start"); ok {
+			return node.ID
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	require.NotNil(s.t, draft, "no draft version found")
-	for _, node := range draft.Nodes {
-		if node.Name == "Start" {
-			return node.ID
-		}
-	}
 	require.FailNow(s.t, "expected Start node in draft")
 	return ""
 }
@@ -158,12 +143,8 @@ func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
 		return nil, false, false
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	if draft == nil {
-		return nil, false, false
-	}
-
-	for _, node := range draft.Nodes {
+	nodes, _ := s.canvas.DraftEffectiveSpec()
+	for _, node := range nodes {
 		if node.ID == s.nodeID {
 			val, exists := node.Configuration["customName"]
 			return val, exists, true
