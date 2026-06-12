@@ -58,7 +58,7 @@ export function RunRow({
         className="absolute inset-0 z-0"
         aria-label={title}
       />
-      <span className="pointer-events-none relative z-0 flex w-full items-center gap-1.5">
+      <span className="pointer-events-none relative z-0 flex min-w-0 flex-1 items-center gap-1.5">
         <RunNodeIcon
           iconSrc={iconSrc}
           iconSlug={iconSlug}
