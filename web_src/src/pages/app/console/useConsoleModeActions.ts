@@ -2,52 +2,25 @@ import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface ConsoleModeActionsConfig {
-  setIsConsoleMode: (value: boolean) => void;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
-  setIsRunsMode: (value: boolean) => void;
-  setIsVersionsMode: (value: boolean) => void;
-  setIsMemoryMode: (value: boolean) => void;
-  setIsFilesMode: (value: boolean) => void;
-  setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
 export function useConsoleModeActions({
-  setIsConsoleMode,
   setIsConsoleAddPanelOpen,
   setIsConsoleYamlOpen,
-  setIsRunsMode,
-  setIsVersionsMode,
-  setIsMemoryMode,
-  setIsFilesMode,
-  setSelectedRunId,
   setSearchParams,
 }: ConsoleModeActionsConfig) {
   const handleSelectConsoleMode = useCallback(() => {
-    setIsConsoleMode(true);
-    setIsRunsMode(false);
-    setIsVersionsMode(false);
-    setIsMemoryMode(false);
-    setIsFilesMode(false);
-    setSelectedRunId(null);
     setSearchParams(toConsoleSearchParams, { replace: true });
-  }, [
-    setIsConsoleMode,
-    setIsFilesMode,
-    setIsMemoryMode,
-    setIsRunsMode,
-    setIsVersionsMode,
-    setSearchParams,
-    setSelectedRunId,
-  ]);
+  }, [setSearchParams]);
 
   const handleExitConsoleMode = useCallback(() => {
-    setIsConsoleMode(false);
     setIsConsoleAddPanelOpen(false);
     setIsConsoleYamlOpen(false);
     setSearchParams(removeConsoleSearchParam, { replace: true });
-  }, [setIsConsoleAddPanelOpen, setIsConsoleYamlOpen, setIsConsoleMode, setSearchParams]);
+  }, [setIsConsoleAddPanelOpen, setIsConsoleYamlOpen, setSearchParams]);
 
   return { handleSelectConsoleMode, handleExitConsoleMode };
 }

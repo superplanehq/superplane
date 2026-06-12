@@ -10,6 +10,7 @@ import { VersionRow } from "./VersionsTabPanelRow";
 export interface VersionsTabPanelProps {
   scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
+  liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   pendingApprovalVersions?: Array<{
     version: CanvasesCanvasVersion;
@@ -51,6 +52,7 @@ type VersionRowItem = {
 export function VersionsTabPanel({
   scrollPersistenceKey,
   liveCanvasVersionId,
+  liveCanvasVersion,
   selectedCanvasVersion,
   pendingApprovalVersions,
   rejectedVersions,
@@ -81,6 +83,7 @@ export function VersionsTabPanel({
     setRejectedVersionsExpanded,
   } = useVersionsPanelData({
     liveCanvasVersionId,
+    liveCanvasVersion,
     selectedCanvasVersion,
     pendingApprovalVersions,
     rejectedVersions,
@@ -145,6 +148,7 @@ export function VersionsTabPanel({
 
 function useVersionsPanelData({
   liveCanvasVersionId,
+  liveCanvasVersion,
   selectedCanvasVersion,
   pendingApprovalVersions,
   rejectedVersions,
@@ -156,6 +160,7 @@ function useVersionsPanelData({
 }: Pick<
   VersionsTabPanelProps,
   | "liveCanvasVersionId"
+  | "liveCanvasVersion"
   | "selectedCanvasVersion"
   | "pendingApprovalVersions"
   | "rejectedVersions"
@@ -178,7 +183,8 @@ function useVersionsPanelData({
     },
     [onVersionNodeDiffContextChange],
   );
-  const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, liveVersions[0]);
+  const baselineVersion = liveVersions[0] ?? liveCanvasVersion ?? undefined;
+  const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, baselineVersion);
   const liveItems = buildLiveItems({
     liveCanvasVersionId,
     liveVersions,
@@ -187,7 +193,7 @@ function useVersionsPanelData({
     onLoadMoreLiveVersions,
     selectedVersionId,
   });
-  const rejectedItems = buildRejectedItems(rejectedList, selectedVersionId, liveVersions[0]);
+  const rejectedItems = buildRejectedItems(rejectedList, selectedVersionId, baselineVersion);
   const hasNoVersions = liveVersions.length === 0 && pendingItems.length === 0 && rejectedItems.length === 0;
 
   return {
