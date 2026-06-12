@@ -42,7 +42,13 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 		return nil, status.Error(codes.InvalidArgument, "cannot update provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, spec)
+	//
+	// UpdateSecret only updates the encrypted payload, never the secret name
+	// (renames go through UpdateSecretName). Encrypt with the persisted name
+	// as AAD so subsequent reads can decrypt the stored bytes regardless of
+	// what the client sent in spec.Metadata.Name.
+	//
+	data, err := prepareSecretData(ctx, encryptor, spec, secret.Name)
 	if err != nil {
 		return nil, err
 	}

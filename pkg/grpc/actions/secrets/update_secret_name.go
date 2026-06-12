@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -37,7 +38,7 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return &pb.UpdateSecretNameResponse{Secret: s}, nil
 	}
 
-	updated, err := secret.UpdateName(name)
+	updated, err := updateSecretName(ctx, encryptor, secret, name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -50,4 +51,27 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return nil, err
 	}
 	return &pb.UpdateSecretNameResponse{Secret: s}, nil
+}
+
+// updateSecretName persists a new name for the secret and, when the secret is
+// stored with an AAD-bound encryption (currently the local provider),
+// re-encrypts the payload so the stored data stays decryptable under the new
+// name. Doing both column updates together avoids leaving the row in a state
+// where `data` cannot be decrypted with `name`.
+func updateSecretName(ctx context.Context, encryptor crypto.Encryptor, secret *models.Secret, name string) (*models.Secret, error) {
+	if secret.Provider != secrets.ProviderLocal || len(secret.Data) == 0 {
+		return secret.UpdateName(name)
+	}
+
+	values, err := decryptSecretData(ctx, encryptor, *secret)
+	if err != nil {
+		return nil, err
+	}
+
+	encrypted, err := encryptSecretData(ctx, encryptor, name, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return secret.UpdateNameAndData(name, encrypted)
 }

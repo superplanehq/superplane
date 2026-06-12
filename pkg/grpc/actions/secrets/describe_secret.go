@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -67,19 +68,45 @@ func serializeSecret(ctx context.Context, encryptor crypto.Encryptor, secret mod
 }
 
 func serializeLocalSecretData(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (*pb.Secret_Local, error) {
+	local := &pb.Secret_Local{
+		Data: map[string]string{},
+	}
+
+	if len(secret.Data) == 0 {
+		return local, nil
+	}
+
 	data, err := encryptor.Decrypt(ctx, secret.Data, []byte(secret.Name))
 	if err != nil {
-		return nil, err
+		//
+		// A failure to decrypt one secret's payload (for example because of an
+		// AAD mismatch caused by an older bug that renamed a secret without
+		// re-encrypting its data) must not take down endpoints that fan-out
+		// over many secrets, like ListSecrets. Log and degrade gracefully by
+		// returning an empty key set instead of bubbling up an Internal error.
+		//
+		log.WithError(err).WithFields(log.Fields{
+			"secret_id":   secret.ID.String(),
+			"secret_name": secret.Name,
+			"domain_id":   secret.DomainID.String(),
+			"domain_type": secret.DomainType,
+		}).Warn("failed to decrypt secret payload; returning empty key set")
+		return local, nil
+	}
+
+	if len(data) == 0 {
+		return local, nil
 	}
 
 	var values map[string]string
-	err = json.Unmarshal(data, &values)
-	if err != nil {
-		return nil, err
-	}
-
-	local := &pb.Secret_Local{
-		Data: map[string]string{},
+	if err := json.Unmarshal(data, &values); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"secret_id":   secret.ID.String(),
+			"secret_name": secret.Name,
+			"domain_id":   secret.DomainID.String(),
+			"domain_type": secret.DomainType,
+		}).Warn("failed to parse secret payload; returning empty key set")
+		return local, nil
 	}
 
 	//
