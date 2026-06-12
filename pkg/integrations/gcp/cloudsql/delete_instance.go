@@ -111,6 +111,14 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if _, err := deleteInstance(context.Background(), client, client.ProjectID(), instance); err != nil {
+		if gcpcommon.IsNotFoundError(err) {
+			// The instance is already gone — confirm the deletion instead of
+			// failing, mirroring how the poll path treats a 404. This keeps the
+			// component idempotent when the instance was removed out of band.
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, instancePayloadType, []any{
+				map[string]any{"name": instance, "deleted": true},
+			})
+		}
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete instance", err, roleHintAdmin))
 	}
 

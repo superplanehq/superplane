@@ -31,6 +31,33 @@ func Test__DeleteInstance__Setup(t *testing.T) {
 func Test__DeleteInstance__Execute(t *testing.T) {
 	d := &DeleteInstance{}
 
+	t.Run("confirms deletion when the instance is already gone", func(t *testing.T) {
+		mc := &mockClient{
+			projectID: "my-project",
+			deleteFunc: func(ctx context.Context, url string) ([]byte, error) {
+				return nil, &gcpcommon.GCPAPIError{StatusCode: http.StatusNotFound, Message: "not found"}
+			},
+		}
+		withFactory(mc)
+
+		requests := &contexts.RequestContext{}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := d.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"instance": "my-instance"},
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requests,
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		// Already-gone instances emit the deletion confirmation immediately,
+		// without scheduling a poll.
+		assert.True(t, state.Passed)
+		assert.Empty(t, requests.Action)
+		data := firstData(t, state)
+		assert.Equal(t, "my-instance", data["name"])
+		assert.Equal(t, true, data["deleted"])
+	})
+
 	t.Run("starts deletion and schedules a poll that emits once the instance is gone", func(t *testing.T) {
 		var deleteURL string
 		stillExists := true
