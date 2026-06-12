@@ -15,10 +15,8 @@ import (
 type CreateDatabase struct{}
 
 type CreateDatabaseSpec struct {
-	Instance  string `json:"instance" mapstructure:"instance"`
-	Name      string `json:"name" mapstructure:"name"`
-	Charset   string `json:"charset" mapstructure:"charset"`
-	Collation string `json:"collation" mapstructure:"collation"`
+	Instance string `json:"instance" mapstructure:"instance"`
+	Name     string `json:"name" mapstructure:"name"`
 }
 
 func (c *CreateDatabase) Name() string {
@@ -46,8 +44,6 @@ func (c *CreateDatabase) Documentation() string {
 
 - **Instance**: The Cloud SQL instance that will contain the new database (required)
 - **Database Name**: The name of the database to create (required, supports expressions)
-- **Character Set**: The character set for the new database (optional, engine default when empty)
-- **Collation**: The collation for the new database (optional, engine default when empty)
 
 ## Output
 
@@ -94,22 +90,6 @@ func (c *CreateDatabase) Configuration() []configuration.Field {
 			Description: "The name of the database to create",
 			Placeholder: "app_db",
 		},
-		{
-			Name:        "charset",
-			Label:       "Character Set",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The character set (e.g. UTF8 for PostgreSQL, utf8mb4 for MySQL). Leave empty for the engine default.",
-			Placeholder: "e.g. utf8mb4",
-		},
-		{
-			Name:        "collation",
-			Label:       "Collation",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The collation (e.g. en_US.UTF8 for PostgreSQL, utf8mb4_general_ci for MySQL). Leave empty for the engine default.",
-			Placeholder: "e.g. utf8mb4_general_ci",
-		},
 	}
 }
 
@@ -149,8 +129,7 @@ func (c *CreateDatabase) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
-	db, err := createDatabase(context.Background(), client, client.ProjectID(), instance, name,
-		strings.TrimSpace(spec.Charset), strings.TrimSpace(spec.Collation))
+	db, err := createDatabase(context.Background(), client, client.ProjectID(), instance, name)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create database", err))
 	}

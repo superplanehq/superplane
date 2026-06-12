@@ -64,40 +64,6 @@ func Test__CreateDatabase__Execute(t *testing.T) {
 		assert.Equal(t, "app_db", data["name"])
 		assert.Equal(t, "my-instance", data["instance"])
 		assert.Equal(t, "UTF8", data["charset"])
-		// No charset/collation configured -> omitted so the engine defaults apply.
-		_, hasCharset := postBody["charset"]
-		assert.False(t, hasCharset)
-		_, hasCollation := postBody["collation"]
-		assert.False(t, hasCollation)
-	})
-
-	t.Run("passes charset and collation through to the API", func(t *testing.T) {
-		var postBody map[string]any
-		mc := &mockClient{
-			projectID: "my-project",
-			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
-				postBody, _ = body.(map[string]any)
-				return []byte(doneOperation), nil
-			},
-			getFunc: func(ctx context.Context, url string) ([]byte, error) {
-				return []byte(`{"name":"app_db","instance":"my-instance","project":"my-project","charset":"utf8mb4","collation":"utf8mb4_general_ci"}`), nil
-			},
-		}
-		withFactory(mc)
-
-		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := c.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"instance": "my-instance", "name": "app_db",
-				"charset": "utf8mb4", "collation": "utf8mb4_general_ci",
-			},
-			ExecutionState: state,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, state.Passed)
-		assert.Equal(t, "utf8mb4", postBody["charset"])
-		assert.Equal(t, "utf8mb4_general_ci", postBody["collation"])
 	})
 
 	t.Run("surfaces a failed operation", func(t *testing.T) {

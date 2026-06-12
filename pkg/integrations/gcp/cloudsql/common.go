@@ -81,16 +81,9 @@ func operationURL(project, operationName string) string {
 }
 
 // createDatabase creates a logical database in the instance, waits for the
-// returned operation to finish, and returns the created database. Charset and
-// collation are optional; when blank the database engine's defaults apply.
-func createDatabase(ctx context.Context, client Client, project, instance, name, charset, collation string) (*Database, error) {
+// returned operation to finish, and returns the created database.
+func createDatabase(ctx context.Context, client Client, project, instance, name string) (*Database, error) {
 	body := map[string]any{"name": name, "project": project, "instance": instance}
-	if charset != "" {
-		body["charset"] = charset
-	}
-	if collation != "" {
-		body["collation"] = collation
-	}
 	respBody, err := client.PostURL(ctx, databasesURL(project, instance), body)
 	if err != nil {
 		return nil, err
