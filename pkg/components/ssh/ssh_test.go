@@ -10,8 +10,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+// Legacy SSH nodes were saved before the commandSource field existed, so their
+// stored configuration omits it entirely. ValidateConfiguration does not apply
+// Field.Default, so commandSource must stay optional at the schema level or
+// re-validating/patching such a node would fail even though inline commands are
+// valid (the worker defaults the source to inline via commandSourceOrDefault).
+func TestSSHCommand_ValidateConfiguration_LegacyConfigWithoutCommandSource(t *testing.T) {
+	c := &SSHCommand{}
+	fields := c.Configuration()
+
+	legacyConfig := map[string]any{
+		"host":     "example.com",
+		"port":     22,
+		"username": "root",
+		"authentication": map[string]any{
+			"authMethod": AuthMethodPassword,
+			"password":   map[string]any{"secret": "my-secret", "key": "password"},
+		},
+		"commands": "echo hi\nls -la",
+		"timeout":  60,
+	}
+
+	require.NoError(t, configuration.ValidateConfiguration(fields, legacyConfig))
+}
 
 type testMetadataContext struct {
 	value any

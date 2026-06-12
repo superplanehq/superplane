@@ -251,8 +251,14 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Label:       "Command source",
 			Type:        configuration.FieldTypeSelect,
 			Description: "Where the commands come from",
-			Required:    true,
-			Default:     CommandSourceInline,
+			// Optional at the schema level even though it has a default:
+			// configuration.ValidateConfiguration does not apply Field.Default, so
+			// requiring it would reject legacy SSH nodes saved before this field
+			// existed when their configuration is re-validated or patched. The
+			// worker defaults a missing/blank value to inline via
+			// commandSourceOrDefault, and the UI uses Default to pre-fill new nodes.
+			Required: false,
+			Default:  CommandSourceInline,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
