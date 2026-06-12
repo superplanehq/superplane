@@ -67,10 +67,22 @@ func loadOwnedDraftVersion(
 	return canvas, version, userUUID, nil
 }
 
-// buildStagingState reports the uncommitted spec edits held in workflow_staging
+// ensureStagedReadAllowed restricts effective staged reads to the draft owner.
+// Staging rows can outlive a draft's edit session; without this check any org
+// reader could pass ?stage=true and read someone else's uncommitted work.
+func ensureStagedReadAllowed(ctx context.Context, version *models.CanvasVersion) error {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
+	return ensureVersionIsOwnedRegisteredDraft(uuid.MustParse(userID), version)
+}
+
+// buildStagingSummary reports the uncommitted spec edits held in workflow_staged_files
 // for a draft version so the UI can drive its orange/blue indicators.
-func buildStagingState(versionID uuid.UUID, rows []models.WorkflowStaging) *pb.StagingState {
-	state := &pb.StagingState{}
+func buildStagingSummary(versionID uuid.UUID, rows []models.WorkflowStaging) *pb.StagingSummary {
+	state := &pb.StagingSummary{}
 	if len(rows) == 0 {
 		return state
 	}
@@ -118,7 +130,7 @@ func effectiveSpecYAML(
 }
 
 // StageRepositorySpecFileOperations stores repository file edits in
-// workflow_staging verbatim, leaving workflow_versions untouched until commit.
+// workflow_staged_files verbatim, leaving workflow_versions untouched until commit.
 // Both spec files (canvas.yaml/console.yaml, committed into the version row) and
 // arbitrary repository files (committed to git) are accepted; the path kind is
 // resolved at commit time.
@@ -128,7 +140,7 @@ func StageRepositorySpecFileOperations(
 	canvasID string,
 	versionID string,
 	operations []*pb.CanvasRepositoryFileOperation,
-) (*pb.StagingState, error) {
+) (*pb.StagingSummary, error) {
 	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return nil, err
@@ -173,17 +185,17 @@ func StageRepositorySpecFileOperations(
 		return nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
 	}
 
-	return buildStagingState(version.ID, rows), nil
+	return buildStagingSummary(version.ID, rows), nil
 }
 
-// stagingStateForVersion returns the StagingState for a version, used by reads
+// stagingSummaryForVersion returns the StagingSummary for a version, used by reads
 // to drive draft indicators without a dedicated list endpoint.
-func stagingStateForVersion(versionID uuid.UUID) (*pb.StagingState, []models.WorkflowStaging, error) {
+func stagingSummaryForVersion(versionID uuid.UUID) (*pb.StagingSummary, []models.WorkflowStaging, error) {
 	rows, err := models.ListWorkflowStaging(versionID)
 	if err != nil {
 		return nil, nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
 	}
-	return buildStagingState(versionID, rows), rows, nil
+	return buildStagingSummary(versionID, rows), rows, nil
 }
 
 // ReadStagedRepositoryFile returns the staged content for an arbitrary (non-spec)
@@ -206,7 +218,11 @@ func ReadStagedRepositoryFile(
 		return "", false, false, err
 	}
 
-	_, rows, err := stagingStateForVersion(version.ID)
+	if err := ensureStagedReadAllowed(ctx, version); err != nil {
+		return "", false, false, err
+	}
+
+	_, rows, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return "", false, false, err
 	}

@@ -32,7 +32,7 @@ func ApplyCanvasAutoLayout(
 		return nil, err
 	}
 
-	_, rows, err := stagingStateForVersion(version.ID)
+	_, rows, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,10 +82,10 @@ func ApplyCanvasAutoLayout(
 		return nil, status.Errorf(codes.Internal, "failed to stage canvas layout: %v", err)
 	}
 
-	state, _, err := stagingStateForVersion(version.ID)
+	state, _, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.ApplyCanvasAutoLayoutResponse{StagingState: state}, nil
+	return &pb.ApplyCanvasAutoLayoutResponse{StagingSummary: state}, nil
 }

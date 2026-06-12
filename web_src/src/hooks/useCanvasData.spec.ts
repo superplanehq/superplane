@@ -323,9 +323,11 @@ describe("useUpdateCanvasConsole", () => {
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
     canvasesStageCanvasRepositoryFile.mockResolvedValue({ data: {} });
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
-    canvasesDiscardCanvasStaging.mockResolvedValue({ data: { stagingState: { hasStaging: false, stagedPaths: [] } } });
+    canvasesDiscardCanvasStaging.mockResolvedValue({
+      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+    });
     canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingState: { hasStaging: false, stagedPaths: [] } },
+      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
     });
     mockConsoleRepositoryFileFetch(emptyConsoleYaml);
 
@@ -388,7 +390,7 @@ describe("useUpdateCanvasConsole", () => {
     canvasesStageCanvasRepositoryFile.mockReturnValue(savePromise);
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
     canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingState: { hasStaging: true, stagedPaths: ["console.yaml"] } },
+      data: { stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] } },
     });
     mockConsoleRepositoryFileFetch(afterConsoleYaml, { committedYaml: emptyConsoleYaml });
 

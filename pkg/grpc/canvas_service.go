@@ -474,7 +474,7 @@ func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.S
 	if err != nil {
 		return nil, err
 	}
-	return &pb.StageCanvasRepositoryFileResponse{StagingState: state}, nil
+	return &pb.StageCanvasRepositoryFileResponse{StagingSummary: state}, nil
 }
 
 func (s *CanvasService) DiscardCanvasStaging(ctx context.Context, req *pb.DiscardCanvasStagingRequest) (*pb.DiscardCanvasStagingResponse, error) {

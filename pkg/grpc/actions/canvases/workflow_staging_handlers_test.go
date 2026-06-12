@@ -69,7 +69,7 @@ func TestDiscardCanvasStaging(t *testing.T) {
 
 	resp, err := DiscardCanvasStaging(ctx, orgID, canvasID, versionID, nil)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingState().GetHasStaging())
+	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
 	// After discard the effective read falls back to the materialized version.
 	effective, err := ReadRepositorySpecFileStaged(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
@@ -92,8 +92,8 @@ func TestApplyCanvasAutoLayout(t *testing.T) {
 			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 		})
 		require.NoError(t, err)
-		assert.True(t, resp.GetStagingState().GetHasStaging())
-		assert.Contains(t, resp.GetStagingState().GetStagedPaths(), CanvasYAMLRepositoryPath)
+		assert.True(t, resp.GetStagingSummary().GetHasStaging())
+		assert.Contains(t, resp.GetStagingSummary().GetStagedPaths(), CanvasYAMLRepositoryPath)
 
 		staged, err := ReadRepositorySpecFileStaged(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
 		require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 
 	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingState().GetHasStaging())
+	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
 
 	// Version row is updated and staging is cleared.
@@ -173,7 +173,7 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	// Commit durably writes the arbitrary file to git and clears staging.
 	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingState().GetHasStaging())
+	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
 	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
 	require.NoError(t, err)
@@ -185,4 +185,23 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	hasStaging, err := models.HasWorkflowStaging(uuid.MustParse(versionID))
 	require.NoError(t, err)
 	assert.False(t, hasStaging)
+}
+
+func TestStagedReadRequiresDraftOwner(t *testing.T) {
+	r, ownerCtx, canvasID, versionID := setupStagingDraft(t)
+	orgID := r.Organization.ID.String()
+
+	baseline, err := ReadRepositorySpecFile(ownerCtx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+
+	_, err = StageRepositorySpecFileOperations(ownerCtx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# staged\n")},
+	})
+	require.NoError(t, err)
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+
+	_, err = ReadRepositorySpecFileStaged(otherCtx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.Error(t, err)
 }

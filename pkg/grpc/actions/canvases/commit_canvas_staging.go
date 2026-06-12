@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
@@ -45,11 +46,14 @@ func CommitCanvasStaging(
 
 	specOps, gitOps := stagedCommitOperations(rows)
 
-	// Git files and spec rows live in separate stores, so they cannot share a
-	// transaction. Commit git files first: if the git commit fails (for example
-	// on a missing repository), the request returns before any spec change is
-	// written, keeping the version row consistent with the failed commit.
+	var gitRevertOps []gitprovider.FileOperation
 	if len(gitOps) > 0 {
+		var snapshotErr error
+		gitRevertOps, snapshotErr = snapshotGitFilesBeforeCommit(ctx, gitProvider, canvas, gitOps)
+		if snapshotErr != nil {
+			return nil, snapshotErr
+		}
+
 		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitOps); err != nil {
 			return nil, err
 		}
@@ -70,6 +74,16 @@ func CommitCanvasStaging(
 			false,
 			specOps,
 		); err != nil {
+			if len(gitRevertOps) > 0 {
+				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
+					log.Errorf(
+						"failed to revert git commit after spec apply failure for canvas %s version %s: %v",
+						canvasID,
+						versionID,
+						revertErr,
+					)
+				}
+			}
 			return nil, err
 		}
 	}
@@ -83,14 +97,14 @@ func CommitCanvasStaging(
 		return nil, status.Errorf(codes.Internal, "failed to reload version: %v", err)
 	}
 
-	state, _, err := stagingStateForVersion(version.ID)
+	state, _, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:      SerializeCanvasVersionMetadata(committed, organizationID),
-		StagingState: state,
+		Version:        SerializeCanvasVersionMetadata(committed, organizationID),
+		StagingSummary: state,
 	}, nil
 }
 
@@ -194,4 +208,98 @@ func commitStagedGitFiles(
 	}
 
 	return nil
+}
+
+func snapshotGitFilesBeforeCommit(
+	ctx context.Context,
+	gitProvider gitprovider.Provider,
+	canvas *models.Canvas,
+	gitOps []*pb.CanvasRepositoryFileOperation,
+) ([]gitprovider.FileOperation, error) {
+	if gitProvider == nil {
+		return nil, status.Error(codes.FailedPrecondition, "git provider is not configured")
+	}
+
+	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+	}
+
+	revertOps := make([]gitprovider.FileOperation, 0, len(gitOps))
+	for _, operation := range gitOps {
+		path := operation.GetPath()
+		if operation.GetDelete() {
+			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path)
+			if readErr != nil {
+				return nil, status.Errorf(codes.FailedPrecondition, "cannot snapshot %q before staged delete: %v", path, readErr)
+			}
+
+			content, readErr := io.ReadAll(reader)
+			_ = reader.Close()
+			if readErr != nil {
+				return nil, status.Errorf(codes.Internal, "failed to read %q before commit: %v", path, readErr)
+			}
+
+			revertOps = append(revertOps, gitprovider.FileOperation{
+				Path:      path,
+				Content:   bytes.NewReader(content),
+				SizeBytes: int64(len(content)),
+			})
+			continue
+		}
+
+		reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path)
+		if readErr != nil {
+			revertOps = append(revertOps, gitprovider.FileOperation{
+				Path:   path,
+				Delete: true,
+			})
+			continue
+		}
+
+		content, readErr := io.ReadAll(reader)
+		_ = reader.Close()
+		if readErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to read %q before commit: %v", path, readErr)
+		}
+
+		revertOps = append(revertOps, gitprovider.FileOperation{
+			Path:      path,
+			Content:   bytes.NewReader(content),
+			SizeBytes: int64(len(content)),
+		})
+	}
+
+	return revertOps, nil
+}
+
+func revertGitFileCommit(
+	ctx context.Context,
+	gitProvider gitprovider.Provider,
+	canvas *models.Canvas,
+	organizationID string,
+	userID string,
+	revertOps []gitprovider.FileOperation,
+) error {
+	if len(revertOps) == 0 {
+		return nil
+	}
+
+	pbOps := make([]*pb.CanvasRepositoryFileOperation, 0, len(revertOps))
+	for _, operation := range revertOps {
+		pbOp := &pb.CanvasRepositoryFileOperation{
+			Path:   operation.Path,
+			Delete: operation.Delete,
+		}
+		if operation.Content != nil && !operation.Delete {
+			content, err := io.ReadAll(operation.Content)
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to read revert content for %q: %v", operation.Path, err)
+			}
+			pbOp.Content = content
+		}
+		pbOps = append(pbOps, pbOp)
+	}
+
+	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, pbOps)
 }

@@ -23,7 +23,7 @@ type WorkflowStaging struct {
 }
 
 func (WorkflowStaging) TableName() string {
-	return "workflow_staging"
+	return "workflow_staged_files"
 }
 
 func UpsertWorkflowStagingPath(

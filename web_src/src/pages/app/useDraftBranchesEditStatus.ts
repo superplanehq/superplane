@@ -6,7 +6,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 import { resolveDraftBranchEditStatus, type DraftBranchEditStatus } from "./lib/draft-branch-edit-status";
-import { fetchCanvasVersionStagingState, fetchConsoleSpecFromRepository } from "./lib/repository-spec-files";
+import { fetchCanvasVersionStagingSummary, fetchConsoleSpecFromRepository } from "./lib/repository-spec-files";
 import { draftVersionId } from "@/lib/draftVersion";
 
 type UseDraftBranchesEditStatusOptions = {
@@ -51,7 +51,7 @@ export function useDraftBranchesEditStatus({
       const versionId = draftVersionId(draft);
       return {
         queryKey: canvasKeys.versionStaging(canvasId ?? "", versionId ?? ""),
-        queryFn: () => fetchCanvasVersionStagingState(canvasId!, versionId!),
+        queryFn: () => fetchCanvasVersionStagingSummary(canvasId!, versionId!),
         enabled: !!canvasId && !!versionId,
         staleTime: 15_000,
       };

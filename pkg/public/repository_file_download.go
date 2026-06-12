@@ -101,7 +101,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 	}
 
 	// For arbitrary repository files on a draft, staged edits (stored in
-	// workflow_staging) take precedence over the committed git content when the
+	// workflow_staged_files) take precedence over the committed git content when the
 	// caller opts in with ?stage=true.
 	if stage && versionID != "" {
 		ctx := authentication.SetUserIdInMetadata(r.Context(), user.ID.String())

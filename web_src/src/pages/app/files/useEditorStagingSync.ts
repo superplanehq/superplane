@@ -13,6 +13,7 @@ type UseEditorStagingSyncOptions = {
   committedContentByPath: Record<string, string>;
   reconcilePendingWithCommitted: (committed: Record<string, string>) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 };
 
 export function useEditorStagingSync({
@@ -24,12 +25,14 @@ export function useEditorStagingSync({
   committedContentByPath,
   reconcilePendingWithCommitted,
   onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: UseEditorStagingSyncOptions) {
   useRepositoryFileStaging({
     canvasId,
     versionId,
     enabled: canManageRepositoryFiles && !!versionId && !suspendRepositoryFileStaging,
     pendingChanges,
+    onFlushReady: onFlushRepositoryFileStagingReady,
   });
 
   useEffect(() => {

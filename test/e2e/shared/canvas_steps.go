@@ -270,7 +270,7 @@ func (s *CanvasSteps) waitForEnabledExitEditButton() {
 	}
 }
 
-// WaitForStaging waits until the given draft version has workflow_staging rows.
+// WaitForStaging waits until the given draft version has workflow_staged_files rows.
 func (s *CanvasSteps) WaitForStaging(versionID uuid.UUID) {
 	require.Eventually(s.t, func() bool {
 		hasStaging, err := models.HasWorkflowStaging(versionID)
@@ -354,14 +354,14 @@ func (s *CanvasSteps) CommitStaging() {
 	s.WaitForPublishEnabled()
 }
 
-// AssertNoStaging verifies the draft version has no workflow_staging rows.
+// AssertNoStaging verifies the draft version has no workflow_staged_files rows.
 func (s *CanvasSteps) AssertNoStaging(versionID uuid.UUID) {
 	hasStaging, err := models.HasWorkflowStaging(versionID)
 	require.NoError(s.t, err)
 	require.False(s.t, hasStaging, "expected no staging rows for version %s", versionID)
 }
 
-// AssertHasStaging verifies the draft version has workflow_staging rows.
+// AssertHasStaging verifies the draft version has workflow_staged_files rows.
 func (s *CanvasSteps) AssertHasStaging(versionID uuid.UUID) {
 	hasStaging, err := models.HasWorkflowStaging(versionID)
 	require.NoError(s.t, err)

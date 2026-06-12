@@ -6,7 +6,7 @@ This guide describes the current canvas versioning and change-request flow in Su
 
 When effective canvas versioning is enabled:
 
-1. Edit a draft version through the **stage → Commit** loop (canvas/console/files edits from the UI editor and agent tools autosave into `workflow_staging`; **Commit** materializes them onto the draft version row) or commit directly via the CLI.
+1. Edit a draft version through the **stage → Commit** loop (canvas/console/files edits from the UI editor and agent tools autosave into `workflow_staged_files`; **Commit** materializes them onto the draft version row) or commit directly via the CLI.
 2. Create a change request from that committed draft.
 3. Review the change request and collect approvals.
 4. Publish the change request when approval requirements are satisfied.

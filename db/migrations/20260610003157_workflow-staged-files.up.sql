@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE workflow_staging (
+CREATE TABLE workflow_staged_files (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   version_id UUID NOT NULL REFERENCES workflow_versions(id) ON DELETE CASCADE,
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -13,7 +13,7 @@ CREATE TABLE workflow_staging (
   UNIQUE (version_id, path)
 );
 
-CREATE INDEX idx_workflow_staging_version_id
-  ON workflow_staging (version_id);
+CREATE INDEX idx_workflow_staged_files_version_id
+  ON workflow_staged_files (version_id);
 
 COMMIT;

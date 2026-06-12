@@ -23,6 +23,7 @@ type UseEditorOptions = {
   suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 };
 
 export function useEditor({
@@ -36,6 +37,7 @@ export function useEditor({
   suspendRepositoryFileStaging = false,
   onSpecFileChange,
   onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
@@ -105,6 +107,7 @@ export function useEditor({
     committedContentByPath,
     reconcilePendingWithCommitted: pending.reconcilePendingWithCommitted,
     onLocalFilesStagingChange,
+    onFlushRepositoryFileStagingReady,
   });
 
   // Some changes live in the draft's staging layer rather than in the

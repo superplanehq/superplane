@@ -25,10 +25,10 @@ func DiscardCanvasStaging(
 		return nil, status.Errorf(codes.Internal, "failed to discard staging: %v", err)
 	}
 
-	state, _, err := stagingStateForVersion(version.ID)
+	state, _, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.DiscardCanvasStagingResponse{StagingState: state}, nil
+	return &pb.DiscardCanvasStagingResponse{StagingSummary: state}, nil
 }

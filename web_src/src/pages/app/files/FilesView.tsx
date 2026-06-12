@@ -22,6 +22,7 @@ export function FilesView({
   suspendRepositoryFileStaging,
   onSpecFileChange,
   onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: {
   canvasId?: string;
   versionId?: string;
@@ -33,6 +34,7 @@ export function FilesView({
   suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 }) {
   const editor = useEditor({
     canvasId,
@@ -45,6 +47,7 @@ export function FilesView({
     suspendRepositoryFileStaging,
     onSpecFileChange,
     onLocalFilesStagingChange,
+    onFlushRepositoryFileStagingReady,
   });
 
   return (

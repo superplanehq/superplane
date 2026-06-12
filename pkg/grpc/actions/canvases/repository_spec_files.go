@@ -99,7 +99,11 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		_, rows, stagingErr := stagingStateForVersion(version.ID)
+		if err := ensureStagedReadAllowed(ctx, version); err != nil {
+			return "", err
+		}
+
+		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
 		if stagingErr != nil {
 			return "", stagingErr
 		}

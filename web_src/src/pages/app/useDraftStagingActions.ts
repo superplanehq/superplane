@@ -25,6 +25,7 @@ type UseDraftStagingActionsOptions = {
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
   consoleMutationGenerationRef: MutableRefObject<number>;
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
+  flushRepositoryFileStaging?: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
 };
@@ -89,6 +90,7 @@ export function useDraftStagingActions({
   setStagingResetNonce,
   consoleMutationGenerationRef,
   setIsPreparingVersionAction,
+  flushRepositoryFileStaging,
   cancelPendingCanvasSaves,
   onCanvasDraftRestoredToCommitted,
 }: UseDraftStagingActionsOptions) {
@@ -99,13 +101,14 @@ export function useDraftStagingActions({
       return;
     }
 
-    setIsPreparingVersionAction(true);
     try {
+      await flushRepositoryFileStaging?.();
       const isReady = await ensureVersionActionDraftReady("Unable to prepare staged changes for commit");
       if (!isReady) {
         return;
       }
 
+      setIsPreparingVersionAction(true);
       consoleMutationGenerationRef.current += 1;
       await commitCanvasStagingMutation.mutateAsync();
       await queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId!) });
@@ -125,6 +128,7 @@ export function useDraftStagingActions({
     consoleMutationGenerationRef,
     draftCanvasSpecsRef,
     ensureVersionActionDraftReady,
+    flushRepositoryFileStaging,
     hasEditableVersion,
     queryClient,
     setDraftCanvasSpec,

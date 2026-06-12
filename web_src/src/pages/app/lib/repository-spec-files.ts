@@ -1,4 +1,4 @@
-import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion, type CanvasesStagingState } from "@/api-client";
+import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion, type CanvasesStagingSummary } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
@@ -34,18 +34,18 @@ export async function fetchRepositorySpecFileContent(
   return response.text();
 }
 
-// fetchCanvasVersionStagingState returns the uncommitted staging summary for a
+// fetchCanvasVersionStagingSummary returns the uncommitted staging summary for a
 // draft version, used to drive the orange "uncommitted changes" indicators.
-export async function fetchCanvasVersionStagingState(
+export async function fetchCanvasVersionStagingSummary(
   canvasId: string,
   versionId: string,
-): Promise<CanvasesStagingState | undefined> {
+): Promise<CanvasesStagingSummary | undefined> {
   const response = await canvasesDescribeCanvasVersion(
     withOrganizationHeader({
       path: { canvasId, versionId },
     }),
   );
-  return response.data?.stagingState;
+  return response.data?.stagingSummary;
 }
 
 export function canvasVersionWithSpecFromYaml(

@@ -125,8 +125,8 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 		update.VersionID,
 	)
 	require.NoError(t, err)
-	assert.True(t, described.GetStagingState().GetHasStaging())
-	assert.Contains(t, described.GetStagingState().GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
+	assert.True(t, described.GetStagingSummary().GetHasStaging())
+	assert.Contains(t, described.GetStagingSummary().GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
 
 	// The agent reads back the same staged content it wrote through the staged
 	// read path the `read` action now uses.

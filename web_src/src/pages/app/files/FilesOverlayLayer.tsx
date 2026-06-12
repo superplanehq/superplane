@@ -15,6 +15,7 @@ interface FilesOverlayLayerProps {
   suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 }
 
 export function FilesOverlayLayer({
@@ -29,6 +30,7 @@ export function FilesOverlayLayer({
   suspendRepositoryFileStaging,
   onSpecFileChange,
   onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: FilesOverlayLayerProps) {
   if (!isFilesMode) return null;
 
@@ -44,6 +46,7 @@ export function FilesOverlayLayer({
       suspendRepositoryFileStaging={suspendRepositoryFileStaging}
       onSpecFileChange={onSpecFileChange}
       onLocalFilesStagingChange={onLocalFilesStagingChange}
+      onFlushRepositoryFileStagingReady={onFlushRepositoryFileStagingReady}
     />
   );
 }

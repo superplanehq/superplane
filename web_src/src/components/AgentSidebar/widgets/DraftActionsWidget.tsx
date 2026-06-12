@@ -53,7 +53,7 @@ export function DraftActionsWidget({
     }
   };
 
-  // The agent writes draft edits into workflow_staging (the same layer the UI
+  // The agent writes draft edits into workflow_staged_files (the same layer the UI
   // editor stages into), and publish materializes the draft version row only.
   // Commit any pending staging before publishing so the agent's staged edits
   // are included; otherwise publish would ship the last committed version and

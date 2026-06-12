@@ -637,7 +637,7 @@ message StageCanvasRepositoryFileRequest {
 }
 
 message StageCanvasRepositoryFileResponse {
-  StagingState staging_state = 1;
+  StagingSummary staging_summary = 1;
 }
 
 message CreateCanvasVersionRequest {
@@ -673,11 +673,11 @@ message DescribeCanvasVersionResponse {
   // (use ?stage=true on the file GET to read effective staged content).
   CanvasVersion version = 1;
   // Populated for draft versions to drive uncommitted/ready-to-publish indicators.
-  StagingState staging_state = 2;
+  StagingSummary staging_summary = 2;
 }
 
-// StagingState reports the uncommitted spec edits held in workflow_staging for a draft version.
-message StagingState {
+// StagingSummary reports the uncommitted spec edits held in workflow_staged_files for a draft version.
+message StagingSummary {
   bool has_staging = 1;
   repeated string staged_paths = 2;
   optional string base_version_id = 3;
@@ -728,7 +728,7 @@ message DiscardCanvasStagingRequest {
 }
 
 message DiscardCanvasStagingResponse {
-  StagingState staging_state = 1;
+  StagingSummary staging_summary = 1;
 }
 
 message CommitCanvasStagingRequest {
@@ -738,7 +738,7 @@ message CommitCanvasStagingRequest {
 
 message CommitCanvasStagingResponse {
   CanvasVersion version = 1;
-  StagingState staging_state = 2;
+  StagingSummary staging_summary = 2;
 }
 
 message ApplyCanvasAutoLayoutRequest {
@@ -748,7 +748,7 @@ message ApplyCanvasAutoLayoutRequest {
 }
 
 message ApplyCanvasAutoLayoutResponse {
-  StagingState staging_state = 1;
+  StagingSummary staging_summary = 1;
 }
 
 message CreateCanvasChangeRequestRequest {

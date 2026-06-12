@@ -295,6 +295,13 @@ export function AppPage() {
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
   const [stagingResetNonce, setStagingResetNonce] = useState(0);
+  const flushRepositoryFileStagingRef = useRef<(() => Promise<void>) | null>(null);
+  const handleFlushRepositoryFileStagingReady = useCallback((flush: (() => Promise<void>) | null) => {
+    flushRepositoryFileStagingRef.current = flush;
+  }, []);
+  const flushRepositoryFileStaging = useCallback(async () => {
+    await flushRepositoryFileStagingRef.current?.();
+  }, []);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -4170,6 +4177,7 @@ export function AppPage() {
     setStagingResetNonce,
     consoleMutationGenerationRef,
     setIsPreparingVersionAction,
+    flushRepositoryFileStaging,
     cancelPendingCanvasSaves,
     onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
   });
@@ -5396,6 +5404,7 @@ export function AppPage() {
             suspendRepositoryFileStaging: isPreparingVersionAction,
             onSpecFileChange,
             onLocalFilesStagingChange: handleLocalFilesStagingChange,
+            onFlushRepositoryFileStagingReady: handleFlushRepositoryFileStagingReady,
           }}
         />
         <CanvasPage
