@@ -2,7 +2,7 @@
     "type": "atlascloud.response",
     "data": {
         "id": "resp-1234567890",
-        "model": "deepseek-ai/DeepSeek-V3-0324",
+        "model": "deepseek-ai/deepseek-v4-pro",
         "text": "Hello, world!",
         "usage": {
             "input_tokens": 10,

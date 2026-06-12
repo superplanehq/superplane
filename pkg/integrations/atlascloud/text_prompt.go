@@ -52,7 +52,7 @@ func (c *CreateResponse) Documentation() string {
 
 ## Configuration
 
-- **Model**: Select the Atlas Cloud model to use (e.g., deepseek-ai/DeepSeek-V3-0324)
+- **Model**: Select the Atlas Cloud model to use (e.g., deepseek-ai/deepseek-v4-pro)
 - **Prompt**: The text prompt to send to the model (supports expressions)
 
 ## Output
@@ -67,6 +67,7 @@ Returns the generated response including:
 
 - Requires a valid Atlas Cloud API key configured in the application settings
 - Atlas Cloud exposes a single OpenAI-compatible API for 300+ models across LLM, image, and video modalities
+- The default ` + "`deepseek-ai/deepseek-v4-pro`" + ` is a reasoning model; allow enough output budget so the final answer is not truncated by the reasoning trace
 - Response quality and speed depend on the selected model
 - Token usage is tracked and may incur costs based on your Atlas Cloud plan`
 }
@@ -90,8 +91,8 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Label:       "Model",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Default:     "deepseek-ai/DeepSeek-V3-0324",
-			Placeholder: "e.g. deepseek-ai/DeepSeek-V3-0324",
+			Default:     "deepseek-ai/deepseek-v4-pro",
+			Placeholder: "e.g. deepseek-ai/deepseek-v4-pro",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "model",

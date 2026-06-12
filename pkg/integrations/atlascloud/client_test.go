@@ -171,7 +171,7 @@ func Test__Client__ListModels(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
 						"data": [
-							{"id": "deepseek-ai/DeepSeek-V3-0324"},
+							{"id": "deepseek-ai/deepseek-v4-pro"},
 							{"id": "anthropic/claude-sonnet-4.6"}
 						]
 					}`)),
@@ -189,7 +189,7 @@ func Test__Client__ListModels(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, models, 2)
-		assert.Equal(t, "deepseek-ai/DeepSeek-V3-0324", models[0].ID)
+		assert.Equal(t, "deepseek-ai/deepseek-v4-pro", models[0].ID)
 		assert.Equal(t, "anthropic/claude-sonnet-4.6", models[1].ID)
 	})
 
@@ -245,7 +245,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
 						"id": "resp-123",
-						"model": "deepseek-ai/DeepSeek-V3-0324",
+						"model": "deepseek-ai/deepseek-v4-pro",
 						"output_text": "Hello there",
 						"output": [
 							{
@@ -266,11 +266,11 @@ func Test__Client__CreateResponse(t *testing.T) {
 			http:    httpCtx,
 		}
 
-		resp, err := client.CreateResponse("deepseek-ai/DeepSeek-V3-0324", "Hi")
+		resp, err := client.CreateResponse("deepseek-ai/deepseek-v4-pro", "Hi")
 
 		require.NoError(t, err)
 		assert.Equal(t, "resp-123", resp.ID)
-		assert.Equal(t, "deepseek-ai/DeepSeek-V3-0324", resp.Model)
+		assert.Equal(t, "deepseek-ai/deepseek-v4-pro", resp.Model)
 		assert.Equal(t, "Hello there", resp.OutputText)
 		require.Len(t, resp.Output, 1)
 		assert.Equal(t, "assistant", resp.Output[0].Role)
@@ -284,7 +284,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 		assert.Equal(t, "application/json", httpCtx.Requests[0].Header.Get("Content-Type"))
 
 		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
-		assert.Contains(t, string(body), `"model":"deepseek-ai/DeepSeek-V3-0324"`)
+		assert.Contains(t, string(body), `"model":"deepseek-ai/deepseek-v4-pro"`)
 		assert.Contains(t, string(body), `"input":"Hi"`)
 	})
 
