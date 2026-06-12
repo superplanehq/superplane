@@ -102,8 +102,16 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertVisible(q.TestID("agent-stop-button"))
 		steps.stopAgent()
 		steps.assertInterruptSent()
-		steps.finishRunningTurnAsFailed("stopped by e2e")
-		steps.assertText("Last turn failed")
+		// InterruptSession resets the row to idle and broadcasts
+		// turn_completed/idle, so the composer flips back to "Ready" on
+		// the WS event — regardless of any late provider stream error.
+		// The "late session_failed must not overwrite idle" race is
+		// covered as a unit test in
+		// TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt;
+		// reproducing it here would race InterruptSession's DB commit
+		// (assertInterruptSent fires as soon as the provider call is
+		// recorded, mid-flight) and flake.
+		steps.assertText("Ready")
 		steps.assertHidden(q.TestID("agent-stop-button"))
 	})
 
@@ -278,15 +286,6 @@ func (s *agentSteps) stopAgent() {
 
 func (s *agentSteps) startBuildingFromRubric() {
 	s.session.Click(q.Locator(`button:has-text("Start Building")`))
-}
-
-func (s *agentSteps) finishRunningTurnAsFailed(message string) {
-	agentSession := s.currentAgentSession()
-	require.NoError(s.t, ctx.AgentProvider.QueueEvents(agentSession.ProviderSessionID, agents.ProviderEvent{
-		ProviderEventID: "session-failed-" + uuid.NewString(),
-		Type:            agents.ProviderEventSessionFailed,
-		ErrorMessage:    message,
-	}))
 }
 
 func (s *agentSteps) currentAgentSession() *models.AgentSession {
