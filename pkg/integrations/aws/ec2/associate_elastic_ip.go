@@ -48,11 +48,11 @@ func (c *AssociateElasticIP) Label() string {
 }
 
 func (c *AssociateElasticIP) Description() string {
-	return "Associate or disassociate an Elastic IP address with an EC2 resource"
+	return "Associate or disassociate an Elastic IP address with an EC2 instance"
 }
 
 func (c *AssociateElasticIP) Documentation() string {
-	return `The Associate Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance or network interface.
+	return `The Associate Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
 
 ## Use Cases
 

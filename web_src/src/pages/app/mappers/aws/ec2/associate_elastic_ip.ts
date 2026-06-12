@@ -144,7 +144,7 @@ function associateElasticIPMetadata(node: NodeInfo): MetadataItem[] {
 
   const metadata: MetadataItem[] = [];
 
-  if (instanceName) {
+  if (operation === "associate" && instanceName) {
     metadata.push({ icon: "server", label: instanceName });
   }
 
