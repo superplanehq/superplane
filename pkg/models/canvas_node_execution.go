@@ -105,11 +105,12 @@ func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// NOTE: this is only used in EventRouter, when processing events for blueprint child nodes.
 func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
 	var execution CanvasNodeExecution
 
 	err := tx.
-		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
 		First(&execution).
 		Error
