@@ -98,12 +98,15 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Belongs to an organization
 - Contains multiple workflows with their nodes and edges
 - Stores workflow graph structure, node configurations, and metadata
-- Versioning is always enabled: users always edit draft versions and publish them
+- Versioning is always enabled: users edit draft versions through a stage → commit → publish loop. Canvas/console/files edits autosave into `workflow_staging`; **Commit** materializes them onto the draft version row; **Publish** promotes the committed draft to live
+- Edit paths:
+  - **Web UI** stages canvas/console/files edits into `workflow_staging`, then requires **Commit** before **Publish**
+  - **CLI and agent tools** commit directly to the draft version row via `CommitCanvasRepositoryFiles`, discarding any pending staging in the same transaction; they never read or write `workflow_staging`
 - Change management (change requests with approvals) is controlled by: organization metadata `change_management_enabled` OR canvas metadata `change_management_enabled` (API field `changeManagementEnabled`)
 - Effective behavior:
   - Organization change management enabled: all canvases require change requests
   - Organization change management disabled: each canvas uses its own `change_management_enabled` value
-- When change management is enabled, users must submit change requests for approval before publishing; when disabled, users can publish draft versions directly
+- When change management is enabled, users must submit change requests for approval before publishing; when disabled, users can publish committed draft versions directly (uncommitted staging must be committed first)
 - Change request lifecycle:
   - `STATUS_OPEN`: active change request
   - `STATUS_REJECTED`: closed without publish
