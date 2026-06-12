@@ -33,6 +33,7 @@ const (
 	cloudWatchAPIVersion              = "2010-08-01"
 	ResourceTypeImageOS               = "ec2.imageOS"
 	ResourceTypeElasticIP             = "ec2.elasticIp"
+	ResourceTypeElasticIPUnassociated = "ec2.elasticIpUnassociated"
 	ResourceTypeElasticIPAssociation  = "ec2.elasticIpAssociation"
 	ResourceTypePublicIPv4Pool        = "ec2.publicIpv4Pool"
 	ResourceTypeCustomerOwnedIPv4Pool = "ec2.customerOwnedIpv4Pool"

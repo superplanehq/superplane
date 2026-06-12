@@ -325,6 +325,39 @@ func ListElasticIPs(ctx core.ListResourcesContext, resourceType string) ([]core.
 	return resources, nil
 }
 
+func ListUnassociatedElasticIPs(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	addresses, err := client.ListAddresses()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Elastic IPs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(addresses))
+	for _, address := range addresses {
+		if strings.TrimSpace(address.AssociationID) != "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: elasticIPResourceName(address),
+			ID:   address.AllocationID,
+		})
+	}
+
+	return resources, nil
+}
+
 func ListElasticIPAssociations(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
