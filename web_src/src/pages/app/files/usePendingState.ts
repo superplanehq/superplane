@@ -86,8 +86,12 @@ export function usePendingState({
 
       if (generatedPathSet.has(selectedPath)) return;
 
+      // Prefer the committed (stage=false) baseline so reverting an edit back to
+      // the original clears the pending change. loadedContentByPath holds staged
+      // content for draft reads, so after autosave it no longer reflects the
+      // original and would keep a phantom pending change (and Diff button) alive.
       const originalContent =
-        loadedContentByPathRef.current[selectedPath] ?? committedContentByPathRef.current[selectedPath];
+        committedContentByPathRef.current[selectedPath] ?? loadedContentByPathRef.current[selectedPath];
       setPendingChangesByPath((current) => applyPendingContentUpdate(current, selectedPath, value, originalContent));
     },
     [committedContentByPathRef, generatedPathSet, loadedContentByPathRef, onSpecFileChange],

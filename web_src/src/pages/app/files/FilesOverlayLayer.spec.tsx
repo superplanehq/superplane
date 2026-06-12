@@ -38,6 +38,11 @@ vi.mock("@/hooks/useCanvasData", () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useCanvasVersionStaging: () => ({
+    data: { hasStaging: false, stagedPaths: [] },
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 vi.mock("@monaco-editor/react", () => ({

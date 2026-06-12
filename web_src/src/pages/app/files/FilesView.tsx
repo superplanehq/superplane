@@ -105,7 +105,9 @@ export function FilesView({
         <Suspense fallback={null}>
           <DiffDialog
             changes={editor.pendingChanges}
+            committedContentByPath={editor.committedContentByPath}
             loadedContentByPath={editor.loadedContentByPath}
+            stagedFileDiffs={editor.stagedFileDiffs}
             open={editor.isDiffOpen}
             onOpenChange={editor.setIsDiffOpen}
           />
@@ -114,7 +116,7 @@ export function FilesView({
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
             <DiffHeaderAction
-              hasPendingChanges={editor.pendingChanges.length > 0}
+              hasPendingChanges={editor.pendingChanges.length > 0 || editor.stagedDiffPaths.length > 0}
               onDiffOpen={() => editor.setIsDiffOpen(true)}
             />,
             editor.headerActionsHost,

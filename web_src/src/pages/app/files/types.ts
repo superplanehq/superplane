@@ -8,6 +8,17 @@ export type AppFile = {
   errorMessage?: string;
 };
 
+// Diff for a path whose edits live in the draft's staging layer rather than in
+// the in-session pending changes: the virtual spec files (canvas.yaml /
+// console.yaml), and repository files whose staged edits outlive a page refresh.
+// Computed from the committed (stage=false) vs effective (stage=true) server
+// reads.
+export type StagedFileDiff = {
+  path: string;
+  committedContent: string;
+  effectiveContent: string;
+};
+
 export type PendingFileChange =
   | {
       type: "added";

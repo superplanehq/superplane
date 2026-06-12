@@ -1,3 +1,4 @@
+import { useCanvasVersionStaging } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
@@ -7,6 +8,7 @@ import { useEditorLifecycle } from "./useEditorLifecycle";
 import { useEditorStagingSync } from "./useEditorStagingSync";
 import { usePendingState } from "./usePendingState";
 import { useFilesTabState } from "./useFilesTabState";
+import { useStagedFileDiffs } from "./useStagedFileDiffs";
 import { useCatalog, useRepositoryPathLists, useRepositorySelectedFileQuery } from "./useCatalog";
 import type { AppFile } from "./types";
 
@@ -105,6 +107,25 @@ export function useEditor({
     onLocalFilesStagingChange,
   });
 
+  // Some changes live in the draft's staging layer rather than in the
+  // in-session pendingChanges: the virtual spec files (canvas.yaml /
+  // console.yaml), and—after a page refresh—repository files whose staged edits
+  // outlived the session. Detect them from the server staging state and surface
+  // them in the Diff dialog. Paths still covered by a pending change are
+  // excluded so they aren't diffed twice (the pending change wins, as it
+  // reflects the freshest in-editor content).
+  const stagingQuery = useCanvasVersionStaging(canvasId ?? "", versionId, canManageRepositoryFiles && !!versionId);
+  const stagedDiffPaths = useMemo(() => {
+    const stagedPaths = stagingQuery.data?.stagedPaths ?? [];
+    return stagedPaths.filter((path) => !pending.pendingChangesByPath[path]);
+  }, [stagingQuery.data?.stagedPaths, pending.pendingChangesByPath]);
+  const stagedFileDiffs = useStagedFileDiffs({
+    canvasId,
+    versionId,
+    paths: stagedDiffPaths,
+    enabled: isDiffOpen,
+  });
+
   return buildFilesEditorResult({
     catalog,
     pathLists,
@@ -113,6 +134,9 @@ export function useEditor({
     pendingChanges,
     selection,
     loadedContentByPath,
+    committedContentByPath,
+    stagedDiffPaths,
+    stagedFileDiffs,
     canManageRepositoryFiles,
     leftOffset,
     isDiffOpen,
