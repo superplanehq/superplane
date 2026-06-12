@@ -211,6 +211,26 @@ func ResolveAllItemValues(
 	return resolved, nil
 }
 
+// ResolveAllItemMatches evaluates matchList for every list element using the
+// same per-item iteration variable rules as ResolveAllItemValues, so bare
+// expressions like item.uuid resolve to each iteration's actual value.
+func ResolveAllItemMatches(
+	items []any,
+	mode ListMode,
+	pairs []NameValuePair,
+	expressions core.ExpressionContext,
+) ([]map[string]any, error) {
+	resolved := make([]map[string]any, 0, len(items))
+	for i, item := range items {
+		matches, err := ResolvePairs(pairs, mode.Variables(item), expressions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve matches for list item %d: %w", i, err)
+		}
+		resolved = append(resolved, matches)
+	}
+	return resolved, nil
+}
+
 // AppendUniqueRecords appends records by physical memory ID. If a record is
 // seen again, its latest values replace the previous entry without increasing
 // the reported count.
