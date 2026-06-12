@@ -7,14 +7,13 @@ import type { DraftEditTabTone } from "@/pages/app/lib/draft-branch-edit-status"
 
 import { DraftChangeDots } from "./DraftChangeDots";
 
-export type CanvasMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
+export type CanvasMode = "version-live" | "version-edit" | "console" | "memory" | "files" | "versions";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
-  onSelectConsole?: () => void;
-  onSelectRuns?: () => void;
   onSelectVersions?: () => void;
+  onSelectConsole?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
@@ -29,9 +28,8 @@ interface CanvasModeToggleProps {
 }
 
 const CANVAS_TAB = "canvas";
-const CONSOLE_TAB = "console";
-const RUNS_TAB = "runs";
 const VERSIONS_TAB = "versions";
+const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
 
@@ -43,9 +41,8 @@ const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
 const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
 
 const MODE_TO_TAB: Record<string, string> = {
-  console: CONSOLE_TAB,
-  runs: RUNS_TAB,
   versions: VERSIONS_TAB,
+  console: CONSOLE_TAB,
   memory: MEMORY_TAB,
   files: FILES_TAB,
 };
@@ -88,23 +85,11 @@ function tabClasses(selected: string, value: string, editing: boolean, tone: Dra
   return cn(BASE_TAB_CLASSES, stateClass);
 }
 
-function GroupDivider() {
-  return (
-    <span
-      aria-hidden="true"
-      role="separator"
-      className="mx-2 h-7 w-px shrink-0 bg-slate-950/15"
-      data-testid="canvas-view-mode-group-divider"
-    />
-  );
-}
-
 export function CanvasModeToggle({
   mode,
   onSelectLive,
-  onSelectConsole,
-  onSelectRuns,
   onSelectVersions,
+  onSelectConsole,
   onSelectMemory,
   onSelectFiles,
   editing = false,
@@ -117,12 +102,10 @@ export function CanvasModeToggle({
   editTabTone = "neutral",
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
-  const showConsole = Boolean(onSelectConsole);
-  const showRuns = Boolean(onSelectRuns);
   const showVersions = Boolean(onSelectVersions);
+  const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
-  const showSecondaryGroup = showConsole || showMemory || showFiles;
   const selected = modeToTab(mode);
   const baseHref = organizationId && appId ? appPath(organizationId, appId) : "#";
   const tabHref = (view?: string) => (view ? `${baseHref}?view=${view}` : baseHref);
@@ -152,18 +135,6 @@ export function CanvasModeToggle({
           />
         </span>
       </Link>
-      {showRuns ? (
-        <Link
-          to={tabHref("runs")}
-          onClick={(e) => handleTabClick(e, selected === RUNS_TAB, () => void onSelectRuns?.())}
-          className={tabClasses(selected, RUNS_TAB, editing, editTabTone)}
-          data-testid="canvas-view-mode-runs"
-          aria-label="Runs"
-          aria-current={selected === RUNS_TAB ? "page" : undefined}
-        >
-          Runs
-        </Link>
-      ) : null}
       {showVersions ? (
         <Link
           to={tabHref("versions")}
@@ -176,7 +147,6 @@ export function CanvasModeToggle({
           Versions
         </Link>
       ) : null}
-      {showSecondaryGroup ? <GroupDivider /> : null}
       {showConsole ? (
         <Link
           to={tabHref("console")}

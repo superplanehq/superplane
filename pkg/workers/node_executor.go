@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -168,6 +169,30 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
+	//
+	// For every execution we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, action_error, internal
+	// - component: the component name of the node
+	//
+	start := time.Now()
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	metricComponent := "unknown"
+	defer func() {
+		telemetry.RecordExecutorWorkerExecution(
+			context.Background(),
+			time.Since(start),
+			metricOutcome,
+			metricReason,
+			metricComponent,
+		)
+	}()
+
+	//
+	// We track the events produced by the component execution,
+	// so we can publish RabbitMQ messages for them.
+	//
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
@@ -196,10 +221,32 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		execution, err := models.LockPendingNodeExecutionInActiveCanvas(tx, id)
 		if err != nil {
 			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, execution, onNewEvents)
+		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(err)
+			return err
+		}
+
+		metricComponent = node.ComponentName()
+		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
+		if processErr != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(processErr)
+			return processErr
+		}
+
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyExecutionFailure(execution)
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -213,24 +260,21 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
-	if err != nil {
-		return err
-	}
-
+func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	if node.Type == models.NodeTypeBlueprint {
-		return w.executeBlueprintNode(tx, execution, node)
+		return w.executeBlueprintNode(tx, execution, node, onNewEvents)
 	}
 
 	return w.executeActionNode(tx, execution, node, onNewEvents)
 }
 
-func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
+func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+
 	ref := node.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
-		return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
+		return executionState.Fail(models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
 	}
 
 	firstNode := blueprint.FindRootNode()
@@ -263,12 +307,10 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 
 	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
 	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
+		return executionState.Fail(
 			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
 		)
-		return nil
 	}
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
@@ -277,13 +319,10 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
+		return executionState.Fail(
 			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
 		)
-
-		return nil
 	}
 
 	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
@@ -394,7 +433,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				logger.Errorf("integration %s not found", *node.AppInstallationID)
-				return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "integration not found")
+				return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "integration not found")
 			}
 
 			logger.Errorf("failed to find integration: %v", err)
@@ -408,11 +447,58 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute action: %v", err)
-		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())
-		return err
+		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
 	}
 
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+const (
+	executorOutcomeSuccess = "success"
+	executorOutcomeFailed  = "failed"
+	executorOutcomeSkipped = "skipped"
+
+	executorReasonNone     = "none"
+	executorReasonLocked   = "locked"
+	executorReasonDeadlock = "deadlock"
+	executorReasonNotFound = "not_found"
+	executorReasonInternal = "internal"
+)
+
+func classifyProcessError(err error) string {
+	if err == nil {
+		return executorReasonNone
+	}
+
+	if errors.Is(err, ErrRecordLocked) {
+		return executorReasonLocked
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return executorReasonNotFound
+	}
+
+	if strings.Contains(err.Error(), "deadlock detected") || strings.Contains(err.Error(), "40P01") {
+		return executorReasonDeadlock
+	}
+
+	return executorReasonInternal
+}
+
+func classifyExecutionFailure(execution *models.CanvasNodeExecution) string {
+	if execution.Result != models.CanvasNodeExecutionResultFailed {
+		return executorReasonNone
+	}
+
+	if isDeadlockMessage(execution.ResultMessage) {
+		return executorReasonDeadlock
+	}
+
+	return execution.ResultReason
+}
+
+func isDeadlockMessage(message string) bool {
+	return strings.Contains(message, "deadlock detected") || strings.Contains(message, "40P01")
 }

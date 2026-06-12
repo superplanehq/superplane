@@ -67,8 +67,6 @@ export interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
-  /** Provided when Runs is available as a first-class tab; opens the Runs view. */
-  onSelectRuns?: () => void;
   /** Provided when Versions is available as a first-class tab; opens the Versions view. */
   onSelectVersions?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
@@ -250,10 +248,7 @@ function PageHeader({
             />
           </div>
         ) : null}
-        {mode !== "runs" &&
-        mode !== "versions" &&
-        !isEditing &&
-        (onEnterEditMode || startEditingDrafts !== undefined) ? (
+        {!isEditing && mode !== "versions" && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -292,9 +287,8 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onSelectCanvasView}
-              onSelectConsole={props.onSelectConsole}
-              onSelectRuns={props.onSelectRuns}
               onSelectVersions={props.onSelectVersions}
+              onSelectConsole={props.onSelectConsole}
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
@@ -316,13 +310,7 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (
-    !props.onSelectConsole &&
-    !props.onSelectRuns &&
-    !props.onSelectVersions &&
-    !props.onSelectMemory &&
-    !props.onSelectFiles
-  ) {
+  if (!props.onSelectConsole && !props.onSelectVersions && !props.onSelectMemory && !props.onSelectFiles) {
     return false;
   }
 
@@ -333,7 +321,6 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
   return (
     mode === "version-live" ||
     mode === "version-edit" ||
-    mode === "runs" ||
     mode === "versions" ||
     mode === "console" ||
     mode === "memory" ||
@@ -342,7 +329,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "runs" || mode === "versions" || mode === "console" || mode === "memory" || mode === "files") {
+  if (mode === "versions" || mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 
