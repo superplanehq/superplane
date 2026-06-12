@@ -217,7 +217,7 @@ function ChatConversation({
         sending={agentBusy}
         sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={statusLabel(status)}
+        statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={modeDisabled}
@@ -374,6 +374,7 @@ function DraftActionsBar({
   outcomePassed,
   onVersionPublished,
 }: DraftActionsBarProps) {
+  const notifiedDraftVersionId = useRef<string | null>(null);
   const { latestDraft, dismiss } = useDraftActions({
     messages,
     canvasId,
@@ -381,6 +382,20 @@ function DraftActionsBar({
     outcomePassed,
     onVersionPublished,
   });
+
+  useEffect(() => {
+    if (!latestDraft) {
+      notifiedDraftVersionId.current = null;
+      return;
+    }
+
+    if (notifiedDraftVersionId.current === latestDraft.versionId) {
+      return;
+    }
+
+    notifiedDraftVersionId.current = latestDraft.versionId;
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+  }, [latestDraft]);
 
   if (!latestDraft) return null;
 
