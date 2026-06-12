@@ -30,12 +30,13 @@ var validAllocateIPSources = []string{
 type AllocateElasticIP struct{}
 
 type AllocateElasticIPConfiguration struct {
-	Region                string  `json:"region" mapstructure:"region"`
-	IPSource              string  `json:"ipSource" mapstructure:"ipSource"`
-	PublicIPv4Pool        string  `json:"publicIpv4Pool" mapstructure:"publicIpv4Pool"`
-	CustomerOwnedIPv4Pool string  `json:"customerOwnedIpv4Pool" mapstructure:"customerOwnedIpv4Pool"`
-	IpamPoolID            string  `json:"ipamPoolId" mapstructure:"ipamPoolId"`
-	Address               *string `json:"address,omitempty" mapstructure:"address"`
+	Region                string       `json:"region" mapstructure:"region"`
+	IPSource              string       `json:"ipSource" mapstructure:"ipSource"`
+	PublicIPv4Pool        string       `json:"publicIpv4Pool" mapstructure:"publicIpv4Pool"`
+	CustomerOwnedIPv4Pool string       `json:"customerOwnedIpv4Pool" mapstructure:"customerOwnedIpv4Pool"`
+	IpamPoolID            string       `json:"ipamPoolId" mapstructure:"ipamPoolId"`
+	Address               *string      `json:"address,omitempty" mapstructure:"address"`
+	Tags                  []common.Tag `json:"tags" mapstructure:"tags"`
 }
 
 type AllocateElasticIPNodeMetadata struct {
@@ -75,6 +76,7 @@ func (c *AllocateElasticIP) Documentation() string {
   - **IPAM pool**: Address from a VPC IPAM pool with a public IPv4 CIDR
 - **Pool**: Required when using BYOIP, customer-owned, or IPAM sources (searchable pickers scoped to the selected region)
 - **Address** (optional): Request a specific IPv4 address from the selected pool
+- **Tags** (optional): Key/value tags applied to the Elastic IP at allocation time
 
 ## Output
 
@@ -224,6 +226,35 @@ func (c *AllocateElasticIP) Configuration() []configuration.Field {
 				{Field: "ipSource", Values: []string{allocateIPSourceBYOIP, allocateIPSourceCustomerOwned, allocateIPSourceIPAM}},
 			},
 		},
+		{
+			Name:        "tags",
+			Label:       "Tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Tags to apply to the allocated Elastic IP address",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "key",
+								Label:    "Key",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: false,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -338,6 +369,8 @@ func buildAllocateAddressInput(config AllocateElasticIPConfiguration, ipSource s
 	if ipSource != allocateIPSourceAmazon && config.Address != nil {
 		input.Address = strings.TrimSpace(*config.Address)
 	}
+
+	input.Tags = common.NormalizeTags(config.Tags)
 
 	return input
 }
