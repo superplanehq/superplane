@@ -678,6 +678,22 @@ CREATE TABLE public.workflow_runs (
 
 
 --
+-- Name: workflow_staged_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_staged_files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    version_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    path text NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    deleted boolean DEFAULT false NOT NULL,
+    updated_by uuid,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_versions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1142,6 +1158,22 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_version_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_version_id_path_key UNIQUE (version_id, path);
 
 
 --
@@ -1614,6 +1646,13 @@ CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING
 --
 
 CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btree (workflow_id, state);
+
+
+--
+-- Name: idx_workflow_staged_files_version_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_files USING btree (version_id);
 
 
 --
@@ -2128,6 +2167,30 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_staged_files workflow_staged_files_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_versions workflow_versions_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2191,7 +2254,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260611153001	f
+20260612213340	f
 \.
 
 

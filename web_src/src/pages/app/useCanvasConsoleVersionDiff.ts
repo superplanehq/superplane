@@ -46,6 +46,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+  getConsoleMutationGeneration?: () => number;
 };
 
 export function useCanvasConsoleVersionDiff({
@@ -55,9 +56,16 @@ export function useCanvasConsoleVersionDiff({
   suppressUnpublishedDraftDiscard,
   enabled,
   registerIgnoredCanvasVersionUpdatedEcho,
+  getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled);
+  // The active console drives the editor, so it is fetched with stage=true and
+  // therefore carries the effective draft: committed changes plus the
+  // uncommitted staged edits the editor is showing.
+  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, true);
   const draftDiffVersionId = versionIds.active || versionIds.draft;
+  // Committed draft console (stage=false) is the publish basis: only committed
+  // changes get promoted to live, so the publishable indicators below diff this
+  // against live.
   const draftConsoleQuery = useCanvasConsole(
     canvasId,
     draftDiffVersionId || undefined,
@@ -68,24 +76,34 @@ export function useCanvasConsoleVersionDiff({
     () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleQuery.data),
     [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],
   );
+
+  // The on-canvas diff surfaces (X-ray panel badges, the diff summary, and the
+  // "Show diff" modal) mirror the canvas tab, which diffs the *effective* draft
+  // against live. Prefer the staged console; fall back to the committed draft
+  // while it loads or when no version is actively being edited.
+  const effectiveConsoleData = consoleQuery.data ?? draftConsoleQuery.data;
+  const hasEffectiveConsoleDiffVersusLive = useMemo(
+    () => hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, effectiveConsoleData),
+    [liveConsoleQuery.data, effectiveConsoleData],
+  );
   const draftConsoleDiff = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive) return undefined;
+    if (!hasEffectiveConsoleDiffVersusLive) return undefined;
     return {
-      diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, draftConsoleQuery.data),
+      diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, effectiveConsoleData),
     };
-  }, [hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+  }, [hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
   const draftConsoleDiffSummary = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive) return undefined;
-    return buildDraftConsoleDiffSummary(liveConsoleQuery.data, draftConsoleQuery.data);
-  }, [hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+    if (!hasEffectiveConsoleDiffVersusLive) return undefined;
+    return buildDraftConsoleDiffSummary(liveConsoleQuery.data, effectiveConsoleData);
+  }, [hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
   const consoleYamlDiffPayload = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive || !draftConsoleQuery.data) return null;
+    if (!hasEffectiveConsoleDiffVersusLive || !effectiveConsoleData) return null;
     const liveYamlText = consoleYamlText(canvasId, liveConsoleQuery.data);
-    const draftYamlText = consoleYamlText(canvasId, draftConsoleQuery.data);
+    const draftYamlText = consoleYamlText(canvasId, effectiveConsoleData);
 
     if (liveYamlText === draftYamlText) return null;
     return { liveYamlText, draftYamlText, filename: "console.yaml" };
-  }, [canvasId, hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+  }, [canvasId, hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
   const [consoleDiffOpen, setConsoleDiffOpen] = useState(false);
   const onShowConsoleDiff = useCallback(() => setConsoleDiffOpen(true), []);
   useEffect(() => {
@@ -96,13 +114,14 @@ export function useCanvasConsoleVersionDiff({
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
-    hasLatestDraftVersion: !!versionIds.draft,
+    hasLatestDraftVersion: !!(versionIds.active || versionIds.draft),
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
     hasDraftDiffVersusLive,
   });
   const updateConsoleMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
     registerIgnoredCanvasVersionUpdatedEcho,
+    getMutationGeneration: getConsoleMutationGeneration,
   });
 
   return {
