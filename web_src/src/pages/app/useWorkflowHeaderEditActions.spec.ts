@@ -6,14 +6,11 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 
 function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof useWorkflowHeaderEditActions>[0]> = {}) {
   const config = {
-    isRunsMode: false,
+    isRunInspectionMode: false,
     isVersionsMode: false,
-    handleExitRunsMode: vi.fn(),
+    handleClearRunInspection: vi.fn(),
     handleExitVersionsMode: vi.fn(),
     handleToggleEditMode: vi.fn().mockResolvedValue(undefined),
-    setIsRunsMode: vi.fn(),
-    setIsVersionsMode: vi.fn(),
-    setSelectedRunId: vi.fn(),
     setRunDetailNodeId: vi.fn(),
     setSearchParams: vi.fn() as unknown as SetURLSearchParams,
     ...overrides,
@@ -25,7 +22,7 @@ function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof us
 }
 
 describe("useWorkflowHeaderEditActions", () => {
-  it("does not clear the current view when entering edit mode outside runs", async () => {
+  it("does not clear the current view when entering edit mode outside run inspection", async () => {
     const { result, config } = renderWorkflowHeaderEditActions();
 
     await act(async () => {
@@ -36,7 +33,7 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setSearchParams).not.toHaveBeenCalled();
   });
 
-  it("does not clear the current view when exiting edit mode outside runs", async () => {
+  it("does not clear the current view when exiting edit mode outside run inspection", async () => {
     const { result, config } = renderWorkflowHeaderEditActions();
 
     await act(async () => {
@@ -47,17 +44,37 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setSearchParams).not.toHaveBeenCalled();
   });
 
-  it("clears runs view before entering edit mode", async () => {
-    const { result, config } = renderWorkflowHeaderEditActions({ isRunsMode: true });
+  it("clears run inspection before entering edit mode", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isRunInspectionMode: true });
 
     await act(async () => {
       await result.current.handleEnterEditModeFromHeader();
     });
 
-    expect(config.setIsRunsMode).toHaveBeenCalledWith(false);
-    expect(config.setSelectedRunId).toHaveBeenCalledWith(null);
     expect(config.setRunDetailNodeId).toHaveBeenCalledWith(null);
     expect(config.setSearchParams).toHaveBeenCalledTimes(1);
+    expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("exits versions mode before entering edit mode", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isVersionsMode: true });
+
+    await act(async () => {
+      await result.current.handleEnterEditModeFromHeader();
+    });
+
+    expect(config.handleExitVersionsMode).toHaveBeenCalledTimes(1);
+    expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("still exits edit mode when a run is in the URL", async () => {
+    const { result, config } = renderWorkflowHeaderEditActions({ isRunInspectionMode: true });
+
+    await act(async () => {
+      await result.current.handleExitEditModeFromHeader();
+    });
+
+    expect(config.handleClearRunInspection).toHaveBeenCalledTimes(1);
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
 
@@ -68,14 +85,11 @@ describe("useWorkflowHeaderEditActions", () => {
 
     renderHook(() =>
       useWorkflowHeaderEditActions({
-        isRunsMode: false,
+        isRunInspectionMode: false,
         isVersionsMode: false,
-        handleExitRunsMode: vi.fn(),
+        handleClearRunInspection: vi.fn(),
         handleExitVersionsMode: vi.fn(),
         handleToggleEditMode,
-        setIsRunsMode: vi.fn(),
-        setIsVersionsMode: vi.fn(),
-        setSelectedRunId: vi.fn(),
         setRunDetailNodeId: vi.fn(),
         setSearchParams: setSearchParams as unknown as SetURLSearchParams,
         startup: {
@@ -97,5 +111,55 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(next.get("edit")).toBeNull();
     expect(next.get("version")).toBe("draft-version");
     expect(next.get("branch")).toBe("drafts/abc");
+  });
+
+  it("auto edit mode clears run inspection before entering edit mode", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
+    const setRunDetailNodeId = vi.fn();
+    const searchParams = new URLSearchParams("edit=1&run=run-123");
+    const callOrder: string[] = [];
+
+    setSearchParams.mockImplementation(() => {
+      callOrder.push("setSearchParams");
+    });
+    handleToggleEditMode.mockImplementation(async () => {
+      callOrder.push("toggleEditMode");
+    });
+
+    renderHook(() =>
+      useWorkflowHeaderEditActions({
+        isRunInspectionMode: true,
+        isVersionsMode: false,
+        handleClearRunInspection: vi.fn(),
+        handleExitVersionsMode: vi.fn(),
+        handleToggleEditMode,
+        setRunDetailNodeId,
+        setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+        startup: {
+          hasEditableVersion: false,
+          canUpdateCanvas: true,
+          canvas: { metadata: { id: "canvas-1" }, spec: {} },
+          searchParams,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+
+    expect(setRunDetailNodeId).toHaveBeenCalledWith(null);
+    expect(setSearchParams).toHaveBeenCalledTimes(2);
+    expect(callOrder).toEqual(["setSearchParams", "toggleEditMode", "setSearchParams"]);
+
+    const clearRunUpdater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const clearedRun = clearRunUpdater(new URLSearchParams("edit=1&run=run-123"));
+    expect(clearedRun.get("run")).toBeNull();
+    expect(clearedRun.get("edit")).toBe("1");
+
+    const clearEditUpdater = setSearchParams.mock.calls[1]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const clearedEdit = clearEditUpdater(new URLSearchParams("edit=1"));
+    expect(clearedEdit.get("edit")).toBeNull();
   });
 });

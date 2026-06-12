@@ -19,10 +19,13 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   inputSize?: "xs" | "sm" | "md" | "lg";
   noExampleObjectText?: string;
   showValuePreview?: boolean;
+  valuePreviewLabel?: string;
   quickTip?: string;
   expressionMode?: "wrapped" | "raw";
   /** Labels of suggestions to hide (e.g., ["$", "previous"] to restrict to root() only). */
   excludedSuggestions?: string[];
+  /** Minimum height in pixels. Overrides the default derived from `inputSize` (useful for multi-line fields). */
+  minHeight?: number;
 }
 
 const suggestionSortPriority = {
@@ -98,9 +101,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       inputSize = "md",
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
+      valuePreviewLabel = "Preview",
       quickTip,
       expressionMode = "wrapped",
       excludedSuggestions,
+      minHeight,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -121,14 +126,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const previousInputValue = useRef<string>(value);
 
     const isRawExpression = expressionMode === "raw";
-
-    // Check if input contains any expressions
-    const hasExpressions = useMemo(() => {
-      if (isRawExpression) {
-        return inputValue.trim().length > 0;
-      }
-      return /\{\{.*?\}\}/.test(inputValue);
-    }, [inputValue, isRawExpression]);
 
     // Check if all expressions are valid
     const allExpressionsValid = useMemo(() => {
@@ -174,10 +171,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       // Use the larger of the two heights
       const textareaHeight = textarea.scrollHeight;
       const backdropHeight = backdrop?.scrollHeight ?? 0;
-      const minHeight = INPUT_SIZE_MIN_HEIGHT[inputSize];
-      const finalHeight = Math.max(textareaHeight, backdropHeight, minHeight);
+      const resolvedMinHeight = minHeight ?? INPUT_SIZE_MIN_HEIGHT[inputSize];
+      const finalHeight = Math.max(textareaHeight, backdropHeight, resolvedMinHeight);
       textarea.style.height = `${finalHeight}px`;
-    }, [inputSize]);
+    }, [inputSize, minHeight]);
 
     // Tokenize expression content for syntax highlighting
     const tokenizeExpression = (expr: string): React.ReactNode[] => {
@@ -569,6 +566,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       params = params.replace(/\s+,/g, ",").replace(/,\s+/g, ", ");
 
       return `(${params})`;
+    };
+
+    const getSuggestionDisplayLabel = (suggestion: Suggestion) => {
+      if (suggestion.kind === "function" && (suggestion.label === "root" || suggestion.label === "previous")) {
+        return `${suggestion.label}()`;
+      }
+
+      return suggestion.label;
     };
 
     const getReplacementRange = (left: string, insertText: string) => {
@@ -1196,7 +1201,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // to prevent position jumping when switching between suggestion types
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
-    const showBottomBar = hasExpressions || (isFocused && !!quickTip);
+    const showPreviewToggle = showValuePreview;
+    const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
 
     return (
       <div ref={containerRef} className="relative w-full">
@@ -1289,7 +1295,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         {showBottomBar && (
           <div className="flex items-center justify-between mt-1 px-0.5">
             {/* Preview toggle - left side */}
-            {hasExpressions ? (
+            {showPreviewToggle ? (
               <button
                 type="button"
                 onClick={() => setPreviewMode(!previewMode)}
@@ -1305,7 +1311,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 ])}
               >
                 {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                <span>Preview</span>
+                <span>{valuePreviewLabel}</span>
               </button>
             ) : (
               <span />
@@ -1562,8 +1568,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           }
                         }}
                       >
-                        <span className="truncate min-w-0">{suggestionItem.label}</span>
-                        {suggestionItem.kind === "function" && (
+                        <span className="truncate min-w-0">{getSuggestionDisplayLabel(suggestionItem)}</span>
+                        {suggestionItem.kind === "function" && !["root", "previous"].includes(suggestionItem.label) && (
                           <span className="text-gray-500 truncate min-w-0">
                             {formatFunctionSignature(suggestionItem)}
                           </span>

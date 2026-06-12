@@ -102,7 +102,7 @@ Rules:
   message: Draft ready — added retry logic to Call Target API
   :::
 
-- You can add, remove, or modify nodes and edges.
+- You can add, remove, or modify nodes and edges. In canvas.yaml edges, always use canonical fields "sourceId", "targetId", and "channel"; never use "source", "target", "from", or "to", because update_draft rejects unknown proto fields.
 - You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Prefer 'superplane_app' with include_console for reads and console_yaml for draft updates. Use 'superplane apps console get ... -o yaml' and 'superplane apps console set ... -f console.yaml --draft-id <draft-id>' only as a fallback.
 - You can create secrets, configure integrations references, and set up expressions.
 - For direct app edits, prefer the shortest reliable path: use 'superplane_app' to read the draft app once, list integrations only if integration IDs are needed, make the draft update, then report the result.

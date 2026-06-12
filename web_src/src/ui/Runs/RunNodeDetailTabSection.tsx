@@ -27,7 +27,7 @@ export function RunNodeDetailTabSection({
   onSelectTab,
 }: RunNodeDetailTabSectionProps) {
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b border-slate-200 px-2">
         {hasDetailsSection ? (
           <TabButton
@@ -70,7 +70,7 @@ export function RunNodeDetailTabSection({
           <JsonView value={tabData?.configuration as object} collapsed={2} style={{ fontSize: 12 }} />
         ) : null}
       </div>
-    </>
+    </div>
   );
 }
 

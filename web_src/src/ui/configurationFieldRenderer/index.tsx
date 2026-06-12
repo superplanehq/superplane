@@ -32,6 +32,7 @@ import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
+import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
@@ -51,9 +52,6 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
 }
 
 type ConfigurationField = FieldRendererProps["field"];
-
-/** Stable reference for trigger run-title fields — hides node/previous sources that don't apply. */
-const RUN_TITLE_EXCLUDED_SUGGESTIONS = ["$", "previous"];
 
 function getInitialSelectValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
   const selectOptions = field.typeOptions?.select?.options;
@@ -288,6 +286,11 @@ export const ConfigurationFieldRenderer = ({
 
   const fieldAllowsExpressions =
     allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+  const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
+  // `field.label` arrives as an empty string (not undefined) when a component omits it,
+  // so fall back to the field name whenever the label is blank.
+  const fieldLabel = runTitlePresentation?.label || field.label || field.name;
+  const fieldDescription = runTitlePresentation?.description ?? field.description;
 
   const commonProps = {
     field,
@@ -299,7 +302,8 @@ export const ConfigurationFieldRenderer = ({
     integrationId,
     organizationId,
     allowExpressions: fieldAllowsExpressions,
-    excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+    excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+    valuePreviewLabel: runTitlePresentation?.previewLabel,
   };
 
   const renderField = () => {
@@ -468,7 +472,7 @@ export const ConfigurationFieldRenderer = ({
         <div className="flex items-center gap-3">
           <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
           <Label className="block text-left flex-1 min-w-0">
-            {field.label || field.name}
+            {fieldLabel}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
@@ -499,8 +503,8 @@ export const ConfigurationFieldRenderer = ({
           </div>
         )}
 
-        {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+        {fieldDescription && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
     );
@@ -513,7 +517,7 @@ export const ConfigurationFieldRenderer = ({
         <div className="flex items-center gap-3">
           {renderField()}
           <Label className="text-left cursor-pointer">
-            {field.label || field.name}
+            {fieldLabel}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
@@ -539,8 +543,8 @@ export const ConfigurationFieldRenderer = ({
           </div>
         )}
 
-        {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+        {fieldDescription && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
     );
@@ -552,7 +556,7 @@ export const ConfigurationFieldRenderer = ({
       <div className="flex items-center gap-3">
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left flex-1 min-w-0">
-          {field.label || field.name}
+          {fieldLabel}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
@@ -586,8 +590,8 @@ export const ConfigurationFieldRenderer = ({
       )}
 
       {/* Display field description */}
-      {field.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+      {fieldDescription && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
       )}
     </div>
   );
