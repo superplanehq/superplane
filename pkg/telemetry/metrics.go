@@ -21,8 +21,10 @@ var (
 	queueWorkerNodesCountHistogram metric.Int64Histogram
 	queueWorkerStuckItems          metric.Int64Histogram
 
-	executorWorkerTickHistogram       metric.Float64Histogram
-	executorWorkerNodesCountHistogram metric.Int64Histogram
+	executorWorkerTickHistogram              metric.Float64Histogram
+	executorWorkerNodesCountHistogram        metric.Int64Histogram
+	executorWorkerExecutionsCounter          metric.Int64Counter
+	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
 	eventWorkerTickHistogram        metric.Float64Histogram
 	eventWorkerEventsCountHistogram metric.Int64Histogram
@@ -88,6 +90,24 @@ func InitMetrics(ctx context.Context) error {
 		"executor_worker.tick.nodes.pending",
 		metric.WithDescription("Number of pending workflow node executions each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerExecutionsCounter, err = meter.Int64Counter(
+		"executor_worker.executions.total",
+		metric.WithDescription("WorkflowNodeExecutor execution processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerExecutionDurationHistogram, err = meter.Float64Histogram(
+		"executor_worker.execution.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeExecutor execution processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -248,6 +268,28 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 	}
 
 	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordExecutorWorkerExecution(ctx context.Context, d time.Duration, outcome, reason, component string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+		attribute.String("component", component),
+	)
+
+	executorWorkerExecutionsCounter.Add(ctx, 1, attrs)
+	executorWorkerExecutionDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+			attribute.String("component", component),
+		),
+	)
 }
 
 func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
