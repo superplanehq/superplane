@@ -320,7 +320,7 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		Table("workflow_events").
 		Select("workflow_events.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_events"},
 			Options:  "SKIP LOCKED",
 		}).

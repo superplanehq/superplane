@@ -109,7 +109,7 @@ func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, e
 	var execution CanvasNodeExecution
 
 	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
 		First(&execution).
 		Error
@@ -170,7 +170,7 @@ func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasN
 		Table("workflow_node_executions").
 		Select("workflow_node_executions.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_node_executions"},
 			Options:  "SKIP LOCKED",
 		}).
