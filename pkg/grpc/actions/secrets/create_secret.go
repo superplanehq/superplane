@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -45,7 +44,12 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
+	id, err := parseDomainID(domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, id, data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
