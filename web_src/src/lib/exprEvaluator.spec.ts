@@ -23,7 +23,7 @@ describe("exprEvaluator", () => {
   it("formats timestamp strings through the date helper", () => {
     expect(
       evaluateExpr('date(root().timestamp).Format("2006-01-02 15:04:05")', {
-        __root: { timestamp: "2024-01-01T09:08:07" },
+        __root: { timestamp: "2024-01-01T09:08:07Z" },
       }),
     ).toBe("2024-01-01 09:08:07");
   });
@@ -31,9 +31,16 @@ describe("exprEvaluator", () => {
   it("formats timestamp strings with date methods", () => {
     expect(
       evaluateExpr('root().timestamp.Format("2006-01-02 15:04:05")', {
-        __root: { timestamp: "2024-01-01T09:08:07" },
+        __root: { timestamp: "2024-01-01T09:08:07Z" },
       }),
     ).toBe("2024-01-01 09:08:07");
+  });
+
+  it("formats timestamp strings in UTC", () => {
+    expect(evaluateExpr('date("2024-01-01T00:00:00Z").Format("2006-01-02 15:04:05")', {})).toBe("2024-01-01 00:00:00");
+    expect(evaluateExpr('date("2024-01-01T01:00:00+01:00").Format("2006-01-02 15:04:05")', {})).toBe(
+      "2024-01-01 00:00:00",
+    );
   });
 
   it("formats primitive, array, and object results for display", () => {
