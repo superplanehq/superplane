@@ -8,6 +8,7 @@ import {
 
 export function useAuxiliarySidebarWidth(isOpen: boolean, storageKey: string, defaultWidth: number) {
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ clientX: number; width: number } | null>(null);
   const width = useSidebarLayoutStore((state) => state.auxLeftWidth);
   const isResizing = useSidebarLayoutStore((state) => state.isAuxLeftResizing);
   const setAuxLeftResizing = useSidebarLayoutStore((state) => state.setAuxLeftResizing);
@@ -19,21 +20,29 @@ export function useAuxiliarySidebarWidth(isOpen: boolean, storageKey: string, de
   const handleMouseDown = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();
+      dragStartRef.current = { clientX: event.clientX, width };
       setAuxLeftResizing(true);
     },
-    [setAuxLeftResizing],
+    [setAuxLeftResizing, width],
   );
 
   useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (event: MouseEvent) => {
-      const rect = sidebarRef.current?.getBoundingClientRect();
-      const left = rect?.left ?? 0;
-      resizeAuxLeft(Math.max(AUX_SIDEBAR_MIN_WIDTH, Math.round(event.clientX - left)));
+      const dragStart = dragStartRef.current;
+      if (!dragStart) {
+        return;
+      }
+
+      const targetWidth = dragStart.width + event.clientX - dragStart.clientX;
+      resizeAuxLeft(Math.max(AUX_SIDEBAR_MIN_WIDTH, Math.round(targetWidth)));
     };
 
-    const handleMouseUp = () => setAuxLeftResizing(false);
+    const handleMouseUp = () => {
+      dragStartRef.current = null;
+      setAuxLeftResizing(false);
+    };
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -43,6 +52,7 @@ export function useAuxiliarySidebarWidth(isOpen: boolean, storageKey: string, de
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
+      dragStartRef.current = null;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
