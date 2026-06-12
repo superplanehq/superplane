@@ -72,7 +72,13 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		return nil, status.Error(codes.PermissionDenied, "version is not visible in current flow")
 	}
 
+	state, _, err := stagingStateForVersion(version.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersionMetadata(version, organizationID),
+		Version:      SerializeCanvasVersionMetadata(version, organizationID),
+		StagingState: state,
 	}, nil
 }

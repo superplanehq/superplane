@@ -165,19 +165,12 @@ func (s *canvasAutoSaveSteps) assertNotePreview(text string) {
 
 func (s *canvasAutoSaveSteps) assertNoteTextInDB(expected string) {
 	require.Eventually(s.t, func() bool {
-		draft := s.canvas.FindCurrentDraft()
-		if draft == nil {
+		node, ok := s.canvas.DraftNodeByName("Note")
+		if !ok {
 			return false
 		}
-
-		for _, node := range draft.Nodes {
-			if node.Name == "Note" {
-				text, _ := node.Configuration["text"].(string)
-				return text == expected
-			}
-		}
-
-		return false
+		text, _ := node.Configuration["text"].(string)
+		return text == expected
 	}, 10*time.Second, 200*time.Millisecond)
 }
 

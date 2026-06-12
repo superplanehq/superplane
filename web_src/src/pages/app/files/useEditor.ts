@@ -1,15 +1,16 @@
-import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
+import { useCanvasVersionStaging } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
-import { canPublishPendingFileChanges } from "./useFilesPublish";
+import { useEditorCommittedContent } from "./useEditorCommittedContent";
 import { useEditorLifecycle } from "./useEditorLifecycle";
+import { useEditorStagingSync } from "./useEditorStagingSync";
 import { usePendingState } from "./usePendingState";
-import { useFilesPublish } from "./useFilesPublish";
 import { useFilesTabState } from "./useFilesTabState";
+import { useStagedFileDiffs } from "./useStagedFileDiffs";
 import { useCatalog, useRepositoryPathLists, useRepositorySelectedFileQuery } from "./useCatalog";
-import type { AppFile, FilesHeaderActionsState } from "./types";
+import type { AppFile } from "./types";
 
 type UseEditorOptions = {
   canvasId?: string;
@@ -18,8 +19,10 @@ type UseEditorOptions = {
   canWrite: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  stagingResetNonce?: number;
+  suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
+  onLocalFilesStagingChange?: (hasStaging: boolean) => void;
 };
 
 export function useEditor({
@@ -29,14 +32,16 @@ export function useEditor({
   canWrite,
   files,
   headerActionsSlotId,
-  onHeaderActionsChange,
+  stagingResetNonce = 0,
+  suspendRepositoryFileStaging = false,
   onSpecFileChange,
+  onLocalFilesStagingChange,
 }: UseEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
   const catalog = useCatalog(canvasId, files);
-  const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
+  const { committedContentByPath, setCommittedContentByPath, committedContentByPathRef } = useEditorCommittedContent();
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
   const loadedContentByPathRef = useRef(loadedContentByPath);
@@ -52,6 +57,7 @@ export function useEditor({
     finalRepositoryPathsRef,
     allPathsRef,
     loadedContentByPathRef,
+    committedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
     versionId,
     onSpecFileChange,
@@ -63,6 +69,7 @@ export function useEditor({
   const pathLists = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, pendingChanges);
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
+
   const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
 
@@ -74,23 +81,9 @@ export function useEditor({
     versionId,
   );
 
-  useFilesPublish({
-    canManageRepositoryFiles,
-    canPublishFiles:
-      canManageRepositoryFiles &&
-      canPublishPendingFileChanges(pendingChanges, pathLists.commitPathError) &&
-      !commitFiles.isPending,
-    commitPathError: pathLists.commitPathError,
-    headSha: catalog.headSha,
-    versionId,
-    pendingChanges,
-    setPendingChangesByPath: pending.setPendingChangesByPath,
-    setLoadedContentByPath,
-    discardAllChanges: pending.discardAllChanges,
-    onHeaderActionsChange,
-    commitFiles,
-  });
   useEditorLifecycle({
+    canvasId,
+    versionId,
     isEditing,
     resetPendingState: pending.resetPendingState,
     setIsDiffOpen,
@@ -99,6 +92,38 @@ export function useEditor({
     selectedPath: tabs.selectedPath,
     selectedFileData: selection.selectedFileQuery.data,
     setLoadedContentByPath,
+    setCommittedContentByPath,
+    stagingResetNonce,
+  });
+
+  useEditorStagingSync({
+    canvasId,
+    versionId,
+    canManageRepositoryFiles,
+    suspendRepositoryFileStaging,
+    pendingChanges,
+    committedContentByPath,
+    reconcilePendingWithCommitted: pending.reconcilePendingWithCommitted,
+    onLocalFilesStagingChange,
+  });
+
+  // Some changes live in the draft's staging layer rather than in the
+  // in-session pendingChanges: the virtual spec files (canvas.yaml /
+  // console.yaml), and—after a page refresh—repository files whose staged edits
+  // outlived the session. Detect them from the server staging state and surface
+  // them in the Diff dialog. Paths still covered by a pending change are
+  // excluded so they aren't diffed twice (the pending change wins, as it
+  // reflects the freshest in-editor content).
+  const stagingQuery = useCanvasVersionStaging(canvasId ?? "", versionId, canManageRepositoryFiles && !!versionId);
+  const stagedDiffPaths = useMemo(() => {
+    const stagedPaths = stagingQuery.data?.stagedPaths ?? [];
+    return stagedPaths.filter((path) => !pending.pendingChangesByPath[path]);
+  }, [stagingQuery.data?.stagedPaths, pending.pendingChangesByPath]);
+  const stagedFileDiffs = useStagedFileDiffs({
+    canvasId,
+    versionId,
+    paths: stagedDiffPaths,
+    enabled: isDiffOpen,
   });
 
   return buildFilesEditorResult({
@@ -109,6 +134,9 @@ export function useEditor({
     pendingChanges,
     selection,
     loadedContentByPath,
+    committedContentByPath,
+    stagedDiffPaths,
+    stagedFileDiffs,
     canManageRepositoryFiles,
     leftOffset,
     isDiffOpen,
