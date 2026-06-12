@@ -58,12 +58,16 @@ interface MarkdownContentProps {
 /**
  * Render a markdown string with the standard GFM + line-break + sanitized-raw
  * HTML pipeline used across the app (console panels, file viewer, etc).
- * Returns `null` when the trimmed content is empty so the caller can decide
- * whether to show its own empty state.
+ * Returns `null` when the content is empty (or whitespace-only) so the caller
+ * can decide whether to show its own empty state.
+ *
+ * Only line endings are normalized; leading/trailing whitespace is preserved
+ * so file viewers render exactly what's on disk (e.g. an indented code block
+ * at the very start of a file stays an indented code block).
  */
 export function MarkdownContent({ content, className, "data-testid": dataTestId }: MarkdownContentProps) {
-  const normalized = content.replace(/\r\n/g, "\n").trim();
-  if (!normalized) return null;
+  const normalized = content.replace(/\r\n/g, "\n");
+  if (!normalized.trim()) return null;
   return (
     <div className={cn(MARKDOWN_CONTENT_CLASSES, className)} data-testid={dataTestId}>
       <ReactMarkdown
