@@ -22,6 +22,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Open")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop A", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -35,6 +36,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Publish")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Publish", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -50,6 +52,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Reject")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Reject", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -108,6 +111,12 @@ func (s *canvasChangeRequestSteps) headerProposeChangeButton() pw.Locator {
 func (s *canvasChangeRequestSteps) addNoopNode(name string, pos models.Position) {
 	s.canvas.AddNoop(name, pos)
 	s.session.AssertText(name)
+}
+
+func (s *canvasChangeRequestSteps) commitStagedDraftChanges() {
+	s.canvas.ClickOnEmptyCanvasArea()
+	s.canvas.WaitForStagingOnCurrentDraft()
+	s.canvas.CommitStaging()
 }
 
 func (s *canvasChangeRequestSteps) waitForProposeChangeReady() {
