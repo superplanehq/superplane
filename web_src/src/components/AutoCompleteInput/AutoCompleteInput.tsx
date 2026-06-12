@@ -122,14 +122,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     const isRawExpression = expressionMode === "raw";
 
-    // Check if input contains any expressions
-    const hasExpressions = useMemo(() => {
-      if (isRawExpression) {
-        return inputValue.trim().length > 0;
-      }
-      return /\{\{.*?\}\}/.test(inputValue);
-    }, [inputValue, isRawExpression]);
-
     // Check if all expressions are valid
     const allExpressionsValid = useMemo(() => {
       if (!exampleObj) return true;
@@ -569,6 +561,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       params = params.replace(/\s+,/g, ",").replace(/,\s+/g, ", ");
 
       return `(${params})`;
+    };
+
+    const getSuggestionDisplayLabel = (suggestion: Suggestion) => {
+      if (suggestion.kind === "function" && (suggestion.label === "root" || suggestion.label === "previous")) {
+        return `${suggestion.label}()`;
+      }
+
+      return suggestion.label;
     };
 
     const getReplacementRange = (left: string, insertText: string) => {
@@ -1563,8 +1563,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           }
                         }}
                       >
-                        <span className="truncate min-w-0">{suggestionItem.label}</span>
-                        {suggestionItem.kind === "function" && (
+                        <span className="truncate min-w-0">{getSuggestionDisplayLabel(suggestionItem)}</span>
+                        {suggestionItem.kind === "function" && !["root", "previous"].includes(suggestionItem.label) && (
                           <span className="text-gray-500 truncate min-w-0">
                             {formatFunctionSignature(suggestionItem)}
                           </span>

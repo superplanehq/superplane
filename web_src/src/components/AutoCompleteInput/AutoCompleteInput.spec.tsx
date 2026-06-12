@@ -27,3 +27,43 @@ describe("AutoCompleteInput preview toggle", () => {
     expect(screen.queryByText(/error \(/i)).not.toBeInTheDocument();
   });
 });
+
+describe("AutoCompleteInput suggestions", () => {
+  const renderRunTitleInput = () =>
+    render(
+      <AutoCompleteInput
+        aria-label="Run title"
+        exampleObj={{ __root: { data: { name: "DCO", sha: "d6f3c8a2e8b7" } } }}
+        value=""
+        onChange={vi.fn()}
+        placeholder="{{ root().data.foo }}"
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        showValuePreview
+      />,
+    );
+
+  it("suggests root data fields inside wrapped expressions", async () => {
+    renderRunTitleInput();
+    const input = screen.getByRole("textbox", { name: "Run title" });
+    const value = "{{ root().data.";
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value, selectionStart: value.length } });
+
+    expect(await screen.findByText("name")).toBeInTheDocument();
+    expect(screen.getByText("sha")).toBeInTheDocument();
+  });
+
+  it("shows canonical root() syntax in function suggestions", async () => {
+    renderRunTitleInput();
+    const input = screen.getByRole("textbox", { name: "Run title" });
+    const value = "{{ ro";
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value, selectionStart: value.length } });
+
+    expect(await screen.findAllByText("root()")).not.toHaveLength(0);
+  });
+});
