@@ -38,7 +38,9 @@ import {
   createDatabaseMapper,
   getDatabaseMapper,
   deleteDatabaseMapper,
-  CLOUDSQL_ACTION_STATE_REGISTRY,
+  CLOUDSQL_CREATED_STATE_REGISTRY,
+  CLOUDSQL_FETCHED_STATE_REGISTRY,
+  CLOUDSQL_DELETED_STATE_REGISTRY,
 } from "./cloudsql_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -116,9 +118,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "compute.createStaticIP": buildActionStateRegistry("completed"),
   "compute.deleteStaticIP": buildActionStateRegistry("completed"),
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
-  "cloudsql.createDatabase": CLOUDSQL_ACTION_STATE_REGISTRY,
-  "cloudsql.getDatabase": CLOUDSQL_ACTION_STATE_REGISTRY,
-  "cloudsql.deleteDatabase": CLOUDSQL_ACTION_STATE_REGISTRY,
+  "cloudsql.createDatabase": CLOUDSQL_CREATED_STATE_REGISTRY,
+  "cloudsql.getDatabase": CLOUDSQL_FETCHED_STATE_REGISTRY,
+  "cloudsql.deleteDatabase": CLOUDSQL_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

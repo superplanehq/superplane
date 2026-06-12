@@ -96,4 +96,7 @@ export const deleteDatabaseMapper: ComponentBaseMapper = {
   subtitle: cloudsqlSubtitle,
 };
 
-export const CLOUDSQL_ACTION_STATE_REGISTRY: EventStateRegistry = buildActionStateRegistry("completed");
+// Per-action success labels so the node badge says what the component did.
+export const CLOUDSQL_CREATED_STATE_REGISTRY: EventStateRegistry = buildActionStateRegistry("created");
+export const CLOUDSQL_FETCHED_STATE_REGISTRY: EventStateRegistry = buildActionStateRegistry("fetched");
+export const CLOUDSQL_DELETED_STATE_REGISTRY: EventStateRegistry = buildActionStateRegistry("deleted");
