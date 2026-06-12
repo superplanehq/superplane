@@ -121,4 +121,114 @@ describe("useAgentChatMessages", () => {
       expect(data?.pages[0]?.messages[0]?.id).toBe("optimistic-message-1");
     });
   });
+
+  it("drops an optimistic message when the initial fetch returns the persisted user message", async () => {
+    type ListAgentChatMessagesResult = Awaited<ReturnType<typeof agentsListAgentChatMessages>>;
+    let resolveList: ((value: ListAgentChatMessagesResult) => void) | undefined;
+    vi.mocked(agentsListAgentChatMessages).mockReturnValue(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }) as ReturnType<typeof agentsListAgentChatMessages>,
+    );
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(() => useAgentChatMessages("chat-1", "org-1", true), {
+      wrapper: wrapper(queryClient),
+    });
+
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"), {
+      pages: [
+        {
+          messages: [
+            {
+              id: "optimistic-message-1",
+              role: "user",
+              content: "Build this",
+              toolName: "",
+              toolCallId: "",
+              toolStatus: "",
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [""],
+    });
+
+    if (!resolveList) {
+      throw new Error("list promise was not created");
+    }
+
+    resolveList({
+      data: {
+        messages: [{ id: "server-message-1", role: "user", content: "Build this" }],
+        hasMore: false,
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as ListAgentChatMessagesResult);
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
+      expect(data?.pages[0]?.messages).toHaveLength(1);
+      expect(data?.pages[0]?.messages[0]?.id).toBe("server-message-1");
+    });
+  });
+
+  it("keeps extra optimistic messages when repeated sends share the same content", async () => {
+    type ListAgentChatMessagesResult = Awaited<ReturnType<typeof agentsListAgentChatMessages>>;
+    let resolveList: ((value: ListAgentChatMessagesResult) => void) | undefined;
+    vi.mocked(agentsListAgentChatMessages).mockReturnValue(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }) as ReturnType<typeof agentsListAgentChatMessages>,
+    );
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(() => useAgentChatMessages("chat-1", "org-1", true), {
+      wrapper: wrapper(queryClient),
+    });
+
+    const makeOptimisticMessage = (id: string) => ({
+      id,
+      role: "user" as const,
+      content: "Build this",
+      toolName: "",
+      toolCallId: "",
+      toolStatus: "",
+      createdAt: new Date().toISOString(),
+    });
+
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"), {
+      pages: [
+        {
+          messages: [makeOptimisticMessage("optimistic-message-1"), makeOptimisticMessage("optimistic-message-2")],
+          hasMore: false,
+        },
+      ],
+      pageParams: [""],
+    });
+
+    if (!resolveList) {
+      throw new Error("list promise was not created");
+    }
+
+    resolveList({
+      data: {
+        messages: [{ id: "server-message-1", role: "user", content: "Build this" }],
+        hasMore: false,
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as ListAgentChatMessagesResult);
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
+      expect(data?.pages[0]?.messages.map((message) => message.id)).toEqual([
+        "server-message-1",
+        "optimistic-message-2",
+      ]);
+    });
+  });
 });

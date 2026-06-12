@@ -153,11 +153,40 @@ function mergePendingOptimisticMessages(
   }
 
   const messageIds = new Set(messages.map((message) => message.id));
-  return [...messages, ...optimisticMessages.filter((message) => !messageIds.has(message.id))];
+  const persistedUserMessageCounts = new Map<string, number>();
+  for (const message of messages) {
+    if (isOptimisticAgentMessage(message) || message.role !== "user") {
+      continue;
+    }
+
+    const key = optimisticMessageMatchKey(message);
+    persistedUserMessageCounts.set(key, (persistedUserMessageCounts.get(key) ?? 0) + 1);
+  }
+
+  const pendingMessages = optimisticMessages.filter((message) => {
+    if (messageIds.has(message.id)) {
+      return false;
+    }
+
+    const key = optimisticMessageMatchKey(message);
+    const persistedCount = persistedUserMessageCounts.get(key) ?? 0;
+    if (persistedCount === 0) {
+      return true;
+    }
+
+    persistedUserMessageCounts.set(key, persistedCount - 1);
+    return false;
+  });
+
+  return [...messages, ...pendingMessages];
 }
 
 function isOptimisticAgentMessage(message: AgentMessage): boolean {
   return message.id.startsWith("optimistic-");
+}
+
+function optimisticMessageMatchKey(message: AgentMessage): string {
+  return `${message.role}:${message.content}`;
 }
 
 export function useInterruptAgentChat(organizationId: string | undefined) {

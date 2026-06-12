@@ -22,6 +22,7 @@ function agentDraftAutoOpenKey(canvasId: string, versionId: string): string {
 type UseAgentDraftEditorArgs = {
   canvasId: string;
   headerMode: CanvasPageHeaderMode;
+  isRunInspectionMode: boolean;
   selectableVersionsById: Map<string, CanvasesCanvasVersion>;
   hasEditableVersion: boolean;
   hasPendingLocalCanvasState: boolean;
@@ -129,6 +130,7 @@ function usePendingAgentDraftAutoOpen({
 export function useAgentDraftEditor({
   canvasId,
   headerMode,
+  isRunInspectionMode,
   selectableVersionsById,
   hasEditableVersion,
   hasPendingLocalCanvasState,
@@ -145,7 +147,7 @@ export function useAgentDraftEditor({
         return "unavailable";
       }
 
-      if (source === "auto" && !isCanvasWorkflowTab(headerMode)) {
+      if (source === "auto" && (!isCanvasWorkflowTab(headerMode) || isRunInspectionMode)) {
         return "skipped";
       }
 
@@ -186,6 +188,7 @@ export function useAgentDraftEditor({
       hasEditableVersion,
       hasPendingLocalCanvasState,
       headerMode,
+      isRunInspectionMode,
       loadAgentDraftVersion,
       setSuppressUnpublishedDraftDiscard,
     ],

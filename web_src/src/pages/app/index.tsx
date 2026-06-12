@@ -4525,6 +4525,7 @@ export function AppPage() {
   useAgentDraftEditor({
     canvasId,
     headerMode,
+    isRunInspectionMode: urlViewFlags.isRunInspectionMode,
     selectableVersionsById,
     hasEditableVersion,
     hasPendingLocalCanvasState,

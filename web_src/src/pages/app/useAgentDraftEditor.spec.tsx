@@ -36,6 +36,7 @@ function setupHook({
   canvasId,
   versionId,
   headerMode = "version-live",
+  isRunInspectionMode = false,
   hasEditableVersion = false,
   hasPendingLocalCanvasState = false,
   activeCanvasVersionId = "live-version",
@@ -44,6 +45,7 @@ function setupHook({
   canvasId: string;
   versionId: string;
   headerMode?: CanvasPageHeaderMode;
+  isRunInspectionMode?: boolean;
   hasEditableVersion?: boolean;
   hasPendingLocalCanvasState?: boolean;
   activeCanvasVersionId?: string;
@@ -60,6 +62,7 @@ function setupHook({
   const initialProps = {
     canvasId,
     headerMode,
+    isRunInspectionMode,
     selectableVersionsById,
     hasEditableVersion,
     hasPendingLocalCanvasState,
@@ -99,6 +102,28 @@ describe("useAgentDraftEditor", () => {
     expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
 
     hook.updateProps({ headerMode: "version-live" });
+
+    await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
+    expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
+      versionId,
+      hook.selectableVersionsById.get(versionId),
+    );
+  });
+
+  it("retries skipped auto-open after run inspection ends", async () => {
+    const versionId = "draft-retry-run-inspection";
+    const hook = setupHook({
+      canvasId: "canvas-retry-run-inspection",
+      versionId,
+      isRunInspectionMode: true,
+    });
+
+    dispatchDraftReady(versionId);
+
+    await act(async () => undefined);
+    expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
+
+    hook.updateProps({ isRunInspectionMode: false });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
     expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
