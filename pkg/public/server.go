@@ -348,6 +348,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner-logs", s.handleRunnerLogs).Methods(http.MethodPost)
+
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 

@@ -303,14 +303,21 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
+	logEndpointURL, logEndpointSecret, err := taskLogEndpoint(ctx.BaseURL)
+	if err != nil {
+		return fmt.Errorf("runner log endpoint: %w", err)
+	}
+
 	params := CreateTaskParams{
-		MachineType:    spec.MachineType,
-		Commands:       cmds,
-		WebhookURL:     webhookURL,
-		Environment:    environment,
-		ExecutionMode:  mode,
-		DockerImage:    resolvedDockerImageRef(spec),
-		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		MachineType:       spec.MachineType,
+		Commands:          cmds,
+		WebhookURL:        webhookURL,
+		LogEndpointURL:    logEndpointURL,
+		LogEndpointSecret: logEndpointSecret,
+		Environment:       environment,
+		ExecutionMode:     mode,
+		DockerImage:       resolvedDockerImageRef(spec),
+		TimeoutSeconds:    spec.ExecutionTimeoutSeconds,
 	}
 
 	taskID, err := broker.CreateTask(params)

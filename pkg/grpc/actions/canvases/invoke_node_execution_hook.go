@@ -86,6 +86,10 @@ func InvokeNodeExecutionHook(
 	tx := database.Conn()
 	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionHookContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID,
+		RunID:          execution.RunID,
+		NodeID:         execution.NodeID,
 		Name:           hookName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),

@@ -247,6 +247,11 @@ func (s *CanvasService) ListNodeExecutions(ctx context.Context, req *pb.ListNode
 	return canvases.ListNodeExecutions(ctx, s.registry, req.CanvasId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }
 
+func (s *CanvasService) ListNodeExecutionLogs(ctx context.Context, req *pb.ListNodeExecutionLogsRequest) (*pb.ListNodeExecutionLogsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListNodeExecutionLogs(uuid.MustParse(organizationID), req.CanvasId, req.ExecutionId, req.Limit, req.AfterSequence)
+}
+
 func (s *CanvasService) ListNodeEvents(ctx context.Context, req *pb.ListNodeEventsRequest) (*pb.ListNodeEventsResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {

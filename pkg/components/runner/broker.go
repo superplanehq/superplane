@@ -92,6 +92,8 @@ type brokerCreateTaskRequest struct {
 	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
+	LogEndpointURL          string                      `json:"log_endpoint_url,omitempty"`
+	LogEndpointSecret       string                      `json:"log_endpoint_secret,omitempty"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
@@ -111,17 +113,19 @@ const (
 
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
-	MachineType    string
-	RunMode        string
-	Script         string
-	MessageChain   json.RawMessage
-	Commands       []string
-	SetupCommands  []string
-	WebhookURL     string
-	Environment    []BrokerEnvironmentVariable
-	ExecutionMode  string
-	DockerImage    string
-	TimeoutSeconds int // 0 = DefaultExecutionTimeoutSeconds
+	MachineType       string
+	RunMode           string
+	Script            string
+	MessageChain      json.RawMessage
+	Commands          []string
+	SetupCommands     []string
+	WebhookURL        string
+	LogEndpointURL    string
+	LogEndpointSecret string
+	Environment       []BrokerEnvironmentVariable
+	ExecutionMode     string
+	DockerImage       string
+	TimeoutSeconds    int // 0 = DefaultExecutionTimeoutSeconds
 }
 
 type brokerCreateTaskResponse struct {
@@ -140,16 +144,18 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 	}
 
 	req := brokerCreateTaskRequest{
-		FleetID:       fleetID,
-		RunMode:       strings.TrimSpace(p.RunMode),
-		Script:        strings.TrimSpace(p.Script),
-		MessageChain:  p.MessageChain,
-		Commands:      p.Commands,
-		SetupCommands: p.SetupCommands,
-		Environment:   p.Environment,
-		WebhookURL:    p.WebhookURL,
-		ExecutionMode: mode,
-		DockerImage:   strings.TrimSpace(p.DockerImage),
+		FleetID:           fleetID,
+		RunMode:           strings.TrimSpace(p.RunMode),
+		Script:            strings.TrimSpace(p.Script),
+		MessageChain:      p.MessageChain,
+		Commands:          p.Commands,
+		SetupCommands:     p.SetupCommands,
+		Environment:       p.Environment,
+		WebhookURL:        p.WebhookURL,
+		LogEndpointURL:    strings.TrimSpace(p.LogEndpointURL),
+		LogEndpointSecret: strings.TrimSpace(p.LogEndpointSecret),
+		ExecutionMode:     mode,
+		DockerImage:       strings.TrimSpace(p.DockerImage),
 	}
 	timeout := p.TimeoutSeconds
 	if timeout <= 0 {
