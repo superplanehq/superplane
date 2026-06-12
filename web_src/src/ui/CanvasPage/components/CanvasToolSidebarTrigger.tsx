@@ -19,15 +19,15 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
   }
 
   return (
-    <div className="relative z-10 -ml-0.5 flex h-7 shrink-0 items-center">
+    <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center">
       <Tooltip delayDuration={350}>
         <TooltipTrigger asChild>
           <UIButton
             type="button"
             variant="ghost"
-            size="icon-xs"
+            size={null}
             className={cn(
-              "h-7 min-h-7 w-7 rounded-full border-0 p-0 shadow-none transition-colors",
+              "h-7 min-h-7 gap-1.5 rounded-full border-0 py-1 pl-2.5 pr-4 text-[13px] shadow-none transition-colors",
               isToolSidebarOpen
                 ? "bg-violet-100 hover:bg-violet-100 focus-visible:bg-violet-100"
                 : "bg-slate-100 text-slate-500 hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100",
@@ -42,6 +42,9 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
             ) : (
               <Sparkle className="size-3.5 shrink-0" />
             )}
+            <span className={cn("text-[13px] font-medium whitespace-nowrap", isToolSidebarOpen && "text-violet-600")}>
+              Agent
+            </span>
           </UIButton>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>
