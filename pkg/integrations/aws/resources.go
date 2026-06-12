@@ -61,6 +61,21 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.instanceAlarm":
 		return ec2.ListInstanceAlarms(ctx, resourceType)
 
+	case "ec2.elasticIp":
+		return ec2.ListElasticIPs(ctx, resourceType)
+
+	case "ec2.elasticIpAssociation":
+		return ec2.ListElasticIPAssociations(ctx, resourceType)
+
+	case "ec2.publicIpv4Pool":
+		return ec2.ListPublicIPv4Pools(ctx, resourceType)
+
+	case "ec2.customerOwnedIpv4Pool":
+		return ec2.ListCustomerOwnedIPv4Pools(ctx, resourceType)
+
+	case "ec2.ipamPool":
+		return ec2.ListIpamPools(ctx, resourceType)
+
 	case "codeartifact.repository":
 		return codeartifact.ListRepositories(ctx, resourceType)
 
