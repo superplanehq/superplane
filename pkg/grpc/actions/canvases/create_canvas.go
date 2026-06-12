@@ -48,10 +48,6 @@ func CreateCanvas(
 		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
 	}
 
-	if pbCanvas.Metadata.GetIsTemplate() {
-		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
-	}
-
 	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
 	if name == "" {
 		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
@@ -122,7 +118,6 @@ func CreateCanvas(
 		ID:             canvasID,
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
-		IsTemplate:     false,
 		Name:           name,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
@@ -213,6 +208,7 @@ func CreateCanvas(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
+			GitProvider:    gitProvider,
 		})
 
 		if err != nil {

@@ -289,7 +289,6 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 			"organization_id",
 			"live_version_id",
 			"folder_id",
-			"is_template",
 			"name",
 			"next_draft_display_number",
 			"created_by",
@@ -368,6 +367,25 @@ func NextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string,
 	}
 
 	return fmt.Sprintf("Draft #%d", number), nil
+}
+
+func CreateDraftBranchFromLive(
+	canvasID uuid.UUID,
+	userID uuid.UUID,
+	displayName string,
+	nodes []Node,
+	edges []Edge,
+) (*CanvasVersion, error) {
+	var draft *CanvasVersion
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		created, createErr := CreateDraftBranchFromLiveInTransaction(tx, canvasID, userID, displayName, nodes, edges)
+		draft = created
+		return createErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return draft, nil
 }
 
 func CreateDraftBranchFromLiveInTransaction(

@@ -177,8 +177,8 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 
 	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
 	// accessible-name collisions between pending and live preview rows or on :has() CSS support.

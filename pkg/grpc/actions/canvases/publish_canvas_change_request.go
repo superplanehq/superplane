@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -25,6 +26,7 @@ func PublishCanvasChangeRequest(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	changeRequestID string,
@@ -51,10 +53,6 @@ func PublishCanvasChangeRequest(
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if canvas.IsTemplate {
-		return nil, nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
@@ -176,6 +174,7 @@ func PublishCanvasChangeRequest(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				GitProvider:    gitProv,
 			},
 		); err != nil {
 			return err

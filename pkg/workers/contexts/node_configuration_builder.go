@@ -25,6 +25,7 @@ type NodeConfigurationBuilder struct {
 	workflowID          uuid.UUID
 	nodeID              string
 	previousExecutionID *uuid.UUID
+	incomingEventID     *uuid.UUID
 	rootEventID         *uuid.UUID
 	rootPayload         any
 	input               any
@@ -63,6 +64,11 @@ func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurati
 
 func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uuid.UUID) *NodeConfigurationBuilder {
 	b.previousExecutionID = previousExecutionID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithIncomingEventID(incomingEventID *uuid.UUID) *NodeConfigurationBuilder {
+	b.incomingEventID = incomingEventID
 	return b
 }
 
@@ -357,9 +363,38 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		if err != nil {
 			return nil, err
 		}
+
+		//
+		// listExecutionsInChain merges the current execution's linear lineage
+		// (walked via previous_execution_id) with every run-wide execution of
+		// upstream nodes. When the graph has a feedback cycle (e.g. a loop whose
+		// body points back at the loop), an upstream node has one execution per
+		// iteration, so the same name maps to many executions in the run. We must
+		// bind each name to the execution in the *current* lineage; otherwise
+		// expressions like a loop's until-condition would read a stale
+		// iteration's output. So a linear-chain execution always wins over a
+		// run-wide upstream match for the same node.
+		//
+		linearExecutions, err := b.listLinearExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		linearExecutionIDs := make(map[uuid.UUID]struct{}, len(linearExecutions))
+		for _, execution := range linearExecutions {
+			linearExecutionIDs[execution.ID] = struct{}{}
+		}
+
 		executionByNodeID = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 		for _, execution := range executionsInChain {
 			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+
+			if existing, ok := executionByNodeID[execution.NodeID]; ok {
+				_, existingIsLinear := linearExecutionIDs[existing.ID]
+				_, candidateIsLinear := linearExecutionIDs[execution.ID]
+				if existingIsLinear && !candidateIsLinear {
+					continue
+				}
+			}
 			executionByNodeID[execution.NodeID] = execution
 		}
 	}
@@ -427,17 +462,21 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 		return nil, err
 	}
 	if len(executionsInChain) > 0 {
-		executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-		for _, execution := range executionsInChain {
-			executionIDs = append(executionIDs, execution.ID)
-		}
-
-		events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+		linearExecutions, err := b.listLinearExecutionsInChain()
 		if err != nil {
 			return nil, err
 		}
 
-		latestByExecution := latestEventByExecution(events, executionIDs)
+		outputs, err := newExecutionOutputLookup(
+			b.tx,
+			linearExecutions,
+			executionIDsFromExecutions(executionsInChain),
+			b.incomingEventID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		for i := len(executionsInChain) - 1; i >= 0; i-- {
 			execution := executionsInChain[i]
 			name, ok := nodeIDToName[execution.NodeID]
@@ -445,8 +484,11 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 				continue
 			}
 
-			event, ok := latestByExecution[execution.ID]
-			if !ok {
+			event, found, err := outputs.outputEvent(execution.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
 				continue
 			}
 
@@ -791,14 +833,31 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		executionIDByRef[nodeRef] = execution.ID
 	}
 
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	chainExecutions, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
+	referencedExecutionIDs := make([]uuid.UUID, 0, len(executionIDByRef))
+	for _, executionID := range executionIDByRef {
+		referencedExecutionIDs = append(referencedExecutionIDs, executionID)
+	}
+
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		chainExecutions,
+		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+		b.incomingEventID,
+	)
+	if err != nil {
+		return err
+	}
+
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok := latestByExecution[executionID]
+		event, ok, err := outputs.outputEvent(executionID)
+		if err != nil {
+			return fmt.Errorf("node %s: %w", nodeRef, err)
+		}
 		if !ok {
 			return fmt.Errorf("node %s has no outputs", nodeRef)
 		}
@@ -807,27 +866,6 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	}
 
 	return nil
-}
-
-func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
-	latestByExecution := make(map[uuid.UUID]models.CanvasEvent, len(executionIDs))
-	for _, event := range events {
-		if event.ExecutionID == nil {
-			continue
-		}
-
-		latest, ok := latestByExecution[*event.ExecutionID]
-		if !ok || event.CreatedAt == nil {
-			latestByExecution[*event.ExecutionID] = event
-			continue
-		}
-
-		if latest.CreatedAt == nil || event.CreatedAt.After(*latest.CreatedAt) {
-			latestByExecution[*event.ExecutionID] = event
-		}
-	}
-
-	return latestByExecution
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
@@ -938,25 +976,27 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		startIndex = 1
 	}
 
-	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-	for _, execution := range executionsInChain {
-		executionIDs = append(executionIDs, execution.ID)
-	}
-
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		executionsInChain,
+		executionIDsFromExecutions(executionsInChain),
+		b.incomingEventID,
+	)
 	if err != nil {
 		return step, nil, err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
 	for _, execution := range executionsInChain[startIndex:] {
 		step++
 		if step < depth {
 			continue
 		}
 
-		event, exists := latestByExecution[execution.ID]
-		if !exists {
+		event, ok, err := outputs.outputEvent(execution.ID)
+		if err != nil {
+			return step, nil, err
+		}
+		if !ok {
 			continue
 		}
 

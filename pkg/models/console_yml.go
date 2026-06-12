@@ -19,6 +19,7 @@ const (
 	DashboardAPIVersion = "v1"
 
 	ConsolePanelTypeMarkdown = "markdown"
+	ConsolePanelTypeHTML     = "html"
 	ConsolePanelTypeNode     = "node"
 	ConsolePanelTypeNodes    = "nodes"
 	ConsolePanelTypeTable    = "table"
@@ -34,6 +35,7 @@ const (
 // — the frontend validators and per-type form editors rely on the same set.
 var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeMarkdown,
+	ConsolePanelTypeHTML,
 	ConsolePanelTypeNode,
 	ConsolePanelTypeNodes,
 	ConsolePanelTypeTable,
@@ -237,6 +239,8 @@ func validatePanelContent(panel ConsolePanel) error {
 	switch panel.Type {
 	case ConsolePanelTypeMarkdown:
 		return validateMarkdownContent(panel)
+	case ConsolePanelTypeHTML:
+		return validateHTMLContent(panel)
 	case ConsolePanelTypeNode:
 		return validateNodePanelContent(panel)
 	case ConsolePanelTypeNodes:
@@ -262,7 +266,38 @@ var AllowedMarkdownRunSelects = []string{"latest", "latest_passed", "latest_fail
 // AllowedMarkdownVariableDirections mirrors `MARKDOWN_VARIABLE_DIRECTIONS` on the FE.
 var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
 
+// AllowedMarkdownVariableModes mirrors `MARKDOWN_VARIABLE_MODES` on the FE.
+// `single` keeps the existing first-row behavior; `list` resolves the
+// variable to every matching row so authors can use CEL list macros.
+var AllowedMarkdownVariableModes = []string{"single", "list"}
+
 func validateMarkdownContent(panel ConsolePanel) error {
+	if panel.Content == nil {
+		return nil
+	}
+	if rawTitle, ok := panel.Content["title"]; ok && rawTitle != nil {
+		if _, ok := rawTitle.(string); !ok {
+			return fmt.Errorf("panel %q content.title must be a string", panel.ID)
+		}
+	}
+	if rawBody, ok := panel.Content["body"]; ok && rawBody != nil {
+		if _, ok := rawBody.(string); !ok {
+			return fmt.Errorf("panel %q content.body must be a string", panel.ID)
+		}
+	}
+	if rawVars, ok := panel.Content["variables"]; ok && rawVars != nil {
+		if err := validateMarkdownVariables(panel.ID, rawVars); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateHTMLContent enforces the shape of an html panel's content. The body
+// is stored raw and sanitized client-side at render time (same trust model as
+// markdown), so the backend only checks structure: title and body are optional
+// strings and the shared variable system rules apply.
+func validateHTMLContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
@@ -341,28 +376,81 @@ func validateMarkdownMemorySource(panelID string, index int, source map[string]a
 			return fmt.Errorf("panel %q content.variables[%d].source.direction must be \"asc\" or \"desc\"", panelID, index)
 		}
 	}
-	if raw, ok := source["matches"]; ok && raw != nil {
-		matches, ok := raw.([]any)
+	if err := validateMarkdownMemoryMatches(panelID, index, source["matches"]); err != nil {
+		return err
+	}
+	if err := validateMarkdownMemoryMode(panelID, index, source["mode"]); err != nil {
+		return err
+	}
+	return validateMarkdownMemoryLimit(panelID, index, source["limit"])
+}
+
+func validateMarkdownMemoryMatches(panelID string, index int, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	matches, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q content.variables[%d].source.matches must be an array", panelID, index)
+	}
+	for j, m := range matches {
+		match, ok := m.(map[string]any)
 		if !ok {
-			return fmt.Errorf("panel %q content.variables[%d].source.matches must be an array", panelID, index)
+			return fmt.Errorf("panel %q content.variables[%d].source.matches[%d] must be an object", panelID, index, j)
 		}
-		for j, m := range matches {
-			match, ok := m.(map[string]any)
-			if !ok {
-				return fmt.Errorf("panel %q content.variables[%d].source.matches[%d] must be an object", panelID, index, j)
-			}
-			field, ok := match["field"].(string)
-			if !ok || strings.TrimSpace(field) == "" {
-				return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].field must be a non-empty string", panelID, index, j)
-			}
-			if rawValue, ok := match["value"]; ok && rawValue != nil {
-				if _, ok := rawValue.(string); !ok {
-					return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].value must be a string", panelID, index, j)
-				}
+		field, ok := match["field"].(string)
+		if !ok || strings.TrimSpace(field) == "" {
+			return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].field must be a non-empty string", panelID, index, j)
+		}
+		if rawValue, ok := match["value"]; ok && rawValue != nil {
+			if _, ok := rawValue.(string); !ok {
+				return fmt.Errorf("panel %q content.variables[%d].source.matches[%d].value must be a string", panelID, index, j)
 			}
 		}
 	}
 	return nil
+}
+
+func validateMarkdownMemoryMode(panelID string, index int, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	mode, ok := raw.(string)
+	if !ok || !slices.Contains(AllowedMarkdownVariableModes, mode) {
+		return fmt.Errorf("panel %q content.variables[%d].source.mode must be \"single\" or \"list\"", panelID, index)
+	}
+	return nil
+}
+
+// validateMarkdownMemoryLimit accepts the integer-shaped JSON / YAML decoder
+// outputs we see in practice: `int`, `int64`, and `float64` carrying a whole
+// number. Anything else - non-numeric, fractional, zero, negative - is
+// rejected with the same message so the UI and YAML editors see consistent
+// feedback.
+func validateMarkdownMemoryLimit(panelID string, index int, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	msg := fmt.Errorf("panel %q content.variables[%d].source.limit must be a positive integer", panelID, index)
+	switch v := raw.(type) {
+	case int:
+		if v <= 0 {
+			return msg
+		}
+		return nil
+	case int64:
+		if v <= 0 {
+			return msg
+		}
+		return nil
+	case float64:
+		if v <= 0 || v != float64(int64(v)) {
+			return msg
+		}
+		return nil
+	default:
+		return msg
+	}
 }
 
 func validateMarkdownRunSource(panelID string, index int, source map[string]any) error {

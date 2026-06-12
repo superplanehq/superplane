@@ -141,22 +141,6 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvasVersion(UpdateCanvasVersionRequest) returns (UpdateCanvasVersionResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
-      body: "*"
-      additional_bindings {
-        put: "/api/v1/canvases/{canvas_id}/versions"
-        body: "*"
-      }
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version";
-      description: "Updates a user-owned canvas version, including metadata and flow content";
-      tags: "CanvasVersion";
-    };
-  }
-
   rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
@@ -479,37 +463,13 @@ service Canvases {
     };
   }
 
-  rpc GetConsole(GetConsoleRequest) returns (GetConsoleResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/console"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get canvas console";
-      description: "Returns the console for a canvas (panels and grid layout)";
-      tags: "Canvas";
-    };
-  }
-
-  rpc UpdateConsole(UpdateConsoleRequest) returns (UpdateConsoleResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/console"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas console";
-      description: "Replaces the console for a canvas";
-      tags: "Canvas";
-    };
-  }
-
 }
 
 message ListCanvasesRequest {
-  bool include_templates = 1;
 }
 
 message ListCanvasesResponse {
-  repeated Canvas canvases = 1;
+  repeated CanvasSummary canvases = 1;
 }
 
 message DescribeCanvasRequest {
@@ -611,6 +571,10 @@ message CommitCanvasRepositoryFilesRequest {
   string expected_head_sha = 2;
   string message = 3;
   repeated CanvasRepositoryFileOperation operations = 4;
+  // Draft version to update when committing canvas.yaml or console.yaml.
+  optional string version_id = 5;
+  // When set, applies auto-layout while processing canvas.yaml updates.
+  optional CanvasAutoLayout auto_layout = 6;
 }
 
 message CommitCanvasRepositoryFilesResponse {
@@ -646,17 +610,7 @@ message DescribeCanvasVersionRequest {
 }
 
 message DescribeCanvasVersionResponse {
-  CanvasVersion version = 1;
-}
-
-message UpdateCanvasVersionRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  Canvas canvas = 3;
-  CanvasAutoLayout auto_layout = 4;
-}
-
-message UpdateCanvasVersionResponse {
+  // Version metadata only; workflow content is in canvas.yaml via the repository files API.
   CanvasVersion version = 1;
 }
 
@@ -775,6 +729,23 @@ message UserRef {
   string name = 2;
 }
 
+message CanvasSummary {
+  message Node {
+    string id = 1;
+    Components.Position position = 2;
+  }
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  UserRef created_by = 7;
+  string folder_id = 8;
+  repeated Node nodes = 9;
+  repeated Components.Edge edges = 10;
+}
+
 message Canvas {
   message Metadata {
     string id = 1;
@@ -784,8 +755,7 @@ message Canvas {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
-    bool is_template = 8;
-    string folder_id = 9;
+    string folder_id = 8;
   }
 
   message ChangeManagement {
@@ -1345,24 +1315,4 @@ message Console {
   repeated LayoutItem layout = 3;
   google.protobuf.Timestamp updated_at = 4;
   string version_id = 5;
-}
-
-message GetConsoleRequest {
-  string canvas_id = 1;
-  optional string version_id = 2;
-}
-
-message GetConsoleResponse {
-  Console console = 1;
-}
-
-message UpdateConsoleRequest {
-  string canvas_id = 1;
-  repeated Console.Panel panels = 2;
-  repeated Console.LayoutItem layout = 3;
-  optional string version_id = 4;
-}
-
-message UpdateConsoleResponse {
-  Console console = 1;
 }

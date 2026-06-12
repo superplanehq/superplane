@@ -37,6 +37,7 @@ func BuildProcessQueueContext(
 	queueItem *models.CanvasNodeQueueItem,
 	configFields []configuration.Field,
 	onNewEvents func([]models.CanvasEvent),
+	repoFiles core.RepositoryFilesContext,
 ) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
@@ -47,6 +48,7 @@ func BuildProcessQueueContext(
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
@@ -75,6 +77,7 @@ func BuildProcessQueueContext(
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
@@ -148,11 +151,23 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
 	}
 
 	ctx.DequeueItem = func() error {
 		return queueItem.Delete(tx)
+	}
+
+	//
+	// The node queue is a FIFO ordered by created_at (see CanvasNode.FirstQueueItem),
+	// so deferring an item is simply moving it to the tail by stamping created_at to
+	// now. This lets other already-queued items (e.g. feedback for an in-progress run)
+	// be processed ahead of it, instead of the worker re-picking this same item forever.
+	//
+	ctx.DeferQueueItem = func() error {
+		now := time.Now()
+		return tx.Model(queueItem).Update("created_at", &now).Error
 	}
 
 	ctx.UpdateNodeState = func(state string) error {
@@ -265,7 +280,16 @@ func BuildProcessQueueContext(
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
+	}
+
+	ctx.HasRunningExecutions = func() (bool, error) {
+		count, err := models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
 	}
 
 	return ctx, nil

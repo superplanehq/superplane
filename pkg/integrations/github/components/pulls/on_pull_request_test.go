@@ -100,6 +100,36 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		assert.Equal(t, eventContext.Count(), 1)
 	})
 
+	t.Run("edited action is in list -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"action":"edited","changes":{"title":{"from":"Old title"}}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", eventType)
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"actions":    []string{"edited"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, eventContext.Count(), 1)
+	})
+
 	t.Run("action is not in list -> event is not emitted", func(t *testing.T) {
 		body := []byte(`{"action":"closed"}`)
 

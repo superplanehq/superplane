@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -183,9 +183,6 @@ check.lint.ui.knip:
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
-
-check.templates:
-	$(COMPOSE) exec app go run ./scripts/check_canvases_templates/main.go
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go

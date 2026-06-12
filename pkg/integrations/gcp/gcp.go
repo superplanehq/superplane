@@ -22,12 +22,13 @@ import (
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/monitoring"
+	gcpprometheus "github.com/superplanehq/superplane/pkg/integrations/gcp/prometheus"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func init() {
-	registry.RegisterIntegration("gcp", &GCP{})
+	registry.RegisterIntegrationWithWebhookHandler("gcp", &GCP{}, &WebhookHandler{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	})
@@ -47,6 +48,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	gcpprometheus.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (gcpprometheus.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -202,6 +206,8 @@ func (g *GCP) Actions() []core.Action {
 		&cloudsql.CreateInstance{},
 		&cloudsql.GetInstance{},
 		&cloudsql.DeleteInstance{},
+		&gcpprometheus.Query{},
+		&gcpprometheus.QueryRange{},
 	}
 }
 
@@ -212,6 +218,7 @@ func (g *GCP) Triggers() []core.Trigger {
 		&artifactregistry.OnArtifactPush{},
 		&artifactregistry.OnArtifactAnalysis{},
 		&gcppubsub.OnMessage{},
+		&monitoring.OnAlert{},
 	}
 }
 

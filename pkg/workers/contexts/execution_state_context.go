@@ -49,6 +49,10 @@ func (s *ExecutionStateContext) Pass() error {
 }
 
 func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
+	if len(payloads) > core.MaxEmitCount {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	}
+
 	outputs := map[string][]any{
 		channel: {},
 	}
@@ -73,6 +77,46 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	}
 
 	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
+	if err != nil {
+		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
+	}
+
+	return nil
+}
+
+func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	if len(payloads) > core.MaxEmitCount {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	}
+
+	outputs := map[string][]any{
+		channel: {},
+	}
+
+	for _, payload := range payloads {
+		event := map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		}
+
+		data, err := json.Marshal(event)
+		if err != nil {
+			return fmt.Errorf("failed to marshal payload: %w", err)
+		}
+
+		if len(data) > s.maxPayloadSize {
+			return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+		}
+
+		outputs[channel] = append(outputs[channel], json.RawMessage(data))
+	}
+
+	newEvents, err := s.execution.EmitOutputsInTransaction(s.tx, outputs)
 	if err != nil {
 		return err
 	}

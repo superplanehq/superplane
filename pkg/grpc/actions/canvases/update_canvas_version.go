@@ -36,7 +36,7 @@ func UpdateCanvasVersion(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*models.CanvasVersion, error) {
 	return UpdateCanvasVersionWithUsage(
 		ctx,
 		nil,
@@ -64,7 +64,7 @@ func UpdateCanvasVersionWithUsage(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -79,10 +79,6 @@ func UpdateCanvasVersionWithUsage(
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
@@ -199,9 +195,7 @@ func UpdateCanvasVersionWithUsage(
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
-	return &pb.UpdateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
-	}, nil
+	return version, nil
 }
 
 func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {

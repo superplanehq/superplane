@@ -24,9 +24,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
@@ -289,7 +291,7 @@ The Approval component pauses workflow execution and waits for manual approval f
 
 1. When the Approval component executes, it creates approval requirements based on the configured approvers
 2. The workflow pauses and waits for all required approvals
-3. Approvers receive notifications and can approve or reject from the workflow UI
+3. Approvers can approve or reject from the workflow UI
 4. Once all approvals are collected, the workflow continues:
    - **Approved channel**: All required approvers approved
    - **Rejected channel**: At least one approver rejected
@@ -460,6 +462,59 @@ The expression has access to:
 }
 ```
 
+<a id="for-each"></a>
+
+## For Each
+
+**Component key:** `forEach`
+
+The For Each component reads an array from the upstream payload and emits one downstream event per element.
+
+### Use Cases
+
+- Iterate over a list of results and process each one independently
+- Split runner output arrays into per-item workflow paths
+- Process each page, service, or record with the same downstream steps
+
+### How It Works
+
+1. Evaluates the configured array expression against the incoming event data
+2. Emits one `foreach.item` event to the `item` channel for each element
+3. If the array is empty, passes without emitting any events
+
+### Limits
+
+- At most 500 items per execution. Larger arrays fail with an error.
+
+### Output Fields (per item)
+
+- **item**: The array element value
+- **index**: Zero-based index of the element
+- **totalCount**: Total number of items in the array
+
+### Expression Environment
+
+- **$**: The run context data
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "index": 0,
+    "item": {
+      "cost_usd": 42.5,
+      "service": "EC2"
+    },
+    "totalCount": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "foreach.item"
+}
+```
+
 <a id="graph-ql-request"></a>
 
 ## GraphQL Request
@@ -616,6 +671,77 @@ The expression has access to:
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "if.executed"
+}
+```
+
+<a id="loop"></a>
+
+## Loop
+
+**Component key:** `loop`
+
+The Loop component runs downstream steps repeatedly until an exit condition becomes true.
+
+### Use Cases
+
+- Poll an API until a resource reaches a ready state
+- Retry a workflow segment until validation passes
+- Paginate through results until all pages are processed
+- Run approval or review cycles until consensus is reached
+
+### How It Works
+
+1. On the first run, Loop emits to the **Next** channel and starts the loop session
+2. Connect downstream nodes to the Next output and wire the last step back to Loop
+3. When those steps finish, Loop evaluates the **Until Expression**
+4. If the expression is `true`, Loop emits on **Done** and the loop ends
+5. If the expression is `false`, Loop emits on **Next** again for another iteration
+
+### Wiring
+
+```
+Trigger → Loop → Step A → Step B ──┐
+              ↑                    │
+              └────────────────────┘
+```
+
+Edges back into Loop are allowed so downstream steps can return control for the next condition check.
+
+### Output Channels
+
+- **Done**: Emitted once when the loop stops. Payload is under `data.done` with `iterations`, `stopReason` (`conditionTrue` or `max_iterations`), and `elapsedMs`
+- **Next**: Emitted at the start of each iteration. Payload is under `data.next` with `iteration` and `maxIterations`
+
+### Limits
+
+- **Max Iterations** caps how many iterations are allowed (default 10, maximum 100)
+- **Timeout** caps the total wall-clock time of a single run (default 3600s, maximum 86400s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
+
+### Delay Between Iterations
+
+Optionally wait before starting the next iteration. Uses the same fixed or exponential backoff strategies as the HTTP component retry settings. The first iteration always starts immediately; delays apply between subsequent iterations only.
+
+### Expression Environment
+
+The until expression has access to:
+
+- **$**: The run context data, including outputs from the latest iteration
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "done": {
+      "elapsedMs": 4521,
+      "iterations": 3,
+      "stopReason": "conditionTrue"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "loop.done"
 }
 ```
 

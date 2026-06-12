@@ -4,8 +4,8 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
-import { getExecutionDetails, getState, getStateMap } from "@/pages/app/mappers";
-import { buildExecutionInfo } from "@/pages/app/utils";
+import { getExecutionDetails, getState, getStateMap, getTriggerRenderer } from "@/pages/app/mappers";
+import { buildEventInfo, buildExecutionInfo } from "@/pages/app/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 
 export type RunNodeDetailTabKey = "details" | "payload" | "configuration";
@@ -194,15 +194,13 @@ export function buildTriggerTabData(
   run: CanvasesCanvasRun,
   workflowNode: ComponentsNode | undefined,
 ): RunNodeDetailTabData {
-  const details: Record<string, unknown> = {};
   const rootEvent = run.rootEvent;
-
-  if (rootEvent?.channel) details.Channel = rootEvent.channel;
-  if (rootEvent?.customName) details.Name = rootEvent.customName;
-  if (rootEvent?.createdAt) details["Triggered at"] = rootEvent.createdAt;
+  const mappedDetails = buildTriggerEventDetails(rootEvent, workflowNode);
+  const fallbackDetails = buildFallbackTriggerEventDetails(rootEvent);
+  const details = Object.keys(mappedDetails).length > 0 ? mappedDetails : fallbackDetails;
 
   const tabData: RunNodeDetailTabData = {
-    details: Object.keys(details).length > 0 ? details : undefined,
+    details: Object.keys(details).length > 0 ? filterEmptyDetailEntries(details) : undefined,
     payload: rootEvent?.data && Object.keys(rootEvent.data).length > 0 ? rootEvent.data : undefined,
   };
 
@@ -215,6 +213,26 @@ export function buildTriggerTabData(
   }
 
   return tabData;
+}
+
+function buildTriggerEventDetails(
+  rootEvent: CanvasesCanvasRun["rootEvent"],
+  workflowNode: ComponentsNode | undefined,
+): Record<string, unknown> {
+  if (!rootEvent) return {};
+
+  const triggerRenderer = getTriggerRenderer(workflowComponentName(workflowNode));
+  return triggerRenderer.getRootEventValues({ event: buildEventInfo(rootEvent) });
+}
+
+function buildFallbackTriggerEventDetails(rootEvent: CanvasesCanvasRun["rootEvent"]): Record<string, unknown> {
+  const details: Record<string, unknown> = {};
+
+  if (rootEvent?.channel) details.Channel = rootEvent.channel;
+  if (rootEvent?.customName) details.Name = rootEvent.customName;
+  if (rootEvent?.createdAt) details["Triggered at"] = rootEvent.createdAt;
+
+  return details;
 }
 
 export function isErrorValue(value: unknown): value is { __type: "error"; message: string } {

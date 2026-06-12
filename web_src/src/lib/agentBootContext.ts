@@ -4,7 +4,7 @@ export const PLACEHOLDER_NODE_CONTEXT_KEY = "add-placeholder-node";
 export const AGENT_BOOT_CONTEXT_READY_EVENT = "agent-boot-context-ready";
 
 const DEFAULT_BOOT_MESSAGE =
-  "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
+  "Session ready. Use the [Canvas Snapshot] from the session context to greet the user. Do not run CLI commands or fetch the canvas just to summarize it. Only check connected integrations if the user asks for integration-specific work.";
 
 const BLANK_BOOT_MESSAGE = ""; // No agent boot message for blank canvas — static greeting only
 
@@ -77,7 +77,7 @@ function buildTemplateBootMessage({ instructions, initialMessage }: TemplateAgen
 
   return [
     "The UI has already shown the user the template introduction.",
-    "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+    "Do not run commands or tools to inspect the canvas, integrations, or files.",
     `Reply only with: "${TEMPLATE_NEXT_STEP_MESSAGE}"`,
   ].join("\n\n");
 }

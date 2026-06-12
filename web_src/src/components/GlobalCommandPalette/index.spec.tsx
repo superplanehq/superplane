@@ -13,9 +13,11 @@ const {
   createCanvasMock,
   defaultAccount,
   defaultPermissions,
-  featureState,
+  inviteLinkQueryState,
+  inviteLinkState,
   navigateMock,
   permissionsState,
+  writeTextMock,
 } = vi.hoisted(() => {
   const defaultAccount = {
     id: "account-1",
@@ -32,6 +34,7 @@ const {
     { resource: "canvases", action: "update" },
     { resource: "org", action: "read" },
     { resource: "members", action: "read" },
+    { resource: "members", action: "create" },
     { resource: "service_accounts", action: "read" },
     { resource: "groups", action: "read" },
     { resource: "roles", action: "read" },
@@ -44,9 +47,11 @@ const {
     createCanvasMock: vi.fn(),
     defaultAccount,
     defaultPermissions,
-    featureState: { managedAgentsEnabled: true },
+    inviteLinkQueryState: { enabledValues: [] as boolean[] },
+    inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
     navigateMock: vi.fn(),
     permissionsState: { permissions: defaultPermissions },
+    writeTextMock: vi.fn(),
   };
 });
 
@@ -80,18 +85,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases: () => ({
     data: [
       {
-        metadata: {
-          id: "canvas-1",
-          name: "Deploy API",
-          description: "Production deployment flow",
-        },
+        id: "canvas-1",
+        name: "Deploy API",
+        description: "Production deployment flow",
       },
       {
-        metadata: {
-          id: "canvas-2",
-          name: "Database Backups",
-          description: "Nightly backup flow",
-        },
+        id: "canvas-2",
+        name: "Database Backups",
+        description: "Nightly backup flow",
       },
     ],
     isLoading: false,
@@ -115,12 +116,33 @@ vi.mock("@/hooks/useOrganizationData", () => ({
     data: { enabled: true },
     error: null,
   }),
+  useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
+    inviteLinkQueryState.enabledValues.push(enabled);
+    return {
+      data: enabled ? inviteLinkState.data : undefined,
+      isLoading: false,
+    };
+  },
 }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (feature: string) => feature === "claude_managed_agents" && featureState.managedAgentsEnabled,
-    enabledExperimentalFeatures: featureState.managedAgentsEnabled ? ["claude_managed_agents"] : [],
+vi.mock("@/hooks/useIntegrations", () => ({
+  useConnectedIntegrations: () => ({
+    data: [
+      {
+        metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
+        status: { state: "ready" },
+      },
+      {
+        metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
+        status: { state: "ready" },
+      },
+    ],
+  }),
+}));
+
+vi.mock("@/hooks/useServiceAccounts", () => ({
+  useServiceAccounts: () => ({
+    data: [{ id: "sa-1", name: "deploy-bot" }],
   }),
 }));
 
@@ -128,13 +150,11 @@ vi.mock("@/lib/canvasNameGenerator", () => ({
   generateCanvasName: () => "generated-canvas",
 }));
 
-let unregisterCanvasNodeSearchProvider: (() => void) | undefined;
-
 function openPalette() {
   openGlobalCommandPalette();
 }
 
-function renderPalette(path = "/org-1/apps/canvas-1") {
+function renderPalette(path = "/org-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -151,6 +171,15 @@ function renderPalette(path = "/org-1/apps/canvas-1") {
   );
 }
 
+function installClipboardWriteMock() {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: writeTextMock },
+  });
+}
+
+let unregisterCanvasNodeSearchProvider: (() => void) | null = null;
+
 describe("GlobalCommandPalette", () => {
   beforeEach(() => {
     accountState.account = defaultAccount;
@@ -159,59 +188,44 @@ describe("GlobalCommandPalette", () => {
     createCanvasMock.mockReset();
     createCanvasMock.mockResolvedValue({ data: { canvas: { metadata: { id: "canvas-new" } } } });
     navigateMock.mockReset();
+    inviteLinkQueryState.enabledValues = [];
+    inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
-    featureState.managedAgentsEnabled = true;
+    writeTextMock.mockReset();
+    writeTextMock.mockResolvedValue(undefined);
+    installClipboardWriteMock();
   });
 
   afterEach(() => {
     unregisterCanvasNodeSearchProvider?.();
-    unregisterCanvasNodeSearchProvider = undefined;
+    unregisterCanvasNodeSearchProvider = null;
   });
 
-  it("opens and shows contextual commands", async () => {
+  it("opens and shows quick links", async () => {
     renderPalette();
 
     openPalette();
 
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.getByText("New Canvas")).toBeInTheDocument();
-    expect(screen.getByText("Console")).toBeInTheDocument();
-    expect(screen.getByText("Agent")).toBeInTheDocument();
-    expect(screen.getByText("Versions")).toBeInTheDocument();
-    expect(screen.getByText("Organization Settings")).toBeInTheDocument();
-    expect(screen.getByText("Installation Admin")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    expect(screen.getByText("New App")).toBeInTheDocument();
+    expect(await screen.findByText("Copy Invite Link")).toBeInTheDocument();
+    expect(screen.getByText("Apps")).toBeInTheDocument();
+    expect(screen.getByText("Integrations")).toBeInTheDocument();
+    expect(screen.getByText("Go to Docs")).toBeInTheDocument();
+    expect(screen.getByText("Sign Out")).toBeInTheDocument();
   });
 
-  it("hides the agent command when managed agents are disabled", async () => {
-    featureState.managedAgentsEnabled = false;
+  it("closes with CMD+K while the command input is focused", async () => {
     renderPalette();
 
     openPalette();
-
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
-    expect(screen.getByText("Versions")).toBeInTheDocument();
-  });
-
-  it("opens current canvas tool tabs from commands", async () => {
-    const user = userEvent.setup();
-    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
-    renderPalette("/org-1/apps/canvas-1?view=memory");
-
-    openPalette();
-    await user.click(await screen.findByText("Versions"));
+    const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
+    input.focus();
+    fireEvent.keyDown(input, { key: "k", metaKey: true });
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-1");
-      expect(dispatchEventSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "canvas-tool-sidebar:select-tab",
-          detail: { tab: "versions" },
-        }),
-      );
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
     });
-
-    dispatchEventSpy.mockRestore();
   });
 
   it("does not open before the account is available", () => {
@@ -220,73 +234,196 @@ describe("GlobalCommandPalette", () => {
 
     openPalette();
 
-    expect(screen.queryByPlaceholderText("What can we help with?")).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Search components and commands")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
   });
 
-  it("does not treat apps/new as a current canvas route", async () => {
-    renderPalette("/org-1/apps/new");
-
-    openPalette();
-
-    expect(await screen.findByPlaceholderText("What can we help with?")).toBeInTheDocument();
-    expect(screen.queryByText("Console")).not.toBeInTheDocument();
-    expect(screen.queryByText("Versions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
-  });
-
-  it("opens organization settings as a nested command page", async () => {
+  it("expands app list when clicking Apps", async () => {
     const user = userEvent.setup();
     renderPalette();
 
     openPalette();
-    await user.click(await screen.findByText("Organization Settings"));
-    await user.click(await screen.findByText("Members"));
+    await user.click(await screen.findByText("Apps"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/settings/members");
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
+    expect(screen.getByText("Database Backups")).toBeInTheDocument();
   });
 
-  it("lists canvases when opening canvas settings outside a canvas route", async () => {
+  it("navigates to an app when selected from expanded list", async () => {
     const user = userEvent.setup();
-    renderPalette("/org-1");
+    renderPalette();
 
     openPalette();
-    await user.click(await screen.findByText("Canvas Settings"));
+    await user.click(await screen.findByText("Apps"));
     await user.click(await screen.findByText("Database Backups"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-2/settings");
+    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-2");
   });
 
-  it("disables canvas settings commands without canvas update permission", async () => {
+  it("searches apps by name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "Deploy");
+
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
+  });
+
+  it("searches apps by description", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "Production");
+
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
+  });
+
+  it("searches integrations by name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "puppies");
+
+    expect(await screen.findByText("puppies-github")).toBeInTheDocument();
+  });
+
+  it("searches integrations by provider name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "slack");
+
+    expect(await screen.findByText("deploy-alerts")).toBeInTheDocument();
+  });
+
+  it("searches service accounts by name", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy-bot");
+
+    expect(await screen.findByText("deploy-bot")).toBeInTheDocument();
+  });
+
+  it("does not match every result by shared category labels", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "service");
+
+    expect(screen.queryByText("deploy-bot")).not.toBeInTheDocument();
+    expect(await screen.findByText("No results found.")).toBeInTheDocument();
+  });
+
+  it("searches canvas nodes from the canvas page", async () => {
+    const user = userEvent.setup();
+    const selectNode = vi.fn();
+    unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
+      searchNodes: (query) =>
+        query.toLowerCase().includes("deploy")
+          ? [
+              {
+                id: "node-1",
+                label: "Deploy component",
+                iconSlug: "box",
+                keywords: ["deploy component", "node-1"],
+              },
+            ]
+          : [],
+      selectNode,
+    });
+    renderPalette("/org-1/apps/canvas-1");
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy");
+    await user.click(await screen.findByText("Deploy component"));
+
+    expect(selectNode).toHaveBeenCalledWith("node-1");
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not fetch or show the invite command without member create permission", async () => {
     permissionsState.permissions = defaultPermissions.filter(
-      (permission) => !(permission.resource === "canvases" && permission.action === "update"),
+      (permission) => permission.resource !== "members" || permission.action !== "create",
     );
     renderPalette();
 
     openPalette();
 
-    await screen.findByPlaceholderText("Search components and commands");
-    const settingsItems = screen.getAllByText("Canvas Settings").map((label) => label.closest("[cmdk-item]"));
-
-    expect(settingsItems).toHaveLength(2);
-    settingsItems.forEach((item) => expect(item).toHaveAttribute("data-disabled", "true"));
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(inviteLinkQueryState.enabledValues.length).toBeGreaterThan(0);
+    });
+    expect(inviteLinkQueryState.enabledValues).not.toContain(true);
+    expect(screen.queryByText("Copy Invite Link")).not.toBeInTheDocument();
   });
 
-  it("uses template route canvas ids for contextual canvas commands", async () => {
-    renderPalette("/org-1/templates/canvas-1");
+  it("disables invite copy when the invite link is inactive", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    inviteLinkState.data = { token: "test-invite-token", enabled: false };
+    renderPalette();
 
     openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
 
-    expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
-    expect(screen.getByText("Console")).toBeInTheDocument();
+    expect(copyInviteLink.closest("[cmdk-item]")).toHaveAttribute("data-disabled", "true");
+    await user.click(copyInviteLink);
+    expect(writeTextMock).not.toHaveBeenCalled();
   });
 
-  it("creates a canvas with the quick shortcut", async () => {
+  it("closes after copying the invite link successfully", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    renderPalette();
+
+    openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
+    await waitFor(() => {
+      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+    });
+    await user.click(copyInviteLink);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("stays open when invite link copy fails", async () => {
+    const user = userEvent.setup();
+    installClipboardWriteMock();
+    writeTextMock.mockRejectedValue(new Error("Clipboard unavailable"));
+    renderPalette();
+
+    openPalette();
+    const copyInviteLink = await screen.findByText("Copy Invite Link");
+    await waitFor(() => {
+      expect(copyInviteLink.closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+    });
+    await user.click(copyInviteLink);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/invite/test-invite-token"));
+    });
+    expect(screen.getByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+  });
+
+  it("creates an app with the quick shortcut", async () => {
     renderPalette();
 
     openPalette();
     await waitFor(() => {
-      expect(screen.getByText("New Canvas").closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
+      expect(screen.getByText("New App").closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
     });
     fireEvent.keyDown(document, { key: "/", metaKey: true });
 
@@ -296,34 +433,16 @@ describe("GlobalCommandPalette", () => {
     expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-new");
   });
 
-  it("searches canvas components from the root command palette", async () => {
+  it("collapses expanded section when back is clicked", async () => {
     const user = userEvent.setup();
-    const selectNode = vi.fn();
-    unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
-      searchNodes: (query) =>
-        [
-          {
-            id: "node-api",
-            label: "Deploy API",
-            iconSlug: "box",
-            keywords: ["deploy api", "node-api"],
-          },
-          {
-            id: "node-worker",
-            label: "Refresh Worker",
-            iconSlug: "box",
-            keywords: ["refresh worker", "node-worker"],
-          },
-        ].filter((node) => node.label.toLowerCase().includes(query.toLowerCase())),
-      selectNode,
-    });
-
     renderPalette();
 
     openPalette();
-    await user.type(await screen.findByPlaceholderText("Search components and commands"), "worker");
-    await user.click(await screen.findByText("Refresh Worker"));
+    await user.click(await screen.findByText("Apps"));
+    expect(await screen.findByText("Deploy API")).toBeInTheDocument();
 
-    expect(selectNode).toHaveBeenCalledWith("node-worker");
+    await user.click(screen.getByText("Back"));
+    expect(screen.queryByText("Deploy API")).not.toBeInTheDocument();
+    expect(screen.getByText("Apps")).toBeInTheDocument();
   });
 });

@@ -169,7 +169,39 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
     const date = coerceToDate(value);
     return date ? date.getTime() : 0;
   },
+  // Parse a JSON-encoded string into a structured CEL value (list, map, or
+  // scalar) so authors can `.map`, `.filter`, or dot-access the result. Already
+  // parsed non-string inputs pass through unchanged, and any parse failure
+  // returns `null` so downstream operations fail soft — matching the
+  // graceful-degrade convention used by `epochMs`, `matches`, and friends.
+  parseJson: (value: unknown): unknown => {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  },
+  // Join the elements of a list with a separator. Exposed as a builtin (not a
+  // method) because cel-js's parser refuses `.foo()` chains after a
+  // function-call result — so `list.map(x, expr).join("")` would not parse.
+  // Authors instead write `join(list.map(x, expr), "")`. Fail-soft: anything
+  // that isn't a list returns the empty string, missing/non-string separators
+  // collapse to "", and null/undefined elements become "" so a careless map
+  // doesn't smear `null` strings into the output.
+  join: (list: unknown, sep: unknown): string => {
+    if (!Array.isArray(list)) return "";
+    const separator = typeof sep === "string" ? sep : "";
+    return list.map((item) => stringifyJoinItem(item)).join(separator);
+  },
 };
+
+function stringifyJoinItem(item: unknown): string {
+  if (item === null || item === undefined) return "";
+  if (typeof item === "string") return item;
+  return String(item);
+}
 
 function toInt(value: unknown): number {
   if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;

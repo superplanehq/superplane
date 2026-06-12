@@ -74,11 +74,11 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar opens the Versions tab in the canvas tool sidebar.
+// OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.waitForToolSidebarOpen()
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.session.Click(q.TestID("canvas-view-mode-versions"))
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
 }
 
@@ -400,6 +400,18 @@ func (s *CanvasSteps) AddNote() {
 	}
 
 	s.session.Click(q.TestID("add-note-button"))
+	require.Eventually(s.t, func() bool {
+		draft := s.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+		for _, node := range draft.Nodes {
+			if node.Name == "Note" {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
 }
@@ -445,6 +457,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	source := q.TestID("building-block-approval")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-approval")
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
@@ -462,6 +475,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	startSource := q.TestID("building-block-start")
 	s.addBlockFromSidebar(startSource, pos)
+	s.openComponentSidebarForLatestBlock("building-block-start")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
 }
@@ -472,6 +486,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	source := q.TestID("building-block-wait")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-wait")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
 	modeSelector := q.TestID("field-mode-select")
@@ -494,6 +509,7 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	source := q.TestID("building-block-filter")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-filter")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
 	s.session.Sleep(300)
@@ -505,6 +521,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 }
@@ -515,6 +532,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
+	s.openComponentSidebarForLatestBlock("building-block-timeGate")
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
@@ -529,6 +547,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
+	s.session.Sleep(500)
+	s.openComponentSidebarForLatestBlock(blockTestID)
 }
 
 func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Position) {
@@ -536,14 +556,22 @@ func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Posit
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 }
 
-func (s *CanvasSteps) selectLatestNoopNode() {
-	headers := s.session.Page().Locator(`.react-flow__node [data-testid^="node-noop"][data-testid$="-header"]`)
+func (s *CanvasSteps) openComponentSidebarForLatestBlock(blockTestID string) {
+	slug := strings.ToLower(strings.TrimPrefix(blockTestID, "building-block-"))
+	headers := s.session.Page().Locator(fmt.Sprintf(
+		`.react-flow__node [data-testid^="node-%s"][data-testid$="-header"]`,
+		slug,
+	))
 	count, err := headers.Count()
 	require.NoError(s.t, err)
-	require.Greater(s.t, count, 0, "expected at least one noop node after adding a noop block")
+	require.Greater(s.t, count, 0, "expected at least one %s node after dropping block", slug)
 
 	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(150)
+}
+
+func (s *CanvasSteps) selectLatestNoopNode() {
+	s.openComponentSidebarForLatestBlock("building-block-noop")
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
@@ -575,25 +603,61 @@ func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
-	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)
+	sourceNodeID := s.waitForDraftNodeID(sourceName)
+	targetNodeID := s.waitForDraftNodeID(targetName)
 
-	loc := targetHandle.Run(s.session)
-	box, err := loc.BoundingBox()
-	if err != nil || box == nil {
-		s.t.Fatalf("getting bounding box for edge %q: %v", loc, err)
-	}
+	edge := q.Locator(`.react-flow__edge`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		count, err := edge.Count()
+		return err == nil && count > 0
+	}, 10*time.Second, 200*time.Millisecond)
 
-	// Click on the edge to delete it (edges now delete on click instead of requiring a separate delete button)
-	// Click a bit left (40px) from the center of the target handle to hit the edge
+	// The edge midpoint lies on the source node's right handle and the target
+	// node's left handle line. Computing it from the handle positions gives a
+	// point that is reliably on the (mostly horizontal) edge path. Playwright's
+	// Locator.Hover()/Click() target an element's bounding-box center, which is
+	// unreliable for an SVG path: the geometric center of the bounding box can
+	// fall off the actual stroke, so the action never lands on the edge.
+	sourceHandle := q.Locator(`.react-flow__node[data-id="` + sourceNodeID + `"] .react-flow__handle-right`).Run(s.session)
+	targetHandle := q.Locator(`.react-flow__node[data-id="` + targetNodeID + `"] .react-flow__handle-left`).Run(s.session)
 
-	centerX := box.X + box.Width/2 - 40
-	centerY := box.Y + box.Height/2
+	sourceBox, err := sourceHandle.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, sourceBox)
+	targetBox, err := targetHandle.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, targetBox)
 
-	if err := s.session.Page().Mouse().Click(centerX, centerY, pw.MouseClickOptions{}); err != nil {
-		s.t.Fatalf("clicking edge %q at center: %v", loc, err)
-	}
+	midX := (sourceBox.X + sourceBox.Width/2 + targetBox.X + targetBox.Width/2) / 2
+	midY := (sourceBox.Y + sourceBox.Height/2 + targetBox.Y + targetBox.Height/2) / 2
 
+	// In edit mode the wide transparent delete hit-area path is always present
+	// (canDelete = isEditMode && !isReadOnly), so a hover is not required to
+	// reveal it. Move the mouse onto the edge to set the hovered state, then
+	// dispatch a raw click at the same on-edge point. Using raw mouse events
+	// avoids the unreliable element-center actionability checks.
+	hitArea := q.Locator(`.react-flow__renderer [data-testid="edge-delete-hit-area"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		count, err := hitArea.Count()
+		return err == nil && count > 0
+	}, 10*time.Second, 200*time.Millisecond)
+
+	mouse := s.session.Page().Mouse()
+	require.NoError(s.t, mouse.Move(midX, midY))
 	s.session.Sleep(300)
+	require.NoError(s.t, mouse.Click(midX, midY))
+	s.session.Sleep(500)
+	s.waitForDraftEdgeCount(0)
+}
+
+func (s *CanvasSteps) waitForDraftEdgeCount(expected int) {
+	require.Eventually(s.t, func() bool {
+		draft := s.FindCurrentDraft()
+		if draft == nil {
+			return false
+		}
+		return len(draft.Edges) == expected
+	}, 10*time.Second, 200*time.Millisecond, "draft edge count to reach %d", expected)
 }
 
 func (s *CanvasSteps) StartEditingNode(name string) {
