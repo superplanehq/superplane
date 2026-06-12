@@ -48,6 +48,18 @@ func Test__AssociateElasticIP__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "allocation ID is required")
 	})
 
+	t.Run("missing instance when associating -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"operation":    "associate",
+				"allocationId": "eipalloc-abc123",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "instance ID is required")
+	})
+
 	t.Run("missing association ID when disassociating -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -77,6 +89,20 @@ func Test__AssociateElasticIP__Setup(t *testing.T) {
 		assert.Equal(t, "us-east-1", stored.Region)
 		assert.Equal(t, "associate", stored.Operation)
 	})
+}
+
+func Test__AssociateElasticIP__Execute_Associate_MissingInstance(t *testing.T) {
+	component := &AssociateElasticIP{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"region":       "us-east-1",
+			"operation":    "associate",
+			"allocationId": "eipalloc-abc123",
+		},
+		Metadata: &contexts.MetadataContext{},
+	})
+	require.ErrorContains(t, err, "instance ID is required")
 }
 
 func Test__AssociateElasticIP__Execute_Associate(t *testing.T) {
