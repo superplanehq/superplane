@@ -51,14 +51,15 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
-	assert.Equal(t, RunModeBash, req.RunMode)
-	assert.Contains(t, req.Script, "jq")
-	assert.Contains(t, req.Script, "SUPERPLANE_PAYLOAD_FILE")
-	assert.Contains(t, req.Script, "SUPERPLANE_RESULT_FILE")
-	assert.NotContains(t, string(body), `"commands"`)
+	require.Len(t, req.Commands, 1)
+	assert.Contains(t, req.Commands[0], "jq")
+	assert.Contains(t, req.Commands[0], "SUPERPLANE_PAYLOAD_FILE")
+	assert.Contains(t, req.Commands[0], "SUPERPLANE_RESULT_FILE")
+	assert.Contains(t, req.Commands[0], "\n")
+	assert.NotContains(t, string(body), `"run_mode"`)
+	assert.NotContains(t, string(body), `"script"`)
 	assert.Empty(t, req.SetupCommands)
-	require.True(t, json.Valid(req.MessageChain))
-	assert.Contains(t, string(req.MessageChain), "GitHub PR")
+	assert.Empty(t, req.MessageChain)
 }
 
 func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
@@ -94,7 +95,8 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, []string{"apt-get update", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, []string{"apt-get update", "echo ready", `echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`}, req.Commands)
+	assert.Empty(t, req.SetupCommands)
 }
 
 func TestValidateRunBashSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {

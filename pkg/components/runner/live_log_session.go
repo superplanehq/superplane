@@ -47,6 +47,10 @@ type LiveLogAccessContext struct {
 }
 
 func isRunnerComponent(name string) bool {
+	return IsRunnerComponent(name)
+}
+
+func IsRunnerComponent(name string) bool {
 	switch strings.TrimSpace(name) {
 	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
 		return true

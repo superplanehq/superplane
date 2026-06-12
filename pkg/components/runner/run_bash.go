@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -312,11 +313,6 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	messageChain, err := messageChainJSON(ctx.Expressions)
-	if err != nil {
-		return err
-	}
-
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -327,18 +323,26 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 	if spec.EnableSetupCommands {
 		setupCommands = normalizeCommands(spec.SetupCommands)
 	}
+	commands := append([]string{}, setupCommands...)
+	if script := strings.TrimSpace(spec.Script); script != "" {
+		commands = append(commands, script)
+	}
+
+	logEndpointURL, logEndpointSecret, err := taskLogEndpoint(ctx.BaseURL)
+	if err != nil {
+		return fmt.Errorf("runner log endpoint: %w", err)
+	}
 
 	params := CreateTaskParams{
-		MachineType:    spec.MachineType,
-		RunMode:        RunModeBash,
-		Script:         spec.Script,
-		MessageChain:   messageChain,
-		SetupCommands:  setupCommands,
-		WebhookURL:     webhookURL,
-		Environment:    environment,
-		ExecutionMode:  mode,
-		DockerImage:    resolvedRunBashDockerImageRef(spec),
-		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		MachineType:       spec.MachineType,
+		Commands:          commands,
+		WebhookURL:        webhookURL,
+		LogEndpointURL:    logEndpointURL,
+		LogEndpointSecret: logEndpointSecret,
+		Environment:       environment,
+		ExecutionMode:     mode,
+		DockerImage:       resolvedRunBashDockerImageRef(spec),
+		TimeoutSeconds:    spec.ExecutionTimeoutSeconds,
 	}
 
 	taskID, err := broker.CreateTask(params)
