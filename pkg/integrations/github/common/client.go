@@ -224,6 +224,10 @@ func (c *Client) CreateIssueComment(ctx context.Context, repository string, issu
 	return c.underlying.Issues.CreateComment(ctx, c.owner, repository, issueNumber, comment)
 }
 
+func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
+	return c.underlying.Issues.EditComment(ctx, c.owner, repository, commentID, comment)
+}
+
 func (c *Client) CreateIssue(ctx context.Context, repository string, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
 	return c.underlying.Issues.Create(ctx, c.owner, repository, issue)
 }
