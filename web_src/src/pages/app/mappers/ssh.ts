@@ -243,11 +243,17 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
   // here too so the node chip preview stays in sync with what actually runs.
   const source: SSHCommandSource = config?.commandSource?.trim() === "file" ? "file" : "inline";
 
-  if (source === "file" && config?.commandFile) {
-    metadata.push({
-      icon: "file-code",
-      label: config.commandFile,
-    });
+  // Branch on the source first so file mode never falls back to the inline
+  // commands preview. The worker ignores `commands` when running in file mode,
+  // so showing them here (e.g. while `commandFile` is still empty during
+  // editing) would misrepresent what actually runs.
+  if (source === "file") {
+    if (config?.commandFile) {
+      metadata.push({
+        icon: "file-code",
+        label: config.commandFile,
+      });
+    }
   } else if (config?.commands) {
     const oneline = config.commands
       .split("\n")

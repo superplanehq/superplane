@@ -155,6 +155,34 @@ describe("sshMapper metadata preview", () => {
     expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
   });
 
+  it("hides the stale inline preview in file mode when commandFile is empty", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commandSource: "file",
+      commandFile: "",
+      commands: "stale inline value that should be hidden",
+    });
+
+    const props = sshMapper.props(buildComponentCtx(node));
+
+    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
+    expect(props.metadata).not.toContainEqual({ icon: "file-code", label: "" });
+  });
+
+  it("hides the stale inline preview in file mode when commandFile is missing", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commandSource: "file",
+      commands: "stale inline value that should be hidden",
+    });
+
+    const props = sshMapper.props(buildComponentCtx(node));
+
+    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
+  });
+
   it("falls back to inline preview when commandSource is missing (legacy nodes)", () => {
     const node = buildNode({
       host: "example.com",
