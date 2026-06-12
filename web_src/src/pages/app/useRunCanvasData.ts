@@ -14,7 +14,7 @@ import { hydrateRunExecution, prepareData } from "./workflowPageHelpers";
 import { stripCanvasNodeSetupWarningsForRunsView } from "./lib/node-integrations";
 
 type UseRunCanvasDataParams = {
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   selectedRun: CanvasesCanvasRun | null;
   selectedRunCanvas?: CanvasesCanvas | null;
   canvasLoading: boolean;
@@ -31,7 +31,7 @@ type UseRunCanvasDataParams = {
 };
 
 type UseRunCanvasPresentationParams = {
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   selectedRun: CanvasesCanvasRun | null;
   runCanvasData: RunCanvasData | null;
   liveNodes: CanvasNode[];
@@ -47,7 +47,7 @@ type RunCanvasData = {
 };
 
 export function useRunCanvasData({
-  isRunsMode,
+  isRunInspectionMode,
   selectedRun,
   selectedRunCanvas,
   canvasLoading,
@@ -64,7 +64,7 @@ export function useRunCanvasData({
 }: UseRunCanvasDataParams): RunCanvasData | null {
   return useMemo(() => {
     if (
-      !isRunsMode ||
+      !isRunInspectionMode ||
       !selectedRunCanvas ||
       canvasLoading ||
       triggersLoading ||
@@ -117,7 +117,7 @@ export function useRunCanvasData({
       participantNodeIds: Array.from(runNodeIds),
     };
   }, [
-    isRunsMode,
+    isRunInspectionMode,
     selectedRun,
     selectedRunCanvas,
     canvasLoading,
@@ -135,7 +135,7 @@ export function useRunCanvasData({
 }
 
 export function useRunCanvasPresentation({
-  isRunsMode,
+  isRunInspectionMode,
   selectedRun,
   runCanvasData,
   liveNodes,
@@ -143,7 +143,7 @@ export function useRunCanvasPresentation({
   isSelectedRunVersionLoading,
   isSelectedRunExecutionsLoading,
 }: UseRunCanvasPresentationParams) {
-  if (!isRunsMode) {
+  if (!isRunInspectionMode) {
     return {
       nodes: liveNodes,
       edges: liveEdges,

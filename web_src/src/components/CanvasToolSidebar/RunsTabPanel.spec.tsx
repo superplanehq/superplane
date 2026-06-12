@@ -60,8 +60,22 @@ describe("RunsTabPanel", () => {
   const baseProps = {
     canvasId: "canvas-1",
     onSelectRun: () => {},
+    onSelectLiveCanvas: () => {},
     workflowNodes: nodes,
   };
+
+  it("shows the Live Canvas row and selects it when no run is active", () => {
+    const onSelectLiveCanvas = vi.fn();
+    render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} onSelectLiveCanvas={onSelectLiveCanvas} />, {
+      wrapper: routerWrapper,
+    });
+
+    const liveCanvas = screen.getByTestId("runs-sidebar-live-canvas");
+    expect(liveCanvas).toHaveAttribute("aria-current", "true");
+
+    fireEvent.click(liveCanvas);
+    expect(onSelectLiveCanvas).toHaveBeenCalledTimes(1);
+  });
 
   it("shows an empty state when there are no runs", () => {
     render(<RunsTabPanel runs={[]} selectedRunId={null} {...baseProps} />, { wrapper: routerWrapper });
@@ -242,5 +256,259 @@ describe("RunsTabPanel", () => {
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
+  });
+
+  it("navigates between runs from the detail header", async () => {
+    const user = userEvent.setup();
+    const onNavigateRun = vi.fn();
+    localStorage.clear();
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({
+        id: "run-2",
+        createdAt: "2026-05-01T11:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Second run" },
+      }),
+    ];
+
+    render(
+      <RunsTabPanel runs={runs} selectedRunId="run-2" initialOpenDetail {...baseProps} onNavigateRun={onNavigateRun} />,
+      { wrapper: routerWrapper },
+    );
+
+    expect(screen.getByTestId("run-detail-newer")).toBeEnabled();
+    expect(screen.getByTestId("run-detail-older")).toBeDisabled();
+
+    await user.click(screen.getByTestId("run-detail-newer"));
+    expect(onNavigateRun).toHaveBeenCalledWith("run-1");
+  });
+
+  it("loads more runs when navigating older at the pagination boundary", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const onNavigateRun = vi.fn();
+    const runs = [
+      makeRun({
+        id: "run-newer",
+        createdAt: "2026-05-01T13:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
+      }),
+      makeRun({
+        id: "run-last-loaded",
+        createdAt: "2026-05-01T12:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
+      }),
+    ];
+
+    render(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    expect(screen.getByTestId("run-detail-older")).toBeEnabled();
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(onNavigateRun).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the next older run after pagination loads", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const onNavigateRun = vi.fn();
+    const runs = [
+      makeRun({
+        id: "run-newer",
+        createdAt: "2026-05-01T13:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
+      }),
+      makeRun({
+        id: "run-last-loaded",
+        createdAt: "2026-05-01T12:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
+      }),
+    ];
+
+    const { rerender } = render(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <RunsTabPanel
+        runs={[
+          ...runs,
+          makeRun({
+            id: "run-older-page-2",
+            createdAt: "2026-05-01T11:00:00Z",
+            rootEvent: { ...makeRun().rootEvent, customName: "Older page run" },
+          }),
+        ]}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage={false}
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+    );
+
+    expect(onNavigateRun).toHaveBeenCalledWith("run-older-page-2");
+  });
+
+  it("retries older-run pagination after a fetch leaves the filtered list unchanged", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const onNavigateRun = vi.fn();
+    const runs = [
+      makeRun({
+        id: "run-newer",
+        createdAt: "2026-05-01T13:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
+      }),
+      makeRun({
+        id: "run-last-loaded",
+        createdAt: "2026-05-01T12:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
+      }),
+    ];
+
+    const { rerender } = render(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={true}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+    );
+
+    rerender(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onLoadMore).toHaveBeenCalledTimes(2);
+    expect(onNavigateRun).not.toHaveBeenCalled();
+  });
+
+  it("cancels pending older navigation when the selected run changes", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const onNavigateRun = vi.fn();
+    const runs = [
+      makeRun({
+        id: "run-newer",
+        createdAt: "2026-05-01T13:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
+      }),
+      makeRun({
+        id: "run-last-loaded",
+        createdAt: "2026-05-01T12:00:00Z",
+        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
+      }),
+    ];
+
+    const { rerender } = render(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-last-loaded"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    await user.click(screen.getByTestId("run-detail-older"));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId="run-newer"
+        initialOpenDetail
+        hasNextPage
+        isFetchingNextPage={true}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+    );
+
+    rerender(
+      <RunsTabPanel
+        runs={[
+          ...runs,
+          makeRun({
+            id: "run-older-page-2",
+            createdAt: "2026-05-01T11:00:00Z",
+            rootEvent: { ...makeRun().rootEvent, customName: "Older page run" },
+          }),
+        ]}
+        selectedRunId="run-newer"
+        initialOpenDetail
+        hasNextPage={false}
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+        onNavigateRun={onNavigateRun}
+        {...baseProps}
+      />,
+    );
+
+    expect(onNavigateRun).not.toHaveBeenCalledWith("run-older-page-2");
   });
 });
