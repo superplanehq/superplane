@@ -9,7 +9,8 @@ to the CLI for common app operations.
 Prefer adding an action to `superplane_app` when the capability is app-related:
 
 - reading app/canvas or Console YAML
-- updating the draft app
+- updating the draft app (`update_draft` commits directly to the draft version row; does not use `workflow_staging`)
+- inspecting agent token permissions (`access`) and runtime state (`read_runtime`)
 - listing connected integrations for the current app context
 - validating or preparing app-specific backend state
 - any operation naturally scoped to the current `AgentSessionContext.CanvasID`
@@ -63,7 +64,7 @@ Action rules:
 
 - Always stay scoped to the current `AgentSessionContext`.
 - Reject or ignore attempts to operate on another canvas.
-- Never publish drafts from an agent action.
+- Never publish drafts from an agent action. `update_draft` commits to the draft version row (matching the CLI) and does not write `workflow_staging`.
 - Return concise JSON payloads; avoid dumping large unrelated data.
 - Prefer backend APIs and model methods over invoking the CLI.
 
