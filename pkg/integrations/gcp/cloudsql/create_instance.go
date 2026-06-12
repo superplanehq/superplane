@@ -445,10 +445,16 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 
 	// Instance creation takes minutes, so record what to poll and schedule the
 	// first poll instead of blocking this execution until the instance is ready.
+	// Failures here are terminal: the GCP operation is already running, and a
+	// plain error would roll back the request and re-run Execute against an
+	// instance that already exists.
 	if err := ctx.Metadata.Set(instanceExecMetadata{Instance: name}); err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("instance creation started but failed to record poll state: %v", err))
 	}
-	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+	if err := ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("instance creation started but failed to schedule the status poll: %v", err))
+	}
+	return nil
 }
 
 // poll re-checks the instance until it reaches RUNNABLE (then emits it), fails,

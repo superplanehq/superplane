@@ -123,11 +123,16 @@ func (d *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Instance deletion takes minutes, so poll until the instance is gone instead
-	// of blocking this execution.
+	// of blocking this execution. Failures here are terminal: the GCP operation
+	// is already running, and a plain error would roll back the request and
+	// re-run Execute against an instance that is already being deleted.
 	if err := ctx.Metadata.Set(instanceExecMetadata{Instance: instance}); err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("instance deletion started but failed to record poll state: %v", err))
 	}
-	return ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval)
+	if err := ctx.Requests.ScheduleActionCall(pollHookName, map[string]any{}, instancePollInterval); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("instance deletion started but failed to schedule the status poll: %v", err))
+	}
+	return nil
 }
 
 // poll re-checks the instance until it no longer exists (then emits a deletion
