@@ -1,0 +1,10 @@
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "publicIp": "203.0.113.10",
+    "domain": "vpc",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.elastic-ip.allocated"
+}
