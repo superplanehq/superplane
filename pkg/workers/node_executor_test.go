@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"errors"
 	"log"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
@@ -437,4 +439,29 @@ func countConcurrentExecutionResults(t *testing.T, results []error) (successCoun
 		}
 	}
 	return successCount, lockedCount
+}
+
+func TestClassifyExecutorProcessError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "nil", err: nil, want: executorReasonNone},
+		{name: "locked", err: ErrRecordLocked, want: executorReasonLocked},
+		{name: "not found", err: gorm.ErrRecordNotFound, want: executorReasonNotFound},
+		{name: "deadlock", err: errors.New("ERROR: deadlock detected (SQLSTATE 40P01)"), want: executorReasonDeadlock},
+		{name: "internal", err: errors.New("something else"), want: executorReasonInternal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyExecutorProcessError(tt.err); got != tt.want {
+				t.Fatalf("classifyExecutorProcessError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
