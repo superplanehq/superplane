@@ -138,6 +138,35 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
+
+	t.Run("roundtrip text type options with AllowExpressions preserves field", func(t *testing.T) {
+		allowExpressions := false
+
+		field := configuration.Field{
+			Name:  "data",
+			Label: "Rule Groups YAML",
+			Type:  configuration.FieldTypeText,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language:         "yaml",
+					AllowExpressions: &allowExpressions,
+				},
+			},
+		}
+
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions)
+		require.NotNil(t, pbField.TypeOptions.Text)
+		require.NotNil(t, pbField.TypeOptions.Text.AllowExpressions)
+		assert.False(t, *pbField.TypeOptions.Text.AllowExpressions)
+
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions)
+		require.NotNil(t, field2.TypeOptions.Text)
+		require.NotNil(t, field2.TypeOptions.Text.AllowExpressions)
+		assert.False(t, *field2.TypeOptions.Text.AllowExpressions)
+		assert.Equal(t, "yaml", field2.TypeOptions.Text.Language)
+	})
 }
 
 func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {

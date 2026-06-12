@@ -1,0 +1,17 @@
+{
+  "data": {
+    "ruleGroupNamespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-33333333-3333-4333-8333-333333333333/example-rule-group-namespace",
+      "createdAt": "2026-01-01T00:35:00Z",
+      "data": "Z3JvdXBzOgogIC0gbmFtZTogZXhhbXBsZV9yZWNvcmRpbmdfcnVsZXMKICAgIGludGVydmFsOiAzMHMKICAgIHJ1bGVzOgogICAgICAtIHJlY29yZDogZXhhbXBsZTpyZXF1ZXN0c19wZXJfc2Vjb25kOnJhdGUxbQogICAgICAgIGV4cHI6IHwKICAgICAgICAgIHN1bShyYXRlKGV4YW1wbGVfcmVxdWVzdHNfdG90YWxbMW1dKSkKCiAgLSBuYW1lOiBleGFtcGxlX2FsZXJ0aW5nX3J1bGVzCiAgICBpbnRlcnZhbDogMzBzCiAgICBydWxlczoKICAgICAgLSBhbGVydDogRXhhbXBsZUhpZ2hSZXF1ZXN0UmF0ZQogICAgICAgIGV4cHI6IHwKICAgICAgICAgIHN1bShyYXRlKGV4YW1wbGVfcmVxdWVzdHNfdG90YWxbMW1dKSkgPiAxMDAKICAgICAgICBmb3I6IDFtCiAgICAgICAgbGFiZWxzOgogICAgICAgICAgc2V2ZXJpdHk6IHdhcm5pbmcKICAgICAgICAgIHNlcnZpY2U6IGV4YW1wbGUKICAgICAgICBhbm5vdGF0aW9uczoKICAgICAgICAgIHN1bW1hcnk6ICJFeGFtcGxlIGhpZ2ggcmVxdWVzdCByYXRlIgogICAgICAgICAgZGVzY3JpcHRpb246ICJUaGUgZXhhbXBsZSBzZXJ2aWNlIGlzIHJlY2VpdmluZyBtb3JlIHRoYW4gMTAwIHJlcXVlc3RzIHBlciBzZWNvbmQuIgo=",
+      "modifiedAt": "2026-01-01T00:40:00Z",
+      "name": "example-rule-group-namespace",
+      "status": {
+        "statusCode": "ACTIVE"
+      }
+    },
+    "workspaceId": "ws-33333333-3333-4333-8333-333333333333"
+  },
+  "timestamp": "2026-01-01T00:45:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace"
+}
