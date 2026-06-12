@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -264,6 +265,12 @@ export const canvasKeys = {
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
   repositoryFile: (canvasId: string, path: string, versionId?: string) =>
     [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live"] as const,
+  // Raw repository-file content keyed per stage so cached reads can be reused
+  // and deduped (e.g. the Files diff and committed-baseline lookups). It
+  // prefix-extends `repositoryFile`, so any invalidation of a file (or the
+  // whole repository) also clears its cached content.
+  repositoryFileContent: (canvasId: string, path: string, versionId: string | undefined, stage: boolean) =>
+    [...canvasKeys.repositoryFile(canvasId, path, versionId), "content", stage ? "staged" : "committed"] as const,
 };
 
 export interface ConsolePanel {
@@ -1850,6 +1857,21 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
+// fetchCanvasConsoleData reads console.yaml from the repository and parses it
+// into console data. Shared by useCanvasConsole and committed-baseline lookups
+// so both reuse the same query cache entry (deduping the read).
+export async function fetchCanvasConsoleData(
+  canvasId: string,
+  versionId: string | undefined,
+  stage: boolean,
+): Promise<CanvasConsoleData | undefined> {
+  const spec = await fetchConsoleSpecFromRepository(canvasId, versionId, stage);
+  if (!spec) {
+    return undefined;
+  }
+  return consoleDataFromYaml(canvasId, versionId, spec.consoleYaml);
+}
+
 export const useCanvasConsole = (
   canvasId: string,
   versionId: string | undefined,
@@ -1858,13 +1880,7 @@ export const useCanvasConsole = (
 ) => {
   return useQuery({
     queryKey: stage ? canvasKeys.consoleStaged(canvasId, versionId) : canvasKeys.console(canvasId, versionId),
-    queryFn: async () => {
-      const spec = await fetchConsoleSpecFromRepository(canvasId, versionId, stage);
-      if (!spec) {
-        return undefined;
-      }
-      return consoleDataFromYaml(canvasId, versionId, spec.consoleYaml);
-    },
+    queryFn: () => fetchCanvasConsoleData(canvasId, versionId, stage),
     enabled: enabled && !!canvasId,
     staleTime: 30_000,
   });
@@ -2002,6 +2018,25 @@ async function fetchRepositoryFileContent(canvasId: string, path: string, versio
   // Draft file reads (versionId present) return effective staged content so the
   // Files tab reflects uncommitted edits.
   return fetchRepositorySpecFileContent(canvasId, path, versionId, !!versionId);
+}
+
+// fetchRepositoryFileContentCached reads raw repository-file content through the
+// React Query cache so callers (the Files diff, committed baselines, selection)
+// reuse and dedupe identical reads. Committed (stage=false) content only changes
+// on publish/commit, so it is cached; staged (stage=true) content changes on
+// every autosave, so it always refetches to stay correct.
+export function fetchRepositoryFileContentCached(
+  queryClient: QueryClient,
+  canvasId: string,
+  path: string,
+  versionId: string | undefined,
+  stage: boolean,
+): Promise<string> {
+  return queryClient.fetchQuery({
+    queryKey: canvasKeys.repositoryFileContent(canvasId, path, versionId, stage),
+    queryFn: () => fetchRepositorySpecFileContent(canvasId, path, versionId, stage),
+    staleTime: stage ? 0 : 30_000,
+  });
 }
 
 export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {

@@ -1,9 +1,11 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { fetchCanvasVersionWithSpec, fetchConsoleSpecFromRepository } from "./lib/repository-spec-files";
+import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
 export type CommittedDraftBaselines = {
   canvasSpec?: CanvasesCanvas["spec"];
@@ -28,6 +30,7 @@ export function useCommittedDraftBaselines({
   enabled,
   stagingResetNonce,
 }: UseCommittedDraftBaselinesOptions): CommittedDraftBaselines {
+  const queryClient = useQueryClient();
   const [baselines, setBaselines] = useState<CommittedDraftBaselines>({ ready: false });
 
   useEffect(() => {
@@ -39,20 +42,33 @@ export function useCommittedDraftBaselines({
     let cancelled = false;
     setBaselines({ ready: false });
 
+    // Read the committed (stage=false) canvas and console through React Query so
+    // the baselines reuse the cache the rest of the editor already populates.
+    // The console read shares its key/fetcher with the draft console query, so
+    // the two committed console.yaml reads are deduped into a single request.
+    // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
     void Promise.all([
-      fetchCanvasVersionWithSpec(canvasId, versionId, false),
-      fetchConsoleSpecFromRepository(canvasId, versionId, false),
-    ]).then(([version, consoleSpec]) => {
+      queryClient.fetchQuery({
+        queryKey: canvasKeys.versionDetail(canvasId, versionId),
+        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
+        staleTime: 30_000,
+      }),
+      queryClient.fetchQuery({
+        queryKey: canvasKeys.console(canvasId, versionId),
+        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
+        staleTime: 30_000,
+      }),
+    ]).then(([version, consoleData]) => {
       if (cancelled) {
         return;
       }
 
       setBaselines({
         canvasSpec: version?.spec,
-        console: consoleSpec
+        console: consoleData
           ? {
-              panels: consoleSpec.panels,
-              layout: consoleSpec.layout,
+              panels: consoleData.panels,
+              layout: consoleData.layout,
             }
           : { panels: [], layout: [] },
         ready: true,
@@ -62,7 +78,7 @@ export function useCommittedDraftBaselines({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, enabled, stagingResetNonce, versionId]);
+  }, [canvasId, enabled, queryClient, stagingResetNonce, versionId]);
 
   return baselines;
 }

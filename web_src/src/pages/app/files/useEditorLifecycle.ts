@@ -1,7 +1,8 @@
 import { useLayoutEffect, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { isWorkflowSpecPath } from "../lib/workflow-spec-paths";
-import { fetchRepositorySpecFileContent } from "../lib/repository-spec-files";
+import { fetchRepositoryFileContentCached } from "@/hooks/useCanvasData";
 
 type UseEditorLifecycleOptions = {
   canvasId?: string;
@@ -32,6 +33,7 @@ export function useEditorLifecycle({
   setCommittedContentByPath,
   stagingResetNonce = 0,
 }: UseEditorLifecycleOptions) {
+  const queryClient = useQueryClient();
   const previousStagingResetNonceRef = useRef(stagingResetNonce);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export function useEditorLifecycle({
     }
 
     let cancelled = false;
-    void fetchRepositorySpecFileContent(canvasId, path, versionId, false).then((content) => {
+    void fetchRepositoryFileContentCached(queryClient, canvasId, path, versionId, false).then((content) => {
       if (cancelled) {
         return;
       }
@@ -97,5 +99,5 @@ export function useEditorLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, selectedPath, setCommittedContentByPath, versionId]);
+  }, [canvasId, queryClient, selectedPath, setCommittedContentByPath, versionId]);
 }
