@@ -31,6 +31,16 @@ func Test__UpdateIssueComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "comment ID is required")
 	})
 
+	t.Run("whitespace-only comment ID is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"commentId": "  ", "body": "test", "repository": "hello"},
+		})
+
+		require.ErrorContains(t, err, "comment ID is required")
+	})
+
 	t.Run("body is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},

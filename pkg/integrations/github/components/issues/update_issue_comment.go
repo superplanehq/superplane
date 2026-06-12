@@ -111,15 +111,15 @@ func (c *UpdateIssueComment) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Repository == "" {
+	if strings.TrimSpace(config.Repository) == "" {
 		return errors.New("repository is required")
 	}
 
-	if config.CommentID == "" {
+	if strings.TrimSpace(config.CommentID) == "" {
 		return errors.New("comment ID is required")
 	}
 
-	if config.Body == "" {
+	if strings.TrimSpace(config.Body) == "" {
 		return errors.New("body is required")
 	}
 
