@@ -171,6 +171,11 @@ func (c *Runner) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "echo \"Hello, World!\"",
 			Description: "One shell command per line.",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "environment",
