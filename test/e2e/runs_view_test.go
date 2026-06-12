@@ -3,7 +3,6 @@ package e2e
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -223,17 +222,9 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	s.session.Click(q.TestID("canvas-edit-button"))
+	s.session.Click(q.TestID("runs-sidebar-live-canvas"))
+	s.session.Sleep(300)
+	s.canvas.EnterEditMode()
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {
@@ -332,17 +323,7 @@ func (s *runsViewSteps) waitForSidebarRowCountAtLeast(locator pw.Locator, expect
 }
 
 func (s *runsViewSteps) thenEditModeIsVisible() {
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
-		url := s.session.Page().URL()
-		exitEdit := q.TestID("canvas-exit-edit-button").Run(s.session)
-		exitVisible, exitErr := exitEdit.IsVisible()
-		if !strings.Contains(url, "run="+s.run.ID.String()) && exitErr == nil && exitVisible {
-			return
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	s.session.AssertVisible(q.TestID("canvas-exit-edit-button"))
+	s.canvas.WaitForEnabledExitEditButton()
 	url := s.session.Page().URL()
 	require.NotContains(s.t, url, "run="+s.run.ID.String())
 }
