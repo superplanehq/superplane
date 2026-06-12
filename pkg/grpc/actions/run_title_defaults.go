@@ -44,6 +44,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"gcp.artifactregistry.onArtifactPush":     "{{ root().data.tag }}",
 	"gcp.cloudbuild.onBuildComplete":          "{{ root().data.status }} - {{ root().data.id }}",
 	"gcp.compute.onVMInstance":                "{{ root().data.resourceName }}",
+	"gcp.monitoring.onAlert":                  "{{ root().data.summary }}",
 	"gcp.pubsub.onMessage":                    "{{ root().data.messageId }}",
 
 	"github.onBranchCreated":   "{{ root().data.ref }}",

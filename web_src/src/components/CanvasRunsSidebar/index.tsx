@@ -18,10 +18,10 @@ export function CanvasRunsSidebar({ isOpen, children }: CanvasRunsSidebarProps) 
     <aside
       ref={sidebarRef}
       data-testid="canvas-runs-sidebar"
-      className="relative z-21 flex h-full shrink-0 flex-col border-r border-border bg-white"
-      style={{ width }}
+      className="relative z-21 flex h-full min-w-0 shrink-0 flex-col overflow-hidden border-r border-border bg-white"
+      style={{ width, maxWidth: width }}
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       <div
         onMouseDown={handleMouseDown}
         className="group absolute top-0 right-0 bottom-0 z-30 w-4 cursor-col-resize bg-transparent"
