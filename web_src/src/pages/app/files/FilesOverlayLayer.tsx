@@ -7,31 +7,37 @@ interface FilesOverlayLayerProps {
   isFilesMode: boolean;
   isEditing?: boolean;
   canvasId?: string;
+  versionId?: string;
   canWrite?: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  onSpecFileChange?: (path: string, content: string) => void;
 }
 
 export function FilesOverlayLayer({
   isFilesMode,
   isEditing = false,
   canvasId,
+  versionId,
   canWrite = false,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
+  onSpecFileChange,
 }: FilesOverlayLayerProps) {
   if (!isFilesMode) return null;
 
   return (
     <FilesView
       canvasId={canvasId}
+      versionId={versionId}
       isEditing={isEditing}
       canWrite={canWrite}
       files={files}
       headerActionsSlotId={headerActionsSlotId}
       onHeaderActionsChange={onHeaderActionsChange}
+      onSpecFileChange={onSpecFileChange}
     />
   );
 }

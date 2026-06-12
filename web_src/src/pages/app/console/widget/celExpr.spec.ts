@@ -161,6 +161,109 @@ describe("celExpr", () => {
     });
   });
 
+  describe("parseJson builtin", () => {
+    // cel-js's grammar does not allow postfix `.foo` / `[i]` / `.method(...)`
+    // after a function call result. So `parseJson(blob).items` is a parse
+    // error. The builtin is still useful when composed with other functions
+    // (`size(...)`, `string(...)`, equality), or when the whole expression
+    // is `parseJson(value)` and the renderer consumes the structured result.
+    it("parses a JSON array string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(tags)");
+      expect(evalExpr(compiled, { tags: '["a","b"]' }, buildEnv())).toEqual(["a", "b"]);
+    });
+
+    it("parses a JSON object string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(blob)");
+      const result = evalExpr(compiled, { blob: '{"items":[{"id":1}]}' }, buildEnv());
+      expect(result).toEqual({ items: [{ id: 1 }] });
+    });
+
+    it("composes with size() to count parsed elements", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: '["a","b","c"]' }, buildEnv())).toBe(3);
+    });
+
+    it("passes already-parsed values through unchanged", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: ["a", "b", "c"] }, buildEnv())).toBe(3);
+    });
+
+    it("returns null for malformed JSON so equality checks stay defined", () => {
+      const compiled = compileExpr("parseJson(bad) == null");
+      expect(evalExpr(compiled, { bad: "not json" }, buildEnv())).toBe(true);
+    });
+
+    it("returns null for null inputs without throwing", () => {
+      const compiled = compileExpr("parseJson(value)");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBeNull();
+    });
+
+    it("works inside templated interpolation when the whole expression is parseJson", () => {
+      const template = compileTemplate("Tags: {{ parseJson(blob) }}");
+      const result = evalTemplate(template, { blob: '["a","b"]' }, buildEnv(), String);
+      // Template stringify uses String() on the parsed value; nested objects
+      // serialize via JS's default Array#toString. Authors who need pretty
+      // formatting should compose `string()` or shape the data upstream.
+      expect(result).toBe("Tags: a,b");
+    });
+  });
+
+  describe("join builtin", () => {
+    // `join` exists specifically so authors can flatten the result of a `.map`
+    // macro chain into a single string. cel-js doesn't allow `.method()`
+    // postfix after a function-call result, so the canonical form is
+    // `join(list.map(x, expr), sep)`.
+    it("joins a list of strings with the separator", () => {
+      const compiled = compileExpr('join(["a", "b", "c"], ", ")');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("a, b, c");
+    });
+
+    it("uses an empty separator when sep is missing or not a string", () => {
+      const compiled = compileExpr('join(["x", "y"], 0)');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("xy");
+    });
+
+    it("renders null / undefined / number elements as their string form", () => {
+      const compiled = compileExpr('join(value, "|")');
+      expect(evalExpr(compiled, { value: ["a", null, 2, "b"] }, buildEnv())).toBe("a||2|b");
+    });
+
+    it("returns an empty string for non-array inputs", () => {
+      const compiled = compileExpr('join(value, ",")');
+      expect(evalExpr(compiled, { value: "not a list" }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: 42 }, buildEnv())).toBe("");
+    });
+
+    it("composes with a list.map macro to render an HTML list", () => {
+      const compiled = compileExpr('join(items.map(x, "<li>" + x.name + "</li>"), "")');
+      const result = evalExpr(compiled, { items: [{ name: "alice" }, { name: "bob" }] }, buildEnv());
+      expect(result).toBe("<li>alice</li><li>bob</li>");
+    });
+
+    it("composes with list.filter to skip rows before joining", () => {
+      const compiled = compileExpr('join(items.filter(x, x.active).map(x, x.name), ", ")');
+      const result = evalExpr(
+        compiled,
+        {
+          items: [
+            { name: "a", active: true },
+            { name: "b", active: false },
+            { name: "c", active: true },
+          ],
+        },
+        buildEnv(),
+      );
+      expect(result).toBe("a, c");
+    });
+
+    it("works inside templated interpolation", () => {
+      const template = compileTemplate('Hits: {{ join(tags, ", ") }}');
+      const result = evalTemplate(template, { tags: ["red", "blue"] }, buildEnv(), String);
+      expect(result).toBe("Hits: red, blue");
+    });
+  });
+
   describe("error reporting", () => {
     it("reports a compile error for invalid CEL", () => {
       const compiled = compileExpr("value /");

@@ -43,3 +43,26 @@ export interface Ec2Instance {
   vpcId?: string;
   region?: string;
 }
+
+export interface Ec2AlarmDimension {
+  name?: string;
+  value?: string;
+}
+
+export interface Ec2Alarm {
+  alarmName?: string;
+  alarmArn?: string;
+  alarmDescription?: string;
+  namespace?: string;
+  metricName?: string;
+  statistic?: string;
+  period?: number;
+  evaluationPeriods?: number;
+  threshold?: number;
+  comparisonOperator?: string;
+  stateValue?: string;
+  stateReason?: string;
+  treatMissingData?: string;
+  dimensions?: Ec2AlarmDimension[];
+  region?: string;
+}

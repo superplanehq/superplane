@@ -35,7 +35,7 @@ func reconcileCanvasCount(orgID string, usageServiceCount int32, publish func(ca
 		orgID, usageServiceCount, dbCount,
 	)
 
-	canvases, err := models.ListCanvases(orgID, false)
+	canvases, err := models.ListCanvases(orgID)
 	if err != nil {
 		log.Warnf("Failed to list canvases for reconciliation in organization %s: %v", orgID, err)
 		return

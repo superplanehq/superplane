@@ -18,7 +18,6 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -116,8 +115,6 @@ function AppRouter() {
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
-                <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-                <Route path="templates/:canvasId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 

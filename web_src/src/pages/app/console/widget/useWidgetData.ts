@@ -456,25 +456,40 @@ export function collectExecutionRows(
  *
  * Iteration stops as soon as `rows.length >= limit`.
  */
+type RunRowSource = Record<string, unknown> & {
+  state?: string;
+  result?: string;
+  createdAt?: string;
+  finishedAt?: string;
+  rootEvent?: {
+    id?: string;
+    nodeId?: string;
+    data?: Record<string, unknown>;
+  };
+};
+
+function buildRunRow(
+  run: RunRowSource,
+  nodeNameById: Map<string, string>,
+  executionsByRootEventId?: Map<string, CanvasesCanvasNodeExecution[]>,
+): unknown {
+  const rootEvent = run.rootEvent;
+  const nodeId = rootEvent?.nodeId;
+  const executions = (rootEvent?.id && executionsByRootEventId?.get(rootEvent.id)) || undefined;
+  const dollarNodes = buildDollarNodes(executions, nodeNameById);
+  return {
+    ...run,
+    status: deriveRunStatus(run.state, run.result),
+    nodeName: (nodeId && nodeNameById.get(nodeId)) || nodeId,
+    payload: rootEvent?.data,
+    durationMs: run.finishedAt && run.createdAt ? Date.parse(run.finishedAt) - Date.parse(run.createdAt) : undefined,
+    $: dollarNodes,
+    [DOLLAR_REWRITE_IDENTIFIER]: dollarNodes,
+  };
+}
+
 export function collectRunRows(
-  pages: Array<
-    | {
-        runs?: Array<
-          Record<string, unknown> & {
-            state?: string;
-            result?: string;
-            createdAt?: string;
-            finishedAt?: string;
-            rootEvent?: {
-              id?: string;
-              nodeId?: string;
-              data?: Record<string, unknown>;
-            };
-          }
-        >;
-      }
-    | undefined
-  >,
+  pages: Array<{ runs?: RunRowSource[] } | undefined>,
   nodeNameById: Map<string, string>,
   limit: number,
   executionsByRootEventId?: Map<string, CanvasesCanvasNodeExecution[]>,
@@ -482,20 +497,7 @@ export function collectRunRows(
   const rows: unknown[] = [];
   for (const page of pages) {
     for (const run of page?.runs ?? []) {
-      const rootEvent = run.rootEvent;
-      const nodeId = rootEvent?.nodeId;
-      const executions = (rootEvent?.id && executionsByRootEventId?.get(rootEvent.id)) || undefined;
-      const dollarNodes = buildDollarNodes(executions, nodeNameById);
-      rows.push({
-        ...run,
-        status: deriveRunStatus(run.state, run.result),
-        nodeName: (nodeId && nodeNameById.get(nodeId)) || nodeId,
-        payload: rootEvent?.data,
-        durationMs:
-          run.finishedAt && run.createdAt ? Date.parse(run.finishedAt) - Date.parse(run.createdAt) : undefined,
-        $: dollarNodes,
-        [DOLLAR_REWRITE_IDENTIFIER]: dollarNodes,
-      });
+      rows.push(buildRunRow(run, nodeNameById, executionsByRootEventId));
       if (rows.length >= limit) return rows;
     }
   }

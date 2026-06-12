@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
@@ -100,22 +101,17 @@ export function MarkdownPanelEditor({
   // vertical space, useful on shorter panel cards.
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
-  const insertAtCursor = (snippet: string) => {
-    const el = textareaRef.current;
-    if (!el) {
-      setDraftBody(draftBody + snippet);
-      return;
-    }
-    const start = el.selectionStart ?? draftBody.length;
-    const end = el.selectionEnd ?? draftBody.length;
-    const next = draftBody.slice(0, start) + snippet + draftBody.slice(end);
-    setDraftBody(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const caret = start + snippet.length;
-      el.setSelectionRange(caret, caret);
-    });
-  };
+  // Variables rail collapses automatically when the parent widget is narrow.
+  // The manual toggle wins until the breakpoint flips again, at which point
+  // the auto behavior takes over so resizes always honor the current width.
+  const {
+    containerRef: gridRef,
+    collapsed: variablesCollapsed,
+    toggle: toggleVariablesCollapsed,
+  } = useResponsiveRailCollapse();
+
+  const insertAtCursor = (snippet: string) =>
+    insertSnippetAtTextareaCursor(textareaRef.current, draftBody, snippet, setDraftBody);
 
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
@@ -131,7 +127,13 @@ export function MarkdownPanelEditor({
           data-testid="console-markdown-title-editor"
         />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+      <div
+        ref={gridRef}
+        className={cn(
+          "grid min-h-0 flex-1 grid-cols-1 gap-0",
+          variablesCollapsed ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_minmax(220px,320px)]",
+        )}
+      >
         <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10">
           <Textarea
             ref={textareaRef}
@@ -159,6 +161,8 @@ export function MarkdownPanelEditor({
           errors={errors}
           isLoading={isLoading}
           onInsertSnippet={insertAtCursor}
+          collapsed={variablesCollapsed}
+          onToggleCollapsed={toggleVariablesCollapsed}
         />
       </div>
       <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
@@ -183,6 +187,33 @@ export function MarkdownPanelEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * Insert `snippet` at the textarea's current selection (replacing any
+ * selected range), updating both the controlled value via `setBody` and
+ * restoring focus + caret after the React re-render. Falls back to an
+ * append when the element isn't mounted yet — matches the behavior the
+ * inline implementation had before this was extracted.
+ */
+function insertSnippetAtTextareaCursor(
+  el: HTMLTextAreaElement | null,
+  body: string,
+  snippet: string,
+  setBody: (next: string) => void,
+) {
+  if (!el) {
+    setBody(body + snippet);
+    return;
+  }
+  const start = el.selectionStart ?? body.length;
+  const end = el.selectionEnd ?? body.length;
+  setBody(body.slice(0, start) + snippet + body.slice(end));
+  requestAnimationFrame(() => {
+    el.focus();
+    const caret = start + snippet.length;
+    el.setSelectionRange(caret, caret);
+  });
 }
 
 /**

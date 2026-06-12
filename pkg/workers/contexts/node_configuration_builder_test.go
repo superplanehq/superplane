@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -320,6 +321,77 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "second-filter", result["field"])
+}
+
+// Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage guards against
+// a loop reading a stale iteration's body output. A loop body forms a feedback
+// cycle (loop -> body -> loop), so the body node is reachable "upstream" of the
+// loop and has one execution per iteration. When the loop evaluates an
+// expression (e.g. its until-condition) for the current feedback, $[body] must
+// resolve to the current iteration's output, not an older one.
+func Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	// start -> loop -> body -> loop (feedback). The cycle makes "body" upstream
+	// of "loop", so all of body's per-iteration executions are in scope.
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "loop",
+				Name:   "loop",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+			},
+			{
+				NodeID: "body",
+				Name:   "body",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "loop", Channel: "default"},
+			{SourceID: "loop", TargetID: "body", Channel: "next"},
+			{SourceID: "body", TargetID: "loop", Channel: "success"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+
+	// The long-lived loop session. Each body iteration branches off it (as in the
+	// real feedback-model loop), so the body executions are siblings.
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "loop", rootEvent.ID, rootEvent.ID, nil)
+
+	body1 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body1.ID, map[string]any{"result": "tail"})
+
+	body2 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body2.ID, map[string]any{"result": "tail"})
+
+	// Current iteration: body flips "head". The feedback into the loop is this event.
+	body3 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	body3Event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body3.ID, map[string]any{"result": "head"})
+
+	// Evaluate from the loop's perspective for the current feedback (body3).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("loop").
+		WithRootEvent(&rootEvent.ID).
+		WithPreviousExecution(&body3.ID).
+		WithIncomingEventID(&body3Event.ID)
+
+	// $[body] must be the current iteration (head), not the oldest (tail).
+	value, err := builder.ResolveExpression(`$["body"].result`)
+	require.NoError(t, err)
+	assert.Equal(t, "head", value)
+
+	done, err := builder.ResolveExpression(`$["body"].result == "head"`)
+	require.NoError(t, err)
+	assert.Equal(t, true, done)
 }
 
 func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
@@ -1695,4 +1767,96 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "start"
+	forEachNode := "forEach"
+	waitNode := "wait"
+	displayNode := "display"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: forEachNode,
+				Name:   forEachNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "forEach"}}),
+			},
+			{
+				NodeID: waitNode,
+				Name:   waitNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "wait"}}),
+			},
+			{
+				NodeID: displayNode,
+				Name:   displayNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "display"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: forEachNode, Channel: "default"},
+			{SourceID: forEachNode, TargetID: waitNode, Channel: "item"},
+			{SourceID: waitNode, TargetID: displayNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		triggerNode,
+		"default",
+		nil,
+		map[string]any{"items": []any{"a", "b", "c"}},
+	)
+
+	forEachExecution := support.CreateCanvasNodeExecution(t, canvas.ID, forEachNode, rootEvent.ID, rootEvent.ID, nil)
+
+	now := time.Now()
+	emitItem := func(item string, index int) *models.CanvasEvent {
+		return support.EmitCanvasEventForNodeWithData(
+			t,
+			canvas.ID,
+			forEachNode,
+			"item",
+			&forEachExecution.ID,
+			map[string]any{"item": item, "index": index, "totalCount": 3},
+		)
+	}
+
+	_ = emitItem("a", 0)
+	branchEvent := emitItem("b", 1)
+	_ = emitItem("c", 2)
+
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).
+		Where("execution_id = ?", forEachExecution.ID).
+		Update("created_at", now).Error)
+
+	waitInput := map[string]any{"item": "b", "index": 1, "totalCount": 3}
+	waitExecution := support.CreateNextNodeExecution(t, canvas.ID, waitNode, rootEvent.ID, branchEvent.ID, &forEachExecution.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&waitExecution.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{waitNode: waitInput})
+
+	result, err := builder.Build(map[string]any{
+		"item": "{{ $[\"" + forEachNode + "\"].item }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "b", result["item"])
 }

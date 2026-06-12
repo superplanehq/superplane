@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -27,6 +28,7 @@ func ActOnCanvasChangeRequest(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	changeRequestID string,
@@ -48,6 +50,7 @@ func ActOnCanvasChangeRequest(
 			ctx,
 			encryptor,
 			registry,
+			gitProv,
 			organizationID,
 			canvasID,
 			changeRequestID,
@@ -132,10 +135,6 @@ func parseActOnCanvasChangeRequestIDs(canvasID string, changeRequestID string) (
 }
 
 func validateActOnCanvasChangeRequestCanvas(canvas *models.Canvas) error {
-	if canvas.IsTemplate {
-		return status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
 		return status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)

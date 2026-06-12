@@ -1,0 +1,26 @@
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.ec2.alarm"
+}

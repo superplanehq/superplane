@@ -250,16 +250,6 @@ func decodeUpdateInstanceConfiguration(raw any) (UpdateInstanceConfiguration, er
 	return config, nil
 }
 
-func hasConfigKey(configuration any, key string) bool {
-	configurationMap, ok := configuration.(map[string]any)
-	if !ok {
-		return false
-	}
-
-	_, exists := configurationMap[key]
-	return exists
-}
-
 func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
 	if err != nil {

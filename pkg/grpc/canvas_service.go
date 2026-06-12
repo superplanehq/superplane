@@ -44,7 +44,7 @@ func NewCanvasService(
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvases(ctx, s.registry, organizationID, req.IncludeTemplates)
+	return canvases.ListCanvases(ctx, s.registry, organizationID)
 }
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
@@ -102,27 +102,6 @@ func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.Descr
 	return canvases.DescribeCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
-func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateCanvasVersionRequest) (*pb.UpdateCanvasVersionResponse, error) {
-	if req.Canvas == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas is required")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasVersionWithUsage(
-		ctx,
-		s.usageService,
-		s.encryptor,
-		s.registry,
-		organizationID,
-		req.CanvasId,
-		req.VersionId,
-		req.Canvas,
-		req.AutoLayout,
-		s.webhookBaseURL,
-		s.authService,
-	)
-}
-
 func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb.ApplyCanvasVersionChangesetRequest) (*pb.ApplyCanvasVersionChangesetResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -174,6 +153,7 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 		ctx,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
@@ -220,6 +200,7 @@ func (s *CanvasService) ActOnCanvasChangeRequest(ctx context.Context, req *pb.Ac
 		s.authService,
 		s.encryptor,
 		s.registry,
+		s.gitProvider,
 		organizationID,
 		req.CanvasId,
 		req.ChangeRequestId,
@@ -399,16 +380,6 @@ func (s *CanvasService) UpdateCanvasMemoryNamespace(ctx context.Context, req *pb
 	return canvases.UpdateCanvasMemoryNamespace(ctx, s.registry, organizationID, req.CanvasId, req.Namespace, req.NewNamespace, req.Entries)
 }
 
-func (s *CanvasService) GetConsole(ctx context.Context, req *pb.GetConsoleRequest) (*pb.GetConsoleResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.GetConsole(ctx, organizationID, req.CanvasId, req.GetVersionId())
-}
-
-func (s *CanvasService) UpdateConsole(ctx context.Context, req *pb.UpdateConsoleRequest) (*pb.UpdateConsoleResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateConsole(ctx, organizationID, req.CanvasId, req.GetVersionId(), req.Panels, req.Layout)
-}
-
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
 }
@@ -473,5 +444,20 @@ func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.L
 
 func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CommitCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.ExpectedHeadSha, req.Message, req.Operations)
+	return canvases.CommitCanvasRepositoryFiles(
+		ctx,
+		s.gitProvider,
+		s.usageService,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.GetVersionId(),
+		req.ExpectedHeadSha,
+		req.Message,
+		req.Operations,
+		req.AutoLayout,
+		s.webhookBaseURL,
+		s.authService,
+	)
 }

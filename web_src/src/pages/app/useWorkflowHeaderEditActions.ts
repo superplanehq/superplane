@@ -19,9 +19,12 @@ interface WorkflowStartupActionsConfig {
 
 interface WorkflowHeaderEditActionsConfig {
   isRunsMode: boolean;
+  isVersionsMode: boolean;
   handleExitRunsMode: () => void;
+  handleExitVersionsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsRunsMode: (value: boolean) => void;
+  setIsVersionsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
@@ -30,9 +33,12 @@ interface WorkflowHeaderEditActionsConfig {
 
 export function useWorkflowHeaderEditActions({
   isRunsMode,
+  isVersionsMode,
   handleExitRunsMode,
+  handleExitVersionsMode,
   handleToggleEditMode,
   setIsRunsMode,
+  setIsVersionsMode,
   setSelectedRunId,
   setRunDetailNodeId,
   setSearchParams,
@@ -44,18 +50,34 @@ export function useWorkflowHeaderEditActions({
       setSelectedRunId(null);
       setRunDetailNodeId(null);
       setSearchParams(clearRunsViewSearchParams, { replace: true });
+    } else if (isVersionsMode) {
+      setIsVersionsMode(false);
+      setSearchParams(clearVersionsViewSearchParams, { replace: true });
     }
 
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunsMode, setIsRunsMode, setRunDetailNodeId, setSearchParams, setSelectedRunId]);
+  }, [
+    handleToggleEditMode,
+    isRunsMode,
+    isVersionsMode,
+    setIsRunsMode,
+    setIsVersionsMode,
+    setRunDetailNodeId,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
     if (isRunsMode) {
       handleExitRunsMode();
       return;
     }
+    if (isVersionsMode) {
+      handleExitVersionsMode();
+      return;
+    }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
+  }, [handleExitRunsMode, handleExitVersionsMode, handleToggleEditMode, isRunsMode, isVersionsMode]);
 
   useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
   useAutoPlaceholderNode(startup);
@@ -94,6 +116,12 @@ function useAutoEditMode(
       );
     });
   }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
+}
+
+function clearVersionsViewSearchParams(current: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(current);
+  next.delete("view");
+  return next;
 }
 
 function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {

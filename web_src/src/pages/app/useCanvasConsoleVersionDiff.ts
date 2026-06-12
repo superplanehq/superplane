@@ -2,17 +2,21 @@ import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useStat
 
 import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
-import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
-import { consoleToYaml } from "./console/consoleYaml";
+import {
+  buildDraftConsoleDiffSummary,
+  getDraftConsoleDiffCounts,
+  hasDraftVersusLiveConsoleDiff,
+} from "./draftConsoleDiff";
+import { materializeConsoleSpec } from "./lib/workflow-spec-files";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
-import type { CanvasesConsole } from "@/api-client";
+import type { CanvasConsoleData } from "@/hooks/useCanvasData";
 
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
 
-function consoleYamlText(canvasId: string, consoleData?: CanvasesConsole | null): string {
-  return consoleToYaml({
+function consoleYamlText(canvasId: string, consoleData?: CanvasConsoleData | null): string {
+  return materializeConsoleSpec({
     panels: (consoleData?.panels ?? []).map((panel) => ({
       id: panel.id ?? "",
       type: panel.type ?? "markdown",
@@ -66,7 +70,13 @@ export function useCanvasConsoleVersionDiff({
   );
   const draftConsoleDiff = useMemo(() => {
     if (!hasDraftConsoleDiffVersusLive) return undefined;
-    return { diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, draftConsoleQuery.data) };
+    return {
+      diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, draftConsoleQuery.data),
+    };
+  }, [hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+  const draftConsoleDiffSummary = useMemo(() => {
+    if (!hasDraftConsoleDiffVersusLive) return undefined;
+    return buildDraftConsoleDiffSummary(liveConsoleQuery.data, draftConsoleQuery.data);
   }, [hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
   const consoleYamlDiffPayload = useMemo(() => {
     if (!hasDraftConsoleDiffVersusLive || !draftConsoleQuery.data) return null;
@@ -102,6 +112,7 @@ export function useCanvasConsoleVersionDiff({
       draftConsoleDiff,
       onShowConsoleDiff: consoleYamlDiffPayload ? onShowConsoleDiff : undefined,
     },
+    draftConsoleDiffSummary,
     consoleYamlDiffModal: consoleYamlDiffPayload
       ? createElement(
           Suspense,

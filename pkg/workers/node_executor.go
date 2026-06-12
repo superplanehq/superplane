@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -33,6 +34,7 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
+	gitProvider    gitprovider.Provider
 	authService    authorization.Authorization
 	baseURL        string
 	webhookBaseURL string
@@ -43,10 +45,11 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
+		gitProvider:    gitProvider,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
@@ -355,6 +358,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
+		WithIncomingEventID(&execution.EventID).
 		WithInput(map[string]any{inputEvent.NodeID: input})
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
@@ -380,6 +384,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+		Files:          contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions:    contexts.NewExpressionContext(builder),
 	}
