@@ -132,6 +132,32 @@ func Test__AllocateElasticIP__Execute(t *testing.T) {
 		assert.Contains(t, string(body), "PublicIpv4Pool=ipv4pool-ec2-abc123")
 	})
 
+	t.Run("Amazon pool ignores stale address in configuration", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(allocateAddressXML("eipalloc-abc123", "203.0.113.10")),
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"ipSource": "amazon",
+				"address":  "18.97.0.41",
+			},
+			HTTP:           httpContext,
+			ExecutionState: executionState,
+			Integration:    elasticIPIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.NotContains(t, string(body), "Address=")
+	})
+
 	t.Run("allocate from IPAM pool with address -> sends IpamPoolId and Address", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
