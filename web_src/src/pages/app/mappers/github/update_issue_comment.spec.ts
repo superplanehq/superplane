@@ -50,24 +50,30 @@ function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetail
     name: "Update Issue Comment",
     componentName: "github.updateIssueComment",
     isCollapsed: false,
-    metadata: {},
-    configuration: execution.configuration ?? {},
+    metadata: {
+      repository: {
+        id: "123456",
+        name: "superplane",
+        url: "https://github.com/superplanehq/superplane",
+      },
+    },
   };
 
   return {
+    nodes: [node],
     node,
     execution: {
       id: "exec-1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       state: "STATE_FINISHED",
       result: "RESULT_PASSED",
-      configuration: execution.configuration ?? {},
-      outputs: execution.outputs ?? {},
-      metadata: {},
+      resultReason: "RESULT_REASON_OK",
       resultMessage: "",
-      resultReason: "",
-      createdAt: "2026-06-11T12:00:00Z",
-      updatedAt: "2026-06-11T14:30:00Z",
-      childExecutions: [],
+      metadata: {},
+      configuration: {},
+      rootEvent: undefined,
+      ...execution,
     },
   };
 }
