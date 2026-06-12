@@ -4547,6 +4547,7 @@ export function AppPage() {
     startEditingMenuOpen,
     setStartEditingMenuOpen,
     handleContinueDraftBranch,
+    handleCreateDraftBranch,
     handleDeleteDraftBranch,
     confirmDeleteDraftVersion,
     requestDeleteActiveDraft,
@@ -4781,7 +4782,11 @@ export function AppPage() {
       startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
     });
 
-  const handleCreateDraftBranchFromHeader = handleEnterEditModeFromHeader;
+  const handleCreateDraftBranchFromHeader = useCallback(async () => {
+    clearRunInspectionForEdit();
+    await Promise.resolve();
+    await handleCreateDraftBranch();
+  }, [clearRunInspectionForEdit, handleCreateDraftBranch]);
 
   const handleContinueDraftBranchFromHeader = useCallback(
     async (branchName: string) => {

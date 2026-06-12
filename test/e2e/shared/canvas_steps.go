@@ -70,12 +70,13 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.waitForEnabledExitEditButton()
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
 	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+	s.waitForEnabledEditButton()
 	s.session.Sleep(500)
 }
 
 // OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
+	s.ensureNotEditingForVersionsSidebar()
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
@@ -96,6 +97,32 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureNotEditingForVersionsSidebar() {
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+	visible, visibleErr := exitEditButton.IsVisible()
+	if visibleErr != nil || !visible {
+		return
+	}
+
+	disabled, err := exitEditButton.IsDisabled()
+	require.NoError(s.t, err)
+	if disabled {
+		return
+	}
+
+	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		visible, visibleErr = exitEditButton.IsVisible()
+		if visibleErr != nil || !visible {
+			s.session.Sleep(300)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
@@ -145,7 +172,16 @@ func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
 	s.OpenVersionsSidebar()
 	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") > button`, displayName))
 	s.session.Click(selector)
-	s.session.Sleep(500)
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		url := s.session.Page().URL()
+		if strings.Contains(url, "branch=") && !strings.Contains(url, "view=versions") {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	s.waitForEnabledExitEditButton()
 }
 

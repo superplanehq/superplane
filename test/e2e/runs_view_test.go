@@ -3,6 +3,7 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,7 +224,14 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
 	s.session.Click(q.TestID("runs-sidebar-live-canvas"))
-	s.session.Sleep(300)
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if !strings.Contains(s.session.Page().URL(), "run=") {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	require.NotContains(s.t, s.session.Page().URL(), "run=")
 	s.canvas.EnterEditMode()
 }
 

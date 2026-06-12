@@ -95,25 +95,7 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
+	s.canvas.EnterEditMode()
 }
 
 // headerProposeChangeButton matches the Propose Change button in the canvas header.
