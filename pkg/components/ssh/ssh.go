@@ -75,15 +75,21 @@ type Spec struct {
 	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
 }
 
-// commandSourceOrDefault returns the command source for the spec, treating an
-// unset value as the inline default so that nodes saved before the file feature
-// continue to behave the same.
+// commandSourceOrDefault returns the command source for the spec. A truly
+// unset (empty or whitespace-only) value defaults to inline so nodes saved
+// before the file feature keep working. Any other value is returned verbatim
+// and must match a known source exactly. We must NOT trim a non-empty value:
+// the UI evaluates the commandFile/commands visibility and required conditions
+// with an exact string comparison, so a padded value like "\tfile\n" would be
+// treated as hidden there (dropping commandFile from the saved payload) while a
+// trimmed value here would still run in file mode on the worker. Returning the
+// value verbatim keeps both sides in agreement and makes a padded value fail
+// loudly as an invalid command source instead of silently losing the path.
 func (s Spec) commandSourceOrDefault() string {
-	source := strings.TrimSpace(s.CommandSource)
-	if source == "" {
+	if strings.TrimSpace(s.CommandSource) == "" {
 		return CommandSourceInline
 	}
-	return source
+	return s.CommandSource
 }
 
 type ExecutionMetadata struct {

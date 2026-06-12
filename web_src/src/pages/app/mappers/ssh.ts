@@ -238,10 +238,11 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
 
   // A blank/unset commandSource is treated as "inline" for backward
   // compatibility with nodes saved before the file source was introduced.
-  // The backend trims this field before selecting file mode, so values like
-  // "file " or "\tfile\n" run from the repository file on the worker; trim
-  // here too so the node chip preview stays in sync with what actually runs.
-  const source: SSHCommandSource = config?.commandSource?.trim() === "file" ? "file" : "inline";
+  // Use an exact match (no trimming): the field's visibility/required
+  // conditions and the backend both compare this value exactly, so only a
+  // clean "file" runs in file mode. Anything else (including padded values)
+  // is treated as inline here so the chip preview matches what actually runs.
+  const source: SSHCommandSource = config?.commandSource === "file" ? "file" : "inline";
 
   // Branch on the source first so file mode never falls back to the inline
   // commands preview. The worker ignores `commands` when running in file mode,

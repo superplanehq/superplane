@@ -140,19 +140,19 @@ describe("sshMapper metadata preview", () => {
     expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
   });
 
-  it("shows the file path when commandSource has surrounding whitespace (matches backend trimming)", () => {
+  it("uses exact matching so a padded commandSource is not treated as file mode (matches UI conditions + backend)", () => {
     const node = buildNode({
       host: "example.com",
       username: "root",
       commandSource: "\tfile\n",
       commandFile: "scripts/deploy.sh",
-      commands: "stale inline value that should be hidden",
+      commands: "echo inline fallback",
     });
 
     const props = sshMapper.props(buildComponentCtx(node));
 
-    expect(props.metadata).toContainEqual({ icon: "file-code", label: "scripts/deploy.sh" });
-    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
+    expect(props.metadata).not.toContainEqual({ icon: "file-code", label: "scripts/deploy.sh" });
+    expect(props.metadata).toContainEqual({ icon: "terminal", label: "echo inline fallback" });
   });
 
   it("hides the stale inline preview in file mode when commandFile is empty", () => {

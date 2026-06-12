@@ -678,12 +678,43 @@ func TestSSHCommand_CommandSourceOrDefault(t *testing.T) {
 		assert.Equal(t, CommandSourceInline, Spec{CommandSource: "  \t "}.commandSourceOrDefault())
 	})
 
-	// Regression: surrounding whitespace must be trimmed so the returned
-	// value matches the inline/file switch cases instead of being reported
-	// as an invalid command source.
-	t.Run("trims surrounding whitespace from recognized values", func(t *testing.T) {
-		assert.Equal(t, CommandSourceFile, Spec{CommandSource: "file "}.commandSourceOrDefault())
-		assert.Equal(t, CommandSourceInline, Spec{CommandSource: " inline"}.commandSourceOrDefault())
-		assert.Equal(t, CommandSourceFile, Spec{CommandSource: "\tfile\n"}.commandSourceOrDefault())
+	t.Run("recognized values are returned unchanged", func(t *testing.T) {
+		assert.Equal(t, CommandSourceFile, Spec{CommandSource: "file"}.commandSourceOrDefault())
+		assert.Equal(t, CommandSourceInline, Spec{CommandSource: "inline"}.commandSourceOrDefault())
 	})
+
+	// Regression: a non-empty padded value must be returned verbatim (NOT
+	// trimmed to a known source). The UI evaluates the commandFile/commands
+	// visibility and required conditions with an exact string comparison, so
+	// trimming "\tfile\n" to "file" here would run file mode on the worker
+	// while the UI had hidden and dropped commandFile from the saved payload.
+	// Returning it verbatim makes validateCommandSource/resolveCommands reject
+	// it loudly as an invalid command source instead.
+	t.Run("non-empty padded values are returned verbatim to match the UI's exact matching", func(t *testing.T) {
+		assert.Equal(t, "file ", Spec{CommandSource: "file "}.commandSourceOrDefault())
+		assert.Equal(t, " inline", Spec{CommandSource: " inline"}.commandSourceOrDefault())
+		assert.Equal(t, "\tfile\n", Spec{CommandSource: "\tfile\n"}.commandSourceOrDefault())
+	})
+}
+
+func TestSSHCommand_Setup_RejectsPaddedCommandSource(t *testing.T) {
+	c := &SSHCommand{}
+	authWithKey := authConfig(AuthMethodSSHKey, map[string]any{"secret": "my-secret", "key": "private_key"}, nil)
+
+	// A padded "file" value must not silently run in file mode: the UI would
+	// have hidden and dropped commandFile, so Setup must reject it instead of
+	// letting the node publish in an inconsistent state.
+	err := c.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"host":           "example.com",
+			"username":       "root",
+			"authentication": authWithKey,
+			"commandSource":  "\tfile\n",
+			"commandFile":    "scripts/deploy.sh",
+			"timeout":        60,
+		},
+		Files: &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "echo hi"}},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid command source")
 }
