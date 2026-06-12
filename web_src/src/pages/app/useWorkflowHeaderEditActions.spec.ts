@@ -116,7 +116,16 @@ describe("useWorkflowHeaderEditActions", () => {
   it("auto edit mode clears run inspection before entering edit mode", async () => {
     const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
     const setSearchParams = vi.fn();
+    const setRunDetailNodeId = vi.fn();
     const searchParams = new URLSearchParams("edit=1&run=run-123");
+    const callOrder: string[] = [];
+
+    setSearchParams.mockImplementation(() => {
+      callOrder.push("setSearchParams");
+    });
+    handleToggleEditMode.mockImplementation(async () => {
+      callOrder.push("toggleEditMode");
+    });
 
     renderHook(() =>
       useWorkflowHeaderEditActions({
@@ -125,7 +134,7 @@ describe("useWorkflowHeaderEditActions", () => {
         handleClearRunInspection: vi.fn(),
         handleExitVersionsMode: vi.fn(),
         handleToggleEditMode,
-        setRunDetailNodeId: vi.fn(),
+        setRunDetailNodeId,
         setSearchParams: setSearchParams as unknown as SetURLSearchParams,
         startup: {
           hasEditableVersion: false,
@@ -140,7 +149,9 @@ describe("useWorkflowHeaderEditActions", () => {
       expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
     });
 
+    expect(setRunDetailNodeId).toHaveBeenCalledWith(null);
     expect(setSearchParams).toHaveBeenCalledTimes(2);
+    expect(callOrder).toEqual(["setSearchParams", "toggleEditMode", "setSearchParams"]);
 
     const clearRunUpdater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
     const clearedRun = clearRunUpdater(new URLSearchParams("edit=1&run=run-123"));

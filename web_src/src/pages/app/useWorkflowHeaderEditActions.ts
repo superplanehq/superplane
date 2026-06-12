@@ -70,7 +70,7 @@ export function useWorkflowHeaderEditActions({
     await handleToggleEditMode();
   }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
-  useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
+  useAutoEditMode(startup, handleToggleEditMode, setRunDetailNodeId, setSearchParams);
   useAutoPlaceholderNode(startup);
 
   const clearRunInspectionForEdit = useCallback(() => {
@@ -88,6 +88,7 @@ export function useWorkflowHeaderEditActions({
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
   handleToggleEditMode: () => Promise<void>,
+  setRunDetailNodeId: (value: string | null) => void,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -105,11 +106,14 @@ function useAutoEditMode(
 
     triggeredRef.current = true;
 
-    if (searchParams.get("run")) {
-      setSearchParams(clearRunInspectionSearchParams, { replace: true });
-    }
+    void (async () => {
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+        await Promise.resolve();
+      }
 
-    void handleToggleEditMode().then(() => {
+      await handleToggleEditMode();
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -118,8 +122,16 @@ function useAutoEditMode(
         },
         { replace: true },
       );
-    });
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
+    })();
+  }, [
+    searchParams,
+    setSearchParams,
+    setRunDetailNodeId,
+    hasEditableVersion,
+    canUpdateCanvas,
+    canvasLoaded,
+    handleToggleEditMode,
+  ]);
 }
 
 /**
