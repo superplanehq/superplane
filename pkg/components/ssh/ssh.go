@@ -219,6 +219,11 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Description: "One or more commands to run on the remote host, one per line",
 			Placeholder: "e.g. echo hello\nls -la /tmp",
 			Required:    true,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "workingDirectory",

@@ -435,6 +435,11 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 			Description: "Shell script or cloud-init payload executed at launch",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "associatePublicIpAddress",

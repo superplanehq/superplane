@@ -100,7 +100,7 @@ export function RunNodeDetailPane({
 
   return (
     <aside
-      className="relative z-31 shrink-0 border-t border-border bg-white"
+      className="relative z-31 flex min-h-0 shrink-0 flex-col overflow-hidden border-t border-border bg-white"
       data-testid="run-node-detail-pane"
       style={{ height: paneHeight, minHeight, maxHeight }}
     >
