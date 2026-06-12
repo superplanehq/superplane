@@ -239,7 +239,7 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 		Table("workflow_nodes").
 		Select("workflow_nodes.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_nodes"},
 			Options:  "SKIP LOCKED",
 		}).
@@ -263,7 +263,7 @@ func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (
 	var node CanvasNode
 
 	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeId).
 		First(&node).
