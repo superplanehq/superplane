@@ -2518,17 +2518,13 @@ export function AppPage() {
       let integrationLabel: string | undefined;
       let blockName: string | undefined;
 
-      if (node.type === "TYPE_ACTION") {
-        const componentMetadata = allComponentsByName.get(node.component);
-        configurationFields = componentMetadata?.configuration || [];
-        displayLabel = componentMetadata?.label || displayLabel;
-        blockName = node.component;
-        integrationName = node.component ? integrationNameByComponentName.get(node.component) : undefined;
-        integrationLabel = integrationName ? availableIntegrationsByName.get(integrationName)?.label : undefined;
-      } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = allTriggersByName.get(node.component);
-        configurationFields = triggerMetadata?.configuration || [];
-        displayLabel = triggerMetadata?.label || displayLabel;
+      if (node.type === "TYPE_ACTION" || node.type === "TYPE_TRIGGER") {
+        const metadata =
+          node.type === "TYPE_ACTION"
+            ? allComponentsByName.get(node.component)
+            : allTriggersByName.get(node.component);
+        configurationFields = metadata?.configuration || [];
+        displayLabel = metadata?.label || displayLabel;
         blockName = node.component;
         integrationName = node.component ? integrationNameByComponentName.get(node.component) : undefined;
         integrationLabel = integrationName ? availableIntegrationsByName.get(integrationName)?.label : undefined;
