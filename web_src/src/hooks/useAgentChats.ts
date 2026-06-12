@@ -49,6 +49,8 @@ export function useCanvasAgentChat(
 export type AgentMessagesPage = { messages: AgentMessage[]; hasMore: boolean };
 
 export function useAgentChatMessages(chatId: string | null, organizationId: string | undefined, enabled: boolean) {
+  const queryClient = useQueryClient();
+
   return useInfiniteQuery({
     queryKey: agentChatKeys.messages(chatId ?? ""),
     enabled: enabled && Boolean(chatId),
@@ -62,6 +64,16 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
         }),
       );
       const messages = (response.data?.messages ?? []).map(fromApiMessage).filter((m): m is AgentMessage => m !== null);
+      if (!pageParam && chatId) {
+        return {
+          messages: mergePendingOptimisticMessages(
+            messages,
+            queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId)),
+          ),
+          hasMore: Boolean(response.data?.hasMore),
+        };
+      }
+
       return { messages, hasMore: Boolean(response.data?.hasMore) };
     },
     getNextPageParam: (lastPage) => {
@@ -129,6 +141,23 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       }
     },
   });
+}
+
+function mergePendingOptimisticMessages(
+  messages: AgentMessage[],
+  currentData: InfiniteData<AgentMessagesPage> | undefined,
+): AgentMessage[] {
+  const optimisticMessages = currentData?.pages.flatMap((page) => page.messages).filter(isOptimisticAgentMessage) ?? [];
+  if (optimisticMessages.length === 0) {
+    return messages;
+  }
+
+  const messageIds = new Set(messages.map((message) => message.id));
+  return [...messages, ...optimisticMessages.filter((message) => !messageIds.has(message.id))];
+}
+
+function isOptimisticAgentMessage(message: AgentMessage): boolean {
+  return message.id.startsWith("optimistic-");
 }
 
 export function useInterruptAgentChat(organizationId: string | undefined) {

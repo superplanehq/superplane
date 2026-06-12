@@ -26,7 +26,7 @@ type UseAgentDraftEditorArgs = {
   hasEditableVersion: boolean;
   hasPendingLocalCanvasState: boolean;
   activeCanvasVersionIdRef: { current: string };
-  activateCanvasVersionForEditing: (versionId: string, version: CanvasesCanvasVersion) => void;
+  activateCanvasVersionForEditing: (versionId: string, version: CanvasesCanvasVersion) => boolean;
   setSuppressUnpublishedDraftDiscard: (value: boolean) => void;
 };
 
@@ -178,8 +178,7 @@ export function useAgentDraftEditor({
       }
 
       setSuppressUnpublishedDraftDiscard(false);
-      activateCanvasVersionForEditing(versionId, version);
-      return "opened";
+      return activateCanvasVersionForEditing(versionId, version) ? "opened" : "skipped";
     },
     [
       activateCanvasVersionForEditing,

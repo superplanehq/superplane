@@ -4360,7 +4360,7 @@ export function AppPage() {
   const activateCanvasVersionForEditing = useCallback(
     (versionID: string, version: CanvasesCanvasVersion) => {
       if (!organizationId || !canvasId) {
-        return;
+        return false;
       }
 
       setIsCreateChangeRequestMode(false);
@@ -4374,7 +4374,7 @@ export function AppPage() {
         (!!liveCanvasVersionId && versionId === liveCanvasVersionId);
       if (!isOwnedDraft && !isPublished && !isPendingApprovalVersion) {
         showErrorToast("You can only use your edit version, open change requests, or published live history");
-        return;
+        return false;
       }
 
       if (isCurrentLive) {
@@ -4448,6 +4448,8 @@ export function AppPage() {
           initializeFromWorkflow,
         });
       }
+
+      return true;
     },
     [
       organizationId,

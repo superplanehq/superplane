@@ -39,6 +39,7 @@ function setupHook({
   hasEditableVersion = false,
   hasPendingLocalCanvasState = false,
   activeCanvasVersionId = "live-version",
+  activateCanvasVersionForEditing = vi.fn(() => true),
 }: {
   canvasId: string;
   versionId: string;
@@ -46,10 +47,10 @@ function setupHook({
   hasEditableVersion?: boolean;
   hasPendingLocalCanvasState?: boolean;
   activeCanvasVersionId?: string;
+  activateCanvasVersionForEditing?: (versionId: string, version: CanvasesCanvasVersion) => boolean;
 }) {
   const queryClient = new QueryClient();
   const activeCanvasVersionIdRef = { current: activeCanvasVersionId };
-  const activateCanvasVersionForEditing = vi.fn();
   const setSuppressUnpublishedDraftDiscard = vi.fn();
   const selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]);
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -145,5 +146,24 @@ describe("useAgentDraftEditor", () => {
 
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries auto-open when activation does not apply the draft", async () => {
+    const versionId = "draft-activation-skipped";
+    const activateCanvasVersionForEditing = vi.fn(() => false);
+    const hook = setupHook({
+      canvasId: "canvas-activation-skipped",
+      versionId,
+      activateCanvasVersionForEditing,
+    });
+
+    dispatchDraftReady(versionId);
+
+    await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
+
+    activateCanvasVersionForEditing.mockReturnValue(true);
+    hook.updateProps({ hasPendingLocalCanvasState: true });
+
+    await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(2));
   });
 });
