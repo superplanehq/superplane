@@ -108,11 +108,7 @@ export const manageElasticIPMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const outputEvent = outputs?.default?.find((output) => output.type?.startsWith(elasticIPPayloadPrefix));
     const output = outputEvent?.data as Output | undefined;
-    const completedAt = context.execution.updatedAt
-      ? new Date(context.execution.updatedAt).toLocaleString()
-      : context.execution.createdAt
-        ? new Date(context.execution.createdAt).toLocaleString()
-        : undefined;
+    const completedAt = formatCompletedAt(context.execution);
     const operationLabel = operationLabelForExecution(configuration, outputEvent?.type);
 
     if (!output) {
@@ -138,6 +134,15 @@ export const manageElasticIPMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function formatCompletedAt(execution: ExecutionInfo): string | undefined {
+  const timestamp = execution.updatedAt ?? execution.createdAt;
+  if (!timestamp) {
+    return undefined;
+  }
+
+  return new Date(timestamp).toLocaleString();
+}
 
 function operationLabelForExecution(configuration: Configuration | undefined, payloadType?: string): string {
   const operationFromOutput = payloadType ? operationFromPayloadType[payloadType] : undefined;
