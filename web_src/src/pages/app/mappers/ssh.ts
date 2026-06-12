@@ -109,11 +109,15 @@ export const SSH_STATE_REGISTRY: EventStateRegistry = {
   getState: sshStateFunction,
 };
 
+type SSHCommandSource = "inline" | "file";
+
 type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
+  commandSource?: SSHCommandSource;
   commands?: string;
+  commandFile?: string;
   authMethod?: string;
 };
 
@@ -231,7 +235,17 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
       label: `${config.username || "user"}@${config.host}${port}`,
     });
   }
-  if (config?.commands) {
+
+  // A blank/unset commandSource is treated as "inline" for backward
+  // compatibility with nodes saved before the file source was introduced.
+  const source: SSHCommandSource = config?.commandSource === "file" ? "file" : "inline";
+
+  if (source === "file" && config?.commandFile) {
+    metadata.push({
+      icon: "file-code",
+      label: config.commandFile,
+    });
+  } else if (config?.commands) {
     const oneline = config.commands
       .split("\n")
       .filter((l) => l.trim() !== "")
