@@ -27,10 +27,6 @@ func (a updateDraftAction) Name() string {
 }
 
 func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.deps.Encryptor == nil || a.deps.Registry == nil || a.deps.AuthService == nil {
-		return updateResult{}, fmt.Errorf("custom tool executor is missing canvas update dependencies")
-	}
-
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
@@ -59,6 +55,11 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("canvas_yaml or console_yaml is required for update_draft")
 	}
 
+	// Commit edits straight into the agent's private draft version row and drop
+	// any pending staging in the same write. The agent's reads (the `read`
+	// action and this action's returned summary) come from the committed version
+	// row, so committing keeps writes and reads consistent. Publishing stays
+	// user-driven. This matches the CLI `apps canvas update --draft-id` flow.
 	if err := canvasRepository.ApplyRepositorySpecFileOperations(
 		ctx,
 		a.deps.UsageService,
@@ -70,6 +71,7 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		a.deps.WebhookBaseURL,
 		a.deps.AuthService,
 		resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate),
+		true,
 		operations,
 	); err != nil {
 		return updateResult{}, err
