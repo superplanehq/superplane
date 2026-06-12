@@ -114,15 +114,70 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
+// InterruptSession resets local state first and treats the provider call
+// as best-effort: the worker checks status per event, so flipping to idle
+// before the provider HTTP roundtrip lets late SSE events get dropped
+// during the network wait instead of after.
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+
+	closeOpenToolsForSession(sessionID)
+
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle); err != nil {
+		return fmt.Errorf("mark session idle: %w", err)
+	}
+
+	if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "turn_completed",
+		Status:    models.AgentSessionStatusIdle,
+	}); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish status event")
+	}
+
+	// Best-effort: any provider error still leaves the row at idle so the
+	// stop button can't leave the UI gated; SendMessage's recovery paths
+	// reconcile on the next turn.
 	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
-		return fmt.Errorf("interrupt: %w", err)
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, local reset already done")
+		} else {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: provider returned error, local reset already done")
+		}
 	}
 	return nil
+}
+
+// closeOpenToolsForSession mirrors agent_stream_worker.closeOpenTools;
+// duplicated to avoid a workers → agents → workers import cycle.
+func closeOpenToolsForSession(sessionID uuid.UUID) {
+	closed, err := models.CloseOpenToolMessages(sessionID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to close open tools")
+		return
+	}
+	for i := range closed {
+		row := &closed[i]
+		if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+			SessionID: sessionID.String(),
+			Event:     "tool_finished",
+			MessageID: row.ID.String(),
+			Message: &messages.AgentMessage{
+				ID:         row.ID.String(),
+				Role:       row.Role,
+				Content:    row.Content,
+				ToolCallID: row.ToolCallID,
+				ToolName:   row.ToolName,
+				ToolStatus: row.ToolStatus,
+				CreatedAt:  row.CreatedAt,
+			},
+		}); err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish tool_finished")
+		}
+	}
 }
 
 func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
@@ -412,12 +467,7 @@ func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (strin
 		Subject: userID,
 		OrgID:   organizationID,
 		Purpose: "agent-builder",
-		Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
-			{ResourceType: "org", Action: "read"},
-			{ResourceType: "integrations", Action: "read"},
-			{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-			{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
-		}),
+		Scopes:  AgentTokenScopes(canvasID),
 	}
 	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
 	if err != nil {
@@ -490,11 +540,12 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		result := "[Draft Status]\n"
 		for _, draft := range drafts {
 			result += fmt.Sprintf(
-				"- Active draft: version %s (created %s)\n",
+				"- Existing draft: version %s (created %s)\n",
 				draft.ID.String(),
 				draftCreatedAt(draft),
 			)
 		}
+		result += "These drafts may belong to other sessions or users. To make changes, reuse the session draft you created earlier (pass its --draft-id), or create a new one with `superplane apps drafts create` if you have not yet this session. Do not reuse an unrelated draft.\n"
 		return result
 	}
 

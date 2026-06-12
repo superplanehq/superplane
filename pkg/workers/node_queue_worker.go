@@ -281,6 +281,11 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
 	}
 
+	if errors.Is(err, core.ErrQueueItemDeferred) {
+		logger.Info("Queue item deferred")
+		return nil, nil, nil
+	}
+
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 

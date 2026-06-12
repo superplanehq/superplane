@@ -132,7 +132,8 @@ CREATE TABLE public.agent_sessions (
     status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    heartbeat_at timestamp with time zone
 );
 
 
@@ -714,7 +715,6 @@ CREATE TABLE public.workflows (
     updated_at timestamp without time zone NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
-    is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
     folder_id uuid,
     next_draft_display_number integer DEFAULT 1 NOT NULL
@@ -1652,13 +1652,6 @@ CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id)
 
 
 --
--- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
-
-
---
 -- Name: idx_workflows_live_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2198,7 +2191,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260607000000	f
+20260611153001	f
 \.
 
 

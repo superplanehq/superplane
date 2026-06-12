@@ -1069,23 +1069,16 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
-        const newNodeId = await props.onNodeAdd({
+        await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
           integrationName: block.integrationName,
         });
-
-        // Close building blocks sidebar
-        setIsBuildingBlocksSidebarOpen(false);
-
-        // Open component sidebar for the new node
-        state.componentSidebar.open(newNodeId);
-        setCurrentTab("settings");
       }
     },
-    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
+    [props, readOnly],
   );
 
   const handleSidebarToggle = useCallback(
@@ -1458,7 +1451,6 @@ function CanvasPage(props: CanvasPageProps) {
                   fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.headerMode === "runs" ? props.runNodeDetailNodeId : null}
-                  onRunNodeDetailClose={props.onRunNodeDetailClose}
                   runNodeDetailPaneOpen={
                     props.headerMode === "runs" &&
                     !!props.runNodeDetailRun &&
@@ -2111,7 +2103,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  onRunNodeDetailClose,
   runNodeDetailPaneOpen,
   runsEvents,
   runsNodes,
@@ -2171,7 +2162,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  onRunNodeDetailClose?: () => void;
   runNodeDetailPaneOpen?: boolean;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
@@ -2574,7 +2564,6 @@ function CanvasContent({
     previouslySelectedRef.current = new Set();
 
     if (headerMode === "runs" && runSelectedNodeId) {
-      onRunNodeDetailClose?.();
       return;
     }
 
@@ -2593,7 +2582,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [headerMode, onBuildingBlocksSidebarToggle, onRunNodeDetailClose, runSelectedNodeId]);
+  }, [headerMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
