@@ -139,8 +139,8 @@ type CreateSessionResult struct {
 }
 
 // SendMessageOptions.ContextPreamble is prepended to the user's message so
-// providers that need caller context inline (e.g. a CLI token on first turn)
-// receive it without a separate system message.
+// providers that need caller context inline (e.g. the canvas/session
+// identifiers) receive it without a separate system message.
 type SendMessageOptions struct {
 	ContextPreamble string
 }

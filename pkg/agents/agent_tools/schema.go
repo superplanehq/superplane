@@ -42,7 +42,7 @@ func (t *ComponentSchemaAgentTool) Name() string {
 }
 
 func (t *ComponentSchemaAgentTool) Description() string {
-	return "Lookup exact SuperPlane component, trigger, and widget schemas from the backend registry without reading mounted reference files. Use this before read/grep commands or researcher delegation when you need YAML component keys, configuration fields, output channel names, integration requirements, or compact examples. Prefer this tool for repeated schema lookups; mounted docs are fallback only."
+	return "Lookup exact SuperPlane component, trigger, and widget schemas from the backend registry without reading mounted reference files. Use this before researcher delegation when you need YAML component keys, configuration fields, output channel names, integration requirements, or compact examples. Prefer this tool for repeated schema lookups; mounted docs are fallback only."
 }
 
 func (t *ComponentSchemaAgentTool) InputSchema() agents.CustomToolInputSchema {
