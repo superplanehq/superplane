@@ -2,8 +2,11 @@ type RunsPage = { runs?: unknown[]; totalCount?: number } | undefined;
 
 export function hasLoadedAllRuns(pages: RunsPage[], hasNextPage: boolean): boolean {
   const loadedCount = pages.reduce((acc, page) => acc + (page?.runs?.length ?? 0), 0);
-  const totalCount = pages[0]?.totalCount ?? 0;
-  return loadedCount >= totalCount || !hasNextPage;
+  const totalCount = pages[0]?.totalCount;
+  if (totalCount !== undefined) {
+    return loadedCount >= totalCount || !hasNextPage;
+  }
+  return !hasNextPage;
 }
 
 export function shouldClearStaleRunUrl({
