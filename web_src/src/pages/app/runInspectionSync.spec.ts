@@ -6,6 +6,8 @@ describe("runInspectionSync", () => {
     expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 1 }], false)).toBe(true);
     expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 2 }], true)).toBe(false);
     expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 2 }], false)).toBe(true);
+    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }] }], true)).toBe(false);
+    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }] }], false)).toBe(true);
   });
 
   it("clears stale run URLs only after the run list finishes loading", () => {

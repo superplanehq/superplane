@@ -138,6 +138,11 @@ export function RunsTabPanel({
 
   const olderNavigationLoadRequestedRef = useRef(false);
   const filteredRunIdsLengthAtFetchStartRef = useRef(0);
+  const pendingOlderNavigationRunIdRef = useRef<string | null>(null);
+  const lastOlderFetchCompletedRef = useRef(false);
+  const wasFetchingNextPageRef = useRef(false);
+  const [olderNavigationSession, setOlderNavigationSession] = useState(0);
+  const [olderFetchCompletedTick, setOlderFetchCompletedTick] = useState(0);
   const [pendingOlderNavigation, setPendingOlderNavigation] = useState(false);
 
   const handleNavigateRun = useCallback(
@@ -154,39 +159,61 @@ export function RunsTabPanel({
       return;
     }
 
-    if (!atOlderPaginationBoundary || !hasNextPage) {
+    if (!atOlderPaginationBoundary || !hasNextPage || filterState.hasAnyFilter) {
       return;
     }
 
+    pendingOlderNavigationRunIdRef.current = selectedRunId;
+    filteredRunIdsLengthAtFetchStartRef.current = sidebarRunIds.length;
+    olderNavigationLoadRequestedRef.current = false;
+    lastOlderFetchCompletedRef.current = false;
+    setOlderNavigationSession((session) => session + 1);
     setPendingOlderNavigation(true);
-  }, [atOlderPaginationBoundary, handleNavigateRun, hasNextPage, olderRunId]);
+  }, [
+    atOlderPaginationBoundary,
+    filterState.hasAnyFilter,
+    handleNavigateRun,
+    hasNextPage,
+    olderRunId,
+    selectedRunId,
+    sidebarRunIds.length,
+  ]);
 
   useEffect(() => {
     if (!pendingOlderNavigation || isFetchingNextPage || !onLoadMore) {
       return;
     }
 
-    if (!selectedRunId) {
+    if (!selectedRunId || selectedRunId !== pendingOlderNavigationRunIdRef.current) {
+      pendingOlderNavigationRunIdRef.current = null;
+      olderNavigationLoadRequestedRef.current = false;
+      lastOlderFetchCompletedRef.current = false;
       setPendingOlderNavigation(false);
       return;
     }
 
     const nextOlderRunId = getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "next");
     if (nextOlderRunId) {
+      pendingOlderNavigationRunIdRef.current = null;
       olderNavigationLoadRequestedRef.current = false;
+      lastOlderFetchCompletedRef.current = false;
       setPendingOlderNavigation(false);
       handleNavigateRun(nextOlderRunId);
       return;
     }
 
     if (!hasNextPage) {
+      pendingOlderNavigationRunIdRef.current = null;
       olderNavigationLoadRequestedRef.current = false;
+      lastOlderFetchCompletedRef.current = false;
       setPendingOlderNavigation(false);
       return;
     }
 
-    if (sidebarRunIds.length === filteredRunIdsLengthAtFetchStartRef.current) {
+    if (lastOlderFetchCompletedRef.current && sidebarRunIds.length === filteredRunIdsLengthAtFetchStartRef.current) {
+      pendingOlderNavigationRunIdRef.current = null;
       olderNavigationLoadRequestedRef.current = false;
+      lastOlderFetchCompletedRef.current = false;
       setPendingOlderNavigation(false);
       return;
     }
@@ -195,13 +222,15 @@ export function RunsTabPanel({
       return;
     }
 
-    filteredRunIdsLengthAtFetchStartRef.current = sidebarRunIds.length;
     olderNavigationLoadRequestedRef.current = true;
+    lastOlderFetchCompletedRef.current = false;
     onLoadMore();
   }, [
     handleNavigateRun,
     hasNextPage,
     isFetchingNextPage,
+    olderFetchCompletedTick,
+    olderNavigationSession,
     onLoadMore,
     pendingOlderNavigation,
     selectedRunId,
@@ -209,10 +238,17 @@ export function RunsTabPanel({
   ]);
 
   useEffect(() => {
-    if (!isFetchingNextPage) {
-      olderNavigationLoadRequestedRef.current = false;
+    const wasFetching = wasFetchingNextPageRef.current;
+    wasFetchingNextPageRef.current = !!isFetchingNextPage;
+
+    if (!wasFetching || isFetchingNextPage || !pendingOlderNavigation) {
+      return;
     }
-  }, [isFetchingNextPage]);
+
+    lastOlderFetchCompletedRef.current = true;
+    olderNavigationLoadRequestedRef.current = false;
+    setOlderFetchCompletedTick((tick) => tick + 1);
+  }, [isFetchingNextPage, pendingOlderNavigation]);
 
   const isDetailView = sidebarView === "detail" && !!selectedRun;
   const isLiveCanvasSelected = !selectedRunId;
@@ -264,7 +300,9 @@ export function RunsTabPanel({
               olderRunId={olderRunId}
               canNavigateOlder={canNavigateOlder}
               onNavigateRun={handleNavigateRun}
-              onNavigateOlder={atOlderPaginationBoundary && hasNextPage ? handleNavigateOlder : undefined}
+              onNavigateOlder={
+                atOlderPaginationBoundary && hasNextPage && !filterState.hasAnyFilter ? handleNavigateOlder : undefined
+              }
             />
           ) : null}
         </div>
