@@ -659,3 +659,22 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 		assert.Equal(t, "echo legacy", command)
 	})
 }
+
+func TestSSHCommand_CommandSourceOrDefault(t *testing.T) {
+	t.Run("empty defaults to inline", func(t *testing.T) {
+		assert.Equal(t, CommandSourceInline, Spec{CommandSource: ""}.commandSourceOrDefault())
+	})
+
+	t.Run("whitespace-only defaults to inline", func(t *testing.T) {
+		assert.Equal(t, CommandSourceInline, Spec{CommandSource: "  \t "}.commandSourceOrDefault())
+	})
+
+	// Regression: surrounding whitespace must be trimmed so the returned
+	// value matches the inline/file switch cases instead of being reported
+	// as an invalid command source.
+	t.Run("trims surrounding whitespace from recognized values", func(t *testing.T) {
+		assert.Equal(t, CommandSourceFile, Spec{CommandSource: "file "}.commandSourceOrDefault())
+		assert.Equal(t, CommandSourceInline, Spec{CommandSource: " inline"}.commandSourceOrDefault())
+		assert.Equal(t, CommandSourceFile, Spec{CommandSource: "\tfile\n"}.commandSourceOrDefault())
+	})
+}

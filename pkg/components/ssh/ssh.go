@@ -79,10 +79,11 @@ type Spec struct {
 // unset value as the inline default so that nodes saved before the file feature
 // continue to behave the same.
 func (s Spec) commandSourceOrDefault() string {
-	if strings.TrimSpace(s.CommandSource) == "" {
+	source := strings.TrimSpace(s.CommandSource)
+	if source == "" {
 		return CommandSourceInline
 	}
-	return s.CommandSource
+	return source
 }
 
 type ExecutionMetadata struct {
