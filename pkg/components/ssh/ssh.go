@@ -131,7 +131,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
 - **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
-- **Command file** (file mode): Path to a file in the Files tab. Its contents are loaded at execution time and run verbatim through bash -lc on the remote host, so the script behaves the same as if pasted into an interactive SSH session: multi-line constructs (if/while/for, here-docs, process substitution), shebangs, comments, and bash features (set -eo pipefail, declare -A, etc.) all work as expected. The file is NOT processed as a SuperPlane expression template, so embedded {{ ... }} syntax (Docker inspect, Helm, kubectl jsonpath, Go templates) is preserved. To inject upstream values into a file-backed script, set them under **Environment variables** (which do support expressions) and reference them as shell variables in your script.
+- **Command file** (file mode): Path to a file in the Files tab.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
