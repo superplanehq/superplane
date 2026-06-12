@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * code blocks, tables, and `<details>` stay visually consistent with the
  * canvas chrome at small panel sizes.
  */
-export const MARKDOWN_CONTENT_CLASSES =
+const MARKDOWN_CONTENT_CLASSES =
   "max-w-none text-sm text-slate-800 " +
   "[&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:leading-tight [&_h1:first-child]:mt-0 " +
   "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-tight [&_h2:first-child]:mt-0 " +
@@ -40,7 +40,7 @@ export const MARKDOWN_CONTENT_CLASSES =
  * authored directly in markdown without weakening the rest of the policy
  * around scripts, event handlers, and inline styles.
  */
-export const MARKDOWN_SANITIZE_SCHEMA = {
+const MARKDOWN_SANITIZE_SCHEMA = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
