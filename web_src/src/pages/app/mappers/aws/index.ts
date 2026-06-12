@@ -47,7 +47,7 @@ import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
 import { getInstanceMapper } from "./ec2/get_instance";
 import { getInstanceMetricsMapper } from "./ec2/get_instance_metrics";
 import { allocateElasticIPMapper } from "./ec2/allocate_elastic_ip";
-import { associateElasticIPMapper, ASSOCIATE_ELASTIC_IP_STATE_REGISTRY } from "./ec2/associate_elastic_ip";
+import { manageElasticIPMapper, MANAGE_ELASTIC_IP_STATE_REGISTRY } from "./ec2/manage_elastic_ip";
 import { manageInstancePowerMapper, MANAGE_INSTANCE_POWER_STATE_REGISTRY } from "./ec2/manage_instance_power";
 import { releaseElasticIPMapper } from "./ec2/release_elastic_ip";
 import { updateInstanceMapper } from "./ec2/update_instance";
@@ -99,7 +99,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.deleteTopic": deleteTopicMapper,
   "sns.publishMessage": publishMessageMapper,
   "ec2.allocateElasticIP": allocateElasticIPMapper,
-  "ec2.associateElasticIP": associateElasticIPMapper,
+  "ec2.manageElasticIP": manageElasticIPMapper,
   "ec2.copyImage": copyImageMapper,
   "ec2.createAlarm": createAlarmMapper,
   "ec2.createImage": createImageMapper,
@@ -169,7 +169,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.deleteTopic": buildActionStateRegistry("deleted"),
   "sns.publishMessage": buildActionStateRegistry("published"),
   "ec2.allocateElasticIP": buildActionStateRegistry("allocated"),
-  "ec2.associateElasticIP": ASSOCIATE_ELASTIC_IP_STATE_REGISTRY,
+  "ec2.manageElasticIP": MANAGE_ELASTIC_IP_STATE_REGISTRY,
   "ec2.copyImage": buildActionStateRegistry("copied"),
   "ec2.createAlarm": buildActionStateRegistry("created"),
   "ec2.createImage": buildActionStateRegistry("created"),

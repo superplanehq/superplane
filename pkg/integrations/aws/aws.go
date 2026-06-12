@@ -155,7 +155,7 @@ func (a *AWS) Actions() []core.Action {
 		&ecs.StopTask{},
 		&ecs.UpdateService{},
 		&ec2.AllocateElasticIP{},
-		&ec2.AssociateElasticIP{},
+		&ec2.ManageElasticIP{},
 		&ec2.CopyImage{},
 		&ec2.CreateAlarm{},
 		&ec2.CreateImage{},

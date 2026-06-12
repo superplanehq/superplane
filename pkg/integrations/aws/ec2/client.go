@@ -165,6 +165,7 @@ type AllocateAddressInput struct {
 	CustomerOwnedIPv4Pool string
 	IpamPoolID            string
 	Address               string
+	Tags                  []common.Tag
 }
 
 type AllocateAddressOutput struct {
@@ -773,6 +774,14 @@ func (c *Client) AllocateAddress(input AllocateAddressInput) (*AllocateAddressOu
 	}
 	if address := strings.TrimSpace(input.Address); address != "" {
 		params.Set("Address", address)
+	}
+	if len(input.Tags) > 0 {
+		params.Set("TagSpecification.1.ResourceType", "elastic-ip")
+		for i, tag := range input.Tags {
+			prefix := fmt.Sprintf("TagSpecification.1.Tag.%d.", i+1)
+			params.Set(prefix+"Key", tag.Key)
+			params.Set(prefix+"Value", tag.Value)
+		}
 	}
 
 	response := allocateAddressResponse{}

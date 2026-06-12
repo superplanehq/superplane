@@ -67,8 +67,8 @@ var exampleOutputAllocateElasticIPBytes []byte
 //go:embed example_output_release_elastic_ip.json
 var exampleOutputReleaseElasticIPBytes []byte
 
-//go:embed example_output_associate_elastic_ip.json
-var exampleOutputAssociateElasticIPBytes []byte
+//go:embed example_output_manage_elastic_ip.json
+var exampleOutputManageElasticIPBytes []byte
 
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
@@ -130,8 +130,8 @@ var exampleOutputAllocateElasticIP map[string]any
 var exampleOutputReleaseElasticIPOnce sync.Once
 var exampleOutputReleaseElasticIP map[string]any
 
-var exampleOutputAssociateElasticIPOnce sync.Once
-var exampleOutputAssociateElasticIP map[string]any
+var exampleOutputManageElasticIPOnce sync.Once
+var exampleOutputManageElasticIP map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -265,10 +265,10 @@ func (c *ReleaseElasticIP) ExampleOutput() map[string]any {
 	)
 }
 
-func (c *AssociateElasticIP) ExampleOutput() map[string]any {
+func (c *ManageElasticIP) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputAssociateElasticIPOnce,
-		exampleOutputAssociateElasticIPBytes,
-		&exampleOutputAssociateElasticIP,
+		&exampleOutputManageElasticIPOnce,
+		exampleOutputManageElasticIPBytes,
+		&exampleOutputManageElasticIP,
 	)
 }
