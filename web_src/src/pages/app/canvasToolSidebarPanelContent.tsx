@@ -17,6 +17,8 @@ export interface CanvasRunsSidebarPanelConfig {
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onNavigateRun?: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
   detailDismissedForRunId?: string | null;
@@ -37,6 +39,7 @@ export interface CanvasVersionsSidebarPanelConfig {
   isOpen: boolean;
   scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
+  liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   pendingApprovalVersions?: Array<{
     version: CanvasesCanvasVersion;
