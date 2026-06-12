@@ -89,6 +89,10 @@ function useAutoEditMode(
 
     triggeredRef.current = true;
 
+    if (searchParams.get("run")) {
+      setSearchParams(clearRunInspectionSearchParams, { replace: true });
+    }
+
     void handleToggleEditMode().then(() => {
       setSearchParams(
         (current) => {
