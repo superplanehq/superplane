@@ -162,24 +162,46 @@ export function workspaceAliasFromMetadata(node: NodeInfo): string | undefined {
 }
 
 export function queryMetadataList(node: NodeInfo, range = false): MetadataItem[] {
-  const config = node.configuration as QueryRangeConfiguration | undefined;
-  const items: MetadataItem[] = [];
-  const alias = workspaceAliasFromMetadata(node);
+  const config = (node.configuration ?? {}) as QueryRangeConfiguration;
+  const items = [
+    metadataItem("activity", workspaceMetadataLabel(node, config)),
+    metadataItem("search", config.query),
+    rangeMetadataItem(config, range),
+  ];
 
-  if (alias || config?.workspace) {
-    items.push({ icon: "activity", label: alias ?? config?.workspace ?? "" });
-  }
-  if (config?.query) {
-    items.push({ icon: "search", label: config.query });
-  }
-  if (range && config?.start) {
-    items.push({ icon: "clock", label: `Start: ${config.start}` });
-  }
-  if (!range && config?.region) {
-    items.push({ icon: "globe", label: config.region });
+  return items.filter(isMetadataItem).slice(0, MAX_METADATA_ITEMS);
+}
+
+function workspaceMetadataLabel(node: NodeInfo, config: QueryConfiguration): string | undefined {
+  return workspaceAliasFromMetadata(node) ?? config.workspace;
+}
+
+function rangeMetadataItem(config: QueryRangeConfiguration, range: boolean): MetadataItem | undefined {
+  if (range) {
+    return metadataItem("clock", startMetadataLabel(config.start));
   }
 
-  return items.slice(0, MAX_METADATA_ITEMS);
+  return metadataItem("globe", config.region);
+}
+
+function startMetadataLabel(start: string | undefined): string | undefined {
+  if (!start) {
+    return undefined;
+  }
+
+  return `Start: ${start}`;
+}
+
+function metadataItem(icon: MetadataItem["icon"], label: string | undefined): MetadataItem | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  return { icon, label };
+}
+
+function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+  return item !== undefined;
 }
 
 export function queryDetails(
