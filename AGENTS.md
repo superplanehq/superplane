@@ -25,6 +25,7 @@
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
 - For E2E test authoring, see [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
+- For performance profiling of the dev server, see [docs/contributing/profiling.md](docs/contributing/profiling.md)
 - After updating UI code, always run `make check.build.ui` to verify everything is correct
 - After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
 - After editing Golang code, always run `make format.go` to make sure that files are consistently formatted

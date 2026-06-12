@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -200,6 +200,19 @@ check.coverage.go:
 
 check.coverage.go.baseline.update:
 	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out --update-baseline
+
+#
+# Performance profiling against the running dev server (PPROF_ENABLED=yes).
+# See docs/contributing/profiling.md
+#
+profile.cpu:
+	$(COMPOSE) exec app go tool pprof -top "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/profile?seconds=$${SECONDS:-30}"
+
+profile.heap:
+	$(COMPOSE) exec app go tool pprof -top "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/heap"
+
+profile.goroutines:
+	$(COMPOSE) exec app curl -s "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/goroutine?debug=2"
 
 
 storybook:
