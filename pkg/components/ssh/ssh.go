@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -19,6 +21,15 @@ const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
 )
+
+const (
+	CommandSourceInline = "inline"
+	CommandSourceFile   = "file"
+)
+
+// Cap the size of a command file we are willing to load over SSH so that a
+// runaway script cannot blow up worker memory or push past shell argv limits.
+const maxCommandFileSize = 256 * 1024
 
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
@@ -54,7 +65,9 @@ type Spec struct {
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"username" mapstructure:"username"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
+	CommandSource    string                `json:"commandSource,omitempty" mapstructure:"commandSource"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
+	CommandFile      string                `json:"commandFile,omitempty" mapstructure:"commandFile"`
 	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -62,12 +75,31 @@ type Spec struct {
 	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
 }
 
+// commandSourceOrDefault returns the command source for the spec. A truly
+// unset (empty or whitespace-only) value defaults to inline so nodes saved
+// before the file feature keep working. Any other value is returned verbatim
+// and must match a known source exactly. We must NOT trim a non-empty value:
+// the UI evaluates the commandFile/commands visibility and required conditions
+// with an exact string comparison, so a padded value like "\tfile\n" would be
+// treated as hidden there (dropping commandFile from the saved payload) while a
+// trimmed value here would still run in file mode on the worker. Returning the
+// value verbatim keeps both sides in agreement and makes a padded value fail
+// loudly as an invalid command source instead of silently losing the path.
+func (s Spec) commandSourceOrDefault() string {
+	if strings.TrimSpace(s.CommandSource) == "" {
+		return CommandSourceInline
+	}
+	return s.CommandSource
+}
+
 type ExecutionMetadata struct {
 	Result           *CommandResult        `json:"result" mapstructure:"result"`
 	Host             string                `json:"host" mapstructure:"host"`
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"user" mapstructure:"user"`
+	CommandSource    string                `json:"commandSource" mapstructure:"commandSource"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
+	CommandFile      string                `json:"commandFile" mapstructure:"commandFile"`
 	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -104,7 +136,9 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ## Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
-- **Commands**: One or more commands to run, one per line (supports expressions). The output payload is based on the last command.
+- **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
+- **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
+- **Command file** (file mode): Path to a file in the Files tab.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
@@ -213,17 +247,44 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "commands",
-			Label:       "Commands",
-			Type:        configuration.FieldTypeText,
-			Description: "One or more commands to run on the remote host, one per line",
-			Placeholder: "e.g. echo hello\nls -la /tmp",
+			Name:        "commandSource",
+			Label:       "Command source",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Where the commands come from",
 			Required:    true,
+			Default:     CommandSourceInline,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Inline", Value: CommandSourceInline, Description: "Type commands directly into the node"},
+						{Label: "From file", Value: CommandSourceFile, Description: "Load commands from a file in the app's repository"},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "commands",
+			Label:                "Commands",
+			Type:                 configuration.FieldTypeText,
+			Description:          "One or more commands to run on the remote host, one per line",
+			Placeholder:          "e.g. echo hello\nls -la /tmp",
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
 					Language: "shell",
 				},
 			},
+		},
+		{
+			Name:                 "commandFile",
+			Label:                "Command file",
+			Type:                 configuration.FieldTypeRepositoryFile,
+			Description:          "Path to a file in the app's repository whose contents are run as the SSH command (e.g. scripts/deploy.sh). The file is run verbatim through bash -lc on the remote host, so multi-line scripts, shebangs, comments, and bash features (pipefail, declare -A, process substitution) all work. {{ ... }} syntax inside the script (Docker inspect, Helm, Go templates) is preserved. Use Environment variables below to inject values from upstream nodes.",
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
 		},
 		{
 			Name:        "workingDirectory",
@@ -379,8 +440,8 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.User == "" {
 		return errors.New("username is required")
 	}
-	if strings.TrimSpace(spec.Commands) == "" {
-		return errors.New("commands is required")
+	if err := validateCommandSource(ctx, spec); err != nil {
+		return err
 	}
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
@@ -435,9 +496,13 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(spec.Commands) == "" {
-		return errors.New("commands is required")
+
+	source := spec.commandSourceOrDefault()
+	resolvedCommands, err := resolveCommands(ctx, spec, source)
+	if err != nil {
+		return err
 	}
+
 	for _, variable := range spec.Environment {
 		if variable.Name == "" {
 			return errors.New("environment variable name is required")
@@ -451,7 +516,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Host:             spec.Host,
 		Port:             spec.Port,
 		User:             spec.User,
-		Commands:         spec.Commands,
+		CommandSource:    source,
+		Commands:         resolvedCommands,
+		CommandFile:      spec.CommandFile,
 		WorkingDirectory: spec.WorkingDirectory,
 		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
@@ -482,6 +549,66 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return c.executeSSH(execCtx)
+}
+
+// resolveCommands returns the literal command string to run. Inline mode uses
+// the configured commands, which are already template-resolved by the queue
+// worker. File mode reads the file at execution time and returns its content
+// verbatim: shell scripts frequently embed their own {{ ... }} syntax (Docker
+// inspect format strings, Helm/Go templates, kubectl jsonpath, etc.) that must
+// not be evaluated as SuperPlane expressions. To inject upstream values into a
+// file-backed script, use the Environment variables field — those values do
+// support {{ ... }} expressions at queue time and become regular env vars in
+// the script.
+func resolveCommands(ctx core.ExecutionContext, spec Spec, source string) (string, error) {
+	switch source {
+	case CommandSourceInline:
+		if strings.TrimSpace(spec.Commands) == "" {
+			return "", errors.New("commands is required")
+		}
+		return spec.Commands, nil
+
+	case CommandSourceFile:
+		return loadCommandFile(ctx.Files, spec.CommandFile)
+
+	default:
+		return "", fmt.Errorf("invalid command source: %s", spec.CommandSource)
+	}
+}
+
+// loadCommandFile reads, size-limits, and validates the command file referenced
+// by rawPath, returning its content verbatim. It rejects empty or
+// whitespace-only files so both Setup (publish time) and Execute (run time)
+// agree on what counts as a runnable script.
+func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string, error) {
+	path := strings.TrimSpace(rawPath)
+	if path == "" {
+		return "", errors.New("command file is required")
+	}
+	normalized, err := gitprovider.ValidateUserPath(path)
+	if err != nil {
+		return "", fmt.Errorf("invalid command file %q: %w", path, err)
+	}
+	if files == nil {
+		return "", errors.New("command file configured but file access is not available")
+	}
+	reader, err := files.Read(normalized)
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(io.LimitReader(reader, maxCommandFileSize+1))
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	if len(data) > maxCommandFileSize {
+		return "", fmt.Errorf("command file %q exceeds maximum size of %d bytes", path, maxCommandFileSize)
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return "", fmt.Errorf("command file %q is empty", path)
+	}
+	return string(data), nil
 }
 
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
@@ -527,16 +654,10 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	commandToExecute := buildCombinedCommands(ctx.execMetadata.Commands)
-	if commandToExecute == "" {
-		return errors.New("commands is required")
+	command, err := c.buildExecutionCommand(ctx.execMetadata)
+	if err != nil {
+		return err
 	}
-
-	command := c.buildRemoteCommand(
-		ctx.execMetadata.WorkingDirectory,
-		ctx.execMetadata.Environment,
-		commandToExecute,
-	)
 	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
 		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, c.getRetryAttempt(ctx.metadataCtx)) {
@@ -711,6 +832,101 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	}
 
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
+}
+
+// buildExecutionCommand assembles the final command sent to the remote host.
+// Inline mode keeps the long-standing behavior of stripping blank lines and
+// joining the rest with `&&` so a list of one-liners runs as a chain. File
+// mode preserves the script verbatim and wraps it in `bash -lc`: shell
+// scripts frequently rely on multi-line constructs (if/while/for, here-docs,
+// process substitution), shebangs, line comments, and bash-only features
+// (pipefail, declare -A) that the &&-join would destroy.
+func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata) (string, error) {
+	if metadata.CommandSource == CommandSourceFile {
+		return c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands), nil
+	}
+
+	combined := buildCombinedCommands(metadata.Commands)
+	if combined == "" {
+		return "", errors.New("commands is required")
+	}
+	return c.buildRemoteCommand(metadata.WorkingDirectory, metadata.Environment, combined), nil
+}
+
+// buildScriptCommand wraps a multi-line shell script in a single `bash -lc`
+// invocation so it behaves the same as if it were pasted into an interactive
+// SSH session. The working-directory change is placed on its own line ahead
+// of the script (followed by `|| exit 1`) so a leading shebang or comment in
+// the script cannot swallow the `cd` via `#`-to-end-of-line.
+func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) string {
+	finalScript := script
+	if workingDirectory != "" {
+		finalScript = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
+	}
+
+	wrapped := fmt.Sprintf("bash -lc %s", shellQuote(finalScript))
+
+	if len(environment) == 0 {
+		return wrapped
+	}
+
+	envAssignments := make([]string, 0, len(environment))
+	for _, variable := range environment {
+		envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
+	}
+
+	return fmt.Sprintf("env %s %s", strings.Join(envAssignments, " "), wrapped)
+}
+
+// validateCommandSource enforces the configured command-source variant.
+// Inline mode requires a non-empty commands string. File mode requires a path
+// that resolves to a real file in the canvas's git repository so Setup catches
+// typos at publish time instead of at every execution.
+func validateCommandSource(ctx core.SetupContext, spec Spec) error {
+	switch spec.commandSourceOrDefault() {
+	case CommandSourceInline:
+		if strings.TrimSpace(spec.Commands) == "" {
+			return errors.New("commands is required")
+		}
+		return nil
+
+	case CommandSourceFile:
+		path := strings.TrimSpace(spec.CommandFile)
+		if path == "" {
+			return errors.New("command file is required")
+		}
+		normalized, err := gitprovider.ValidateUserPath(path)
+		if err != nil {
+			return fmt.Errorf("invalid command file %q: %w", path, err)
+		}
+		if ctx.Files == nil {
+			return errors.New("command file configured but file access is not available")
+		}
+		available, err := ctx.Files.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %w", err)
+		}
+		found := false
+		for _, candidate := range available {
+			if norm, normErr := gitprovider.NormalizePath(candidate); normErr == nil && norm == normalized {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("command file %q not found in app repository", path)
+		}
+		// The file exists; read it now so publish fails fast on empty or
+		// whitespace-only scripts instead of letting every execution fail
+		// with an empty-file error.
+		if _, err := loadCommandFile(ctx.Files, spec.CommandFile); err != nil {
+			return err
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("invalid command source: %s", spec.CommandSource)
+	}
 }
 
 func buildCombinedCommands(commands string) string {

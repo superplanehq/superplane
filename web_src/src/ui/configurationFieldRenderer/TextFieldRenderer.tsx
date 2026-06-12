@@ -12,6 +12,35 @@ import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomple
 
 const PLAIN_TEXT_MIN_HEIGHT_PX = 120;
 
+const CODE_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: "on" as const,
+  wordWrap: "on" as const,
+  folding: false,
+  autoIndent: "none" as const,
+  formatOnPaste: false,
+  formatOnType: false,
+  tabSize: 2,
+  insertSpaces: true,
+  scrollBeyondLastLine: false,
+  renderWhitespace: "boundary" as const,
+  smoothScrolling: true,
+  cursorBlinking: "smooth" as const,
+  contextmenu: true,
+  selectOnLineNumbers: true,
+  bracketPairColorization: {
+    enabled: true,
+  },
+  suggestOnTriggerCharacters: true,
+  quickSuggestions: {
+    other: true,
+    strings: true,
+    comments: false,
+  },
+  wordBasedSuggestions: "off" as const,
+};
+
 function resolveTextFieldLanguage(field: FieldRendererProps["field"]): string | undefined {
   const language = field.typeOptions?.text?.language?.trim();
   return language || undefined;
@@ -103,35 +132,6 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
     onChange(valueToUse || undefined);
   };
 
-  const editorOptions = {
-    minimap: { enabled: false },
-    fontSize: 13,
-    lineNumbers: "on" as const,
-    wordWrap: "on" as const,
-    folding: false,
-    autoIndent: "none" as const,
-    formatOnPaste: false,
-    formatOnType: false,
-    tabSize: 2,
-    insertSpaces: true,
-    scrollBeyondLastLine: false,
-    renderWhitespace: "boundary" as const,
-    smoothScrolling: true,
-    cursorBlinking: "smooth" as const,
-    contextmenu: true,
-    selectOnLineNumbers: true,
-    bracketPairColorization: {
-      enabled: true,
-    },
-    suggestOnTriggerCharacters: true,
-    quickSuggestions: {
-      other: true,
-      strings: true,
-      comments: false,
-    },
-    wordBasedSuggestions: "off" as const,
-  };
-
   return (
     <>
       <div className="flex flex-col gap-2 relative">
@@ -155,7 +155,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             theme="vs"
-            options={editorOptions}
+            options={CODE_EDITOR_OPTIONS}
           />
         </div>
       </div>
@@ -194,7 +194,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
               onMount={handleEditorMount}
               theme="vs"
               options={{
-                ...editorOptions,
+                ...CODE_EDITOR_OPTIONS,
                 automaticLayout: true,
               }}
             />
