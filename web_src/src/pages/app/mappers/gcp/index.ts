@@ -36,6 +36,14 @@ import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
 import { deleteImageMapper } from "./delete_image";
 import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
+import {
+  createInstanceMapper,
+  getInstanceMapper,
+  deleteInstanceMapper,
+  CLOUDSQL_CREATED_STATE_REGISTRY,
+  CLOUDSQL_FETCHED_STATE_REGISTRY,
+  CLOUDSQL_DELETED_STATE_REGISTRY,
+} from "./cloudsql_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: computeBaseMapper,
@@ -70,6 +78,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "compute.createStaticIP": createStaticIPMapper,
   "compute.deleteStaticIP": deleteStaticIPMapper,
   "compute.manageStaticIP": manageStaticIPMapper,
+  "cloudsql.createInstance": createInstanceMapper,
+  "cloudsql.getInstance": getInstanceMapper,
+  "cloudsql.deleteInstance": deleteInstanceMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -114,6 +125,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "compute.createStaticIP": buildActionStateRegistry("completed"),
   "compute.deleteStaticIP": buildActionStateRegistry("completed"),
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
+  "cloudsql.createInstance": CLOUDSQL_CREATED_STATE_REGISTRY,
+  "cloudsql.getInstance": CLOUDSQL_FETCHED_STATE_REGISTRY,
+  "cloudsql.deleteInstance": CLOUDSQL_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};
