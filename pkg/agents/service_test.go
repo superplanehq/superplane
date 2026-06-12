@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -128,8 +127,7 @@ func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.P
 
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
 	t.Helper()
-	signer := jwt.NewSigner("test-secret")
-	return agents.NewService(provider, r.AuthService, signer, "https://api.test.local")
+	return agents.NewService(provider, r.AuthService)
 }
 
 func setupCanvasForUser(t *testing.T, r *support.ResourceRegistry) *models.Canvas {
@@ -462,23 +460,25 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
-	assert.Contains(t, provider.lastPreamble, "api_token:")
-	assert.Contains(t, provider.lastPreamble, "api_token_expires_at:")
-	assert.Contains(t, provider.lastPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
-	assert.Contains(t, provider.lastPreamble, "Do not run `superplane version` as a preflight.")
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
-	assert.Contains(t, provider.lastPreamble, "GET /api/v1/canvases/{canvas_id}/console")
+	assert.Contains(t, provider.lastPreamble, "All SuperPlane access goes through the agent tools.")
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
+	// The agent must never receive a usable API/CLI credential; everything
+	// goes through the server-side tools.
+	assert.NotContains(t, provider.lastPreamble, "api_token:")
+	assert.NotContains(t, provider.lastPreamble, "api_base_url:")
+	assert.NotContains(t, provider.lastPreamble, "SUPERPLANE_TOKEN")
+	assert.NotContains(t, provider.lastPreamble, "superplane version")
 
 	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastPreamble, "api_token:",
-		"a fresh api_token must be re-injected on every turn so the session never expires mid-conversation")
+	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
+		"the session context must be re-injected on every turn")
 }
 
 func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
@@ -499,7 +499,7 @@ func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry")
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastPreamble, "api_token:",
+	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
 		"preamble must still be injected after the previous attempt failed at the provider")
 }
 
@@ -524,12 +524,11 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 		3,
 	)
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Prefer 'superplane_app' action 'update_draft'")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps console set ... -f console.yaml --draft-id <draft-id>")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'update_draft'")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
+	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
+	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps")
 }
 
 func TestService_SendMessage_PrivateToUser(t *testing.T) {

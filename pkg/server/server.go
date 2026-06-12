@@ -58,10 +58,10 @@ func getAgentProviderOverride() agents.Provider {
 	return agentProviderOverride.provider
 }
 
-func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
 	if provider := getAgentProviderOverride(); provider != nil {
 		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+		return provider, agents.NewService(provider, authService)
 	}
 
 	cfg := config.LoadAnthropicAgentConfig()
@@ -101,7 +101,7 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		return nil, nil
 	}
 
-	service := agents.NewService(provider, authService, jwtSigner, baseURL)
+	service := agents.NewService(provider, authService)
 	log.Info("Anthropic managed agents enabled")
 	return provider, service
 }
@@ -560,7 +560,7 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
-	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
+	agentProvider, agentService := buildAgentService(authService)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(
