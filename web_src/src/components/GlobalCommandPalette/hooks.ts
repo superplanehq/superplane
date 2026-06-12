@@ -8,7 +8,7 @@ import { isEditableTarget } from "./route";
 import type { CommandPage } from "./types";
 
 export function usePalettePermissions(organizationId: string | null) {
-  const { data: me, isLoading } = useMe();
+  const { data: me, isLoading } = useMe(true, organizationId);
 
   const permissionSet = useMemo(() => toPermissionSet(me?.permissions ?? []), [me?.permissions]);
 
