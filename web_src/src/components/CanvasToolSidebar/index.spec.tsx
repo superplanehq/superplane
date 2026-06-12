@@ -7,16 +7,13 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, chatState, draftActionState } = vi.hoisted(() => ({
+const { sendMutation, chatState } = vi.hoisted(() => ({
   sendMutation: {
     isPending: false,
     mutateAsync: vi.fn(),
   },
   chatState: {
     status: "idle",
-  },
-  draftActionState: {
-    latestDraft: null as { type: "draft-actions"; versionId: string; message?: string } | null,
   },
 }));
 
@@ -63,13 +60,6 @@ vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
   useAgentSessionWebsocket: () => undefined,
 }));
 
-vi.mock("@/components/AgentSidebar/useDraftActions", () => ({
-  useDraftActions: () => ({
-    latestDraft: draftActionState.latestDraft,
-    dismiss: vi.fn(),
-  }),
-}));
-
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
   RichMessage: ({ content }: { content: string }) => {
     richMessageRenderSpy();
@@ -99,7 +89,6 @@ describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
     chatState.status = "idle";
-    draftActionState.latestDraft = null;
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
@@ -147,29 +136,6 @@ describe("CanvasToolSidebar", () => {
     window.dispatchEvent(new CustomEvent(CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT, { detail: { tab: "agent" } }));
 
     expect(openToolSidebar).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not dispatch draft ready again after the agent tab remounts", async () => {
-    const onDraftReady = vi.fn();
-    draftActionState.latestDraft = {
-      type: "draft-actions",
-      versionId: "draft-remount-test",
-      message: "Changes ready",
-    };
-    window.addEventListener("agent:draft-ready", onDraftReady);
-
-    const { rerender } = render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
-
-    await screen.findByText("Changes ready");
-    expect(onDraftReady).toHaveBeenCalledTimes(1);
-
-    rerender(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false })} />);
-    rerender(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
-
-    await screen.findByText("Changes ready");
-    expect(onDraftReady).toHaveBeenCalledTimes(1);
-
-    window.removeEventListener("agent:draft-ready", onDraftReady);
   });
 
   it("does not re-render agent messages while typing in the composer", async () => {

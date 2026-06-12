@@ -64,22 +64,6 @@ type ConversationHandlers = {
   handleStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => Promise<void>;
 };
 
-const autoOpenedDraftKeys = new Set<string>();
-
-function draftAutoOpenKey(canvasId: string, versionId: string): string {
-  return `${canvasId}:${versionId}`;
-}
-
-function shouldDispatchDraftReady(canvasId: string, versionId: string): boolean {
-  const key = draftAutoOpenKey(canvasId, versionId);
-  if (autoOpenedDraftKeys.has(key)) {
-    return false;
-  }
-
-  autoOpenedDraftKeys.add(key);
-  return true;
-}
-
 export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasToolSidebarState }) {
   const canvasId = toolSidebarState.canvasId ?? "";
   const organizationId = toolSidebarState.organizationId ?? "";
@@ -400,10 +384,6 @@ function DraftActionsBar({
 
   useEffect(() => {
     if (!latestDraft) {
-      return;
-    }
-
-    if (!shouldDispatchDraftReady(canvasId, latestDraft.versionId)) {
       return;
     }
 
