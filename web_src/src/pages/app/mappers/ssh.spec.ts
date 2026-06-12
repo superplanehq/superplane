@@ -140,6 +140,21 @@ describe("sshMapper metadata preview", () => {
     expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
   });
 
+  it("shows the file path when commandSource has surrounding whitespace (matches backend trimming)", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commandSource: "\tfile\n",
+      commandFile: "scripts/deploy.sh",
+      commands: "stale inline value that should be hidden",
+    });
+
+    const props = sshMapper.props(buildComponentCtx(node));
+
+    expect(props.metadata).toContainEqual({ icon: "file-code", label: "scripts/deploy.sh" });
+    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
+  });
+
   it("falls back to inline preview when commandSource is missing (legacy nodes)", () => {
     const node = buildNode({
       host: "example.com",

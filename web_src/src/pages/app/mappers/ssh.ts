@@ -238,7 +238,10 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
 
   // A blank/unset commandSource is treated as "inline" for backward
   // compatibility with nodes saved before the file source was introduced.
-  const source: SSHCommandSource = config?.commandSource === "file" ? "file" : "inline";
+  // The backend trims this field before selecting file mode, so values like
+  // "file " or "\tfile\n" run from the repository file on the worker; trim
+  // here too so the node chip preview stays in sync with what actually runs.
+  const source: SSHCommandSource = config?.commandSource?.trim() === "file" ? "file" : "inline";
 
   if (source === "file" && config?.commandFile) {
     metadata.push({
