@@ -45,7 +45,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const [page, setPage] = useState<CommandPage>("root");
   const [search, setSearch] = useState("");
   const shortcutModifier = useShortcutModifierLabel();
-  const data = useCommandPaletteData(route.organizationId, route.canvasId, !!account);
+  const data = useCommandPaletteData(route.organizationId, route.canvasId);
   const closePalette = useClosePalette(setOpen, setPage, setSearch);
   const canvasNodeSearchProvider = useCanvasNodeSearchProvider();
   const navigation = usePaletteNavigation(closePalette, navigate);
@@ -106,17 +106,13 @@ type PaletteData = {
   usageEnabled: boolean;
 };
 
-function useCommandPaletteData(
-  organizationId: string | null,
-  canvasId: string | null,
-  hasAccount: boolean,
-): PaletteData {
+function useCommandPaletteData(organizationId: string | null, canvasId: string | null): PaletteData {
   const queryOrganizationId = organizationId ?? "";
   const hasOrganization = organizationId !== null;
   const { data: organization } = useOrganization(queryOrganizationId);
   const { data: usageStatus, error: usageError } = useOrganizationUsage(queryOrganizationId, hasOrganization);
   const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId);
-  const permissionState = usePalettePermissions(organizationId, hasAccount);
+  const permissionState = usePalettePermissions(organizationId);
   const createCanvasMutation = useCreateCanvas(queryOrganizationId);
   const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");

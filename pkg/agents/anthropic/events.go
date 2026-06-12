@@ -216,8 +216,9 @@ func joinText(blocks []anthropicContentBlock) string {
 	return strings.Join(parts, "")
 }
 
-// JWTs are the only secret shape we inject into the preamble today; the
-// agent shouldn't be echoing them back through bash or assistant text.
+// Defense in depth: the agent is no longer handed any credential, but if a
+// JWT-shaped secret ever surfaces in tool output or assistant text we still
+// redact it rather than relay it to the user.
 var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`)
 
 func redactSensitive(s string) string {

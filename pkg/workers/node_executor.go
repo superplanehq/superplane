@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -11,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -168,6 +170,30 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
+	//
+	// For every execution we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, action_error, internal
+	// - component: the component name of the node
+	//
+	start := time.Now()
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	metricComponent := "unknown"
+	defer func() {
+		telemetry.RecordExecutorWorkerExecution(
+			context.Background(),
+			time.Since(start),
+			metricOutcome,
+			metricReason,
+			metricComponent,
+		)
+	}()
+
+	//
+	// We track the events produced by the component execution,
+	// so we can publish RabbitMQ messages for them.
+	//
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
@@ -196,10 +222,32 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		execution, err := models.LockPendingNodeExecutionInActiveCanvas(tx, id)
 		if err != nil {
 			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, execution, onNewEvents)
+		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(err, nil)
+			return err
+		}
+
+		metricComponent = node.ComponentName()
+		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
+		if processErr != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(processErr, execution)
+			return processErr
+		}
+
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(nil, execution)
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -213,12 +261,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
-	if err != nil {
-		return err
-	}
-
+func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	if node.Type == models.NodeTypeBlueprint {
 		return w.executeBlueprintNode(tx, execution, node, onNewEvents)
 	}
@@ -411,4 +454,90 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+const (
+	executorOutcomeSuccess = "success"
+	executorOutcomeFailed  = "failed"
+	executorOutcomeSkipped = "skipped"
+
+	executorReasonNone     = "none"
+	executorReasonLocked   = "locked"
+	executorReasonDeadlock = "deadlock"
+	executorReasonNotFound = "not_found"
+	executorReasonInternal = "internal"
+)
+
+func classifyProcessError(err error) string {
+	if err == nil {
+		return executorReasonNone
+	}
+
+	if errors.Is(err, ErrRecordLocked) {
+		return executorReasonLocked
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return executorReasonNotFound
+	}
+
+	if isDeadlockError(err) {
+		return executorReasonDeadlock
+	}
+
+	return executorReasonInternal
+}
+
+func classifyAttemptFailure(err error, execution *models.CanvasNodeExecution) string {
+	if err == nil {
+		if execution == nil {
+			return executorReasonNone
+		}
+		return classifyExecutionFailure(execution)
+	}
+
+	if reason := classifyProcessError(err); reason != executorReasonInternal {
+		return reason
+	}
+
+	if execution != nil {
+		if isDeadlockMessage(execution.ResultMessage) {
+			return executorReasonDeadlock
+		}
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			return classifyExecutionFailure(execution)
+		}
+	}
+
+	return executorReasonInternal
+}
+
+func classifyExecutionFailure(execution *models.CanvasNodeExecution) string {
+	if execution.Result != models.CanvasNodeExecutionResultFailed {
+		return executorReasonNone
+	}
+
+	if isDeadlockMessage(execution.ResultMessage) {
+		return executorReasonDeadlock
+	}
+
+	return execution.ResultReason
+}
+
+func isDeadlockError(err error) bool {
+	for err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "40P01" {
+			return true
+		}
+		if isDeadlockMessage(err.Error()) {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
+func isDeadlockMessage(message string) bool {
+	return strings.Contains(message, "deadlock detected") || strings.Contains(message, "40P01")
 }

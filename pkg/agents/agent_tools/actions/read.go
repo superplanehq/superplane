@@ -12,13 +12,19 @@ import (
 
 const readActionName = "read"
 
-type readAction struct{}
+type readAction struct {
+	deps Dependencies
+}
+
+func newReadAction(deps Dependencies) readAction {
+	return readAction{deps: deps}
+}
 
 func (readAction) Name() string {
 	return readActionName
 }
 
-func (readAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
+func (a readAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return readResult{}, fmt.Errorf("invalid session canvas id: %w", err)
@@ -43,7 +49,10 @@ func (readAction) Execute(ctx context.Context, session agents.AgentSessionContex
 		}
 	}
 
-	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.CanvasYAMLRepositoryPath)
+	// Read the effective staged content (staged edits when present, the
+	// materialized version row otherwise) so the agent observes the same draft
+	// state the UI edits and the same edits it stages through update_draft.
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.CanvasYAMLRepositoryPath)
 	if err != nil {
 		return readResult{}, fmt.Errorf("read canvas yaml: %w", err)
 	}
@@ -58,7 +67,7 @@ func (readAction) Execute(ctx context.Context, session agents.AgentSessionContex
 		CanvasID:   session.CanvasID,
 		Source:     source,
 		VersionID:  versionID,
-		Summary:    summarizeCanvasVersion(canvas, version),
+		Summary:    a.summarize(session.OrganizationID, canvas, version, source, canvasYAML),
 		CanvasYAML: canvasYAML,
 	}
 
@@ -71,7 +80,7 @@ func (readAction) Execute(ctx context.Context, session agents.AgentSessionContex
 	}
 
 	if input.IncludeConsole {
-		consoleYAML, consoleErr := canvasRepository.ReadRepositorySpecFile(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.ConsoleYAMLRepositoryPath)
+		consoleYAML, consoleErr := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.ConsoleYAMLRepositoryPath)
 		if consoleErr != nil {
 			return readResult{}, fmt.Errorf("read console yaml: %w", consoleErr)
 		}
@@ -87,6 +96,31 @@ func (readAction) Execute(ctx context.Context, session agents.AgentSessionContex
 	}
 
 	return result, nil
+}
+
+// summarize derives the canvas summary from the YAML the read returns. A draft
+// read serves effective staged YAML, which staging never materializes into the
+// version row, so the summary is parsed from that YAML. A live read keeps the
+// materialized version-row summary and falls back to it when staged YAML cannot
+// be parsed (for example after the UI stages content the agent never validated).
+func (a readAction) summarize(organizationID string, canvas *models.Canvas, version *models.CanvasVersion, source, canvasYAML string) summary {
+	if source != "draft" {
+		return summarizeCanvasVersion(canvas, version)
+	}
+
+	nodes, edges, err := canvasRepository.ParseAndValidateCanvasYAML(a.deps.Registry, organizationID, canvasYAML)
+	if err != nil {
+		return summarizeCanvasVersion(canvas, version)
+	}
+
+	name := ""
+	if canvas != nil {
+		name = canvas.Name
+	}
+	if name == "" && version != nil {
+		name = version.Name
+	}
+	return summarizeParsedCanvas(name, nodes, edges)
 }
 
 func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) (*models.CanvasVersion, error) {

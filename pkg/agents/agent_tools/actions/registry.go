@@ -37,7 +37,7 @@ type Registry struct {
 func NewDefaultRegistry(deps Dependencies) *Registry {
 	return NewRegistry(
 		newAccessAction(deps),
-		readAction{},
+		newReadAction(deps),
 		newReadRuntimeAction(deps),
 		newUpdateDraftAction(deps),
 		listIntegrationsAction{},
