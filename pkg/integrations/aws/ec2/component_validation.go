@@ -121,3 +121,48 @@ func requireThreshold(configuration any, threshold float64) (float64, error) {
 
 	return threshold, nil
 }
+
+func requireAllocationID(value string) (string, error) {
+	allocationID := strings.TrimSpace(value)
+	if allocationID == "" {
+		return "", fmt.Errorf("allocation ID is required")
+	}
+
+	return allocationID, nil
+}
+
+func requireAssociationID(value string) (string, error) {
+	associationID := strings.TrimSpace(value)
+	if associationID == "" {
+		return "", fmt.Errorf("association ID is required")
+	}
+
+	return associationID, nil
+}
+
+func requirePublicIPv4Pool(value string) (string, error) {
+	poolID := strings.TrimSpace(value)
+	if poolID == "" {
+		return "", fmt.Errorf("public IPv4 pool is required")
+	}
+
+	return poolID, nil
+}
+
+func requireCustomerOwnedIPv4Pool(value string) (string, error) {
+	poolID := strings.TrimSpace(value)
+	if poolID == "" {
+		return "", fmt.Errorf("customer-owned pool is required")
+	}
+
+	return poolID, nil
+}
+
+func requireIpamPoolID(value string) (string, error) {
+	poolID := strings.TrimSpace(value)
+	if poolID == "" {
+		return "", fmt.Errorf("IPAM pool is required")
+	}
+
+	return poolID, nil
+}

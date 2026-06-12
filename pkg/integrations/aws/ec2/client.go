@@ -25,16 +25,21 @@ import (
 )
 
 const (
-	ec2ServiceName        = "ec2"
-	ssmServiceName        = "ssm"
-	cloudWatchServiceName = "monitoring"
-	ssmTargetPrefix       = "AmazonSSM."
-	ec2APIVersion         = "2016-11-15"
-	cloudWatchAPIVersion  = "2010-08-01"
-	ResourceTypeImageOS   = "ec2.imageOS"
-	maxPublicImagesPerOS  = 200
-	defaultUbuntuImages   = 12
-	defaultDebianImages   = 8
+	ec2ServiceName                    = "ec2"
+	ssmServiceName                    = "ssm"
+	cloudWatchServiceName             = "monitoring"
+	ssmTargetPrefix                   = "AmazonSSM."
+	ec2APIVersion                     = "2016-11-15"
+	cloudWatchAPIVersion              = "2010-08-01"
+	ResourceTypeImageOS               = "ec2.imageOS"
+	ResourceTypeElasticIP             = "ec2.elasticIp"
+	ResourceTypeElasticIPAssociation  = "ec2.elasticIpAssociation"
+	ResourceTypePublicIPv4Pool        = "ec2.publicIpv4Pool"
+	ResourceTypeCustomerOwnedIPv4Pool = "ec2.customerOwnedIpv4Pool"
+	ResourceTypeIpamPool              = "ec2.ipamPool"
+	maxPublicImagesPerOS              = 200
+	defaultUbuntuImages               = 12
+	defaultDebianImages               = 8
 )
 
 type Client struct {
@@ -153,6 +158,62 @@ type StartInstancesOutput struct {
 	RequestID  string `json:"requestId" mapstructure:"requestId"`
 	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
 	State      string `json:"state" mapstructure:"state"`
+}
+
+type AllocateAddressInput struct {
+	PublicIPv4Pool        string
+	CustomerOwnedIPv4Pool string
+	IpamPoolID            string
+	Address               string
+	Tags                  []common.Tag
+}
+
+type AllocateAddressOutput struct {
+	RequestID    string `json:"requestId,omitempty" mapstructure:"requestId"`
+	AllocationID string `json:"allocationId" mapstructure:"allocationId"`
+	PublicIP     string `json:"publicIp" mapstructure:"publicIp"`
+	Domain       string `json:"domain" mapstructure:"domain"`
+	Region       string `json:"region" mapstructure:"region"`
+}
+
+type AssociateAddressInput struct {
+	AllocationID       string
+	InstanceID         string
+	NetworkInterfaceID string
+	AllowReassociation bool
+}
+
+type AssociateAddressOutput struct {
+	RequestID     string `json:"requestId,omitempty" mapstructure:"requestId"`
+	AssociationID string `json:"associationId" mapstructure:"associationId"`
+	Region        string `json:"region" mapstructure:"region"`
+}
+
+type ElasticIP struct {
+	AllocationID  string `json:"allocationId" mapstructure:"allocationId"`
+	AssociationID string `json:"associationId,omitempty" mapstructure:"associationId"`
+	PublicIP      string `json:"publicIp" mapstructure:"publicIp"`
+	InstanceID    string `json:"instanceId,omitempty" mapstructure:"instanceId"`
+	Domain        string `json:"domain" mapstructure:"domain"`
+}
+
+type PublicIPv4Pool struct {
+	PoolID      string `json:"poolId" mapstructure:"poolId"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
+}
+
+type CustomerOwnedIPv4Pool struct {
+	PoolID                   string `json:"poolId" mapstructure:"poolId"`
+	LocalGatewayRouteTableID string `json:"localGatewayRouteTableId,omitempty" mapstructure:"localGatewayRouteTableId"`
+}
+
+type IpamPool struct {
+	PoolID                 string `json:"ipamPoolId" mapstructure:"ipamPoolId"`
+	Description            string `json:"description,omitempty" mapstructure:"description"`
+	AddressFamily          string `json:"addressFamily" mapstructure:"addressFamily"`
+	PubliclyAdvertisable   bool   `json:"publiclyAdvertisable" mapstructure:"publiclyAdvertisable"`
+	Locale                 string `json:"locale,omitempty" mapstructure:"locale"`
+	AllocationResourceType string `json:"allocationResourceType,omitempty" mapstructure:"allocationResourceType"`
 }
 
 type CreateImageInput struct {
@@ -696,6 +757,279 @@ func (c *Client) StartInstances(instanceID string) (*StartInstancesOutput, error
 		InstanceID: instance.InstanceID,
 		State:      instance.CurrentState.Name,
 	}, nil
+}
+
+func (c *Client) AllocateAddress(input AllocateAddressInput) (*AllocateAddressOutput, error) {
+	params := url.Values{}
+	params.Set("Domain", "vpc")
+
+	if pool := strings.TrimSpace(input.PublicIPv4Pool); pool != "" {
+		params.Set("PublicIpv4Pool", pool)
+	}
+	if pool := strings.TrimSpace(input.CustomerOwnedIPv4Pool); pool != "" {
+		params.Set("CustomerOwnedIpv4Pool", pool)
+	}
+	if pool := strings.TrimSpace(input.IpamPoolID); pool != "" {
+		params.Set("IpamPoolId", pool)
+	}
+	if address := strings.TrimSpace(input.Address); address != "" {
+		params.Set("Address", address)
+	}
+	if len(input.Tags) > 0 {
+		params.Set("TagSpecification.1.ResourceType", "elastic-ip")
+		for i, tag := range input.Tags {
+			prefix := fmt.Sprintf("TagSpecification.1.Tag.%d.", i+1)
+			params.Set(prefix+"Key", tag.Key)
+			params.Set(prefix+"Value", tag.Value)
+		}
+	}
+
+	response := allocateAddressResponse{}
+	if err := c.postForm("AllocateAddress", params, &response); err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(response.AllocationID) == "" {
+		return nil, fmt.Errorf("response did not include allocation ID")
+	}
+
+	return &AllocateAddressOutput{
+		RequestID:    response.RequestID,
+		AllocationID: response.AllocationID,
+		PublicIP:     response.PublicIP,
+		Domain:       response.Domain,
+		Region:       c.region,
+	}, nil
+}
+
+func (c *Client) ReleaseAddress(allocationID string) error {
+	params := url.Values{}
+	params.Set("AllocationId", strings.TrimSpace(allocationID))
+
+	response := releaseAddressResponse{}
+	if err := c.postForm("ReleaseAddress", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ReleaseAddress returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) AssociateAddress(input AssociateAddressInput) (*AssociateAddressOutput, error) {
+	params := url.Values{}
+	params.Set("AllocationId", strings.TrimSpace(input.AllocationID))
+
+	if input.AllowReassociation {
+		params.Set("AllowReassociation", "true")
+	}
+
+	instanceID := strings.TrimSpace(input.InstanceID)
+	networkInterfaceID := strings.TrimSpace(input.NetworkInterfaceID)
+	if instanceID != "" {
+		params.Set("InstanceId", instanceID)
+	}
+	if networkInterfaceID != "" {
+		params.Set("NetworkInterfaceId", networkInterfaceID)
+	}
+
+	response := associateAddressResponse{}
+	if err := c.postForm("AssociateAddress", params, &response); err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(response.AssociationID) == "" {
+		return nil, fmt.Errorf("response did not include association ID")
+	}
+
+	return &AssociateAddressOutput{
+		RequestID:     response.RequestID,
+		AssociationID: response.AssociationID,
+		Region:        c.region,
+	}, nil
+}
+
+func (c *Client) DisassociateAddress(associationID string) error {
+	params := url.Values{}
+	params.Set("AssociationId", strings.TrimSpace(associationID))
+
+	response := disassociateAddressResponse{}
+	if err := c.postForm("DisassociateAddress", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("DisassociateAddress returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) ListAddresses() ([]ElasticIP, error) {
+	response := describeAddressesResponse{}
+	if err := c.postForm("DescribeAddresses", url.Values{}, &response); err != nil {
+		return nil, err
+	}
+
+	addresses := make([]ElasticIP, 0, len(response.Addresses))
+	for _, address := range response.Addresses {
+		allocationID := strings.TrimSpace(address.AllocationID)
+		if allocationID == "" {
+			continue
+		}
+
+		addresses = append(addresses, ElasticIP{
+			AllocationID:  allocationID,
+			AssociationID: strings.TrimSpace(address.AssociationID),
+			PublicIP:      strings.TrimSpace(address.PublicIP),
+			InstanceID:    strings.TrimSpace(address.InstanceID),
+			Domain:        strings.TrimSpace(address.Domain),
+		})
+	}
+
+	return addresses, nil
+}
+
+func (c *Client) ListPublicIPv4Pools() ([]PublicIPv4Pool, error) {
+	pools := []PublicIPv4Pool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "10")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describePublicIpv4PoolsResponse{}
+		if err := c.postForm("DescribePublicIpv4Pools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			poolID := strings.TrimSpace(pool.PoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, PublicIPv4Pool{
+				PoolID:      poolID,
+				Description: strings.TrimSpace(pool.Description),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func (c *Client) ListCustomerOwnedIPv4Pools() ([]CustomerOwnedIPv4Pool, error) {
+	pools := []CustomerOwnedIPv4Pool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeCoipPoolsResponse{}
+		if err := c.postForm("DescribeCoipPools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			poolID := strings.TrimSpace(pool.PoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, CustomerOwnedIPv4Pool{
+				PoolID:                   poolID,
+				LocalGatewayRouteTableID: strings.TrimSpace(pool.LocalGatewayRouteTableID),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func (c *Client) ListIpamPoolsForElasticIP() ([]IpamPool, error) {
+	pools := []IpamPool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeIpamPoolsResponse{}
+		if err := c.postForm("DescribeIpamPools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			if !isIpamPoolForElasticIP(pool, c.region) {
+				continue
+			}
+
+			poolID := strings.TrimSpace(pool.IpamPoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, IpamPool{
+				PoolID:                 poolID,
+				Description:            strings.TrimSpace(pool.Description),
+				AddressFamily:          strings.TrimSpace(pool.AddressFamily),
+				PubliclyAdvertisable:   pool.PubliclyAdvertisable,
+				Locale:                 strings.TrimSpace(pool.Locale),
+				AllocationResourceType: strings.TrimSpace(pool.AllocationResourceType),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func isIpamPoolForElasticIP(pool xmlIpamPool, region string) bool {
+	if !strings.EqualFold(strings.TrimSpace(pool.AddressFamily), "ipv4") {
+		return false
+	}
+	if !pool.PubliclyAdvertisable {
+		return false
+	}
+
+	locale := strings.TrimSpace(pool.Locale)
+	if locale != "" && locale != region {
+		return false
+	}
+
+	allocationType := strings.TrimSpace(pool.AllocationResourceType)
+	if allocationType != "" && !strings.EqualFold(allocationType, "ec2") {
+		return false
+	}
+
+	return true
 }
 
 func (c *Client) ListSubnets() ([]Subnet, error) {
@@ -1611,6 +1945,78 @@ type stopInstancesResponse struct {
 type startInstancesResponse struct {
 	RequestID string                   `xml:"requestId"`
 	Instances []xmlInstanceStateChange `xml:"instancesSet>item"`
+}
+
+type allocateAddressResponse struct {
+	RequestID    string `xml:"requestId"`
+	PublicIP     string `xml:"publicIp"`
+	Domain       string `xml:"domain"`
+	AllocationID string `xml:"allocationId"`
+}
+
+type releaseAddressResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type associateAddressResponse struct {
+	RequestID     string `xml:"requestId"`
+	AssociationID string `xml:"associationId"`
+}
+
+type disassociateAddressResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type describeAddressesResponse struct {
+	RequestID string       `xml:"requestId"`
+	Addresses []xmlAddress `xml:"addressesSet>item"`
+}
+
+type xmlAddress struct {
+	PublicIP      string `xml:"publicIp"`
+	AllocationID  string `xml:"allocationId"`
+	AssociationID string `xml:"associationId"`
+	InstanceID    string `xml:"instanceId"`
+	Domain        string `xml:"domain"`
+}
+
+type describePublicIpv4PoolsResponse struct {
+	RequestID string              `xml:"requestId"`
+	Pools     []xmlPublicIpv4Pool `xml:"publicIpv4PoolSet>item"`
+	NextToken string              `xml:"nextToken"`
+}
+
+type xmlPublicIpv4Pool struct {
+	PoolID      string `xml:"poolId"`
+	Description string `xml:"description"`
+}
+
+type describeCoipPoolsResponse struct {
+	RequestID string        `xml:"requestId"`
+	Pools     []xmlCoipPool `xml:"coipPoolSet>item"`
+	NextToken string        `xml:"nextToken"`
+}
+
+type xmlCoipPool struct {
+	PoolID                   string `xml:"poolId"`
+	LocalGatewayRouteTableID string `xml:"localGatewayRouteTableId"`
+}
+
+type describeIpamPoolsResponse struct {
+	RequestID string        `xml:"requestId"`
+	Pools     []xmlIpamPool `xml:"ipamPoolSet>item"`
+	NextToken string        `xml:"nextToken"`
+}
+
+type xmlIpamPool struct {
+	IpamPoolID             string `xml:"ipamPoolId"`
+	Description            string `xml:"description"`
+	AddressFamily          string `xml:"addressFamily"`
+	PubliclyAdvertisable   bool   `xml:"publiclyAdvertisable"`
+	Locale                 string `xml:"locale"`
+	AllocationResourceType string `xml:"allocationResourceType"`
 }
 
 type xmlInstanceStateChange struct {
