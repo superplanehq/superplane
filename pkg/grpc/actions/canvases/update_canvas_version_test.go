@@ -111,6 +111,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			nil,
 			"",
 			r.AuthService,
+			false,
 		)
 
 		require.Error(t, err)
