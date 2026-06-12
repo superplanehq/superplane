@@ -29,6 +29,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
+  <LinkCard title="Cloud SQL • Create Database" href="#cloud-sql-•-create-database" description="Create a logical database inside a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Delete Database" href="#cloud-sql-•-delete-database" description="Delete a logical database from a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Get Database" href="#cloud-sql-•-get-database" description="Fetch a logical database from a Cloud SQL instance" />
   <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
@@ -76,7 +79,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
@@ -810,6 +813,138 @@ The invocation result, including:
   },
   "timestamp": "2025-01-01T00:00:05Z",
   "type": "gcp.cloudfunctions.invoke"
+}
+```
+
+<a id="cloud-sql-•-create-database"></a>
+
+## Cloud SQL • Create Database
+
+**Component key:** `gcp.cloudsql.createDatabase`
+
+The Create Database component adds a new logical database to an existing Cloud SQL instance.
+
+### Use Cases
+
+- **Application bootstrap**: Create an application-specific database as part of environment setup
+- **Tenant provisioning**: Add a dedicated database for a new customer or workspace
+- **Migration workflows**: Prepare a destination database before importing data
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that will contain the new database (required)
+- **Database Name**: The name of the database to create (required, supports expressions)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the created database's `name`, `instance`, `project`, `charset`, `collation`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+- Cloud SQL database creation is asynchronous; this component waits for the operation to finish before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "charset": "UTF8",
+    "collation": "en_US.UTF8",
+    "instance": "my-instance",
+    "name": "app_db",
+    "project": "my-project",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance/databases/app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-delete-database"></a>
+
+## Cloud SQL • Delete Database
+
+**Component key:** `gcp.cloudsql.deleteDatabase`
+
+The Delete Database component permanently deletes a logical database from a Cloud SQL instance.
+
+### Use Cases
+
+- **Teardown**: Remove a database as part of decommissioning an environment
+- **Tenant offboarding**: Delete a customer's dedicated database
+- **Cleanup**: Drop temporary databases created during a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that contains the database (required)
+- **Database**: The database to delete (required)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the deleted database's `name` and `instance`, and `deleted: true`.
+
+### Important Notes
+
+- **This permanently deletes the database and all its data — it is irreversible.**
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+- Cloud SQL database deletion is asynchronous; this component waits for the operation to finish before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "instance": "my-instance",
+    "name": "app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-get-database"></a>
+
+## Cloud SQL • Get Database
+
+**Component key:** `gcp.cloudsql.getDatabase`
+
+The Get Database component retrieves a logical database from a Cloud SQL instance.
+
+### Use Cases
+
+- **Existence checks**: Confirm a database is present before acting on it
+- **Enrichment**: Read a database's charset/collation to feed a downstream step
+- **Auditing**: Capture database details as part of a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that contains the database (required)
+- **Database**: The database to fetch (required)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the database's `name`, `instance`, `project`, `charset`, `collation`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.viewer` (or `roles/cloudsql.admin`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+
+### Example Output
+
+```json
+{
+  "data": {
+    "charset": "UTF8",
+    "collation": "en_US.UTF8",
+    "instance": "my-instance",
+    "name": "app_db",
+    "project": "my-project",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance/databases/app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
 }
 ```
 
