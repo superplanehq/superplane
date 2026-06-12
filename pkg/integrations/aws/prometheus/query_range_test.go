@@ -126,4 +126,39 @@ func Test__QueryRange__Execute(t *testing.T) {
 		assert.Equal(t, "1000", request.URL.Query().Get("max_samples_processed_warning_threshold"))
 		assert.Equal(t, "2000", request.URL.Query().Get("max_samples_processed_error_threshold"))
 	})
+
+	t.Run("Prometheus API status error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"status": "error",
+						"errorType": "bad_data",
+						"error": "invalid range query"
+					}`)),
+				},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"workspace": "ws-abc123",
+				"query":     "invalid{",
+				"start":     "2026-06-08T09:00:00Z",
+				"end":       "2026-06-08T10:00:00Z",
+				"step":      "1m",
+			},
+			HTTP:           httpContext,
+			ExecutionState: execState,
+			Integration:    validIntegrationContext(),
+		})
+
+		require.ErrorContains(t, err, "failed to execute PromQL query range")
+		require.ErrorContains(t, err, "prometheus API error (bad_data): invalid range query")
+		assert.False(t, execState.Finished)
+		assert.Empty(t, execState.Payloads)
+	})
 }
