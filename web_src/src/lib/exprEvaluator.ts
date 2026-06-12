@@ -38,6 +38,7 @@ type ASTNode =
   | { type: "Identifier"; name: string }
   | { type: "MemberAccess"; object: ASTNode; property: string; optional: boolean }
   | { type: "IndexAccess"; object: ASTNode; index: ASTNode }
+  | { type: "SliceAccess"; object: ASTNode; start?: ASTNode; end?: ASTNode }
   | { type: "FunctionCall"; callee: ASTNode; args: ASTNode[] }
   | { type: "MethodCall"; object: ASTNode; method: string; args: ASTNode[] }
   | { type: "UnaryOp"; operator: string; operand: ASTNode }
@@ -388,12 +389,25 @@ class Parser {
         continue;
       }
 
-      // Bracket access: [index] or ["key"]
+      // Bracket access: [index], ["key"], [start:end], [:end], or [start:]
       if (this.current().type === "LBRACKET") {
         this.advance();
-        const index = this.parseExpression();
+
+        let start: ASTNode | undefined;
+        if (this.current().type !== "COLON") {
+          start = this.parseExpression();
+        }
+
+        if (this.current().type === "COLON") {
+          this.advance();
+          const end = this.current().type === "RBRACKET" ? undefined : this.parseExpression();
+          this.expect("RBRACKET");
+          node = { type: "SliceAccess", object: node, start, end };
+          continue;
+        }
+
         this.expect("RBRACKET");
-        node = { type: "IndexAccess", object: node, index };
+        node = { type: "IndexAccess", object: node, index: start! };
         continue;
       }
 
@@ -500,6 +514,19 @@ class Parser {
 // ============================================================================
 // EVALUATOR
 // ============================================================================
+
+function resolveSliceIndex(value: unknown): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const index = Number(value);
+  if (!Number.isFinite(index)) {
+    return undefined;
+  }
+
+  return Math.trunc(index);
+}
 
 // Wrapper for Duration that provides expr-lang compatible methods
 class ExprDuration {
@@ -914,6 +941,22 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
       if (Array.isArray(obj) && typeof index === "number") {
         return obj[index];
       }
+      return undefined;
+    }
+
+    case "SliceAccess": {
+      const obj = evaluate(node.object, context);
+      const start = resolveSliceIndex(node.start ? evaluate(node.start, context) : undefined);
+      const end = resolveSliceIndex(node.end ? evaluate(node.end, context) : undefined);
+
+      if (typeof obj === "string") {
+        return obj.slice(start, end);
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.slice(start, end);
+      }
+
       return undefined;
     }
 
