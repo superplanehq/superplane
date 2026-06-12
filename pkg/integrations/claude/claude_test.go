@@ -47,29 +47,48 @@ func TestClaude_Configuration(t *testing.T) {
 func TestClaude_Sync(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
+	modelsOK := func(req *http.Request) *http.Response {
+		if req.URL.Path == "/v1/models" {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"data": [{"id": "claude-2"}]}`)),
+			}
+		}
+		return &http.Response{StatusCode: 404, Body: io.NopCloser(bytes.NewBufferString(""))}
+	}
+
 	tests := []struct {
-		name          string
-		config        map[string]interface{}
-		mockResponses func(*http.Request) *http.Response
-		expectError   bool
-		expectReady   bool
+		name            string
+		config          map[string]interface{}
+		mockResponses   func(*http.Request) *http.Response
+		expectError     bool
+		expectReady     bool
+		newSetupFlow    bool
+		presetSecretKey string
 	}{
 		{
 			name: "Success",
 			config: map[string]interface{}{
 				"apiKey": "sk-ant-test",
 			},
-			mockResponses: func(req *http.Request) *http.Response {
-				if req.URL.Path == "/v1/models" {
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewBufferString(`{"data": [{"id": "claude-2"}]}`)),
-					}
-				}
-				return &http.Response{StatusCode: 404, Body: io.NopCloser(bytes.NewBufferString(""))}
-			},
-			expectError: false,
-			expectReady: true,
+			mockResponses: modelsOK,
+			expectError:   false,
+			expectReady:   true,
+		},
+		{
+			name:            "Success new setup flow reads secret from store",
+			newSetupFlow:    true,
+			config:          map[string]interface{}{},
+			presetSecretKey: "sk-ant-from-secret",
+			mockResponses:   modelsOK,
+			expectError:     false,
+			expectReady:     true,
+		},
+		{
+			name:         "New setup flow missing secret",
+			newSetupFlow: true,
+			config:       map[string]interface{}{},
+			expectError:  true,
 		},
 		{
 			name: "Missing API Key",
@@ -98,10 +117,16 @@ func TestClaude_Sync(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &Claude{}
 			integrationCtx := &contexts.IntegrationContext{
+				NewSetupFlow:  tt.newSetupFlow,
 				Configuration: map[string]any{},
 			}
 			if v, ok := tt.config["apiKey"].(string); ok {
 				integrationCtx.Configuration["apiKey"] = v
+			}
+			if tt.presetSecretKey != "" {
+				integrationCtx.CurrentSecrets = map[string]core.IntegrationSecret{
+					"apiKey": {Name: "apiKey", Value: []byte(tt.presetSecretKey)},
+				}
 			}
 
 			var responses []*http.Response

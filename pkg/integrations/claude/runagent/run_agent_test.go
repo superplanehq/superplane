@@ -55,7 +55,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{"apiKey": "sk-test"},
+		Configuration: map[string]any{apiKeySecretName: "sk-test"},
 	}
 	metadataCtx := &contexts.MetadataContext{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -101,7 +101,7 @@ func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 		},
 	}
-	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{apiKeySecretName: "k"}}
 	metadataCtx := &contexts.MetadataContext{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	requestsCtx := &contexts.RequestContext{}
@@ -133,7 +133,7 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
-	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{apiKeySecretName: "k"}}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: ExecutionMetadata{
