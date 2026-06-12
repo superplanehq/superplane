@@ -207,7 +207,7 @@ export function useInterruptAgentChat(organizationId: string | undefined) {
 // tool rows flicker mid-stream.
 export function upsertAgentMessageInCache(queryClient: QueryClient, chatId: string, message: AgentMessage): void {
   queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId), (prev) => {
-    if (!prev) return { pages: [{ messages: [message], hasMore: false }], pageParams: [""] };
+    if (!prev) return prev;
     const pages = prev.pages.map((p) => ({ ...p, messages: p.messages.slice() }));
     for (const page of pages) {
       const idx = page.messages.findIndex((m) => m.id === message.id);
