@@ -98,7 +98,7 @@ func (c *ReleaseElasticIP) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeElasticIP,
+					Type: ResourceTypeElasticIPUnassociated,
 					Parameters: []configuration.ParameterRef{
 						{
 							Name: "region",
