@@ -66,7 +66,7 @@ export function DraftActionsWidget({
           disabled={busy !== null}
         >
           <Eye size={12} />
-          See in Editor
+          See changes
         </Button>
       )}
       <Button

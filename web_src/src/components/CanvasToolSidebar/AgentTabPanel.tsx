@@ -217,7 +217,7 @@ function ChatConversation({
         sending={agentBusy}
         sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={statusLabel(status)}
+        statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={modeDisabled}
@@ -381,6 +381,14 @@ function DraftActionsBar({
     outcomePassed,
     onVersionPublished,
   });
+
+  useEffect(() => {
+    if (!latestDraft) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+  }, [canvasId, latestDraft]);
 
   if (!latestDraft) return null;
 
