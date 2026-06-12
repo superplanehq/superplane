@@ -382,7 +382,7 @@ func TestSSHCommand_Execute_FileMode(t *testing.T) {
 		return cfg
 	}
 
-	t.Run("reads file content verbatim into execution metadata", func(t *testing.T) {
+	t.Run("stores only the file path in metadata", func(t *testing.T) {
 		fileContent := "echo hello\nls -la"
 		files := &fakeFilesContext{
 			files: map[string]string{"scripts/deploy.sh": fileContent},
@@ -397,36 +397,39 @@ func TestSSHCommand_Execute_FileMode(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported authentication method")
+		// Execute reads the file once at start to validate it is reachable
+		// and non-empty (matches Setup's publish-time guard).
 		assert.Equal(t, "scripts/deploy.sh", files.readPath)
 
 		saved, ok := metadata.Get().(ExecutionMetadata)
 		require.True(t, ok)
 		assert.Equal(t, CommandSourceFile, saved.CommandSource)
 		assert.Equal(t, "scripts/deploy.sh", saved.CommandFile)
-		assert.Equal(t, fileContent, saved.Commands)
+		// File contents must NOT be persisted in metadata — the worker
+		// re-reads the file from the canvas repository on every attempt
+		// (initial + retries) so the script content never lives in the
+		// database.
+		assert.Empty(t, saved.Commands)
+		assert.NotContains(t, fmt.Sprintf("%v", metadata.Get()), fileContent)
 	})
 
-	// Shell scripts frequently embed their own {{ ... }} syntax (Docker
-	// inspect format strings, Helm/Go templates, kubectl jsonpath). The file
-	// content must be passed through to the remote host untouched so these
-	// scripts run the same way they do when pasted into an SSH session.
-	t.Run("preserves embedded {{ }} syntax in file content", func(t *testing.T) {
-		fileContent := `docker inspect --format '{{ .Config.Image }}' my-container
-helm template chart --set image.tag={{ .Values.tag }}`
+	t.Run("inline mode still stores commands in metadata", func(t *testing.T) {
 		metadata := &testMetadataContext{}
-
 		err := c.Execute(core.ExecutionContext{
-			Configuration: baseExecConfig(nil),
-			Metadata:      metadata,
-			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": fileContent}},
+			Configuration: baseExecConfig(map[string]any{
+				"commandSource": CommandSourceInline,
+				"commandFile":   "",
+				"commands":      "echo hi",
+			}),
+			Metadata: metadata,
 		})
-
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported authentication method")
 
 		saved, ok := metadata.Get().(ExecutionMetadata)
 		require.True(t, ok)
-		assert.Equal(t, fileContent, saved.Commands)
+		assert.Equal(t, CommandSourceInline, saved.CommandSource)
+		assert.Equal(t, "echo hi", saved.Commands)
 	})
 
 	t.Run("missing file context is reported", func(t *testing.T) {
@@ -600,21 +603,23 @@ func TestBuildCombinedCommands(t *testing.T) {
 func TestSSHCommand_BuildScriptCommand(t *testing.T) {
 	c := &SSHCommand{}
 
-	t.Run("wraps script in bash -lc preserving newlines and comments", func(t *testing.T) {
+	t.Run("returns plain `bash -s` and the script as the stdin payload", func(t *testing.T) {
 		script := "#!/usr/bin/env bash\n# comment\nset -eo pipefail\necho hi"
-		command := c.buildScriptCommand("", nil, script)
-		assert.Equal(t, "bash -lc '#!/usr/bin/env bash\n# comment\nset -eo pipefail\necho hi'", command)
+		command, payload := c.buildScriptCommand("", nil, script)
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, script, payload)
 	})
 
-	t.Run("working directory uses newline + exit guard so leading comments do not eat cd", func(t *testing.T) {
+	t.Run("working directory is prepended on its own line so a leading comment cannot eat cd", func(t *testing.T) {
 		script := "#!/usr/bin/env bash\necho hi"
-		command := c.buildScriptCommand("/opt/app", nil, script)
-		assert.Equal(t, "bash -lc 'cd '\"'\"'/opt/app'\"'\"' || exit 1\n#!/usr/bin/env bash\necho hi'", command)
+		command, payload := c.buildScriptCommand("/opt/app", nil, script)
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "cd '/opt/app' || exit 1\n#!/usr/bin/env bash\necho hi", payload)
 	})
 
-	t.Run("environment values are exported via env before bash", func(t *testing.T) {
+	t.Run("environment values are exported via env before bash and the script is unchanged", func(t *testing.T) {
 		script := "echo \"$NAME\""
-		command := c.buildScriptCommand(
+		command, payload := c.buildScriptCommand(
 			"",
 			[]EnvironmentVariable{
 				{Name: "NAME", Value: "world"},
@@ -622,19 +627,21 @@ func TestSSHCommand_BuildScriptCommand(t *testing.T) {
 			},
 			script,
 		)
-		assert.Equal(t, "env NAME='world' TOKEN='a'\"'\"'b' bash -lc 'echo \"$NAME\"'", command)
+		assert.Equal(t, "env NAME='world' TOKEN='a'\"'\"'b' bash -s", command)
+		assert.Equal(t, script, payload)
 	})
 
-	t.Run("script with single quotes is properly escaped", func(t *testing.T) {
+	t.Run("script with single quotes is streamed verbatim (no shell escaping needed)", func(t *testing.T) {
 		script := "echo 'hello world'"
-		command := c.buildScriptCommand("", nil, script)
-		assert.Equal(t, "bash -lc 'echo '\"'\"'hello world'\"'\"''", command)
+		command, payload := c.buildScriptCommand("", nil, script)
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, script, payload)
 	})
 
-	// Regression: a bash script that starts with a shebang and contains
-	// multi-line constructs must NOT be collapsed to a single &&-joined
-	// line, because the leading `#!` would turn the rest of the script
-	// into a shell comment and nothing would execute.
+	// Regression: a bash script with embedded `{{ ... }}` template syntax
+	// (Docker inspect, Helm, kubectl jsonpath) must reach the remote host
+	// untouched so it runs the same way it would when pasted into an
+	// interactive SSH session.
 	t.Run("preserves embedded {{ }} and multi-line script structure", func(t *testing.T) {
 		script := `#!/usr/bin/env bash
 set -eo pipefail
@@ -642,25 +649,26 @@ image=$(docker inspect --format '{{ .Config.Image }}' my-container)
 if [ -n "$image" ]; then
   echo "$image"
 fi`
-		command := c.buildScriptCommand("", nil, script)
-		expected := "bash -lc '" + strings.ReplaceAll(script, "'", `'"'"'`) + "'"
-		assert.Equal(t, expected, command)
-		assert.Contains(t, command, "{{ .Config.Image }}")
-		assert.Contains(t, command, "\nset -eo pipefail\n")
+		command, payload := c.buildScriptCommand("", nil, script)
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, script, payload)
+		assert.Contains(t, payload, "{{ .Config.Image }}")
+		assert.Contains(t, payload, "\nset -eo pipefail\n")
 	})
 }
 
 func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 	c := &SSHCommand{}
 
-	t.Run("inline mode joins lines and uses sh", func(t *testing.T) {
+	t.Run("inline mode joins lines, uses sh, and has no stdin payload", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceInline,
 			Commands:      "echo 1\necho 2",
 		}
-		command, err := c.buildExecutionCommand(meta)
+		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
 		assert.Equal(t, "echo 1 && echo 2", command)
+		assert.Nil(t, stdin)
 	})
 
 	t.Run("inline mode rejects empty commands", func(t *testing.T) {
@@ -668,31 +676,139 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 			CommandSource: CommandSourceInline,
 			Commands:      "  \n  ",
 		}
-		_, err := c.buildExecutionCommand(meta)
+		_, _, err := c.buildExecutionCommand(meta, "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "commands is required")
 	})
 
-	t.Run("file mode wraps multi-line script in bash -lc without &&-joining", func(t *testing.T) {
+	t.Run("file mode streams the pre-loaded script as stdin", func(t *testing.T) {
+		script := "#!/usr/bin/env bash\n# header\necho hi"
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceFile,
-			Commands:      "#!/usr/bin/env bash\n# header\necho hi",
+			CommandFile:   "scripts/deploy.sh",
 		}
-		command, err := c.buildExecutionCommand(meta)
+
+		command, stdin, err := c.buildExecutionCommand(meta, script)
 		require.NoError(t, err)
-		assert.Equal(t, "bash -lc '#!/usr/bin/env bash\n# header\necho hi'", command)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
 		assert.NotContains(t, command, " && ")
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, script, string(body))
+	})
+
+	t.Run("file mode prepends working directory to the streamed script", func(t *testing.T) {
+		script := "echo hi"
+		meta := ExecutionMetadata{
+			CommandSource:    CommandSourceFile,
+			CommandFile:      "scripts/deploy.sh",
+			WorkingDirectory: "/opt/app",
+			Environment: []EnvironmentVariable{
+				{Name: "NAME", Value: "world"},
+			},
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, script)
+		require.NoError(t, err)
+		assert.Equal(t, "env NAME='world' bash -s", command)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "cd '/opt/app' || exit 1\necho hi", string(body))
+	})
+
+	t.Run("file mode rejects an empty script body", func(t *testing.T) {
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceFile,
+			CommandFile:   "scripts/deploy.sh",
+		}
+		_, _, err := c.buildExecutionCommand(meta, "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "command file body is required")
 	})
 
 	t.Run("legacy inline metadata (empty CommandSource) keeps old behavior", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			Commands: "echo legacy",
 		}
-		command, err := c.buildExecutionCommand(meta)
+		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
 		assert.Equal(t, "echo legacy", command)
+		assert.Nil(t, stdin)
 	})
 }
+
+// Regression for the metadata-leak fix: the retry hook must re-read the
+// command file from the canvas repository on every retry, surface file
+// errors before any SSH work, and never fall back to script content from
+// stored metadata.
+func TestSSHCommand_HandleHook_FileModeRetryRereadsFile(t *testing.T) {
+	c := &SSHCommand{}
+	files := &fakeFilesContext{
+		files: map[string]string{"scripts/deploy.sh": "echo hi"},
+	}
+	metadata := &testMetadataContext{
+		value: ExecutionMetadata{
+			Host:          "example.com",
+			Port:          22,
+			User:          "root",
+			Timeout:       60,
+			CommandSource: CommandSourceFile,
+			CommandFile:   "scripts/deploy.sh",
+			Authentication: AuthSpec{
+				Method: "invalid",
+			},
+		},
+	}
+
+	err := c.HandleHook(core.ActionHookContext{
+		Name:           "executionRetry",
+		Metadata:       metadata,
+		Files:          files,
+		ExecutionState: &fakeExecutionState{},
+	})
+
+	require.Error(t, err)
+	// We get past the file load (which proves the retry re-read it) and
+	// only fail on the auth setup, which is the next step.
+	assert.Contains(t, err.Error(), "unsupported authentication method")
+	assert.Equal(t, "scripts/deploy.sh", files.readPath)
+}
+
+func TestSSHCommand_HandleHook_FileModeRetryReportsMissingFile(t *testing.T) {
+	c := &SSHCommand{}
+	files := &fakeFilesContext{readErr: errors.New("file gone")}
+	metadata := &testMetadataContext{
+		value: ExecutionMetadata{
+			CommandSource: CommandSourceFile,
+			CommandFile:   "scripts/deploy.sh",
+		},
+	}
+
+	err := c.HandleHook(core.ActionHookContext{
+		Name:           "executionRetry",
+		Metadata:       metadata,
+		Files:          files,
+		ExecutionState: &fakeExecutionState{},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read command file")
+}
+
+type fakeExecutionState struct{ finished bool }
+
+func (f *fakeExecutionState) IsFinished() bool                                       { return f.finished }
+func (f *fakeExecutionState) SetKV(key, value string) error                          { return nil }
+func (f *fakeExecutionState) GetKV(key string) (string, error)                       { return "", nil }
+func (f *fakeExecutionState) Emit(channel, payloadType string, payloads []any) error { return nil }
+func (f *fakeExecutionState) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	return nil
+}
+func (f *fakeExecutionState) Pass() error                       { return nil }
+func (f *fakeExecutionState) Fail(reason, message string) error { return nil }
 
 func TestSSHCommand_CommandSourceOrDefault(t *testing.T) {
 	t.Run("empty defaults to inline", func(t *testing.T) {

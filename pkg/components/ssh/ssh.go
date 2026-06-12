@@ -504,9 +504,17 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	source := spec.commandSourceOrDefault()
-	resolvedCommands, err := resolveCommands(ctx, spec, source)
-	if err != nil {
-		return err
+
+	// Inline mode: the (already template-resolved) commands are stored in
+	// metadata so retries don't have to re-evaluate expressions. File mode:
+	// metadata only carries the path; the file is re-read from the repo on
+	// every attempt so the script content never lives in the database.
+	resolvedCommands := ""
+	if source == CommandSourceInline {
+		if strings.TrimSpace(spec.Commands) == "" {
+			return errors.New("commands is required")
+		}
+		resolvedCommands = spec.Commands
 	}
 
 	for _, variable := range spec.Environment {
@@ -546,40 +554,28 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// File mode: load the script body now so file errors surface before
+	// we try to open an SSH session. This re-checks the same size and
+	// empty-file guards Setup ran at publish time, in case the file
+	// changed in the repo between publish and run.
+	scriptBody := ""
+	if source == CommandSourceFile {
+		scriptBody, err = loadCommandFile(ctx.Files, spec.CommandFile)
+		if err != nil {
+			return err
+		}
+	}
+
 	execCtx := ExecuteSSHContext{
 		secretsCtx:   ctx.Secrets,
 		requestsCtx:  ctx.Requests,
 		stateCtx:     ctx.ExecutionState,
 		metadataCtx:  ctx.Metadata,
 		execMetadata: metadata,
+		scriptBody:   scriptBody,
 	}
 
 	return c.executeSSH(execCtx)
-}
-
-// resolveCommands returns the literal command string to run. Inline mode uses
-// the configured commands, which are already template-resolved by the queue
-// worker. File mode reads the file at execution time and returns its content
-// verbatim: shell scripts frequently embed their own {{ ... }} syntax (Docker
-// inspect format strings, Helm/Go templates, kubectl jsonpath, etc.) that must
-// not be evaluated as SuperPlane expressions. To inject upstream values into a
-// file-backed script, use the Environment variables field — those values do
-// support {{ ... }} expressions at queue time and become regular env vars in
-// the script.
-func resolveCommands(ctx core.ExecutionContext, spec Spec, source string) (string, error) {
-	switch source {
-	case CommandSourceInline:
-		if strings.TrimSpace(spec.Commands) == "" {
-			return "", errors.New("commands is required")
-		}
-		return spec.Commands, nil
-
-	case CommandSourceFile:
-		return loadCommandFile(ctx.Files, spec.CommandFile)
-
-	default:
-		return "", fmt.Errorf("invalid command source: %s", spec.CommandSource)
-	}
 }
 
 // loadCommandFile reads, size-limits, and validates the command file referenced
@@ -630,12 +626,25 @@ func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 			return err
 		}
 
+		// Re-read the command file on every retry so the script body
+		// never lives in stored metadata. Same guards Execute applies on
+		// the initial attempt: a missing file or empty content fails
+		// fast before we try to open an SSH session.
+		scriptBody := ""
+		if metadata.CommandSource == CommandSourceFile {
+			scriptBody, err = loadCommandFile(ctx.Files, metadata.CommandFile)
+			if err != nil {
+				return err
+			}
+		}
+
 		execCtx := ExecuteSSHContext{
 			secretsCtx:   ctx.Secrets,
 			requestsCtx:  ctx.Requests,
 			stateCtx:     ctx.ExecutionState,
 			metadataCtx:  ctx.Metadata,
 			execMetadata: metadata,
+			scriptBody:   scriptBody,
 		}
 
 		return c.executeSSH(execCtx)
@@ -651,6 +660,11 @@ type ExecuteSSHContext struct {
 	metadataCtx core.MetadataWriter
 
 	execMetadata ExecutionMetadata
+
+	// File-mode script body to stream as stdin. Loaded by the caller so
+	// file-system errors surface before the SSH client is created. Empty
+	// for inline mode.
+	scriptBody string
 }
 
 func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
@@ -660,11 +674,11 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	command, err := c.buildExecutionCommand(ctx.execMetadata)
+	command, stdin, err := c.buildExecutionCommand(ctx.execMetadata, ctx.scriptBody)
 	if err != nil {
 		return err
 	}
-	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
+	result, err := client.ExecuteScript(command, stdin, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
 		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, c.getRetryAttempt(ctx.metadataCtx)) {
 			err = c.incrementRetryCount(ctx.metadataCtx)
@@ -840,48 +854,54 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
 }
 
-// buildExecutionCommand assembles the final command sent to the remote host.
+// buildExecutionCommand assembles the final command sent to the remote host
+// and, for file mode, returns the script body to stream as stdin.
+//
 // Inline mode keeps the long-standing behavior of stripping blank lines and
-// joining the rest with `&&` so a list of one-liners runs as a chain. File
-// mode preserves the script verbatim and wraps it in `bash -lc`: shell
-// scripts frequently rely on multi-line constructs (if/while/for, here-docs,
-// process substitution), shebangs, line comments, and bash-only features
-// (pipefail, declare -A) that the &&-join would destroy.
-func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata) (string, error) {
+// joining the rest with `&&` so a list of one-liners runs as a chain. The
+// remote shell receives a single string and no stdin payload.
+//
+// File mode pipes the (already-loaded) script body to `bash -s` over stdin.
+// This avoids embedding the whole script in the command line — argv has size
+// limits and nested quoting is fragile — while preserving multi-line
+// constructs, shebangs, comments, and bash-only features (pipefail,
+// declare -A, here-docs, process substitution) exactly as written.
+func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
 	if metadata.CommandSource == CommandSourceFile {
-		return c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands), nil
+		if scriptBody == "" {
+			return "", nil, errors.New("command file body is required")
+		}
+		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, scriptBody)
+		return command, strings.NewReader(payload), nil
 	}
 
 	combined := buildCombinedCommands(metadata.Commands)
 	if combined == "" {
-		return "", errors.New("commands is required")
+		return "", nil, errors.New("commands is required")
 	}
-	return c.buildRemoteCommand(metadata.WorkingDirectory, metadata.Environment, combined), nil
+	return c.buildRemoteCommand(metadata.WorkingDirectory, metadata.Environment, combined), nil, nil
 }
 
-// buildScriptCommand wraps a multi-line shell script in a single `bash -lc`
-// invocation so it behaves the same as if it were pasted into an interactive
-// SSH session. The working-directory change is placed on its own line ahead
-// of the script (followed by `|| exit 1`) so a leading shebang or comment in
-// the script cannot swallow the `cd` via `#`-to-end-of-line.
-func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) string {
-	finalScript := script
+// buildScriptCommand returns the remote command (`env VAR=v ... bash -s`) and
+// the script body to stream over stdin. The working-directory change is
+// prepended on its own line (followed by `|| exit 1`) so a leading shebang or
+// comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
+func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	payload := script
 	if workingDirectory != "" {
-		finalScript = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
+		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
 	}
 
-	wrapped := fmt.Sprintf("bash -lc %s", shellQuote(finalScript))
-
-	if len(environment) == 0 {
-		return wrapped
+	command := "bash -s"
+	if len(environment) > 0 {
+		envAssignments := make([]string, 0, len(environment))
+		for _, variable := range environment {
+			envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
+		}
+		command = fmt.Sprintf("env %s %s", strings.Join(envAssignments, " "), command)
 	}
 
-	envAssignments := make([]string, 0, len(environment))
-	for _, variable := range environment {
-		envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
-	}
-
-	return fmt.Sprintf("env %s %s", strings.Join(envAssignments, " "), wrapped)
+	return command, payload
 }
 
 // validateCommandSource enforces the configured command-source variant.
