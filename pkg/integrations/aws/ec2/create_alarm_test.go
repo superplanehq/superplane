@@ -103,9 +103,9 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"instance":           "i-abc123",
 				"alarmName":          "HighCPU",
 				"metricName":         "CPUUtilization",
-			"statistic":          "Average",
-			"comparisonOperator": " ",
-			"threshold":          80.0,
+				"statistic":          "Average",
+				"comparisonOperator": " ",
+				"threshold":          80.0,
 			},
 		})
 		require.ErrorContains(t, err, "comparison operator is required")
@@ -120,7 +120,7 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"metricName":         "CPUUtilization",
 				"statistic":          " ",
 				"comparisonOperator": "GreaterThanThreshold",
-			"threshold":          80.0,
+				"threshold":          80.0,
 			},
 		})
 		require.ErrorContains(t, err, "statistic is required")
@@ -147,8 +147,8 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"instance":           "i-abc123",
 				"alarmName":          "HighCPU",
 				"metricName":         "CPUUtilization",
-			"statistic":          "Average",
-			"comparisonOperator": "GreaterThanThreshold",
+				"statistic":          "Average",
+				"comparisonOperator": "GreaterThanThreshold",
 				"threshold":          80.0,
 			},
 			Metadata: &contexts.MetadataContext{},
