@@ -87,6 +87,24 @@ describe("associateElasticIPMapper.props", () => {
     const operationItem = props.metadata?.find((m) => m.icon === "link");
     expect(operationItem?.label).toBe("Disassociate");
   });
+
+  it("does not show instance metadata for disassociate operation", () => {
+    const props = associateElasticIPMapper.props(
+      buildComponentCtx({
+        configuration: {
+          region: "us-east-1",
+          operation: "disassociate",
+          instance: "i-abc123",
+        },
+        metadata: { region: "us-east-1", operation: "disassociate", instanceName: "my-server" },
+      }),
+    );
+
+    expect(props.metadata).toEqual([
+      { icon: "link", label: "Disassociate" },
+      { icon: "globe", label: "us-east-1" },
+    ]);
+  });
 });
 
 describe("associateElasticIPMapper.getExecutionDetails", () => {
