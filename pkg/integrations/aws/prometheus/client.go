@@ -205,6 +205,9 @@ func (c *Client) QueryMetrics(input QueryMetricsInput) (map[string]any, error) {
 	if err := c.requestJSONAtEndpoint(http.MethodGet, c.workspaceEndpoint(), path, query, nil, &response); err != nil {
 		return nil, err
 	}
+	if err := validatePrometheusQueryResponse(response); err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }
@@ -230,8 +233,38 @@ func (c *Client) QueryRangeMetrics(input QueryRangeMetricsInput) (map[string]any
 	if err := c.requestJSONAtEndpoint(http.MethodGet, c.workspaceEndpoint(), path, query, nil, &response); err != nil {
 		return nil, err
 	}
+	if err := validatePrometheusQueryResponse(response); err != nil {
+		return nil, err
+	}
 
 	return response, nil
+}
+
+func validatePrometheusQueryResponse(response map[string]any) error {
+	status, _ := response["status"].(string)
+	if status == "success" {
+		return nil
+	}
+
+	errorType, _ := response["errorType"].(string)
+	errorMessage, _ := response["error"].(string)
+	return formatPrometheusQueryError(errorType, errorMessage)
+}
+
+func formatPrometheusQueryError(errorType string, errorMessage string) error {
+	if errorType == "" && errorMessage == "" {
+		return fmt.Errorf("prometheus API returned non-success status")
+	}
+
+	if errorType == "" {
+		return fmt.Errorf("prometheus API error: %s", errorMessage)
+	}
+
+	if errorMessage == "" {
+		return fmt.Errorf("prometheus API error type: %s", errorType)
+	}
+
+	return fmt.Errorf("prometheus API error (%s): %s", errorType, errorMessage)
 }
 
 func (c *Client) requestJSON(method string, path string, query url.Values, payload any, out any) error {
