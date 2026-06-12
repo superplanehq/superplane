@@ -149,6 +149,15 @@ func (a *AuthService) newReadEnforcer(filters []gormadapter.Filter) (casbin.IEnf
 	return enforcer, nil
 }
 
+func (a *AuthService) withReadEnforcer(domainType, domainID string, fn func(casbin.IEnforcer) error) error {
+	enforcer, err := a.newReadEnforcer(policyFiltersForDomain(domainType, domainID))
+	if err != nil {
+		return err
+	}
+
+	return fn(enforcer)
+}
+
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
 	domain := prefixDomain(domainType, domainID)
 	filters := policyFiltersForDomain(domainType, domainID)
@@ -346,33 +355,44 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 
 func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
-	groupExists, err := a.groupExistsInDomain(group, domain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check group existence: %w", err)
-	}
-	if !groupExists {
-		return nil, fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
-	}
-
 	prefixedGroupName := prefixGroupName(group)
 
-	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get group users: %w", err)
-	}
-
 	var users []string
-	for _, policy := range policies {
-		unprefixedUserID := strings.TrimPrefix(policy[0], "/users/")
-		users = append(users, unprefixedUserID)
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		exists, err := a.groupExistsWithEnforcer(enforcer, group, domain)
+		if err != nil {
+			return fmt.Errorf("failed to check group existence: %w", err)
+		}
+		if !exists {
+			return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
+		}
+
+		policies, err := enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get group users: %w", err)
+		}
+
+		for _, policy := range policies {
+			unprefixedUserID := strings.TrimPrefix(policy[0], "/users/")
+			users = append(users, unprefixedUserID)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return users, nil
 }
 
 func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
+	return a.groupExistsWithEnforcer(a.enforcer, group, domain)
+}
+
+func (a *AuthService) groupExistsWithEnforcer(enforcer casbin.IEnforcer, group, domain string) (bool, error) {
 	prefixedGroupName := prefixGroupName(group)
-	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	groups, err := enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
 		return false, err
 	}
@@ -389,16 +409,24 @@ func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
 func (a *AuthService) GetUserGroups(domainID string, domainType string, userID string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedUserID := prefixUserID(userID)
-	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user groups: %w", err)
-	}
 
 	var userGroups []string
-	for _, group := range groups {
-		if strings.HasPrefix(group[1], "/groups/") {
-			userGroups = append(userGroups, strings.TrimPrefix(group[1], "/groups/"))
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		groups, err := enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
+		if err != nil {
+			return fmt.Errorf("failed to get user groups: %w", err)
 		}
+
+		for _, group := range groups {
+			if strings.HasPrefix(group[1], "/groups/") {
+				userGroups = append(userGroups, strings.TrimPrefix(group[1], "/groups/"))
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return userGroups, nil
@@ -406,23 +434,31 @@ func (a *AuthService) GetUserGroups(domainID string, domainType string, userID s
 
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
-	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get groups: %w", err)
-	}
 
-	groupMap := make(map[string]bool)
-
-	for _, policy := range policies {
-		if strings.HasPrefix(policy[0], "/groups/") {
-			groupName := policy[0][len("/groups/"):]
-			groupMap[groupName] = true
+	var groups []string
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		policies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get groups: %w", err)
 		}
-	}
 
-	groups := make([]string, 0, len(groupMap))
-	for group := range groupMap {
-		groups = append(groups, group)
+		groupMap := make(map[string]bool)
+		for _, policy := range policies {
+			if strings.HasPrefix(policy[0], "/groups/") {
+				groupName := policy[0][len("/groups/"):]
+				groupMap[groupName] = true
+			}
+		}
+
+		groups = make([]string, 0, len(groupMap))
+		for group := range groupMap {
+			groups = append(groups, group)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return groups, nil
@@ -431,17 +467,28 @@ func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, e
 func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedGroupName := prefixGroupName(group)
-	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
-	unprefixedRoles := []string{}
-	for _, role := range roles {
-		if strings.HasPrefix(role, "/roles/") {
-			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "/roles/"))
+
+	var role string
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		roles := enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
+		unprefixedRoles := []string{}
+		for _, r := range roles {
+			if strings.HasPrefix(r, "/roles/") {
+				unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(r, "/roles/"))
+			}
 		}
+		if len(unprefixedRoles) == 0 {
+			return fmt.Errorf("group %s not found in domain %s", group, domainID)
+		}
+
+		role = unprefixedRoles[0]
+		return nil
+	})
+	if err != nil {
+		return "", err
 	}
-	if len(unprefixedRoles) == 0 {
-		return "", fmt.Errorf("group %s not found in domain %s", group, domainID)
-	}
-	return unprefixedRoles[0], nil
+
+	return role, nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
@@ -519,17 +566,26 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
 	prefixedRole := prefixRoleName(role)
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
-	users, err := a.enforcer.GetUsersForRole(prefixedRole, orgDomain)
+
+	var unprefixedUsers []string
+	err := a.withReadEnforcer(models.DomainTypeOrganization, orgID, func(enforcer casbin.IEnforcer) error {
+		users, err := enforcer.GetUsersForRole(prefixedRole, orgDomain)
+		if err != nil {
+			return err
+		}
+
+		for _, user := range users {
+			if strings.HasPrefix(user, "/users/") {
+				unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "/users/"))
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	unprefixedUsers := []string{}
-	for _, user := range users {
-		if strings.HasPrefix(user, "/users/") {
-			unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "/users/"))
-		}
-	}
 	return unprefixedUsers, nil
 }
 
@@ -641,7 +697,17 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 }
 
 func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
-	return a.getRoleDefinition(a.enforcer, roleName, domainType, domainID)
+	var roleDefinition *RoleDefinition
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		var err error
+		roleDefinition, err = a.getRoleDefinition(enforcer, roleName, domainType, domainID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return roleDefinition, nil
 }
 
 func (a *AuthService) getRoleDefinition(enforcer casbin.IEnforcer, roleName string, domainType string, domainID string) (*RoleDefinition, error) {
@@ -690,18 +756,25 @@ func (a *AuthService) getRoleDefinition(enforcer casbin.IEnforcer, roleName stri
 func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
 	domain := prefixDomain(domainType, domainID)
 
-	roles, err := a.getRolesFromPolicies(domain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get roles for domain %s: %w", domain, err)
-	}
-
-	roleDefinitions := []*RoleDefinition{}
-	for _, roleName := range roles {
-		roleDef, err := a.GetRoleDefinition(roleName, domainType, domainID)
+	var roleDefinitions []*RoleDefinition
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		roles, err := a.getRolesFromPoliciesWithEnforcer(enforcer, domain)
 		if err != nil {
-			continue
+			return fmt.Errorf("failed to get roles for domain %s: %w", domain, err)
 		}
-		roleDefinitions = append(roleDefinitions, roleDef)
+
+		for _, roleName := range roles {
+			roleDef, err := a.getRoleDefinition(enforcer, roleName, domainType, domainID)
+			if err != nil {
+				continue
+			}
+			roleDefinitions = append(roleDefinitions, roleDef)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return roleDefinitions, nil
@@ -715,17 +788,24 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 	domain := prefixDomain(domainType, domainID)
 	prefixedRoleName := prefixRoleName(roleName)
 
-	// For custom roles, check if role exists by looking for policies
-	if !a.IsDefaultRole(roleName, domainType) {
-		// For custom roles, check if role exists by looking for policies
-		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-		if len(policies) == 0 && len(groupingPolicies) == 0 {
-			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	var permissions []*Permission
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		if !a.IsDefaultRole(roleName, domainType) {
+			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if len(policies) == 0 && len(groupingPolicies) == 0 {
+				return fmt.Errorf("role %s not found in domain %s", roleName, domain)
+			}
 		}
+
+		permissions = a.getRolePermissions(enforcer, roleName, domain, domainType)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return a.getRolePermissions(a.enforcer, roleName, domain, domainType), nil
+	return permissions, nil
 }
 
 func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
@@ -736,26 +816,32 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 	domain := prefixDomain(domainType, domainID)
 	prefixedRoleName := prefixRoleName(roleName)
 
-	// For custom roles, check if role exists by looking for policies
-	if !a.IsDefaultRole(roleName, domainType) {
-		// For custom roles, check if role exists by looking for policies
-		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-		if len(policies) == 0 && len(groupingPolicies) == 0 {
-			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	var hierarchy []string
+	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		if !a.IsDefaultRole(roleName, domainType) {
+			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if len(policies) == 0 && len(groupingPolicies) == 0 {
+				return fmt.Errorf("role %s not found in domain %s", roleName, domain)
+			}
 		}
-	}
 
-	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(roleName, domain)
+		implicitRoles, err := enforcer.GetImplicitRolesForUser(roleName, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get role hierarchy: %w", err)
+		}
+
+		hierarchy = []string{roleName}
+		for _, role := range implicitRoles {
+			if role != roleName {
+				hierarchy = append(hierarchy, role)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get role hierarchy: %w", err)
-	}
-
-	hierarchy := []string{roleName}
-	for _, role := range implicitRoles {
-		if role != roleName {
-			hierarchy = append(hierarchy, role)
-		}
+		return nil, err
 	}
 
 	return hierarchy, nil
@@ -1163,10 +1249,14 @@ func (a *AuthService) getInheritedRole(enforcer casbin.IEnforcer, roleName, doma
 }
 
 func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
+	return a.getRolesFromPoliciesWithEnforcer(a.enforcer, domain)
+}
+
+func (a *AuthService) getRolesFromPoliciesWithEnforcer(enforcer casbin.IEnforcer, domain string) ([]string, error) {
 	roleSet := make(map[string]bool)
 
 	// Get all policies where the domain matches (position 1 in policy)
-	policies, err := a.enforcer.GetFilteredPolicy(1, domain)
+	policies, err := enforcer.GetFilteredPolicy(1, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered policy: %w", err)
 	}
@@ -1179,7 +1269,7 @@ func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
 	}
 
 	// Also get roles from grouping policies (inheritance)
-	groupingPolicies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
+	groupingPolicies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get filtered grouping policy: %w", err)
 	}
