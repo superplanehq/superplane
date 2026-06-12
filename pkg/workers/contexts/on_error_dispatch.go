@@ -50,7 +50,7 @@ func dispatchOnError(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEv
 		}
 	}
 
-	payload, err := buildOnErrorPayload(tx, execution, nodes)
+	payload, err := buildOnErrorPayload(tx, execution, nodes, rootEvent)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func dispatchOnError(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEv
 	return nil
 }
 
-func buildOnErrorPayload(tx *gorm.DB, execution *models.CanvasNodeExecution, nodes []models.CanvasNode) (map[string]any, error) {
+func buildOnErrorPayload(tx *gorm.DB, execution *models.CanvasNodeExecution, nodes []models.CanvasNode, rootEvent *models.CanvasEvent) (map[string]any, error) {
 	erroredNode := findNode(nodes, execution.NodeID)
 
 	builder := NewNodeConfigurationBuilder(tx, execution.WorkflowID).
@@ -101,8 +101,28 @@ func buildOnErrorPayload(tx *gorm.DB, execution *models.CanvasNodeExecution, nod
 		"run": map[string]any{
 			"id": execution.RunID.String(),
 		},
+		"root":     buildRootInfo(nodes, rootEvent),
 		"payloads": payloads,
 	}, nil
+}
+
+// buildRootInfo describes the event that started the failed run, so On Error
+// handlers can display what originally triggered the chain.
+func buildRootInfo(nodes []models.CanvasNode, rootEvent *models.CanvasEvent) map[string]any {
+	rootNode := findNode(nodes, rootEvent.NodeID)
+
+	nodeInfo := map[string]any{
+		"id":        rootEvent.NodeID,
+		"component": componentNameForNode(rootNode),
+	}
+	if rootNode != nil {
+		nodeInfo["name"] = rootNode.Name
+	}
+
+	return map[string]any{
+		"node":    nodeInfo,
+		"payload": rootEvent.Data.Data(),
+	}
 }
 
 func onErrorNodesFrom(nodes []models.CanvasNode) []models.CanvasNode {

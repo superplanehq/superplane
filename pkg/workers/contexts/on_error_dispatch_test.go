@@ -102,6 +102,18 @@ func Test__DispatchOnError(t *testing.T) {
 
 		_, ok = payload["payloads"].(map[string]any)
 		assert.True(t, ok, "payload should include a payloads object")
+
+		root, ok := payload["root"].(map[string]any)
+		require.True(t, ok, "payload should include the run's root info")
+
+		rootNode, ok := root["node"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, triggerNodeID, rootNode["id"])
+		assert.Equal(t, "Manual Run", rootNode["name"])
+
+		rootPayload, ok := root["payload"].(map[string]any)
+		require.True(t, ok, "root payload should carry the triggering event data")
+		assert.Equal(t, "1.4.2", rootPayload["version"])
 	})
 
 	t.Run("does not emit for non-error failures", func(t *testing.T) {

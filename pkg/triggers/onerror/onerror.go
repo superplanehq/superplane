@@ -60,6 +60,8 @@ Each emitted event carries:
 - ` + "`node`" + `: the node that errored - its ` + "`id`" + `, ` + "`name`" + `, and ` + "`component`" + ` type
 - ` + "`error`" + `: the failure ` + "`reason`" + ` and human-readable ` + "`message`" + `
 - ` + "`run`" + `: the ` + "`id`" + ` of the run that failed
+- ` + "`root`" + `: the event that started the failed run - the originating ` + "`node`" + ` and
+  its ` + "`payload`" + `
 - ` + "`payloads`" + `: the payloads emitted by every upstream node in the failed run,
   keyed by node name
 
@@ -67,6 +69,7 @@ Each emitted event carries:
 
 - ` + "`$['On Error'].node.name`" + `: the name of the node that errored
 - ` + "`$['On Error'].error.message`" + `: the error message
+- ` + "`$['On Error'].root.payload.data.version`" + `: data from the event that triggered the failed run
 - ` + "`$['On Error'].payloads['Build'].data.version`" + `: data from an upstream node in the failed run`
 }
 

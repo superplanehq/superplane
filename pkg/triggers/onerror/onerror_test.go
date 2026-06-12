@@ -35,5 +35,6 @@ func TestOnError_ExampleDataMatchesPayloadShape(t *testing.T) {
 	assert.Contains(t, data, "node")
 	assert.Contains(t, data, "error")
 	assert.Contains(t, data, "run")
+	assert.Contains(t, data, "root")
 	assert.Contains(t, data, "payloads")
 }
