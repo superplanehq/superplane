@@ -1161,19 +1161,19 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: workflow_staged_files workflow_staging_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staging_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT workflow_staged_files_pkey PRIMARY KEY (id);
 
 
 --
--- Name: workflow_staged_files workflow_staging_version_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_version_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staging_version_id_path_key UNIQUE (version_id, path);
+    ADD CONSTRAINT workflow_staged_files_version_id_path_key UNIQUE (version_id, path);
 
 
 --
@@ -2167,27 +2167,27 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: workflow_staged_files workflow_staging_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staging_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
--- Name: workflow_staged_files workflow_staging_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staging_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
--- Name: workflow_staged_files workflow_staging_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staging_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_staged_files workflow_staged_files_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
 
 
 --
