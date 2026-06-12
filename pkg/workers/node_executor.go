@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -229,7 +230,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
-			metricReason = classifyProcessError(err)
+			metricReason = classifyAttemptFailure(err, nil)
 			return err
 		}
 
@@ -237,13 +238,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
-			metricReason = classifyProcessError(processErr)
+			metricReason = classifyAttemptFailure(processErr, execution)
 			return processErr
 		}
 
 		if execution.Result == models.CanvasNodeExecutionResultFailed {
 			metricOutcome = executorOutcomeFailed
-			metricReason = classifyExecutionFailure(execution)
+			metricReason = classifyAttemptFailure(nil, execution)
 		}
 
 		return nil
@@ -480,8 +481,32 @@ func classifyProcessError(err error) string {
 		return executorReasonNotFound
 	}
 
-	if strings.Contains(err.Error(), "deadlock detected") || strings.Contains(err.Error(), "40P01") {
+	if isDeadlockError(err) {
 		return executorReasonDeadlock
+	}
+
+	return executorReasonInternal
+}
+
+func classifyAttemptFailure(err error, execution *models.CanvasNodeExecution) string {
+	if err == nil {
+		if execution == nil {
+			return executorReasonNone
+		}
+		return classifyExecutionFailure(execution)
+	}
+
+	if reason := classifyProcessError(err); reason != executorReasonInternal {
+		return reason
+	}
+
+	if execution != nil {
+		if isDeadlockMessage(execution.ResultMessage) {
+			return executorReasonDeadlock
+		}
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			return classifyExecutionFailure(execution)
+		}
 	}
 
 	return executorReasonInternal
@@ -497,6 +522,20 @@ func classifyExecutionFailure(execution *models.CanvasNodeExecution) string {
 	}
 
 	return execution.ResultReason
+}
+
+func isDeadlockError(err error) bool {
+	for err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "40P01" {
+			return true
+		}
+		if isDeadlockMessage(err.Error()) {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }
 
 func isDeadlockMessage(message string) bool {
