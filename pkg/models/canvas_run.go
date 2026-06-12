@@ -236,7 +236,11 @@ func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {
 func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
 	err := tx.
-		Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+		// Run finalization checks for open child work before marking the run
+		// finished. Use FOR UPDATE, not FOR NO KEY UPDATE, so concurrent FK
+		// inserts for events, queue items, or executions cannot appear between
+		// the open-work check and the final state update.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", runID).
 		First(&run).
 		Error
