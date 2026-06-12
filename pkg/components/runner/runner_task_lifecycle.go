@@ -21,13 +21,13 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 }
 
 func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
 	taskID, ok := ctx.Parameters["task_id"].(string)
 	if !ok {
 		return fmt.Errorf("task_id is missing from parameters")
+	}
+
+	if ctx.ExecutionState.IsFinished() {
+		return nil
 	}
 
 	broker, err := NewBrokerClient(ctx.HTTP)

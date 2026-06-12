@@ -137,6 +137,7 @@ func BuildProcessQueueContext(
 
 		return &core.ExecutionContext{
 			ID:             execution.ID,
+			RunID:          execution.RunID,
 			WorkflowID:     execution.WorkflowID.String(),
 			OrganizationID: orgID,
 			CanvasName:     canvasName,
@@ -266,6 +267,7 @@ func BuildProcessQueueContext(
 
 		return &core.ExecutionContext{
 			ID:             execution.ID,
+			RunID:          execution.RunID,
 			WorkflowID:     execution.WorkflowID.String(),
 			OrganizationID: orgID,
 			CanvasName:     canvasName,
