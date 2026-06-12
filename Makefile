@@ -2,6 +2,13 @@
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
+
+# Auto-source local overrides from .env so host-side targets (e.g. profiling)
+# see the same values docker compose interpolates from it. Command-line
+# overrides still take precedence, and a missing .env file is ignored.
+-include .env
+export
+
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
