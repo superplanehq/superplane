@@ -76,10 +76,41 @@ func (s *CanvasSteps) ExitEditMode() {
 
 // OpenVersionsSidebar opens the Versions view via the canvas header tab.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.session.Click(q.TestID("canvas-view-mode-versions"))
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
+		sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
+		tabVisible, tabErr := versionsTab.IsVisible()
+		sidebarVisible, sidebarErr := sidebar.IsVisible()
+		if tabErr == nil && sidebarErr == nil && tabVisible && sidebarVisible {
+			s.session.Sleep(300)
+			return
+		}
+		if tabErr == nil {
+			if visible, _ := versionsTab.IsVisible(); !visible {
+				s.session.Click(q.TestID("canvas-view-mode-versions"))
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
+}
+
+// SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
+func (s *CanvasSteps) SelectRunInSidebar(runID string) {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)).Run(s.session)
+		if visible, err := runLink.IsVisible(); err == nil && visible {
+			s.session.Click(runLink)
+			s.session.Sleep(300)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.session.Click(q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)))
 }
 
 func (s *CanvasSteps) waitForToolSidebarOpen() {
@@ -112,10 +143,23 @@ func (s *CanvasSteps) waitForToolSidebarOpen() {
 // OpenDraftBranchInSidebar selects a draft branch from the Versions sidebar by display name.
 func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
 	s.OpenVersionsSidebar()
-	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") button`, displayName))
+	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") > button`, displayName))
 	s.session.Click(selector)
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
+}
+
+// WaitForRunsSidebar waits until the runs sidebar is visible on the canvas tab.
+func (s *CanvasSteps) WaitForRunsSidebar() {
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		sidebar := q.TestID("canvas-runs-sidebar").Run(s.session)
+		if visible, err := sidebar.IsVisible(); err == nil && visible {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
 }
 
 // ListDraftVersions returns all draft versions for this canvas, newest first.

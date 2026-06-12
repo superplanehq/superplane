@@ -13,12 +13,13 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(true);
   });
 
-  it("clears openRunDetailOnMount when leaving runs mode", () => {
+  it("clears openRunDetailOnMount when leaving run inspection", () => {
     const { result, rerender } = renderHook(
-      ({ isRunsMode, searchParams, selectedRunId }) => useRunsDetailState(searchParams, isRunsMode, selectedRunId),
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId),
       {
         initialProps: {
-          isRunsMode: true,
+          isRunInspectionMode: true,
           searchParams: makeSearchParams({ run: "run-1" }),
           selectedRunId: "run-1" as string | null,
         },
@@ -28,7 +29,7 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(true);
 
     rerender({
-      isRunsMode: false,
+      isRunInspectionMode: false,
       searchParams: makeSearchParams({ run: "run-1" }),
       selectedRunId: "run-1",
     });
@@ -36,12 +37,13 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(false);
   });
 
-  it("does not reopen detail after leaving and re-entering runs without a run param", () => {
+  it("does not reopen detail after leaving and re-entering run inspection without a run param", () => {
     const { result, rerender } = renderHook(
-      ({ isRunsMode, searchParams, selectedRunId }) => useRunsDetailState(searchParams, isRunsMode, selectedRunId),
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId),
       {
         initialProps: {
-          isRunsMode: true,
+          isRunInspectionMode: true,
           searchParams: makeSearchParams({ run: "run-1" }),
           selectedRunId: "run-1" as string | null,
         },
@@ -49,13 +51,13 @@ describe("useRunsDetailState", () => {
     );
 
     rerender({
-      isRunsMode: false,
+      isRunInspectionMode: false,
       searchParams: makeSearchParams({ run: "run-1" }),
       selectedRunId: "run-1",
     });
 
     rerender({
-      isRunsMode: true,
+      isRunInspectionMode: true,
       searchParams: makeSearchParams(),
       selectedRunId: null,
     });
@@ -63,12 +65,13 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(false);
   });
 
-  it("reopens detail when re-entering runs with a run param that was not dismissed", () => {
+  it("reopens detail when entering run inspection with a run param that was not dismissed", () => {
     const { result, rerender } = renderHook(
-      ({ isRunsMode, searchParams, selectedRunId }) => useRunsDetailState(searchParams, isRunsMode, selectedRunId),
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId),
       {
         initialProps: {
-          isRunsMode: true,
+          isRunInspectionMode: false,
           searchParams: makeSearchParams({ run: "run-1" }),
           selectedRunId: "run-1" as string | null,
         },
@@ -76,13 +79,7 @@ describe("useRunsDetailState", () => {
     );
 
     rerender({
-      isRunsMode: false,
-      searchParams: makeSearchParams({ run: "run-1" }),
-      selectedRunId: "run-1",
-    });
-
-    rerender({
-      isRunsMode: true,
+      isRunInspectionMode: true,
       searchParams: makeSearchParams({ run: "run-2" }),
       selectedRunId: "run-2",
     });
@@ -90,12 +87,68 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(true);
   });
 
-  it("keeps detail closed when the user dismissed detail for the run in the URL", () => {
+  it("clears the selected run node when the run changes", () => {
     const { result, rerender } = renderHook(
-      ({ isRunsMode, searchParams, selectedRunId }) => useRunsDetailState(searchParams, isRunsMode, selectedRunId),
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId),
       {
         initialProps: {
-          isRunsMode: true,
+          isRunInspectionMode: true,
+          searchParams: makeSearchParams({ run: "run-1" }),
+          selectedRunId: "run-1" as string | null,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setRunDetailNodeId("node-1");
+    });
+    expect(result.current.runDetailNodeId).toBe("node-1");
+
+    rerender({
+      isRunInspectionMode: true,
+      searchParams: makeSearchParams({ run: "run-2" }),
+      selectedRunId: "run-2",
+    });
+
+    expect(result.current.runDetailNodeId).toBeNull();
+  });
+
+  it("preserves the selected run node when flagged before changing runs", () => {
+    const preserveRunDetailNodeOnNextRunChangeRef = { current: false };
+    const { result, rerender } = renderHook(
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, preserveRunDetailNodeOnNextRunChangeRef),
+      {
+        initialProps: {
+          isRunInspectionMode: true,
+          searchParams: makeSearchParams({ run: "run-1" }),
+          selectedRunId: "run-1" as string | null,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setRunDetailNodeId("node-1");
+    });
+
+    preserveRunDetailNodeOnNextRunChangeRef.current = true;
+    rerender({
+      isRunInspectionMode: true,
+      searchParams: makeSearchParams({ run: "run-2" }),
+      selectedRunId: "run-2",
+    });
+
+    expect(result.current.runDetailNodeId).toBe("node-1");
+  });
+
+  it("keeps detail closed when the user dismissed detail for the run in the URL", () => {
+    const { result, rerender } = renderHook(
+      ({ isRunInspectionMode, searchParams, selectedRunId }) =>
+        useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId),
+      {
+        initialProps: {
+          isRunInspectionMode: true,
           searchParams: makeSearchParams({ run: "run-1" }),
           selectedRunId: "run-1" as string | null,
         },
@@ -109,13 +162,13 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(false);
 
     rerender({
-      isRunsMode: false,
+      isRunInspectionMode: false,
       searchParams: makeSearchParams({ run: "run-1" }),
       selectedRunId: "run-1",
     });
 
     rerender({
-      isRunsMode: true,
+      isRunInspectionMode: true,
       searchParams: makeSearchParams({ run: "run-1" }),
       selectedRunId: "run-1",
     });

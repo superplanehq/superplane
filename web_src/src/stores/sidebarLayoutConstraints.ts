@@ -1,4 +1,6 @@
 export const SIDEBAR_MIN_WIDTH = 300;
+/** Runs/Versions auxiliary sidebar can be narrower than the agent or component sidebars. */
+export const AUX_SIDEBAR_MIN_WIDTH = 240;
 export const MIDDLE_MIN_WIDTH = 220;
 
 export interface SidebarLayoutSnapshot {
@@ -38,8 +40,8 @@ function shrinkLeftPanelsToFit(
   let nextAux = auxLeftWidth;
   let overflow = currentLeftTotal - allowedLeftTotal;
 
-  if (auxMounted && auxLeftWidth > SIDEBAR_MIN_WIDTH) {
-    const auxShrink = Math.min(overflow, auxLeftWidth - SIDEBAR_MIN_WIDTH);
+  if (auxMounted && auxLeftWidth > AUX_SIDEBAR_MIN_WIDTH) {
+    const auxShrink = Math.min(overflow, auxLeftWidth - AUX_SIDEBAR_MIN_WIDTH);
     nextAux = auxLeftWidth - auxShrink;
     overflow -= auxShrink;
   }
@@ -95,7 +97,7 @@ export function computeResizeAuxLeft(state: SidebarLayoutSnapshot, target: numbe
   const rightMounted = rightIsMounted(state);
   const leftFloor = leftMounted ? state.leftWidth : 0;
   const maxAux = sidebarCap(viewport, leftFloor + (rightMounted ? state.rightWidth : 0));
-  const nextAux = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxAux, Math.round(target)));
+  const nextAux = Math.max(AUX_SIDEBAR_MIN_WIDTH, Math.min(maxAux, Math.round(target)));
 
   let nextRight = state.rightWidth;
   if (rightMounted) {
