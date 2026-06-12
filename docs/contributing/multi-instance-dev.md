@@ -39,5 +39,6 @@ These are the ports you can override per repo:
 | PgWeb | `PGWEB_PORT` | `8081` | `8082` |
 | RabbitMQ | `RABBITMQ_PORT` | `5672` | `5673` |
 | RabbitMQ UI | `RABBITMQ_MANAGEMENT_PORT` | `15672` | `15673` |
+| pprof | `PPROF_PORT` | `6060` | `6061` |
 | Base URL | `BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |
 | Webhooks base URL | `WEBHOOKS_BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |
