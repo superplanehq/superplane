@@ -2520,9 +2520,7 @@ export function AppPage() {
 
       if (node.type === "TYPE_ACTION" || node.type === "TYPE_TRIGGER") {
         const metadata =
-          node.type === "TYPE_ACTION"
-            ? allComponentsByName.get(node.component)
-            : allTriggersByName.get(node.component);
+          node.type === "TYPE_ACTION" ? allComponentsByName.get(node.component) : allTriggersByName.get(node.component);
         configurationFields = metadata?.configuration || [];
         displayLabel = metadata?.label || displayLabel;
         blockName = node.component;

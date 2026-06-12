@@ -78,7 +78,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version:      SerializeCanvasVersionMetadata(version, organizationID),
+		Version:        SerializeCanvasVersionMetadata(version, organizationID),
 		StagingSummary: state,
 	}, nil
 }
