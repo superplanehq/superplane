@@ -83,7 +83,15 @@ function looksLikeHtmlDocument(value: string): boolean {
   );
 }
 
-function looksLikeBrowserNetworkError(value: string): boolean {
+/**
+ * Recognizes the generic "the network broke" messages that browsers raise when
+ * a fetch is rejected (offline, DNS failure, blocked by ad-blocker, etc).
+ *
+ * These are not actionable from the application's side, so we use this both to
+ * suppress them from user-facing error messages and to drop them before they
+ * are reported to Sentry.
+ */
+export function looksLikeBrowserNetworkError(value: string): boolean {
   const normalized = value.trim().toLowerCase();
 
   return (
