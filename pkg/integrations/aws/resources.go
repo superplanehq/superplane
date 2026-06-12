@@ -64,6 +64,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.elasticIp":
 		return ec2.ListElasticIPs(ctx, resourceType)
 
+	case "ec2.elasticIpUnassociated":
+		return ec2.ListUnassociatedElasticIPs(ctx, resourceType)
+
 	case "ec2.elasticIpAssociation":
 		return ec2.ListElasticIPAssociations(ctx, resourceType)
 

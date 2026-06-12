@@ -49,6 +49,36 @@ func Test__ListElasticIPs(t *testing.T) {
 	})
 }
 
+func Test__ListUnassociatedElasticIPs(t *testing.T) {
+	t.Run("missing region -> error", func(t *testing.T) {
+		_, err := ListUnassociatedElasticIPs(core.ListResourcesContext{
+			Integration: elasticIPIntegration(),
+			Parameters:  map[string]string{},
+		}, ResourceTypeElasticIPUnassociated)
+		require.ErrorContains(t, err, "region is required")
+	})
+
+	t.Run("returns only unassociated Elastic IPs", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeAddressesXML()),
+			},
+		}
+
+		resources, err := ListUnassociatedElasticIPs(core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: elasticIPIntegration(),
+			Parameters:  map[string]string{"region": "us-east-1"},
+		}, ResourceTypeElasticIPUnassociated)
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, ResourceTypeElasticIPUnassociated, resources[0].Type)
+		assert.Equal(t, "eipalloc-def456", resources[0].ID)
+		assert.Equal(t, "198.51.100.5 (eipalloc-def456)", resources[0].Name)
+	})
+}
+
 func Test__ListElasticIPAssociations(t *testing.T) {
 	t.Run("missing region -> error", func(t *testing.T) {
 		_, err := ListElasticIPAssociations(core.ListResourcesContext{
