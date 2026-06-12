@@ -65,19 +65,56 @@ func ReadRepositorySpecFile(
 	versionID string,
 	path string,
 ) (string, error) {
+	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, false)
+}
+
+// ReadRepositorySpecFileStaged returns the effective draft content for a spec
+// path: staged content when present, the materialized version row otherwise.
+func ReadRepositorySpecFileStaged(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	path string,
+) (string, error) {
+	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, true)
+}
+
+func readRepositorySpecFile(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	path string,
+	stage bool,
+) (string, error) {
 	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", err
 	}
 
 	normalized := normalizeRepositoryFilePath(path)
+	if normalized != CanvasYAMLRepositoryPath && normalized != ConsoleYAMLRepositoryPath {
+		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+	}
+
+	if stage {
+		if err := ensureStagedReadAllowed(ctx, version); err != nil {
+			return "", err
+		}
+
+		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
+		if stagingErr != nil {
+			return "", stagingErr
+		}
+		return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
+	}
+
 	switch normalized {
 	case CanvasYAMLRepositoryPath:
 		return canvasYAMLFromVersion(canvas, version, organizationID)
-	case ConsoleYAMLRepositoryPath:
-		return consoleYAMLFromVersion(version)
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+		return consoleYAMLFromVersion(version)
 	}
 }
 
@@ -137,21 +174,12 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
-	if !hasAutoLayout {
-		return nil
-	}
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
-		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
-		len(autoLayout.NodeIds) == 0 {
-		return nil
-	}
-	return autoLayout
-}
-
+// ApplyRepositorySpecFileOperations parses canvas.yaml/console.yaml content into
+// the draft version row. It is the validated write path shared by the
+// staging-commit flow (CommitCanvasStaging) and the direct-commit flow
+// (CommitCanvasRepositoryFiles). When autoLayout is set it lays out canvas.yaml
+// during the write; when discardStaging is set it drops any staged edits for the
+// version in the same transaction as the version-row write.
 func ApplyRepositorySpecFileOperations(
 	ctx context.Context,
 	usageService usage.Service,
@@ -163,6 +191,7 @@ func ApplyRepositorySpecFileOperations(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 	autoLayout *pb.CanvasAutoLayout,
+	discardStaging bool,
 	operations []*pb.CanvasRepositoryFileOperation,
 ) error {
 	if strings.TrimSpace(versionID) == "" {
@@ -199,6 +228,7 @@ func ApplyRepositorySpecFileOperations(
 				autoLayout,
 				webhookBaseURL,
 				authService,
+				discardStaging,
 			)
 			if err != nil {
 				return err
@@ -209,7 +239,7 @@ func ApplyRepositorySpecFileOperations(
 				return err
 			}
 
-			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout)
+			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging)
 			if err != nil {
 				return err
 			}
@@ -219,6 +249,40 @@ func ApplyRepositorySpecFileOperations(
 	}
 
 	return nil
+}
+
+// ParseAndValidateCanvasYAML parses canvas.yaml text and runs the same registry
+// validation as the commit path, returning materialized nodes/edges (carrying
+// per-node error/warning messages) without persisting anything. Agent tools use
+// it to validate staged edits before staging and to summarize staged content.
+func ParseAndValidateCanvasYAML(registry *registry.Registry, organizationID, text string) ([]models.Node, []models.Edge, error) {
+	pbCanvas, err := canvasFromYAMLText(text)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ParseCanvas(registry, organizationID, pbCanvas)
+}
+
+// ValidateConsoleYAML parses and validates console.yaml text without persisting,
+// mirroring the validation the commit path runs before writing the version row.
+func ValidateConsoleYAML(text string) error {
+	_, _, err := consolePanelsLayoutFromYAMLText(text)
+	return err
+}
+
+func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
+	if !hasAutoLayout {
+		return nil
+	}
+	if autoLayout == nil {
+		return nil
+	}
+	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
+		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
+		len(autoLayout.NodeIds) == 0 {
+		return nil
+	}
+	return autoLayout
 }
 
 func splitRepositoryFileOperations(operations []*pb.CanvasRepositoryFileOperation) (specOps []*pb.CanvasRepositoryFileOperation, gitOps []*pb.CanvasRepositoryFileOperation) {
