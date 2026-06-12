@@ -14,8 +14,11 @@ import { interpolateMarkdownTemplate } from "./markdownInterpolation";
 export function MarkdownBody({ body, vars }: { body: string; vars: Record<string, unknown> }) {
   // Interpolate `{{ name.field }}` (and `$["Node"]` run-node references) before
   // delegating to the shared markdown renderer so live values flow through the
-  // same sanitize + GFM pipeline as static markdown.
-  const interpolated = useMemo(() => interpolateMarkdownTemplate(body, vars), [body, vars]);
+  // same sanitize + GFM pipeline as static markdown. Trim here (not in
+  // MarkdownContent) so panel-authored content keeps its historical "ignore
+  // leading/trailing whitespace" behavior while the file viewer still sees
+  // its content byte-for-byte.
+  const interpolated = useMemo(() => interpolateMarkdownTemplate(body, vars).trim(), [body, vars]);
   return <MarkdownContent content={interpolated} data-testid="console-markdown" />;
 }
 
