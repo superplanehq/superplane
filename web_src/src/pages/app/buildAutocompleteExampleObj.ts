@@ -232,10 +232,6 @@ function buildNamedExampleObj({
     namedExampleObj[nodeName] = value;
   }
 
-  if (Object.keys(namedExampleObj).length === 0) {
-    return null;
-  }
-
   if (exampleObj.__root) {
     namedExampleObj.__root = exampleObj.__root;
   }
@@ -251,6 +247,10 @@ function buildNamedExampleObj({
   }
   if (currentNodeId) {
     delete nodeMetadata[currentNodeId];
+  }
+
+  if (Object.keys(namedExampleObj).length === 0) {
+    return null;
   }
 
   if (Object.keys(nodeMetadata).length > 0) {
