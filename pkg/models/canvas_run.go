@@ -17,6 +17,10 @@ const (
 	CanvasRunResultPassed    = "passed"
 	CanvasRunResultFailed    = "failed"
 	CanvasRunResultCancelled = "cancelled"
+
+	// Used when locking rows to update non-key columns only, so concurrent child
+	// inserts referencing the row via FK are not blocked (PostgreSQL FOR NO KEY UPDATE).
+	lockingForUpdateNoKey = "NO KEY UPDATE"
 )
 
 type CanvasRun struct {
@@ -232,6 +236,10 @@ func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {
 func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
 	err := tx.
+		// Run finalization checks for open child work before marking the run
+		// finished. Use FOR UPDATE, not FOR NO KEY UPDATE, so concurrent FK
+		// inserts for events, queue items, or executions cannot appear between
+		// the open-work check and the final state update.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", runID).
 		First(&run).
