@@ -21,7 +21,7 @@ func Test__ListElasticIPs(t *testing.T) {
 		require.ErrorContains(t, err, "region is required")
 	})
 
-	t.Run("returns allocated Elastic IPs", func(t *testing.T) {
+	t.Run("returns only VPC Elastic IPs, excluding classic standard-domain addresses", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				okResponse(describeAddressesXML()),
@@ -58,7 +58,7 @@ func Test__ListUnassociatedElasticIPs(t *testing.T) {
 		require.ErrorContains(t, err, "region is required")
 	})
 
-	t.Run("returns only unassociated Elastic IPs", func(t *testing.T) {
+	t.Run("returns only unassociated VPC Elastic IPs, excluding classic standard-domain addresses", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				okResponse(describeAddressesXML()),
@@ -88,7 +88,7 @@ func Test__ListElasticIPAssociations(t *testing.T) {
 		require.ErrorContains(t, err, "region is required")
 	})
 
-	t.Run("returns only associated Elastic IPs", func(t *testing.T) {
+	t.Run("returns only associated VPC Elastic IPs, excluding classic standard-domain addresses", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				okResponse(describeAddressesXML()),
@@ -121,13 +121,15 @@ func Test__Client__ListAddresses(t *testing.T) {
 
 	addresses, err := client.ListAddresses()
 	require.NoError(t, err)
-	require.Len(t, addresses, 2)
+	require.Len(t, addresses, 3)
 	assert.Equal(t, "eipalloc-abc123", addresses[0].AllocationID)
 	assert.Equal(t, "eipassoc-xyz789", addresses[0].AssociationID)
 	assert.Equal(t, "203.0.113.10", addresses[0].PublicIP)
 	assert.Equal(t, "i-abc123", addresses[0].InstanceID)
 	assert.Equal(t, "vpc", addresses[0].Domain)
 	assert.Equal(t, "", addresses[1].AssociationID)
+	assert.Equal(t, "eipalloc-classic", addresses[2].AllocationID)
+	assert.Equal(t, "standard", addresses[2].Domain)
 }
 
 func describeAddressesXML() string {
@@ -146,6 +148,11 @@ func describeAddressesXML() string {
 					<publicIp>198.51.100.5</publicIp>
 					<allocationId>eipalloc-def456</allocationId>
 					<domain>vpc</domain>
+				</item>
+				<item>
+					<publicIp>192.0.2.100</publicIp>
+					<allocationId>eipalloc-classic</allocationId>
+					<domain>standard</domain>
 				</item>
 			</addressesSet>
 		</DescribeAddressesResponse>`

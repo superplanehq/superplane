@@ -315,6 +315,10 @@ func ListElasticIPs(ctx core.ListResourcesContext, resourceType string) ([]core.
 
 	resources := make([]core.IntegrationResource, 0, len(addresses))
 	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
 		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
 			Name: elasticIPResourceName(address),
@@ -344,6 +348,10 @@ func ListUnassociatedElasticIPs(ctx core.ListResourcesContext, resourceType stri
 
 	resources := make([]core.IntegrationResource, 0, len(addresses))
 	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
 		if strings.TrimSpace(address.AssociationID) != "" {
 			continue
 		}
@@ -377,6 +385,10 @@ func ListElasticIPAssociations(ctx core.ListResourcesContext, resourceType strin
 
 	resources := make([]core.IntegrationResource, 0, len(addresses))
 	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
 		associationID := strings.TrimSpace(address.AssociationID)
 		if associationID == "" {
 			continue
