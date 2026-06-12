@@ -296,6 +296,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` section 6
 | `intervalSeconds: 0` | `intervalSeconds: 1` | Minimum is 1 |
 | `timezone: "UTC"` | `timezone: "0"` | Must be numeric offset, not IANA name |
 | Missing `metadata.id` | Always include `metadata.id: <app-id>` | Required for updates — get from app context |
+| `edges: [{source: a, target: b}]` | `edges: [{sourceId: a, targetId: b, channel: default}]` | Canvas YAML is strict; `source` and `target` are invalid fields |
 | Using integration without ID | Add `integration: {id: "..."}` | Check `integrations list` |
 | `start` with `configuration: {}` | `templates: [{name, payload, parameters?}]` | Manual Run needs templates for the UI Run button and hook execution |
 
