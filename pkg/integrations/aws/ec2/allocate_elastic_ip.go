@@ -335,7 +335,7 @@ func buildAllocateAddressInput(config AllocateElasticIPConfiguration, ipSource s
 		input.IpamPoolID = strings.TrimSpace(config.IpamPoolID)
 	}
 
-	if config.Address != nil {
+	if ipSource != allocateIPSourceAmazon && config.Address != nil {
 		input.Address = strings.TrimSpace(*config.Address)
 	}
 
