@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -117,17 +116,4 @@ func (c *DeleteWorkspace) Hooks() []core.Hook {
 
 func (c *DeleteWorkspace) HandleHook(ctx core.ActionHookContext) error {
 	return nil
-}
-
-func workspaceAliasFromExecution(ctx core.ExecutionContext) string {
-	if ctx.NodeMetadata == nil {
-		return ""
-	}
-
-	metadata := WorkspaceNodeMetadata{}
-	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata); err != nil {
-		return ""
-	}
-
-	return metadata.WorkspaceAlias
 }

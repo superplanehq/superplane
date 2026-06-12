@@ -41,6 +41,23 @@ export interface WorkspaceNodeMetadata {
   workspaceAlias?: string;
 }
 
+export interface QueryConfiguration {
+  region?: string;
+  workspace?: string;
+  query?: string;
+}
+
+export interface QueryRangeConfiguration extends QueryConfiguration {
+  start?: string;
+  end?: string;
+  step?: string;
+}
+
+export interface PrometheusQueryPayload {
+  resultType?: string;
+  result?: unknown[];
+}
+
 export function buildPrometheusComponentProps(
   context: ComponentBaseContext,
   metadata: MetadataItem[],
@@ -142,6 +159,74 @@ export function formatExecutionTimestamp(
 export function workspaceAliasFromMetadata(node: NodeInfo): string | undefined {
   const metadata = node.metadata as WorkspaceNodeMetadata | undefined;
   return metadata?.workspaceAlias?.trim() || undefined;
+}
+
+export function queryMetadataList(node: NodeInfo, range = false): MetadataItem[] {
+  const config = (node.configuration ?? {}) as QueryRangeConfiguration;
+  const items = [
+    metadataItem("activity", workspaceMetadataLabel(node, config)),
+    metadataItem("search", config.query),
+    rangeMetadataItem(config, range),
+  ];
+
+  return items.filter(isMetadataItem).slice(0, MAX_METADATA_ITEMS);
+}
+
+function workspaceMetadataLabel(node: NodeInfo, config: QueryConfiguration): string | undefined {
+  return workspaceAliasFromMetadata(node) ?? config.workspace;
+}
+
+function rangeMetadataItem(config: QueryRangeConfiguration, range: boolean): MetadataItem | undefined {
+  if (range) {
+    return metadataItem("clock", startMetadataLabel(config.start));
+  }
+
+  return metadataItem("globe", config.region);
+}
+
+function startMetadataLabel(start: string | undefined): string | undefined {
+  if (!start) {
+    return undefined;
+  }
+
+  return `Start: ${start}`;
+}
+
+function metadataItem(icon: MetadataItem["icon"], label: string | undefined): MetadataItem | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  return { icon, label };
+}
+
+function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+  return item !== undefined;
+}
+
+export function queryDetails(
+  execution: ExecutionInfo,
+  node: NodeInfo,
+  payload: PrometheusQueryPayload | undefined,
+): Record<string, string> {
+  const config = node.configuration as QueryRangeConfiguration | undefined;
+  const details: Record<string, string> = {
+    "Executed At": stringOrDash(formatExecutionTimestamp(execution)),
+    Alias: stringOrDash(workspaceAliasFromMetadata(node) ?? config?.workspace),
+  };
+
+  details["Result Type"] = stringOrDash(payload?.resultType);
+  details.Results = resultCount(payload);
+
+  return details;
+}
+
+function resultCount(payload: PrometheusQueryPayload | undefined): string {
+  if (payload?.result === undefined) {
+    return "-";
+  }
+
+  return String(Array.isArray(payload.result) ? payload.result.length : 0);
 }
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
