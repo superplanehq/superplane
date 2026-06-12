@@ -216,6 +216,19 @@ func resolveWorkspaceAlias(ctx core.SetupContext, region string, workspaceID str
 	return alias
 }
 
+func workspaceAliasFromExecution(ctx core.ExecutionContext) string {
+	if ctx.NodeMetadata == nil {
+		return ""
+	}
+
+	metadata := WorkspaceNodeMetadata{}
+	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata); err != nil {
+		return ""
+	}
+
+	return metadata.WorkspaceAlias
+}
+
 func noopWebhook() (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
