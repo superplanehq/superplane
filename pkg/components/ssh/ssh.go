@@ -563,38 +563,46 @@ func resolveCommands(ctx core.ExecutionContext, spec Spec, source string) (strin
 		return spec.Commands, nil
 
 	case CommandSourceFile:
-		path := strings.TrimSpace(spec.CommandFile)
-		if path == "" {
-			return "", errors.New("command file is required")
-		}
-		normalized, err := gitprovider.ValidateUserPath(path)
-		if err != nil {
-			return "", fmt.Errorf("invalid command file %q: %w", path, err)
-		}
-		if ctx.Files == nil {
-			return "", errors.New("command file configured but file access is not available")
-		}
-		reader, err := ctx.Files.Read(normalized)
-		if err != nil {
-			return "", fmt.Errorf("read command file %q: %w", path, err)
-		}
-		defer reader.Close()
-
-		data, err := io.ReadAll(io.LimitReader(reader, maxCommandFileSize+1))
-		if err != nil {
-			return "", fmt.Errorf("read command file %q: %w", path, err)
-		}
-		if len(data) > maxCommandFileSize {
-			return "", fmt.Errorf("command file %q exceeds maximum size of %d bytes", path, maxCommandFileSize)
-		}
-		if strings.TrimSpace(string(data)) == "" {
-			return "", fmt.Errorf("command file %q is empty", path)
-		}
-		return string(data), nil
+		return loadCommandFile(ctx.Files, spec.CommandFile)
 
 	default:
 		return "", fmt.Errorf("invalid command source: %s", spec.CommandSource)
 	}
+}
+
+// loadCommandFile reads, size-limits, and validates the command file referenced
+// by rawPath, returning its content verbatim. It rejects empty or
+// whitespace-only files so both Setup (publish time) and Execute (run time)
+// agree on what counts as a runnable script.
+func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string, error) {
+	path := strings.TrimSpace(rawPath)
+	if path == "" {
+		return "", errors.New("command file is required")
+	}
+	normalized, err := gitprovider.ValidateUserPath(path)
+	if err != nil {
+		return "", fmt.Errorf("invalid command file %q: %w", path, err)
+	}
+	if files == nil {
+		return "", errors.New("command file configured but file access is not available")
+	}
+	reader, err := files.Read(normalized)
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(io.LimitReader(reader, maxCommandFileSize+1))
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	if len(data) > maxCommandFileSize {
+		return "", fmt.Errorf("command file %q exceeds maximum size of %d bytes", path, maxCommandFileSize)
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return "", fmt.Errorf("command file %q is empty", path)
+	}
+	return string(data), nil
 }
 
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
@@ -892,12 +900,23 @@ func validateCommandSource(ctx core.SetupContext, spec Spec) error {
 		if err != nil {
 			return fmt.Errorf("failed to list repository files: %w", err)
 		}
+		found := false
 		for _, candidate := range available {
 			if norm, normErr := gitprovider.NormalizePath(candidate); normErr == nil && norm == normalized {
-				return nil
+				found = true
+				break
 			}
 		}
-		return fmt.Errorf("command file %q not found in app repository", path)
+		if !found {
+			return fmt.Errorf("command file %q not found in app repository", path)
+		}
+		// The file exists; read it now so publish fails fast on empty or
+		// whitespace-only scripts instead of letting every execution fail
+		// with an empty-file error.
+		if _, err := loadCommandFile(ctx.Files, spec.CommandFile); err != nil {
+			return err
+		}
+		return nil
 
 	default:
 		return fmt.Errorf("invalid command source: %s", spec.CommandSource)

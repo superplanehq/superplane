@@ -315,6 +315,15 @@ func TestSSHCommand_Setup_FileMode(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("whitespace-only file content is rejected at setup", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: baseConfig(map[string]any{"commandFile": "scripts/deploy.sh"}),
+			Files:         &fakeFilesContext{files: map[string]string{"scripts/deploy.sh": "  \n\t"}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty")
+	})
+
 	t.Run("file mode ignores stale inline commands field", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: baseConfig(map[string]any{
