@@ -579,28 +579,28 @@ class ExprDate {
   constructor(private date: Date) {}
 
   Year(): number {
-    return this.date.getFullYear();
+    return this.date.getUTCFullYear();
   }
   Month(): number {
-    return this.date.getMonth() + 1; // 1-indexed like Go
+    return this.date.getUTCMonth() + 1; // 1-indexed like Go
   }
   Day(): number {
-    return this.date.getDate();
+    return this.date.getUTCDate();
   }
   Hour(): number {
-    return this.date.getHours();
+    return this.date.getUTCHours();
   }
   Minute(): number {
-    return this.date.getMinutes();
+    return this.date.getUTCMinutes();
   }
   Second(): number {
-    return this.date.getSeconds();
+    return this.date.getUTCSeconds();
   }
   Weekday(): number {
-    return this.date.getDay();
+    return this.date.getUTCDay();
   }
   YearDay(): number {
-    const start = new Date(this.date.getFullYear(), 0, 0);
+    const start = new Date(Date.UTC(this.date.getUTCFullYear(), 0, 0));
     const diff = this.date.getTime() - start.getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
@@ -622,12 +622,12 @@ class ExprDate {
     const fmt = layout ?? "2006-01-02 15:04:05";
     const pad = (n: number, width: number = 2) => String(n).padStart(width, "0");
     const replacements: Record<string, string> = {
-      "2006": String(this.date.getFullYear()),
-      "01": pad(this.date.getMonth() + 1),
-      "02": pad(this.date.getDate()),
-      "15": pad(this.date.getHours()),
-      "04": pad(this.date.getMinutes()),
-      "05": pad(this.date.getSeconds()),
+      "2006": String(this.date.getUTCFullYear()),
+      "01": pad(this.date.getUTCMonth() + 1),
+      "02": pad(this.date.getUTCDate()),
+      "15": pad(this.date.getUTCHours()),
+      "04": pad(this.date.getUTCMinutes()),
+      "05": pad(this.date.getUTCSeconds()),
     };
     return fmt.replace(/2006|01|02|15|04|05/g, (token) => replacements[token]);
   }
