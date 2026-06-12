@@ -2,7 +2,6 @@ import {
   ArrowRightLeft,
   BookOpen,
   CircleUser,
-  History,
   LogOut,
   MemoryStick,
   Palette,
@@ -36,7 +35,7 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "console" | "memory" | "runs" | "versions") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
@@ -128,16 +127,8 @@ export function buildCurrentCanvasActions({
       label: "Runs",
       description: currentCanvasName,
       icon: PlayCircle,
-      onSelect: () => goToCurrentCanvasView("runs"),
+      onSelect: () => goToCurrentCanvasView(),
       keywords: ["runs", "executions"],
-    },
-    {
-      id: "current-canvas-versions",
-      label: "Versions",
-      description: currentCanvasName,
-      icon: History,
-      onSelect: () => goToCurrentCanvasView("versions"),
-      keywords: ["versions", "version history", "change requests"],
     },
     {
       id: "current-canvas-memory",
