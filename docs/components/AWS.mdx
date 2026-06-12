@@ -34,7 +34,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Allocate Elastic IP" href="#ec2-•-allocate-elastic-ip" description="Allocate a new Elastic IP address in a VPC" />
-  <LinkCard title="EC2 • Associate Elastic IP" href="#ec2-•-associate-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 resource" />
+  <LinkCard title="EC2 • Associate Elastic IP" href="#ec2-•-associate-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 instance" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
@@ -1136,7 +1136,7 @@ Emits the allocated Elastic IP details on the default output channel:
 
 **Component key:** `aws.ec2.associateElasticIP`
 
-The Associate Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance or network interface.
+The Associate Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
 
 ### Use Cases
 
