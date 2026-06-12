@@ -57,39 +57,35 @@ export function RunRow({
         className="absolute inset-0 z-0"
         aria-label={title}
       />
-      <RunNodeIcon
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        alt={triggerName}
-        size={RUN_NODE_ICON_SIZE}
-        className={cn(
-          "pointer-events-none relative z-0 h-3.5 w-3.5 shrink-0",
-          isSelected ? "text-gray-800" : "text-gray-500",
-        )}
-      />
-      <span
-        aria-label={RUN_STATUS_META[status].label}
-        title={RUN_STATUS_META[status].label}
-        className={cn(
-          "pointer-events-none relative z-0 inline-block h-2 w-2 shrink-0 rounded-full",
-          RUN_STATUS_META[status].dotClassName,
-        )}
-      />
-      <span
-        className={cn(
-          "pointer-events-none relative z-0 max-w-[35%] min-w-0 shrink truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
-          isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
-        )}
-      >
-        {triggerName}
-      </span>
-      <span
-        className={cn(
-          "pointer-events-none relative z-0 min-w-0 flex-1 truncate text-[13px]",
-          isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
-        )}
-      >
-        {title}
+      <span className="pointer-events-none relative z-0 flex min-w-0 flex-1 items-center gap-1.5">
+        <RunNodeIcon
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          alt={triggerName}
+          size={RUN_NODE_ICON_SIZE}
+          className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
+        />
+        <span
+          aria-label={RUN_STATUS_META[status].label}
+          title={RUN_STATUS_META[status].label}
+          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
+        />
+        <span
+          className={cn(
+            "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+            isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
+          )}
+        >
+          {triggerName}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-xs",
+            isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
+          )}
+        >
+          {title}
+        </span>
       </span>
       <button
         type="button"
