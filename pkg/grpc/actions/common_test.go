@@ -165,6 +165,8 @@ func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotEmpty(t, resolved)
+			require.NotContains(t, resolved, "<nil>")
+			require.NotContains(t, resolved, "<no value>")
 		})
 	}
 }
