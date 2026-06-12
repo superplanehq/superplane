@@ -50,6 +50,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
@@ -3170,6 +3171,78 @@ Returns the updated issue object with all current information.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `github.updateIssueComment`
+
+The **Update Issue Comment** component edits an existing comment on a GitHub issue or pull request.
+
+### Use Cases
+
+- **Status updates**: Update a summary comment on a PR instead of posting new comments on every run
+- **Living reports**: Keep a single comment with the latest test results, coverage, or review status
+- **Avoid spam**: Update one comment instead of flooding a PR with repeated bot comments
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Comment ID**: The numeric ID of the comment to update (supports expressions)
+- **Body**: The new comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the updated comment object including comment ID, URL, body, and timestamps.
+
+### Notes
+
+- The comment ID is returned in the output of `github.createIssueComment` as `id`
+- You can store the comment ID in canvas memory on first run, then use it for subsequent updates
+- The authenticated user must have permission to edit the comment (must be the comment author or have admin access)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author_association": "NONE",
+    "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal refactors with no user-facing impact.",
+    "created_at": "2026-01-16T17:56:16Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+    "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "node_id": "IC_kwDOExample",
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890/reactions"
+    },
+    "updated_at": "2026-01-16T18:30:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "html_url": "https://github.com/apps/superplane-app",
+      "id": 12345678,
+      "login": "superplane-app[bot]",
+      "node_id": "BOT_kwExample",
+      "site_admin": false,
+      "type": "Bot",
+      "url": "https://api.github.com/users/superplane-app[bot]"
+    }
+  },
+  "timestamp": "2026-01-16T18:30:00.680755501Z",
+  "type": "github.issueComment"
 }
 ```
 
