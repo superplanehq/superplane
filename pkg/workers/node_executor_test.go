@@ -441,7 +441,7 @@ func countConcurrentExecutionResults(t *testing.T, results []error) (successCoun
 	return successCount, lockedCount
 }
 
-func TestClassifyExecutorProcessError(t *testing.T) {
+func TestClassifyProcessError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -459,8 +459,61 @@ func TestClassifyExecutorProcessError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := classifyExecutorProcessError(tt.err); got != tt.want {
-				t.Fatalf("classifyExecutorProcessError() = %q, want %q", got, tt.want)
+			if got := classifyProcessError(tt.err); got != tt.want {
+				t.Fatalf("classifyProcessError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyExecutionFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		execution models.CanvasNodeExecution
+		want      string
+	}{
+		{
+			name: "passed execution",
+			execution: models.CanvasNodeExecution{
+				Result: models.CanvasNodeExecutionResultPassed,
+			},
+			want: executorReasonNone,
+		},
+		{
+			name: "component error",
+			execution: models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "request failed",
+			},
+			want: models.CanvasNodeExecutionResultReasonError,
+		},
+		{
+			name: "deadlock message",
+			execution: models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonDeadlock,
+		},
+		{
+			name: "custom reason",
+			execution: models.CanvasNodeExecution{
+				Result:       models.CanvasNodeExecutionResultFailed,
+				ResultReason: "timeout",
+			},
+			want: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyExecutionFailure(&tt.execution); got != tt.want {
+				t.Fatalf("classifyExecutionFailure() = %q, want %q", got, tt.want)
 			}
 		})
 	}

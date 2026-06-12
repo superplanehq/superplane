@@ -229,6 +229,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(err)
 			return err
 		}
 
@@ -236,8 +237,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
-			metricReason = classifyExecutorProcessError(processErr)
+			metricReason = classifyProcessError(processErr)
 			return processErr
+		}
+
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyExecutionFailure(execution)
 		}
 
 		return nil
@@ -458,15 +464,14 @@ const (
 	executorOutcomeFailed  = "failed"
 	executorOutcomeSkipped = "skipped"
 
-	executorReasonNone        = "none"
-	executorReasonLocked      = "locked"
-	executorReasonDeadlock    = "deadlock"
-	executorReasonNotFound    = "not_found"
-	executorReasonActionError = "action_error"
-	executorReasonInternal    = "internal"
+	executorReasonNone     = "none"
+	executorReasonLocked   = "locked"
+	executorReasonDeadlock = "deadlock"
+	executorReasonNotFound = "not_found"
+	executorReasonInternal = "internal"
 )
 
-func classifyExecutorProcessError(err error) string {
+func classifyProcessError(err error) string {
 	if err == nil {
 		return executorReasonNone
 	}
@@ -484,4 +489,20 @@ func classifyExecutorProcessError(err error) string {
 	}
 
 	return executorReasonInternal
+}
+
+func classifyExecutionFailure(execution *models.CanvasNodeExecution) string {
+	if execution.Result != models.CanvasNodeExecutionResultFailed {
+		return executorReasonNone
+	}
+
+	if isDeadlockMessage(execution.ResultMessage) {
+		return executorReasonDeadlock
+	}
+
+	return execution.ResultReason
+}
+
+func isDeadlockMessage(message string) bool {
+	return strings.Contains(message, "deadlock detected") || strings.Contains(message, "40P01")
 }
