@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import {
+  AUX_SIDEBAR_MIN_WIDTH,
   computeRecomputeForViewport,
   computeResizeAuxLeft,
   computeResizeLeft,
@@ -26,7 +27,7 @@ import {
  * existing local storage values are honored.
  */
 
-export { MIDDLE_MIN_WIDTH, SIDEBAR_MIN_WIDTH } from "./sidebarLayoutConstraints";
+export { AUX_SIDEBAR_MIN_WIDTH, MIDDLE_MIN_WIDTH, SIDEBAR_MIN_WIDTH } from "./sidebarLayoutConstraints";
 
 const LEFT_STORAGE_KEY = "agent-sidebar-width";
 const RIGHT_STORAGE_KEY = "componentSidebarWidth";
@@ -39,13 +40,13 @@ function getViewportWidth(): number {
   return typeof window === "undefined" ? FALLBACK_VIEWPORT : window.innerWidth;
 }
 
-function readPersistedWidth(key: string, fallback: number): number {
+function readPersistedWidth(key: string, fallback: number, minWidth = SIDEBAR_MIN_WIDTH): number {
   if (typeof window === "undefined") return fallback;
   try {
     const saved = window.localStorage.getItem(key);
     const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
     if (!Number.isFinite(parsed)) return fallback;
-    return Math.max(SIDEBAR_MIN_WIDTH, parsed);
+    return Math.max(minWidth, parsed);
   } catch {
     return fallback;
   }
@@ -129,7 +130,7 @@ export const useSidebarLayoutStore = create<SidebarLayoutState>((set, get) => ({
     set((state) => ({
       auxLeftMountCount: state.auxLeftMountCount + 1,
       auxLeftStorageKey: storageKey,
-      auxLeftWidth: readPersistedWidth(storageKey, defaultWidth),
+      auxLeftWidth: readPersistedWidth(storageKey, defaultWidth, AUX_SIDEBAR_MIN_WIDTH),
     }));
     get().recomputeForViewport();
     return () =>

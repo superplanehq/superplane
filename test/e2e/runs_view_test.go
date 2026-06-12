@@ -3,7 +3,6 @@ package e2e
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ func TestRunsView(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndNoop()
 		steps.whenTheManualTriggerRuns()
-		steps.whenIVisitRunsView()
+		steps.whenIVisitRunInspection()
 		steps.thenTheFinishedRunIsVisible()
 		steps.whenIOpenRunNodeDetails()
 		steps.thenRunNodeDetailsModalIsVisible()
@@ -94,7 +93,33 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.canvas.Visit()
+	s.canvas.WaitForRunsSidebar()
+}
+
+func (s *runsViewSteps) whenIVisitRunInspection() {
+	require.NotNil(s.t, s.run, "expected run to be created before visiting run inspection")
+	s.whenIVisitRunsView()
+	s.canvas.SelectRunInSidebar(s.run.ID.String())
+	s.waitForRunInspectionReady()
+}
+
+func (s *runsViewSteps) waitForRunInspectionReady() {
+	deadline := time.Now().Add(30 * time.Second)
+	runID := s.run.ID.String()
+	for time.Now().Before(deadline) {
+		require.Contains(s.t, s.session.Page().URL(), "run="+runID)
+		startHeader := q.TestID("node-start-header").Run(s.session)
+		outputHeader := q.TestID("node-output-header").Run(s.session)
+		startVisible, startErr := startHeader.IsVisible()
+		outputVisible, outputErr := outputHeader.IsVisible()
+		if startErr == nil && outputErr == nil && startVisible && outputVisible {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.session.AssertVisible(q.TestID("node-start-header"))
+	s.session.AssertVisible(q.TestID("node-output-header"))
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
@@ -162,11 +187,11 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
 	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-runs"][aria-current="page"]`))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-live"][aria-current="page"]`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
-	s.session.AssertURLContains("view=runs")
 	s.session.AssertURLContains("run=" + s.run.ID.String())
+	require.NotContains(s.t, s.session.Page().URL(), "view=runs")
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
 	s.session.AssertText("success")
@@ -184,18 +209,26 @@ func (s *runsViewSteps) thenRunNodeDetailsModalIsVisible() {
 
 func (s *runsViewSteps) whenICloseRunNodeDetails() {
 	s.session.PressKey("Escape")
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		modal := q.TestID("run-node-detail-modal").Run(s.session)
+		visible, err := modal.IsVisible()
+		if err == nil && !visible {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	s.session.Click(q.TestID("canvas-view-mode-live"))
-	s.session.Click(q.TestID("canvas-edit-button"))
+	s.session.Click(q.TestID("runs-sidebar-live-canvas"))
+	s.session.Sleep(300)
+	s.canvas.EnterEditMode()
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {
-	s.session.Click(q.TestID("canvas-view-mode-versions"))
-	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
+	s.canvas.OpenVersionsSidebar()
 }
 
 func (s *runsViewSteps) thenRunsLoadMoreButtonIsHidden() {
@@ -290,19 +323,8 @@ func (s *runsViewSteps) waitForSidebarRowCountAtLeast(locator pw.Locator, expect
 }
 
 func (s *runsViewSteps) thenEditModeIsVisible() {
-	deadline := time.Now().Add(15 * time.Second)
-
-	for time.Now().Before(deadline) {
-		url := s.session.Page().URL()
-		if !strings.Contains(url, "view=runs") && !strings.Contains(url, "run="+s.run.ID.String()) {
-			return
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
+	s.canvas.WaitForEnabledExitEditButton()
 	url := s.session.Page().URL()
-	require.NotContains(s.t, url, "view=runs")
 	require.NotContains(s.t, url, "run="+s.run.ID.String())
 }
 
