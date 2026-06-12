@@ -59,7 +59,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read, and update the current SuperPlane app canvas without invoking the SuperPlane CLI. Use access to check the current agent token's interceptor-backed API permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft only creates or updates the caller's private draft and returns the draft version ID plus validation issues."
+	return "Inspect access, read, and update the current SuperPlane app canvas. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft only creates or updates the caller's private draft and returns the draft version ID plus validation issues."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -116,7 +116,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"namespace": {
 				Type:        "string",
-				Description: "For read_runtime resource memory. Optional client-side namespace filter, matching the CLI behavior.",
+				Description: "For read_runtime resource memory. Optional client-side namespace filter.",
 			},
 			"node_id": {
 				Type:        "string",

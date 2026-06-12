@@ -38,6 +38,7 @@ import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactreg
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
 import gcpComputeIcon from "@/assets/icons/integrations/gcp.compute.svg";
+import gcpCloudSqlIcon from "@/assets/icons/integrations/gcp.cloudsql.svg";
 import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
@@ -181,6 +182,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     artifactregistry: gcpArtifactRegistryIcon,
     pubsub: gcpPubSubIcon,
     clouddns: gcpCloudDNSIcon,
+    cloudsql: gcpCloudSqlIcon,
     compute: gcpComputeIcon,
     createVM: gcpComputeIcon,
     deleteVMInstance: gcpComputeIcon,

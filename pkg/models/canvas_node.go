@@ -50,6 +50,23 @@ func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
 }
 
+func (c *CanvasNode) ComponentName() string {
+	ref := c.Ref.Data()
+	if ref.Component != nil && ref.Component.Name != "" {
+		return ref.Component.Name
+	}
+
+	if ref.Trigger != nil && ref.Trigger.Name != "" {
+		return ref.Trigger.Name
+	}
+
+	if c.Type == NodeTypeBlueprint {
+		return "blueprint"
+	}
+
+	return "unknown"
+}
+
 var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
 
 func GenerateUniqueNodeID(node Node, reservedIDs map[string]bool) string {
