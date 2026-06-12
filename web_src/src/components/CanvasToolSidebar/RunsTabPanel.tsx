@@ -4,8 +4,9 @@ import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunDetailPanel } from "./RunDetailPanel";
 import { RunsTabListView } from "./RunsTabListView";
-import { getAdjacentSidebarRunId, getRunSidebarNavigation } from "./runsSidebarNavigation";
+import { getRunSidebarNavigation } from "./runsSidebarNavigation";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
+import { useOlderRunSidebarNavigation } from "./useOlderRunSidebarNavigation";
 import { useRunFilters } from "./useRunFilters";
 
 export type RunsSidebarView = "list" | "detail";
@@ -136,15 +137,6 @@ export function RunsTabPanel({
     [filterState.hasAnyFilter, filterState.orderedRuns, hasNextPage, selectedRunId],
   );
 
-  const olderNavigationLoadRequestedRef = useRef(false);
-  const filteredRunIdsLengthAtFetchStartRef = useRef(0);
-  const pendingOlderNavigationRunIdRef = useRef<string | null>(null);
-  const lastOlderFetchCompletedRef = useRef(false);
-  const wasFetchingNextPageRef = useRef(false);
-  const [olderNavigationSession, setOlderNavigationSession] = useState(0);
-  const [olderFetchCompletedTick, setOlderFetchCompletedTick] = useState(0);
-  const [pendingOlderNavigation, setPendingOlderNavigation] = useState(false);
-
   const handleNavigateRun = useCallback(
     (runId: string) => {
       (onNavigateRun ?? onSelectRun)(runId);
@@ -153,102 +145,17 @@ export function RunsTabPanel({
     [onNavigateRun, onSelectRun],
   );
 
-  const handleNavigateOlder = useCallback(() => {
-    if (olderRunId) {
-      handleNavigateRun(olderRunId);
-      return;
-    }
-
-    if (!atOlderPaginationBoundary || !hasNextPage || filterState.hasAnyFilter) {
-      return;
-    }
-
-    pendingOlderNavigationRunIdRef.current = selectedRunId;
-    filteredRunIdsLengthAtFetchStartRef.current = sidebarRunIds.length;
-    olderNavigationLoadRequestedRef.current = false;
-    lastOlderFetchCompletedRef.current = false;
-    setOlderNavigationSession((session) => session + 1);
-    setPendingOlderNavigation(true);
-  }, [
-    atOlderPaginationBoundary,
-    filterState.hasAnyFilter,
-    handleNavigateRun,
-    hasNextPage,
-    olderRunId,
-    selectedRunId,
-    sidebarRunIds.length,
-  ]);
-
-  useEffect(() => {
-    if (!pendingOlderNavigation || isFetchingNextPage || !onLoadMore) {
-      return;
-    }
-
-    if (!selectedRunId || selectedRunId !== pendingOlderNavigationRunIdRef.current) {
-      pendingOlderNavigationRunIdRef.current = null;
-      olderNavigationLoadRequestedRef.current = false;
-      lastOlderFetchCompletedRef.current = false;
-      setPendingOlderNavigation(false);
-      return;
-    }
-
-    const nextOlderRunId = getAdjacentSidebarRunId(sidebarRunIds, selectedRunId, "next");
-    if (nextOlderRunId) {
-      pendingOlderNavigationRunIdRef.current = null;
-      olderNavigationLoadRequestedRef.current = false;
-      lastOlderFetchCompletedRef.current = false;
-      setPendingOlderNavigation(false);
-      handleNavigateRun(nextOlderRunId);
-      return;
-    }
-
-    if (!hasNextPage) {
-      pendingOlderNavigationRunIdRef.current = null;
-      olderNavigationLoadRequestedRef.current = false;
-      lastOlderFetchCompletedRef.current = false;
-      setPendingOlderNavigation(false);
-      return;
-    }
-
-    if (lastOlderFetchCompletedRef.current && sidebarRunIds.length === filteredRunIdsLengthAtFetchStartRef.current) {
-      pendingOlderNavigationRunIdRef.current = null;
-      olderNavigationLoadRequestedRef.current = false;
-      lastOlderFetchCompletedRef.current = false;
-      setPendingOlderNavigation(false);
-      return;
-    }
-
-    if (olderNavigationLoadRequestedRef.current) {
-      return;
-    }
-
-    olderNavigationLoadRequestedRef.current = true;
-    lastOlderFetchCompletedRef.current = false;
-    onLoadMore();
-  }, [
-    handleNavigateRun,
-    hasNextPage,
-    isFetchingNextPage,
-    olderFetchCompletedTick,
-    olderNavigationSession,
-    onLoadMore,
-    pendingOlderNavigation,
+  const { handleNavigateOlder } = useOlderRunSidebarNavigation({
     selectedRunId,
     sidebarRunIds,
-  ]);
-
-  useEffect(() => {
-    const wasFetching = wasFetchingNextPageRef.current;
-    wasFetchingNextPageRef.current = !!isFetchingNextPage;
-
-    if (!wasFetching || isFetchingNextPage || !pendingOlderNavigation) {
-      return;
-    }
-
-    lastOlderFetchCompletedRef.current = true;
-    olderNavigationLoadRequestedRef.current = false;
-    setOlderFetchCompletedTick((tick) => tick + 1);
-  }, [isFetchingNextPage, pendingOlderNavigation]);
+    olderRunId,
+    atOlderPaginationBoundary,
+    hasNextPage,
+    hasActiveFilters: filterState.hasAnyFilter,
+    isFetchingNextPage,
+    onLoadMore,
+    onNavigateRun: handleNavigateRun,
+  });
 
   const isDetailView = sidebarView === "detail" && !!selectedRun;
   const isLiveCanvasSelected = !selectedRunId;
