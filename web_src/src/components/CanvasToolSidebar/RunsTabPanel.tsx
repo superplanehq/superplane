@@ -1,9 +1,12 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunDetailPanel } from "./RunDetailPanel";
 import { RunsTabListView } from "./RunsTabListView";
+import { getRunSidebarNavigation } from "./runsSidebarNavigation";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
+import { useOlderRunSidebarNavigation } from "./useOlderRunSidebarNavigation";
 import { useRunFilters } from "./useRunFilters";
 
 export type RunsSidebarView = "list" | "detail";
@@ -13,6 +16,8 @@ export interface RunsTabPanelProps {
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onNavigateRun?: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
   detailDismissedForRunId?: string | null;
@@ -34,6 +39,8 @@ export function RunsTabPanel({
   runs,
   selectedRunId,
   onSelectRun,
+  onNavigateRun,
+  onSelectLiveCanvas,
   onBackToRunList,
   initialOpenDetail = false,
   detailDismissedForRunId = null,
@@ -90,8 +97,12 @@ export function RunsTabPanel({
   }, [detailDismissedForRunId, initialOpenDetail, selectedRunId]);
 
   useEffect(() => {
+    if (sidebarView === "detail" && selectedRunId) {
+      return;
+    }
+
     loadMoreIfNeeded(scrollRef.current);
-  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
+  }, [filterState.filteredRuns.length, loadMoreIfNeeded, selectedRunId, sidebarView]);
 
   const handleRunSelect = useCallback(
     (runId: string) => {
@@ -106,50 +117,102 @@ export function RunsTabPanel({
     onBackToRunList?.();
   }, [onBackToRunList]);
 
+  const handleSelectLiveCanvas = useCallback(() => {
+    setSidebarView("list");
+    onSelectLiveCanvas();
+  }, [onSelectLiveCanvas]);
+
+  const {
+    runIds: sidebarRunIds,
+    newerRunId,
+    olderRunId,
+    canNavigateOlder,
+    atOlderPaginationBoundary,
+  } = useMemo(
+    () =>
+      getRunSidebarNavigation(filterState.orderedRuns, selectedRunId, {
+        hasNextPage: !!hasNextPage,
+        hasActiveFilters: filterState.hasAnyFilter,
+      }),
+    [filterState.hasAnyFilter, filterState.orderedRuns, hasNextPage, selectedRunId],
+  );
+
+  const handleNavigateRun = useCallback(
+    (runId: string) => {
+      (onNavigateRun ?? onSelectRun)(runId);
+      setSidebarView("detail");
+    },
+    [onNavigateRun, onSelectRun],
+  );
+
+  const { handleNavigateOlder } = useOlderRunSidebarNavigation({
+    selectedRunId,
+    sidebarRunIds,
+    olderRunId,
+    atOlderPaginationBoundary,
+    hasNextPage,
+    hasActiveFilters: filterState.hasAnyFilter,
+    isFetchingNextPage,
+    onLoadMore,
+    onNavigateRun: handleNavigateRun,
+  });
+
   const isDetailView = sidebarView === "detail" && !!selectedRun;
+  const isLiveCanvasSelected = !selectedRunId;
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
-      <RunsTabListView
-        isActive={!isDetailView}
-        scrollRef={scrollRef}
-        onScroll={handleScroll}
-        runs={runs}
-        filteredRuns={filterState.filteredRuns}
-        orderedRuns={filterState.orderedRuns}
-        selectedRunId={selectedRunId}
-        onSelectRun={handleRunSelect}
-        componentIconMap={componentIconMap}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={onRetry}
-        onClearFilters={filterState.clearFilters}
-        hasAnyFilter={filterState.hasAnyFilter}
-        selectedStatuses={filterState.selectedStatuses}
-        selectedTriggerIds={filterState.selectedTriggerIds}
-        triggerOptions={filterState.triggerOptions}
-        onToggleStatus={filterState.toggleStatus}
-        onClearStatuses={filterState.clearStatuses}
-        onToggleTrigger={filterState.toggleTrigger}
-        onClearTriggers={filterState.clearTriggers}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <LiveCanvasSidebarRow isSelected={isLiveCanvasSelected} onSelect={handleSelectLiveCanvas} />
 
-      <div
-        className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
-          isDetailView ? "translate-x-0" : "translate-x-full"
-        } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
-      >
-        {selectedRun ? (
-          <RunDetailPanel
-            canvasId={canvasId}
-            run={selectedRun}
-            workflowNodes={workflowNodes}
-            componentIconMap={componentIconMap}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode ?? (() => {})}
-            onBack={handleBack}
-          />
-        ) : null}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <RunsTabListView
+          isActive={!isDetailView}
+          scrollRef={scrollRef}
+          onScroll={handleScroll}
+          runs={runs}
+          filteredRuns={filterState.filteredRuns}
+          orderedRuns={filterState.orderedRuns}
+          selectedRunId={selectedRunId}
+          onSelectRun={handleRunSelect}
+          componentIconMap={componentIconMap}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={onRetry}
+          onClearFilters={filterState.clearFilters}
+          hasAnyFilter={filterState.hasAnyFilter}
+          selectedStatuses={filterState.selectedStatuses}
+          selectedTriggerIds={filterState.selectedTriggerIds}
+          triggerOptions={filterState.triggerOptions}
+          onToggleStatus={filterState.toggleStatus}
+          onClearStatuses={filterState.clearStatuses}
+          onToggleTrigger={filterState.toggleTrigger}
+          onClearTriggers={filterState.clearTriggers}
+        />
+
+        <div
+          className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out ${
+            isDetailView ? "translate-x-0" : "translate-x-full"
+          } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+        >
+          {selectedRun ? (
+            <RunDetailPanel
+              canvasId={canvasId}
+              run={selectedRun}
+              workflowNodes={workflowNodes}
+              componentIconMap={componentIconMap}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode ?? (() => {})}
+              onBack={handleBack}
+              newerRunId={newerRunId}
+              olderRunId={olderRunId}
+              canNavigateOlder={canNavigateOlder}
+              onNavigateRun={handleNavigateRun}
+              onNavigateOlder={
+                atOlderPaginationBoundary && hasNextPage && !filterState.hasAnyFilter ? handleNavigateOlder : undefined
+              }
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );
