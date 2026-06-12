@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getWorkflowViewPresentation } from "./viewState";
 
 describe("getWorkflowViewPresentation", () => {
-  it("keeps run inspection read-only until edit mode is active", () => {
+  it("keeps run inspection read-only even when a draft is active", () => {
     const inspectingRun = getWorkflowViewPresentation({
       isConsoleMode: false,
       isRunInspectionMode: true,
@@ -16,7 +16,7 @@ describe("getWorkflowViewPresentation", () => {
 
     expect(inspectingRun.readOnlyViewModes).toBe(true);
 
-    const editingFromRunLink = getWorkflowViewPresentation({
+    const inspectingRunWhileEditingDraft = getWorkflowViewPresentation({
       isConsoleMode: false,
       isRunInspectionMode: true,
       isMemoryMode: false,
@@ -27,6 +27,6 @@ describe("getWorkflowViewPresentation", () => {
       isViewingCurrentLiveVersion: true,
     });
 
-    expect(editingFromRunLink.readOnlyViewModes).toBe(false);
+    expect(inspectingRunWhileEditingDraft.readOnlyViewModes).toBe(true);
   });
 });

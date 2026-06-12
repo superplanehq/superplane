@@ -4669,8 +4669,17 @@ export function AppPage() {
     exitToLive,
   ]);
 
+  const exitEditableVersionForRunInspection = useCallback(() => {
+    if (!hasEditableVersion || !liveCanvasVersionId) {
+      return;
+    }
+
+    handleUseVersion(liveCanvasVersionId);
+  }, [hasEditableVersion, liveCanvasVersionId, handleUseVersion]);
+
   const handleSelectRun = useCallback(
     (runId: string) => {
+      exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
       setSearchParams(
@@ -4685,11 +4694,12 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, setSearchParams, setRunDetailNodeId],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
   );
 
   const handleNavigateRun = useCallback(
     (runId: string) => {
+      exitEditableVersionForRunInspection();
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       clearDismissedRunDetail();
       setSearchParams(
@@ -4704,7 +4714,7 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, setSearchParams],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams],
   );
 
   const handleClearRunInspection = useCallback(() => {
@@ -4810,9 +4820,9 @@ export function AppPage() {
   );
 
   useEffect(() => {
-    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId || hasEditableVersion) return;
+    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId) return;
     handleUseVersion(liveCanvasVersionId);
-  }, [handleUseVersion, hasEditableVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
+  }, [handleUseVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
 
   const handleDiscardDraftAndStartEdit = useCallback(async () => {
     if (!canUpdateCanvas) {
