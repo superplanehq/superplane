@@ -102,8 +102,8 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 func (s *CanvasSteps) SelectRunInSidebar(runID string) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID)).Run(s.session)
-		if visible, err := runLink.IsVisible(); err == nil && visible {
+		runLink := q.Locator(fmt.Sprintf(`a[href*="run=%s"]`, runID))
+		if visible, err := runLink.Run(s.session).IsVisible(); err == nil && visible {
 			s.session.Click(runLink)
 			s.session.Sleep(300)
 			return
