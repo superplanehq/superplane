@@ -19,6 +19,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   inputSize?: "xs" | "sm" | "md" | "lg";
   noExampleObjectText?: string;
   showValuePreview?: boolean;
+  valuePreviewLabel?: string;
   quickTip?: string;
   expressionMode?: "wrapped" | "raw";
   /** Labels of suggestions to hide (e.g., ["$", "previous"] to restrict to root() only). */
@@ -98,6 +99,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       inputSize = "md",
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
+      valuePreviewLabel = "Preview",
       quickTip,
       expressionMode = "wrapped",
       excludedSuggestions,
@@ -1306,7 +1308,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 ])}
               >
                 {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                <span>Preview</span>
+                <span>{valuePreviewLabel}</span>
               </button>
             ) : (
               <span />

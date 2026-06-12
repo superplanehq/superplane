@@ -26,6 +26,24 @@ describe("AutoCompleteInput preview toggle", () => {
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
     expect(screen.queryByText(/error \(/i)).not.toBeInTheDocument();
   });
+
+  it("uses a custom preview label when provided", () => {
+    render(
+      <AutoCompleteInput
+        exampleObj={{ __root: { data: { name: "DCO" } } }}
+        value=""
+        onChange={vi.fn()}
+        placeholder="{{ root().data.foo }}"
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        showValuePreview
+        valuePreviewLabel="Preview title"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Preview title" })).toBeInTheDocument();
+  });
 });
 
 describe("AutoCompleteInput suggestions", () => {
