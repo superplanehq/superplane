@@ -107,6 +107,52 @@ export const analytics = {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
 
+  agentMessageSendSubmitted: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
+  ) => {
+    posthog.capture("agent:message_send_submitted", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+    });
+  },
+
+  agentMessageSendAcknowledged: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
+    durationMs: number,
+  ) => {
+    posthog.capture("agent:message_send_acknowledged", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+      duration_ms: durationMs,
+    });
+  },
+
+  agentMessageSendFailed: (
+    chatId: string,
+    canvasId: string | undefined,
+    organizationId: string | undefined,
+    mode: string | undefined,
+    durationMs: number,
+  ) => {
+    posthog.capture("agent:message_send_failed", {
+      chat_id: chatId,
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      mode,
+      duration_ms: durationMs,
+    });
+  },
+
   integrationConnectStart: (
     integration: string,
     source: "node_configuration" | "integrations_page",
