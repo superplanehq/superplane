@@ -220,17 +220,19 @@ func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.Canva
 	}
 
 	if node.Type == models.NodeTypeBlueprint {
-		return w.executeBlueprintNode(tx, execution, node)
+		return w.executeBlueprintNode(tx, execution, node, onNewEvents)
 	}
 
 	return w.executeActionNode(tx, execution, node, onNewEvents)
 }
 
-func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
+func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+
 	ref := node.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
-		return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
+		return executionState.Fail(models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
 	}
 
 	firstNode := blueprint.FindRootNode()
@@ -263,12 +265,10 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 
 	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
 	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
+		return executionState.Fail(
 			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
 		)
-		return nil
 	}
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
@@ -277,13 +277,10 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
+		return executionState.Fail(
 			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
 		)
-
-		return nil
 	}
 
 	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
@@ -394,7 +391,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				logger.Errorf("integration %s not found", *node.AppInstallationID)
-				return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "integration not found")
+				return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "integration not found")
 			}
 
 			logger.Errorf("failed to find integration: %v", err)
@@ -408,8 +405,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute action: %v", err)
-		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())
-		return err
+		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
 	}
 
 	logger.Info("Action executed successfully")

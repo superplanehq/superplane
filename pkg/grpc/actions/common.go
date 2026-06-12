@@ -1049,7 +1049,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configFields = AppendGlobalTriggerFields(configFields)
+		configFields = AppendGlobalTriggerFields(trigger.Name(), configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1069,21 +1069,27 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	return out
 }
 
-func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
+func AppendGlobalTriggerFields(triggerName string, fields []configuration.Field) []configuration.Field {
 	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
 		return field.Name == "customName"
 	}) {
 		return fields
 	}
 
-	fields = append(fields, configuration.Field{
+	runTitleField := configuration.Field{
 		Name:        "customName",
 		Label:       "Run title",
 		Type:        configuration.FieldTypeString,
 		Togglable:   true,
 		Description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
 		Placeholder: "{{ root().data.foo }}",
-	})
+	}
+
+	if defaultTitle := defaultRunTitleExpression(triggerName); defaultTitle != "" {
+		runTitleField.Default = defaultTitle
+	}
+
+	fields = append(fields, runTitleField)
 
 	return fields
 }

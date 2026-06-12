@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
@@ -43,6 +44,91 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
+
+<a id="on-error"></a>
+
+## On Error
+
+**Trigger key:** `onError`
+
+The On Error trigger reacts to unexpected failures anywhere in the canvas.
+
+### How It Works
+
+Whenever any node in the same canvas finishes in the **error** state (it could not
+execute - e.g. a network failure, invalid credentials, or an unhandled exception),
+every On Error node in that canvas fires a new run. This happens independently of how
+your nodes are connected: On Error nodes do not need an incoming connection.
+
+If you place multiple On Error nodes on a canvas, all of them receive every error.
+
+> Note: this reacts to the **error** state, not the **failed** state. A component that
+> executed successfully but produced a failure outcome (e.g. an HTTP request returning
+> 404, or a rejected approval) does **not** trigger On Error. Use a Filter or the
+> component's failure output channel for those cases.
+
+### Event Data
+
+Each emitted event carries:
+
+- `node`: the node that errored - its `id`, `name`, and `component` type
+- `error`: the failure `reason` and human-readable `message`
+- `run`: the `id` of the run that failed
+- `root`: the event that started the failed run - the originating `node` and
+  its `payload`
+- `payloads`: the payloads emitted by every upstream node in the failed run,
+  keyed by node name
+
+### Examples
+
+- `$['On Error'].node.name`: the name of the node that errored
+- `$['On Error'].error.message`: the error message
+- `$['On Error'].root.payload.data.version`: data from the event that triggered the failed run
+- `$['On Error'].payloads['Build'].data.version`: data from an upstream node in the failed run
+
+### Example Data
+
+```json
+{
+  "data": {
+    "error": {
+      "message": "request timeout after 30s",
+      "reason": "error"
+    },
+    "node": {
+      "component": "http",
+      "id": "http-deploy-to-prod-a1b2c3",
+      "name": "Deploy to Prod"
+    },
+    "payloads": {
+      "Manual Run": {
+        "data": {
+          "version": "1.4.2"
+        },
+        "type": "manual.run"
+      }
+    },
+    "root": {
+      "node": {
+        "component": "start",
+        "id": "manual-run-9z8y7x",
+        "name": "Manual Run"
+      },
+      "payload": {
+        "data": {
+          "version": "1.4.2"
+        },
+        "type": "manual.run"
+      }
+    },
+    "run": {
+      "id": "8f1c2d3e-4a5b-6c7d-8e9f-0a1b2c3d4e5f"
+    }
+  },
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "onError.triggered"
+}
+```
 
 <a id="schedule"></a>
 

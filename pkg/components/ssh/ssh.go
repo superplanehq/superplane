@@ -265,6 +265,11 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
 			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:                 "commandFile",
