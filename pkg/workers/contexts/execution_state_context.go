@@ -129,8 +129,15 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
-	err := s.execution.FailInTransaction(s.tx, reason, message)
-	return err
+	if err := s.execution.FailInTransaction(s.tx, reason, message); err != nil {
+		return err
+	}
+
+	if reason == models.CanvasNodeExecutionResultReasonError {
+		DispatchOnError(s.tx, s.execution, s.onNewEvents)
+	}
+
+	return nil
 }
 
 func (s *ExecutionStateContext) SetKV(key, value string) error {

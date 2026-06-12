@@ -8,6 +8,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"start":    "Manual run {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 	"schedule": "Schedule {{ root().data.calendar.month }} {{ root().data.calendar.day }} {{ root().data.calendar.hour }}:{{ root().data.calendar.minute }}",
 	"webhook":  "Webhook {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
+	"onError":  "{{ root().data.node.name }} errored",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.detail.alarmName }} - {{ root().data.detail.previousState.value }} -> {{ root().data.detail.state.value }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",

@@ -107,7 +107,7 @@ describe("CanvasToolSidebar", () => {
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
-    expect(await screen.findByText("Last turn failed")).toBeInTheDocument();
+    expect(await screen.findByText("Message failed. Try again.")).toBeInTheDocument();
     await user.type(screen.getByTestId("agent-input"), "retry");
     await user.click(screen.getByTestId("agent-send-message-button"));
 

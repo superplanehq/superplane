@@ -249,9 +249,6 @@ async function processVersionUpdate({
 function findLatestDraftAction(messages: AgentMessage[], dismissedVersionIds: Set<string>): DraftActionsSegment | null {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
-    if (message.role === "user") {
-      return null;
-    }
     if (message.role !== "assistant") {
       continue;
     }
