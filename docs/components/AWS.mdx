@@ -33,6 +33,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Get Pipeline Execution" href="#code-pipeline-•-get-pipeline-execution" description="Retrieve the status and details of an AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Retry Stage Execution" href="#code-pipeline-•-retry-stage-execution" description="Retry a failed stage in an existing AWS CodePipeline execution" />
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
+  <LinkCard title="EC2 • Allocate Elastic IP" href="#ec2-•-allocate-elastic-ip" description="Allocate a new Elastic IP address in a VPC" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
@@ -47,7 +48,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
   <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
   <LinkCard title="EC2 • Get Instance Metrics" href="#ec2-•-get-instance-metrics" description="Fetch CPU, network, and optional memory metrics for an EC2 instance via CloudWatch" />
+  <LinkCard title="EC2 • Manage Elastic IP" href="#ec2-•-manage-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 instance" />
   <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
+  <LinkCard title="EC2 • Release Elastic IP" href="#ec2-•-release-elastic-ip" description="Release an Elastic IP address back to the AWS address pool" />
   <LinkCard title="EC2 • Update Instance" href="#ec2-•-update-instance" description="Resize an EC2 instance or update its security groups" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
@@ -1075,6 +1078,59 @@ The Run Pipeline component triggers an AWS CodePipeline execution and waits for 
 }
 ```
 
+<a id="ec2-•-allocate-elastic-ip"></a>
+
+## EC2 • Allocate Elastic IP
+
+**Component key:** `aws.ec2.allocateElasticIP`
+
+The Allocate Elastic IP component allocates a new Elastic IP address to your AWS account in the selected region.
+
+### Use Cases
+
+- **Static public IPs**: Reserve a public IPv4 address before launching or exposing a service
+- **Failover workflows**: Allocate a replacement Elastic IP during disaster recovery
+- **Pre-provisioning**: Reserve an address ahead of association with an instance or network interface
+- **BYOIP and IPAM**: Allocate from your own address pools or VPC IPAM pools
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP will be allocated
+- **IP source**: Where the address comes from:
+  - **Amazon's pool**: Default public IPv4 address from AWS
+  - **BYOIP pool**: Address from a public IPv4 pool you brought to your account
+  - **Customer-owned pool**: Address from an on-premises pool for use with an Outpost
+  - **IPAM pool**: Address from a VPC IPAM pool with a public IPv4 CIDR
+- **Pool**: Required when using BYOIP, customer-owned, or IPAM sources (searchable pickers scoped to the selected region)
+- **Address** (optional): Request a specific IPv4 address from the selected pool
+- **Tags** (optional): Key/value tags applied to the Elastic IP at allocation time
+
+### Output
+
+Emits the allocated Elastic IP details on the default output channel:
+- `allocationId`, `publicIp`, `domain`, `region`
+
+### Important Notes
+
+- Elastic IPs are allocated to your account and incur charges when not associated with a running instance
+- The address is allocated for use in a VPC (`domain: vpc`)
+- BYOIP, customer-owned, and IPAM pools must already exist in the target region
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "domain": "vpc",
+    "publicIp": "203.0.113.10",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.elastic-ip.allocated"
+}
+```
+
 <a id="ec2-•-copy-image"></a>
 
 ## EC2 • Copy Image
@@ -1738,6 +1794,55 @@ Returns averaged and aggregated metrics over the lookback window:
 }
 ```
 
+<a id="ec2-•-manage-elastic-ip"></a>
+
+## EC2 • Manage Elastic IP
+
+**Component key:** `aws.ec2.manageElasticIP`
+
+The Manage Elastic IP component associates or disassociates an Elastic IP address with an EC2 instance.
+
+### Use Cases
+
+- **Static addressing**: Attach a reserved Elastic IP to an instance after launch
+- **Failover**: Re-associate an Elastic IP to a replacement instance
+- **Cleanup**: Disassociate an Elastic IP before releasing it
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP and instance reside
+- **Operation**: Choose **Associate** or **Disassociate**
+- **Elastic IP** (associate only): The allocated Elastic IP to attach
+- **Instance** (associate only): EC2 instance to associate the Elastic IP with
+- **Association** (disassociate only): The active Elastic IP association to remove
+
+### Output
+
+Emits operation-specific details on the default output channel:
+- **Associate**: `associationId`, `allocationId`, `instanceId`, `region`
+- **Disassociate**: `associationId`, `region`
+
+### Important Notes
+
+- The Elastic IP must be allocated before it can be associated
+- Disassociating is required before releasing an Elastic IP
+- Re-association to a different instance is allowed when the address is already associated elsewhere
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "associationId": "eipassoc-0abc1234567890def",
+    "instanceId": "i-0abc1234567890def",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:03:00Z",
+  "type": "aws.ec2.elastic-ip.associated"
+}
+```
+
 <a id="ec2-•-manage-instance-power"></a>
 
 ## EC2 • Manage Instance Power
@@ -1795,6 +1900,48 @@ Emits instance details on the default output channel once the operation complete
   },
   "timestamp": "2026-05-28T09:41:26.29656651Z",
   "type": "aws.ec2.instance.power.started"
+}
+```
+
+<a id="ec2-•-release-elastic-ip"></a>
+
+## EC2 • Release Elastic IP
+
+**Component key:** `aws.ec2.releaseElasticIP`
+
+The Release Elastic IP component releases an allocated Elastic IP address from your AWS account.
+
+### Use Cases
+
+- **Cost optimisation**: Release unused Elastic IPs to avoid idle charges
+- **Cleanup workflows**: Remove temporary addresses after a workflow completes
+- **Decommissioning**: Release addresses when tearing down infrastructure
+
+### Configuration
+
+- **Region**: AWS region where the Elastic IP was allocated
+- **Elastic IP**: The allocated Elastic IP to release
+
+### Output
+
+Emits a release confirmation on the default output channel:
+- `allocationId`, `region`
+
+### Important Notes
+
+- The Elastic IP must be disassociated before it can be released
+- Released addresses may be allocated to another AWS account and cannot always be recovered
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allocationId": "eipalloc-0abc1234567890def",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:02:00Z",
+  "type": "aws.ec2.elastic-ip.released"
 }
 ```
 
