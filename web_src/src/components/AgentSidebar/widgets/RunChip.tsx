@@ -50,7 +50,7 @@ export function RunChip({ runId, label, status, canvasId, organizationId }: RunC
 
   return (
     <Link
-      to={appPath(organizationId, canvasId, `?view=runs&run=${runId}`)}
+      to={appPath(organizationId, canvasId, `?run=${runId}`)}
       className={cn(
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full ring-0 text-xs font-medium transition-colors cursor-pointer align-middle",
         meta.badgeClassName,

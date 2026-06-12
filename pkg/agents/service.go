@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -22,20 +21,14 @@ import (
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
 
 type Service struct {
-	provider  Provider
-	auth      authorization.Authorization
-	jwtSigner *jwt.Signer
-	baseURL   string
-	clock     func() time.Time
+	provider Provider
+	auth     authorization.Authorization
 }
 
-func NewService(provider Provider, auth authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) *Service {
+func NewService(provider Provider, auth authorization.Authorization) *Service {
 	return &Service{
-		provider:  provider,
-		auth:      auth,
-		jwtSigner: jwtSigner,
-		baseURL:   baseURL,
-		clock:     time.Now,
+		provider: provider,
+		auth:     auth,
 	}
 }
 
@@ -189,10 +182,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID, ModeBuilder)
-	if err != nil {
-		return fmt.Errorf("build preamble: %w", err)
-	}
+	preamble := s.buildPreamble(session, ModeBuilder)
 
 	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
 		Description:     description,
@@ -252,10 +242,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		agentMode = NormalizeMode(mode[0])
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
-	if err != nil {
-		return nil, fmt.Errorf("build preamble: %w", err)
-	}
+	preamble := s.buildPreamble(session, agentMode)
 
 	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
 		if errors.Is(err, ErrSessionBusy) {
@@ -420,24 +407,17 @@ func (s *Service) cleanupProviderSession(ctx context.Context, providerSessionID 
 	}
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode Mode) (string, error) {
-	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
-	if err != nil {
-		return "", err
-	}
+func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
-		s.baseURL,
-		token,
-		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
 	canvasSnapshot := buildCanvasSnapshot(session)
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -458,22 +438,6 @@ func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) err
 	})
 	log.WithError(err).Error("failed to enqueue agent stream request")
 	return fmt.Errorf("enqueue stream: %w", err)
-}
-
-// mintAgentToken returns a JWT scoped to one canvas to bound the blast-
-// radius if it leaks out of the agent container.
-func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (string, time.Time, error) {
-	claims := jwt.ScopedTokenClaims{
-		Subject: userID,
-		OrgID:   organizationID,
-		Purpose: "agent-builder",
-		Scopes:  AgentTokenScopes(canvasID),
-	}
-	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("mint agent token: %w", err)
-	}
-	return token, s.clock().Add(agentTokenTTL), nil
 }
 
 // checkAgentPermission enforces the org-level baseline. Per-canvas access is
@@ -545,7 +509,7 @@ func getDraftStatus(canvasID uuid.UUID) string {
 				draftCreatedAt(draft),
 			)
 		}
-		result += "These drafts may belong to other sessions or users. To make changes, reuse the session draft you created earlier (pass its --draft-id), or create a new one with `superplane apps drafts create` if you have not yet this session. Do not reuse an unrelated draft.\n"
+		result += "These drafts may belong to other sessions or users. To make changes, use 'superplane_app' action 'update_draft'; it automatically targets your own private draft, creating one from the live version if needed. Do not assume an unrelated draft is yours.\n"
 		return result
 	}
 

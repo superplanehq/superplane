@@ -18,76 +18,77 @@ interface WorkflowStartupActionsConfig {
 }
 
 interface WorkflowHeaderEditActionsConfig {
-  isRunsMode: boolean;
+  isRunInspectionMode: boolean;
   isVersionsMode: boolean;
-  handleExitRunsMode: () => void;
+  handleClearRunInspection: () => void;
   handleExitVersionsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
-  setIsRunsMode: (value: boolean) => void;
-  setIsVersionsMode: (value: boolean) => void;
-  setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
   startup?: WorkflowStartupActionsConfig;
 }
 
+function clearRunInspectionSearchParams(current: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(current);
+  next.delete("run");
+  return next;
+}
+
 export function useWorkflowHeaderEditActions({
-  isRunsMode,
+  isRunInspectionMode,
   isVersionsMode,
-  handleExitRunsMode,
+  handleClearRunInspection,
   handleExitVersionsMode,
   handleToggleEditMode,
-  setIsRunsMode,
-  setIsVersionsMode,
-  setSelectedRunId,
   setRunDetailNodeId,
   setSearchParams,
   startup,
 }: WorkflowHeaderEditActionsConfig) {
   const handleEnterEditModeFromHeader = useCallback(async () => {
-    if (isRunsMode) {
-      setIsRunsMode(false);
-      setSelectedRunId(null);
+    if (isRunInspectionMode) {
       setRunDetailNodeId(null);
-      setSearchParams(clearRunsViewSearchParams, { replace: true });
+      setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      await Promise.resolve();
     } else if (isVersionsMode) {
-      setIsVersionsMode(false);
-      setSearchParams(clearVersionsViewSearchParams, { replace: true });
+      handleExitVersionsMode();
     }
 
     await handleToggleEditMode();
   }, [
+    handleExitVersionsMode,
     handleToggleEditMode,
-    isRunsMode,
+    isRunInspectionMode,
     isVersionsMode,
-    setIsRunsMode,
-    setIsVersionsMode,
     setRunDetailNodeId,
     setSearchParams,
-    setSelectedRunId,
   ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
-    }
-    if (isVersionsMode) {
-      handleExitVersionsMode();
-      return;
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
     }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleExitVersionsMode, handleToggleEditMode, isRunsMode, isVersionsMode]);
+  }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
-  useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
+  useAutoEditMode(startup, handleToggleEditMode, setRunDetailNodeId, setSearchParams);
   useAutoPlaceholderNode(startup);
 
-  return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
+  const clearRunInspectionForEdit = useCallback(() => {
+    if (!isRunInspectionMode) {
+      return;
+    }
+
+    setRunDetailNodeId(null);
+    setSearchParams(clearRunInspectionSearchParams, { replace: true });
+  }, [isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+
+  return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit };
 }
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
   handleToggleEditMode: () => Promise<void>,
+  setRunDetailNodeId: (value: string | null) => void,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -105,7 +106,14 @@ function useAutoEditMode(
 
     triggeredRef.current = true;
 
-    void handleToggleEditMode().then(() => {
+    void (async () => {
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+        await Promise.resolve();
+      }
+
+      await handleToggleEditMode();
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -114,21 +122,16 @@ function useAutoEditMode(
         },
         { replace: true },
       );
-    });
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
-}
-
-function clearVersionsViewSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("view");
-  return next;
-}
-
-function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("view");
-  next.delete("run");
-  return next;
+    })();
+  }, [
+    searchParams,
+    setSearchParams,
+    setRunDetailNodeId,
+    hasEditableVersion,
+    canUpdateCanvas,
+    canvasLoaded,
+    handleToggleEditMode,
+  ]);
 }
 
 /**

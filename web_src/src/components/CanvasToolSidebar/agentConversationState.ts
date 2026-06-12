@@ -151,7 +151,7 @@ export function statusLabel(status: string): string {
     case "streaming":
       return "Agent is running...";
     case "failed":
-      return "Last turn failed";
+      return "Message failed. Try again.";
     case "terminated":
       return "Session ended";
     default:
