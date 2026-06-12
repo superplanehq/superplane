@@ -1,11 +1,11 @@
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { buildFilesEditorResult } from "./lib/build-files-editor-result";
-import { hasLocalFilesStaging as computeLocalFilesStaging } from "../lib/local-staging-indicators";
+import { useEditorCommittedContent } from "./useEditorCommittedContent";
 import { useEditorLifecycle } from "./useEditorLifecycle";
+import { useEditorStagingSync } from "./useEditorStagingSync";
 import { usePendingState } from "./usePendingState";
-import { useRepositoryFileStaging } from "./useRepositoryFileStaging";
 import { useFilesTabState } from "./useFilesTabState";
 import { useCatalog, useRepositoryPathLists, useRepositorySelectedFileQuery } from "./useCatalog";
 import type { AppFile } from "./types";
@@ -39,13 +39,11 @@ export function useEditor({
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
   const catalog = useCatalog(canvasId, files);
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
-  const [committedContentByPath, setCommittedContentByPath] = useState<Record<string, string>>({});
+  const { committedContentByPath, setCommittedContentByPath, committedContentByPathRef } = useEditorCommittedContent();
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
   const loadedContentByPathRef = useRef(loadedContentByPath);
   loadedContentByPathRef.current = loadedContentByPath;
-  const committedContentByPathRef = useRef(committedContentByPath);
-  committedContentByPathRef.current = committedContentByPath;
 
   const bootstrapPaths = useRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, []);
   const allPathsRef = useRef(bootstrapPaths.allPaths);
@@ -70,14 +68,6 @@ export function useEditor({
   allPathsRef.current = pathLists.allPaths;
   finalRepositoryPathsRef.current = pathLists.finalRepositoryPaths;
 
-  // Mirror non-spec file edits into the draft staging layer (debounced) so the
-  // header switches to Reset/Commit and Commit can persist them to git.
-  useRepositoryFileStaging({
-    canvasId,
-    versionId,
-    enabled: canManageRepositoryFiles && !!versionId && !suspendRepositoryFileStaging,
-    pendingChanges,
-  });
   const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
 
@@ -104,20 +94,16 @@ export function useEditor({
     stagingResetNonce,
   });
 
-  const { reconcilePendingWithCommitted } = pending;
-
-  useEffect(() => {
-    reconcilePendingWithCommitted(committedContentByPath);
-  }, [committedContentByPath, reconcilePendingWithCommitted]);
-
-  const hasLocalFilesStaging = useMemo(
-    () => computeLocalFilesStaging(pendingChanges, committedContentByPath),
-    [pendingChanges, committedContentByPath],
-  );
-
-  useEffect(() => {
-    onLocalFilesStagingChange?.(hasLocalFilesStaging);
-  }, [hasLocalFilesStaging, onLocalFilesStagingChange]);
+  useEditorStagingSync({
+    canvasId,
+    versionId,
+    canManageRepositoryFiles,
+    suspendRepositoryFileStaging,
+    pendingChanges,
+    committedContentByPath,
+    reconcilePendingWithCommitted: pending.reconcilePendingWithCommitted,
+    onLocalFilesStagingChange,
+  });
 
   return buildFilesEditorResult({
     catalog,
