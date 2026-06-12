@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/util"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	log "github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
 	enforcer           *casbin.SyncedEnforcer
+	casbinModel        model.Model
 	orgPolicyTemplates [][5]string
 }
 
@@ -33,12 +35,17 @@ func NewAuthService() (*AuthService, error) {
 	modelPath := os.Getenv("RBAC_MODEL_PATH")
 	orgPolicyPath := os.Getenv("RBAC_ORG_POLICY_PATH")
 
+	casbinModel, err := model.NewModelFromFile(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load casbin model: %w", err)
+	}
+
 	adapter, err := gormadapter.NewTransactionalAdapterByDB(database.Conn())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewSyncedEnforcer(modelPath, adapter)
+	enforcer, err := casbin.NewSyncedEnforcer(casbinModel, adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
@@ -62,6 +69,7 @@ func NewAuthService() (*AuthService, error) {
 
 	service := &AuthService{
 		enforcer:           enforcer,
+		casbinModel:        casbinModel,
 		orgPolicyTemplates: orgPolicyTemplates,
 	}
 
@@ -97,19 +105,14 @@ func (a *AuthService) IsValidPermission(domainType string, permission *Permissio
 	return false
 }
 
-func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
+func policyFiltersForDomain(domainType, domainID string) []gormadapter.Filter {
 	domain := prefixDomain(domainType, domainID)
-	defaultDomain := ""
-	if domainType == models.DomainTypeOrganization {
-		defaultDomain = "/org/*"
-	}
-
 	policyDomains := []string{domain}
-	if defaultDomain != "" {
-		policyDomains = append(policyDomains, defaultDomain)
+	if domainType == models.DomainTypeOrganization {
+		policyDomains = append(policyDomains, "/org/*")
 	}
 
-	filters := []gormadapter.Filter{
+	return []gormadapter.Filter{
 		{
 			Ptype: []string{"p"},
 			V1:    policyDomains,
@@ -119,32 +122,49 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 			V2:    policyDomains,
 		},
 	}
+}
 
-	//
-	// We always reload policies before checking for permissions.
-	// Due to the lack of proper support for distributed enforcers in casbin,
-	// we have no way to reliably know if policies on this instance are up to date.
-	//
-	err := a.enforcer.LoadFilteredPolicy(filters)
+func (a *AuthService) newReadEnforcer(filters []gormadapter.Filter) (casbin.IEnforcer, error) {
+	adapter, err := gormadapter.NewAdapterByDB(database.Conn())
 	if err != nil {
-		return false, err
+		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	if err := a.loadDefaultPolicies(); err != nil {
+	enforcer, err := casbin.NewEnforcer(a.casbinModel, adapter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
+	}
+
+	enforcer.EnableAutoSave(false)
+	enforcer.AddNamedDomainMatchingFunc("g", "keyMatch", util.KeyMatch)
+
+	if err := enforcer.LoadFilteredPolicy(filters); err != nil {
+		return nil, fmt.Errorf("failed to load filtered policy: %w", err)
+	}
+
+	if err := a.loadDefaultPoliciesOn(enforcer); err != nil {
+		return nil, fmt.Errorf("failed to load default policies: %w", err)
+	}
+
+	return enforcer, nil
+}
+
+func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
+	domain := prefixDomain(domainType, domainID)
+	filters := policyFiltersForDomain(domainType, domainID)
+
+	enforcer, err := a.newReadEnforcer(filters)
+	if err != nil {
 		return false, err
 	}
 
 	prefixedUserID := prefixUserID(userID)
-	allowed, err := a.enforcer.Enforce(prefixedUserID, domain, resource, action)
+	allowed, err := enforcer.Enforce(prefixedUserID, domain, resource, action)
 	if err != nil {
 		return false, err
 	}
 
-	if allowed {
-		return true, nil
-	}
-
-	return false, nil
+	return allowed, nil
 }
 
 func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string, displayName string, description string) error {
@@ -588,30 +608,15 @@ func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
+	filters := policyFiltersForDomain(models.DomainTypeOrganization, orgID)
 
-	//
-	// Keep policy cache fresh for role resolution calls that are not preceded by a permission
-	// check (for example, /me when include_permissions=true).
-	//
-	filters := []gormadapter.Filter{
-		{
-			Ptype: []string{"p"},
-			V1:    []string{orgDomain, "/org/*"},
-		},
-		{
-			Ptype: []string{"g"},
-			V2:    []string{orgDomain, "/org/*"},
-		},
-	}
-	if err := a.enforcer.LoadFilteredPolicy(filters); err != nil {
-		return nil, err
-	}
-	if err := a.loadDefaultPolicies(); err != nil {
+	enforcer, err := a.newReadEnforcer(filters)
+	if err != nil {
 		return nil, err
 	}
 
 	prefixedUserID := prefixUserID(userID)
-	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
+	roleNames, err := enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +630,7 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 	roles := []*RoleDefinition{}
 	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeOrganization, orgID)
+		roleDef, err := a.getRoleDefinition(enforcer, roleName, models.DomainTypeOrganization, orgID)
 		if err != nil {
 			continue
 		}
@@ -636,6 +641,10 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 }
 
 func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
+	return a.getRoleDefinition(a.enforcer, roleName, domainType, domainID)
+}
+
+func (a *AuthService) getRoleDefinition(enforcer casbin.IEnforcer, roleName string, domainType string, domainID string) (*RoleDefinition, error) {
 	if err := models.ValidateDomainType(domainType); err != nil {
 		return nil, err
 	}
@@ -646,8 +655,8 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 	// For custom roles, check if role exists by looking for policies
 	if !a.IsDefaultRole(roleName, domainType) {
 		// For custom roles, check if role exists by looking for policies
-		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
 		if len(policies) == 0 && len(groupingPolicies) == 0 {
 			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
 		}
@@ -657,9 +666,9 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 	// For custom roles, show only direct permissions
 	var permissions []*Permission
 	if a.IsDefaultRole(roleName, domainType) {
-		permissions = a.getRolePermissions(roleName, domain, domainType)
+		permissions = a.getRolePermissions(enforcer, roleName, domain, domainType)
 	} else {
-		permissions = a.getDirectRolePermissions(roleName, domain, domainType)
+		permissions = a.getDirectRolePermissions(enforcer, roleName, domain, domainType)
 	}
 
 	roleDefinition := &RoleDefinition{
@@ -670,7 +679,7 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 		Readonly:    true,
 	}
 
-	inheritedRole := a.getInheritedRole(roleName, domain, domainType)
+	inheritedRole := a.getInheritedRole(enforcer, roleName, domain, domainType)
 	if inheritedRole != nil {
 		roleDefinition.InheritsFrom = inheritedRole
 	}
@@ -716,7 +725,7 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 		}
 	}
 
-	return a.getRolePermissions(roleName, domain, domainType), nil
+	return a.getRolePermissions(a.enforcer, roleName, domain, domainType), nil
 }
 
 func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
@@ -956,15 +965,19 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 }
 
 func (a *AuthService) loadDefaultPolicies() error {
+	return a.loadDefaultPoliciesOn(a.enforcer)
+}
+
+func (a *AuthService) loadDefaultPoliciesOn(enforcer casbin.IEnforcer) error {
 	for _, policy := range a.orgPolicyTemplates {
 		switch policy[0] {
 		case "g":
-			_, err := a.enforcer.AddGroupingPolicy(policy[1], policy[2], policy[3])
+			_, err := enforcer.AddGroupingPolicy(policy[1], policy[2], policy[3])
 			if err != nil {
 				return fmt.Errorf("failed to add default grouping policy: %w", err)
 			}
 		case "p":
-			_, err := a.enforcer.AddPolicy(policy[1], policy[2], policy[3], policy[4])
+			_, err := enforcer.AddPolicy(policy[1], policy[2], policy[3], policy[4])
 			if err != nil {
 				return fmt.Errorf("failed to add default policy: %w", err)
 			}
@@ -1004,7 +1017,7 @@ func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 	return false
 }
 
-func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
+func (a *AuthService) getRolePermissions(enforcer casbin.IEnforcer, roleName, domain, domainType string) []*Permission {
 	if a.IsDefaultRole(roleName, domainType) {
 		return a.getDefaultRolePermissions(roleName, domainType)
 	}
@@ -1014,7 +1027,7 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 		prefixedRoleName: true,
 	}
 
-	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
+	implicitRoles, err := enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
 	if err == nil {
 		for _, role := range implicitRoles {
 			roleSet[role] = true
@@ -1032,7 +1045,7 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 			continue
 		}
 
-		permissions, err := a.enforcer.GetFilteredPolicy(0, role, domain)
+		permissions, err := enforcer.GetFilteredPolicy(0, role, domain)
 		if err != nil {
 			continue
 		}
@@ -1104,10 +1117,10 @@ func (a *AuthService) getDefaultRolePermissions(roleName, domainType string) []*
 	return rolePermissions
 }
 
-func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType string) []*Permission {
+func (a *AuthService) getDirectRolePermissions(enforcer casbin.IEnforcer, roleName, domain, domainType string) []*Permission {
 	prefixedRoleName := prefixRoleName(roleName)
 	// Get only direct permissions for this role, not inherited ones
-	permissions, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	permissions, err := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
 		return []*Permission{}
 	}
@@ -1126,9 +1139,9 @@ func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType stri
 	return rolePermissions
 }
 
-func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *RoleDefinition {
+func (a *AuthService) getInheritedRole(enforcer casbin.IEnforcer, roleName, domain, domainType string) *RoleDefinition {
 	prefixedRoleName := prefixRoleName(roleName)
-	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
+	implicitRoles, err := enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
 	if err != nil || len(implicitRoles) == 0 {
 		return nil
 	}
@@ -1140,7 +1153,7 @@ func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *Rol
 				Name:        unprefixedRoleName,
 				DomainType:  domainType,
 				Description: a.getRoleDescription(unprefixedRoleName),
-				Permissions: a.getRolePermissions(unprefixedRoleName, domain, domainType),
+				Permissions: a.getRolePermissions(enforcer, unprefixedRoleName, domain, domainType),
 				Readonly:    true,
 			}
 		}
