@@ -287,7 +287,9 @@ export const ConfigurationFieldRenderer = ({
   const fieldAllowsExpressions =
     allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
   const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
-  const fieldLabel = runTitlePresentation?.label ?? field.label ?? field.name;
+  // `field.label` arrives as an empty string (not undefined) when a component omits it,
+  // so fall back to the field name whenever the label is blank.
+  const fieldLabel = runTitlePresentation?.label || field.label || field.name;
   const fieldDescription = runTitlePresentation?.description ?? field.description;
 
   const commonProps = {
