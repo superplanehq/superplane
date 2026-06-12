@@ -5,9 +5,9 @@ func defaultRunTitleExpression(triggerName string) string {
 }
 
 var defaultRunTitleExpressions = map[string]string{
-	"start":    "Manual run {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
-	"schedule": "Schedule {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
-	"webhook":  "Webhook {{ root().timestamp.Format(\"2006-01-02 15:04:05Z07:00\") }}",
+	"start":    "Manual run {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
+	"schedule": "Schedule {{ root().data.calendar.month }} {{ root().data.calendar.day }} {{ root().data.calendar.hour }}:{{ root().data.calendar.minute }}",
+	"webhook":  "Webhook {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.alarmName }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",
@@ -44,6 +44,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"gcp.artifactregistry.onArtifactPush":     "{{ root().data.tag }}",
 	"gcp.cloudbuild.onBuildComplete":          "{{ root().data.status }} - {{ root().data.id }}",
 	"gcp.compute.onVMInstance":                "{{ root().data.resourceName }}",
+	"gcp.monitoring.onAlert":                  "{{ root().data.conditionName }} {{ root().data.state }} - {{ root().data.resourceName }}",
 	"gcp.pubsub.onMessage":                    "{{ root().data.messageId }}",
 
 	"github.onBranchCreated":   "{{ root().data.ref }}",

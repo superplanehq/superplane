@@ -621,13 +621,15 @@ class ExprDate {
     // Default to ISO-like format if no layout provided
     const fmt = layout ?? "2006-01-02 15:04:05";
     const pad = (n: number, width: number = 2) => String(n).padStart(width, "0");
-    return fmt
-      .replace("2006", String(this.date.getFullYear()))
-      .replace("01", pad(this.date.getMonth() + 1))
-      .replace("02", pad(this.date.getDate()))
-      .replace("15", pad(this.date.getHours()))
-      .replace("04", pad(this.date.getMinutes()))
-      .replace("05", pad(this.date.getSeconds()));
+    const replacements: Record<string, string> = {
+      "2006": String(this.date.getFullYear()),
+      "01": pad(this.date.getMonth() + 1),
+      "02": pad(this.date.getDate()),
+      "15": pad(this.date.getHours()),
+      "04": pad(this.date.getMinutes()),
+      "05": pad(this.date.getSeconds()),
+    };
+    return fmt.replace(/2006|01|02|15|04|05/g, (token) => replacements[token]);
   }
   Add(duration?: ExprDuration): ExprDate {
     if (!duration || !(duration instanceof ExprDuration)) {
@@ -695,6 +697,14 @@ class ExprDate {
   }
 }
 
+function parseDateString(value: string): ExprDate | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return new ExprDate(date);
+}
+
 // Built-in functions
 const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   // String functions
@@ -737,7 +747,7 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
 
   // Date functions
   now: () => new ExprDate(new Date()),
-  date: (str: unknown) => new ExprDate(new Date(String(str))),
+  date: (str: unknown) => parseDateString(String(str)),
   duration: (str: unknown) => {
     // Parse duration string like "1h", "30m", "1h30m", "2s", "500ms"
     const s = String(str);
@@ -986,6 +996,13 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
 
       // Handle string methods
       if (typeof obj === "string") {
+        const date = parseDateString(obj);
+        const dateMethod = date?.[node.method as keyof ExprDate];
+        if (typeof dateMethod === "function") {
+          const args = node.args.map((arg) => evaluate(arg, context));
+          return (dateMethod as (...args: unknown[]) => unknown).apply(date, args);
+        }
+
         const strMethods: Record<string, (...args: unknown[]) => unknown> = {
           contains: (sub: unknown) => obj.includes(String(sub)),
           startsWith: (prefix: unknown) => obj.startsWith(String(prefix)),

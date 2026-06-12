@@ -20,6 +20,22 @@ describe("exprEvaluator", () => {
     expect(evaluateExpr("root().data.items[1:]", { __root: { data: { items: ["a", "b", "c"] } } })).toEqual(["b", "c"]);
   });
 
+  it("formats timestamp strings through the date helper", () => {
+    expect(
+      evaluateExpr('date(root().timestamp).Format("2006-01-02 15:04:05")', {
+        __root: { timestamp: "2024-01-01T09:08:07" },
+      }),
+    ).toBe("2024-01-01 09:08:07");
+  });
+
+  it("formats timestamp strings with date methods", () => {
+    expect(
+      evaluateExpr('root().timestamp.Format("2006-01-02 15:04:05")', {
+        __root: { timestamp: "2024-01-01T09:08:07" },
+      }),
+    ).toBe("2024-01-01 09:08:07");
+  });
+
   it("formats primitive, array, and object results for display", () => {
     expect(formatExprResult(null)).toBe("null");
     expect(formatExprResult(["a", "b", "c"])).toBe("[a, b, c]");
