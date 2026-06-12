@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -174,18 +176,35 @@ func (c *UpdateIssueComment) Cleanup(ctx core.SetupContext) error         { retu
 func (c *UpdateIssueComment) Hooks() []core.Hook                          { return []core.Hook{} }
 func (c *UpdateIssueComment) HandleHook(ctx core.ActionHookContext) error { return nil }
 
-// parseCommentID handles both plain integer strings and scientific notation
+// parseCommentID handles plain integer strings and scientific notation
 // (e.g. "1.234567e+09") which can occur when large GitHub IDs pass through
-// JSON expression evaluation.
-func parseCommentID(s string) (int64, error) {
-	// Try integer first
-	if id, err := strconv.ParseInt(s, 10, 64); err == nil {
+// JSON expression evaluation. Same logic as pulls/add_reaction.go.
+func parseCommentID(value string) (int64, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, fmt.Errorf("value is empty")
+	}
+
+	if id, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
 		return id, nil
 	}
-	// Fall back to float parsing for scientific notation
-	f, err := strconv.ParseFloat(s, 64)
+
+	f, err := strconv.ParseFloat(trimmed, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("not a valid number")
 	}
+
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("value is not finite")
+	}
+
+	if f != math.Trunc(f) {
+		return 0, fmt.Errorf("value has decimals")
+	}
+
+	if f > float64(math.MaxInt64) || f < float64(math.MinInt64) {
+		return 0, fmt.Errorf("value is out of range")
+	}
+
 	return int64(f), nil
 }

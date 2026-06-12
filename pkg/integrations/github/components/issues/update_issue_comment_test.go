@@ -72,6 +72,21 @@ func Test__UpdateIssueComment__Execute(t *testing.T) {
 		require.Equal(t, int64(1234567890), id)
 	})
 
+	t.Run("rejects NaN", func(t *testing.T) {
+		_, err := parseCommentID("NaN")
+		require.Error(t, err)
+	})
+
+	t.Run("rejects decimal", func(t *testing.T) {
+		_, err := parseCommentID("123.456")
+		require.Error(t, err)
+	})
+
+	t.Run("rejects empty", func(t *testing.T) {
+		_, err := parseCommentID("")
+		require.Error(t, err)
+	})
+
 	t.Run("fails when configuration decode fails", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration:    &contexts.IntegrationContext{},
