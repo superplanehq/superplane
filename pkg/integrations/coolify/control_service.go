@@ -143,6 +143,7 @@ func decodeControlServiceSpec(cfg any) (ControlServiceSpec, error) {
 		return ControlServiceSpec{}, fmt.Errorf("service is required")
 	}
 
+	spec.Operation = strings.TrimSpace(spec.Operation)
 	if err := validateLifecycleOperation(spec.Operation); err != nil {
 		return ControlServiceSpec{}, err
 	}

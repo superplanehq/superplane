@@ -143,6 +143,7 @@ func decodeControlApplicationSpec(cfg any) (ControlApplicationSpec, error) {
 		return ControlApplicationSpec{}, fmt.Errorf("application is required")
 	}
 
+	spec.Operation = strings.TrimSpace(spec.Operation)
 	if err := validateLifecycleOperation(spec.Operation); err != nil {
 		return ControlApplicationSpec{}, err
 	}
