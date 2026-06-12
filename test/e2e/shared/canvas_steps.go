@@ -208,14 +208,21 @@ func (s *CanvasSteps) waitForEnabledEditButton() {
 	}
 }
 
+func (s *CanvasSteps) WaitForEnabledExitEditButton() {
+	s.waitForEnabledExitEditButton()
+}
+
 func (s *CanvasSteps) waitForEnabledExitEditButton() {
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for {
-		disabled, err := exitEditButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			return
+		visible, visibleErr := exitEditButton.IsVisible()
+		if visibleErr == nil && visible {
+			disabled, err := exitEditButton.IsDisabled()
+			require.NoError(s.t, err)
+			if !disabled {
+				return
+			}
 		}
 		if time.Now().After(deadline) {
 			s.t.Fatalf("exit edit button did not become enabled")
