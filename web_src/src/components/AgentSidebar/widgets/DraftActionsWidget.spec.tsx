@@ -23,4 +23,56 @@ describe("DraftActionsWidget", () => {
       }),
     );
   });
+
+  it("commits staged edits before publishing so the agent's staged changes are included", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onDismiss = vi.fn();
+
+    render(
+      <DraftActionsWidget
+        versionId="draft-1"
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /publish/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/staging/commit");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/publish");
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "PATCH" });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not publish when committing staged edits fails", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => "bad staging" } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onDismiss = vi.fn();
+
+    render(
+      <DraftActionsWidget
+        versionId="draft-1"
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /publish/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/staging/commit");
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });

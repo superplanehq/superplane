@@ -247,6 +247,25 @@ func ApplyRepositorySpecFileOperations(
 	return nil
 }
 
+// ParseAndValidateCanvasYAML parses canvas.yaml text and runs the same registry
+// validation as the commit path, returning materialized nodes/edges (carrying
+// per-node error/warning messages) without persisting anything. Agent tools use
+// it to validate staged edits before staging and to summarize staged content.
+func ParseAndValidateCanvasYAML(registry *registry.Registry, organizationID, text string) ([]models.Node, []models.Edge, error) {
+	pbCanvas, err := canvasFromYAMLText(text)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ParseCanvas(registry, organizationID, pbCanvas)
+}
+
+// ValidateConsoleYAML parses and validates console.yaml text without persisting,
+// mirroring the validation the commit path runs before writing the version row.
+func ValidateConsoleYAML(text string) error {
+	_, _, err := consolePanelsLayoutFromYAMLText(text)
+	return err
+}
+
 func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
 	if !hasAutoLayout {
 		return nil
