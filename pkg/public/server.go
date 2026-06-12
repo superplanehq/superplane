@@ -348,8 +348,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
 
-	s.Router.HandleFunc("/api/v1/runner-logs", s.handleRunnerLogs).Methods(http.MethodPost)
-
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 
@@ -583,6 +581,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
+
+	// Runner log push endpoint (Bearer-token auth, no org context required)
+	r.HandleFunc("/api/v1/runner-logs", s.handleRunnerLogs).Methods(http.MethodPost)
 
 	//
 	// Webhook endpoints for triggers
