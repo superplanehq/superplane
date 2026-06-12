@@ -9,6 +9,7 @@ import { Link as LinkIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
@@ -17,7 +18,6 @@ interface RunRowProps {
   status: RunStatusKey;
   triggerNode?: ComponentsNode;
   isSelected: boolean;
-  hideBottomBorder?: boolean;
   componentIconMap: Record<string, string>;
   onSelectRun: (runId: string) => void;
 }
@@ -29,21 +29,20 @@ export function RunRow({
   status,
   triggerNode,
   isSelected,
-  hideBottomBorder = false,
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
-  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?view=runs&run=${run.id}`) : "#";
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
 
   return (
     <div
       data-testid="runs-sidebar-row"
       className={cn(
-        "group relative flex w-full items-center gap-1.5 px-3 py-2 transition-colors",
-        !hideBottomBorder && "border-b border-b-slate-950/10",
+        RUNS_SIDEBAR_ROW_CLASS,
+        "group relative w-full transition-colors",
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
