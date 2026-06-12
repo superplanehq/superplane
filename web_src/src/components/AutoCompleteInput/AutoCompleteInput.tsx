@@ -1196,7 +1196,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // to prevent position jumping when switching between suggestion types
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
-    const showBottomBar = hasExpressions || (isFocused && !!quickTip);
+    const showPreviewToggle = showValuePreview;
+    const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
 
     return (
       <div ref={containerRef} className="relative w-full">
@@ -1289,7 +1290,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         {showBottomBar && (
           <div className="flex items-center justify-between mt-1 px-0.5">
             {/* Preview toggle - left side */}
-            {hasExpressions ? (
+            {showPreviewToggle ? (
               <button
                 type="button"
                 onClick={() => setPreviewMode(!previewMode)}
