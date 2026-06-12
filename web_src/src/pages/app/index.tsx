@@ -4547,7 +4547,6 @@ export function AppPage() {
     startEditingMenuOpen,
     setStartEditingMenuOpen,
     handleContinueDraftBranch,
-    handleCreateDraftBranch,
     handleDeleteDraftBranch,
     confirmDeleteDraftVersion,
     requestDeleteActiveDraft,
@@ -4770,16 +4769,29 @@ export function AppPage() {
     setIsConsoleYamlOpen,
   });
 
-  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
-    isRunInspectionMode,
-    isVersionsMode: urlViewFlags.isVersionsMode,
-    handleClearRunInspection,
-    handleExitVersionsMode,
-    handleToggleEditMode,
-    setRunDetailNodeId,
-    setSearchParams,
-    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
-  });
+  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit } =
+    useWorkflowHeaderEditActions({
+      isRunInspectionMode,
+      isVersionsMode: urlViewFlags.isVersionsMode,
+      handleClearRunInspection,
+      handleExitVersionsMode,
+      handleToggleEditMode,
+      setRunDetailNodeId,
+      setSearchParams,
+      startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
+    });
+
+  const handleCreateDraftBranchFromHeader = handleEnterEditModeFromHeader;
+
+  const handleContinueDraftBranchFromHeader = useCallback(
+    async (branchName: string) => {
+      clearRunInspectionForEdit();
+      await Promise.resolve();
+      handleContinueDraftBranch(branchName);
+    },
+    [clearRunInspectionForEdit, handleContinueDraftBranch],
+  );
+
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
       if (!isRunInspectionMode || !selectedRun) return;
@@ -4793,17 +4805,18 @@ export function AppPage() {
   );
 
   useEffect(() => {
-    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId) return;
+    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId || hasEditableVersion) return;
     handleUseVersion(liveCanvasVersionId);
-  }, [handleUseVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
+  }, [handleUseVersion, hasEditableVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
 
   const handleDiscardDraftAndStartEdit = useCallback(async () => {
     if (!canUpdateCanvas) {
       showErrorToast("You don't have permission to edit this canvas");
       return;
     }
+    clearRunInspectionForEdit();
     await discardDraftAndCreateNew();
-  }, [canUpdateCanvas, discardDraftAndCreateNew]);
+  }, [canUpdateCanvas, clearRunInspectionForEdit, discardDraftAndCreateNew]);
 
   const handleResetDraftChanges = useCallback(() => {
     if (!organizationId || !canvasId) {
@@ -5368,8 +5381,8 @@ export function AppPage() {
           startEditingDefaultDraft={startEditingDefaultDraft}
           startEditingMenuOpen={startEditingMenuOpen}
           onStartEditingMenuOpenChange={setStartEditingMenuOpen}
-          onContinueDraftBranch={handleContinueDraftBranch}
-          onCreateDraftBranch={handleCreateDraftBranch}
+          onContinueDraftBranch={handleContinueDraftBranchFromHeader}
+          onCreateDraftBranch={handleCreateDraftBranchFromHeader}
           createDraftBranchPending={isCreatingDraftBranch}
           headerMode={headerMode}
           onSelectCanvasView={handleSelectCanvasView}

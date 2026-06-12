@@ -52,5 +52,21 @@ describe("runInspectionSync", () => {
         runCanvasLoading: false,
       }),
     ).toBe(false);
+
+    expect(
+      shouldClearRunDetailNode({
+        runDetailNodeId: "node-a",
+        participantNodeIds: [],
+        runCanvasLoading: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldClearRunDetailNode({
+        runDetailNodeId: "node-a",
+        participantNodeIds: [],
+        runCanvasLoading: true,
+      }),
+    ).toBe(false);
   });
 });

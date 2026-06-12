@@ -42,6 +42,6 @@ export function shouldClearRunDetailNode({
   runCanvasLoading: boolean;
 }): boolean {
   if (!runDetailNodeId || runCanvasLoading) return false;
-  if (participantNodeIds.length === 0) return false;
+  if (participantNodeIds.length === 0) return true;
   return !participantNodeIds.includes(runDetailNodeId);
 }
