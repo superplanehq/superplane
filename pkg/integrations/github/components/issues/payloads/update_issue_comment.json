@@ -1,0 +1,37 @@
+{
+  "data": {
+    "id": 1234567890,
+    "node_id": "IC_kwDOExample",
+    "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal refactors with no user-facing impact.",
+    "user": {
+      "login": "superplane-app[bot]",
+      "id": 12345678,
+      "node_id": "BOT_kwExample",
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "url": "https://api.github.com/users/superplane-app[bot]",
+      "html_url": "https://github.com/apps/superplane-app",
+      "type": "Bot",
+      "site_admin": false
+    },
+    "created_at": "2026-01-16T17:56:16Z",
+    "updated_at": "2026-01-16T18:30:00Z",
+    "author_association": "NONE",
+    "reactions": {
+      "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    }
+  },
+  "timestamp": "2026-01-16T18:30:00.680755501Z",
+  "type": "github.issueComment"
+}
