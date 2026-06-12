@@ -153,6 +153,32 @@ describe("associateElasticIPMapper.getExecutionDetails", () => {
     expect(details["Instance ID"]).toBeUndefined();
   });
 
+  it("uses output payload type for operation when configuration changed after run", () => {
+    const ctx = buildDetailsCtx({
+      node: {
+        configuration: { region: "us-east-1", operation: "associate" },
+      },
+      execution: {
+        outputs: {
+          default: [
+            {
+              type: "aws.ec2.elastic-ip.disassociated",
+              timestamp: new Date().toISOString(),
+              data: {
+                associationId: "eipassoc-xyz789",
+                region: "us-east-1",
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const details = associateElasticIPMapper.getExecutionDetails(ctx);
+    expect(details["Operation"]).toBe("Disassociate");
+    expect(details["Region"]).toBe("us-east-1");
+  });
+
   it("maps disassociate output without ID fields", () => {
     const ctx = buildDetailsCtx({
       node: {

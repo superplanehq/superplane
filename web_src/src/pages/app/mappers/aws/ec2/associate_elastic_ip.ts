@@ -45,6 +45,11 @@ const operationLabels: Record<string, string> = {
   disassociate: "Disassociate",
 };
 
+const operationFromPayloadType: Record<string, string> = {
+  "aws.ec2.elastic-ip.associated": "associate",
+  "aws.ec2.elastic-ip.disassociated": "disassociate",
+};
+
 export const elasticIPAssociationStateMap: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   "aws.ec2.elastic-ip.associated": {
@@ -101,14 +106,14 @@ export const associateElasticIPMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const configuration = context.node.configuration as Configuration | undefined;
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const output = outputs?.default?.[0]?.data as Output | undefined;
-    const operation = configuration?.operation;
+    const outputEvent = outputs?.default?.find((output) => output.type?.startsWith(elasticIPPayloadPrefix));
+    const output = outputEvent?.data as Output | undefined;
     const completedAt = context.execution.updatedAt
       ? new Date(context.execution.updatedAt).toLocaleString()
       : context.execution.createdAt
         ? new Date(context.execution.createdAt).toLocaleString()
         : undefined;
-    const operationLabel = (operation && operationLabels[operation]) ?? operation ?? "-";
+    const operationLabel = operationLabelForExecution(configuration, outputEvent?.type);
 
     if (!output) {
       return {
@@ -133,6 +138,12 @@ export const associateElasticIPMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function operationLabelForExecution(configuration: Configuration | undefined, payloadType?: string): string {
+  const operationFromOutput = payloadType ? operationFromPayloadType[payloadType] : undefined;
+  const operation = operationFromOutput ?? configuration?.operation;
+  return (operation && operationLabels[operation]) ?? operation ?? "-";
+}
 
 function associateElasticIPMetadata(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as Configuration | undefined;
