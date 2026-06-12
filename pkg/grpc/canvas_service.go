@@ -461,3 +461,44 @@ func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb
 		s.authService,
 	)
 }
+
+func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.StageCanvasRepositoryFileRequest) (*pb.StageCanvasRepositoryFileResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	state, err := canvases.StageRepositorySpecFileOperations(
+		ctx,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		req.Operations,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.StageCanvasRepositoryFileResponse{StagingSummary: state}, nil
+}
+
+func (s *CanvasService) DiscardCanvasStaging(ctx context.Context, req *pb.DiscardCanvasStagingRequest) (*pb.DiscardCanvasStagingResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DiscardCanvasStaging(ctx, organizationID, req.CanvasId, req.VersionId, req.Paths)
+}
+
+func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasStaging(
+		ctx,
+		s.gitProvider,
+		s.usageService,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		s.webhookBaseURL,
+		s.authService,
+	)
+}
+
+func (s *CanvasService) ApplyCanvasAutoLayout(ctx context.Context, req *pb.ApplyCanvasAutoLayoutRequest) (*pb.ApplyCanvasAutoLayoutResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ApplyCanvasAutoLayout(ctx, organizationID, req.CanvasId, req.VersionId, req.AutoLayout)
+}

@@ -3,6 +3,11 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { draftBranchName, draftDisplayName, draftOwnerName, draftUpdatedAt, draftVersionId } from "@/lib/draftVersion";
+import {
+  draftBranchRowBackgroundClassName,
+  draftBranchStatusBadge,
+  type DraftBranchEditStatus,
+} from "@/pages/app/lib/draft-branch-edit-status";
 
 function formatUpdatedAt(value?: string): string {
   if (!value) {
@@ -20,6 +25,7 @@ function formatUpdatedAt(value?: string): string {
 export function DraftBranchRow({
   draft,
   isActive,
+  editStatus = "ready",
   canUpdateCanvas,
   deletePending,
   onOpen,
@@ -27,6 +33,7 @@ export function DraftBranchRow({
 }: {
   draft: CanvasesCanvasVersion;
   isActive: boolean;
+  editStatus?: DraftBranchEditStatus;
   canUpdateCanvas: boolean;
   deletePending?: boolean;
   onOpen: (branchName: string) => void;
@@ -36,10 +43,14 @@ export function DraftBranchRow({
   const displayName = draftDisplayName(draft);
   const ownerName = draftOwnerName(draft);
   const versionId = draftVersionId(draft);
+  const statusBadge = draftBranchStatusBadge(editStatus, isActive);
 
   return (
     <div
-      className={cn("flex items-start gap-2 border-b border-slate-100 px-4 py-3", isActive ? "bg-blue-50" : "bg-white")}
+      className={cn(
+        "flex items-start gap-2 border-b border-slate-100 px-4 py-3",
+        draftBranchRowBackgroundClassName(isActive, editStatus),
+      )}
       data-testid="canvas-draft-branch-row"
     >
       <button
@@ -48,8 +59,9 @@ export function DraftBranchRow({
         onClick={() => branchName && onOpen(branchName)}
         disabled={!branchName}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
+          <span className={statusBadge.className}>{statusBadge.label}</span>
         </div>
         <p className="mt-0.5 truncate text-xs text-slate-500">{branchName}</p>
         <p className="mt-1 text-xs text-slate-500">

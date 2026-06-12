@@ -84,7 +84,7 @@ func (s *runsViewSteps) givenACanvasWithManualTriggerAndNoop() {
 	s.canvas.AddNoop("Output", models.Position{X: 1000, Y: 200})
 	s.canvas.Connect("Start", "Output")
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *runsViewSteps) whenTheManualTriggerRuns() {
