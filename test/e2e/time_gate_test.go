@@ -26,7 +26,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
@@ -39,7 +39,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
@@ -167,7 +167,7 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas.Connect("timeGate", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *TimeGateSteps) runManualTrigger() {

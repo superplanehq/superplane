@@ -1,7 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -32,6 +32,10 @@ export function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
   const onConsoleTab = mode === "console";
@@ -69,7 +73,6 @@ export function SecondaryHeaderActions({
             />
           ) : null}
           <EditModePublishDiscardActions
-            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardVersion={onDiscardVersion}
             discardVersionDisabled={discardVersionDisabled}
             discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -77,6 +80,10 @@ export function SecondaryHeaderActions({
             publishVersionLabel={publishVersionLabel}
             publishVersionDisabled={publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+            hasStagingChanges={hasStagingChanges}
+            onCommitStaging={onCommitStaging}
+            commitStagingPending={commitStagingPending}
+            onResetStaging={onResetStaging}
           />
         </>
       ) : null}
@@ -119,7 +126,6 @@ function FilesHeaderActionsSlot({
 }
 
 function EditModePublishDiscardActions({
-  hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -127,9 +133,12 @@ function EditModePublishDiscardActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: Pick<
   HeaderProps,
-  | "hasUnpublishedDraftChanges"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -137,13 +146,40 @@ function EditModePublishDiscardActions({
   | "publishVersionLabel"
   | "publishVersionDisabled"
   | "publishVersionDisabledTooltip"
+  | "hasStagingChanges"
+  | "onCommitStaging"
+  | "commitStagingPending"
+  | "onResetStaging"
 >) {
+  const showStagingActions = !!hasStagingChanges && !!onCommitStaging;
+
+  // Staging and committed states are mutually exclusive: while there are staged
+  // edits the user can only Reset/Commit them; once everything is committed they
+  // can Discard the draft or Publish it.
+  if (showStagingActions) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {commitStagingPending ? (
+          <Loader2
+            className="size-4 shrink-0 animate-spin text-slate-400"
+            aria-label="Committing changes"
+            data-testid="canvas-commit-staging-spinner"
+          />
+        ) : null}
+        {onResetStaging ? (
+          <ResetStagingButton onReset={() => onResetStaging()} disabled={!!commitStagingPending} />
+        ) : null}
+        <CommitStagingButton onCommit={() => onCommitStaging?.()} pending={!!commitStagingPending} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5">
-      {hasUnpublishedDraftChanges ? (
+      {onDiscardVersion ? (
         <DiscardDraftButton
-          onDiscard={() => onDiscardVersion?.()}
-          disabled={discardVersionDisabled || !onDiscardVersion}
+          onDiscard={() => onDiscardVersion()}
+          disabled={!!discardVersionDisabled}
           disabledTooltip={discardVersionDisabledTooltip}
         />
       ) : null}
@@ -155,6 +191,45 @@ function EditModePublishDiscardActions({
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       />
     </div>
+  );
+}
+
+function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabled: boolean }) {
+  return (
+    <Tooltip delayDuration={2000}>
+      <TooltipTrigger asChild>
+        <UIButton
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
+          disabled={disabled}
+          data-testid="canvas-reset-staging-button"
+        >
+          Reset
+        </UIButton>
+      </TooltipTrigger>
+      <TooltipContent side="top">Reset to last commit</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// The label stays fixed (no "Committing…") so the button keeps a constant
+// width while a commit is in flight; the progress spinner lives to the left of
+// the Reset button instead.
+function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
+  return (
+    <UIButton
+      type="button"
+      variant="default"
+      size="sm"
+      className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
+      onClick={onCommit}
+      disabled={pending}
+      data-testid="canvas-commit-staging-button"
+    >
+      Commit
+    </UIButton>
   );
 }
 

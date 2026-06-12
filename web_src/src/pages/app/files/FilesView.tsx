@@ -7,7 +7,7 @@ import { FileList } from "./FileList";
 import { TabBar } from "./TabBar";
 import { DiffHeaderAction, IconButton } from "./FilesUi";
 import { useEditor } from "./useEditor";
-import type { AppFile, FilesHeaderActionsState } from "./types";
+import type { AppFile } from "./types";
 
 const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default: module.DiffDialog })));
 
@@ -18,8 +18,10 @@ export function FilesView({
   canWrite,
   files,
   headerActionsSlotId,
-  onHeaderActionsChange,
+  stagingResetNonce,
+  suspendRepositoryFileStaging,
   onSpecFileChange,
+  onLocalFilesStagingChange,
 }: {
   canvasId?: string;
   versionId?: string;
@@ -27,8 +29,10 @@ export function FilesView({
   canWrite: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  stagingResetNonce?: number;
+  suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
+  onLocalFilesStagingChange?: (hasStaging: boolean) => void;
 }) {
   const editor = useEditor({
     canvasId,
@@ -37,8 +41,10 @@ export function FilesView({
     canWrite,
     files,
     headerActionsSlotId,
-    onHeaderActionsChange,
+    stagingResetNonce,
+    suspendRepositoryFileStaging,
     onSpecFileChange,
+    onLocalFilesStagingChange,
   });
 
   return (
@@ -78,6 +84,7 @@ export function FilesView({
           openTabs={editor.openTabs}
           selectedPath={editor.selectedPath}
           pendingChangesByPath={editor.pendingChangesByPath}
+          specDraftByPath={editor.specDraftByPath}
           onOpenFile={editor.openFile}
           onCloseTab={editor.closeTab}
         />

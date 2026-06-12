@@ -83,6 +83,7 @@ export function buildFilesEditorResult({
     openTabs: tabs.openTabs,
     pendingChanges,
     pendingChangesByPath: pending.pendingChangesByPath,
+    specDraftByPath: pending.specDraftByPath,
     newFilePath: pending.newFilePath,
     isDiffOpen,
     setIsDiffOpen,

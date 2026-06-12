@@ -29,7 +29,7 @@ func updateConsoleFromProto(
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	modelLayout := deserializeConsoleLayout(layout)
-	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout)
+	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout, false)
 }
 
 func Test__UpdateConsole(t *testing.T) {
