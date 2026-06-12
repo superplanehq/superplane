@@ -172,7 +172,7 @@ export function getWorkflowViewPresentation({
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunInspectionMode || isVersionsMode || isFilesMode,
+    readOnlyViewModes: (isRunInspectionMode && !hasEditableVersion) || isVersionsMode || isFilesMode,
   };
 }
 

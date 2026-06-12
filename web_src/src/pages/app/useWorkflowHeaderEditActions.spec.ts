@@ -112,4 +112,43 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(next.get("version")).toBe("draft-version");
     expect(next.get("branch")).toBe("drafts/abc");
   });
+
+  it("auto edit mode clears run inspection before entering edit mode", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("edit=1&run=run-123");
+
+    renderHook(() =>
+      useWorkflowHeaderEditActions({
+        isRunInspectionMode: true,
+        isVersionsMode: false,
+        handleClearRunInspection: vi.fn(),
+        handleExitVersionsMode: vi.fn(),
+        handleToggleEditMode,
+        setRunDetailNodeId: vi.fn(),
+        setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+        startup: {
+          hasEditableVersion: false,
+          canUpdateCanvas: true,
+          canvas: { metadata: { id: "canvas-1" }, spec: {} },
+          searchParams,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(2);
+
+    const clearRunUpdater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const clearedRun = clearRunUpdater(new URLSearchParams("edit=1&run=run-123"));
+    expect(clearedRun.get("run")).toBeNull();
+    expect(clearedRun.get("edit")).toBe("1");
+
+    const clearEditUpdater = setSearchParams.mock.calls[1]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const clearedEdit = clearEditUpdater(new URLSearchParams("edit=1"));
+    expect(clearedEdit.get("edit")).toBeNull();
+  });
 });
