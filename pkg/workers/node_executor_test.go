@@ -2,9 +2,11 @@ package workers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -453,6 +455,8 @@ func TestClassifyProcessError(t *testing.T) {
 		{name: "locked", err: ErrRecordLocked, want: executorReasonLocked},
 		{name: "not found", err: gorm.ErrRecordNotFound, want: executorReasonNotFound},
 		{name: "deadlock", err: errors.New("ERROR: deadlock detected (SQLSTATE 40P01)"), want: executorReasonDeadlock},
+		{name: "pg deadlock code", err: &pgconn.PgError{Code: "40P01", Message: "deadlock detected"}, want: executorReasonDeadlock},
+		{name: "wrapped pg deadlock", err: fmt.Errorf("update execution: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"}), want: executorReasonDeadlock},
 		{name: "internal", err: errors.New("something else"), want: executorReasonInternal},
 	}
 
@@ -514,6 +518,56 @@ func TestClassifyExecutionFailure(t *testing.T) {
 			t.Parallel()
 			if got := classifyExecutionFailure(&tt.execution); got != tt.want {
 				t.Fatalf("classifyExecutionFailure() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyAttemptFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		err       error
+		execution *models.CanvasNodeExecution
+		want      string
+	}{
+		{
+			name: "aborted transaction with deadlock result message",
+			err:  errors.New("ERROR: current transaction is aborted, commands ignored until end of transaction block"),
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonDeadlock,
+		},
+		{
+			name: "failed execution without process error",
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "request failed",
+			},
+			want: models.CanvasNodeExecutionResultReasonError,
+		},
+		{
+			name: "process error takes precedence over execution state",
+			err:  gorm.ErrRecordNotFound,
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyAttemptFailure(tt.err, tt.execution); got != tt.want {
+				t.Fatalf("classifyAttemptFailure() = %q, want %q", got, tt.want)
 			}
 		})
 	}
