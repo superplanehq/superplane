@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
 import { showErrorToast } from "@/lib/toast";
@@ -15,7 +17,7 @@ import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
 import type { InstallParam } from "../install/types";
 
-type Phase = "installing" | "done" | "configuring";
+type Phase = "installing" | "done" | "integrations" | "configuring";
 
 interface Step {
   label: string;
@@ -171,16 +173,25 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
             ))}
           </div>
           <div className="flex items-center gap-3 pt-2">
-            {installParams.length > 0 && (
-              <Button variant="default" size="sm" onClick={handleConfigure}>
+            {(app.integrations.length > 0 || installParams.length > 0) && (
+              <Button variant="default" size="sm" onClick={() => setPhase(app.integrations.length > 0 ? "integrations" : "configuring")}>
                 Configure
               </Button>
             )}
-            <Button variant={installParams.length > 0 ? "outline" : "default"} size="sm" onClick={handleGoToApp}>
-              {installParams.length > 0 ? "Just take me there" : "Open App"}
+            <Button variant={(app.integrations.length > 0 || installParams.length > 0) ? "outline" : "default"} size="sm" onClick={handleGoToApp}>
+              {(app.integrations.length > 0 || installParams.length > 0) ? "Just take me there" : "Open App"}
             </Button>
           </div>
         </div>
+      )}
+
+      {phase === "integrations" && (
+        <IntegrationsStep
+          integrations={app.integrations}
+          organizationId={organizationId ?? ""}
+          onNext={() => installParams.length > 0 ? setPhase("configuring") : handleGoToApp()}
+          onSkip={handleGoToApp}
+        />
       )}
 
       {phase === "configuring" && (
@@ -211,6 +222,76 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function IntegrationsStep({
+  integrations,
+  organizationId,
+  onNext,
+  onSkip,
+}: {
+  integrations: string[];
+  organizationId: string;
+  onNext: () => void;
+  onSkip: () => void;
+}) {
+  const { data: connected, refetch } = useConnectedIntegrations(organizationId, {
+    enabled: !!organizationId,
+    refetchInterval: 3000,
+  });
+
+  const integrationStatus = integrations.map((name) => {
+    const instance = connected?.find(
+      (item) => item.metadata?.integrationName === name && item.status?.state === "ready",
+    );
+    return { name, connected: !!instance };
+  });
+
+  const allConnected = integrationStatus.every((i) => i.connected);
+
+  const formatName = (name: string) =>
+    name.charAt(0).toUpperCase() + name.slice(1);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium text-slate-700">Connect Integrations</p>
+      <p className="text-xs text-slate-500">This app requires the following integrations to be connected.</p>
+      <div className="space-y-2">
+        {integrationStatus.map((integration) => (
+          <div key={integration.name} className="flex items-center justify-between rounded-md border px-3 py-2">
+            <div className="flex items-center gap-2.5">
+              <IntegrationIcon integrationName={integration.name} className="h-5 w-5" size={20} />
+              <span className="text-sm font-medium text-slate-700">{formatName(integration.name)}</span>
+            </div>
+            {integration.connected ? (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+                <Check className="h-3.5 w-3.5" />
+                <span>Connected</span>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => window.open(`/${organizationId}/settings/integrations`, "_blank")}
+              >
+                Connect
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 pt-2">
+        <Button variant="default" size="sm" onClick={onNext} disabled={!allConnected}>
+          {allConnected ? "Next" : "Waiting for integrations..."}
+        </Button>
+        <Button variant="outline" size="sm" onClick={onSkip}>
+          Skip
+        </Button>
+      </div>
     </div>
   );
 }
