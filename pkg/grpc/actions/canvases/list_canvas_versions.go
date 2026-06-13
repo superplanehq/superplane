@@ -57,7 +57,7 @@ func ListCanvasVersionsPaginated(
 
 	var publishedVersions []models.CanvasVersion
 	var publishedCount int64
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
 		if versionsErr != nil {
 			return versionsErr
