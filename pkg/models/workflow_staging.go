@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ type WorkflowStaging struct {
 	OrganizationID uuid.UUID `gorm:"type:uuid;not null"`
 	Path           string    `gorm:"type:text;not null"`
 	Content        string    `gorm:"type:text;not null;default:''"`
+	BaseHeadSHA    string    `gorm:"column:base_head_sha;type:varchar(40);not null;default:''"`
 	// Deleted marks a staged file removal (row kept). Effective read returns empty
 	// content when true. DiscardWorkflowStaging hard-deletes rows to revert staging.
 	Deleted   bool       `gorm:"not null;default:false"`
@@ -28,7 +30,7 @@ func (WorkflowStaging) TableName() string {
 
 func UpsertWorkflowStagingPath(
 	versionID, organizationID uuid.UUID,
-	path, content string,
+	path, content, baseHeadSHA string,
 	updatedBy *uuid.UUID,
 ) (*WorkflowStaging, error) {
 	return UpsertWorkflowStagingPathInTransaction(
@@ -37,13 +39,14 @@ func UpsertWorkflowStagingPath(
 		organizationID,
 		path,
 		content,
+		baseHeadSHA,
 		updatedBy,
 	)
 }
 
 func MarkWorkflowStagingPathDeleted(
 	versionID, organizationID uuid.UUID,
-	path string,
+	path, baseHeadSHA string,
 	updatedBy *uuid.UUID,
 ) error {
 	return MarkWorkflowStagingPathDeletedInTransaction(
@@ -51,6 +54,7 @@ func MarkWorkflowStagingPathDeleted(
 		versionID,
 		organizationID,
 		path,
+		baseHeadSHA,
 		updatedBy,
 	)
 }
@@ -74,7 +78,7 @@ func FindWorkflowStagingPath(versionID uuid.UUID, path string) (*WorkflowStaging
 func UpsertWorkflowStagingPathInTransaction(
 	tx *gorm.DB,
 	versionID, organizationID uuid.UUID,
-	path, content string,
+	path, content, baseHeadSHA string,
 	updatedBy *uuid.UUID,
 ) (*WorkflowStaging, error) {
 	row := WorkflowStaging{
@@ -82,6 +86,7 @@ func UpsertWorkflowStagingPathInTransaction(
 		OrganizationID: organizationID,
 		Path:           path,
 		Content:        content,
+		BaseHeadSHA:    strings.TrimSpace(baseHeadSHA),
 		Deleted:        false,
 		UpdatedBy:      updatedBy,
 		UpdatedAt:      time.Now(),
@@ -97,6 +102,10 @@ func UpsertWorkflowStagingPathInTransaction(
 			"deleted":    false,
 			"updated_by": updatedBy,
 			"updated_at": time.Now(),
+			"base_head_sha": gorm.Expr(
+				"CASE WHEN workflow_staged_files.base_head_sha = '' THEN ? ELSE workflow_staged_files.base_head_sha END",
+				strings.TrimSpace(baseHeadSHA),
+			),
 		}),
 	}).Create(&row).Error
 	if err != nil {
@@ -112,7 +121,7 @@ func UpsertWorkflowStagingPathInTransaction(
 func MarkWorkflowStagingPathDeletedInTransaction(
 	tx *gorm.DB,
 	versionID, organizationID uuid.UUID,
-	path string,
+	path, baseHeadSHA string,
 	updatedBy *uuid.UUID,
 ) error {
 	row := WorkflowStaging{
@@ -120,6 +129,7 @@ func MarkWorkflowStagingPathDeletedInTransaction(
 		OrganizationID: organizationID,
 		Path:           path,
 		Content:        "",
+		BaseHeadSHA:    strings.TrimSpace(baseHeadSHA),
 		Deleted:        true,
 		UpdatedBy:      updatedBy,
 		UpdatedAt:      time.Now(),
@@ -135,6 +145,10 @@ func MarkWorkflowStagingPathDeletedInTransaction(
 			"deleted":    true,
 			"updated_by": updatedBy,
 			"updated_at": time.Now(),
+			"base_head_sha": gorm.Expr(
+				"CASE WHEN workflow_staged_files.base_head_sha = '' THEN ? ELSE workflow_staged_files.base_head_sha END",
+				strings.TrimSpace(baseHeadSHA),
+			),
 		}),
 	}).Create(&row).Error
 }

@@ -89,12 +89,12 @@ func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateC
 	if req.DisplayName != nil {
 		displayName = *req.DisplayName
 	}
-	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId, displayName)
+	return canvases.CreateCanvasVersion(ctx, s.gitProvider, s.registry, organizationID, req.CanvasId, displayName)
 }
 
 func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
+	return canvases.DeleteCanvasVersion(ctx, s.gitProvider, organizationID, req.CanvasId, req.VersionId)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
@@ -439,7 +439,7 @@ func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanv
 
 func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
+	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.GetBranch(), req.GetRef())
 }
 
 func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {

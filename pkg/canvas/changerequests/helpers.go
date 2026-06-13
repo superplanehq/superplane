@@ -1,4 +1,4 @@
-package canvases
+package changerequests
 
 import (
 	"github.com/google/uuid"
@@ -6,8 +6,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func isOpenCanvasChangeRequestStatus(status string) bool {
-	return status == models.CanvasChangeRequestStatusOpen
+// ResolveCanvasChangeRequestBaseAndLiveInTransaction returns the base and live
+// node/edge sets used to diff and merge a change request.
+func ResolveCanvasChangeRequestBaseAndLiveInTransaction(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	request *models.CanvasChangeRequest,
+) (baseNodes []models.Node, baseEdges []models.Edge, liveNodes []models.Node, liveEdges []models.Edge, err error) {
+	return resolveCanvasChangeRequestBaseAndLiveInTransaction(tx, canvas, request)
 }
 
 func resolveCanvasChangeRequestBaseAndLiveInTransaction(

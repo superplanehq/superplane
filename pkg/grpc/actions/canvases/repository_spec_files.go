@@ -8,8 +8,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -174,14 +178,11 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-// ApplyRepositorySpecFileOperations parses canvas.yaml/console.yaml content into
-// the draft version row. It is the validated write path shared by the
-// staging-commit flow (CommitCanvasStaging) and the direct-commit flow
-// (CommitCanvasRepositoryFiles). When autoLayout is set it lays out canvas.yaml
-// during the write; when discardStaging is set it drops any staged edits for the
-// version in the same transaction as the version-row write.
+// ApplyRepositorySpecFileOperations commits canvas.yaml/console.yaml to the draft
+// branch in git, materializes the resulting commit, and optionally clears staging.
 func ApplyRepositorySpecFileOperations(
 	ctx context.Context,
+	gitProvider git.Provider,
 	usageService usage.Service,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -198,6 +199,25 @@ func ApplyRepositorySpecFileOperations(
 		return status.Error(codes.InvalidArgument, "version_id is required for canvas.yaml and console.yaml updates")
 	}
 
+	versionUUID, err := uuid.Parse(versionID)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+	}
+
+	canvasUUID, err := uuid.Parse(canvasID)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+	}
+
+	version, err := models.FindCanvasVersion(canvasUUID, versionUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return status.Error(codes.NotFound, "version not found")
+		}
+		return status.Errorf(codes.Internal, "failed to load version: %v", err)
+	}
+
+	processed := make([]*pb.CanvasRepositoryFileOperation, 0, len(operations))
 	for _, operation := range operations {
 		if operation == nil {
 			continue
@@ -209,42 +229,71 @@ func ApplyRepositorySpecFileOperations(
 		normalized := normalizeRepositoryFilePath(operation.GetPath())
 		content := string(operation.GetContent())
 
-		switch normalized {
-		case CanvasYAMLRepositoryPath:
-			pbCanvas, err := canvasFromYAMLText(content)
-			if err != nil {
-				return err
+		if normalized == CanvasYAMLRepositoryPath && autoLayout != nil {
+			pbCanvas, parseErr := canvasFromYAMLText(content)
+			if parseErr != nil {
+				return parseErr
 			}
 
-			_, err = UpdateCanvasVersionWithUsage(
-				ctx,
-				usageService,
-				encryptor,
-				registry,
-				organizationID,
-				canvasID,
-				versionID,
-				pbCanvas,
-				autoLayout,
-				webhookBaseURL,
-				authService,
-				discardStaging,
-			)
-			if err != nil {
-				return err
-			}
-		case ConsoleYAMLRepositoryPath:
-			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
-			if err != nil {
-				return err
+			nodes := actions.ProtoToNodes(pbCanvas.GetSpec().GetNodes())
+			edges := actions.ProtoToEdges(pbCanvas.GetSpec().GetEdges())
+			laidOutNodes, laidOutEdges, layoutErr := layout.ApplyLayout(nodes, edges, autoLayout)
+			if layoutErr != nil {
+				return status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", layoutErr)
 			}
 
-			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging)
-			if err != nil {
-				return err
+			positioned := &pb.CanvasVersion{
+				Metadata: &pb.CanvasVersion_Metadata{
+					Name:        pbCanvas.GetMetadata().GetName(),
+					Description: pbCanvas.GetMetadata().GetDescription(),
+				},
+				Spec: &pb.Canvas_Spec{
+					Nodes:            actions.NodesToProto(laidOutNodes),
+					Edges:            actions.EdgesToProto(laidOutEdges),
+					ChangeManagement: pbCanvas.GetSpec().GetChangeManagement(),
+				},
 			}
-		default:
-			return status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", operation.GetPath())
+
+			positionedYAML, yamlErr := canvasyaml.CanvasResourceYAML(positioned, canvasID)
+			if yamlErr != nil {
+				return status.Errorf(codes.Internal, "failed to serialize canvas: %v", yamlErr)
+			}
+			content = positionedYAML
+		}
+
+		processed = append(processed, &pb.CanvasRepositoryFileOperation{
+			Path:    normalized,
+			Content: []byte(content),
+		})
+	}
+
+	if len(processed) == 0 {
+		return status.Error(codes.InvalidArgument, "at least one file operation is required")
+	}
+
+	_, err = CommitCanvasRepositoryFiles(
+		ctx,
+		gitProvider,
+		usageService,
+		encryptor,
+		registry,
+		organizationID,
+		canvasID,
+		versionID,
+		version.CommitSHA,
+		"Update repository spec files",
+		processed,
+		autoLayout,
+		webhookBaseURL,
+		authService,
+	)
+	if err != nil {
+		return err
+	}
+
+	if discardStaging {
+		if discardErr := models.DiscardWorkflowStaging(versionUUID, nil); discardErr != nil {
+			return status.Errorf(codes.Internal, "failed to discard staging: %v", discardErr)
 		}
 	}
 

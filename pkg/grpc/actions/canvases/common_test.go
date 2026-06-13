@@ -1,9 +1,7 @@
 package canvases
 
 import (
-	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,20 +13,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-func createDraftVersionID(ctx context.Context, t *testing.T, orgID, canvasID, displayName string) string {
-	t.Helper()
-
-	response, err := CreateCanvasVersion(ctx, orgID, canvasID, displayName)
-	require.NoError(t, err)
-	require.NotNil(t, response.GetVersion())
-	require.NotNil(t, response.GetVersion().GetMetadata())
-
-	versionID := strings.TrimSpace(response.GetVersion().GetMetadata().GetId())
-	require.NotEmpty(t, versionID)
-
-	return versionID
-}
 
 func findRegisteredDraftBranch(t *testing.T, canvasID uuid.UUID, branchName string) *models.CanvasVersion {
 	t.Helper()

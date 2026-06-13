@@ -17,7 +17,19 @@ type CanvasWebsocketPayload = {
   versionId?: string;
 };
 
-type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
+type RepositoryBranchUpdatedPayload = {
+  canvasId: string;
+  branch?: string;
+  headSha?: string;
+  materializationStatus?: string;
+  materializationError?: string;
+};
+
+type CanvasLifecycleEventName =
+  | "canvas_updated"
+  | "canvas_version_updated"
+  | "canvas_deleted"
+  | "repository_branch_updated";
 
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
@@ -56,7 +68,10 @@ export function useCanvasWebsocket(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
       const isCanvasLifecycleEvent =
-        data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
+        data.event === "canvas_updated" ||
+        data.event === "canvas_version_updated" ||
+        data.event === "canvas_deleted" ||
+        data.event === "repository_branch_updated";
       if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
         return;
       }
@@ -143,10 +158,12 @@ export function useCanvasWebsocket(
         }
         case "canvas_updated":
         case "canvas_version_updated":
-        case "canvas_deleted": {
+        case "canvas_deleted":
+        case "repository_branch_updated": {
           // Canvas structure changed from another actor (e.g. CLI), refresh cache.
-          const canvasMessage = payload as Partial<CanvasWebsocketPayload>;
-          if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
+          const canvasMessage = payload as Partial<CanvasWebsocketPayload & RepositoryBranchUpdatedPayload>;
+          const messageCanvasId = canvasMessage.canvasId;
+          if (!messageCanvasId || messageCanvasId !== canvasId) {
             break;
           }
 
@@ -170,6 +187,12 @@ export function useCanvasWebsocket(
           }
 
           queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+
+          if (data.event === "repository_branch_updated") {
+            queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+            queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+            break;
+          }
 
           if (data.event === "canvas_version_updated") {
             queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
