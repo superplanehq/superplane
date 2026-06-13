@@ -28,14 +28,50 @@ func BuildPreview(repoParam string) (*Preview, error) {
 		return nil, err
 	}
 
-	canvas, ref, err := FetchCanvas(repo)
+	// Fetch raw canvas to resolve ref, then check for params.
+	var canvasBody []byte
+	var ref string
+	if repo.Ref == "" {
+		for _, r := range defaultRefs {
+			body, fetchErr := fetchURL(rawFileURL(repo, r, canvasFileName))
+			if fetchErr == nil {
+				ref = r
+				repo.Ref = r
+				canvasBody = body
+				break
+			}
+		}
+		if canvasBody == nil {
+			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")
+		}
+	} else {
+		ref = repo.Ref
+		canvasBody, err = fetchURL(rawFileURL(repo, ref, canvasFileName))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Fetch params and substitute with defaults/placeholders so canvas parses.
+	params, _ := FetchParams(repo, ref)
+	if params != nil && len(params.InstallParams) > 0 {
+		defaults := make(map[string]string, len(params.InstallParams))
+		for _, p := range params.InstallParams {
+			if p.Default != "" {
+				defaults[p.Name] = p.Default
+			} else if p.Placeholder != "" {
+				defaults[p.Name] = p.Placeholder
+			} else {
+				defaults[p.Name] = p.Name
+			}
+		}
+		canvasBody = SubstituteInstallParams(canvasBody, defaults)
+	}
+
+	canvas, err := parseCanvasYAML(canvasBody)
 	if err != nil {
 		return nil, err
 	}
-
-	repo.Ref = ref
-
-	params, _ := FetchParams(repo, ref)
 
 	preview := previewFromCanvas(repo, canvas, ref)
 	if params != nil {
