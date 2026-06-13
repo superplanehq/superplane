@@ -15,6 +15,7 @@ interface UseInstallAppOptions {
   defaultOrganizationId: string;
   organizations: OrganizationOption[];
   isPreviewReady: boolean;
+  installParams?: import("./types").InstallParam[];
 }
 
 export function useInstallApp({
@@ -23,6 +24,7 @@ export function useInstallApp({
   defaultOrganizationId,
   organizations,
   isPreviewReady,
+  installParams = [],
 }: UseInstallAppOptions) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -30,6 +32,7 @@ export function useInstallApp({
   const [organizationId, setOrganizationId] = useState("");
   const [nameError, setNameError] = useState("");
   const [isInstalling, setIsInstalling] = useState(false);
+  const [installParamValues, setInstallParamValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isPreviewReady) {
@@ -39,7 +42,16 @@ export function useInstallApp({
     setName(defaultName);
     setOrganizationId(defaultOrganizationId);
     setNameError("");
-  }, [defaultName, defaultOrganizationId, isPreviewReady]);
+
+    // Initialize param values with defaults
+    const defaults: Record<string, string> = {};
+    for (const p of installParams) {
+      if (p.default) {
+        defaults[p.name] = p.default;
+      }
+    }
+    setInstallParamValues(defaults);
+  }, [defaultName, defaultOrganizationId, isPreviewReady, installParams]);
 
   const handleInstall = useCallback(
     async (installName = name, installOrganizationId = organizationId) => {
@@ -74,6 +86,7 @@ export function useInstallApp({
             repo: repoParam,
             name: trimmedName,
             organizationId: installOrganizationId,
+            installParams: Object.keys(installParamValues).length > 0 ? installParamValues : undefined,
           }),
         });
 
@@ -103,6 +116,10 @@ export function useInstallApp({
     setNameError("");
   }, []);
 
+  const handleInstallParamChange = useCallback((paramName: string, value: string) => {
+    setInstallParamValues((prev) => ({ ...prev, [paramName]: value }));
+  }, []);
+
   return {
     name,
     setName,
@@ -113,6 +130,8 @@ export function useInstallApp({
     handleInstall,
     clearNameError,
     showOrganizationPicker: organizations.length > 1,
+    installParamValues,
+    handleInstallParamChange,
   };
 }
 

@@ -48,12 +48,15 @@ function InstallPageContent() {
     handleInstall,
     clearNameError,
     showOrganizationPicker,
+    installParamValues,
+    handleInstallParamChange,
   } = useInstallApp({
     repoParam,
     defaultName,
     defaultOrganizationId,
     organizations,
     isPreviewReady,
+    installParams: preview?.installParams,
   });
 
   const { canAutoInstall } = useAutoInstall({
@@ -86,6 +89,8 @@ function InstallPageContent() {
           organizations={organizations}
           showOrganizationPicker={showOrganizationPicker}
           isInstalling={isInstalling}
+          installParams={preview?.installParams}
+          installParamValues={installParamValues}
           onNameChange={(value) => {
             setName(value);
             if (nameError) {
@@ -93,6 +98,7 @@ function InstallPageContent() {
             }
           }}
           onOrganizationChange={setOrganizationId}
+          onInstallParamChange={handleInstallParamChange}
           onSubmit={() => {
             void handleInstall();
           }}
