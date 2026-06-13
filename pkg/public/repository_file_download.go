@@ -140,7 +140,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	reader, err := s.gitProvider.GetFile(r.Context(), repository.RepoID, path)
+	reader, err := s.gitProvider.GetFile(r.Context(), repository.RepoID, path, "")
 	if err != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), err)
 		http.Error(w, "Failed to get file", http.StatusInternalServerError)

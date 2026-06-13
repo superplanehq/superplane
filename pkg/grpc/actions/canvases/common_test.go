@@ -1,9 +1,7 @@
 package canvases
 
 import (
-	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,20 +12,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func createDraftVersionID(ctx context.Context, t *testing.T, orgID, canvasID, displayName string) string {
+func structFromAnyMap(t *testing.T, value map[string]any) *structpb.Struct {
 	t.Helper()
 
-	response, err := CreateCanvasVersion(ctx, orgID, canvasID, displayName)
+	result, err := structpb.NewStruct(value)
 	require.NoError(t, err)
-	require.NotNil(t, response.GetVersion())
-	require.NotNil(t, response.GetVersion().GetMetadata())
 
-	versionID := strings.TrimSpace(response.GetVersion().GetMetadata().GetId())
-	require.NotEmpty(t, versionID)
-
-	return versionID
+	return result
 }
 
 func findRegisteredDraftBranch(t *testing.T, canvasID uuid.UUID, branchName string) *models.CanvasVersion {
