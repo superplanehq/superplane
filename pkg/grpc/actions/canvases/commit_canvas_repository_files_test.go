@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -151,36 +150,47 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "commit-files-author")
+		created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
+		require.NoError(t, err)
+		versionID := created.GetVersion().GetMetadata().GetId()
+
+		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(versionID))
+		require.NoError(t, err)
+		require.NotNil(t, version.BranchName)
+		draftBranch := *version.BranchName
+
+		repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
+		require.NoError(t, err)
+		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
 		require.NoError(t, err)
 
+		// Commits target the draft branch; arbitrary repository files land there.
 		response, err := commitCanvasRepositoryFilesForTest(
 			ctx,
 			r,
 			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
+			canvasID,
+			versionID,
 			headSHA,
 			"add readme",
 			[]*pb.CanvasRepositoryFileOperation{
 				{Path: "README.md", Content: []byte("hello world")},
-				{Path: "old.txt", Delete: true},
 			},
 		)
 		require.NoError(t, err)
 		assert.NotEmpty(t, response.CommitSha)
 
-		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", draftBranch)
 		require.NoError(t, err)
 		content, err := io.ReadAll(reader)
 		require.NoError(t, err)
 		require.NoError(t, reader.Close())
 		assert.Equal(t, "hello world", string(content))
 
-		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID)
+		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID, draftBranch)
 		require.NoError(t, err)
-		assert.Equal(t, []string{"README.md"}, files)
+		assert.Contains(t, files, "README.md")
 	})
 }
 
@@ -188,21 +198,20 @@ func Test__CommitCanvasRepositoryFiles_DiscardsStaging(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	canvas, draftVersionID := createGitCanvasWithDraft(ctx, t, r, "commit-discards-staging")
+	draftVersionUUID := uuid.MustParse(draftVersionID)
 
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
-	require.NoError(t, err)
-
-	_, err = models.UpsertWorkflowStagingPath(
-		draftVersion.ID,
+	_, err := models.UpsertWorkflowStagingPath(
+		draftVersionUUID,
 		r.Organization.ID,
 		ConsoleYAMLRepositoryPath,
 		"stale staged content",
+		"",
 		&r.User,
 	)
 	require.NoError(t, err)
 
-	hasStaging, err := models.HasWorkflowStaging(draftVersion.ID)
+	hasStaging, err := models.HasWorkflowStaging(draftVersionUUID)
 	require.NoError(t, err)
 	require.True(t, hasStaging)
 
@@ -224,7 +233,7 @@ spec:
 		r,
 		r.Organization.ID.String(),
 		canvas.ID.String(),
-		draftVersion.ID.String(),
+		draftVersionID,
 		"",
 		"Update canvas.yaml",
 		[]*pb.CanvasRepositoryFileOperation{
@@ -233,7 +242,7 @@ spec:
 	)
 	require.NoError(t, err)
 
-	hasStaging, err = models.HasWorkflowStaging(draftVersion.ID)
+	hasStaging, err = models.HasWorkflowStaging(draftVersionUUID)
 	require.NoError(t, err)
 	assert.False(t, hasStaging, "direct commit should discard existing staged changes")
 }
