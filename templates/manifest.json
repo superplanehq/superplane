@@ -4,8 +4,14 @@
     "icon": "digitalocean",
     "title": "Preview Environments (GitHub + DigitalOcean)",
     "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes using DigitalOcean Droplets.",
-    "integrations": ["github", "digitalocean"],
-    "tags": ["CI/CD", "Preview"],
+    "integrations": [
+      "github",
+      "digitalocean"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview"
+    ],
     "requirements": [
       "GitHub integration with Deployments permission",
       "DigitalOcean integration",
@@ -20,8 +26,14 @@
     "icon": "aws",
     "title": "Preview Environments (GitHub + AWS)",
     "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes using AWS EC2 instances.",
-    "integrations": ["github", "aws"],
-    "tags": ["CI/CD", "Preview"],
+    "integrations": [
+      "github",
+      "aws"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview"
+    ],
     "requirements": [
       "GitHub integration with Deployments permission",
       "AWS integration",
@@ -30,5 +42,26 @@
     ],
     "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and AWS. Setup usually involves: 1) Connecting their GitHub integration (needs Deployments permission), 2) Connecting their AWS integration, 3) Adding an SSH key as a secret, 4) Updating the repository name and setup script URL in the canvas nodes to match their project.",
     "agentInitialMessage": "Welcome! This canvas is a full preview environment pipeline for **examplehq/example** - it spins up AWS EC2 instances for pull requests, runs your setup script, posts preview URLs as PR comments, and tears everything down when PRs close or after the 24h TTL.\n\nThe canvas is structurally wired, but it still uses template defaults. Here's the full setup checklist:\n\n---\n\n**What needs to be done:**\n\n**1. Connect GitHub** - [GitHub](integration:github)\nAlmost every trigger and action in this canvas uses GitHub. It needs the **Deployments** permission to create deployment statuses, in addition to standard PR and issue permissions.\n\n**2. Connect AWS** - [AWS](integration:aws)\nUsed to create and terminate EC2 instances on demand.\n\n**3. Add your SSH private key as a secret**\nThe [Setup App](node:setup-app) node SSHs into new instances using a secret named `preview-aws-ssh-key` with key `private-key`. Add the private key that matches the EC2 key pair configured in AWS.\n\n**4. Update the repo, setup script URL, and EC2 settings**\nThe template uses example placeholders. We'll need to update:\n- GitHub repository fields from `examplehq/example` to your repo\n- The repo/app values in [Save Environment](node:save-env) from `example-app` to your app name\n- The setup script URL in [Setup App](node:setup-app) (for example, `https://raw.githubusercontent.com/examplehq/example/main/scripts/preview-setup.sh` to your repo's URL)\n- The EC2 settings in [Create Instance](node:create-droplet), including region, instance type, AMI, subnet, security group, and key pair if the defaults do not match your account\n\n---\n\nLet's start at the top. Connect the integrations, then come back and tell me:\n\n:::survey\nWhat is your GitHub repository? (e.g. `my-org/my-repo`)\n- [input]\n\nWhat is the full URL to your setup script?\n- [input]\n\nDoes the secret `preview-aws-ssh-key` already exist in your org, or do you need to create it?\n- I need to create it\n- It already exists\n:::\n\nOnce you've shared those details, I'll update the canvas nodes and get the preview environment pipeline wired up."
+  },
+  {
+    "repo": "github.com/bender-rodriguez-unit1/app_preview-env-digitalocean",
+    "icon": "digitalocean",
+    "title": "Preview Environments \u2014 Parameterized (Test)",
+    "description": "Test version with install_params. Spin up preview environments for every PR using DigitalOcean.",
+    "integrations": [
+      "github",
+      "digitalocean"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview",
+      "Test"
+    ],
+    "requirements": [
+      "GitHub integration with Deployments permission",
+      "DigitalOcean integration"
+    ],
+    "agentInstructions": "This app was installed with parameterized values. Check the canvas to verify the install_params were substituted correctly.",
+    "agentInitialMessage": "This app was installed with your custom parameters. The canvas should have your repository name, org, and SSH secret configured. Check the nodes to verify everything looks correct."
   }
 ]
