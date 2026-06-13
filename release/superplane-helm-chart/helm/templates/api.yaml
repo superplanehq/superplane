@@ -120,6 +120,14 @@ spec:
 {{- end }}
             - name: OTEL_ENABLED
               value: "yes"
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-api" .Release.Name | quote }}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.instance.id=$(POD_NAME)"
             - name: SUPERPLANE_BEACON_ENABLED
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE

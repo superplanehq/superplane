@@ -95,6 +95,14 @@ spec:
               value: /app/oidc-keys
             - name: OTEL_ENABLED
               value: "yes"
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-workers" .Release.Name | quote }}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.instance.id=$(POD_NAME)"
             - name: GIT_STORAGE_PROVIDER
               value: supergit
             - name: GIT_STORAGE_SUPERGIT_BASE_URL
