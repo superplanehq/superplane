@@ -55,6 +55,9 @@ func TestEnsureConsoleVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T
 		require.NoError(t, err, "reviewer should describe the CR snapshot version")
 		require.NotNil(t, resp.GetVersion())
 		assert.Equal(t, snapshotVersionID, resp.GetVersion().GetMetadata().GetId())
+		// Snapshots are immutable and never carry staging, so describing one
+		// must not depend on the staging table being readable.
+		assert.Nil(t, resp.GetStagingSummary(), "snapshots must not return a StagingSummary")
 	})
 
 	t.Run("reading console.yaml returns the snapshot console to its owner", func(t *testing.T) {
