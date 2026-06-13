@@ -17,6 +17,16 @@ import (
 
 const testWebhookBaseURL = "http://localhost:3000/api/v1"
 
+func canvasSpecFromVersionYAML(ctx context.Context, t *testing.T, orgID, canvasID, versionID string) *pb.Canvas_Spec {
+	t.Helper()
+	yamlText, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	canvas, err := canvasFromYAMLText(yamlText)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.GetSpec())
+	return canvas.GetSpec()
+}
+
 func createDraftVersionID(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasID, displayName string) string {
 	t.Helper()
 

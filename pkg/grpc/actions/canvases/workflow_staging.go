@@ -67,6 +67,29 @@ func loadOwnedDraftVersion(
 	return canvas, version, userUUID, nil
 }
 
+// ensureVersionIsOwnedRegisteredDraft guards draft mutations: the caller must own
+// the version, and the version must be an editable, registered draft branch (not a
+// published or snapshot version).
+func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
+	if version.OwnerID == nil || *version.OwnerID != userID {
+		return status.Error(codes.PermissionDenied, "version owner mismatch")
+	}
+
+	if version.State == models.CanvasVersionStatePublished {
+		return status.Error(codes.FailedPrecondition, "published versions are immutable")
+	}
+
+	if version.State != models.CanvasVersionStateDraft {
+		return status.Error(codes.FailedPrecondition, "version is not your editable draft")
+	}
+
+	if !models.IsRegisteredDraftVersion(version) {
+		return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+	}
+
+	return nil
+}
+
 // ensureStagedReadAllowed restricts effective staged reads to the draft owner.
 // Staging rows can outlive a draft's edit session; without this check any org
 // reader could pass ?stage=true and read someone else's uncommitted work.

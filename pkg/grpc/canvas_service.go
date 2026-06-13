@@ -102,51 +102,6 @@ func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.Descr
 	return canvases.DescribeCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
-func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb.ApplyCanvasVersionChangesetRequest) (*pb.ApplyCanvasVersionChangesetResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
-	}
-
-	versionID, err := uuid.Parse(req.VersionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	return canvases.ApplyCanvasVersionChangeset(
-		ctx,
-		s.registry,
-		uuid.MustParse(organizationID),
-		canvasID,
-		versionID,
-		req.Changeset,
-		req.AutoLayout,
-	)
-}
-
-func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req *pb.ValidateCanvasVersionChangesetRequest) (*pb.ValidateCanvasVersionChangesetResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
-	}
-
-	versionID, err := uuid.Parse(req.VersionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	return canvases.ValidateCanvasVersionChangeset(
-		ctx,
-		s.registry,
-		uuid.MustParse(organizationID),
-		canvasID,
-		versionID,
-		req.Changeset,
-	)
-}
-
 func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.PublishCanvasVersion(

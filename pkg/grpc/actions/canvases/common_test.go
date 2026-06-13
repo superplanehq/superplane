@@ -12,7 +12,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
+
+func structFromAnyMap(t *testing.T, value map[string]any) *structpb.Struct {
+	t.Helper()
+
+	result, err := structpb.NewStruct(value)
+	require.NoError(t, err)
+
+	return result
+}
 
 func findRegisteredDraftBranch(t *testing.T, canvasID uuid.UUID, branchName string) *models.CanvasVersion {
 	t.Helper()
