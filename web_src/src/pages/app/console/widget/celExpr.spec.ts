@@ -208,6 +208,177 @@ describe("celExpr", () => {
     });
   });
 
+  describe("string trimming builtins", () => {
+    // These exist because cel-js doesn't allow postfix `[i]` / `.method()`
+    // after a function-call result. The user-facing requirement is "first
+    // line" / "first X chars" against runs data (raw multi-line outputs);
+    // each helper returns the scalar directly so authors don't need
+    // chaining the language can't parse.
+
+    describe("firstLine", () => {
+      it("returns the text before the first newline", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "hello\nworld\nbye" }, buildEnv())).toBe("hello");
+      });
+
+      it("treats CRLF and bare CR the same as LF", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "alpha\r\nbeta" }, buildEnv())).toBe("alpha");
+        expect(evalExpr(compiled, { message: "alpha\rbeta" }, buildEnv())).toBe("alpha");
+      });
+
+      it("returns the input unchanged when there is no newline", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "single line" }, buildEnv())).toBe("single line");
+      });
+
+      it("returns empty string for null inputs", () => {
+        const compiled = compileExpr("firstLine(value)");
+        expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      });
+
+      it("composes with another builtin that takes a string", () => {
+        const compiled = compileExpr("upper(firstLine(message))");
+        expect(evalExpr(compiled, { message: "hello\nworld" }, buildEnv())).toBe("HELLO");
+      });
+    });
+
+    describe("substring", () => {
+      it("returns the first N characters when end is supplied", () => {
+        const compiled = compileExpr("substring(message, 0, 5)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello");
+      });
+
+      it("returns the tail when only start is supplied", () => {
+        const compiled = compileExpr("substring(message, 6)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("world");
+      });
+
+      it("clamps end past the string length", () => {
+        const compiled = compileExpr("substring(message, 0, 999)");
+        expect(evalExpr(compiled, { message: "hi" }, buildEnv())).toBe("hi");
+      });
+
+      it("returns empty string when end <= start", () => {
+        const compiled = compileExpr("substring(message, 5, 2)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("");
+      });
+
+      it("treats negative start as offset from the end", () => {
+        const compiled = compileExpr("substring(message, -3)");
+        expect(evalExpr(compiled, { message: "hello" }, buildEnv())).toBe("llo");
+      });
+
+      it("coerces non-string input via String(value)", () => {
+        const compiled = compileExpr("substring(value, 0, 3)");
+        expect(evalExpr(compiled, { value: 12345 }, buildEnv())).toBe("123");
+      });
+
+      it("returns empty string for null / undefined input", () => {
+        const compiled = compileExpr("substring(value, 0, 5)");
+        expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      });
+    });
+
+    describe("truncate", () => {
+      it("returns the input unchanged when shorter than the limit", () => {
+        const compiled = compileExpr('truncate(message, 80, "…")');
+        expect(evalExpr(compiled, { message: "short" }, buildEnv())).toBe("short");
+      });
+
+      it("clips long input to N characters and appends the suffix", () => {
+        const compiled = compileExpr('truncate(message, 5, "…")');
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello…");
+      });
+
+      it("omits the suffix when none is supplied", () => {
+        const compiled = compileExpr("truncate(message, 5)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello");
+      });
+
+      it("returns the original text for non-numeric or negative limits", () => {
+        const env = buildEnv();
+        expect(evalExpr(compileExpr("truncate(message, value)"), { message: "abcdef", value: "nope" }, env)).toBe(
+          "abcdef",
+        );
+        expect(evalExpr(compileExpr("truncate(message, -1)"), { message: "abcdef" }, env)).toBe("abcdef");
+      });
+    });
+
+    describe("splitIndex", () => {
+      it("returns the nth segment as a scalar", () => {
+        // cel-js copies string literals verbatim — `"\n"` in CEL source is
+        // backslash + n, not a newline — so `splitIndex` unescapes the
+        // separator. The JS-side `\\n` here matches what an author would
+        // type in their YAML cell expression.
+        const compiled = compileExpr('splitIndex(message, "\\n", 0)');
+        expect(evalExpr(compiled, { message: "first\nsecond\nthird" }, buildEnv())).toBe("first");
+      });
+
+      it("treats CRLF and bare CR the same as LF for a newline separator", () => {
+        // Run output often arrives with Windows (`\r\n`) or classic-Mac (`\r`)
+        // line endings. Splitting on a bare `\n` would leave a trailing `\r`
+        // on the first segment, disagreeing with `firstLine`. They must match.
+        const compiled = compileExpr('splitIndex(message, "\\n", 0)');
+        expect(evalExpr(compiled, { message: "first\r\nsecond" }, buildEnv())).toBe("first");
+        expect(evalExpr(compiled, { message: "first\rsecond" }, buildEnv())).toBe("first");
+      });
+
+      it("preserves a literal backslash that is not part of a recognized escape", () => {
+        const compiled = compileExpr('splitIndex(value, "\\?", 0)');
+        expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
+      });
+
+      it("supports non-newline separators", () => {
+        const compiled = compileExpr('splitIndex(value, ",", 1)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("b");
+      });
+
+      it("treats negative indexes as offsets from the end", () => {
+        const compiled = compileExpr('splitIndex(value, ",", -1)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("c");
+      });
+
+      it("returns empty string for out-of-range indexes", () => {
+        const compiled = compileExpr('splitIndex(value, ",", 9)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("");
+      });
+
+      it("returns the input unchanged when the separator is empty", () => {
+        const compiled = compileExpr('splitIndex(value, "", 0)');
+        expect(evalExpr(compiled, { value: "abc" }, buildEnv())).toBe("abc");
+      });
+    });
+
+    describe("trim / replace / indexOf", () => {
+      it("trims leading and trailing whitespace by default", () => {
+        const compiled = compileExpr("trim(value)");
+        expect(evalExpr(compiled, { value: "  hello  " }, buildEnv())).toBe("hello");
+      });
+
+      it("trims a custom character set when supplied", () => {
+        const compiled = compileExpr('trim(value, "/")');
+        expect(evalExpr(compiled, { value: "///path///" }, buildEnv())).toBe("path");
+      });
+
+      it("replaces every occurrence of old with new", () => {
+        const compiled = compileExpr('replace(value, "a", "X")');
+        expect(evalExpr(compiled, { value: "banana" }, buildEnv())).toBe("bXnXnX");
+      });
+
+      it("returns -1 from indexOf when the substring is missing", () => {
+        const compiled = compileExpr('indexOf(value, "z")');
+        expect(evalExpr(compiled, { value: "abc" }, buildEnv())).toBe(-1);
+      });
+
+      it("composes inside templated interpolation for runs-style trimming", () => {
+        const template = compileTemplate('Summary: {{ truncate(firstLine(message), 20, "…") }}');
+        const result = evalTemplate(template, { message: "  long\nrest of message" }, buildEnv(), String);
+        expect(result).toBe("Summary:   long");
+      });
+    });
+  });
+
   describe("join builtin", () => {
     // `join` exists specifically so authors can flatten the result of a `.map`
     // macro chain into a single string. cel-js doesn't allow `.method()`
