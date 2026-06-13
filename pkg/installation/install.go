@@ -106,16 +106,30 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	}
 
 	// Substitute install params in raw YAML before parsing.
-	// Only validate and substitute if the caller actually provided params.
-	// The home page one-click install doesn't send params — it skips the wizard.
-	if len(req.InstallParams) > 0 {
-		params, _ := FetchParams(repo, repo.Ref)
-		if params != nil && len(params.InstallParams) > 0 {
+	// If the template has params, we always need to substitute something
+	// so the YAML is valid ({{ install_params.xxx }} is not valid YAML).
+	params, _ := FetchParams(repo, repo.Ref)
+	if params != nil && len(params.InstallParams) > 0 {
+		if len(req.InstallParams) > 0 {
+			// Wizard flow: user provided values, validate and substitute.
 			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
 			if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 			}
 			canvasBody = SubstituteInstallParams(canvasBody, resolved)
+		} else {
+			// One-click flow: no params sent, substitute with defaults/placeholders.
+			defaults := make(map[string]string, len(params.InstallParams))
+			for _, p := range params.InstallParams {
+				if p.Default != "" {
+					defaults[p.Name] = p.Default
+				} else if p.Placeholder != "" {
+					defaults[p.Name] = p.Placeholder
+				} else {
+					defaults[p.Name] = p.Name
+				}
+			}
+			canvasBody = SubstituteInstallParams(canvasBody, defaults)
 		}
 	}
 
