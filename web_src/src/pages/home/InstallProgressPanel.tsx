@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Loader2, ExternalLink } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -237,7 +237,7 @@ function IntegrationsStep({
   onNext: () => void;
   onSkip: () => void;
 }) {
-  const { data: connected, refetch } = useConnectedIntegrations(organizationId, {
+  const { data: connected } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
     refetchInterval: 3000,
   });
@@ -258,30 +258,30 @@ function IntegrationsStep({
     <div className="space-y-4">
       <p className="text-sm font-medium text-slate-700">Connect Integrations</p>
       <p className="text-xs text-slate-500">This app requires the following integrations to be connected.</p>
-      <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         {integrationStatus.map((integration) => (
-          <div key={integration.name} className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div className="flex items-center gap-2.5">
-              <IntegrationIcon integrationName={integration.name} className="h-5 w-5" size={20} />
-              <span className="text-sm font-medium text-slate-700">{formatName(integration.name)}</span>
-            </div>
+          <button
+            key={integration.name}
+            type="button"
+            onClick={() => {
+              if (!integration.connected) {
+                window.open(`/${organizationId}/settings/integrations`, "_blank");
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
+              integration.connected
+                ? "border-emerald-200 text-emerald-700 bg-white"
+                : "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer"
+            }`}
+          >
+            <IntegrationIcon integrationName={integration.name} className="h-4 w-4" size={16} />
+            <span>{formatName(integration.name)}</span>
             {integration.connected ? (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600">
-                <Check className="h-3.5 w-3.5" />
-                <span>Connected</span>
-              </div>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 gap-1"
-                onClick={() => window.open(`/${organizationId}/settings/integrations`, "_blank")}
-              >
-                Connect
-                <ExternalLink className="h-3 w-3" />
-              </Button>
+              <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>
             )}
-          </div>
+          </button>
         ))}
       </div>
       <div className="flex items-center gap-3 pt-2">
