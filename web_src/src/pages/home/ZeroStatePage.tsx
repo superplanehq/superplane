@@ -88,9 +88,7 @@ export function ZeroStatePage() {
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
 
-        {installingApp && (
-          <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />
-        )}
+        {installingApp && <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />}
       </div>
     </>
   );

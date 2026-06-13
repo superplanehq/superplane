@@ -2,13 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ConnectIntegrationModal } from "@/ui/ConnectIntegrationModal";
+import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
+import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
 import { showErrorToast } from "@/lib/toast";
@@ -175,12 +178,20 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           </div>
           <div className="flex items-center gap-3 pt-2">
             {(app.integrations.length > 0 || installParams.length > 0) && (
-              <Button variant="default" size="sm" onClick={() => setPhase(app.integrations.length > 0 ? "integrations" : "configuring")}>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setPhase(app.integrations.length > 0 ? "integrations" : "configuring")}
+              >
                 Configure
               </Button>
             )}
-            <Button variant={(app.integrations.length > 0 || installParams.length > 0) ? "outline" : "default"} size="sm" onClick={handleGoToApp}>
-              {(app.integrations.length > 0 || installParams.length > 0) ? "Just take me there" : "Open App"}
+            <Button
+              variant={app.integrations.length > 0 || installParams.length > 0 ? "outline" : "default"}
+              size="sm"
+              onClick={handleGoToApp}
+            >
+              {app.integrations.length > 0 || installParams.length > 0 ? "Just take me there" : "Open App"}
             </Button>
           </div>
         </div>
@@ -190,7 +201,7 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
         <IntegrationsStep
           integrations={app.integrations}
           organizationId={organizationId ?? ""}
-          onNext={() => installParams.length > 0 ? setPhase("configuring") : handleGoToApp()}
+          onNext={() => (installParams.length > 0 ? setPhase("configuring") : handleGoToApp())}
           onSkip={handleGoToApp}
         />
       )}
@@ -238,75 +249,165 @@ function IntegrationsStep({
   onNext: () => void;
   onSkip: () => void;
 }) {
-  const { data: connected, refetch } = useConnectedIntegrations(organizationId, {
+  const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
-  const [connectingIntegration, setConnectingIntegration] = useState<string | null>(null);
+  const { data: availableIntegrations = [] } = useAvailableIntegrations();
+  const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
+  const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
 
-  const integrationStatus = integrations.map((name) => {
-    const instance = connected?.find(
-      (item) => item.metadata?.integrationName === name && item.status?.state === "ready",
-    );
-    return { name, connected: !!instance };
-  });
+  const existingIntegrationNames = useMemo(
+    () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
+    [connected],
+  );
 
-  const allConnected = integrationStatus.every((i) => i.connected);
+  const integrationStatus = useMemo(
+    () =>
+      integrations.map((name) => {
+        const readyInstance = connected.find(
+          (item) => item.metadata?.integrationName === name && item.status?.state === "ready",
+        );
+        if (readyInstance) return { name, state: "ready" as const };
 
-  const formatName = (name: string) =>
-    name.charAt(0).toUpperCase() + name.slice(1);
+        const pendingInstance = connected.find(
+          (item) => item.metadata?.integrationName === name && item.status?.state !== "ready",
+        );
+        if (pendingInstance) {
+          const rawState = pendingInstance.status?.state;
+          return {
+            name,
+            state: (rawState === "error" ? "error" : "pending") as "error" | "pending",
+            stateDescription: pendingInstance.status?.stateDescription,
+            pendingInstance,
+          };
+        }
 
-  const handleConnected = useCallback(() => {
-    setConnectingIntegration(null);
+        return { name, state: "missing" as const };
+      }),
+    [integrations, connected],
+  );
+
+  const allReady = integrationStatus.every((i) => i.state === "ready");
+
+  const dialogDefinition = useMemo(
+    () => (dialogIntegrationName ? availableIntegrations.find((d) => d.name === dialogIntegrationName) : undefined),
+    [availableIntegrations, dialogIntegrationName],
+  );
+
+  const dialogPendingInstance = useMemo(() => {
+    if (!dialogIntegrationName) return undefined;
+    return connected.find((i) => i.metadata?.integrationName === dialogIntegrationName && i.status?.state !== "ready");
+  }, [dialogIntegrationName, connected]);
+
+  const initialWebhookSetup = useMemo(() => {
+    const webhookUrl = getIntegrationWebhookUrl(dialogPendingInstance?.status?.metadata);
+    if (!webhookUrl || !dialogPendingInstance?.metadata?.id) return undefined;
+    return {
+      id: dialogPendingInstance.metadata.id,
+      webhookUrl,
+      config: { ...(dialogPendingInstance.spec?.configuration ?? {}) },
+    };
+  }, [dialogPendingInstance]);
+
+  const defaultDialogName = useMemo(() => {
+    if (dialogPendingInstance?.metadata?.name) return dialogPendingInstance.metadata.name;
+    if (!dialogIntegrationName) return "";
+    return getNextIntegrationName(dialogIntegrationName, existingIntegrationNames);
+  }, [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames]);
+
+  const handleCreated = useCallback(() => {
+    setDialogIntegrationName(null);
     void refetch();
   }, [refetch]);
+
+  const badgeClassName = (state: string) => {
+    switch (state) {
+      case "ready":
+        return "border-emerald-200 text-emerald-700 bg-white";
+      case "pending":
+        return "border-amber-200 text-amber-700 bg-white hover:bg-amber-50 hover:border-amber-300 cursor-pointer";
+      case "error":
+        return "border-red-200 text-red-700 bg-white hover:bg-red-50 hover:border-red-300 cursor-pointer";
+      default:
+        return "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer";
+    }
+  };
+
+  const badgeDot = (state: string) => {
+    switch (state) {
+      case "ready":
+        return <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />;
+      case "pending":
+        return <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />;
+      case "error":
+        return <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />;
+      default:
+        return <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>;
+    }
+  };
 
   return (
     <div className="space-y-4">
       <p className="text-sm font-medium text-slate-700">Connect Integrations</p>
       <p className="text-xs text-slate-500">This app requires the following integrations to be connected.</p>
       <div className="flex flex-wrap gap-2">
-        {integrationStatus.map((integration) => (
-          <button
-            key={integration.name}
-            type="button"
-            onClick={() => {
-              if (!integration.connected) {
-                setConnectingIntegration(integration.name);
+        {integrationStatus.map((integration) => {
+          const displayName =
+            getIntegrationTypeDisplayName(undefined, integration.name) ||
+            integration.name.charAt(0).toUpperCase() + integration.name.slice(1);
+          return (
+            <button
+              key={integration.name}
+              type="button"
+              onClick={() => {
+                if (integration.state !== "ready") {
+                  setDialogIntegrationName(integration.name);
+                }
+              }}
+              title={
+                integration.state === "ready"
+                  ? `Connected: ${displayName}`
+                  : integration.state === "pending"
+                    ? `Pending: ${displayName} — ${integration.stateDescription || "setup in progress"}`
+                    : integration.state === "error"
+                      ? `Error: ${displayName} — ${integration.stateDescription || "setup failed"}`
+                      : `Connect ${displayName}`
               }
-            }}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
-              integration.connected
-                ? "border-emerald-200 text-emerald-700 bg-white"
-                : "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer"
-            }`}
-          >
-            <IntegrationIcon integrationName={integration.name} className="h-4 w-4" size={16} />
-            <span>{formatName(integration.name)}</span>
-            {integration.connected ? (
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            ) : (
-              <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>
-            )}
-          </button>
-        ))}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${badgeClassName(integration.state)}`}
+            >
+              <IntegrationIcon integrationName={integration.name} className="h-4 w-4" size={16} />
+              <span>{displayName}</span>
+              {badgeDot(integration.state)}
+            </button>
+          );
+        })}
       </div>
       <div className="flex items-center gap-3 pt-2">
-        <Button variant="default" size="sm" onClick={onNext} disabled={!allConnected}>
-          {allConnected ? "Next" : "Connect all integrations to continue"}
+        <Button variant="default" size="sm" onClick={onNext} disabled={!allReady}>
+          {allReady ? "Next" : "Connect all integrations to continue"}
         </Button>
         <Button variant="outline" size="sm" onClick={onSkip}>
           Skip
         </Button>
       </div>
 
-      {connectingIntegration && (
-        <ConnectIntegrationModal
-          integrationName={connectingIntegration}
-          organizationId={organizationId}
-          onClose={() => setConnectingIntegration(null)}
-          onConnected={handleConnected}
-        />
-      )}
+      <IntegrationCreateDialog
+        open={!!dialogIntegrationName}
+        onOpenChange={(open) => !open && setDialogIntegrationName(null)}
+        integrationDefinition={dialogDefinition ?? null}
+        organizationId={organizationId}
+        onCreateIntegration={async (payload) => {
+          const res = await createIntegrationMutation.mutateAsync(payload);
+          return res.data;
+        }}
+        onReset={() => createIntegrationMutation.reset()}
+        defaultName={defaultDialogName}
+        onCreated={() => void handleCreated()}
+        initialBrowserAction={dialogPendingInstance?.status?.browserAction}
+        initialCreatedIntegrationId={dialogPendingInstance?.metadata?.id}
+        initialWebhookSetup={initialWebhookSetup}
+        initialConfiguration={dialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined}
+      />
     </div>
   );
 }
