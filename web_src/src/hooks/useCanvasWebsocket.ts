@@ -12,6 +12,8 @@ import { canvasKeys } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
+const INVALIDATION_DEBOUNCE_MS = 1000;
+
 type CanvasWebsocketPayload = {
   canvasId: string;
   versionId?: string;
@@ -52,6 +54,54 @@ export function useCanvasWebsocket(
   const messageQueues = useRef<Map<string, QueuedMessage[]>>(new Map());
   const processingNodes = useRef<Set<string>>(new Set());
 
+  const runsDirty = useRef(false);
+  const eventsDirty = useRef(false);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasConnectedOnce = useRef(false);
+
+  const flushInvalidations = useCallback(() => {
+    flushTimerRef.current = null;
+
+    if (eventsDirty.current) {
+      eventsDirty.current = false;
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.infiniteEvents(canvasId),
+      });
+    }
+
+    if (runsDirty.current) {
+      runsDirty.current = false;
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+    }
+  }, [queryClient, canvasId]);
+
+  const invalidateRunsNow = useCallback(() => {
+    runsDirty.current = false;
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
+  const scheduleRunsEventsInvalidation = useCallback(
+    (target: "events" | "runs" | "both") => {
+      if (target === "events" || target === "both") {
+        eventsDirty.current = true;
+      }
+      if (target === "runs" || target === "both") {
+        runsDirty.current = true;
+      }
+
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+      }
+
+      flushTimerRef.current = setTimeout(flushInvalidations, INVALIDATION_DEBOUNCE_MS);
+    },
+    [flushInvalidations],
+  );
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
@@ -73,9 +123,7 @@ export function useCanvasWebsocket(
              * if the event being received is a root canvas event.
              */
             if (workflowEvent.root) {
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
+              scheduleRunsEventsInvalidation("events");
             }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
@@ -95,13 +143,7 @@ export function useCanvasWebsocket(
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteRuns(canvasId),
-              });
+              scheduleRunsEventsInvalidation("both");
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -136,9 +178,7 @@ export function useCanvasWebsocket(
             break;
           }
 
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.infiniteRuns(canvasId),
-          });
+          invalidateRunsNow();
           break;
         }
         case "canvas_updated":
@@ -199,6 +239,8 @@ export function useCanvasWebsocket(
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
       organizationId,
+      scheduleRunsEventsInvalidation,
+      invalidateRunsNow,
     ],
   );
 
@@ -285,11 +327,28 @@ export function useCanvasWebsocket(
     [processMessage, processQueue],
   );
 
+  const handleWebSocketOpen = useCallback(() => {
+    if (!hasConnectedOnce.current) {
+      hasConnectedOnce.current = true;
+      return;
+    }
+
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteEvents(canvasId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   // Cleanup on unmount
   useEffect(() => {
     const queues = messageQueues.current;
     const processing = processingNodes.current;
     return () => {
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+      }
       queues.clear();
       processing.clear();
     };
@@ -302,7 +361,7 @@ export function useCanvasWebsocket(
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
       reconnectInterval: 3000,
-      onOpen: () => {},
+      onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
       share: false,
