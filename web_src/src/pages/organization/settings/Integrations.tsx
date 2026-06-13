@@ -1,6 +1,6 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,
@@ -36,7 +36,6 @@ interface IntegrationsProps {
 export function Integrations({ organizationId }: IntegrationsProps) {
   usePageTitle(["Integrations"]);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
   const [integrationName, setIntegrationName] = useState("");
@@ -63,32 +62,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
-
-  // Auto-open connect modal when ?connect=<integration-name> is in the URL
-  useEffect(() => {
-    const connectParam = searchParams.get("connect");
-    if (!connectParam || isLoading || availableIntegrations.length === 0) return;
-
-    const integration = availableIntegrations.find((d) => d.name === connectParam);
-    if (!integration) return;
-
-    // Clear the param so it doesn't re-trigger
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("connect");
-    navigate({ search: newParams.toString() }, { replace: true });
-
-    // Trigger the connect flow
-    if (isCapabilityBasedIntegrationDefinition(integration)) {
-      if (integration.name) {
-        navigate(`/${organizationId}/settings/integrations/${integration.name}/setup`);
-      }
-    } else {
-      setSelectedIntegration(integration);
-      setIntegrationName(getNextIntegrationName(integration.name));
-      setConfiguration({});
-      setIsModalOpen(true);
-    }
-  }, [searchParams, isLoading, availableIntegrations, navigate, organizationId]);
   const integrationNames = useMemo(() => {
     return new Set(
       organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],

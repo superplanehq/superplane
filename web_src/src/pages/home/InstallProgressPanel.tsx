@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { ConnectIntegrationModal } from "@/ui/ConnectIntegrationModal";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
 import { showErrorToast } from "@/lib/toast";
@@ -237,10 +238,10 @@ function IntegrationsStep({
   onNext: () => void;
   onSkip: () => void;
 }) {
-  const { data: connected } = useConnectedIntegrations(organizationId, {
+  const { data: connected, refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
-    refetchInterval: 3000,
   });
+  const [connectingIntegration, setConnectingIntegration] = useState<string | null>(null);
 
   const integrationStatus = integrations.map((name) => {
     const instance = connected?.find(
@@ -254,6 +255,11 @@ function IntegrationsStep({
   const formatName = (name: string) =>
     name.charAt(0).toUpperCase() + name.slice(1);
 
+  const handleConnected = useCallback(() => {
+    setConnectingIntegration(null);
+    void refetch();
+  }, [refetch]);
+
   return (
     <div className="space-y-4">
       <p className="text-sm font-medium text-slate-700">Connect Integrations</p>
@@ -265,7 +271,7 @@ function IntegrationsStep({
             type="button"
             onClick={() => {
               if (!integration.connected) {
-                window.open(`/${organizationId}/settings/integrations?connect=${integration.name}`, "_blank");
+                setConnectingIntegration(integration.name);
               }
             }}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
@@ -286,12 +292,21 @@ function IntegrationsStep({
       </div>
       <div className="flex items-center gap-3 pt-2">
         <Button variant="default" size="sm" onClick={onNext} disabled={!allConnected}>
-          {allConnected ? "Next" : "Waiting for integrations..."}
+          {allConnected ? "Next" : "Connect all integrations to continue"}
         </Button>
         <Button variant="outline" size="sm" onClick={onSkip}>
           Skip
         </Button>
       </div>
+
+      {connectingIntegration && (
+        <ConnectIntegrationModal
+          integrationName={connectingIntegration}
+          organizationId={organizationId}
+          onClose={() => setConnectingIntegration(null)}
+          onConnected={handleConnected}
+        />
+      )}
     </div>
   );
 }
