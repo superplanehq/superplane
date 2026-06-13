@@ -453,7 +453,7 @@ func configureLogging() {
 	}
 }
 
-func setupOtelMetrics() {
+func setupOtel() {
 	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
@@ -465,6 +465,12 @@ func setupOtelMetrics() {
 		log.Warnf("Failed to initialize OpenTelemetry metrics: %v", err)
 	} else {
 		log.Info("OpenTelemetry metrics initialized")
+	}
+
+	if err := telemetry.InitTracing(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry tracing: %v", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized for critical API endpoints")
 	}
 }
 
@@ -492,7 +498,7 @@ func startPprofServer() {
 
 func Start() {
 	configureLogging()
-	setupOtelMetrics()
+	setupOtel()
 	startPprofServer()
 
 	telemetry.InitSentry()

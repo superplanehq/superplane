@@ -1360,6 +1360,7 @@ export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });
@@ -1398,6 +1399,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });
