@@ -1,5 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +13,16 @@ const repositoryFiles = [{ path: "README.md" }];
 const repositoryFileContents: Record<string, string> = {
   "README.md": "# readme",
 };
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function Wrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
+  );
+}
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvasRepository: () => ({
@@ -28,10 +40,23 @@ vi.mock("@/hooks/useCanvasData", () => ({
     isLoading: false,
     error: null,
   }),
-  useCommitCanvasRepositoryFiles: () => ({
+  useStageRepositoryFiles: () => ({
+    mutate: vi.fn(),
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useDiscardRepositoryFilePaths: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useCanvasVersionStaging: () => ({
+    data: { hasStaging: false, stagedPaths: [] },
+    isLoading: false,
+    error: null,
+  }),
+  fetchRepositoryFileContentCached: (_queryClient: unknown, _canvasId: string, path: string) =>
+    Promise.resolve(repositoryFileContents[path] ?? ""),
 }));
 
 vi.mock("@monaco-editor/react", () => ({
@@ -99,7 +124,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
-      { wrapper: MemoryRouter },
+      { wrapper: Wrapper },
     );
 
     expect(screen.getByRole("button", { name: "Close canvas.yaml" })).toBeInTheDocument();
@@ -108,6 +133,35 @@ describe("FilesOverlayLayer", () => {
 
     expect(screen.queryByRole("button", { name: "Close canvas.yaml" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("monaco-stub")).not.toBeInTheDocument();
+  });
+
+  it("keeps the first edit after switching away and back to a repository file", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <FilesOverlayLayer
+        isFilesMode
+        canvasId="canvas-1"
+        isEditing
+        canWrite
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
+    await user.type(screen.getByTestId("monaco-stub"), "!");
+
+    await user.click(screen.getByRole("button", { name: "canvas.yaml" }));
+    await user.click(screen.getAllByRole("button", { name: "README.md" }).at(-1)!);
+
+    expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme!");
   });
 
   it("keeps repository file content when switching to and from generated files", async () => {
@@ -127,7 +181,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
-      { wrapper: MemoryRouter },
+      { wrapper: Wrapper },
     );
 
     await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
@@ -157,7 +211,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
-      { wrapper: MemoryRouter },
+      { wrapper: Wrapper },
     );
 
     await user.click(screen.getByRole("button", { name: "New file" }));
@@ -188,7 +242,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
-      { wrapper: MemoryRouter },
+      { wrapper: Wrapper },
     );
 
     expect(document.getElementById(slotId)).toBeNull();
@@ -237,7 +291,7 @@ describe("FilesOverlayLayer", () => {
           },
         ]}
       />,
-      { wrapper: MemoryRouter },
+      { wrapper: Wrapper },
     );
 
     const overlay = screen.getByTestId("files-overlay");

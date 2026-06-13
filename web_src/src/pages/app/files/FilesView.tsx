@@ -7,7 +7,7 @@ import { FileList } from "./FileList";
 import { TabBar } from "./TabBar";
 import { DiffHeaderAction, IconButton } from "./FilesUi";
 import { useEditor } from "./useEditor";
-import type { AppFile, FilesHeaderActionsState } from "./types";
+import type { AppFile } from "./types";
 
 const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default: module.DiffDialog })));
 
@@ -18,8 +18,11 @@ export function FilesView({
   canWrite,
   files,
   headerActionsSlotId,
-  onHeaderActionsChange,
+  stagingResetNonce,
+  suspendRepositoryFileStaging,
   onSpecFileChange,
+  onLocalFilesStagingChange,
+  onFlushRepositoryFileStagingReady,
 }: {
   canvasId?: string;
   versionId?: string;
@@ -27,8 +30,11 @@ export function FilesView({
   canWrite: boolean;
   files: AppFile[];
   headerActionsSlotId?: string;
-  onHeaderActionsChange?: (actions: FilesHeaderActionsState | null) => void;
+  stagingResetNonce?: number;
+  suspendRepositoryFileStaging?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
+  onLocalFilesStagingChange?: (hasStaging: boolean) => void;
+  onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
 }) {
   const editor = useEditor({
     canvasId,
@@ -37,8 +43,11 @@ export function FilesView({
     canWrite,
     files,
     headerActionsSlotId,
-    onHeaderActionsChange,
+    stagingResetNonce,
+    suspendRepositoryFileStaging,
     onSpecFileChange,
+    onLocalFilesStagingChange,
+    onFlushRepositoryFileStagingReady,
   });
 
   return (
@@ -78,6 +87,7 @@ export function FilesView({
           openTabs={editor.openTabs}
           selectedPath={editor.selectedPath}
           pendingChangesByPath={editor.pendingChangesByPath}
+          specDraftByPath={editor.specDraftByPath}
           onOpenFile={editor.openFile}
           onCloseTab={editor.closeTab}
         />
@@ -98,7 +108,9 @@ export function FilesView({
         <Suspense fallback={null}>
           <DiffDialog
             changes={editor.pendingChanges}
+            committedContentByPath={editor.committedContentByPath}
             loadedContentByPath={editor.loadedContentByPath}
+            stagedFileDiffs={editor.stagedFileDiffs}
             open={editor.isDiffOpen}
             onOpenChange={editor.setIsDiffOpen}
           />
@@ -107,7 +119,7 @@ export function FilesView({
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
             <DiffHeaderAction
-              hasPendingChanges={editor.pendingChanges.length > 0}
+              hasPendingChanges={editor.pendingChanges.length > 0 || editor.stagedDiffPaths.length > 0}
               onDiffOpen={() => editor.setIsDiffOpen(true)}
             />,
             editor.headerActionsHost,

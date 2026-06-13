@@ -3,7 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
+	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
+	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -449,7 +453,7 @@ func configureLogging() {
 	}
 }
 
-func setupOtelMetrics() {
+func setupOtel() {
 	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
@@ -462,11 +466,40 @@ func setupOtelMetrics() {
 	} else {
 		log.Info("OpenTelemetry metrics initialized")
 	}
+
+	if err := telemetry.InitTracing(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry tracing: %v", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized for critical API endpoints")
+	}
+}
+
+func startPprofServer() {
+	if os.Getenv("PPROF_ENABLED") != "yes" {
+		return
+	}
+
+	port := os.Getenv("PPROF_PORT")
+	if port == "" {
+		port = "6060"
+	}
+
+	// Sample contention so /debug/pprof/block and /debug/pprof/mutex are useful.
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(5)
+
+	go func() {
+		log.Infof("pprof server listening on :%s", port)
+		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+			log.Warnf("pprof server stopped: %v", err)
+		}
+	}()
 }
 
 func Start() {
 	configureLogging()
-	setupOtelMetrics()
+	setupOtel()
+	startPprofServer()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()

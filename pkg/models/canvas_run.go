@@ -121,8 +121,12 @@ type CanvasRunFilters struct {
 }
 
 func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, beforeTime, filters)
+}
+
+func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC").
 		Limit(limit)
@@ -142,8 +146,12 @@ func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filt
 }
 
 func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
+	return CountCanvasRunsInTransaction(database.Conn(), workflowID, filters)
+}
+
+func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
 	var count int64
-	query := database.Conn().
+	query := tx.
 		Model(&CanvasRun{}).
 		Where("workflow_id = ?", workflowID)
 

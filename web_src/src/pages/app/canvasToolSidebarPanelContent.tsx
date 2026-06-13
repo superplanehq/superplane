@@ -8,6 +8,7 @@ import type {
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import type { ReactNode } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
@@ -61,6 +62,7 @@ export interface CanvasVersionsSidebarPanelConfig {
   changeRequestApprovalConfig?: CanvasChangeManagement;
   draftBranches?: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
+  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   onOpenDraftBranch?: (branchName: string) => void;
   onDeleteDraftBranch?: (versionId: string) => void;
   deleteDraftBranchPending?: boolean;
