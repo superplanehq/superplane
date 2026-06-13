@@ -14,6 +14,8 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
@@ -27,6 +29,14 @@ type InstallRequest struct {
 	OrganizationID uuid.UUID
 	AccountID      uuid.UUID
 	InstallParams  map[string]string
+	Integrations   map[string]IntegrationMapping // integration type name → instance to wire
+}
+
+// IntegrationMapping identifies a specific integration instance to wire
+// into canvas nodes of the corresponding integration type.
+type IntegrationMapping struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type InstallResult struct {
@@ -148,6 +158,11 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 
 	canvas.Metadata.Name = name
 
+	// Wire integration instances into canvas nodes.
+	if len(req.Integrations) > 0 {
+		wireIntegrations(canvas, req.Integrations, s.Registry)
+	}
+
 	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 	response, err := canvases.CreateCanvas(
 		ctx,
@@ -215,6 +230,59 @@ func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error
 		)
 		return err
 	})
+}
+
+// wireIntegrations sets the Integration ref on each canvas node whose
+// component belongs to an integration type present in the mapping.
+func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping, reg *registry.Registry) {
+	if canvas.Spec == nil {
+		return
+	}
+
+	for _, node := range canvas.Spec.Nodes {
+		if node.Component == "" {
+			continue
+		}
+
+		integrationName := findIntegrationForComponent(node, reg)
+		if integrationName == "" {
+			continue
+		}
+
+		mapping, ok := mappings[integrationName]
+		if !ok {
+			continue
+		}
+
+		node.Integration = &componentpb.IntegrationRef{
+			Id:   &mapping.ID,
+			Name: &mapping.Name,
+		}
+	}
+}
+
+// findIntegrationForComponent returns the integration name that owns
+// the given node's component (trigger or action). Returns "" if not found.
+func findIntegrationForComponent(node *componentpb.Node, reg *registry.Registry) string {
+	if node.Component == "" {
+		return ""
+	}
+
+	for _, integration := range reg.ListIntegrations() {
+		for _, trigger := range integration.Triggers() {
+			if trigger.Name() == node.Component {
+				return integration.Name()
+			}
+		}
+
+		for _, action := range integration.Actions() {
+			if action.Name() == node.Component {
+				return integration.Name()
+			}
+		}
+	}
+
+	return ""
 }
 
 func FindActiveUserForAccountInOrganization(accountID, organizationID uuid.UUID) (*models.User, error) {
