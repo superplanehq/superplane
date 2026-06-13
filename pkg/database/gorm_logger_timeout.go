@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -63,7 +63,7 @@ func (w *gormTimeoutLogger) Trace(
 			trace.WithSpanKind(trace.SpanKindClient),
 		)
 		span.SetAttributes(
-			semconv.DBSystemKey.String("postgresql"),
+			semconv.DBSystemNamePostgreSQL,
 			attribute.String("db.operation", dbOperation(sql)),
 			attribute.String("db.statement", truncateSQL(sql)),
 			attribute.Int64("db.rows_affected", rowsAffected),
