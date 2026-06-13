@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -8,6 +8,15 @@ import type {
   CanvasesCanvasRun,
 } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import {
+  parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoInfiniteEventsData,
+  upsertExecutionIntoInfiniteRunsData,
+  upsertRootEventIntoInfiniteData,
+  upsertRunIntoInfiniteData,
+  type InfiniteEventsPage,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
 import { canvasKeys } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
@@ -111,6 +120,53 @@ export function useCanvasWebsocket(
     [canvasId, organizationId, queryClient, onCanvasLifecycleEvent, shouldApplyCanvasUpdate],
   );
 
+  const hasConnectedOnce = useRef(false);
+
+  const patchRunInCache = useCallback(
+    (run: CanvasesCanvasRun) => {
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
+
+        const filters = parseRunsFiltersFromQueryKey(queryKey);
+        const next = upsertRunIntoInfiniteData(data, run, filters);
+        if (next !== data) {
+          queryClient.setQueryData(queryKey, next);
+        }
+      }
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchRootEventInCache = useCallback(
+    (event: CanvasesCanvasEvent) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertRootEventIntoInfiniteData(old, event),
+      );
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchExecutionInCache = useCallback(
+    (execution: CanvasesCanvasNodeExecution) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertExecutionIntoInfiniteEventsData(old, execution),
+      );
+      queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
+        { queryKey: canvasKeys.infiniteRuns(canvasId) },
+        (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
+      );
+    },
+    [queryClient, canvasId],
+  );
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
@@ -131,13 +187,11 @@ export function useCanvasWebsocket(
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
 
             /*
-             * We only invalidate the canvas root events query
-             * if the event being received is a root canvas event.
+             * Root canvas events are upserted into the infinite events cache
+             * instead of triggering a refetch.
              */
             if (workflowEvent.root) {
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
+              patchRootEventInCache(workflowEvent);
             }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
@@ -157,13 +211,7 @@ export function useCanvasWebsocket(
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteRuns(canvasId),
-              });
+              patchExecutionInCache(execution);
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -198,9 +246,7 @@ export function useCanvasWebsocket(
             break;
           }
 
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.infiniteRuns(canvasId),
-          });
+          patchRunInCache(run);
           break;
         }
         case "canvas_updated":
@@ -222,6 +268,9 @@ export function useCanvasWebsocket(
       onExecutionEvent,
       processRuntimeEvents,
       handleCanvasLifecycleEvent,
+      patchRunInCache,
+      patchRootEventInCache,
+      patchExecutionInCache,
     ],
   );
 
@@ -308,6 +357,20 @@ export function useCanvasWebsocket(
     [processMessage, processQueue],
   );
 
+  const handleWebSocketOpen = useCallback(() => {
+    if (!hasConnectedOnce.current) {
+      hasConnectedOnce.current = true;
+      return;
+    }
+
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteEvents(canvasId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   // Cleanup on unmount
   useEffect(() => {
     const queues = messageQueues.current;
@@ -325,7 +388,7 @@ export function useCanvasWebsocket(
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
       reconnectInterval: 3000,
-      onOpen: () => {},
+      onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
       share: false,
