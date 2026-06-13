@@ -163,10 +163,7 @@ export const ConfigurationFieldRenderer = ({
     [isTogglable, field, onChange, parsedDefaultValue],
   );
 
-  // Check visibility conditions
-  const isVisible = React.useMemo(() => {
-    return isFieldVisible(field, allValues);
-  }, [field, allValues]);
+  const isVisible = React.useMemo(() => isFieldVisible(field, allValues), [field, allValues]);
 
   // Check if field is conditionally required
   const isRequired = React.useMemo(() => {
@@ -285,10 +282,11 @@ export const ConfigurationFieldRenderer = ({
   }
 
   const fieldAllowsExpressions =
-    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+    allowExpressions &&
+    !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false) &&
+    !(field.type === "text" && field.typeOptions?.text?.allowExpressions === false);
   const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
-  // `field.label` arrives as an empty string (not undefined) when a component omits it,
-  // so fall back to the field name whenever the label is blank.
+  // Fall back to the field name when a component omits the label.
   const fieldLabel = runTitlePresentation?.label || field.label || field.name;
   const fieldDescription = runTitlePresentation?.description ?? field.description;
 

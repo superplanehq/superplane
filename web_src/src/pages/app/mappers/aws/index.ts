@@ -57,7 +57,16 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
-import { createWorkspaceMapper, deleteWorkspaceMapper, getWorkspaceMapper, updateWorkspaceMapper } from "./prometheus";
+import {
+  createRuleGroupNamespaceMapper,
+  createWorkspaceMapper,
+  deleteRuleGroupNamespaceMapper,
+  deleteWorkspaceMapper,
+  getRuleGroupNamespaceMapper,
+  getWorkspaceMapper,
+  updateRuleGroupNamespaceMapper,
+  updateWorkspaceMapper,
+} from "./prometheus";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codepipeline.getPipeline": getPipelineMapper,
@@ -78,6 +87,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "prometheus.getWorkspace": getWorkspaceMapper,
   "prometheus.updateWorkspace": updateWorkspaceMapper,
   "prometheus.deleteWorkspace": deleteWorkspaceMapper,
+  "prometheus.createRuleGroupNamespace": createRuleGroupNamespaceMapper,
+  "prometheus.getRuleGroupNamespace": getRuleGroupNamespaceMapper,
+  "prometheus.updateRuleGroupNamespace": updateRuleGroupNamespaceMapper,
+  "prometheus.deleteRuleGroupNamespace": deleteRuleGroupNamespaceMapper,
   "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
   "codeArtifact.createRepository": createRepositoryMapper,
   "codeArtifact.deletePackageVersions": deletePackageVersionsMapper,
@@ -148,6 +161,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "prometheus.getWorkspace": buildActionStateRegistry("retrieved"),
   "prometheus.updateWorkspace": buildActionStateRegistry("updated"),
   "prometheus.deleteWorkspace": buildActionStateRegistry("deleted"),
+  "prometheus.createRuleGroupNamespace": buildActionStateRegistry("created"),
+  "prometheus.getRuleGroupNamespace": buildActionStateRegistry("retrieved"),
+  "prometheus.updateRuleGroupNamespace": buildActionStateRegistry("updated"),
+  "prometheus.deleteRuleGroupNamespace": buildActionStateRegistry("deleted"),
   "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
   "codeArtifact.createRepository": buildActionStateRegistry("created"),
   "codeArtifact.deletePackageVersions": buildActionStateRegistry("deleted"),
