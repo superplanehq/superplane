@@ -93,8 +93,9 @@ func NewClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (*
 }
 
 // readBaseURL fetches and validates the Coolify base URL from the integration
-// configuration. It strips any trailing slash so callers can append paths
-// directly.
+// configuration. It strips any trailing slash and a trailing API path prefix
+// (e.g. "/api/v1") so callers can append paths directly without producing a
+// duplicated "/api/v1/api/v1" path.
 func readBaseURL(integration core.IntegrationContext) (string, error) {
 	raw, err := integration.GetConfig("baseUrl")
 	if err != nil {
@@ -117,6 +118,8 @@ func readBaseURL(integration core.IntegrationContext) (string, error) {
 		return "", fmt.Errorf("invalid baseUrl: unsupported scheme %q (expected http or https)", parsed.Scheme)
 	}
 
+	value = strings.TrimRight(value, "/")
+	value = strings.TrimSuffix(value, apiPathPrefix)
 	return strings.TrimRight(value, "/"), nil
 }
 

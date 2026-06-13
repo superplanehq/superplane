@@ -139,6 +139,39 @@ func Test__Coolify__Sync(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "https://coolify.example.com/api/v1/version", httpCtx.Requests[0].URL.String())
 	})
+
+	t.Run("baseUrl with /api/v1 suffix is normalized", func(t *testing.T) {
+		for _, baseURL := range []string{
+			"https://coolify.example.com/api/v1",
+			"https://coolify.example.com/api/v1/",
+		} {
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`"4.0.0"`)),
+					},
+				},
+			}
+
+			integrationCtx := &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":  baseURL,
+					"apiToken": "coolify_test_token",
+				},
+			}
+
+			err := integration.Sync(core.SyncContext{
+				Configuration: integrationCtx.Configuration,
+				HTTP:          httpCtx,
+				Integration:   integrationCtx,
+			})
+
+			require.NoError(t, err)
+			require.Len(t, httpCtx.Requests, 1)
+			assert.Equal(t, "https://coolify.example.com/api/v1/version", httpCtx.Requests[0].URL.String(), "baseUrl %q should not duplicate the API path prefix", baseURL)
+		}
+	})
 }
 
 func Test__Coolify__ListResources(t *testing.T) {
