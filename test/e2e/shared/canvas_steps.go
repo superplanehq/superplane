@@ -477,6 +477,8 @@ func (s *CanvasSteps) Create() {
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
 
+	support.ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
+
 	s.Visit()
 }
 
@@ -533,6 +535,8 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
+
+	support.ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
 
 	s.Visit()
 }

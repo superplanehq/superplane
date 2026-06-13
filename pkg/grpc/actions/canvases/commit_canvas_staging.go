@@ -53,8 +53,20 @@ func CommitCanvasStaging(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
 	}
+
+	// Committing with nothing staged is a no-op: callers such as the publish
+	// flow flush staging unconditionally before promoting a draft, so an empty
+	// commit must succeed instead of failing the surrounding operation.
 	if len(rows) == 0 {
-		return nil, status.Error(codes.FailedPrecondition, "no staged changes to commit")
+		summary, _, err := stagingSummaryForVersion(version.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &pb.CommitCanvasStagingResponse{
+			Version:        SerializeCanvasVersionMetadata(version, organizationID),
+			StagingSummary: summary,
+		}, nil
 	}
 
 	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
