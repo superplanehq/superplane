@@ -406,6 +406,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		CanvasName:     workflow.Name,

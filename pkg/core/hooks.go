@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
@@ -22,6 +23,10 @@ type Hook struct {
  * Context for executing a action hook.
  */
 type ActionHookContext struct {
+	ID             uuid.UUID
+	WorkflowID     uuid.UUID
+	RunID          uuid.UUID
+	NodeID         string
 	Name           string
 	Configuration  any
 	Parameters     map[string]any

@@ -311,6 +311,10 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 
 	logger := logging.ForExecution(execution, nil)
 	hookCtx := core.ActionHookContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID,
+		RunID:          execution.RunID,
+		NodeID:         execution.NodeID,
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
@@ -390,6 +394,10 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 	}
 
 	hookCtx := core.ActionHookContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID,
+		RunID:          execution.RunID,
+		NodeID:         execution.NodeID,
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,

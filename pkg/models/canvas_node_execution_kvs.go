@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 )
 
@@ -58,6 +59,31 @@ func FindLatestNodeExecutionKVValueInTransaction(tx *gorm.DB, executionID uuid.U
 		return "", err
 	}
 	return rec.Value, nil
+}
+
+func FirstNodeExecutionByKVValue(key, value string) (*CanvasNodeExecution, error) {
+	return FirstNodeExecutionByKVValueInTransaction(database.Conn(), key, value)
+}
+
+func FirstNodeExecutionByKVValueInTransaction(tx *gorm.DB, key, value string) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("id IN (?)", tx.
+			Select("execution_id").
+			Table("workflow_node_execution_kvs").
+			Where("key = ? AND value = ?", key, value)).
+		Order("created_at ASC").
+		Limit(1).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
 }
 
 func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*CanvasNodeExecution, error) {

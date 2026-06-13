@@ -579,6 +579,28 @@ CREATE TABLE public.workflow_node_execution_kvs (
 
 
 --
+-- Name: workflow_node_execution_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_execution_logs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    execution_id uuid NOT NULL,
+    sequence bigint NOT NULL,
+    type character varying(32) NOT NULL,
+    text text,
+    message text,
+    command_index integer,
+    status character varying(32),
+    duration_ms bigint,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1121,6 +1143,22 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_execution_id_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_execution_id_sequence_key UNIQUE (execution_id, sequence);
+
+
+--
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1520,6 +1558,20 @@ CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_executi
 --
 
 CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
+
+
+--
+-- Name: idx_workflow_node_execution_logs_execution_sequence; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_logs_execution_sequence ON public.workflow_node_execution_logs USING btree (execution_id, sequence);
+
+
+--
+-- Name: idx_workflow_node_execution_logs_workflow_node_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_logs_workflow_node_created ON public.workflow_node_execution_logs USING btree (workflow_id, node_id, created_at DESC);
 
 
 --
@@ -2031,6 +2083,38 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_logs workflow_node_execution_logs_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_logs
+    ADD CONSTRAINT workflow_node_execution_logs_workflow_id_node_id_fkey FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2254,7 +2338,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260611153001	f
+20260612131308	f
 \.
 
 

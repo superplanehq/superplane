@@ -55,10 +55,10 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 	assert.Contains(t, req.Script, "jq")
 	assert.Contains(t, req.Script, "SUPERPLANE_PAYLOAD_FILE")
 	assert.Contains(t, req.Script, "SUPERPLANE_RESULT_FILE")
-	assert.NotContains(t, string(body), `"commands"`)
-	assert.Empty(t, req.SetupCommands)
+	assert.Empty(t, req.Commands)
 	require.True(t, json.Valid(req.MessageChain))
 	assert.Contains(t, string(req.MessageChain), "GitHub PR")
+	assert.Empty(t, req.SetupCommands)
 }
 
 func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
@@ -94,7 +94,10 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
+	assert.Equal(t, RunModeBash, req.RunMode)
 	assert.Equal(t, []string{"apt-get update", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, `echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`, req.Script)
+	assert.Empty(t, req.Commands)
 }
 
 func TestValidateRunBashSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {

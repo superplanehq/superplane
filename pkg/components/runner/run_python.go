@@ -321,17 +321,24 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		setupCommands = normalizeCommands(spec.SetupCommands)
 	}
 
+	logEndpointURL, logEndpointSecret, err := taskLogEndpoint(ctx.BaseURL)
+	if err != nil {
+		return fmt.Errorf("runner log endpoint: %w", err)
+	}
+
 	params := CreateTaskParams{
-		MachineType:    spec.MachineType,
-		RunMode:        RunModePython,
-		Script:         spec.Script,
-		MessageChain:   messageChain,
-		SetupCommands:  setupCommands,
-		WebhookURL:     webhookURL,
-		Environment:    environment,
-		ExecutionMode:  mode,
-		DockerImage:    resolvedRunPythonDockerImageRef(spec),
-		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		MachineType:       spec.MachineType,
+		RunMode:           RunModePython,
+		Script:            spec.Script,
+		MessageChain:      messageChain,
+		SetupCommands:     setupCommands,
+		WebhookURL:        webhookURL,
+		LogEndpointURL:    logEndpointURL,
+		LogEndpointSecret: logEndpointSecret,
+		Environment:       environment,
+		ExecutionMode:     mode,
+		DockerImage:       resolvedRunPythonDockerImageRef(spec),
+		TimeoutSeconds:    spec.ExecutionTimeoutSeconds,
 	}
 
 	taskID, err := broker.CreateTask(params)

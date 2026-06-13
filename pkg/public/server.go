@@ -582,6 +582,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 
+	// Runner log push endpoint (Bearer-token auth, no org context required)
+	r.HandleFunc("/api/v1/runner-logs", s.handleRunnerLogs).Methods(http.MethodPost)
+
 	//
 	// Webhook endpoints for triggers
 	//
