@@ -26,6 +26,7 @@ type InstallRequest struct {
 	Name           string
 	OrganizationID uuid.UUID
 	AccountID      uuid.UUID
+	InstallParams  map[string]string
 }
 
 type InstallResult struct {
@@ -81,9 +82,29 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
 	}
 
+	// Fetch and parse canvas. FetchCanvas resolves the ref.
 	canvas, _, err := FetchCanvas(repo)
 	if err != nil {
 		return nil, err
+	}
+
+	// If install params are provided, re-fetch raw YAML, substitute, and re-parse.
+	params, _ := FetchParams(repo, repo.Ref)
+	if params != nil && len(params.InstallParams) > 0 && len(req.InstallParams) > 0 {
+		resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
+		if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		}
+
+		canvasBody, fetchErr := fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+		canvasBody = SubstituteInstallParams(canvasBody, resolved)
+		canvas, err = parseCanvasYAML(canvasBody)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Pre-parse the optional console.yaml from the same ref. Doing this

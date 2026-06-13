@@ -9,14 +9,16 @@ import (
 
 // Preview describes an installable GitHub app before the user confirms installation.
 type Preview struct {
-	Repo        string `json:"repo"`
-	Owner       string `json:"owner"`
-	Repository  string `json:"repository"`
-	Ref         string `json:"ref"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	CanvasName  string `json:"canvasName"`
-	DefaultName string `json:"defaultName"`
+	Repo          string         `json:"repo"`
+	Owner         string         `json:"owner"`
+	Repository    string         `json:"repository"`
+	Ref           string         `json:"ref"`
+	Title         string         `json:"title"`
+	Description   string         `json:"description"`
+	CanvasName    string         `json:"canvasName"`
+	DefaultName   string         `json:"defaultName"`
+	InstallParams []InstallParam `json:"installParams,omitempty"`
+	Integrations  []string       `json:"integrations,omitempty"`
 }
 
 // BuildPreview loads app metadata from GitHub and prepares install defaults.
@@ -33,7 +35,14 @@ func BuildPreview(repoParam string) (*Preview, error) {
 
 	repo.Ref = ref
 
-	return previewFromCanvas(repo, canvas, ref), nil
+	params, _ := FetchParams(repo, ref)
+
+	preview := previewFromCanvas(repo, canvas, ref)
+	if params != nil {
+		preview.InstallParams = params.InstallParams
+	}
+
+	return preview, nil
 }
 
 func previewFromCanvas(repo *Repository, canvas *pb.Canvas, ref string) *Preview {

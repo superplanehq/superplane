@@ -15,9 +15,10 @@ import (
 )
 
 type installAppRequest struct {
-	Repo           string `json:"repo"`
-	OrganizationID string `json:"organizationId"`
-	Name           string `json:"name"`
+	Repo           string            `json:"repo"`
+	OrganizationID string            `json:"organizationId"`
+	Name           string            `json:"name"`
+	InstallParams  map[string]string `json:"installParams,omitempty"`
 }
 
 type installAppResponse struct {
@@ -79,6 +80,7 @@ func (s *Server) installApp(w http.ResponseWriter, r *http.Request) {
 		Name:           req.Name,
 		OrganizationID: organizationID,
 		AccountID:      account.ID,
+		InstallParams:  req.InstallParams,
 	})
 	if err != nil {
 		writeAppInstallError(w, err)
