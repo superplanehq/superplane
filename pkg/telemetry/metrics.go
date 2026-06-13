@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
@@ -51,13 +52,28 @@ var (
 	pendingExecutionsGauge metric.Int64Gauge
 )
 
+func newMetricsResource(ctx context.Context) (*resource.Resource, error) {
+	return resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+	)
+}
+
 func InitMetrics(ctx context.Context) error {
+	res, err := newMetricsResource(ctx)
+	if err != nil {
+		return err
+	}
+
 	exporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
 		return err
 	}
 
 	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(
 			sdkmetric.NewPeriodicReader(exporter),
 		),
