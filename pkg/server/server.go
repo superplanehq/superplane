@@ -149,7 +149,7 @@ func startWorkers(
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 
