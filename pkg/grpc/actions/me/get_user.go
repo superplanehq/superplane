@@ -27,12 +27,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	var user *models.User
-	err := telemetry.RunSpan(ctx, "me.load_user", func(ctx context.Context) error {
-		var loadErr error
-		user, loadErr = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
-		return loadErr
-	})
+	user, err := models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
@@ -56,7 +51,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	}
 
 	var roles []*authorization.RoleDefinition
-	err = telemetry.RunSpan(ctx, "me.load_roles", func(ctx context.Context) error {
+	err = telemetry.RunSpan(ctx, "auth.load_user_roles", func(ctx context.Context) error {
 		var loadErr error
 		roles, loadErr = authService.GetUserRolesForOrg(userID, user.OrganizationID.String())
 		return loadErr
@@ -90,7 +85,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	userProto.Permissions = permissions
 
 	var groups []string
-	err = telemetry.RunSpan(ctx, "me.load_groups", func(ctx context.Context) error {
+	err = telemetry.RunSpan(ctx, "auth.load_user_groups", func(ctx context.Context) error {
 		var loadErr error
 		groups, loadErr = authService.GetUserGroups(user.OrganizationID.String(), models.DomainTypeOrganization, userID)
 		return loadErr
