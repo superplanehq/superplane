@@ -214,9 +214,6 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		return nil
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
 	appInstallationID, err := p.getNodeIntegrationID(node)
 	if err != nil {
 		return err
@@ -303,9 +300,6 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 		return fmt.Errorf("node %s not found", updatedNode.ID)
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
 	if err != nil {
 		return err

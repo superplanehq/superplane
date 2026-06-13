@@ -29,7 +29,6 @@
     "pkg/grpc/actions": 28.1,
     "pkg/grpc/actions/agents": 44,
     "pkg/grpc/actions/auth": 80.8,
-    "pkg/grpc/actions/blueprints": 0,
     "pkg/grpc/actions/canvases": 62.6,
     "pkg/grpc/actions/canvases/changesets": 84.7,
     "pkg/grpc/actions/canvases/layout": 63.1,
