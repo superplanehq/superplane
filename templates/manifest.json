@@ -47,9 +47,10 @@
         "repo": "github.com/bender-rodriguez-unit1/app_preview-env-digitalocean",
         "icon": "digitalocean",
         "title": "DO Droplet Test",
-        "description": "Manual run \u2192 create droplet \u2192 delete droplet. Simple parameterized test app.",
+        "description": "Manual run or Dash0 alert \u2192 create droplet \u2192 delete droplet. Simple parameterized test app.",
         "integrations": [
-            "digitalocean"
+            "digitalocean",
+            "dash0"
         ],
         "tags": [
             "Test"
