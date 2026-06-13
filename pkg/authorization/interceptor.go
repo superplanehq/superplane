@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -145,13 +144,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 		pbOrganization.Organizations_UpdateIntegrationCapabilities_FullMethodName: {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationProperty_FullMethodName:     {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationSecret_FullMethodName:       {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
-
-		// Blueprints rules
-		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprints", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Discovery rules
 		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},

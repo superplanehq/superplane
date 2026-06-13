@@ -54,15 +54,6 @@ func BuildProcessQueueContext(
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
 
-	if node.ParentNodeID != nil {
-		parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		configBuilder = configBuilder.ForBlueprintNode(parent)
-	}
-
 	config, err := configBuilder.Build(node.Configuration.Data())
 	if err != nil {
 		return nil, &ConfigurationBuildError{
@@ -108,17 +99,6 @@ func BuildProcessQueueContext(
 			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
-		}
-
-		// If this queue item originated from an internal (blueprint) execution chain,
-		// propagate the parent execution id from the previous execution so that
-		// child executions are linked to the top-level blueprint execution.
-		if event.ExecutionID != nil {
-			if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
-				if prev.ParentExecutionID != nil {
-					execution.ParentExecutionID = prev.ParentExecutionID
-				}
-			}
 		}
 
 		err := tx.Create(&execution).Error
@@ -192,39 +172,6 @@ func BuildProcessQueueContext(
 	}
 
 	ctx.DistinctIncomingSources = func() ([]core.Node, error) {
-		// Similar blueprint-aware logic as CountIncomingEdges, but count
-		// distinct source nodes rather than edge count.
-		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
-			parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
-			if err != nil {
-				return nil, err
-			}
-
-			blueprintID := parent.Ref.Data().Blueprint.ID
-			if blueprintID != "" {
-				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
-				if err != nil {
-					return nil, err
-				}
-
-				prefix := parent.NodeID + ":"
-				childID := node.NodeID
-				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
-					childID = childID[len(prefix):]
-				}
-
-				sources := []core.Node{}
-				for _, e := range bp.Edges {
-					if e.TargetID == childID {
-						sources = append(sources, core.Node{
-							ID: fmt.Sprintf("%s:%s", parent.NodeID, e.SourceID),
-						})
-					}
-				}
-				return uniqueSourceNodes(sources), nil
-			}
-		}
-
 		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return nil, err
