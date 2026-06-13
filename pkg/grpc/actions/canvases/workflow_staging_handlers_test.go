@@ -20,11 +20,11 @@ func setupStagingDraft(t *testing.T) (*support.ResourceRegistry, context.Context
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	created, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), "")
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "staging-draft")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
 	require.NoError(t, err)
 
-	return r, ctx, canvas.ID.String(), created.GetVersion().GetMetadata().GetId()
+	return r, ctx, canvasID, created.GetVersion().GetMetadata().GetId()
 }
 
 func TestStageRepositorySpecFileOperations(t *testing.T) {
@@ -122,7 +122,7 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
@@ -142,11 +142,14 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	created, err := CreateCanvasVersion(ctx, orgID, canvas.ID.String(), "")
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "stage-arbitrary-file")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, orgID, canvasID, "")
 	require.NoError(t, err)
-	canvasID := canvas.ID.String()
 	versionID := created.GetVersion().GetMetadata().GetId()
+
+	repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
+	require.NoError(t, err)
+	_ = repository
 
 	// Staging an arbitrary (non-spec) repository file flips the staging state and
 	// reports the path so the UI switches to Reset/Commit.
@@ -175,7 +178,12 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
-	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+	// Staged files are committed to the draft branch, not main.
+	draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(versionID))
+	require.NoError(t, err)
+	require.NotNil(t, draftVersion.BranchName)
+
+	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", *draftVersion.BranchName)
 	require.NoError(t, err)
 	committed, err := io.ReadAll(reader)
 	require.NoError(t, err)
