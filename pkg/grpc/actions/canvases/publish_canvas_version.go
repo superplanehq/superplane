@@ -3,16 +3,17 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -99,70 +100,108 @@ func publishDraftVersionInTransaction(
 	authService authorization.Authorization,
 	webhookBaseURL string,
 ) (*models.CanvasVersion, error) {
-	var publishedVersion *models.CanvasVersion
-
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
-		if findErr != nil {
-			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
-			}
-			return findErr
-		}
-
-		if version.State != models.CanvasVersionStateDraft {
-			return status.Error(codes.FailedPrecondition, "only draft versions can be published")
-		}
-
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
-		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
-		}
-		if nameErr != nil {
-			return nameErr
-		}
-
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
-		if err != nil {
-			return err
-		}
-
-		err = publishCanvasVersionInTransaction(
-			ctx,
-			tx,
-			liveVersion,
-			version,
-			changesets.CanvasPublisherOptions{
-				Registry:       reg,
-				OrgID:          organizationUUID,
-				Encryptor:      encryptor,
-				AuthService:    authService,
-				WebhookBaseURL: webhookBaseURL,
-				GitProvider:    gitProv,
-			},
-		)
-		if err != nil {
-			log.Errorf("failed to publish canvas version: %v", err)
-			return err
-		}
-
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
-		if refreshErr != nil {
-			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
-			return refreshErr
-		}
-
-		publishedVersion = version
-		return nil
-	})
-
+	version, err := models.FindCanvasVersion(canvasUUID, versionUUID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "version not found")
+		}
 		return nil, err
 	}
+
+	if version.State != models.CanvasVersionStateDraft {
+		return nil, status.Error(codes.FailedPrecondition, "only draft versions can be published")
+	}
+
+	if !models.IsRegisteredDraftVersion(version) {
+		return nil, status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+	}
+
+	if version.OwnerID == nil || *version.OwnerID != userUUID {
+		return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
+	}
+
+	if version.BranchName == nil || strings.TrimSpace(*version.BranchName) == "" {
+		return nil, status.Error(codes.FailedPrecondition, "draft branch is required")
+	}
+
+	draftBranch := strings.TrimSpace(*version.BranchName)
+
+	repository, err := models.FindRepository(organizationUUID, canvasUUID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+	}
+
+	user, err := models.FindActiveUserByID(organizationID, userUUID.String())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
+	}
+
+	mergeSHA, err := gitProv.MergeBranch(
+		ctx,
+		repository.RepoID,
+		draftBranch,
+		models.CanvasGitBranchMain,
+		"Publish canvas",
+		gitprovider.CommitAuthor{Name: user.Name, Email: user.GetEmail()},
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to merge draft branch: %v", err)
+	}
+
+	var publishedVersion *models.CanvasVersion
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		synced, syncErr := materialize.SyncLiveFromGit(
+			ctx,
+			tx,
+			gitProv,
+			reg,
+			encryptor,
+			authService,
+			webhookBaseURL,
+			organizationUUID,
+			canvasUUID,
+			materialize.SyncLiveFromGitOptions{
+				HeadSHA:                   mergeSHA,
+				SkipChangeManagementCheck: true,
+			},
+		)
+		if syncErr != nil {
+			return syncErr
+		}
+
+		publishedVersion = synced
+		return nil
+	})
+	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
+		if errors.Is(err, models.ErrCanvasNameAlreadyExists) {
+			return nil, status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to publish canvas: %v", err)
+	}
+
+	if err := gitProv.DeleteBranch(ctx, repository.RepoID, draftBranch); err != nil && !errors.Is(err, gitprovider.ErrInvalidRef) {
+		return nil, status.Errorf(codes.Internal, "failed to delete draft branch after publish: %v", err)
+	}
+
+	var removed []string
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var reconcileErr error
+		removed, reconcileErr = materialize.ReconcileDraftBranchDeletionsFromGit(
+			ctx,
+			tx,
+			gitProv,
+			canvasUUID,
+			materialize.ReconcileDraftBranchDeletionsOptions{BranchName: draftBranch},
+		)
+		return reconcileErr
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to reconcile draft branch deletion after publish: %v", err)
+	}
+	materialize.PublishDraftBranchDeletionEvents(canvasUUID.String(), removed)
 
 	return publishedVersion, nil
 }
