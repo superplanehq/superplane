@@ -2,20 +2,18 @@ import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
-import { useInstallTemplate } from "./useInstallTemplate";
+import { InstallProgressPanel } from "./InstallProgressPanel";
 
 export function ZeroStatePage() {
-  const navigate = useNavigate();
   const { createApp, isSaving } = useCreateApp();
-  const { isInstalling } = useInstallTemplate();
   const [visibleCount, setVisibleCount] = useState(7);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
+  const [installingApp, setInstallingApp] = useState<AppEntry | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const busy = isSaving || isInstalling;
+  const busy = isSaving || installingApp !== null;
 
   const visible = APP_CATALOG.slice(0, visibleCount);
 
@@ -46,8 +44,8 @@ export function ZeroStatePage() {
 
   const handleInstall = (app: AppEntry) => {
     if (busy) return;
-    // Navigate to install wizard page so params form is shown if the app has install_params.
-    navigate(`/install?repo=${encodeURIComponent(app.repo)}`);
+    setInstallingApp(app);
+    setSelectedApp(null);
   };
 
   return (
@@ -89,6 +87,10 @@ export function ZeroStatePage() {
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
+
+        {installingApp && (
+          <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />
+        )}
       </div>
     </>
   );
