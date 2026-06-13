@@ -50,7 +50,7 @@
         "description": "Manual run or Dash0 alert \u2192 create droplet \u2192 delete droplet. Simple parameterized test app.",
         "integrations": [
             "digitalocean",
-            "dash0"
+            "daytona"
         ],
         "tags": [
             "Test"
