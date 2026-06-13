@@ -106,13 +106,17 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	}
 
 	// Substitute install params in raw YAML before parsing.
-	params, _ := FetchParams(repo, repo.Ref)
-	if params != nil && len(params.InstallParams) > 0 {
-		resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
-		if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	// Only validate and substitute if the caller actually provided params.
+	// The home page one-click install doesn't send params — it skips the wizard.
+	if len(req.InstallParams) > 0 {
+		params, _ := FetchParams(repo, repo.Ref)
+		if params != nil && len(params.InstallParams) > 0 {
+			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
+			if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+			}
+			canvasBody = SubstituteInstallParams(canvasBody, resolved)
 		}
-		canvasBody = SubstituteInstallParams(canvasBody, resolved)
 	}
 
 	canvas, err := parseCanvasYAML(canvasBody)
