@@ -38,6 +38,13 @@ var (
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 
+	dbPoolConnectionsMaxGauge   metric.Int64Gauge
+	dbPoolConnectionsOpenGauge  metric.Int64Gauge
+	dbPoolConnectionsInUseGauge metric.Int64Gauge
+	dbPoolConnectionsIdleGauge  metric.Int64Gauge
+	dbPoolWaitCountCounter      metric.Int64Counter
+	dbPoolWaitDurationHistogram metric.Float64Histogram
+
 	dbRowsAffectedCounter metric.Int64Counter
 
 	pendingEventsGauge     metric.Int64Gauge
@@ -180,6 +187,60 @@ func InitMetrics(ctx context.Context) error {
 		"db.long_queries.count",
 		metric.WithDescription("Number of long-running database queries"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsMaxGauge, err = meter.Int64Gauge(
+		"db.pool.connections.max",
+		metric.WithDescription("Configured maximum open database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsOpenGauge, err = meter.Int64Gauge(
+		"db.pool.connections.open",
+		metric.WithDescription("Number of open database connections"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsInUseGauge, err = meter.Int64Gauge(
+		"db.pool.connections.in_use",
+		metric.WithDescription("Number of database connections currently in use"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsIdleGauge, err = meter.Int64Gauge(
+		"db.pool.connections.idle",
+		metric.WithDescription("Number of idle database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitCountCounter, err = meter.Int64Counter(
+		"db.pool.wait.count",
+		metric.WithDescription("Number of times a request waited for a database connection"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitDurationHistogram, err = meter.Float64Histogram(
+		"db.pool.wait.duration.seconds",
+		metric.WithDescription("Time spent waiting for a database connection"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -362,6 +423,33 @@ func RecordDBLongQueriesCount(ctx context.Context, count int64) {
 	}
 
 	dbLongQueriesCountHistogram.Record(ctx, count)
+}
+
+func RecordDBPoolStats(ctx context.Context, maxOpen, open, inUse, idle int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbPoolConnectionsMaxGauge.Record(ctx, maxOpen)
+	dbPoolConnectionsOpenGauge.Record(ctx, open)
+	dbPoolConnectionsInUseGauge.Record(ctx, inUse)
+	dbPoolConnectionsIdleGauge.Record(ctx, idle)
+}
+
+func RecordDBPoolWaitCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() || count <= 0 {
+		return
+	}
+
+	dbPoolWaitCountCounter.Add(ctx, count)
+}
+
+func RecordDBPoolWaitDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() || d <= 0 {
+		return
+	}
+
+	dbPoolWaitDurationHistogram.Record(ctx, d.Seconds())
 }
 
 func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation string) {

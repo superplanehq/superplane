@@ -32,6 +32,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -85,7 +86,12 @@ func RunServer(
 		recovery.WithRecoveryHandler(customFunc),
 	}
 
-	grpcServer := grpc.NewServer(
+	var serverOptions []grpc.ServerOption
+	if telemetry.TracingEnabled() {
+		serverOptions = append(serverOptions, grpc.StatsHandler(telemetry.CriticalGRPCServerStatsHandler()))
+	}
+
+	serverOptions = append(serverOptions,
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(opts...),
 			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
@@ -95,6 +101,8 @@ func RunServer(
 			recovery.StreamServerInterceptor(opts...),
 		),
 	)
+
+	grpcServer := grpc.NewServer(serverOptions...)
 
 	//
 	// Initialize health service.

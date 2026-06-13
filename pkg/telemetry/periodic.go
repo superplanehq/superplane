@@ -12,7 +12,9 @@ import (
 //
 
 type Periodic struct {
-	ctx context.Context
+	ctx                  context.Context
+	lastPoolWaitCount    int64
+	lastPoolWaitDuration time.Duration
 }
 
 func NewPeriodic(ctx context.Context) *Periodic {
@@ -33,11 +35,35 @@ func (p *Periodic) Start() {
 }
 
 func (p *Periodic) report() {
+	p.reportDatabasePoolStats()
 	p.reportDatabaseLocks()
 	p.reportLongQueries()
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+}
+
+func (p *Periodic) reportDatabasePoolStats() {
+	stats, err := database.PoolStats()
+	if err != nil {
+		return
+	}
+
+	RecordDBPoolStats(
+		p.ctx,
+		int64(stats.MaxOpenConnections),
+		int64(stats.OpenConnections),
+		int64(stats.InUse),
+		int64(stats.Idle),
+	)
+
+	waitCountDelta := stats.WaitCount - p.lastPoolWaitCount
+	waitDurationDelta := stats.WaitDuration - p.lastPoolWaitDuration
+	p.lastPoolWaitCount = stats.WaitCount
+	p.lastPoolWaitDuration = stats.WaitDuration
+
+	RecordDBPoolWaitCount(p.ctx, waitCountDelta)
+	RecordDBPoolWaitDuration(p.ctx, waitDurationDelta)
 }
 
 func (p *Periodic) reportDatabaseLocks() {
