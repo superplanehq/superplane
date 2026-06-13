@@ -243,11 +243,16 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
   // unescaping, the natural `splitIndex(message, "\n", 0)` form would never
   // match an actual newline. We translate `\n`, `\r`, `\t`, and `\\` so the
   // common cases just work.
+  //
+  // When the separator is a bare newline we split on `/\r\n|\r|\n/` so that
+  // `\r\n` (Windows) and bare `\r` (classic Mac) line endings are treated the
+  // same as `\n`. This keeps `splitIndex(value, "\n", 0)` in agreement with
+  // `firstLine` — otherwise CRLF text would leave a trailing `\r` on segments.
   splitIndex: (s: unknown, sep: unknown, i: unknown): string => {
     const text = coerceToString(s);
     const separator = unescapeSeparator(typeof sep === "string" ? sep : String(sep ?? ""));
     if (separator === "") return text;
-    const parts = text.split(separator);
+    const parts = separator === "\n" ? text.split(/\r\n|\r|\n/) : text.split(separator);
     const raw = Number(i);
     if (!Number.isFinite(raw)) return "";
     const index = raw < 0 ? parts.length + Math.trunc(raw) : Math.trunc(raw);

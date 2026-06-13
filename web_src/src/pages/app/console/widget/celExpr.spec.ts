@@ -315,6 +315,15 @@ describe("celExpr", () => {
         expect(evalExpr(compiled, { message: "first\nsecond\nthird" }, buildEnv())).toBe("first");
       });
 
+      it("treats CRLF and bare CR the same as LF for a newline separator", () => {
+        // Run output often arrives with Windows (`\r\n`) or classic-Mac (`\r`)
+        // line endings. Splitting on a bare `\n` would leave a trailing `\r`
+        // on the first segment, disagreeing with `firstLine`. They must match.
+        const compiled = compileExpr('splitIndex(message, "\\n", 0)');
+        expect(evalExpr(compiled, { message: "first\r\nsecond" }, buildEnv())).toBe("first");
+        expect(evalExpr(compiled, { message: "first\rsecond" }, buildEnv())).toBe("first");
+      });
+
       it("preserves a literal backslash that is not part of a recognized escape", () => {
         const compiled = compileExpr('splitIndex(value, "\\?", 0)');
         expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
