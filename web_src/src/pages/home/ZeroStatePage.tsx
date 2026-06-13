@@ -2,14 +2,16 @@ import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
 
 export function ZeroStatePage() {
+  const navigate = useNavigate();
   const { createApp, isSaving } = useCreateApp();
-  const { installTemplate, isInstalling } = useInstallTemplate();
+  const { isInstalling } = useInstallTemplate();
   const [visibleCount, setVisibleCount] = useState(7);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -44,10 +46,8 @@ export function ZeroStatePage() {
 
   const handleInstall = (app: AppEntry) => {
     if (busy) return;
-    void installTemplate(app.repo, {
-      instructions: app.agentInstructions,
-      initialMessage: app.agentInitialMessage,
-    });
+    // Navigate to install wizard page so params form is shown if the app has install_params.
+    navigate(`/install?repo=${encodeURIComponent(app.repo)}`);
   };
 
   return (
