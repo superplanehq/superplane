@@ -6,8 +6,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useCreateIntegration } from "@/hooks/useIntegrations";
-import { Icon } from "@/ui/icons";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 interface ConnectIntegrationModalProps {
@@ -77,7 +76,7 @@ export function ConnectIntegrationModal({
               className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
               disabled={createMutation.isPending}
             >
-              <Icon name="x" size="sm" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
