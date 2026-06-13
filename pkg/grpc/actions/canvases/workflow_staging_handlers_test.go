@@ -27,6 +27,34 @@ func setupStagingDraft(t *testing.T) (*support.ResourceRegistry, context.Context
 	return r, ctx, canvas.ID.String(), created.GetVersion().GetMetadata().GetId()
 }
 
+func TestDescribeCanvasVersionStagingSummary(t *testing.T) {
+	r, ctx, canvasID, versionID := setupStagingDraft(t)
+	orgID := r.Organization.ID.String()
+
+	t.Run("owner describing a clean draft reports no staging", func(t *testing.T) {
+		resp, err := DescribeCanvasVersion(ctx, orgID, canvasID, versionID)
+		require.NoError(t, err)
+		require.NotNil(t, resp.GetStagingSummary())
+		assert.False(t, resp.GetStagingSummary().GetHasStaging())
+	})
+
+	t.Run("owner describing a draft with staged edits sees the staged paths", func(t *testing.T) {
+		baseline, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+		require.NoError(t, err)
+
+		_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# staged\n")},
+		})
+		require.NoError(t, err)
+
+		resp, err := DescribeCanvasVersion(ctx, orgID, canvasID, versionID)
+		require.NoError(t, err)
+		require.NotNil(t, resp.GetStagingSummary())
+		assert.True(t, resp.GetStagingSummary().GetHasStaging())
+		assert.Contains(t, resp.GetStagingSummary().GetStagedPaths(), CanvasYAMLRepositoryPath)
+	})
+}
+
 func TestStageRepositorySpecFileOperations(t *testing.T) {
 	r, ctx, canvasID, versionID := setupStagingDraft(t)
 	orgID := r.Organization.ID.String()

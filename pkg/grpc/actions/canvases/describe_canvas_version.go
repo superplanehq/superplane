@@ -50,35 +50,45 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		}, nil
 	}
 
-	canAccess := false
-	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
-			canAccess = true
-			return nil
-		}
+	isOwnedDraft := models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version)
+	canAccess := isOwnedDraft
 
-		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
-			canAccess = true
+	// Snapshots are only readable to the org through an attached change
+	// request. Drafts are owner-private and have already been resolved above,
+	// so a missing CR for a draft simply means access is denied.
+	if !canAccess && version.State == models.CanvasVersionStateSnapshot {
+		if err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
+				canAccess = true
+				return nil
+			} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
+				return requestErr
+			}
 			return nil
-		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
-			return requestErr
+		}); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to resolve version access: %v", err)
 		}
-		return nil
-	}); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to resolve version access: %v", err)
 	}
 
 	if !canAccess {
 		return nil, status.Error(codes.PermissionDenied, "version is not visible in current flow")
 	}
 
-	state, _, err := stagingSummaryForVersion(version.ID)
-	if err != nil {
-		return nil, err
+	response := &pb.DescribeCanvasVersionResponse{
+		Version: SerializeCanvasVersionMetadata(version, organizationID),
 	}
 
-	return &pb.DescribeCanvasVersionResponse{
-		Version:        SerializeCanvasVersionMetadata(version, organizationID),
-		StagingSummary: state,
-	}, nil
+	// StagingSummary only makes sense on the owner's draft. Snapshots are
+	// immutable so they never accrue staging rows, and a wasted query here
+	// would surface as a 500 to reviewers (e.g. when the underlying staging
+	// table is unavailable) without any user-visible benefit.
+	if isOwnedDraft {
+		stagingSummary, _, err := stagingSummaryForVersion(version.ID)
+		if err != nil {
+			return nil, err
+		}
+		response.StagingSummary = stagingSummary
+	}
+
+	return response, nil
 }
