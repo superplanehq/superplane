@@ -70,7 +70,7 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
-	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, []models.CanvasNodeExecution{})
+	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution})
 	if err != nil {
 		return fmt.Errorf("failed to serialize execution: %w", err)
 	}

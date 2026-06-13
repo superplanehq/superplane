@@ -202,7 +202,7 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		pb, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
+		pb, err := SerializeNodeExecutions(executions)
 		require.NoError(b, err)
 		require.NotNil(b, pb)
 		assert.Len(b, pb, 1000)
