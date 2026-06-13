@@ -22,8 +22,8 @@ import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
 import type { InstallParam } from "../install/types";
 
-// Flow: integrations (optional) → params (optional) → installing → done
-type Phase = "integrations" | "configuring" | "installing" | "done";
+// Flow: loading → integrations (optional) → params (optional) → installing → done
+type Phase = "loading" | "integrations" | "configuring" | "installing" | "done";
 
 interface Step {
   label: string;
@@ -45,7 +45,8 @@ interface InstallProgressPanelProps {
 
 function getInitialPhase(app: AppEntry): Phase {
   if (app.integrations.length > 0) return "integrations";
-  return "installing";
+  // We don't know about params until preview loads, so show a brief loading state.
+  return "loading";
 }
 
 export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps) {
@@ -65,7 +66,7 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const installTriggered = useRef(false);
 
-  // Fetch preview to get params
+  // Fetch preview to get params, then decide initial phase if we started in "loading"
   useEffect(() => {
     fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
       .then((r) => r.json())
@@ -77,9 +78,17 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
             if (p.default) defaults[p.name] = p.default;
           }
           setParamValues(defaults);
+          // If we're still in loading (no integrations step), go to params
+          setPhase((prev) => (prev === "loading" ? "configuring" : prev));
+        } else {
+          // No params — if loading, go straight to install
+          setPhase((prev) => (prev === "loading" ? "installing" : prev));
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // On error, just install without params
+        setPhase((prev) => (prev === "loading" ? "installing" : prev));
+      });
   }, [app.repo]);
 
   // Run install when phase transitions to "installing"
@@ -174,6 +183,13 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
+      {phase === "loading" && (
+        <div className="flex items-center gap-2.5 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+          <span className="text-slate-500">Loading app configuration...</span>
+        </div>
+      )}
+
       {phase === "integrations" && (
         <IntegrationsStep
           integrations={app.integrations}
