@@ -1,7 +1,6 @@
 package support
 
 import (
-	"context"
 	"encoding/json"
 	"maps"
 	"strings"
@@ -12,10 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitfactory "github.com/superplanehq/superplane/pkg/git"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -449,52 +446,6 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	}))
 
 	return workflow, createdNodes
-}
-
-// ProvisionCanvasGitRepository creates and seeds a ready git repository for a
-// canvas that was created directly in the database (via CreateCanvas), bringing
-// it in line with the git-first backend. The canvas draft/commit/publish flow
-// requires a provisioned repository with a seeded main branch, which the
-// production CreateCanvas RPC sets up synchronously; tests that bypass the RPC
-// need the same setup so that entering edit mode (creating a draft version)
-// works.
-func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID) {
-	gitProvider, err := gitfactory.NewProvider()
-	require.NoError(t, err)
-
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	require.NoError(t, err)
-
-	repoID := gitProvider.GetRepositoryID(git.RepositoryOptions{
-		OrganizationID: orgID,
-		CanvasID:       canvasID,
-	})
-	require.NoError(t, canvas.CreatePendingRepository(gitProvider.Name(), repoID))
-
-	repository, err := models.FindRepository(orgID, canvasID)
-	require.NoError(t, err)
-
-	input := materialize.SeedRepositoryInput{
-		Name:                    canvas.Name,
-		Description:             canvas.Description,
-		ChangeManagementEnabled: canvas.ChangeManagementEnabled,
-		ChangeRequestApprovers:  models.DefaultCanvasChangeRequestApprovers(),
-		Author:                  git.CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"},
-	}
-	if canvas.LiveVersionID != nil {
-		liveVersion, liveErr := models.FindCanvasVersionInTransaction(database.Conn(), canvasID, *canvas.LiveVersionID)
-		require.NoError(t, liveErr)
-		input.Description = liveVersion.Description
-		input.Nodes = liveVersion.Nodes
-		input.Edges = liveVersion.Edges
-		input.ChangeManagementEnabled = liveVersion.ChangeManagementEnabled
-		input.ChangeRequestApprovers = liveVersion.EffectiveChangeRequestApprovers()
-	}
-
-	_, err = materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)
-	require.NoError(t, err)
-
-	require.NoError(t, repository.MarkReady(database.Conn()))
 }
 
 func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
