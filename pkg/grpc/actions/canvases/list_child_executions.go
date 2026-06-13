@@ -20,7 +20,7 @@ func ListChildExecutions(ctx context.Context, registry *registry.Registry, workf
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
+	serialized, err := SerializeNodeExecutions(executions)
 	if err != nil {
 		return nil, err
 	}

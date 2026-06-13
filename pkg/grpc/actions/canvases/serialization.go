@@ -72,17 +72,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	executionIDs := make([]string, len(lastExecutions))
-	for i, execution := range lastExecutions {
-		executionIDs[i] = execution.ID.String()
-	}
-
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions)
 	if err != nil {
 		return nil, err
 	}
