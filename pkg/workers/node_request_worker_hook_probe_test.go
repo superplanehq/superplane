@@ -113,7 +113,7 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	}
 	require.NoError(t, database.Conn().Create(&req).Error)
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 	err := worker.LockAndProcessRequest(req)
 	require.NoError(t, err)
 
