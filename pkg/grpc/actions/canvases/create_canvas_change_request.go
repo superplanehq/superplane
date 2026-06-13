@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/canvas/changerequests"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -139,7 +140,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			return createErr
 		}
 
-		return refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
+		return changerequests.RefreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request)
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

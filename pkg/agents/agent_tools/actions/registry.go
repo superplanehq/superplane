@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -19,6 +20,7 @@ type Dependencies struct {
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
 	UsageService   usage.Service
+	GitProvider    git.Provider
 }
 
 // Action executes one superplane_app action value.

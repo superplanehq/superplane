@@ -2059,13 +2059,14 @@ export const useCanvasRepository = (canvasId: string, enabled: boolean = true) =
   });
 };
 
-export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true, branch?: string) => {
   return useQuery({
-    queryKey: canvasKeys.repositoryFiles(canvasId),
+    queryKey: [...canvasKeys.repositoryFiles(canvasId), branch ?? ""],
     queryFn: async () => {
       const response = await canvasesListCanvasRepositoryFiles(
         withOrganizationHeader({
           path: { canvasId },
+          query: branch ? { branch } : undefined,
         }),
       );
       return response.data;
