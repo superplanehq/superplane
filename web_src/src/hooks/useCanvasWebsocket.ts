@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -8,11 +8,18 @@ import type {
   CanvasesCanvasRun,
 } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import {
+  parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoInfiniteEventsData,
+  upsertExecutionIntoInfiniteRunsData,
+  upsertRootEventIntoInfiniteData,
+  upsertRunIntoInfiniteData,
+  type InfiniteEventsPage,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
 import { canvasKeys } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
-
-const INVALIDATION_DEBOUNCE_MS = 1000;
 
 type CanvasWebsocketPayload = {
   canvasId: string;
@@ -54,52 +61,51 @@ export function useCanvasWebsocket(
   const messageQueues = useRef<Map<string, QueuedMessage[]>>(new Map());
   const processingNodes = useRef<Set<string>>(new Set());
 
-  const runsDirty = useRef(false);
-  const eventsDirty = useRef(false);
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasConnectedOnce = useRef(false);
 
-  const flushInvalidations = useCallback(() => {
-    flushTimerRef.current = null;
-
-    if (eventsDirty.current) {
-      eventsDirty.current = false;
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.infiniteEvents(canvasId),
-      });
-    }
-
-    if (runsDirty.current) {
-      runsDirty.current = false;
-      queryClient.invalidateQueries({
+  const patchRunInCache = useCallback(
+    (run: CanvasesCanvasRun) => {
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
         queryKey: canvasKeys.infiniteRuns(canvasId),
       });
-    }
-  }, [queryClient, canvasId]);
 
-  const invalidateRunsNow = useCallback(() => {
-    runsDirty.current = false;
-    queryClient.invalidateQueries({
-      queryKey: canvasKeys.infiniteRuns(canvasId),
-    });
-  }, [queryClient, canvasId]);
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
 
-  const scheduleRunsEventsInvalidation = useCallback(
-    (target: "events" | "runs" | "both") => {
-      if (target === "events" || target === "both") {
-        eventsDirty.current = true;
+        const filters = parseRunsFiltersFromQueryKey(queryKey);
+        const next = upsertRunIntoInfiniteData(data, run, filters);
+        if (next !== data) {
+          queryClient.setQueryData(queryKey, next);
+        }
       }
-      if (target === "runs" || target === "both") {
-        runsDirty.current = true;
-      }
-
-      if (flushTimerRef.current !== null) {
-        clearTimeout(flushTimerRef.current);
-      }
-
-      flushTimerRef.current = setTimeout(flushInvalidations, INVALIDATION_DEBOUNCE_MS);
     },
-    [flushInvalidations],
+    [queryClient, canvasId],
+  );
+
+  const patchRootEventInCache = useCallback(
+    (event: CanvasesCanvasEvent) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertRootEventIntoInfiniteData(old, event),
+      );
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchExecutionInCache = useCallback(
+    (execution: CanvasesCanvasNodeExecution) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertExecutionIntoInfiniteEventsData(old, execution),
+      );
+      queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
+        { queryKey: canvasKeys.infiniteRuns(canvasId) },
+        (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
+      );
+    },
+    [queryClient, canvasId],
   );
 
   const processMessage = useCallback(
@@ -119,11 +125,11 @@ export function useCanvasWebsocket(
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
 
             /*
-             * We only invalidate the canvas root events query
-             * if the event being received is a root canvas event.
+             * Root canvas events are upserted into the infinite events cache
+             * instead of triggering a refetch.
              */
             if (workflowEvent.root) {
-              scheduleRunsEventsInvalidation("events");
+              patchRootEventInCache(workflowEvent);
             }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
@@ -143,7 +149,7 @@ export function useCanvasWebsocket(
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
-              scheduleRunsEventsInvalidation("both");
+              patchExecutionInCache(execution);
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -178,7 +184,7 @@ export function useCanvasWebsocket(
             break;
           }
 
-          invalidateRunsNow();
+          patchRunInCache(run);
           break;
         }
         case "canvas_updated":
@@ -239,8 +245,9 @@ export function useCanvasWebsocket(
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
       organizationId,
-      scheduleRunsEventsInvalidation,
-      invalidateRunsNow,
+      patchRunInCache,
+      patchRootEventInCache,
+      patchExecutionInCache,
     ],
   );
 
@@ -346,9 +353,6 @@ export function useCanvasWebsocket(
     const queues = messageQueues.current;
     const processing = processingNodes.current;
     return () => {
-      if (flushTimerRef.current !== null) {
-        clearTimeout(flushTimerRef.current);
-      }
       queues.clear();
       processing.clear();
     };
