@@ -11,19 +11,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-const testWebhookBaseURL = "http://localhost:3000/api/v1"
-
 func TestCreateCanvasChangeRequestCreatesOpenRequestOnly(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "create-cr-open-only")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "create-cr-open-only")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
@@ -38,7 +35,7 @@ func TestActOnCanvasChangeRequestRejectAndReopen(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "reject-reopen")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "reject-reopen")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.NoError(t, err)
@@ -69,7 +66,7 @@ func TestConflictedChangeRequestCannotBeApproved(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "conflict-approve")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "conflict-approve")
 
 	firstDraftID := createDraftVersion(ctx, t, r, canvasID, "Draft One")
 	firstChangeRequestResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, firstDraftID)
@@ -111,7 +108,7 @@ func TestApproveDoesNotPublishUntilPublishAction(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "approve-then-publish")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "approve-then-publish")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.NoError(t, err)
@@ -144,7 +141,7 @@ func TestPublishRequiresApprovals(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-needs-approval")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "publish-needs-approval")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.NoError(t, err)
@@ -164,8 +161,8 @@ func TestPublishChangeRequestWithDuplicateNameReturnsAlreadyExists(t *testing.T)
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	existingCanvasID := createCanvasWithNoopNode(ctx, t, r, "existing-live-canvas")
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "change-request-duplicate-name")
+	existingCanvasID := createCanvasWithChangeManagement(ctx, t, r, "existing-live-canvas")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "change-request-duplicate-name")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 
 	existingCanvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(existingCanvasID))
@@ -219,7 +216,7 @@ func TestUnapproveRequiresReapprovalBeforePublish(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "unapprove-before-publish")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "unapprove-before-publish")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.NoError(t, err)
@@ -259,7 +256,7 @@ func TestRejectInvalidatesActiveApprovalsAndReopenAllowsApprovalsAgain(t *testin
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(ctx, t, r, "reject-invalidates-approvals")
+	canvasID := createCanvasWithChangeManagement(ctx, t, r, "reject-invalidates-approvals")
 	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
 	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
 	require.NoError(t, err)
@@ -297,79 +294,6 @@ func TestRejectInvalidatesActiveApprovalsAndReopenAllowsApprovalsAgain(t *testin
 
 	_, err = actOnCanvasChangeRequestAction(ctx, r, canvasID, changeRequestID, pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE)
 	require.NoError(t, err)
-}
-
-func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasName string) string {
-	t.Helper()
-	require.NoError(
-		t,
-		database.Conn().
-			Model(&models.Organization{}).
-			Where("id = ?", r.Organization.ID).
-			Update("change_management_enabled", true).
-			Error,
-	)
-
-	createCanvasResponse, err := CreateCanvas(
-		ctx,
-		r.Registry,
-		r.Encryptor,
-		r.AuthService,
-		r.GitProvider,
-		testWebhookBaseURL,
-		r.Organization.ID,
-		&pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{Name: canvasName},
-			Spec: &pb.Canvas_Spec{
-				Nodes: []*componentpb.Node{
-					{
-						Id:        "node-1",
-						Name:      "Initial Name",
-						Component: "noop",
-					},
-				},
-				Edges: []*componentpb.Edge{},
-			},
-		},
-		nil,
-		nil,
-	)
-
-	require.NoError(t, err)
-	return createCanvasResponse.Canvas.Metadata.Id
-}
-
-func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasID string, nodeName string) string {
-	t.Helper()
-
-	versionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
-
-	_, err := UpdateCanvasVersion(
-		ctx,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvasID,
-		versionID,
-		&pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{Name: "Test Canvas"},
-			Spec: &pb.Canvas_Spec{
-				Nodes: []*componentpb.Node{
-					{
-						Id:        "node-1",
-						Name:      nodeName,
-						Component: "noop",
-					},
-				},
-				Edges: []*componentpb.Edge{},
-			},
-		},
-		nil,
-		testWebhookBaseURL,
-		r.AuthService,
-	)
-	require.NoError(t, err)
-	return versionID
 }
 
 func actOnCanvasChangeRequestAction(
