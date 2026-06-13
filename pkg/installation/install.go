@@ -82,29 +82,42 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
 	}
 
-	// Fetch and parse canvas. FetchCanvas resolves the ref.
-	canvas, _, err := FetchCanvas(repo)
-	if err != nil {
-		return nil, err
+	// Resolve the ref by trying to fetch the canvas file.
+	// We need the ref for params.json and console.yaml too.
+	var canvasBody []byte
+	if repo.Ref == "" {
+		for _, ref := range defaultRefs {
+			body, fetchErr := fetchURL(rawFileURL(repo, ref, canvasFileName))
+			if fetchErr == nil {
+				repo.Ref = ref
+				canvasBody = body
+				break
+			}
+		}
+		if canvasBody == nil {
+			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")
+		}
+	} else {
+		var fetchErr error
+		canvasBody, fetchErr = fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
 	}
 
-	// If install params are provided, re-fetch raw YAML, substitute, and re-parse.
+	// Substitute install params in raw YAML before parsing.
 	params, _ := FetchParams(repo, repo.Ref)
-	if params != nil && len(params.InstallParams) > 0 && len(req.InstallParams) > 0 {
+	if params != nil && len(params.InstallParams) > 0 {
 		resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
 		if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 		}
-
-		canvasBody, fetchErr := fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
-		if fetchErr != nil {
-			return nil, fetchErr
-		}
 		canvasBody = SubstituteInstallParams(canvasBody, resolved)
-		canvas, err = parseCanvasYAML(canvasBody)
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	canvas, err := parseCanvasYAML(canvasBody)
+	if err != nil {
+		return nil, err
 	}
 
 	// Pre-parse the optional console.yaml from the same ref. Doing this
