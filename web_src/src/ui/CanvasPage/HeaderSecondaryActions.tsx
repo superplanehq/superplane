@@ -18,6 +18,8 @@ export function SecondaryHeaderActions({
   saveIsPrimary,
   hasUnpublishedDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
   onShowDiff,
   onShowConsoleDiff,
   visualDiffEnabled,
@@ -55,7 +57,9 @@ export function SecondaryHeaderActions({
 
       {isEditing ? (
         <>
-          {onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+          {onCanvasTab &&
+          (hasUnpublishedDraftChanges || hasUncommittedCanvasDraftChanges) &&
+          draftVisualDiff?.diffCounts ? (
             <DiffSummaryHoverCard
               diffCounts={draftVisualDiff.diffCounts}
               visualDiffEnabled={visualDiffEnabled}
@@ -64,7 +68,9 @@ export function SecondaryHeaderActions({
               onShowDiff={onShowDiff}
             />
           ) : null}
-          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+          {onConsoleTab &&
+          (hasUnpublishedConsoleDraftChanges || hasUncommittedConsoleDraftChanges) &&
+          draftConsoleDiff?.diffCounts ? (
             <ConsoleDiffSummaryHoverCard
               draftConsoleDiff={draftConsoleDiff}
               visualDiffEnabled={visualDiffEnabled}

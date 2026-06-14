@@ -21,4 +21,28 @@ describe("SecondaryHeaderActions", () => {
 
     expect(screen.getByText("+1")).toBeInTheDocument();
   });
+
+  it("shows the canvas diff badge for uncommitted (staged) changes", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-edit"
+        isEditing
+        hasUncommittedCanvasDraftChanges
+        draftVisualDiff={{
+          diffCounts: { added: 1, updated: 0, removed: 0 },
+          diffToggles: {
+            showDeletedNodes: false,
+            toggleShowDeletedNodes: vi.fn(),
+            showEdgeDiff: false,
+            toggleShowEdgeDiff: vi.fn(),
+          },
+        }}
+        onShowDiff={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+      />,
+    );
+
+    expect(screen.getByText("+1")).toBeInTheDocument();
+  });
 });
