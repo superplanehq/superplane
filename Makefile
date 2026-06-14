@@ -172,12 +172,16 @@ check.db.structure:
 
 check.db.migrations:
 	bash ./scripts/verify_no_future_migrations.sh
+	bash ./scripts/verify_branch_migrations_are_latest.sh
 
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
 check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:coverage"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+
+check.test.ui.shard:
+	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
@@ -290,8 +294,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents,usage
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models

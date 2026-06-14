@@ -17,6 +17,10 @@ const (
 	CanvasRunResultPassed    = "passed"
 	CanvasRunResultFailed    = "failed"
 	CanvasRunResultCancelled = "cancelled"
+
+	// Used when locking rows to update non-key columns only, so concurrent child
+	// inserts referencing the row via FK are not blocked (PostgreSQL FOR NO KEY UPDATE).
+	lockingForUpdateNoKey = "NO KEY UPDATE"
 )
 
 type CanvasRun struct {
@@ -117,8 +121,12 @@ type CanvasRunFilters struct {
 }
 
 func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, beforeTime, filters)
+}
+
+func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC").
 		Limit(limit)
@@ -138,8 +146,12 @@ func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filt
 }
 
 func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
+	return CountCanvasRunsInTransaction(database.Conn(), workflowID, filters)
+}
+
+func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
 	var count int64
-	query := database.Conn().
+	query := tx.
 		Model(&CanvasRun{}).
 		Where("workflow_id = ?", workflowID)
 
@@ -178,7 +190,6 @@ func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID,
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Where("run_id IN ?", runIDs).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC").
 		Find(&executions).
 		Error
@@ -232,6 +243,10 @@ func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {
 func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
 	err := tx.
+		// Run finalization checks for open child work before marking the run
+		// finished. Use FOR UPDATE, not FOR NO KEY UPDATE, so concurrent FK
+		// inserts for events, queue items, or executions cannot appear between
+		// the open-work check and the final state update.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", runID).
 		First(&run).

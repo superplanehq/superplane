@@ -52,12 +52,8 @@ func InvokeNodeExecutionHook(
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
 
-	//
-	// TODO
-	// Blueprint nodes don't expose actions for now.
-	//
-	if node.Ref.Data().Component == nil {
-		return nil, fmt.Errorf("node is not a component node")
+	if node.Type != models.NodeTypeComponent || node.Ref.Data().Component == nil {
+		return nil, status.Error(codes.InvalidArgument, "node is not a component node")
 	}
 
 	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
@@ -84,7 +80,7 @@ func InvokeNodeExecutionHook(
 	}
 
 	tx := database.Conn()
-	logger := logging.ForExecution(execution, nil)
+	logger := logging.ForExecution(execution)
 	actionCtx := core.ActionHookContext{
 		Name:           hookName,
 		Parameters:     parameters,

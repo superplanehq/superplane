@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -23,6 +23,7 @@ import (
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -145,13 +146,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 		pbOrganization.Organizations_UpdateIntegrationCapabilities_FullMethodName: {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationProperty_FullMethodName:     {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationSecret_FullMethodName:       {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
-
-		// Blueprints rules
-		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprints", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Discovery rules
 		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
@@ -394,12 +388,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_ListChildExecutions_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_ListCanvasMemories_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
@@ -500,15 +488,23 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		userID := userMeta[0]
 		organizationID := orgMeta[0]
-		org, err := models.FindOrganizationByID(organizationID)
+
+		var org *models.Organization
+		err := telemetry.RunSpan(ctx, "auth.load_organization", func(ctx context.Context) error {
+			var loadErr error
+			org, loadErr = models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID)
+			return loadErr
+		})
 		if err != nil {
 			return nil, status.Error(codes.NotFound, "organization not found")
 		}
 
-		//
-		// Verify if the user has the required RBAC permission.
-		//
-		allowed, err := a.authService.CheckOrganizationPermission(userID, org.ID.String(), rule.Resource, rule.Action)
+		var allowed bool
+		err = telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
+			var checkErr error
+			allowed, checkErr = a.authService.CheckOrganizationPermission(userID, org.ID.String(), rule.Resource, rule.Action)
+			return checkErr
+		})
 		if err != nil {
 			return nil, err
 		}

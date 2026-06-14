@@ -17,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -235,7 +234,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -261,111 +260,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
-	if node.Type == models.NodeTypeBlueprint {
-		return w.executeBlueprintNode(tx, execution, node, onNewEvents)
-	}
-
-	return w.executeActionNode(tx, execution, node, onNewEvents)
-}
-
-func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
-	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
-
-	ref := node.Ref.Data()
-	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
-	if err != nil {
-		return executionState.Fail(models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
-	}
-
-	firstNode := blueprint.FindRootNode()
-	if firstNode == nil {
-		return fmt.Errorf("blueprint %s has no start node", blueprint.ID)
-	}
-
-	input, err := execution.GetInput(tx)
-	if err != nil {
-		return fmt.Errorf("error finding input: %v", err)
-	}
-
-	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
-	if err != nil {
-		return fmt.Errorf("error finding input event: %v", err)
-	}
-
-	//
-	// Build the configuration for the first node.
-	// If we have an error here, we should fail the execution,
-	// since this means the first node has improper configuration,
-	// and the user should be aware of this.
-	//
-	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
-		WithNodeID(node.NodeID).
-		WithRootEvent(&execution.RootEventID).
-		WithPreviousExecution(&execution.ID).
-		ForBlueprintNode(node).
-		WithInput(map[string]any{inputEvent.NodeID: input})
-
-	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
-	if err != nil {
-		return executionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
-		)
-	}
-	if len(configFields) > 0 {
-		configBuilder = configBuilder.WithConfigurationFields(configFields)
-	}
-
-	config, err := configBuilder.Build(firstNode.Configuration)
-
-	if err != nil {
-		return executionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
-		)
-	}
-
-	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
-	if err != nil {
-		return fmt.Errorf("failed to create child execution: %w", err)
-	}
-
-	err = execution.StartInTransaction(tx)
-
-	return err
-}
-
-func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
-	switch {
-	case node.Ref.Component != nil && node.Ref.Component.Name != "":
-		action, err := w.registry.GetAction(node.Ref.Component.Name)
-		if err != nil {
-			return nil, fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
-		}
-		return action.Configuration(), nil
-	case node.Ref.Trigger != nil && node.Ref.Trigger.Name != "":
-		trigger, err := w.registry.GetTrigger(node.Ref.Trigger.Name)
-		if err != nil {
-			return nil, fmt.Errorf("trigger %s not found: %w", node.Ref.Trigger.Name, err)
-		}
-		return trigger.Configuration(), nil
-	case node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "":
-		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, node.Ref.Blueprint.ID)
-		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", node.Ref.Blueprint.ID, err)
-		}
-		return blueprint.Configuration, nil
-	default:
-		return nil, nil
-	}
-}
-
 func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
-		nil,
 	)
 
 	err := execution.StartInTransaction(tx)

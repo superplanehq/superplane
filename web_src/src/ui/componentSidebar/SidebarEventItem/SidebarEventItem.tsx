@@ -17,7 +17,6 @@ export interface ExecutionChainItem extends EventStateStyle {
   executionId: string;
   state: string;
   payload?: any;
-  children?: Array<{ name: string; state: string } & EventStateStyle>;
 }
 
 export interface TabData {
@@ -152,26 +151,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             executionId: exec.id || "",
             payload,
             state: state,
-            children:
-              exec?.childExecutions && exec.childExecutions.length > 0
-                ? exec.childExecutions
-                    .slice()
-                    .sort((a: any, b: any) => {
-                      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                      return timeA - timeB;
-                    })
-                    .map((childExec: any) => {
-                      const nodeId = childExec?.nodeId?.split(":")?.at(-1);
-                      const { map, state } = getExecutionState(exec.nodeId, childExec);
-
-                      return {
-                        name: nodeId || "Unknown",
-                        state: state,
-                        ...map[state],
-                      };
-                    })
-                : undefined,
           };
 
           return mainItem;
@@ -211,9 +190,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   pollingRef.current.hasInProgress =
     ["waiting", "running", "pending"].includes(event.state || "") ||
     executionChainData?.some((item) => item.state !== "running" && item.state !== "failed") ||
-    executionChainData?.some((execution) =>
-      execution.children?.some((children) => children.state !== "success" && children.state !== "failed"),
-    ) ||
     false;
   pollingRef.current.loadData = () => loadExecutionChainData(true);
 

@@ -82,8 +82,9 @@ blocks:
             - make check.build.ui
 
         - name: Unit Tests
+          parallelism: 4
           commands:
-            - make check.test.ui
+            - make check.test.ui.shard INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:

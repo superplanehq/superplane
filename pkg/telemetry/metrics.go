@@ -72,6 +72,11 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	res, err := otelResource(ctx)
+	if err != nil {
+		return err
+	}
+
 	provider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(
