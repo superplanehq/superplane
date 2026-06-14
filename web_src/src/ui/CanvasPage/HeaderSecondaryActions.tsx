@@ -1,7 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -18,6 +18,8 @@ export function SecondaryHeaderActions({
   saveIsPrimary,
   hasUnpublishedDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
   onShowDiff,
   onShowConsoleDiff,
   visualDiffEnabled,
@@ -55,7 +57,9 @@ export function SecondaryHeaderActions({
 
       {isEditing ? (
         <>
-          {onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+          {onCanvasTab &&
+          (hasUnpublishedDraftChanges || hasUncommittedCanvasDraftChanges) &&
+          draftVisualDiff?.diffCounts ? (
             <DiffSummaryHoverCard
               diffCounts={draftVisualDiff.diffCounts}
               visualDiffEnabled={visualDiffEnabled}
@@ -64,7 +68,9 @@ export function SecondaryHeaderActions({
               onShowDiff={onShowDiff}
             />
           ) : null}
-          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+          {onConsoleTab &&
+          (hasUnpublishedConsoleDraftChanges || hasUncommittedConsoleDraftChanges) &&
+          draftConsoleDiff?.diffCounts ? (
             <ConsoleDiffSummaryHoverCard
               draftConsoleDiff={draftConsoleDiff}
               visualDiffEnabled={visualDiffEnabled}
@@ -151,7 +157,11 @@ function EditModePublishDiscardActions({
   | "commitStagingPending"
   | "onResetStaging"
 >) {
-  const showStagingActions = !!hasStagingChanges && !!onCommitStaging;
+  // Keep showing the staging controls while a commit is in flight even after
+  // `hasStagingChanges` optimistically flips false, so the commit button stays
+  // pending/disabled until staging settles and never flashes an enabled
+  // [Reset][Commit] (or a premature Discard/Publish).
+  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || !!commitStagingPending);
 
   // Staging and committed states are mutually exclusive: while there are staged
   // edits the user can only Reset/Commit them; once everything is committed they
@@ -159,13 +169,6 @@ function EditModePublishDiscardActions({
   if (showStagingActions) {
     return (
       <div className="flex items-center gap-1.5">
-        {commitStagingPending ? (
-          <Loader2
-            className="size-4 shrink-0 animate-spin text-slate-400"
-            aria-label="Committing changes"
-            data-testid="canvas-commit-staging-spinner"
-          />
-        ) : null}
         {onResetStaging ? (
           <ResetStagingButton onReset={() => onResetStaging()} disabled={!!commitStagingPending} />
         ) : null}
@@ -215,8 +218,8 @@ function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabl
 }
 
 // The label stays fixed (no "Committing…") so the button keeps a constant
-// width while a commit is in flight; the progress spinner lives to the left of
-// the Reset button instead.
+// width while a commit is in flight; the button is disabled instead to signal
+// the in-flight commit.
 function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
   return (
     <UIButton
