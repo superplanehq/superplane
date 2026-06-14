@@ -10,6 +10,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -45,19 +47,40 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return nil, status.Error(codes.Internal, "failed to list canvas memories")
 	}
 
-	items := make([]*pb.CanvasMemory, 0, len(records))
-	for _, record := range records {
-		item, err := canvasMemoryToProto(record)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to serialize canvas memory")
-		}
-
-		items = append(items, item)
+	items, err := serializeCanvasMemories(ctx, records)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to serialize canvas memory")
 	}
 
 	return &pb.ListCanvasMemoriesResponse{
 		Items: items,
 	}, nil
+}
+
+func serializeCanvasMemories(ctx context.Context, records []models.CanvasMemory) ([]*pb.CanvasMemory, error) {
+	var items []*pb.CanvasMemory
+	err := telemetry.RunSpan(ctx, "memories.serialize", func(ctx context.Context) error {
+		items = make([]*pb.CanvasMemory, 0, len(records))
+		for _, record := range records {
+			item, itemErr := canvasMemoryToProto(record)
+			if itemErr != nil {
+				return itemErr
+			}
+
+			items = append(items, item)
+		}
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("memories.count", len(records)))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }
 
 func canvasMemoryToProto(record models.CanvasMemory) (*pb.CanvasMemory, error) {
