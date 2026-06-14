@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
@@ -83,12 +83,15 @@ export function ZeroStatePage() {
 
         <div className="flex flex-col gap-4">
           {visible.map((app) => (
-            <AppListItem key={app.repo} app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
+            <React.Fragment key={app.repo}>
+              <AppListItem app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
+              {installingApp?.repo === app.repo && (
+                <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />
+              )}
+            </React.Fragment>
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
-
-        {installingApp && <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />}
       </div>
     </>
   );
