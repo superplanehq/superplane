@@ -1213,6 +1213,7 @@ export function AppPage() {
     hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
+    hasCommittedFilesDraftChanges,
     hasFilesStagingChanges,
   } = useAppDraftStagingData({
     organizationId: organizationId!,
@@ -5413,6 +5414,7 @@ export function AppPage() {
           hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+          hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
           onCommitStaging={handleCommitStaging}
           commitStagingPending={isPreparingVersionAction || commitCanvasStagingMutation.isPending}

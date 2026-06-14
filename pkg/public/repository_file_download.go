@@ -140,14 +140,24 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	reader, err := s.gitProvider.GetFile(r.Context(), repository.RepoID, path, "")
+	// Reads scoped to a draft version must come from that draft's branch, where
+	// committed Files-tab edits live. Reading the default branch here would
+	// silently return the live content and revert just-committed draft edits.
+	ctx := authentication.SetUserIdInMetadata(r.Context(), user.ID.String())
+	content, err := canvases.ReadCommittedRepositoryFile(
+		ctx,
+		s.gitProvider,
+		repository.RepoID,
+		user.OrganizationID.String(),
+		canvas.ID.String(),
+		versionID,
+		path,
+	)
 	if err != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), err)
 		http.Error(w, "Failed to get file", http.StatusInternalServerError)
 		return
 	}
-
-	defer reader.Close()
 
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -155,10 +165,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		"filename": filepath.Base(path),
 	}))
 
-	_, err = io.Copy(w, reader)
-	if err != nil {
-		log.Errorf("Failed to copy file %s in canvas %s: %v", path, canvasID.String(), err)
-		http.Error(w, "Failed to copy file", http.StatusInternalServerError)
-		return
+	if _, err = io.WriteString(w, content); err != nil {
+		log.Errorf("Failed to write file %s in canvas %s: %v", path, canvasID.String(), err)
 	}
 }
