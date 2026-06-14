@@ -95,15 +95,9 @@ func ListCanvasChangeRequests(
 		return nil, status.Errorf(codes.Internal, "failed to list canvas change requests: %v", err)
 	}
 
-	protoRequests := make([]*pb.CanvasChangeRequest, 0, len(requests))
-	for i := range requests {
-		request := requests[i]
-		version, versionErr := models.FindCanvasVersion(request.WorkflowID, request.VersionID)
-		if versionErr != nil {
-			return nil, status.Errorf(codes.Internal, "failed to load change request version: %v", versionErr)
-		}
-
-		protoRequests = append(protoRequests, SerializeCanvasChangeRequest(&request, version, organizationID))
+	protoRequests, err := serializeCanvasChangeRequests(ctx, requests, organizationID)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.ListCanvasChangeRequestsResponse{

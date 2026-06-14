@@ -10,6 +10,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -75,7 +77,7 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		executionsByRunID[execution.RunID.String()] = append(executionsByRunID[execution.RunID.String()], execution)
 	}
 
-	serialized, err := SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+	serialized, err := serializeCanvasRuns(ctx, runs, rootEventsByRunID, executionsByRunID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,4 +244,28 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	}
 
 	return nil
+}
+
+func serializeCanvasRuns(
+	ctx context.Context,
+	runs []models.CanvasRun,
+	rootEventsByRunID map[string]models.CanvasEvent,
+	executionsByRunID map[string][]models.CanvasNodeExecution,
+) ([]*pb.CanvasRun, error) {
+	var serialized []*pb.CanvasRun
+	err := telemetry.RunSpan(ctx, "runs.serialize", func(ctx context.Context) error {
+		var serErr error
+		serialized, serErr = SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("runs.count", len(runs)))
+		}
+
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return serialized, nil
 }
