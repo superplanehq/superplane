@@ -271,13 +271,13 @@ function IntegrationsSection({
     [integrations, connected],
   );
 
-  // Auto-select when there's exactly one ready instance
+  // Auto-select: first ready instance (covers both single and multiple cases)
   useEffect(() => {
     let changed = false;
     const next = { ...selections };
     for (const data of integrationData) {
       if (next[data.name]) continue;
-      if (data.readyInstances.length === 1) {
+      if (data.readyInstances.length > 0) {
         const instance = data.readyInstances[0];
         if (instance.metadata?.id && instance.metadata?.name) {
           next[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
@@ -337,68 +337,43 @@ function IntegrationsSection({
             getIntegrationTypeDisplayName(undefined, data.name) ||
             data.name.charAt(0).toUpperCase() + data.name.slice(1);
 
-          // No ready instances
-          if (data.readyInstances.length === 0) {
-            return (
-              <div key={data.name} className="flex items-center gap-2">
-                <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-                <span className="text-xs text-slate-500">No {displayName} connected</span>
-                <button
-                  type="button"
-                  onClick={() => setDialogIntegrationName(data.name)}
-                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                  create new
-                </button>
-              </div>
-            );
-          }
-
-          // Single ready instance (auto-selected)
-          if (data.readyInstances.length === 1) {
-            const instance = data.readyInstances[0];
-            return (
-              <div key={data.name} className="flex items-center gap-2">
-                <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-                <span className="text-xs text-slate-700">{instance.metadata?.name || displayName}</span>
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-              </div>
-            );
-          }
-
-          // Multiple ready instances — dropdown
+          // Always show dropdown + "or create new" — consistent for 0, 1, or N instances
           return (
             <div key={data.name} className="flex items-center gap-2">
               <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-              <Select
-                value={selections[data.name]?.id || ""}
-                onValueChange={(instanceId) => {
-                  const instance = data.readyInstances.find((i) => i.metadata?.id === instanceId);
-                  if (instance?.metadata?.id && instance?.metadata?.name) {
-                    onSelectionsChange({
-                      ...selections,
-                      [data.name]: { id: instance.metadata.id, name: instance.metadata.name },
-                    });
-                  }
-                }}
-              >
-                <SelectTrigger className="w-56 h-7 text-xs">
-                  <SelectValue placeholder={`Select ${displayName}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.readyInstances.map((instance) => (
-                    <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
-                      {instance.metadata?.name || instance.metadata?.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {data.readyInstances.length > 0 ? (
+                <Select
+                  value={selections[data.name]?.id || ""}
+                  onValueChange={(instanceId) => {
+                    const instance = data.readyInstances.find((i) => i.metadata?.id === instanceId);
+                    if (instance?.metadata?.id && instance?.metadata?.name) {
+                      onSelectionsChange({
+                        ...selections,
+                        [data.name]: { id: instance.metadata.id, name: instance.metadata.name },
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-56 h-7 text-xs">
+                    <SelectValue placeholder={`Select ${displayName}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {data.readyInstances.map((instance) => (
+                      <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
+                        {instance.metadata?.name || instance.metadata?.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="text-xs text-slate-400">Not connected</span>
+              )}
               <button
                 type="button"
                 onClick={() => setDialogIntegrationName(data.name)}
-                className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                className="text-xs text-blue-600 hover:text-blue-700 hover:underline shrink-0"
               >
-                or create new
+                {data.readyInstances.length > 0 ? "or create new" : "create new"}
               </button>
             </div>
           );
