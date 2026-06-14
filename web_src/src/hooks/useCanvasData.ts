@@ -55,6 +55,7 @@ import type {
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { draftVersionId } from "../lib/draftVersion";
 import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
 import {
@@ -955,6 +956,37 @@ export const useListDraftBranches = (organizationId: string, canvasId: string, e
     },
     enabled: enabled && !!organizationId && !!canvasId,
   });
+};
+
+// Refetches the draft branches and reports whether the given version still
+// exists, so commit/publish can pre-check a possibly-stale draft id.
+export const ensureDraftVersionExists = async (
+  queryClient: QueryClient,
+  organizationId: string,
+  canvasId: string,
+  versionId: string,
+): Promise<boolean> => {
+  if (!organizationId || !canvasId || !versionId) {
+    return false;
+  }
+
+  const branches = await queryClient.fetchQuery({
+    queryKey: canvasKeys.draftBranches(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: { state: "STATE_DRAFT" },
+        }),
+      );
+      return response.data?.versions ?? [];
+    },
+    // Always hit the network — a cached list (app-wide 5-min staleTime) could
+    // still contain a draft that was just deleted, defeating the guard.
+    staleTime: 0,
+  });
+
+  return branches.some((branch) => draftVersionId(branch) === versionId);
 };
 
 export const useCreateDraftBranch = (organizationId: string, canvasId: string) => {
