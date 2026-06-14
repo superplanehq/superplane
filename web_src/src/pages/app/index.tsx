@@ -55,6 +55,7 @@ import {
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import { useCanvasDraftResync } from "@/hooks/useCanvasDraftResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
@@ -114,7 +115,6 @@ import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
-import { syncCommittedCanvasDraftState } from "./lib/sync-committed-canvas-draft";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -2095,115 +2095,19 @@ export function AppPage() {
     [queryClient],
   );
 
-  // A remote `canvas_version_updated` (e.g. a CLI `apps canvas update`) commits
-  // canvas.yaml into the version row and discards the draft's staging. Refresh
-  // the committed/staged caches and clear the staging indicators so the UI does
-  // not keep showing stale "uncommitted changes" for content that no longer has
-  // any staging on the server.
-  const resyncDraftToCommitted = useCallback(
-    async (versionId: string) => {
-      if (!organizationId || !canvasId) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
-
-      // Only the actively-edited draft drives the rendered graph and staging
-      // indicators, so the full committed-state resync (and canvas remount via
-      // stagingResetNonce) is reserved for it. Other branches just refresh their
-      // cached staging/version data.
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
-      }
-
-      consoleMutationGenerationRef.current += 1;
-      const committedVersion = await syncCommittedCanvasDraftState({
-        queryClient,
-        organizationId,
-        canvasId,
-        versionId,
-      });
-
-      const committedSpec = committedVersion?.spec ?? null;
-      if (committedSpec) {
-        draftCanvasSpecsRef.current.set(versionId, committedSpec);
-      } else {
-        draftCanvasSpecsRef.current.delete(versionId);
-      }
-      setDraftCanvasSpec(committedSpec);
-      setActiveCanvasVersion((current) =>
-        current?.metadata?.id === versionId ? { ...current, spec: committedSpec ?? current.spec } : current,
-      );
-      const restored = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      if (restored) {
-        setLastSavedWorkflowSnapshot(restored);
-      }
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
-    },
-    [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
-  );
-
-  // A remote `staging_updated` (another tab editing the same draft) changed the
-  // draft's staging layer without committing. The console/files caches and diff
-  // badge refresh through the websocket hook's invalidations, but the rendered
-  // graph reads `draftCanvasSpec` (React state), so the active draft needs its
-  // effective staged spec re-applied here.
-  const resyncDraftToStaged = useCallback(
-    async (versionId: string) => {
-      if (!organizationId || !canvasId) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
-
-      // Only the actively-edited draft drives the rendered graph, so the spec
-      // re-apply is reserved for it. Other branches just drop their cached spec
-      // so a later switch refetches the staged content.
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
-      }
-
-      consoleMutationGenerationRef.current += 1;
-      const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
-      const stagedSpec = stagedVersion?.spec ?? null;
-
-      if (stagedVersion) {
-        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
-      }
-      if (stagedSpec) {
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
-          current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current,
-        );
-        draftCanvasSpecsRef.current.set(versionId, stagedSpec);
-      } else {
-        draftCanvasSpecsRef.current.delete(versionId);
-      }
-      setDraftCanvasSpec(stagedSpec);
-      setActiveCanvasVersion((current) =>
-        current?.metadata?.id === versionId ? { ...current, spec: stagedSpec ?? current.spec } : current,
-      );
-
-      // Treat the applied staged spec as the saved baseline so it is not
-      // mistaken for a local edit (which would re-stage and echo back to the
-      // originating tab, creating a feedback loop).
-      const restored = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      if (restored) {
-        setLastSavedWorkflowSnapshot(restored);
-      }
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
-    },
-    [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
-  );
+  const { resyncDraftToCommitted, resyncDraftToStaged } = useCanvasDraftResync({
+    organizationId,
+    canvasId,
+    activeCanvasVersionIdRef,
+    draftCanvasSpecsRef,
+    consoleMutationGenerationRef,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setLastSavedWorkflowSnapshot,
+    setHasUnsavedChanges,
+    setHasNonPositionalUnsavedChanges,
+    setStagingResetNonce,
+  });
 
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {

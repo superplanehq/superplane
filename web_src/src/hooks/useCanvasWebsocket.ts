@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -43,6 +43,20 @@ interface QueuedMessage {
     payload: WebsocketPayload;
   };
   timestamp: number;
+}
+
+// Refreshes the staged caches for a draft version. versionStagedDetail,
+// consoleStaged and staged repositoryFileContent keys all end with "staged" and
+// include the version id, so a single predicate refreshes the editor's
+// effective draft reads without touching the committed caches.
+function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
+  queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey;
+      return Array.isArray(key) && key[key.length - 1] === "staged" && (key as readonly unknown[]).includes(versionId);
+    },
+  });
 }
 
 export function useCanvasWebsocket(
@@ -242,26 +256,9 @@ export function useCanvasWebsocket(
 
           const shouldInvalidateStagingQueries =
             onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
-          if (!shouldInvalidateStagingQueries) {
-            break;
+          if (shouldInvalidateStagingQueries) {
+            invalidateStagedCanvasQueries(queryClient, canvasId, stagingMessage.versionId);
           }
-
-          const versionId = stagingMessage.versionId;
-          queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
-          // versionStagedDetail, consoleStaged and staged repositoryFileContent
-          // keys all end with "staged" and include the version id, so a single
-          // predicate refreshes the editor's effective draft reads without
-          // touching the committed caches.
-          queryClient.invalidateQueries({
-            predicate: (query) => {
-              const key = query.queryKey;
-              return (
-                Array.isArray(key) &&
-                key[key.length - 1] === "staged" &&
-                (key as readonly unknown[]).includes(versionId)
-              );
-            },
-          });
           break;
         }
         default:
