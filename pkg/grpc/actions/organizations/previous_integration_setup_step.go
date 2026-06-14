@@ -75,7 +75,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration).SetTrigger(telemetry.IntegrationSecretTriggerSetup),
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretTriggerSetup),
 			Capabilities:   capabilityCtx,
 		}
 

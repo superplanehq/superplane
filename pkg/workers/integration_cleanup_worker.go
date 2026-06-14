@@ -101,7 +101,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 		BaseURL:        w.baseURL,
 		OrganizationID: integration.OrganizationID.String(),
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Integration:    contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil).SetTrigger(telemetry.IntegrationSecretTriggerCleanup),
+		Integration:    contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil, telemetry.IntegrationSecretTriggerCleanup),
 		Logger:         logging.ForIntegration(*integration),
 	})
 

@@ -64,7 +64,7 @@ const (
 	IntegrationSecretTriggerOAuthCallback     = "oauth_callback"
 	IntegrationSecretTriggerCleanup           = "cleanup"
 	IntegrationSecretTriggerIntegrationAction = "integration_action"
-	IntegrationSecretTriggerUnknown           = "unknown"
+	IntegrationSecretTriggerListResources     = "list_resources"
 )
 
 // Operation values for integration secret writes.

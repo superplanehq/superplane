@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -36,7 +37,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil, telemetry.IntegrationSecretTriggerSync)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -137,7 +138,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil, telemetry.IntegrationSecretTriggerExecution)
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)
@@ -212,7 +213,7 @@ func Test__IntegrationContext_RequestWebhook_ReuseWebhookOnResave(t *testing.T) 
 	require.NoError(t, database.Conn().Save(&node).Error)
 
 	// Simulate re-save: RequestWebhook is called again with nil config.
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil, telemetry.IntegrationSecretTriggerExecution)
 	require.NoError(t, ctx.RequestWebhook(nil))
 
 	// The node must still point to the original webhook — not a new one.
@@ -318,7 +319,7 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	node.AppInstallationID = &integration.ID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, nil, telemetry.IntegrationSecretTriggerExecution)
 	require.NoError(t, ctx.RequestWebhook(map[string]any{"eventTypes": []string{"build_ended"}}))
 
 	require.NotNil(t, node.WebhookID)
@@ -385,7 +386,7 @@ func Test__IntegrationContext_ListSubscriptions_UsesOnEventsCallback(t *testing.
 		newEvents = append(newEvents, events...)
 	}
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, onNewEvents, telemetry.IntegrationSecretTriggerExecution)
 	_, err = ctx.Subscribe(map[string]any{"enabled": true})
 	require.NoError(t, err)
 

@@ -153,7 +153,7 @@ func (w *WebhookProvisioner) runIntegrationSetup(webhook *models.Webhook) (any, 
 
 	return handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil).SetTrigger(telemetry.IntegrationSecretTriggerWebhook),
+		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil, telemetry.IntegrationSecretTriggerWebhook),
 		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})

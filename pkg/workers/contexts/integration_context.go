@@ -45,6 +45,7 @@ func NewIntegrationContext(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	onNewEvents func([]models.CanvasEvent),
+	trigger string,
 ) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
@@ -53,18 +54,8 @@ func NewIntegrationContext(
 		encryptor:   encryptor,
 		registry:    registry,
 		onNewEvents: onNewEvents,
-		trigger:     telemetry.IntegrationSecretTriggerUnknown,
+		trigger:     trigger,
 	}
-}
-
-// SetTrigger records which call path created this context so secret writes
-// can be attributed in metrics and logs. Returns the context for chaining.
-func (c *IntegrationContext) SetTrigger(trigger string) *IntegrationContext {
-	c.trigger = trigger
-	if c.secretStorage != nil {
-		c.secretStorage.SetTrigger(trigger)
-	}
-	return c
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
@@ -520,6 +511,6 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 		return c.secretStorage
 	}
 
-	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration).SetTrigger(c.trigger)
+	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration, c.trigger)
 	return c.secretStorage
 }

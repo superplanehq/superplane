@@ -106,8 +106,7 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
 
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil).
-		SetTrigger(telemetry.IntegrationSecretTriggerSync)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil, telemetry.IntegrationSecretTriggerSync)
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            w.registry.HTTPContextInTransaction(tx),
@@ -146,8 +145,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 	}
 
 	logger := logging.ForIntegration(*integration)
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil).
-		SetTrigger(telemetry.IntegrationSecretTriggerIntegrationAction)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil, telemetry.IntegrationSecretTriggerIntegrationAction)
 	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,

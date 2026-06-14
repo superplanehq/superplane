@@ -26,21 +26,14 @@ type IntegrationSecretStorage struct {
 	trigger string
 }
 
-func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
+func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration, trigger string) *IntegrationSecretStorage {
 	return &IntegrationSecretStorage{
 		tx:          tx,
 		encryptor:   encryptor,
 		integration: integration,
 		secrets:     []models.IntegrationSecret{},
-		trigger:     telemetry.IntegrationSecretTriggerUnknown,
+		trigger:     trigger,
 	}
-}
-
-// SetTrigger records which call path created this storage so secret writes
-// can be attributed in metrics and logs. Returns the storage for chaining.
-func (s *IntegrationSecretStorage) SetTrigger(trigger string) *IntegrationSecretStorage {
-	s.trigger = trigger
-	return s
 }
 
 func (s *IntegrationSecretStorage) loadSecrets() error {
