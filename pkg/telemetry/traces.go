@@ -7,6 +7,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -34,6 +35,19 @@ func InitTracing(ctx context.Context) error {
 	)
 
 	otel.SetTracerProvider(provider)
+	/*
+	 * Propagate trace context across process boundaries. The default global
+	 * propagator is a no-op, so without this the grpc-gateway client span and
+	 * the internal gRPC server span end up in separate traces and handler/DB
+	 * children never appear under the HTTP request in Dash0.
+	 *
+	 * TraceContext carries W3C traceparent/tracestate (used by otelgrpc over
+	 * gRPC metadata). Baggage is included for standard W3C baggage headers.
+	 */
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 	tracerProvider = provider
 	tracer = provider.Tracer("superplane")
 	tracesReady.Store(true)
