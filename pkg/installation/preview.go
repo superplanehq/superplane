@@ -1,7 +1,6 @@
 package installation
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -31,31 +30,9 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		return nil, err
 	}
 
-	// Fetch raw canvas to resolve ref, then check for params.
-	var canvasBody []byte
-	var ref string
-	if repo.Ref == "" {
-		for _, r := range defaultRefs {
-			body, fetchErr := fetchURL(rawFileURL(repo, r, canvasFileName))
-			if fetchErr == nil {
-				ref = r
-				repo.Ref = r
-				canvasBody = body
-				break
-			}
-			if !errors.Is(fetchErr, errFileNotFound) {
-				return nil, fetchErr
-			}
-		}
-		if canvasBody == nil {
-			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")
-		}
-	} else {
-		ref = repo.Ref
-		canvasBody, err = fetchURL(rawFileURL(repo, ref, canvasFileName))
-		if err != nil {
-			return nil, err
-		}
+	canvasBody, ref, err := fetchRawCanvasFile(repo)
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch params and substitute with defaults/placeholders so canvas parses.

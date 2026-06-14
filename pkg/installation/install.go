@@ -92,30 +92,9 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
 	}
 
-	// Resolve the ref by trying to fetch the canvas file.
-	// We need the ref for params.json and console.yaml too.
-	var canvasBody []byte
-	if repo.Ref == "" {
-		for _, ref := range defaultRefs {
-			body, fetchErr := fetchURL(rawFileURL(repo, ref, canvasFileName))
-			if fetchErr == nil {
-				repo.Ref = ref
-				canvasBody = body
-				break
-			}
-			if !errors.Is(fetchErr, errFileNotFound) {
-				return nil, fetchErr
-			}
-		}
-		if canvasBody == nil {
-			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")
-		}
-	} else {
-		var fetchErr error
-		canvasBody, fetchErr = fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
-		if fetchErr != nil {
-			return nil, fetchErr
-		}
+	canvasBody, _, err := fetchRawCanvasFile(repo)
+	if err != nil {
+		return nil, err
 	}
 
 	// Substitute install params in raw YAML before parsing.
