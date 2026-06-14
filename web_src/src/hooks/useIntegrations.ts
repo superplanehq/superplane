@@ -73,6 +73,7 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     queryFn: async () => {
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );
@@ -91,6 +92,7 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
     queryFn: async () => {
       const response = await organizationsDescribeIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
         }),
       );
@@ -121,6 +123,7 @@ export const useIntegrationResources = (
 
       const response = await organizationsListIntegrationResources(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           query,
         }),
@@ -134,7 +137,10 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
+export const useCreateIntegration = (
+  organizationId: string,
+  source: "node_configuration" | "integrations_page" | "install_wizard",
+) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -146,6 +152,7 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
     }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             integrationName: data.integrationName,
@@ -229,6 +236,7 @@ export const useUpdateIntegration = (organizationId: string, integrationId: stri
     mutationFn: async (data: { name?: string; configuration?: Record<string, unknown> }) => {
       return await organizationsUpdateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: {
             name: data.name,
