@@ -1,9 +1,16 @@
 package canvases
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -135,4 +142,35 @@ func findCanvasChangeRequestUserRef(organizationID string, userID *uuid.UUID) *p
 	}
 
 	return &pb.UserRef{Id: id, Name: name}
+}
+
+func serializeCanvasChangeRequests(
+	ctx context.Context,
+	requests []models.CanvasChangeRequest,
+	organizationID string,
+) ([]*pb.CanvasChangeRequest, error) {
+	var protoRequests []*pb.CanvasChangeRequest
+	err := telemetry.RunSpan(ctx, "change_requests.serialize", func(ctx context.Context) error {
+		protoRequests = make([]*pb.CanvasChangeRequest, 0, len(requests))
+		for i := range requests {
+			request := requests[i]
+			version, versionErr := models.FindCanvasVersion(request.WorkflowID, request.VersionID)
+			if versionErr != nil {
+				return status.Errorf(codes.Internal, "failed to load change request version: %v", versionErr)
+			}
+
+			protoRequests = append(protoRequests, SerializeCanvasChangeRequest(&request, version, organizationID))
+		}
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("change_requests.count", len(requests)))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return protoRequests, nil
 }
