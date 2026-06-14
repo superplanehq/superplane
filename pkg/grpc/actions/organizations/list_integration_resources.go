@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -68,6 +69,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		registry.Encryptor,
 		registry,
 		nil,
+		telemetry.IntegrationSecretTriggerListResources,
 	)
 
 	listCtx := core.ListResourcesContext{

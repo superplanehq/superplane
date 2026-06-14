@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -437,6 +438,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Encryptor,
 			p.options.Registry,
 			nil,
+			telemetry.IntegrationSecretTriggerSetup,
 		)
 	}
 
@@ -476,6 +478,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 			p.options.Encryptor,
 			p.options.Registry,
 			nil,
+			telemetry.IntegrationSecretTriggerSetup,
 		)
 	}
 

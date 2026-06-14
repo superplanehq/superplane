@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -100,7 +101,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 		BaseURL:        w.baseURL,
 		OrganizationID: integration.OrganizationID.String(),
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Integration:    contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil),
+		Integration:    contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil, telemetry.IntegrationSecretTriggerCleanup),
 		Logger:         logging.ForIntegration(*integration),
 	})
 

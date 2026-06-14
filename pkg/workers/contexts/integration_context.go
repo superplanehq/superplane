@@ -12,8 +12,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -25,6 +27,10 @@ type IntegrationContext struct {
 	encryptor   crypto.Encryptor
 	registry    *registry.Registry
 	onNewEvents func([]models.CanvasEvent)
+
+	// Identifies the call path that created this context, used to attribute
+	// secret writes in metrics and logs.
+	trigger string
 
 	//
 	// Lazily create a secret storage, when Secrets() used.
@@ -39,6 +45,7 @@ func NewIntegrationContext(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	onNewEvents func([]models.CanvasEvent),
+	trigger string,
 ) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
@@ -47,6 +54,7 @@ func NewIntegrationContext(
 		encryptor:   encryptor,
 		registry:    registry,
 		onNewEvents: onNewEvents,
+		trigger:     trigger,
 	}
 }
 
@@ -351,13 +359,41 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 			UpdatedAt:      &now,
 		}
 
-		return c.tx.Create(&secret).Error
+		if err := c.tx.Create(&secret).Error; err != nil {
+			return err
+		}
+
+		c.recordSecretWrite(name, telemetry.IntegrationSecretOperationCreate)
+		return nil
 	}
 
 	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
 
-	return c.tx.Save(&secret).Error
+	if err := c.tx.Save(&secret).Error; err != nil {
+		return err
+	}
+
+	c.recordSecretWrite(name, telemetry.IntegrationSecretOperationUpdate)
+	return nil
+}
+
+// recordSecretWrite emits the metric and structured log for a write to
+// app_installation_secrets. The secret value is never logged.
+func (c *IntegrationContext) recordSecretWrite(name, operation string) {
+	telemetry.RecordIntegrationSecretWrite(
+		context.Background(),
+		c.integration.AppName,
+		c.trigger,
+		c.integration.ID.String(),
+		operation,
+	)
+
+	logging.ForIntegration(*c.integration).WithFields(map[string]any{
+		"secret_name": name,
+		"trigger":     c.trigger,
+		"operation":   operation,
+	}).Info("Integration secret write")
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
@@ -475,6 +511,6 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 		return c.secretStorage
 	}
 
-	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
+	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration, c.trigger)
 	return c.secretStorage
 }

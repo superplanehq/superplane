@@ -47,8 +47,30 @@ var (
 
 	dbRowsAffectedCounter metric.Int64Counter
 
+	integrationSecretWritesCounter metric.Int64Counter
+
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
+)
+
+// Trigger values for integration secret writes, used as the "trigger"
+// attribute on the integration.secret.writes.total counter.
+const (
+	IntegrationSecretTriggerSync              = "sync"
+	IntegrationSecretTriggerExecution         = "execution"
+	IntegrationSecretTriggerSetup             = "setup"
+	IntegrationSecretTriggerUserUpdate        = "user_update"
+	IntegrationSecretTriggerWebhook           = "webhook"
+	IntegrationSecretTriggerOAuthCallback     = "oauth_callback"
+	IntegrationSecretTriggerCleanup           = "cleanup"
+	IntegrationSecretTriggerIntegrationAction = "integration_action"
+	IntegrationSecretTriggerListResources     = "list_resources"
+)
+
+// Operation values for integration secret writes.
+const (
+	IntegrationSecretOperationCreate = "create"
+	IntegrationSecretOperationUpdate = "update"
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -270,6 +292,15 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	integrationSecretWritesCounter, err = meter.Int64Counter(
+		"integration.secret.writes.total",
+		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration and trigger"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	pendingEventsGauge, err = meter.Int64Gauge(
 		"workflow_events.pending.count",
 		metric.WithDescription("Current number of pending workflow events"),
@@ -468,6 +499,23 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 		count,
 		metric.WithAttributes(
 			attribute.String("table", tableName),
+			attribute.String("operation", operation),
+		),
+	)
+}
+
+func RecordIntegrationSecretWrite(ctx context.Context, appName, trigger, installationID, operation string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretWritesCounter.Add(
+		ctx,
+		1,
+		metric.WithAttributes(
+			attribute.String("app_name", appName),
+			attribute.String("trigger", trigger),
+			attribute.String("installation_id", installationID),
 			attribute.String("operation", operation),
 		),
 	)
