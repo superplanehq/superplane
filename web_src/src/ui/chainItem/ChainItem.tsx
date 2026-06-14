@@ -205,43 +205,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   </span>
                 </>
               )}
-            {(item.childExecutions?.length || 0) > 0 && (
-              <>
-                <span className="mx-1">·</span>
-                <span>
-                  {item.childExecutions?.length} execution{item.childExecutions!.length > 1 ? "s" : ""}
-                </span>
-              </>
-            )}
           </span>
         </div>
-
-        {/* Child executions for composite components */}
-        {item.childExecutions && item.childExecutions.length > 0 && (
-          <div className="ml-8 mt-1 space-y-1">
-            {item.childExecutions.map((child, childIndex) => (
-              <div key={`${item.id}-child-${childIndex}`} className="flex items-center justify-between gap-2 text-sm">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="flex-shrink-0">
-                    {React.createElement(resolveIcon("corner-down-right"), {
-                      size: 16,
-                      className: "text-gray-400",
-                    })}
-                  </div>
-                  <ChainItemIcon item={child} size={14} className="text-gray-500" />
-                  <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
-                </div>
-                <div
-                  className={`capitalize text-xs py-[1px] px-[3px] rounded flex items-center justify-center flex-shrink-0 ${
-                    child.badgeColor?.replace("bg", "text") || "bg-gray-400"
-                  }`}
-                >
-                  <span>{child.state}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Expandable content */}
         {isOpen && item.tabData && (
