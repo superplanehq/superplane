@@ -29,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
@@ -139,6 +140,27 @@ func getOtelMetricRoute(ctx context.Context) string {
 	}
 
 	return route.pattern
+}
+
+func resolveCriticalHTTPRoute(r *http.Request) string {
+	route := getOtelMetricRoute(r.Context())
+	if route != "" {
+		return route
+	}
+
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+
+	currentRoute := mux.CurrentRoute(r)
+	if currentRoute != nil {
+		routeTemplate, err := currentRoute.GetPathTemplate()
+		if err == nil {
+			return routeTemplate
+		}
+	}
+
+	return ""
 }
 
 func NewServer(
@@ -262,6 +284,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
+	opts = append(opts, telemetry.GRPCGatewayDialOptions()...)
 
 	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
@@ -536,6 +559,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 			next.ServeHTTP(w, withOtelMetricRoute(r))
 		})
 	})
+	r.Use(middleware.CriticalHTTPTraceMiddleware(resolveCriticalHTTPRoute))
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",
 		otelmux.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
