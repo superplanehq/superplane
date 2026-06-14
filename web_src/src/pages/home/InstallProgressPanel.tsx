@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -20,20 +20,8 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
+import { IntegrationIcons } from "./AppDetailModal";
 import type { InstallParam } from "../install/types";
-
-// Flow: loading → integrations (optional) → params (optional) → installing → done
-type Phase = "loading" | "integrations" | "configuring" | "installing" | "done";
-
-interface Step {
-  label: string;
-  done: boolean;
-}
-
-interface InstallResult {
-  canvasId: string;
-  organizationId: string;
-}
 
 // Integration type name → { id, name } of the selected/created instance
 type IntegrationSelections = Record<string, { id: string; name: string }>;
@@ -43,30 +31,18 @@ interface InstallProgressPanelProps {
   onClose: () => void;
 }
 
-function getInitialPhase(app: AppEntry): Phase {
-  if (app.integrations.length > 0) return "integrations";
-  // We don't know about params until preview loads, so show a brief loading state.
-  return "loading";
-}
-
 export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [phase, setPhase] = useState<Phase>(() => getInitialPhase(app));
-  const [steps, setSteps] = useState<Step[]>([
-    { label: "Cloning repo", done: false },
-    { label: "Initializing Canvas", done: false },
-    { label: "Setting up Console", done: false },
-  ]);
-  const [installResult, setInstallResult] = useState<InstallResult | null>(null);
   const [installParams, setInstallParams] = useState<InstallParam[]>([]);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
-  const installTriggered = useRef(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(true);
 
-  // Fetch preview to get params, then decide initial phase if we started in "loading"
+  // Fetch preview to discover params
   useEffect(() => {
     fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
       .then((r) => r.json())
@@ -78,38 +54,26 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
             if (p.default) defaults[p.name] = p.default;
           }
           setParamValues(defaults);
-          // If we're still in loading (no integrations step), go to params
-          setPhase((prev) => (prev === "loading" ? "configuring" : prev));
-        } else {
-          // No params — if loading, go straight to install
-          setPhase((prev) => (prev === "loading" ? "installing" : prev));
         }
       })
-      .catch(() => {
-        // On error, just install without params
-        setPhase((prev) => (prev === "loading" ? "installing" : prev));
-      });
+      .catch(() => {})
+      .finally(() => setPreviewLoading(false));
   }, [app.repo]);
 
-  // Run install when phase transitions to "installing"
-  useEffect(() => {
-    if (phase !== "installing" || !organizationId || installTriggered.current) return;
-    installTriggered.current = true;
+  const doInstall = useCallback(
+    async (skipParams: boolean) => {
+      if (!organizationId || isInstalling) return;
+      setIsInstalling(true);
 
-    const doInstall = async () => {
       try {
-        // Step 1: Cloning
-        await sleep(400);
-        setSteps((s) => s.map((step, i) => (i === 0 ? { ...step, done: true } : step)));
-
-        // Build install body with integrations and params
         const body: Record<string, unknown> = {
           repo: app.repo,
           name: generateCanvasName(),
           organizationId,
         };
 
-        if (Object.keys(paramValues).length > 0) {
+        // Only send params if user chose "Install" (not "Just take me there")
+        if (!skipParams && Object.keys(paramValues).length > 0) {
           body.installParams = paramValues;
         }
 
@@ -117,7 +81,6 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           body.integrations = integrationSelections;
         }
 
-        // Step 2: Canvas
         const response = await fetch("/apps/install", {
           method: "POST",
           credentials: "include",
@@ -130,13 +93,7 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           throw new Error(message || "Failed to install");
         }
 
-        const result = (await response.json()) as InstallResult;
-        setInstallResult(result);
-        setSteps((s) => s.map((step, i) => (i <= 1 ? { ...step, done: true } : step)));
-
-        // Step 3: Console
-        await sleep(300);
-        setSteps((s) => s.map((step) => ({ ...step, done: true })));
+        const result = (await response.json()) as { canvasId: string; organizationId: string };
 
         await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
 
@@ -147,134 +104,149 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           });
         }
 
-        setPhase("done");
+        localStorage.setItem("canvasAgentSidebarOpen", "true");
+        localStorage.setItem("canvasSidebarOpen", "false");
+        navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
       } catch (error) {
+        setIsInstalling(false);
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install"));
         showErrorToast(message);
-        onClose();
-      }
-    };
-
-    void doInstall();
-  }, [phase, organizationId, app, queryClient, onClose, paramValues, integrationSelections]);
-
-  const handleGoToApp = useCallback(() => {
-    if (!installResult) return;
-    localStorage.setItem("canvasAgentSidebarOpen", "true");
-    localStorage.setItem("canvasSidebarOpen", "false");
-    navigate(appPath(installResult.organizationId, installResult.canvasId, "?edit=1"));
-  }, [installResult, navigate]);
-
-  const advanceFromIntegrations = useCallback(
-    (selections: IntegrationSelections) => {
-      setIntegrationSelections(selections);
-      if (installParams.length > 0) {
-        setPhase("configuring");
-      } else {
-        setPhase("installing");
       }
     },
-    [installParams.length],
+    [organizationId, app, paramValues, integrationSelections, isInstalling, queryClient, navigate],
   );
 
-  const skipToInstall = useCallback(() => {
-    setPhase("installing");
-  }, []);
+  const hasIntegrations = app.integrations.length > 0;
+  const hasParams = installParams.length > 0;
+  const repoUrl = `https://${app.repo}`;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
-      {phase === "loading" && (
-        <div className="flex items-center gap-2.5 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-          <span className="text-slate-500">Loading app configuration...</span>
+      {/* Panel 1: App Info */}
+      <div className="mb-5">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-slate-900">{app.title}</h3>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <IntegrationIcons integrations={app.integrations} />
+              {app.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+          <a
+            href={repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 shrink-0"
+          >
+            <ExternalLink className="h-3 w-3" />
+            GitHub
+          </a>
+        </div>
+        {app.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{app.description}</p>}
+        {app.requirements.length > 0 && (
+          <ul className="mt-2 space-y-0.5">
+            {app.requirements.map((req) => (
+              <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                {req}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Panel 2: Integrations */}
+      {hasIntegrations && (
+        <div className="mb-5 border-t border-slate-100 pt-4">
+          <IntegrationsSection
+            integrations={app.integrations}
+            organizationId={organizationId ?? ""}
+            selections={integrationSelections}
+            onSelectionsChange={setIntegrationSelections}
+          />
         </div>
       )}
 
-      {phase === "integrations" && (
-        <IntegrationsStep
-          integrations={app.integrations}
-          organizationId={organizationId ?? ""}
-          onNext={advanceFromIntegrations}
-          onSkip={skipToInstall}
-        />
-      )}
-
-      {phase === "configuring" && (
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-slate-700">Configure {app.title}</p>
-          {installParams.map((param) => (
-            <div key={param.name} className="space-y-1.5">
-              <Label htmlFor={`param-${param.name}`}>
-                {param.label}
-                {param.required && <span className="text-red-500 ml-0.5">*</span>}
-              </Label>
-              <Input
-                id={`param-${param.name}`}
-                value={paramValues[param.name] ?? ""}
-                placeholder={param.placeholder}
-                onChange={(e) => setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))}
-              />
-              {param.description && <p className="text-xs text-slate-500">{param.description}</p>}
-            </div>
-          ))}
-          <div className="flex items-center gap-3 pt-2">
-            <Button variant="default" size="sm" onClick={() => setPhase("installing")}>
-              Install
-            </Button>
-            <Button variant="outline" size="sm" onClick={skipToInstall}>
-              Skip
-            </Button>
+      {/* Panel 3: Parameters */}
+      {previewLoading && (
+        <div className="mb-5 border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Loading configuration...
           </div>
         </div>
       )}
 
-      {phase === "installing" && (
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-slate-700">Installing {app.title}...</p>
-          {steps.map((step) => (
-            <div key={step.label} className="flex items-center gap-2.5 text-sm">
-              {step.done ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-              )}
-              <span className={step.done ? "text-slate-700" : "text-slate-500"}>{step.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {phase === "done" && (
-        <div className="space-y-4">
+      {!previewLoading && hasParams && (
+        <div className="mb-5 border-t border-slate-100 pt-4">
+          <p className="text-xs font-semibold text-slate-700 mb-3">Configuration</p>
           <div className="space-y-3">
-            {steps.map((step) => (
-              <div key={step.label} className="flex items-center gap-2.5 text-sm">
-                <Check className="h-4 w-4 text-green-500" />
-                <span className="text-slate-700">{step.label}</span>
+            {installParams.map((param) => (
+              <div key={param.name} className="space-y-1">
+                <Label htmlFor={`param-${param.name}`} className="text-xs">
+                  {param.label}
+                  {param.required && <span className="text-red-500 ml-0.5">*</span>}
+                </Label>
+                <Input
+                  id={`param-${param.name}`}
+                  value={paramValues[param.name] ?? ""}
+                  placeholder={param.placeholder}
+                  className="h-8 text-xs"
+                  onChange={(e) => setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))}
+                />
+                {param.description && <p className="text-[10px] text-slate-400">{param.description}</p>}
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <Button variant="default" size="sm" onClick={handleGoToApp}>
-              Open App
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {!previewLoading && (
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+          <Button size="sm" onClick={() => void doInstall(false)} disabled={isInstalling}>
+            {isInstalling ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                Installing...
+              </>
+            ) : (
+              "Install"
+            )}
+          </Button>
+          {hasParams && (
+            <Button variant="outline" size="sm" onClick={() => void doInstall(true)} disabled={isInstalling}>
+              Just take me there
             </Button>
-          </div>
+          )}
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isInstalling}>
+            Cancel
+          </Button>
         </div>
       )}
     </div>
   );
 }
 
-function IntegrationsStep({
+// ─── Integrations Section ────────────────────────────────────────────────────
+
+function IntegrationsSection({
   integrations,
   organizationId,
-  onNext,
-  onSkip,
+  selections,
+  onSelectionsChange,
 }: {
   integrations: string[];
   organizationId: string;
-  onNext: (selections: IntegrationSelections) => void;
-  onSkip: () => void;
+  selections: IntegrationSelections;
+  onSelectionsChange: (selections: IntegrationSelections) => void;
 }) {
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
@@ -283,58 +255,38 @@ function IntegrationsStep({
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
 
-  // Track which instance is selected for each integration type
-  const [selections, setSelections] = useState<IntegrationSelections>({});
-
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
     [connected],
   );
 
-  // For each required integration type, find all ready instances
   const integrationData = useMemo(
     () =>
       integrations.map((name) => {
         const readyInstances = connected.filter(
           (item) => item.metadata?.integrationName === name && item.status?.state === "ready",
         );
-        const pendingInstance = connected.find(
-          (item) => item.metadata?.integrationName === name && item.status?.state !== "ready",
-        );
-
-        return {
-          name,
-          readyInstances,
-          pendingInstance,
-          pendingState: pendingInstance
-            ? ((pendingInstance.status?.state === "error" ? "error" : "pending") as "error" | "pending")
-            : undefined,
-          stateDescription: pendingInstance?.status?.stateDescription,
-        };
+        return { name, readyInstances };
       }),
     [integrations, connected],
   );
 
   // Auto-select when there's exactly one ready instance
   useEffect(() => {
-    setSelections((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const data of integrationData) {
-        if (next[data.name]) continue;
-        if (data.readyInstances.length === 1) {
-          const instance = data.readyInstances[0];
-          if (instance.metadata?.id && instance.metadata?.name) {
-            next[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
-            changed = true;
-          }
+    let changed = false;
+    const next = { ...selections };
+    for (const data of integrationData) {
+      if (next[data.name]) continue;
+      if (data.readyInstances.length === 1) {
+        const instance = data.readyInstances[0];
+        if (instance.metadata?.id && instance.metadata?.name) {
+          next[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
+          changed = true;
         }
       }
-      return changed ? next : prev;
-    });
-  }, [integrationData]);
-
-  const allResolved = integrationData.every((data) => selections[data.name] || data.readyInstances.length > 0);
+    }
+    if (changed) onSelectionsChange(next);
+  }, [integrationData, selections, onSelectionsChange]);
 
   const dialogDefinition = useMemo(
     () => (dialogIntegrationName ? availableIntegrations.find((d) => d.name === dialogIntegrationName) : undefined),
@@ -365,45 +317,27 @@ function IntegrationsStep({
   const handleCreated = useCallback(
     (integrationId: string, instanceName: string) => {
       if (dialogIntegrationName) {
-        setSelections((prev) => ({
-          ...prev,
+        onSelectionsChange({
+          ...selections,
           [dialogIntegrationName]: { id: integrationId, name: instanceName },
-        }));
+        });
       }
       setDialogIntegrationName(null);
       void refetch();
     },
-    [dialogIntegrationName, refetch],
+    [dialogIntegrationName, selections, onSelectionsChange, refetch],
   );
 
-  const handleNext = useCallback(() => {
-    // Build final selections: use explicit selections, or auto-select the single ready instance
-    const finalSelections: IntegrationSelections = {};
-    for (const data of integrationData) {
-      if (selections[data.name]) {
-        finalSelections[data.name] = selections[data.name];
-      } else if (data.readyInstances.length === 1) {
-        const instance = data.readyInstances[0];
-        if (instance.metadata?.id && instance.metadata?.name) {
-          finalSelections[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
-        }
-      }
-    }
-    onNext(finalSelections);
-  }, [integrationData, selections, onNext]);
-
   return (
-    <div className="space-y-4">
-      <p className="text-sm font-medium text-slate-700">Connect Integrations</p>
-      <p className="text-xs text-slate-500">This app requires the following integrations to be connected.</p>
-
-      <div className="space-y-3">
+    <>
+      <p className="text-xs font-semibold text-slate-700 mb-3">Integrations</p>
+      <div className="space-y-2.5">
         {integrationData.map((data) => {
           const displayName =
             getIntegrationTypeDisplayName(undefined, data.name) ||
             data.name.charAt(0).toUpperCase() + data.name.slice(1);
 
-          // No ready instances — same row style as dropdown, but with "create new" only
+          // No ready instances
           if (data.readyInstances.length === 0) {
             return (
               <div key={data.name} className="flex items-center gap-2">
@@ -420,21 +354,19 @@ function IntegrationsStep({
             );
           }
 
-          // Exactly one ready instance — show green badge (auto-selected)
+          // Single ready instance (auto-selected)
           if (data.readyInstances.length === 1) {
             const instance = data.readyInstances[0];
             return (
               <div key={data.name} className="flex items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-200 text-emerald-700 bg-white text-xs font-medium">
-                  <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-                  <span>{instance.metadata?.name || displayName}</span>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                </div>
+                <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
+                <span className="text-xs text-slate-700">{instance.metadata?.name || displayName}</span>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               </div>
             );
           }
 
-          // Multiple ready instances — show select dropdown
+          // Multiple ready instances — dropdown
           return (
             <div key={data.name} className="flex items-center gap-2">
               <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
@@ -443,15 +375,15 @@ function IntegrationsStep({
                 onValueChange={(instanceId) => {
                   const instance = data.readyInstances.find((i) => i.metadata?.id === instanceId);
                   if (instance?.metadata?.id && instance?.metadata?.name) {
-                    setSelections((prev) => ({
-                      ...prev,
-                      [data.name]: { id: instance.metadata!.id!, name: instance.metadata!.name! },
-                    }));
+                    onSelectionsChange({
+                      ...selections,
+                      [data.name]: { id: instance.metadata.id, name: instance.metadata.name },
+                    });
                   }
                 }}
               >
-                <SelectTrigger className="w-64 h-8 text-xs">
-                  <SelectValue placeholder={`Select ${displayName} instance`} />
+                <SelectTrigger className="w-56 h-7 text-xs">
+                  <SelectValue placeholder={`Select ${displayName}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {data.readyInstances.map((instance) => (
@@ -473,15 +405,6 @@ function IntegrationsStep({
         })}
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <Button variant="default" size="sm" onClick={handleNext} disabled={!allResolved}>
-          {allResolved ? "Next" : "Connect all integrations to continue"}
-        </Button>
-        <Button variant="outline" size="sm" onClick={onSkip}>
-          Skip
-        </Button>
-      </div>
-
       <IntegrationCreateDialog
         open={!!dialogIntegrationName}
         onOpenChange={(open) => !open && setDialogIntegrationName(null)}
@@ -499,36 +422,6 @@ function IntegrationsStep({
         initialWebhookSetup={initialWebhookSetup}
         initialConfiguration={dialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined}
       />
-    </div>
+    </>
   );
-}
-
-function badgeClassName(state: string) {
-  switch (state) {
-    case "ready":
-      return "border-emerald-200 text-emerald-700 bg-white";
-    case "pending":
-      return "border-amber-200 text-amber-700 bg-white hover:bg-amber-50 hover:border-amber-300 cursor-pointer";
-    case "error":
-      return "border-red-200 text-red-700 bg-white hover:bg-red-50 hover:border-red-300 cursor-pointer";
-    default:
-      return "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer";
-  }
-}
-
-function badgeDot(state: string) {
-  switch (state) {
-    case "ready":
-      return <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />;
-    case "pending":
-      return <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />;
-    case "error":
-      return <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />;
-    default:
-      return <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>;
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
