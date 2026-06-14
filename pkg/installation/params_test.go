@@ -91,10 +91,17 @@ func Test__ResolveInstallParams(t *testing.T) {
 		assert.Equal(t, "s", resolved["script"])
 	})
 
-	t.Run("skips params without value or default", func(t *testing.T) {
+	t.Run("falls back to param name when no value, default, or placeholder", func(t *testing.T) {
 		resolved := ResolveInstallParams(schema, map[string]string{})
 		assert.Equal(t, "default-repo", resolved["repo"])
-		_, hasScript := resolved["script"]
-		assert.False(t, hasScript)
+		assert.Equal(t, "script", resolved["script"])
+	})
+
+	t.Run("falls back to placeholder before param name", func(t *testing.T) {
+		schemaWithPlaceholder := []InstallParam{
+			{Name: "region", Placeholder: "us-east-1"},
+		}
+		resolved := ResolveInstallParams(schemaWithPlaceholder, map[string]string{})
+		assert.Equal(t, "us-east-1", resolved["region"])
 	})
 }

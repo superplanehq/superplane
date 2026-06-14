@@ -124,12 +124,12 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	params, _ := FetchParams(repo, repo.Ref)
 	if params != nil && len(params.InstallParams) > 0 {
 		if req.InstallParams != nil {
-			// Wizard flow: user submitted the form. Validate required fields
-			// even if the map is empty (catches blank required params).
-			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
-			if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
+			// Wizard flow: validate raw user input BEFORE resolving defaults,
+			// so required fields with no value are caught.
+			if err := ValidateInstallParams(params.InstallParams, req.InstallParams); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 			}
+			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
 			canvasBody = SubstituteInstallParams(canvasBody, resolved)
 		} else {
 			// One-click flow: no params sent, substitute with defaults/placeholders.
