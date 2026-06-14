@@ -136,7 +136,8 @@ export function InstallProgressPanel({
   const hasParams = preview.installParams.length > 0;
   const canProceed = checkCanProceed(organizationId, isInstalling, preview, integrations, integrationSelections);
   const canInstall = canProceed && checkRequiredParams(preview.installParams, preview.paramValues);
-  const canSkip = canProceed;
+  // Skip only needs org + not installing + preview loaded — skips both integrations and params
+  const canSkip = !!organizationId && !isInstalling && !preview.previewLoading && !preview.previewError;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
@@ -185,7 +186,6 @@ export function InstallProgressPanel({
           canInstall={canInstall}
           canSkip={canSkip}
           isInstalling={isInstalling}
-          hasParams={hasParams}
           onInstall={() => void doInstall(false)}
           onSkip={() => void doInstall(true)}
           onClose={onClose}
@@ -199,7 +199,6 @@ function InstallActions({
   canInstall,
   canSkip,
   isInstalling,
-  hasParams,
   onInstall,
   onSkip,
   onClose,
@@ -207,7 +206,6 @@ function InstallActions({
   canInstall: boolean;
   canSkip: boolean;
   isInstalling: boolean;
-  hasParams: boolean;
   onInstall: () => void;
   onSkip: () => void;
   onClose: () => void;
@@ -224,11 +222,9 @@ function InstallActions({
           "Install"
         )}
       </Button>
-      {hasParams && (
-        <Button variant="outline" size="sm" onClick={onSkip} disabled={!canSkip}>
-          Just take me there
-        </Button>
-      )}
+      <Button variant="outline" size="sm" onClick={onSkip} disabled={!canSkip}>
+        Just take me there
+      </Button>
       <Button variant="ghost" size="sm" onClick={onClose} disabled={isInstalling}>
         Cancel
       </Button>
