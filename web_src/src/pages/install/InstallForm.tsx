@@ -3,7 +3,8 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MAX_APP_NAME_LENGTH } from "./constants";
-import type { OrganizationOption } from "./types";
+import { InstallParamsForm } from "./InstallParamsForm";
+import type { InstallParam, OrganizationOption } from "./types";
 
 interface InstallFormProps {
   name: string;
@@ -12,8 +13,11 @@ interface InstallFormProps {
   organizations: OrganizationOption[];
   showOrganizationPicker: boolean;
   isInstalling: boolean;
+  installParams?: InstallParam[];
+  installParamValues: Record<string, string>;
   onNameChange: (value: string) => void;
   onOrganizationChange: (value: string) => void;
+  onInstallParamChange: (name: string, value: string) => void;
   onSubmit: () => void;
 }
 
@@ -24,8 +28,11 @@ export function InstallForm({
   organizations,
   showOrganizationPicker,
   isInstalling,
+  installParams,
+  installParamValues,
   onNameChange,
   onOrganizationChange,
+  onInstallParamChange,
   onSubmit,
 }: InstallFormProps) {
   return (
@@ -76,6 +83,10 @@ export function InstallForm({
           </Select>
         </div>
       ) : null}
+
+      {installParams && installParams.length > 0 && (
+        <InstallParamsForm params={installParams} values={installParamValues} onChange={onInstallParamChange} />
+      )}
 
       <div className="flex flex-row justify-start gap-3 pt-2">
         <LoadingButton
