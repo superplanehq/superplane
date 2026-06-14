@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -66,6 +65,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		return nil, status.Error(codes.Internal, "failed to get setup provider")
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "setup_step_revert").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
 		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
@@ -75,7 +75,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:   capabilityCtx,
 		}
 

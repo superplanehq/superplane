@@ -20,19 +20,14 @@ type IntegrationSecretStorage struct {
 	integration *models.Integration
 	secrets     []models.IntegrationSecret
 	loaded      bool
-
-	// Identifies the call path that created this storage, used to attribute
-	// secret writes in metrics and logs.
-	source string
 }
 
-func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration, source string) *IntegrationSecretStorage {
+func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
 	return &IntegrationSecretStorage{
 		tx:          tx,
 		encryptor:   encryptor,
 		integration: integration,
 		secrets:     []models.IntegrationSecret{},
-		source:      source,
 	}
 }
 
@@ -208,14 +203,12 @@ func (s *IntegrationSecretStorage) recordSecretWrite(name, operation string) {
 	telemetry.RecordIntegrationSecretWrite(
 		context.Background(),
 		s.integration.AppName,
-		s.source,
 		s.integration.ID.String(),
 		operation,
 	)
 
 	logging.ForIntegration(*s.integration).WithFields(map[string]any{
 		"secret_name": name,
-		"source":      s.source,
 		"operation":   operation,
 	}).Info("Integration secret write")
 }

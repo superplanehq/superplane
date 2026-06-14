@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -216,12 +215,13 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 	}
 
 	capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
+	logging.ForIntegration(*integration).WithField("source", "capability_update").Info("Integration operation may write secrets")
 	nextStep, err := setupProvider.OnCapabilityUpdate(core.CapabilityUpdateContext{
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},
 		HTTP:         registry.HTTPContextInTransaction(tx),
 		Properties:   contexts.NewIntegrationPropertyStorage(integration),
-		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
+		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 		Capabilities: capabilityCtx,
 	})
 

@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -100,7 +99,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 
 	err = handler.Cleanup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContextInTransaction(tx),
-		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil, telemetry.IntegrationSecretSourceCleanup),
+		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})

@@ -28,10 +28,6 @@ type IntegrationContext struct {
 	registry    *registry.Registry
 	onNewEvents func([]models.CanvasEvent)
 
-	// Identifies the call path that created this context, used to attribute
-	// secret writes in metrics and logs.
-	source string
-
 	//
 	// Lazily create a secret storage, when Secrets() used.
 	//
@@ -45,7 +41,6 @@ func NewIntegrationContext(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	onNewEvents func([]models.CanvasEvent),
-	source string,
 ) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
@@ -54,7 +49,6 @@ func NewIntegrationContext(
 		encryptor:   encryptor,
 		registry:    registry,
 		onNewEvents: onNewEvents,
-		source:      source,
 	}
 }
 
@@ -384,14 +378,12 @@ func (c *IntegrationContext) recordSecretWrite(name, operation string) {
 	telemetry.RecordIntegrationSecretWrite(
 		context.Background(),
 		c.integration.AppName,
-		c.source,
 		c.integration.ID.String(),
 		operation,
 	)
 
 	logging.ForIntegration(*c.integration).WithFields(map[string]any{
 		"secret_name": name,
-		"source":      c.source,
 		"operation":   operation,
 	}).Info("Integration secret write")
 }
@@ -511,6 +503,6 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 		return c.secretStorage
 	}
 
-	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration, c.source)
+	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
 	return c.secretStorage
 }

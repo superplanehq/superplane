@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -31,7 +30,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	t.Run("loads and decrypts existing secrets", func(t *testing.T) {
 		seedContextIntegrationSecret(t, integration, "token", "initial-token")
 
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		value, err := storage.Get("token")
 		require.NoError(t, err)
 		assert.Equal(t, "initial-token", value)
@@ -43,7 +42,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	})
 
 	t.Run("creates and persists secrets", func(t *testing.T) {
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		err := storage.Create(core.IntegrationSecretDefinition{
 			Name:        "created-token",
 			Label:       "Created token",
@@ -73,7 +72,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	})
 
 	t.Run("rejects empty and duplicate secret names", func(t *testing.T) {
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		err := storage.Create(core.IntegrationSecretDefinition{Value: "missing-name"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "secret name is required")
@@ -84,7 +83,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	})
 
 	t.Run("creates many secrets and stops on duplicates", func(t *testing.T) {
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		err := storage.CreateMany([]core.IntegrationSecretDefinition{
 			{Name: "many-one", Value: "1"},
 			{Name: "many-two", Value: "2"},
@@ -104,7 +103,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	})
 
 	t.Run("updates cached and persisted secret value", func(t *testing.T) {
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		oldValue, err := storage.Get("created-token")
 		require.NoError(t, err)
 
@@ -129,7 +128,7 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 	})
 
 	t.Run("deletes cached and persisted secrets", func(t *testing.T) {
-		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration, telemetry.IntegrationSecretSourceSetup)
+		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
 		require.NoError(t, storage.Delete("many-two"))
 
 		_, err := storage.Get("many-two")

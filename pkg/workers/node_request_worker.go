@@ -197,7 +197,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents, telemetry.IntegrationSecretSourceExecution)
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	_, err = hookProvider.HandleHook(hookCtx)
@@ -252,7 +252,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents, telemetry.IntegrationSecretSourceExecution)
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 		hookCtx.Logger = logger
 	}
 
@@ -329,7 +329,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents, telemetry.IntegrationSecretSourceExecution)
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
 	hookCtx.Logger = logger

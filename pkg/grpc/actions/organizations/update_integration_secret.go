@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,13 +55,14 @@ func UpdateIntegrationSecret(
 		return nil, err
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "user_update").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		setupStep, err := setupProvider.OnSecretUpdate(core.SecretUpdateContext{
 			SecretName:   secretName,
 			Value:        value,
 			Logger:       logrus.WithField("integration_id", integration.ID),
 			HTTP:         registry.HTTPContextInTransaction(tx),
-			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceUserUpdate),
+			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Properties:   contexts.NewIntegrationPropertyStorage(integration),
 			Capabilities: contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities),
 		})

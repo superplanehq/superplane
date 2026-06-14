@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -106,7 +105,8 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
 
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil, telemetry.IntegrationSecretSourceSync)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil)
+	logging.ForIntegration(*instance).WithField("source", "sync").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            w.registry.HTTPContextInTransaction(tx),
@@ -145,7 +145,8 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 	}
 
 	logger := logging.ForIntegration(*integration)
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil, telemetry.IntegrationSecretSourceIntegrationAction)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil)
+	logger.WithField("source", "integration_action").Info("Integration operation may write secrets")
 	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,

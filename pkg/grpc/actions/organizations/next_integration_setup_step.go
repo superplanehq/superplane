@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -126,6 +125,7 @@ func submitStep(
 		}
 	}
 
+	logging.ForIntegration(*integration).WithField("source", "setup_step_submit").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities, integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
@@ -137,7 +137,7 @@ func submitStep(
 			OrganizationID:  integration.OrganizationID.String(),
 			HTTP:            registry.HTTPContextInTransaction(tx),
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
+			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,
 		})
 

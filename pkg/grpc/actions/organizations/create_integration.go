@@ -19,7 +19,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
@@ -131,13 +130,14 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
+		logging.ForIntegration(*newIntegration).WithField("source", "integration_create_first_step").Info("Integration operation may write secrets")
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
 			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration, telemetry.IntegrationSecretSourceSetup),
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{
@@ -180,9 +180,9 @@ func syncIntegration(
 		registry.Encryptor,
 		registry,
 		nil,
-		telemetry.IntegrationSecretSourceSetup,
 	)
 
+	logging.ForIntegration(*newIntegration).WithField("source", "integration_create_sync").Info("Integration operation may write secrets")
 	syncErr := integrationImpl.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            registry.HTTPContext(),
