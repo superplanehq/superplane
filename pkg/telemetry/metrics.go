@@ -47,8 +47,16 @@ var (
 
 	dbRowsAffectedCounter metric.Int64Counter
 
+	integrationSecretWritesCounter metric.Int64Counter
+
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
+)
+
+// Operation values for integration secret writes.
+const (
+	IntegrationSecretOperationCreate = "create"
+	IntegrationSecretOperationUpdate = "update"
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -270,6 +278,15 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	integrationSecretWritesCounter, err = meter.Int64Counter(
+		"integration.secret.writes.total",
+		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration type and operation"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	pendingEventsGauge, err = meter.Int64Gauge(
 		"workflow_events.pending.count",
 		metric.WithDescription("Current number of pending workflow events"),
@@ -468,6 +485,21 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 		count,
 		metric.WithAttributes(
 			attribute.String("table", tableName),
+			attribute.String("operation", operation),
+		),
+	)
+}
+
+func RecordIntegrationSecretWrite(ctx context.Context, appName, operation string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretWritesCounter.Add(
+		ctx,
+		1,
+		metric.WithAttributes(
+			attribute.String("app_name", appName),
 			attribute.String("operation", operation),
 		),
 	)

@@ -8,7 +8,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -149,6 +151,7 @@ func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) 
 	}
 
 	s.secrets = append(s.secrets, secret)
+	s.recordSecretWrite(def.Name, telemetry.IntegrationSecretOperationCreate)
 	return nil
 }
 
@@ -186,5 +189,25 @@ func (s *IntegrationSecretStorage) Update(name string, value string) error {
 	now := time.Now()
 	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
-	return s.tx.Save(secret).Error
+	if err := s.tx.Save(secret).Error; err != nil {
+		return err
+	}
+
+	s.recordSecretWrite(name, telemetry.IntegrationSecretOperationUpdate)
+	return nil
+}
+
+// recordSecretWrite emits the metric and structured log for a write to
+// app_installation_secrets. The secret value is never logged.
+func (s *IntegrationSecretStorage) recordSecretWrite(name, operation string) {
+	telemetry.RecordIntegrationSecretWrite(
+		context.Background(),
+		s.integration.AppName,
+		operation,
+	)
+
+	logging.ForIntegration(*s.integration).WithFields(map[string]any{
+		"secret_name": name,
+		"operation":   operation,
+	}).Info("Integration secret write")
 }
