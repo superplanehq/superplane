@@ -1,5 +1,8 @@
 import { lazy, Suspense } from "react";
 
+import { MarkdownContent } from "../Markdown";
+import { getFileMonacoLanguage } from "./lib/monaco-language";
+
 const FileMonacoEditor = lazy(() =>
   import("./FileMonacoEditor").then((module) => ({ default: module.FileMonacoEditor })),
 );
@@ -41,6 +44,17 @@ export function FileEditor({
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">
         File marked for deletion
+      </div>
+    );
+  }
+
+  const resolvedLanguage = language ?? getFileMonacoLanguage(path);
+  const isMarkdown = resolvedLanguage === "markdown";
+
+  if (disabled && isMarkdown) {
+    return (
+      <div className="min-h-0 flex-1 overflow-auto bg-white p-6">
+        <MarkdownContent content={content} data-testid="file-markdown-preview" />
       </div>
     );
   }
