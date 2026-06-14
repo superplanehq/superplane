@@ -79,10 +79,7 @@ func ListCanvasVersionsPaginated(
 		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
 	}
 
-	protoVersions := make([]*pb.CanvasVersion, 0, len(publishedVersions))
-	for i := range publishedVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&publishedVersions[i], organizationID))
-	}
+	protoVersions := serializeCanvasVersions(ctx, publishedVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
@@ -126,10 +123,7 @@ func listDraftCanvasVersions(
 		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
 	}
 
-	protoVersions := make([]*pb.CanvasVersion, 0, len(draftVersions))
-	for i := range draftVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&draftVersions[i], organizationID))
-	}
+	protoVersions := serializeCanvasVersions(ctx, draftVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
