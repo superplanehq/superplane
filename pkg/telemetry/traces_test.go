@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestConfigureTestTracerProvider(t *testing.T) {
 
 	require.True(t, TracingEnabled())
 
-	ctx, span := StartSpan(t.Context(), "test-span")
+	_, span := StartSpan(context.Background(), "test-span")
 	span.End()
 
 	require.Len(t, exporter.GetSpans(), 1)
