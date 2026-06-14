@@ -74,6 +74,11 @@ func ResolveInstallParams(schema []InstallParam, values map[string]string) map[s
 			resolved[p.Name] = val
 		} else if p.Default != "" {
 			resolved[p.Name] = p.Default
+		} else if p.Placeholder != "" {
+			resolved[p.Name] = p.Placeholder
+		} else {
+			// Always resolve every param so no {{ install_params.xxx }} tokens remain.
+			resolved[p.Name] = p.Name
 		}
 	}
 	return resolved

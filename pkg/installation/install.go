@@ -123,8 +123,9 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	// so the YAML is valid ({{ install_params.xxx }} is not valid YAML).
 	params, _ := FetchParams(repo, repo.Ref)
 	if params != nil && len(params.InstallParams) > 0 {
-		if len(req.InstallParams) > 0 {
-			// Wizard flow: user provided values, validate and substitute.
+		if req.InstallParams != nil {
+			// Wizard flow: user submitted the form. Validate required fields
+			// even if the map is empty (catches blank required params).
 			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
 			if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "%v", err)

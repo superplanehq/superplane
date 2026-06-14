@@ -80,8 +80,9 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
           organizationId,
         };
 
-        // Only send params if user chose "Install" (not "Just take me there")
-        if (!skipParams && Object.keys(paramValues).length > 0) {
+        // Send params when user chose "Install" (even if empty — backend validates required fields).
+        // Skip sends nothing — backend uses defaults/placeholders.
+        if (!skipParams && installParams.length > 0) {
           body.installParams = paramValues;
         }
 
