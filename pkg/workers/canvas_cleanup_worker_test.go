@@ -169,7 +169,7 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	// Create associated data
 	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID)
 	support.CreateQueueItem(t, canvas.ID, "node-1", event1.ID, event2.ID)
 
 	// Create canvas node execution KV
@@ -568,7 +568,7 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	)
 
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID, nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
 
 	//
 	// Soft delete the canvas using the new soft delete method

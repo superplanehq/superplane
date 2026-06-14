@@ -62,7 +62,7 @@ func Test__DeleteCanvas(t *testing.T) {
 
 		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID)
 		support.CreateQueueItem(t, canvas.ID, "node-1", event1.ID, event2.ID)
 
 		//
