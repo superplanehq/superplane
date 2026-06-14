@@ -1,19 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
-import { useInstallTemplate } from "./useInstallTemplate";
+import { InstallProgressPanel } from "./InstallProgressPanel";
 
 export function ZeroStatePage() {
   const { createApp, isSaving } = useCreateApp();
-  const { installTemplate, isInstalling } = useInstallTemplate();
   const [visibleCount, setVisibleCount] = useState(7);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
+  const [installingApp, setInstallingApp] = useState<AppEntry | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const busy = isSaving || isInstalling;
+  const busy = isSaving || installingApp !== null;
 
   const visible = APP_CATALOG.slice(0, visibleCount);
 
@@ -44,10 +44,8 @@ export function ZeroStatePage() {
 
   const handleInstall = (app: AppEntry) => {
     if (busy) return;
-    void installTemplate(app.repo, {
-      instructions: app.agentInstructions,
-      initialMessage: app.agentInitialMessage,
-    });
+    setInstallingApp(app);
+    setSelectedApp(null);
   };
 
   return (
@@ -85,7 +83,12 @@ export function ZeroStatePage() {
 
         <div className="flex flex-col gap-4">
           {visible.map((app) => (
-            <AppListItem key={app.repo} app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
+            <React.Fragment key={app.repo}>
+              <AppListItem app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
+              {installingApp?.repo === app.repo && (
+                <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />
+              )}
+            </React.Fragment>
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
