@@ -103,6 +103,9 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 				canvasBody = body
 				break
 			}
+			if !errors.Is(fetchErr, errFileNotFound) {
+				return nil, fetchErr
+			}
 		}
 		if canvasBody == nil {
 			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")

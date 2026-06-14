@@ -1,6 +1,7 @@
 package installation
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -41,6 +42,9 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 				repo.Ref = r
 				canvasBody = body
 				break
+			}
+			if !errors.Is(fetchErr, errFileNotFound) {
+				return nil, fetchErr
 			}
 		}
 		if canvasBody == nil {
