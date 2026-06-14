@@ -55,12 +55,22 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 
 	go usage.ReconcileCanvasCount(orgID, orgUsage.GetCanvases())
 
+	var response *pb.DescribeUsageResponse
+	_ = telemetry.RunSpan(ctx, "usage.build_response", func(ctx context.Context) error {
+		response = buildDescribeUsageResponse(limits, orgUsage)
+		return nil
+	})
+
+	return response, nil
+}
+
+func buildDescribeUsageResponse(limits *usagepb.OrganizationLimits, orgUsage *usagepb.OrganizationUsage) *pb.DescribeUsageResponse {
 	return &pb.DescribeUsageResponse{
 		Enabled:       true,
 		StatusMessage: "Usage tracking is active and up to date.",
 		Limits:        serializeUsageLimits(limits),
 		Usage:         serializeUsage(orgUsage),
-	}, nil
+	}
 }
 
 func describeUsageLimits(

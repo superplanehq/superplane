@@ -27,9 +27,9 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	user, err := models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+	user, err := loadUser(ctx, orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		return nil, err
 	}
 
 	userProto := &pb.User{
@@ -99,4 +99,18 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	return &pb.MeResponse{
 		User: userProto,
 	}, nil
+}
+
+func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
+	var user *models.User
+	err := telemetry.RunSpan(ctx, "auth.load_user", func(ctx context.Context) error {
+		var loadErr error
+		user, loadErr = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+		return loadErr
+	})
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	return user, nil
 }
