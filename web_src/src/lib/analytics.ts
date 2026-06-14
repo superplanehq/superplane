@@ -155,7 +155,7 @@ export const analytics = {
 
   integrationConnectStart: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: "node_configuration" | "integrations_page" | "install_wizard",
     organizationId: string,
   ) => {
     integrationConnectStartTimes.set(integration, Date.now());
@@ -196,7 +196,7 @@ export const analytics = {
 
   integrationConnectSubmit: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: "node_configuration" | "integrations_page" | "install_wizard",
     status: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -214,7 +214,7 @@ export const analytics = {
 
   integrationConfigureOpen: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: "node_configuration" | "integrations_page" | "install_wizard",
     previousStatus: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -250,7 +250,7 @@ export const analytics = {
 export function useIntegrationConfigureOpen(
   integration: OrganizationsIntegration | undefined,
   integrationId: string | null | undefined,
-  source: "node_configuration" | "integrations_page",
+  source: "node_configuration" | "integrations_page" | "install_wizard",
   organizationId: string | undefined,
 ) {
   const firedRef = useRef<string | null>(null);
