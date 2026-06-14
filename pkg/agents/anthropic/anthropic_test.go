@@ -825,10 +825,14 @@ func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
 		return nil
 	}))
 
-	require.Len(t, received, 2)
-	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
-	assert.Equal(t, "Recovered", received[0].Text)
-	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
+	// session.error surfaces as a non-terminal notice; the stream keeps going
+	// and the recovered assistant message + turn completion still arrive.
+	require.Len(t, received, 3)
+	assert.Equal(t, agents.ProviderEventSessionNotice, received[0].Type)
+	assert.Equal(t, "An internal service error occurred", received[0].ErrorMessage)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[1].Type)
+	assert.Equal(t, "Recovered", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
 }
 
 func TestStreamEvents_SkipsMalformed(t *testing.T) {
