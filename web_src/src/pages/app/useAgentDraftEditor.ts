@@ -8,6 +8,7 @@ import type { CanvasPageHeaderMode } from "./viewState";
 import { isCanvasWorkflowTab } from "./viewState";
 import { isDraftVersion } from "./lib/canvas-versions";
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
+import { isNotFoundError } from "./workflowPageHelpers";
 
 type AgentDraftOpenSource = "auto" | "button";
 type AgentDraftOpenResult = "opened" | "skipped" | "unavailable";
@@ -37,6 +38,22 @@ function useLoadAgentDraftVersion(
 ): LoadAgentDraftVersion {
   const queryClient = useQueryClient();
 
+  // Drop a deleted draft id from the cached lists so it stops being offered.
+  const pruneDeadDraft = useCallback(
+    (versionId: string) => {
+      if (!canvasId) {
+        return;
+      }
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
+        current.filter((branch) => draftVersionId(branch) !== versionId),
+      );
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) =>
+        current.filter((version) => version.metadata?.id !== versionId),
+      );
+    },
+    [canvasId, queryClient],
+  );
+
   return useCallback(
     async (versionId: string): Promise<CanvasesCanvasVersion | null> => {
       const cachedVersion = selectableVersionsById.get(versionId);
@@ -51,6 +68,7 @@ function useLoadAgentDraftVersion(
       try {
         const loadedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId);
         if (!loadedVersion?.metadata?.id) {
+          pruneDeadDraft(versionId);
           return null;
         }
 
@@ -72,12 +90,16 @@ function useLoadAgentDraftVersion(
         }
 
         return loadedVersion;
-      } catch {
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          pruneDeadDraft(versionId);
+          return null;
+        }
         showErrorToast("Failed to load draft version");
         return null;
       }
     },
-    [canvasId, queryClient, selectableVersionsById],
+    [canvasId, pruneDeadDraft, queryClient, selectableVersionsById],
   );
 }
 
@@ -141,6 +163,20 @@ export function useAgentDraftEditor({
   const [pendingAutoOpenVersionId, setPendingAutoOpenVersionId] = useState<string | null>(null);
   const loadAgentDraftVersion = useLoadAgentDraftVersion(canvasId, selectableVersionsById);
 
+  // Drop the stale ref for a deleted draft so it can't be re-published.
+  const handleMissingDraft = useCallback(
+    (versionId: string, source: AgentDraftOpenSource): AgentDraftOpenResult => {
+      if (activeCanvasVersionIdRef.current === versionId) {
+        activeCanvasVersionIdRef.current = "";
+      }
+      if (source === "button") {
+        showErrorToast("This draft no longer exists.");
+      }
+      return "unavailable";
+    },
+    [activeCanvasVersionIdRef],
+  );
+
   const openAgentDraftVersion = useCallback(
     async (versionId: string, source: AgentDraftOpenSource): Promise<AgentDraftOpenResult> => {
       if (!versionId) {
@@ -170,8 +206,7 @@ export function useAgentDraftEditor({
 
       const version = await loadAgentDraftVersion(versionId);
       if (!version) {
-        showErrorToast("Draft version not found");
-        return "unavailable";
+        return handleMissingDraft(versionId, source);
       }
 
       if (!isDraftVersion(version)) {
@@ -185,6 +220,7 @@ export function useAgentDraftEditor({
     [
       activateCanvasVersionForEditing,
       activeCanvasVersionIdRef,
+      handleMissingDraft,
       hasEditableVersion,
       hasPendingLocalCanvasState,
       headerMode,
