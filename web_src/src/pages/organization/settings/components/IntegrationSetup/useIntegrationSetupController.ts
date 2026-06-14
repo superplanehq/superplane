@@ -40,6 +40,17 @@ export function useIntegrationSetupController(organizationId: string) {
   });
   const progress = useIntegrationSetupProgress(state.createdIntegration, metadata.integrationLabel);
   useSyncSelectedCapabilitiesForStep(progress.currentStep, state.setSelectedCapabilities);
+  const redirectPromptDescribe = useRedirectPromptDescribe(
+    organizationId,
+    state.createdIntegration,
+    progress.currentStep,
+  );
+  useRedirectPromptDescribeSync(
+    state.createdIntegration,
+    progress.currentStep,
+    redirectPromptDescribe.data,
+    state.setCreatedIntegration,
+  );
   const mutations = useIntegrationSetupMutations(organizationId, state.createdIntegration);
   const actions = useIntegrationSetupActions({
     route,
@@ -214,6 +225,51 @@ function getCapabilitySelectionOfferKey(currentStep: IntegrationSetupStepDefinit
 
 function getCapabilitiesFromOfferKey(offerKey: string) {
   return (JSON.parse(offerKey) as { capabilities: string[] }).capabilities;
+}
+
+function useRedirectPromptDescribe(
+  organizationId: string,
+  createdIntegration: OrganizationsIntegration | null,
+  currentStep: IntegrationSetupStepDefinition | null,
+) {
+  const integrationId = createdIntegration?.metadata?.id ?? "";
+  const shouldPoll = currentStep?.type === "REDIRECT_PROMPT" && integrationId !== "";
+
+  return useIntegration(organizationId, integrationId, {
+    enabled: shouldPoll,
+    staleTime: 0,
+    refetchInterval: shouldPoll ? 2000 : false,
+    refetchIntervalInBackground: true,
+  });
+}
+
+function useRedirectPromptDescribeSync(
+  createdIntegration: OrganizationsIntegration | null,
+  currentStep: IntegrationSetupStepDefinition | null,
+  redirectPromptDescribe: OrganizationsIntegration | null | undefined,
+  setCreatedIntegration: Dispatch<SetStateAction<OrganizationsIntegration | null>>,
+) {
+  const lastRedirectPromptDescribeKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (currentStep?.type !== "REDIRECT_PROMPT") {
+      lastRedirectPromptDescribeKey.current = null;
+      return;
+    }
+
+    const createdIntegrationId = createdIntegration?.metadata?.id;
+    if (!createdIntegrationId || redirectPromptDescribe?.metadata?.id !== createdIntegrationId) {
+      return;
+    }
+
+    const describeKey = getResumeDescribeStateKey(redirectPromptDescribe);
+    if (lastRedirectPromptDescribeKey.current === describeKey) {
+      return;
+    }
+
+    lastRedirectPromptDescribeKey.current = describeKey;
+    setCreatedIntegration(redirectPromptDescribe);
+  }, [createdIntegration, currentStep, redirectPromptDescribe, setCreatedIntegration]);
 }
 
 function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegration | null, integrationLabel: string) {
