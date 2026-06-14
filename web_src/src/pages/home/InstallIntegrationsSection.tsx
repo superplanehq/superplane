@@ -1,3 +1,4 @@
+import type { OrganizationsBrowserAction } from "@/api-client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -138,7 +139,7 @@ function useCreateDialogProps(
   availableIntegrations: Array<{ name?: string; [key: string]: unknown }>,
   connected: Array<{
     metadata?: { id?: string; name?: string; integrationName?: string };
-    status?: { state?: string; metadata?: { [key: string]: unknown }; browserAction?: unknown };
+    status?: { state?: string; metadata?: { [key: string]: unknown }; browserAction?: OrganizationsBrowserAction };
     spec?: { configuration?: unknown };
   }>,
   existingIntegrationNames: Set<string>,
