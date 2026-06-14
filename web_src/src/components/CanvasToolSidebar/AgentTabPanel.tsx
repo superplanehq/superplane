@@ -117,6 +117,7 @@ function ChatConversation({
   const outcomeMutation = useDefineAgentOutcome(organizationId);
   const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
@@ -168,7 +169,10 @@ function ChatConversation({
     setOutcomeState,
   });
 
-  const wsCallbacks = useMemo(() => createWebsocketCallbacks(setStatus, setError, setOutcomeState), [setOutcomeState]);
+  const wsCallbacks = useMemo(
+    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+    [setOutcomeState],
+  );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
@@ -181,6 +185,7 @@ function ChatConversation({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
+        notice={notice}
         canvasId={canvasId}
         organizationId={organizationId}
         messageGroups={messageGroups}
