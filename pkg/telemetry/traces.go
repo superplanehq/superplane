@@ -75,6 +75,31 @@ func ShutdownTracing(ctx context.Context) error {
 	return tracerProvider.Shutdown(ctx)
 }
 
+/*
+ * ConfigureTestTracerProvider enables tracing against exporter for unit tests.
+ * Returns a cleanup function that restores the previous tracer state.
+ */
+func ConfigureTestTracerProvider(exporter sdktrace.SpanExporter) func() {
+	previousGlobalProvider := otel.GetTracerProvider()
+	previousProvider := tracerProvider
+	previousTracer := tracer
+	previousReady := tracesReady.Load()
+
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(provider)
+	tracerProvider = provider
+	tracer = provider.Tracer("superplane")
+	tracesReady.Store(true)
+
+	return func() {
+		_ = provider.Shutdown(context.Background())
+		tracesReady.Store(previousReady)
+		tracerProvider = previousProvider
+		tracer = previousTracer
+		otel.SetTracerProvider(previousGlobalProvider)
+	}
+}
+
 func serviceName() string {
 	name := os.Getenv("OTEL_SERVICE_NAME")
 	if name == "" {
