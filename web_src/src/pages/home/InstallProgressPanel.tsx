@@ -19,6 +19,21 @@ import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegr
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import type { InstallParam } from "../install/types";
 
+function checkCanProceed(
+  organizationId: string | undefined,
+  isInstalling: boolean,
+  preview: { previewLoading: boolean; previewError: string | null },
+  integrations: string[],
+  selections: IntegrationSelections,
+): boolean {
+  if (!organizationId || isInstalling || preview.previewLoading || preview.previewError) return false;
+  return integrations.length === 0 || integrations.every((name) => selections[name]);
+}
+
+function checkRequiredParams(params: InstallParam[], values: Record<string, string>): boolean {
+  return params.filter((p) => p.required && !p.default).every((p) => (values[p.name] ?? "").trim() !== "");
+}
+
 async function executeInstall(opts: {
   repo: string;
   organizationId: string;
@@ -71,15 +86,10 @@ export function InstallProgressPanel({
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // Clear selections and org-specific param values when org changes
+  // Clear selections when org changes
   useEffect(() => {
     setIntegrationSelections({});
-    // Reset param values to defaults (clears org-specific values like resource IDs)
-    const defaults: Record<string, string> = {};
-    for (const p of preview.installParams) {
-      if (p.default) defaults[p.name] = p.default;
-    }
-    preview.setParamValues(defaults);
+    preview.resetParamValues();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset on org change
   }, [organizationId]);
 
@@ -124,17 +134,9 @@ export function InstallProgressPanel({
   const integrations = preview.detectedIntegrations.length > 0 ? preview.detectedIntegrations : app.integrations;
   const hasIntegrations = integrations.length > 0;
   const hasParams = preview.installParams.length > 0;
-  const allIntegrationsSelected = !hasIntegrations || integrations.every((name) => integrationSelections[name]);
-  const allRequiredParamsFilled = preview.installParams
-    .filter((p) => p.required && !p.default)
-    .every((p) => (preview.paramValues[p.name] ?? "").trim() !== "");
-  const canInstall =
-    !!organizationId &&
-    !isInstalling &&
-    !preview.previewLoading &&
-    !preview.previewError &&
-    allIntegrationsSelected &&
-    allRequiredParamsFilled;
+  const canProceed = checkCanProceed(organizationId, isInstalling, preview, integrations, integrationSelections);
+  const canInstall = canProceed && checkRequiredParams(preview.installParams, preview.paramValues);
+  const canSkip = canProceed;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
@@ -181,6 +183,7 @@ export function InstallProgressPanel({
       {!preview.previewLoading && (
         <InstallActions
           canInstall={canInstall}
+          canSkip={canSkip}
           isInstalling={isInstalling}
           hasParams={hasParams}
           onInstall={() => void doInstall(false)}
@@ -194,6 +197,7 @@ export function InstallProgressPanel({
 
 function InstallActions({
   canInstall,
+  canSkip,
   isInstalling,
   hasParams,
   onInstall,
@@ -201,6 +205,7 @@ function InstallActions({
   onClose,
 }: {
   canInstall: boolean;
+  canSkip: boolean;
   isInstalling: boolean;
   hasParams: boolean;
   onInstall: () => void;
@@ -220,7 +225,7 @@ function InstallActions({
         )}
       </Button>
       {hasParams && (
-        <Button variant="outline" size="sm" onClick={onSkip} disabled={!canInstall}>
+        <Button variant="outline" size="sm" onClick={onSkip} disabled={!canSkip}>
           Just take me there
         </Button>
       )}

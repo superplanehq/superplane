@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { InstallParam } from "../install/types";
 
 interface UseInstallPreviewDataOptions {
@@ -47,10 +47,19 @@ export function useInstallPreviewData({ repo, preloadedIntegrations, preloadedPa
       .finally(() => setPreviewLoading(false));
   }, [repo, hasPreloaded]);
 
+  const resetParamValues = useCallback(() => {
+    const defaults: Record<string, string> = {};
+    for (const p of installParams) {
+      if (p.default) defaults[p.name] = p.default;
+    }
+    setParamValues(defaults);
+  }, [installParams]);
+
   return {
     installParams,
     paramValues,
     setParamValues,
+    resetParamValues,
     previewLoading,
     previewError,
     detectedIntegrations,
