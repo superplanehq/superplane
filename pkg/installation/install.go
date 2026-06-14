@@ -14,6 +14,8 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
@@ -26,6 +28,15 @@ type InstallRequest struct {
 	Name           string
 	OrganizationID uuid.UUID
 	AccountID      uuid.UUID
+	InstallParams  map[string]string
+	Integrations   map[string]IntegrationMapping // integration type name → instance to wire
+}
+
+// IntegrationMapping identifies a specific integration instance to wire
+// into canvas nodes of the corresponding integration type.
+type IntegrationMapping struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type InstallResult struct {
@@ -48,7 +59,7 @@ func (s *Service) Preview(repoParam string) (*Preview, error) {
 		return nil, fmt.Errorf("repo query parameter is required")
 	}
 
-	return BuildPreview(repoParam)
+	return BuildPreview(repoParam, s.Registry)
 }
 
 func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResult, error) {
@@ -81,7 +92,62 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
 	}
 
-	canvas, _, err := FetchCanvas(repo)
+	// Resolve the ref by trying to fetch the canvas file.
+	// We need the ref for params.json and console.yaml too.
+	var canvasBody []byte
+	if repo.Ref == "" {
+		for _, ref := range defaultRefs {
+			body, fetchErr := fetchURL(rawFileURL(repo, ref, canvasFileName))
+			if fetchErr == nil {
+				repo.Ref = ref
+				canvasBody = body
+				break
+			}
+			if !errors.Is(fetchErr, errFileNotFound) {
+				return nil, fetchErr
+			}
+		}
+		if canvasBody == nil {
+			return nil, fmt.Errorf("canvas.yaml not found on main or master branch")
+		}
+	} else {
+		var fetchErr error
+		canvasBody, fetchErr = fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+	}
+
+	// Substitute install params in raw YAML before parsing.
+	// If the template has params, we always need to substitute something
+	// so the YAML is valid ({{ install_params.xxx }} is not valid YAML).
+	params, _ := FetchParams(repo, repo.Ref)
+	if params != nil && len(params.InstallParams) > 0 {
+		if req.InstallParams != nil {
+			// Wizard flow: user submitted the form. Validate required fields
+			// even if the map is empty (catches blank required params).
+			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
+			if err := ValidateInstallParams(params.InstallParams, resolved); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+			}
+			canvasBody = SubstituteInstallParams(canvasBody, resolved)
+		} else {
+			// One-click flow: no params sent, substitute with defaults/placeholders.
+			defaults := make(map[string]string, len(params.InstallParams))
+			for _, p := range params.InstallParams {
+				if p.Default != "" {
+					defaults[p.Name] = p.Default
+				} else if p.Placeholder != "" {
+					defaults[p.Name] = p.Placeholder
+				} else {
+					defaults[p.Name] = p.Name
+				}
+			}
+			canvasBody = SubstituteInstallParams(canvasBody, defaults)
+		}
+	}
+
+	canvas, err := parseCanvasYAML(canvasBody)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +161,11 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	}
 
 	canvas.Metadata.Name = name
+
+	// Wire integration instances into canvas nodes.
+	if len(req.Integrations) > 0 {
+		wireIntegrations(canvas, req.Integrations, s.Registry)
+	}
 
 	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 	response, err := canvases.CreateCanvas(
@@ -163,6 +234,59 @@ func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error
 		)
 		return err
 	})
+}
+
+// wireIntegrations sets the Integration ref on each canvas node whose
+// component belongs to an integration type present in the mapping.
+func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping, reg *registry.Registry) {
+	if canvas.Spec == nil {
+		return
+	}
+
+	for _, node := range canvas.Spec.Nodes {
+		if node.Component == "" {
+			continue
+		}
+
+		integrationName := findIntegrationForComponent(node, reg)
+		if integrationName == "" {
+			continue
+		}
+
+		mapping, ok := mappings[integrationName]
+		if !ok {
+			continue
+		}
+
+		node.Integration = &componentpb.IntegrationRef{
+			Id:   &mapping.ID,
+			Name: &mapping.Name,
+		}
+	}
+}
+
+// findIntegrationForComponent returns the integration name that owns
+// the given node's component (trigger or action). Returns "" if not found.
+func findIntegrationForComponent(node *componentpb.Node, reg *registry.Registry) string {
+	if node.Component == "" {
+		return ""
+	}
+
+	for _, integration := range reg.ListIntegrations() {
+		for _, trigger := range integration.Triggers() {
+			if trigger.Name() == node.Component {
+				return integration.Name()
+			}
+		}
+
+		for _, action := range integration.Actions() {
+			if action.Name() == node.Component {
+				return integration.Name()
+			}
+		}
+	}
+
+	return ""
 }
 
 func FindActiveUserForAccountInOrganization(accountID, organizationID uuid.UUID) (*models.User, error) {
