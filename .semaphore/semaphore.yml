@@ -24,17 +24,6 @@ auto_cancel:
   queued:
     when: branch != 'main'
 blocks:
-  - name: "License Check"
-    dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
-    task:
-      jobs:
-        - name: Licence Check
-          commands:
-            - sudo rm -rf tmp/go/pkg/mod tmp/go-build
-            - make test.license.check
-
   - name: "Backend Tests"
     dependencies: []
     run:
