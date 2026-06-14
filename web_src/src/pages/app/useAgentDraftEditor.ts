@@ -8,10 +8,14 @@ import type { CanvasPageHeaderMode } from "./viewState";
 import { isCanvasWorkflowTab } from "./viewState";
 import { isDraftVersion } from "./lib/canvas-versions";
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
+import { isNotFoundError } from "./workflowPageHelpers";
 
 type AgentDraftOpenSource = "auto" | "button";
 type AgentDraftOpenResult = "opened" | "skipped" | "unavailable";
-type LoadAgentDraftVersion = (versionId: string) => Promise<CanvasesCanvasVersion | null>;
+// `notFound` distinguishes a genuinely-deleted draft from a transient load
+// failure, so only the former clears the active ref.
+type LoadAgentDraftResult = { version: CanvasesCanvasVersion | null; notFound: boolean };
+type LoadAgentDraftVersion = (versionId: string) => Promise<LoadAgentDraftResult>;
 
 const autoOpenedAgentDraftKeys = new Set<string>();
 
@@ -37,21 +41,38 @@ function useLoadAgentDraftVersion(
 ): LoadAgentDraftVersion {
   const queryClient = useQueryClient();
 
+  // Drop a deleted draft id from the cached lists so it stops being offered.
+  const pruneDeadDraft = useCallback(
+    (versionId: string) => {
+      if (!canvasId) {
+        return;
+      }
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
+        current.filter((branch) => draftVersionId(branch) !== versionId),
+      );
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) =>
+        current.filter((version) => version.metadata?.id !== versionId),
+      );
+    },
+    [canvasId, queryClient],
+  );
+
   return useCallback(
-    async (versionId: string): Promise<CanvasesCanvasVersion | null> => {
+    async (versionId: string): Promise<LoadAgentDraftResult> => {
       const cachedVersion = selectableVersionsById.get(versionId);
       if (cachedVersion) {
-        return cachedVersion;
+        return { version: cachedVersion, notFound: false };
       }
 
       if (!canvasId) {
-        return null;
+        return { version: null, notFound: false };
       }
 
       try {
         const loadedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId);
         if (!loadedVersion?.metadata?.id) {
-          return null;
+          pruneDeadDraft(versionId);
+          return { version: null, notFound: true };
         }
 
         queryClient.setQueryData<CanvasesCanvasVersion>(canvasKeys.versionDetail(canvasId, versionId), loadedVersion);
@@ -71,13 +92,17 @@ function useLoadAgentDraftVersion(
           });
         }
 
-        return loadedVersion;
-      } catch {
+        return { version: loadedVersion, notFound: false };
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          pruneDeadDraft(versionId);
+          return { version: null, notFound: true };
+        }
         showErrorToast("Failed to load draft version");
-        return null;
+        return { version: null, notFound: false };
       }
     },
-    [canvasId, queryClient, selectableVersionsById],
+    [canvasId, pruneDeadDraft, queryClient, selectableVersionsById],
   );
 }
 
@@ -141,6 +166,20 @@ export function useAgentDraftEditor({
   const [pendingAutoOpenVersionId, setPendingAutoOpenVersionId] = useState<string | null>(null);
   const loadAgentDraftVersion = useLoadAgentDraftVersion(canvasId, selectableVersionsById);
 
+  // Drop the stale ref for a deleted draft so it can't be re-published.
+  const handleMissingDraft = useCallback(
+    (versionId: string, source: AgentDraftOpenSource): AgentDraftOpenResult => {
+      if (activeCanvasVersionIdRef.current === versionId) {
+        activeCanvasVersionIdRef.current = "";
+      }
+      if (source === "button") {
+        showErrorToast("This draft no longer exists.");
+      }
+      return "unavailable";
+    },
+    [activeCanvasVersionIdRef],
+  );
+
   const openAgentDraftVersion = useCallback(
     async (versionId: string, source: AgentDraftOpenSource): Promise<AgentDraftOpenResult> => {
       if (!versionId) {
@@ -168,10 +207,11 @@ export function useAgentDraftEditor({
         }
       }
 
-      const version = await loadAgentDraftVersion(versionId);
+      const { version, notFound } = await loadAgentDraftVersion(versionId);
       if (!version) {
-        showErrorToast("Draft version not found");
-        return "unavailable";
+        // A transient load failure already toasted; don't clear the active ref
+        // or claim the draft is gone unless it actually is.
+        return notFound ? handleMissingDraft(versionId, source) : "unavailable";
       }
 
       if (!isDraftVersion(version)) {
@@ -185,6 +225,7 @@ export function useAgentDraftEditor({
     [
       activateCanvasVersionForEditing,
       activeCanvasVersionIdRef,
+      handleMissingDraft,
       hasEditableVersion,
       hasPendingLocalCanvasState,
       headerMode,
