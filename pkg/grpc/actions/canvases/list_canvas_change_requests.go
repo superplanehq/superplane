@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -41,7 +42,7 @@ func ListCanvasChangeRequests(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
+	canvas, err := findCanvas(ctx, uuid.MustParse(organizationID), canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
@@ -71,22 +72,24 @@ func ListCanvasChangeRequests(
 
 	var requests []models.CanvasChangeRequest
 	var totalCount int64
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		items, listErr := models.ListCanvasChangeRequestsFilteredInTransaction(tx, canvas.ID, listOptions)
-		if listErr != nil {
-			return listErr
-		}
-		requests = items
+	err = telemetry.RunSpan(ctx, "change_requests.list", func(ctx context.Context) error {
+		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+			items, listErr := models.ListCanvasChangeRequestsFilteredInTransaction(tx, canvas.ID, listOptions)
+			if listErr != nil {
+				return listErr
+			}
+			requests = items
 
-		countOptions := listOptions
-		countOptions.Limit = 0
-		countOptions.Before = nil
-		count, countErr := models.CountCanvasChangeRequestsFilteredInTransaction(tx, canvas.ID, countOptions)
-		if countErr != nil {
-			return countErr
-		}
-		totalCount = count
-		return nil
+			countOptions := listOptions
+			countOptions.Limit = 0
+			countOptions.Before = nil
+			count, countErr := models.CountCanvasChangeRequestsFilteredInTransaction(tx, canvas.ID, countOptions)
+			if countErr != nil {
+				return countErr
+			}
+			totalCount = count
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list canvas change requests: %v", err)
