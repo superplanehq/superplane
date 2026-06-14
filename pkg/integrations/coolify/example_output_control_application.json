@@ -1,0 +1,9 @@
+{
+  "type": "coolify.application.controlled",
+  "data": {
+    "applicationUuid": "abc123def456",
+    "operation": "restart",
+    "message": "Application restarting."
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
