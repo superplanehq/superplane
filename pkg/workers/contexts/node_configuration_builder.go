@@ -30,7 +30,6 @@ type NodeConfigurationBuilder struct {
 	rootPayload         any
 	input               any
 	expressionVariables map[string]any
-	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
 }
 
@@ -39,11 +38,6 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 		tx:         tx,
 		workflowID: workflowID,
 	}
-}
-
-func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.CanvasNode) *NodeConfigurationBuilder {
-	b.parentBlueprintNode = parentBlueprintNode
-	return b
 }
 
 func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationBuilder {
@@ -282,10 +276,6 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 	env := map[string]any{
 		"$":      messageChain,
 		"memory": b.buildMemoryExpressionNamespace(),
-	}
-
-	if b.parentBlueprintNode != nil {
-		env["config"] = normalizeExpressionValue(b.parentBlueprintNode.Configuration.Data())
 	}
 
 	for key, value := range variables {

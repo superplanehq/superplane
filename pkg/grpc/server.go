@@ -18,7 +18,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -151,9 +150,6 @@ func RunServer(
 
 	widgetService := NewWidgetService(registry)
 	widgetPb.RegisterWidgetsServer(grpcServer, widgetService)
-
-	blueprintService := NewBlueprintService(registry)
-	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
 	canvasService := NewCanvasService(authService, registry, encryptor, gitProvider, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)

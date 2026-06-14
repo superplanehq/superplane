@@ -2,8 +2,6 @@ package support
 
 import (
 	"encoding/json"
-	"maps"
-	"strings"
 	"testing"
 	"time"
 
@@ -385,29 +383,16 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		UpdatedAt:               &now,
 	}
 
-	//
-	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
-	//
-	expandedNodes, err := expandBlueprintNodes(t, orgID, inputNodes)
-	require.NoError(t, err)
-
 	var createdNodes []models.CanvasNode
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(workflow).Error; err != nil {
 			return err
 		}
 
-		for _, node := range expandedNodes {
-			var parentNodeID *string
-			if idx := strings.Index(node.ID, ":"); idx != -1 {
-				parent := node.ID[:idx]
-				parentNodeID = &parent
-			}
-
+		for _, node := range inputNodes {
 			canvasNode := models.CanvasNode{
 				WorkflowID:    workflow.ID,
 				NodeID:        node.ID,
-				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
 				State:         models.CanvasNodeStateReady,
 				Type:          node.Type,
@@ -436,7 +421,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			ChangeManagementEnabled: workflow.ChangeManagementEnabled,
 			ChangeRequestApprovers:  datatypes.NewJSONSlice(models.DefaultCanvasChangeRequestApprovers()),
 			PublishedAt:             &now,
-			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
+			Nodes:                   datatypes.NewJSONSlice(inputNodes),
 			Edges:                   datatypes.NewJSONSlice(edges),
 			CreatedAt:               &now,
 			UpdatedAt:               &now,
@@ -458,25 +443,6 @@ func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, en
 		Where("id = ?", *canvas.LiveVersionID).
 		Update("change_management_enabled", enabled).
 		Error)
-}
-
-func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
-	now := time.Now()
-
-	blueprint := models.Blueprint{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           RandomName("blueprint"),
-		Nodes:          datatypes.NewJSONSlice(nodes),
-		Edges:          datatypes.NewJSONSlice(edges),
-		OutputChannels: datatypes.NewJSONSlice(outputChannels),
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	require.NoError(t, database.Conn().Create(&blueprint).Error)
-
-	return &blueprint
 }
 
 func VerifyCanvasEventsCount(t require.TestingT, canvasID uuid.UUID, expected int) {
@@ -618,43 +584,4 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	}
 
 	require.NoError(t, database.Conn().Create(&node).Error)
-}
-
-func expandBlueprintNodes(t require.TestingT, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
-	expanded := make([]models.Node, 0, len(nodes))
-
-	for _, n := range nodes {
-		expanded = append(expanded, n)
-
-		if n.Type != models.NodeTypeBlueprint || n.Ref.Blueprint == nil {
-			continue
-		}
-
-		blueprintID := n.Ref.Blueprint.ID
-		if blueprintID == "" {
-			continue
-		}
-
-		b, err := models.FindBlueprint(orgID.String(), blueprintID)
-		if err != nil {
-			continue
-		}
-
-		for _, bn := range b.Nodes {
-			internal := models.Node{
-				ID:            n.ID + ":" + bn.ID,
-				Name:          bn.Name,
-				Type:          bn.Type,
-				Ref:           bn.Ref,
-				Configuration: bn.Configuration,
-				Metadata:      maps.Clone(bn.Metadata),
-				Position:      bn.Position,
-				IsCollapsed:   bn.IsCollapsed,
-			}
-
-			expanded = append(expanded, internal)
-		}
-	}
-
-	return expanded, nil
 }

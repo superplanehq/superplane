@@ -89,21 +89,6 @@ func FindBlueprintInTransaction(tx *gorm.DB, orgID, id string) (*Blueprint, erro
 	return &blueprint, nil
 }
 
-func FindBlueprintByName(name string, orgID uuid.UUID) (*Blueprint, error) {
-	var blueprint Blueprint
-	err := database.Conn().
-		Where("organization_id = ?", orgID).
-		Where("name = ?", name).
-		First(&blueprint).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &blueprint, nil
-}
-
 func FindUnscopedBlueprint(id string) (*Blueprint, error) {
 	return FindUnscopedBlueprintInTransaction(database.Conn(), id)
 }

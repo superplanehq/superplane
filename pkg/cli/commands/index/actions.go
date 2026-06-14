@@ -137,7 +137,7 @@ func renderActionText(stdout io.Writer, action openapi_client.SuperplaneActionsA
 	return renderExamplePayloadText(stdout, action.GetExampleOutput())
 }
 
-func renderActionOutputChannelsText(stdout io.Writer, channels []openapi_client.SuperplaneActionsOutputChannel) error {
+func renderActionOutputChannelsText(stdout io.Writer, channels []openapi_client.ActionsOutputChannel) error {
 	_, err := fmt.Fprintln(stdout, "Output Channels:")
 	if err != nil {
 		return err
