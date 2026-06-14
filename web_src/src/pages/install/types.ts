@@ -17,6 +17,7 @@ export interface InstallPreview {
   repo: string;
   title: string;
   description?: string;
+  canvasName?: string;
   defaultName: string;
   installParams?: InstallParam[];
   integrations?: string[];

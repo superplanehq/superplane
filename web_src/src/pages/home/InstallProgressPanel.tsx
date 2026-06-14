@@ -29,11 +29,13 @@ type IntegrationSelections = Record<string, { id: string; name: string }>;
 
 interface InstallProgressPanelProps {
   app: AppEntry;
+  organizationId?: string;
   onClose: () => void;
 }
 
-export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps) {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }: InstallProgressPanelProps) {
+  const { organizationId: routeOrgId } = useParams<{ organizationId: string }>();
+  const organizationId = propOrgId || routeOrgId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -42,8 +44,9 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(true);
+  const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>([]);
 
-  // Fetch preview to discover params
+  // Fetch preview to discover params and integrations
   useEffect(() => {
     fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
       .then((r) => r.json())
@@ -55,6 +58,9 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
             if (p.default) defaults[p.name] = p.default;
           }
           setParamValues(defaults);
+        }
+        if (data.integrations && data.integrations.length > 0) {
+          setDetectedIntegrations(data.integrations);
         }
       })
       .catch(() => {})
@@ -117,7 +123,9 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
     [organizationId, app, paramValues, integrationSelections, isInstalling, queryClient, navigate],
   );
 
-  const hasIntegrations = app.integrations.length > 0;
+  // Use manifest integrations if available, otherwise auto-detected from canvas
+  const integrations = app.integrations.length > 0 ? app.integrations : detectedIntegrations;
+  const hasIntegrations = integrations.length > 0;
   const hasParams = installParams.length > 0;
   const repoUrl = `https://${app.repo}`;
 
@@ -129,7 +137,7 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-slate-900">{app.title}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <IntegrationIcons integrations={app.integrations} />
+              <IntegrationIcons integrations={integrations} />
               {app.tags.map((tag) => (
                 <span
                   key={tag}
@@ -167,7 +175,7 @@ export function InstallProgressPanel({ app, onClose }: InstallProgressPanelProps
       {hasIntegrations && (
         <div className="mb-5 border-t border-slate-100 pt-4">
           <IntegrationsSection
-            integrations={app.integrations}
+            integrations={integrations}
             organizationId={organizationId ?? ""}
             selections={integrationSelections}
             onSelectionsChange={setIntegrationSelections}

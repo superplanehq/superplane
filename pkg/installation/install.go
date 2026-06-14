@@ -59,7 +59,7 @@ func (s *Service) Preview(repoParam string) (*Preview, error) {
 		return nil, fmt.Errorf("repo query parameter is required")
 	}
 
-	return BuildPreview(repoParam)
+	return BuildPreview(repoParam, s.Registry)
 }
 
 func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResult, error) {

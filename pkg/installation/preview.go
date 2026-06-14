@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 // Preview describes an installable GitHub app before the user confirms installation.
@@ -22,7 +23,8 @@ type Preview struct {
 }
 
 // BuildPreview loads app metadata from GitHub and prepares install defaults.
-func BuildPreview(repoParam string) (*Preview, error) {
+// If reg is non-nil, it also detects which integrations the canvas needs.
+func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 	repo, err := ParseRepository(repoParam)
 	if err != nil {
 		return nil, err
@@ -78,7 +80,32 @@ func BuildPreview(repoParam string) (*Preview, error) {
 		preview.InstallParams = params.InstallParams
 	}
 
+	if reg != nil {
+		preview.Integrations = detectIntegrations(canvas, reg)
+	}
+
 	return preview, nil
+}
+
+// detectIntegrations returns a deduplicated list of integration type names
+// required by the canvas nodes.
+func detectIntegrations(canvas *pb.Canvas, reg *registry.Registry) []string {
+	if canvas.Spec == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+	for _, node := range canvas.Spec.Nodes {
+		name := findIntegrationForComponent(node, reg)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		result = append(result, name)
+	}
+
+	return result
 }
 
 func previewFromCanvas(repo *Repository, canvas *pb.Canvas, ref string) *Preview {
