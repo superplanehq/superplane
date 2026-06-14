@@ -112,7 +112,7 @@ import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
-import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
+import { activateDraftVersion } from "./lib/draft-spec-cache";
 import { syncCommittedCanvasDraftState } from "./lib/sync-committed-canvas-draft";
 import {
   isDraftVersion,
@@ -172,6 +172,7 @@ import {
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
+import { useDraftRecovery } from "./useDraftRecovery";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
@@ -4087,63 +4088,29 @@ export function AppPage() {
     ]);
   }, [organizationId, canvasId, queryClient]);
 
-  const handlePublishVersion = useCallback(async () => {
-    if (!organizationId || !canvasId || !activeCanvasVersionId) {
-      return;
-    }
-
-    setIsPreparingVersionAction(true);
-    try {
-      const isReady = await ensureVersionActionDraftReady(
-        "Unable to prepare the latest version changes for publishing",
-      );
-      if (!isReady) {
-        return;
-      }
-
-      const versionIdToPublish = activeCanvasVersionIdRef.current;
-      if (!versionIdToPublish) {
-        return;
-      }
-
-      // Publish operates on the committed draft row, so flush any staged spec
-      // edits into the version before promoting it to live.
-      consoleMutationGenerationRef.current += 1;
-      await commitCanvasStagingMutation.mutateAsync();
-
-      await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
-      activeCanvasVersionIdRef.current = "";
-      clearDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionIdToPublish);
-      exitToLive();
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        next.delete("branch");
-        return clearComponentSidebarSearchParams(next);
-      });
-      await refreshLatestLiveCanvasData();
-      showSuccessToast("Version published");
-    } catch (error) {
-      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
-    } finally {
-      setIsPreparingVersionAction(false);
-    }
-  }, [
-    organizationId,
-    canvasId,
-    activeCanvasVersionId,
-    ensureVersionActionDraftReady,
-    publishCanvasVersionMutation,
-    commitCanvasStagingMutation,
-    refreshLatestLiveCanvasData,
-    setSearchParams,
-    exitToLive,
-  ]);
-
   const cancelPendingCanvasSaves = useCallback(() => {
     canvasSaveSessionRef.current += 1;
     clearQueuedCanvasSave();
   }, [clearQueuedCanvasSave]);
+
+  const { handlePublishVersion, recoverIfDraftMissing, recoverFromMissingDraft } = useDraftRecovery({
+    organizationId,
+    canvasId,
+    activeCanvasVersionId,
+    activeCanvasVersionIdRef,
+    draftCanvasSpecsRef,
+    setActiveCanvasVersion,
+    setDraftCanvasSpec,
+    exitToLive,
+    setSearchParams,
+    refreshLatestLiveCanvasData,
+    cancelPendingCanvasSaves,
+    ensureVersionActionDraftReady,
+    commitCanvasStagingMutation,
+    publishCanvasVersionMutation,
+    consoleMutationGenerationRef,
+    setIsPreparingVersionAction,
+  });
 
   const handleCanvasDraftRestoredToCommitted = useCallback(
     (_version: CanvasesCanvasVersion) => {
@@ -4174,6 +4141,7 @@ export function AppPage() {
     flushRepositoryFileStaging,
     cancelPendingCanvasSaves,
     onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
+    recoverIfDraftMissing,
   });
 
   const handleActOnChangeRequest = useCallback(
@@ -4583,6 +4551,7 @@ export function AppPage() {
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
     setSuppressUnpublishedDraftDiscard,
+    onActiveDraftMissing: recoverFromMissingDraft,
   });
 
   const handleSubmitCreateChangeRequest = useCallback(
