@@ -472,58 +472,26 @@ export const WithNestedExecutionChain: Story = {
         {
           name: "Preparation Phase",
           state: "completed",
-          children: [
-            { name: "Validate Configuration", state: "completed" },
-            { name: "Check Dependencies", state: "completed" },
-            { name: "Reserve Resources", state: "completed" },
-          ],
         },
         {
           name: "Build Phase",
           state: "completed",
-          children: [
-            { name: "Build API Service", state: "completed" },
-            { name: "Build Frontend", state: "completed" },
-            { name: "Build Background Jobs", state: "completed" },
-            { name: "Build Database Migrations", state: "completed" },
-          ],
         },
         {
           name: "Test Phase",
           state: "completed",
-          children: [
-            { name: "Unit Tests", state: "completed" },
-            { name: "Integration Tests", state: "completed" },
-            { name: "Security Scan", state: "completed" },
-          ],
         },
         {
           name: "Deploy to Staging",
           state: "running",
-          children: [
-            { name: "Deploy Database", state: "completed" },
-            { name: "Deploy API Service", state: "completed" },
-            { name: "Deploy Frontend", state: "running" },
-            { name: "Deploy Background Jobs", state: "running" },
-          ],
         },
         {
           name: "Staging Tests",
           state: "running",
-          children: [
-            { name: "Smoke Tests", state: "running" },
-            { name: "Performance Tests", state: "running" },
-            { name: "User Acceptance Tests", state: "running" },
-          ],
         },
         {
           name: "Production Deployment",
           state: "running",
-          children: [
-            { name: "Blue-Green Switch", state: "running" },
-            { name: "Health Checks", state: "running" },
-            { name: "Monitor Metrics", state: "running" },
-          ],
         },
       ],
     },
