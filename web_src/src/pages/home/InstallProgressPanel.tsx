@@ -123,8 +123,9 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
     [organizationId, app, paramValues, integrationSelections, isInstalling, queryClient, navigate],
   );
 
-  // Use manifest integrations if available, otherwise auto-detected from canvas
-  const integrations = app.integrations.length > 0 ? app.integrations : detectedIntegrations;
+  // Always use auto-detected integrations from canvas (source of truth).
+  // Falls back to manifest only while preview is loading.
+  const integrations = detectedIntegrations.length > 0 ? detectedIntegrations : app.integrations;
   const hasIntegrations = integrations.length > 0;
   const hasParams = installParams.length > 0;
   const repoUrl = `https://${app.repo}`;
