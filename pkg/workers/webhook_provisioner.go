@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -152,7 +153,7 @@ func (w *WebhookProvisioner) runIntegrationSetup(webhook *models.Webhook) (any, 
 
 	return handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
+		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil).SetTrigger(telemetry.IntegrationSecretTriggerWebhook),
 		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})

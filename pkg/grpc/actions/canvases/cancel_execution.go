@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -107,7 +108,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			logger = logging.WithIntegration(logger, *integration)
-			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil)
+			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil).SetTrigger(telemetry.IntegrationSecretTriggerExecution)
 		}
 
 		ctx.Logger = logger

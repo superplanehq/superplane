@@ -19,6 +19,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
@@ -136,7 +137,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration).SetTrigger(telemetry.IntegrationSecretTriggerSetup),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{
@@ -179,7 +180,7 @@ func syncIntegration(
 		registry.Encryptor,
 		registry,
 		nil,
-	)
+	).SetTrigger(telemetry.IntegrationSecretTriggerSetup)
 
 	syncErr := integrationImpl.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
