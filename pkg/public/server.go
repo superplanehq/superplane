@@ -446,7 +446,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -463,7 +463,7 @@ func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) htt
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-account-id", account.ID.String())
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
