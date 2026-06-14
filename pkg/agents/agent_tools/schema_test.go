@@ -50,7 +50,6 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 		"node_executions",
 		"node_queue_items",
 		"node_events",
-		"child_executions",
 	}, resourceSchema.Enum)
 	assert.Contains(t, schema.Properties, "namespace")
 	assert.Contains(t, schema.Properties, "node_id")

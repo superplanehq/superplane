@@ -142,12 +142,7 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const execution = payload as CanvasesCanvasNodeExecution;
             if (execution.nodeId) {
-              const storeNodeId =
-                execution.parentExecutionId && execution.nodeId.includes(":")
-                  ? execution.nodeId.split(":")[0]
-                  : execution.nodeId;
-
-              nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
+              nodeExecutionStore.updateNodeExecution(execution.nodeId, execution);
 
               patchExecutionInCache(execution);
 
@@ -299,13 +294,6 @@ export function useCanvasWebsocket(
         let nodeId: string | undefined;
         if (payload && "nodeId" in payload && payload.nodeId) {
           nodeId = payload.nodeId as string;
-
-          // For child executions, use parent nodeId for queuing
-          if (data.event.startsWith("execution_") && "parentExecutionId" in payload && payload.parentExecutionId) {
-            if (nodeId.includes(":")) {
-              nodeId = nodeId.split(":")[0];
-            }
-          }
         }
 
         if (!nodeId) {

@@ -5,31 +5,51 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp) (*pb.ListCanvasEventsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	events, err := models.ListRootCanvasEvents(canvasID, int(limit), beforeTime)
+
+	var events []models.CanvasEvent
+	err := telemetry.RunSpan(ctx, "events.list", func(ctx context.Context) error {
+		var listErr error
+		events, listErr = models.ListRootCanvasEventsInTransaction(database.DB(ctx), canvasID, int(limit), beforeTime)
+		return listErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountRootCanvasEvents(canvasID)
+	var count int64
+	err = telemetry.RunSpan(ctx, "events.count", func(ctx context.Context) error {
+		var countErr error
+		count, countErr = models.CountRootCanvasEventsInTransaction(database.DB(ctx), canvasID)
+		return countErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	executionsByEventID, err := listExecutionsForCanvasEvents(canvasID, events)
+	var executionsByEventID map[string][]models.CanvasNodeExecution
+	err = telemetry.RunSpan(ctx, "events.load_executions", func(ctx context.Context) error {
+		var loadErr error
+		executionsByEventID, loadErr = listExecutionsForCanvasEvents(ctx, canvasID, events)
+		return loadErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID)
+	serialized, err := serializeCanvasEventsWithExecutions(ctx, events, executionsByEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +169,7 @@ func getLastEventTimestamp(events []models.CanvasEvent) *timestamppb.Timestamp {
 	return nil
 }
 
-func listExecutionsForCanvasEvents(canvasID uuid.UUID, events []models.CanvasEvent) (map[string][]models.CanvasNodeExecution, error) {
+func listExecutionsForCanvasEvents(ctx context.Context, canvasID uuid.UUID, events []models.CanvasEvent) (map[string][]models.CanvasNodeExecution, error) {
 	if len(events) == 0 {
 		return map[string][]models.CanvasNodeExecution{}, nil
 	}
@@ -159,7 +179,7 @@ func listExecutionsForCanvasEvents(canvasID uuid.UUID, events []models.CanvasEve
 		eventIDs[i] = event.ID
 	}
 
-	executions, err := models.ListParentExecutionsForRootEvents(canvasID, eventIDs)
+	executions, err := models.ListParentExecutionsForRootEventsInTransaction(database.DB(ctx), canvasID, eventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -171,4 +191,27 @@ func listExecutionsForCanvasEvents(canvasID uuid.UUID, events []models.CanvasEve
 	}
 
 	return executionsByEventID, nil
+}
+
+func serializeCanvasEventsWithExecutions(
+	ctx context.Context,
+	events []models.CanvasEvent,
+	executionsByEventID map[string][]models.CanvasNodeExecution,
+) ([]*pb.CanvasEventWithExecutions, error) {
+	var serialized []*pb.CanvasEventWithExecutions
+	err := telemetry.RunSpan(ctx, "events.serialize", func(ctx context.Context) error {
+		var serErr error
+		serialized, serErr = SerializeCanvasEventsWithExecutions(events, executionsByEventID)
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("events.count", len(events)))
+		}
+
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return serialized, nil
 }

@@ -22,14 +22,55 @@ const (
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
-	NodeTypeBlueprint = "blueprint"
 	NodeTypeWidget    = "widget"
 )
+
+type Node struct {
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	Type           string         `json:"type"`
+	Ref            NodeRef        `json:"ref"`
+	Configuration  map[string]any `json:"configuration"`
+	Metadata       map[string]any `json:"metadata"`
+	Position       Position       `json:"position"`
+	IsCollapsed    bool           `json:"isCollapsed"`
+	IntegrationID  *string        `json:"integrationId,omitempty"`
+	ErrorMessage   *string        `json:"errorMessage,omitempty"`
+	WarningMessage *string        `json:"warningMessage,omitempty"`
+}
+
+type Position struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+type NodeRef struct {
+	Component *ComponentRef `json:"component,omitempty"`
+	Trigger   *TriggerRef   `json:"trigger,omitempty"`
+	Widget    *WidgetRef    `json:"widget,omitempty"`
+}
+
+type ComponentRef struct {
+	Name string `json:"name"`
+}
+
+type TriggerRef struct {
+	Name string `json:"name"`
+}
+
+type WidgetRef struct {
+	Name string `json:"name"`
+}
+
+type Edge struct {
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Channel  string `json:"channel"`
+}
 
 type CanvasNode struct {
 	WorkflowID        uuid.UUID `gorm:"primaryKey"`
 	NodeID            string    `gorm:"primaryKey"`
-	ParentNodeID      *string
 	Name              string
 	State             string
 	StateReason       *string
@@ -58,10 +99,6 @@ func (c *CanvasNode) ComponentName() string {
 
 	if ref.Trigger != nil && ref.Trigger.Name != "" {
 		return ref.Trigger.Name
-	}
-
-	if c.Type == NodeTypeBlueprint {
-		return "blueprint"
 	}
 
 	return "unknown"
@@ -97,9 +134,6 @@ func NodeTypeName(node Node) string {
 	}
 	if node.Ref.Trigger != nil && node.Ref.Trigger.Name != "" {
 		return node.Ref.Trigger.Name
-	}
-	if node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "" {
-		return node.Ref.Blueprint.ID
 	}
 	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
 		return node.Ref.Widget.Name
@@ -203,7 +237,7 @@ func ListCanvasNodesReady() ([]CanvasNode, error) {
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
 		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
-		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Where("workflow_nodes.type = ?", NodeTypeComponent).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
