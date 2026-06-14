@@ -45,12 +45,16 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>([]);
 
   // Fetch preview to discover params and integrations
   useEffect(() => {
     fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Failed to load app configuration (${r.status})`);
+        return r.json();
+      })
       .then((data) => {
         if (data.installParams && data.installParams.length > 0) {
           setInstallParams(data.installParams);
@@ -64,7 +68,9 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
           setDetectedIntegrations(data.integrations);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        setPreviewError(err instanceof Error ? err.message : "Failed to load app configuration");
+      })
       .finally(() => setPreviewLoading(false));
   }, [app.repo]);
 
@@ -131,6 +137,8 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
   const hasIntegrations = integrations.length > 0;
   const hasParams = installParams.length > 0;
   const repoUrl = `https://${app.repo}`;
+  const allIntegrationsSelected = !hasIntegrations || integrations.every((name) => integrationSelections[name]);
+  const canInstall = !isInstalling && !previewLoading && !previewError && allIntegrationsSelected;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
@@ -196,6 +204,12 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
         </div>
       )}
 
+      {previewError && (
+        <div className="mb-5 border-t border-slate-100 pt-4">
+          <p className="text-xs text-red-600">{previewError}</p>
+        </div>
+      )}
+
       {!previewLoading && hasParams && (
         <div className="mb-5 border-t border-slate-100 pt-4">
           <p className="text-xs font-semibold text-slate-700 mb-3">Configuration</p>
@@ -249,7 +263,7 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
       {/* Action buttons */}
       {!previewLoading && (
         <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
-          <Button size="sm" onClick={() => void doInstall(false)} disabled={isInstalling}>
+          <Button size="sm" onClick={() => void doInstall(false)} disabled={!canInstall}>
             {isInstalling ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
@@ -260,7 +274,7 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
             )}
           </Button>
           {hasParams && (
-            <Button variant="outline" size="sm" onClick={() => void doInstall(true)} disabled={isInstalling}>
+            <Button variant="outline" size="sm" onClick={() => void doInstall(true)} disabled={!canInstall}>
               Just take me there
             </Button>
           )}
