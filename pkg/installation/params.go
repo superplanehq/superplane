@@ -84,6 +84,22 @@ func ResolveInstallParams(schema []InstallParam, values map[string]string) map[s
 	return resolved
 }
 
+// DefaultParamValues builds a fallback map from the schema using
+// default → placeholder → param name, in that priority order.
+func DefaultParamValues(schema []InstallParam) map[string]string {
+	defaults := make(map[string]string, len(schema))
+	for _, p := range schema {
+		if p.Default != "" {
+			defaults[p.Name] = p.Default
+		} else if p.Placeholder != "" {
+			defaults[p.Name] = p.Placeholder
+		} else {
+			defaults[p.Name] = p.Name
+		}
+	}
+	return defaults
+}
+
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
 
 // SubstituteInstallParams replaces {{ install_params.xxx }} placeholders

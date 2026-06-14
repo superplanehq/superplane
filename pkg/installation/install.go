@@ -112,17 +112,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 			canvasBody = SubstituteInstallParams(canvasBody, resolved)
 		} else {
 			// One-click flow: no params sent, substitute with defaults/placeholders.
-			defaults := make(map[string]string, len(params.InstallParams))
-			for _, p := range params.InstallParams {
-				if p.Default != "" {
-					defaults[p.Name] = p.Default
-				} else if p.Placeholder != "" {
-					defaults[p.Name] = p.Placeholder
-				} else {
-					defaults[p.Name] = p.Name
-				}
-			}
-			canvasBody = SubstituteInstallParams(canvasBody, defaults)
+			canvasBody = SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams))
 		}
 	}
 

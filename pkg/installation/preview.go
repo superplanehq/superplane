@@ -35,20 +35,9 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		return nil, err
 	}
 
-	// Fetch params and substitute with defaults/placeholders so canvas parses.
 	params, _ := FetchParams(repo, ref)
 	if params != nil && len(params.InstallParams) > 0 {
-		defaults := make(map[string]string, len(params.InstallParams))
-		for _, p := range params.InstallParams {
-			if p.Default != "" {
-				defaults[p.Name] = p.Default
-			} else if p.Placeholder != "" {
-				defaults[p.Name] = p.Placeholder
-			} else {
-				defaults[p.Name] = p.Name
-			}
-		}
-		canvasBody = SubstituteInstallParams(canvasBody, defaults)
+		canvasBody = SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams))
 	}
 
 	canvas, err := parseCanvasYAML(canvasBody)

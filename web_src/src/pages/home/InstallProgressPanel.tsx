@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -70,6 +70,11 @@ export function InstallProgressPanel({
 
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
+
+  // Clear selections when org changes (e.g. user switches org on /install page)
+  useEffect(() => {
+    setIntegrationSelections({});
+  }, [organizationId]);
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
