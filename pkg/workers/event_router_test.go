@@ -168,7 +168,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
 	require.NoError(t, err)
 	require.NoError(t, triggerEvent.Routed())
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID)
 	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
@@ -225,7 +225,7 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, triggerEvent.Routed())
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID)
 	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
