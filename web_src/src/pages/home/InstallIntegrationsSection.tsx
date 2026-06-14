@@ -138,7 +138,7 @@ function useCreateDialogProps(
   availableIntegrations: Array<{ name?: string; [key: string]: unknown }>,
   connected: Array<{
     metadata?: { id?: string; name?: string; integrationName?: string };
-    status?: { state?: string; metadata?: { [key: string]: unknown } };
+    status?: { state?: string; metadata?: { [key: string]: unknown }; browserAction?: unknown };
     spec?: { configuration?: unknown };
   }>,
   existingIntegrationNames: Set<string>,
