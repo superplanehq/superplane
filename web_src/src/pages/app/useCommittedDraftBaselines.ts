@@ -47,17 +47,27 @@ export function useCommittedDraftBaselines({
     // The console read shares its key/fetcher with the draft console query, so
     // the two committed console.yaml reads are deduped into a single request.
     // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
-    void Promise.all([
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
-        staleTime: 30_000,
-      }),
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.console(canvasId, versionId),
-        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
-        staleTime: 30_000,
-      }),
+    //
+    // Each read is wrapped in a `.catch(() => undefined)` so that a transient
+    // backend failure (e.g. git provider down, or the committed canvas/console
+    // file not yet present for a brand-new draft) only degrades the affected
+    // baseline to "missing" rather than producing an unhandled promise rejection
+    // that would surface as a "Failed to get file" error in monitoring.
+    Promise.all([
+      queryClient
+        .fetchQuery({
+          queryKey: canvasKeys.versionDetail(canvasId, versionId),
+          queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
+          staleTime: 30_000,
+        })
+        .catch(() => undefined),
+      queryClient
+        .fetchQuery({
+          queryKey: canvasKeys.console(canvasId, versionId),
+          queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
+          staleTime: 30_000,
+        })
+        .catch(() => undefined),
     ]).then(([version, consoleData]) => {
       if (cancelled) {
         return;
