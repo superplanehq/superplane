@@ -82,19 +82,27 @@ export function useEditorLifecycle({
     }
 
     let cancelled = false;
-    void fetchRepositoryFileContentCached(queryClient, canvasId, path, versionId, false).then((content) => {
-      if (cancelled) {
-        return;
-      }
-
-      setCommittedContentByPath((current) => {
-        if (current[path] === content) {
-          return current;
+    // The committed read fails (HTTP 500) when the selected file does not exist
+    // in the committed version yet (e.g. it was newly added via staging) or when
+    // the git backend is transiently unavailable. Either way, the editor only
+    // uses this content to compute diffs against the staged content, so we
+    // gracefully fall back to empty content rather than letting the rejection
+    // bubble up as an unhandled error (which would otherwise get reported).
+    fetchRepositoryFileContentCached(queryClient, canvasId, path, versionId, false)
+      .catch(() => "")
+      .then((content) => {
+        if (cancelled) {
+          return;
         }
 
-        return { ...current, [path]: content };
+        setCommittedContentByPath((current) => {
+          if (current[path] === content) {
+            return current;
+          }
+
+          return { ...current, [path]: content };
+        });
       });
-    });
 
     return () => {
       cancelled = true;

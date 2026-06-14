@@ -2181,7 +2181,11 @@ export function AppPage() {
         }
 
         invalidateCanvasVersionData(canvasId, payload.versionId);
-        void resyncDraftToCommitted(payload.versionId);
+        // Swallow transient resync failures (e.g. a committed-canvas read that
+        // momentarily fails) so they do not bubble up as unhandled rejections.
+        // The query cache invalidation above will trigger a fresh fetch on the
+        // next interaction, so the UI recovers without user action.
+        resyncDraftToCommitted(payload.versionId).catch(() => {});
         return true;
       }
 
