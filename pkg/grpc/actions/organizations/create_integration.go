@@ -130,6 +130,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
+		logging.ForIntegration(*newIntegration).WithField("source", "integration_create_first_step").Info("Integration operation may write secrets")
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
@@ -181,6 +182,7 @@ func syncIntegration(
 		nil,
 	)
 
+	logging.ForIntegration(*newIntegration).WithField("source", "integration_create_sync").Info("Integration operation may write secrets")
 	syncErr := integrationImpl.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            registry.HTTPContext(),
