@@ -33,8 +33,8 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, canvasID,
 			return err
 		}
 
-		if lockedNode.Type != models.NodeTypeComponent && lockedNode.Type != models.NodeTypeBlueprint {
-			return status.Error(codes.InvalidArgument, "pause is only supported for component or blueprint nodes")
+		if lockedNode.Type != models.NodeTypeComponent {
+			return status.Error(codes.InvalidArgument, "pause is only supported for component nodes")
 		}
 
 		if paused {

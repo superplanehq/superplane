@@ -60,7 +60,7 @@ func Test_UpdateNodePause(t *testing.T) {
 	t.Run("resumes to processing when execution is running", func(t *testing.T) {
 		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 		require.NoError(t, database.Conn().
 			Model(execution).
 			Update("state", models.CanvasNodeExecutionStateStarted).

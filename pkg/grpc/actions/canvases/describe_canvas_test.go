@@ -167,14 +167,14 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create multiple executions for node-1 (older one first)
 		//
-		oldExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		oldExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 		// Wait a bit to ensure different timestamps
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 
 		//
 		// Create one execution for node-2
 		//
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID)
 
 		//
 		// Describe the canvas
@@ -360,9 +360,9 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create executions for all nodes
 		//
-		activeExec1 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID, nil)
-		activeExec2 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID, nil)
-		deletedExec := support.CreateCanvasNodeExecution(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID, nil)
+		activeExec1 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID)
+		activeExec2 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID)
+		deletedExec := support.CreateCanvasNodeExecution(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID)
 
 		//
 		// Delete one node (soft delete)
