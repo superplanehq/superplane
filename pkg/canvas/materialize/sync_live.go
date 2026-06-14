@@ -44,6 +44,10 @@ func SyncLiveFromGit(
 		return nil, fmt.Errorf("git provider is not configured")
 	}
 
+	if err := lockBranchMaterialization(tx, canvasID, models.CanvasGitBranchMain); err != nil {
+		return nil, err
+	}
+
 	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)

@@ -115,6 +115,10 @@ func SyncDraftBranchFromGit(
 		return nil, fmt.Errorf("branch %q is not a draft branch", branchName)
 	}
 
+	if err := lockBranchMaterialization(tx, canvasID, branchName); err != nil {
+		return nil, err
+	}
+
 	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)

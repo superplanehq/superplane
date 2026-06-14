@@ -34,6 +34,10 @@ func (m *DraftMaterializer) MaterializeDraft(
 		return nil, fmt.Errorf("draft materializer is not configured")
 	}
 
+	if err := lockBranchMaterialization(tx, canvasID, branch); err != nil {
+		return nil, err
+	}
+
 	if isDraftBranch(branch) {
 		existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branch)
 		if err == nil &&
