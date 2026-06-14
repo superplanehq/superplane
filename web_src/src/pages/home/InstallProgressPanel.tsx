@@ -10,6 +10,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
@@ -254,6 +255,7 @@ function IntegrationsSection({
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
+  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
 
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
@@ -263,10 +265,10 @@ function IntegrationsSection({
   const integrationData = useMemo(
     () =>
       integrations.map((name) => {
-        const readyInstances = connected.filter(
-          (item) => item.metadata?.integrationName === name && item.status?.state === "ready",
-        );
-        return { name, readyInstances };
+        const allInstances = connected.filter((item) => item.metadata?.integrationName === name);
+        const readyInstances = allInstances.filter((item) => item.status?.state === "ready");
+        const nonReadyInstances = allInstances.filter((item) => item.status?.state !== "ready");
+        return { name, allInstances, readyInstances, nonReadyInstances };
       }),
     [integrations, connected],
   );
@@ -337,16 +339,24 @@ function IntegrationsSection({
             getIntegrationTypeDisplayName(undefined, data.name) ||
             data.name.charAt(0).toUpperCase() + data.name.slice(1);
 
-          // Always show dropdown + "or create new" — consistent for 0, 1, or N instances
+          // Always show dropdown + "or create new"
           return (
             <div key={data.name} className="flex items-center gap-2">
               <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-              {data.readyInstances.length > 0 ? (
+              {data.allInstances.length > 0 ? (
                 <Select
                   value={selections[data.name]?.id || ""}
                   onValueChange={(instanceId) => {
-                    const instance = data.readyInstances.find((i) => i.metadata?.id === instanceId);
-                    if (instance?.metadata?.id && instance?.metadata?.name) {
+                    const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
+                    if (!instance?.metadata?.id) return;
+
+                    // If the selected instance is not ready, open configure dialog
+                    if (instance.status?.state !== "ready") {
+                      setConfigureIntegrationId(instance.metadata.id);
+                      return;
+                    }
+
+                    if (instance.metadata.name) {
                       onSelectionsChange({
                         ...selections,
                         [data.name]: { id: instance.metadata.id, name: instance.metadata.name },
@@ -358,11 +368,26 @@ function IntegrationsSection({
                     <SelectValue placeholder={`Select ${displayName}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {data.readyInstances.map((instance) => (
-                      <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
-                        {instance.metadata?.name || instance.metadata?.id}
-                      </SelectItem>
-                    ))}
+                    {data.allInstances.map((instance) => {
+                      const state = instance.status?.state;
+                      const isReady = state === "ready";
+                      return (
+                        <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
+                          <span className="flex items-center gap-1.5">
+                            <span>{instance.metadata?.name || instance.metadata?.id}</span>
+                            {isReady && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            )}
+                            {state === "pending" && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                            )}
+                            {state === "error" && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                            )}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (
@@ -373,12 +398,21 @@ function IntegrationsSection({
                 onClick={() => setDialogIntegrationName(data.name)}
                 className="text-xs text-blue-600 hover:text-blue-700 hover:underline shrink-0"
               >
-                {data.readyInstances.length > 0 ? "or create new" : "create new"}
+                {data.allInstances.length > 0 ? "or create new" : "create new"}
               </button>
             </div>
           );
         })}
       </div>
+
+      <ConfigureIntegrationDialog
+        integrationId={configureIntegrationId}
+        organizationId={organizationId}
+        onClose={() => {
+          setConfigureIntegrationId(null);
+          void refetch();
+        }}
+      />
 
       <IntegrationCreateDialog
         open={!!dialogIntegrationName}
