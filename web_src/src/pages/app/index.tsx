@@ -55,6 +55,7 @@ import {
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import { useCanvasDraftResync } from "@/hooks/useCanvasDraftResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
@@ -70,6 +71,7 @@ import { analytics } from "@/lib/analytics";
 import { appPath } from "@/lib/appPaths";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
+import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -113,7 +115,6 @@ import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
-import { syncCommittedCanvasDraftState } from "./lib/sync-committed-canvas-draft";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -2094,58 +2095,19 @@ export function AppPage() {
     [queryClient],
   );
 
-  // A remote `canvas_version_updated` (e.g. a CLI `apps canvas update`) commits
-  // canvas.yaml into the version row and discards the draft's staging. Refresh
-  // the committed/staged caches and clear the staging indicators so the UI does
-  // not keep showing stale "uncommitted changes" for content that no longer has
-  // any staging on the server.
-  const resyncDraftToCommitted = useCallback(
-    async (versionId: string) => {
-      if (!organizationId || !canvasId) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
-
-      // Only the actively-edited draft drives the rendered graph and staging
-      // indicators, so the full committed-state resync (and canvas remount via
-      // stagingResetNonce) is reserved for it. Other branches just refresh their
-      // cached staging/version data.
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
-      }
-
-      consoleMutationGenerationRef.current += 1;
-      const committedVersion = await syncCommittedCanvasDraftState({
-        queryClient,
-        organizationId,
-        canvasId,
-        versionId,
-      });
-
-      const committedSpec = committedVersion?.spec ?? null;
-      if (committedSpec) {
-        draftCanvasSpecsRef.current.set(versionId, committedSpec);
-      } else {
-        draftCanvasSpecsRef.current.delete(versionId);
-      }
-      setDraftCanvasSpec(committedSpec);
-      setActiveCanvasVersion((current) =>
-        current?.metadata?.id === versionId ? { ...current, spec: committedSpec ?? current.spec } : current,
-      );
-      const restored = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      if (restored) {
-        setLastSavedWorkflowSnapshot(restored);
-      }
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
-    },
-    [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
-  );
+  const { resyncDraftToCommitted, resyncDraftToStaged } = useCanvasDraftResync({
+    organizationId,
+    canvasId,
+    activeCanvasVersionIdRef,
+    draftCanvasSpecsRef,
+    consoleMutationGenerationRef,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setLastSavedWorkflowSnapshot,
+    setHasUnsavedChanges,
+    setHasNonPositionalUnsavedChanges,
+    setStagingResetNonce,
+  });
 
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {
@@ -2213,6 +2175,32 @@ export function AppPage() {
     [isViewingLiveVersion, hasPendingLocalCanvasState, canvasDeletedRemotely],
   );
 
+  const handleCanvasStagingEvent = useCallback(
+    (payload: { canvasId: string; versionId?: string }) => {
+      if (!payload.versionId) {
+        return false;
+      }
+
+      // This tab's own staging writes broadcast back to it; skip the refetch so
+      // it does not clobber newer, still in-flight local edits.
+      if (consumeLocalStagingWrite(canvasId, payload.versionId)) {
+        return false;
+      }
+
+      // Defer when this tab has its own unsaved canvas edits to avoid clobbering
+      // them; the deferred-apply effect refreshes once they settle. The console
+      // and files staged caches still refresh through the websocket hook.
+      if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
+        setRemoteCanvasUpdatePending(true);
+        return true;
+      }
+
+      void resyncDraftToStaged(payload.versionId);
+      return true;
+    },
+    [canvasId, activeCanvasVersionId, hasPendingLocalCanvasState, resyncDraftToStaged],
+  );
+
   useCanvasWebsocket(
     canvasId!,
     organizationId!,
@@ -2223,6 +2211,7 @@ export function AppPage() {
     shouldApplyCanvasUpdate,
     isViewingLiveVersion,
     true,
+    handleCanvasStagingEvent,
   );
 
   const rawLogNodes = canvasNodes;

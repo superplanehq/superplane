@@ -16,7 +16,7 @@ func DiscardCanvasStaging(
 	versionID string,
 	paths []string,
 ) (*pb.DiscardCanvasStagingResponse, error) {
-	_, version, _, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
+	canvas, version, _, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -29,6 +29,8 @@ func DiscardCanvasStaging(
 	if err != nil {
 		return nil, err
 	}
+
+	publishStagingUpdated(canvas.ID, version.ID)
 
 	return &pb.DiscardCanvasStagingResponse{StagingSummary: state}, nil
 }
