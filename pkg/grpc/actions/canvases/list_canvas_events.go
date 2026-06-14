@@ -10,6 +10,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -47,7 +49,7 @@ func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID
 		return nil, err
 	}
 
-	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID)
+	serialized, err := serializeCanvasEventsWithExecutions(ctx, events, executionsByEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,4 +191,27 @@ func listExecutionsForCanvasEvents(ctx context.Context, canvasID uuid.UUID, even
 	}
 
 	return executionsByEventID, nil
+}
+
+func serializeCanvasEventsWithExecutions(
+	ctx context.Context,
+	events []models.CanvasEvent,
+	executionsByEventID map[string][]models.CanvasNodeExecution,
+) ([]*pb.CanvasEventWithExecutions, error) {
+	var serialized []*pb.CanvasEventWithExecutions
+	err := telemetry.RunSpan(ctx, "events.serialize", func(ctx context.Context) error {
+		var serErr error
+		serialized, serErr = SerializeCanvasEventsWithExecutions(events, executionsByEventID)
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("events.count", len(events)))
+		}
+
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return serialized, nil
 }

@@ -1,6 +1,7 @@
 package canvases
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -342,4 +344,18 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef,
 	}
 
 	return nil
+}
+
+func serializeCanvas(ctx context.Context, canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
+	var proto *pb.Canvas
+	err := telemetry.RunSpan(ctx, "canvases.serialize", func(ctx context.Context) error {
+		var serErr error
+		proto, serErr = SerializeCanvas(canvas, includeStatus, user)
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return proto, nil
 }
