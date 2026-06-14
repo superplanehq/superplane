@@ -273,13 +273,22 @@ function IntegrationsSection({
     [integrations, connected],
   );
 
-  // Auto-select: first ready instance (covers both single and multiple cases)
+  // Auto-select first ready instance, and clear selections that point to non-ready instances
   useEffect(() => {
     let changed = false;
     const next = { ...selections };
     for (const data of integrationData) {
-      if (next[data.name]) continue;
-      if (data.readyInstances.length > 0) {
+      // If current selection points to a non-ready instance, clear it
+      if (next[data.name]) {
+        const selectedInstance = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
+        if (selectedInstance && selectedInstance.status?.state !== "ready") {
+          delete next[data.name];
+          changed = true;
+        }
+      }
+
+      // Auto-select first ready instance if nothing selected
+      if (!next[data.name] && data.readyInstances.length > 0) {
         const instance = data.readyInstances[0];
         if (instance.metadata?.id && instance.metadata?.name) {
           next[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
@@ -318,6 +327,8 @@ function IntegrationsSection({
 
   const handleCreated = useCallback(
     (integrationId: string, instanceName: string) => {
+      // Only auto-select if onCreated fires — the dialog considers it successful.
+      // After refetch, the auto-select effect will verify it's actually ready.
       if (dialogIntegrationName) {
         onSelectionsChange({
           ...selections,
