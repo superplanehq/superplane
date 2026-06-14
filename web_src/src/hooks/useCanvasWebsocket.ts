@@ -28,6 +28,8 @@ type CanvasWebsocketPayload = {
 
 type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
 
+type CanvasStagingEventName = "staging_updated";
+
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
   | CanvasesCanvasEvent
@@ -53,6 +55,7 @@ export function useCanvasWebsocket(
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
+  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -113,7 +116,10 @@ export function useCanvasWebsocket(
       const payload = data.payload;
       const isCanvasLifecycleEvent =
         data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
-      if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
+      // Staging events fire while editing a draft (not the live version), so they
+      // must bypass the runtime-event gate that is disabled outside the live view.
+      const isCanvasStagingEvent = data.event === "staging_updated";
+      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -225,6 +231,39 @@ export function useCanvasWebsocket(
           queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
           break;
         }
+        case "staging_updated": {
+          // A draft's staging layer changed in another tab (or this one). Refresh
+          // the staged caches so the diff badge, console and files tabs reflect
+          // the uncommitted changes.
+          const stagingMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId || !stagingMessage.versionId) {
+            break;
+          }
+
+          const shouldInvalidateStagingQueries =
+            onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
+          if (!shouldInvalidateStagingQueries) {
+            break;
+          }
+
+          const versionId = stagingMessage.versionId;
+          queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+          // versionStagedDetail, consoleStaged and staged repositoryFileContent
+          // keys all end with "staged" and include the version id, so a single
+          // predicate refreshes the editor's effective draft reads without
+          // touching the committed caches.
+          queryClient.invalidateQueries({
+            predicate: (query) => {
+              const key = query.queryKey;
+              return (
+                Array.isArray(key) &&
+                key[key.length - 1] === "staged" &&
+                (key as readonly unknown[]).includes(versionId)
+              );
+            },
+          });
+          break;
+        }
         default:
           break;
       }
@@ -237,6 +276,7 @@ export function useCanvasWebsocket(
       onWorkflowEvent,
       onExecutionEvent,
       onCanvasLifecycleEvent,
+      onCanvasStagingEvent,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
       organizationId,
