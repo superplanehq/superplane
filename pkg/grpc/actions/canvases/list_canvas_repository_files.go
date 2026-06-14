@@ -34,13 +34,20 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 
 	repositoryPaths := []string{}
 	repository, err := models.FindRepository(orgID, canvasID)
-	if err == nil {
+	switch {
+	case err == nil && repository.Status == models.RepositoryStatusReady:
+		//
+		// Only call out to the git provider when the repository has been
+		// successfully provisioned. For pending/error states the underlying
+		// repo does not yet exist on the git provider side, so calling
+		// ListFiles() would fail and produce a 500.
+		//
 		files, listErr := gitProvider.ListFiles(ctx, repository.RepoID)
 		if listErr != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", listErr)
 		}
 		repositoryPaths = files
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound):
 		return nil, status.Errorf(codes.Internal, "failed to load repository: %v", err)
 	}
 

@@ -32,6 +32,26 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[1].Path)
 	})
 
+	t.Run("repository pending -> returns virtual spec files without calling git provider", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusPending, false)
+
+		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.Len(t, response.Files, 2)
+		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[0].Path)
+		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[1].Path)
+	})
+
+	t.Run("repository error -> returns virtual spec files without calling git provider", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusError, false)
+
+		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.Len(t, response.Files, 2)
+		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[0].Path)
+		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[1].Path)
+	})
+
 	t.Run("list files fails -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
 
