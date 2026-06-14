@@ -1,20 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
-import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
-import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
-import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
 import { showErrorToast } from "@/lib/toast";
@@ -23,15 +15,36 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
 import { IntegrationIcons } from "./AppDetailModal";
+import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
+import { useInstallPreviewData } from "./useInstallPreviewData";
 import type { InstallParam } from "../install/types";
 
-// Integration type name → { id, name } of the selected/created instance
-type IntegrationSelections = Record<string, { id: string; name: string }>;
+async function executeInstall(opts: {
+  repo: string;
+  organizationId: string;
+  installParams?: Record<string, string>;
+  integrations: IntegrationSelections;
+}): Promise<{ canvasId: string; organizationId: string }> {
+  const body: Record<string, unknown> = {
+    repo: opts.repo,
+    name: generateCanvasName(),
+    organizationId: opts.organizationId,
+  };
+  if (opts.installParams) body.installParams = opts.installParams;
+  if (Object.keys(opts.integrations).length > 0) body.integrations = opts.integrations;
+  const response = await fetch("/apps/install", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error((await response.text()) || "Failed to install");
+  return response.json() as Promise<{ canvasId: string; organizationId: string }>;
+}
 
 interface InstallProgressPanelProps {
   app: AppEntry;
   organizationId?: string;
-  /** If provided, skips the preview fetch (caller already loaded it). */
   preloadedIntegrations?: string[];
   preloadedParams?: InstallParam[];
   onClose: () => void;
@@ -49,157 +62,63 @@ export function InstallProgressPanel({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const hasPreloaded = Boolean(preloadedIntegrations || preloadedParams);
-  const [installParams, setInstallParams] = useState<InstallParam[]>(preloadedParams ?? []);
-  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
-    const defaults: Record<string, string> = {};
-    for (const p of preloadedParams ?? []) {
-      if (p.default) defaults[p.name] = p.default;
-    }
-    return defaults;
+  const preview = useInstallPreviewData({
+    repo: app.repo,
+    preloadedIntegrations,
+    preloadedParams,
   });
+
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(!hasPreloaded);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>(preloadedIntegrations ?? []);
-
-  // Fetch preview to discover params and integrations (skip if preloaded)
-  useEffect(() => {
-    if (hasPreloaded) return;
-    fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load app configuration (${r.status})`);
-        return r.json();
-      })
-      .then((data) => {
-        if (data.installParams && data.installParams.length > 0) {
-          setInstallParams(data.installParams);
-          const defaults: Record<string, string> = {};
-          for (const p of data.installParams) {
-            if (p.default) defaults[p.name] = p.default;
-          }
-          setParamValues(defaults);
-        }
-        if (data.integrations && data.integrations.length > 0) {
-          setDetectedIntegrations(data.integrations);
-        }
-      })
-      .catch((err) => {
-        setPreviewError(err instanceof Error ? err.message : "Failed to load app configuration");
-      })
-      .finally(() => setPreviewLoading(false));
-  }, [app.repo, hasPreloaded]);
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
       if (!organizationId || isInstalling) return;
       setIsInstalling(true);
-
       try {
-        const body: Record<string, unknown> = {
+        const result = await executeInstall({
           repo: app.repo,
-          name: generateCanvasName(),
           organizationId,
-        };
-
-        // Send params when user chose "Install" (even if empty — backend validates required fields).
-        // Skip sends nothing — backend uses defaults/placeholders.
-        if (!skipParams && installParams.length > 0) {
-          body.installParams = paramValues;
-        }
-
-        if (Object.keys(integrationSelections).length > 0) {
-          body.integrations = integrationSelections;
-        }
-
-        const response = await fetch("/apps/install", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          installParams: !skipParams && preview.installParams.length > 0 ? preview.paramValues : undefined,
+          integrations: integrationSelections,
         });
-
-        if (!response.ok) {
-          const message = await response.text();
-          throw new Error(message || "Failed to install");
-        }
-
-        const result = (await response.json()) as { canvasId: string; organizationId: string };
-
         await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
-
         if (app.agentInstructions || app.agentInitialMessage) {
           setAgentBootContext(result.canvasId, {
             instructions: app.agentInstructions,
             initialMessage: app.agentInitialMessage,
           });
         }
-
         localStorage.setItem("canvasAgentSidebarOpen", "true");
         localStorage.setItem("canvasSidebarOpen", "false");
         navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
       } catch (error) {
         setIsInstalling(false);
-        const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install"));
-        showErrorToast(message);
+        showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install")));
       }
     },
-    [organizationId, app, paramValues, installParams, integrationSelections, isInstalling, queryClient, navigate],
+    [
+      organizationId,
+      app,
+      preview.paramValues,
+      preview.installParams,
+      integrationSelections,
+      isInstalling,
+      queryClient,
+      navigate,
+    ],
   );
 
-  // Always use auto-detected integrations from canvas (source of truth).
-  // Falls back to manifest only while preview is loading.
-  const integrations = detectedIntegrations.length > 0 ? detectedIntegrations : app.integrations;
+  const integrations = preview.detectedIntegrations.length > 0 ? preview.detectedIntegrations : app.integrations;
   const hasIntegrations = integrations.length > 0;
-  const hasParams = installParams.length > 0;
-  const repoUrl = `https://${app.repo}`;
+  const hasParams = preview.installParams.length > 0;
   const allIntegrationsSelected = !hasIntegrations || integrations.every((name) => integrationSelections[name]);
-  const canInstall = !isInstalling && !previewLoading && !previewError && allIntegrationsSelected;
+  const canInstall = !isInstalling && !preview.previewLoading && !preview.previewError && allIntegrationsSelected;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
-      {/* Panel 1: App Info */}
-      <div className="mb-5">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-slate-900">{app.title}</h3>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <IntegrationIcons integrations={integrations} />
-              {app.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-          <a
-            href={repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 shrink-0"
-          >
-            <ExternalLink className="h-3 w-3" />
-            GitHub
-          </a>
-        </div>
-        {app.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{app.description}</p>}
-        {app.requirements.length > 0 && (
-          <ul className="mt-2 space-y-0.5">
-            {app.requirements.map((req) => (
-              <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
-                {req}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <AppInfoHeader app={app} integrations={integrations} />
 
-      {/* Panel 2: Integrations */}
       {hasIntegrations && (
         <div className="mb-5 border-t border-slate-100 pt-4">
           <IntegrationsSection
@@ -211,8 +130,7 @@ export function InstallProgressPanel({
         </div>
       )}
 
-      {/* Panel 3: Parameters */}
-      {previewLoading && (
+      {preview.previewLoading && (
         <div className="mb-5 border-t border-slate-100 pt-4">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -221,295 +139,173 @@ export function InstallProgressPanel({
         </div>
       )}
 
-      {previewError && (
+      {preview.previewError && (
         <div className="mb-5 border-t border-slate-100 pt-4">
-          <p className="text-xs text-red-600">{previewError}</p>
+          <p className="text-xs text-red-600">{preview.previewError}</p>
         </div>
       )}
 
-      {!previewLoading && hasParams && (
+      {!preview.previewLoading && hasParams && (
         <div className="mb-5 border-t border-slate-100 pt-4">
-          <p className="text-xs font-semibold text-slate-700 mb-3">Configuration</p>
-          <div className="space-y-3">
-            {installParams.map((param) => (
-              <div key={param.name} className="space-y-1">
-                <Label htmlFor={`param-${param.name}`} className="text-xs">
-                  {param.label}
-                  {param.required && <span className="text-red-500 ml-0.5">*</span>}
-                </Label>
-                {param.type === "integration-resource" && param.integration && param.resourceType ? (
-                  <IntegrationResourceFieldRenderer
-                    field={{
-                      name: param.name,
-                      label: param.label,
-                      type: "integration-resource",
-                      placeholder: param.placeholder,
-                      required: param.required,
-                      typeOptions: {
-                        resource: {
-                          type: param.resourceType,
-                        },
-                      },
-                    }}
-                    value={paramValues[param.name]}
-                    onChange={(val) =>
-                      setParamValues((prev) => ({
-                        ...prev,
-                        [param.name]: typeof val === "string" ? val : Array.isArray(val) ? (val[0] ?? "") : "",
-                      }))
-                    }
-                    organizationId={organizationId}
-                    integrationId={integrationSelections[param.integration]?.id}
-                  />
-                ) : (
-                  <Input
-                    id={`param-${param.name}`}
-                    value={paramValues[param.name] ?? ""}
-                    placeholder={param.placeholder}
-                    className="h-8 text-xs"
-                    onChange={(e) => setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))}
-                  />
-                )}
-                {param.description && <p className="text-[10px] text-slate-400">{param.description}</p>}
-              </div>
-            ))}
-          </div>
+          <ParamsSection
+            params={preview.installParams}
+            values={preview.paramValues}
+            onChange={preview.setParamValues}
+            organizationId={organizationId}
+            integrationSelections={integrationSelections}
+          />
         </div>
       )}
 
-      {/* Action buttons */}
-      {!previewLoading && (
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
-          <Button size="sm" onClick={() => void doInstall(false)} disabled={!canInstall}>
-            {isInstalling ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                Installing...
-              </>
-            ) : (
-              "Install"
-            )}
-          </Button>
-          {hasParams && (
-            <Button variant="outline" size="sm" onClick={() => void doInstall(true)} disabled={!canInstall}>
-              Just take me there
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isInstalling}>
-            Cancel
-          </Button>
-        </div>
+      {!preview.previewLoading && (
+        <InstallActions
+          canInstall={canInstall}
+          isInstalling={isInstalling}
+          hasParams={hasParams}
+          onInstall={() => void doInstall(false)}
+          onSkip={() => void doInstall(true)}
+          onClose={onClose}
+        />
       )}
     </div>
   );
 }
 
-// ─── Integrations Section ────────────────────────────────────────────────────
-
-function IntegrationsSection({
-  integrations,
-  organizationId,
-  selections,
-  onSelectionsChange,
+function InstallActions({
+  canInstall,
+  isInstalling,
+  hasParams,
+  onInstall,
+  onSkip,
+  onClose,
 }: {
-  integrations: string[];
-  organizationId: string;
-  selections: IntegrationSelections;
-  onSelectionsChange: (selections: IntegrationSelections) => void;
+  canInstall: boolean;
+  isInstalling: boolean;
+  hasParams: boolean;
+  onInstall: () => void;
+  onSkip: () => void;
+  onClose: () => void;
 }) {
-  const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
-    enabled: !!organizationId,
-  });
-  const { data: availableIntegrations = [] } = useAvailableIntegrations();
-  const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
-  const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
-  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
-
-  const existingIntegrationNames = useMemo(
-    () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
-    [connected],
+  return (
+    <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+      <Button size="sm" onClick={onInstall} disabled={!canInstall}>
+        {isInstalling ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+            Installing...
+          </>
+        ) : (
+          "Install"
+        )}
+      </Button>
+      {hasParams && (
+        <Button variant="outline" size="sm" onClick={onSkip} disabled={!canInstall}>
+          Just take me there
+        </Button>
+      )}
+      <Button variant="ghost" size="sm" onClick={onClose} disabled={isInstalling}>
+        Cancel
+      </Button>
+    </div>
   );
+}
 
-  const integrationData = useMemo(
-    () =>
-      integrations.map((name) => {
-        const allInstances = connected.filter((item) => item.metadata?.integrationName === name);
-        const readyInstances = allInstances.filter((item) => item.status?.state === "ready");
-        const nonReadyInstances = allInstances.filter((item) => item.status?.state !== "ready");
-        return { name, allInstances, readyInstances, nonReadyInstances };
-      }),
-    [integrations, connected],
+function AppInfoHeader({ app, integrations }: { app: AppEntry; integrations: string[] }) {
+  return (
+    <div className="mb-5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-slate-900">{app.title}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <IntegrationIcons integrations={integrations} />
+            {app.tags.map((tag) => (
+              <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+        <a
+          href={`https://${app.repo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 shrink-0"
+        >
+          <ExternalLink className="h-3 w-3" />
+          GitHub
+        </a>
+      </div>
+      {app.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{app.description}</p>}
+      {app.requirements.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {app.requirements.map((req) => (
+            <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+              {req}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
+}
 
-  // Auto-select first ready instance, and clear selections that point to non-ready instances
-  useEffect(() => {
-    let changed = false;
-    const next = { ...selections };
-    for (const data of integrationData) {
-      // If current selection points to a non-ready instance, clear it
-      if (next[data.name]) {
-        const selectedInstance = data.allInstances.find((i) => i.metadata?.id === next[data.name].id);
-        if (selectedInstance && selectedInstance.status?.state !== "ready") {
-          delete next[data.name];
-          changed = true;
-        }
-      }
-
-      // Auto-select first ready instance if nothing selected
-      if (!next[data.name] && data.readyInstances.length > 0) {
-        const instance = data.readyInstances[0];
-        if (instance.metadata?.id && instance.metadata?.name) {
-          next[data.name] = { id: instance.metadata.id, name: instance.metadata.name };
-          changed = true;
-        }
-      }
-    }
-    if (changed) onSelectionsChange(next);
-  }, [integrationData, selections, onSelectionsChange]);
-
-  const dialogDefinition = useMemo(
-    () => (dialogIntegrationName ? availableIntegrations.find((d) => d.name === dialogIntegrationName) : undefined),
-    [availableIntegrations, dialogIntegrationName],
-  );
-
-  const dialogPendingInstance = useMemo(() => {
-    if (!dialogIntegrationName) return undefined;
-    return connected.find((i) => i.metadata?.integrationName === dialogIntegrationName && i.status?.state !== "ready");
-  }, [dialogIntegrationName, connected]);
-
-  const initialWebhookSetup = useMemo(() => {
-    const webhookUrl = getIntegrationWebhookUrl(dialogPendingInstance?.status?.metadata);
-    if (!webhookUrl || !dialogPendingInstance?.metadata?.id) return undefined;
-    return {
-      id: dialogPendingInstance.metadata.id,
-      webhookUrl,
-      config: { ...(dialogPendingInstance.spec?.configuration ?? {}) },
-    };
-  }, [dialogPendingInstance]);
-
-  const defaultDialogName = useMemo(() => {
-    if (dialogPendingInstance?.metadata?.name) return dialogPendingInstance.metadata.name;
-    if (!dialogIntegrationName) return "";
-    return getNextIntegrationName(dialogIntegrationName, existingIntegrationNames);
-  }, [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames]);
-
-  const handleCreated = useCallback(
-    (integrationId: string, instanceName: string) => {
-      // Only auto-select if onCreated fires — the dialog considers it successful.
-      // After refetch, the auto-select effect will verify it's actually ready.
-      if (dialogIntegrationName) {
-        onSelectionsChange({
-          ...selections,
-          [dialogIntegrationName]: { id: integrationId, name: instanceName },
-        });
-      }
-      setDialogIntegrationName(null);
-      void refetch();
-    },
-    [dialogIntegrationName, selections, onSelectionsChange, refetch],
-  );
-
+function ParamsSection({
+  params,
+  values,
+  onChange,
+  organizationId,
+  integrationSelections,
+}: {
+  params: InstallParam[];
+  values: Record<string, string>;
+  onChange: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  organizationId?: string;
+  integrationSelections: IntegrationSelections;
+}) {
   return (
     <>
-      <p className="text-xs font-semibold text-slate-700 mb-3">Integrations</p>
-      <div className="space-y-2.5">
-        {integrationData.map((data) => {
-          const displayName =
-            getIntegrationTypeDisplayName(undefined, data.name) ||
-            data.name.charAt(0).toUpperCase() + data.name.slice(1);
-
-          // Always show dropdown + "or create new"
-          return (
-            <div key={data.name} className="flex items-center gap-2">
-              <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-              {data.allInstances.length > 0 ? (
-                <Select
-                  value={selections[data.name]?.id || ""}
-                  onValueChange={(instanceId) => {
-                    const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
-                    if (!instance?.metadata?.id) return;
-
-                    // If the selected instance is not ready, open configure dialog
-                    if (instance.status?.state !== "ready") {
-                      setConfigureIntegrationId(instance.metadata.id);
-                      return;
-                    }
-
-                    if (instance.metadata.name) {
-                      onSelectionsChange({
-                        ...selections,
-                        [data.name]: { id: instance.metadata.id, name: instance.metadata.name },
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-56 h-7 text-xs">
-                    <SelectValue placeholder={`Select ${displayName}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {data.allInstances.map((instance) => {
-                      const state = instance.status?.state;
-                      const isReady = state === "ready";
-                      return (
-                        <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
-                          <span className="flex items-center gap-1.5">
-                            <span>{instance.metadata?.name || instance.metadata?.id}</span>
-                            {isReady && (
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            )}
-                            {state === "pending" && (
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                            )}
-                            {state === "error" && (
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                            )}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="text-xs text-slate-400">Not connected</span>
-              )}
-              <button
-                type="button"
-                onClick={() => setDialogIntegrationName(data.name)}
-                className="text-xs text-blue-600 hover:text-blue-700 hover:underline shrink-0"
-              >
-                {data.allInstances.length > 0 ? "or create new" : "create new"}
-              </button>
-            </div>
-          );
-        })}
+      <p className="text-xs font-semibold text-slate-700 mb-3">Configuration</p>
+      <div className="space-y-3">
+        {params.map((param) => (
+          <div key={param.name} className="space-y-1">
+            <Label htmlFor={`param-${param.name}`} className="text-xs">
+              {param.label}
+              {param.required && <span className="text-red-500 ml-0.5">*</span>}
+            </Label>
+            {param.type === "integration-resource" && param.integration && param.resourceType ? (
+              <IntegrationResourceFieldRenderer
+                field={{
+                  name: param.name,
+                  label: param.label,
+                  type: "integration-resource",
+                  placeholder: param.placeholder,
+                  required: param.required,
+                  typeOptions: { resource: { type: param.resourceType } },
+                }}
+                value={values[param.name]}
+                onChange={(val) =>
+                  onChange((prev) => ({
+                    ...prev,
+                    [param.name]: typeof val === "string" ? val : Array.isArray(val) ? (val[0] ?? "") : "",
+                  }))
+                }
+                organizationId={organizationId}
+                integrationId={integrationSelections[param.integration]?.id}
+              />
+            ) : (
+              <Input
+                id={`param-${param.name}`}
+                value={values[param.name] ?? ""}
+                placeholder={param.placeholder}
+                className="h-8 text-xs"
+                onChange={(e) => onChange((prev) => ({ ...prev, [param.name]: e.target.value }))}
+              />
+            )}
+            {param.description && <p className="text-[10px] text-slate-400">{param.description}</p>}
+          </div>
+        ))}
       </div>
-
-      <ConfigureIntegrationDialog
-        integrationId={configureIntegrationId}
-        organizationId={organizationId}
-        onClose={() => {
-          setConfigureIntegrationId(null);
-          void refetch();
-        }}
-      />
-
-      <IntegrationCreateDialog
-        open={!!dialogIntegrationName}
-        onOpenChange={(open) => !open && setDialogIntegrationName(null)}
-        integrationDefinition={dialogDefinition ?? null}
-        organizationId={organizationId}
-        onCreateIntegration={async (payload) => {
-          const res = await createIntegrationMutation.mutateAsync(payload);
-          return res.data;
-        }}
-        onReset={() => createIntegrationMutation.reset()}
-        defaultName={defaultDialogName}
-        onCreated={(integrationId, instanceName) => handleCreated(integrationId, instanceName)}
-        initialBrowserAction={dialogPendingInstance?.status?.browserAction}
-        initialCreatedIntegrationId={dialogPendingInstance?.metadata?.id}
-        initialWebhookSetup={initialWebhookSetup}
-        initialConfiguration={dialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined}
-      />
     </>
   );
 }

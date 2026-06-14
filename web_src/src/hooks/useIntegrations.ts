@@ -135,7 +135,10 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
+export const useCreateIntegration = (
+  organizationId: string,
+  source: "node_configuration" | "integrations_page" | "install_wizard",
+) => {
   const queryClient = useQueryClient();
 
   return useMutation({
