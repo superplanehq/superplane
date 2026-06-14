@@ -80,22 +80,40 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	createResp, err := canvasRepository.CreateCanvas(
+		ctx,
+		r.Registry,
+		r.Encryptor,
+		r.AuthService,
+		r.GitProvider,
+		"https://hooks.example.test",
+		r.Organization.ID,
+		&pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{Name: support.RandomName("agent-update-draft")},
+			Spec:     &pb.Canvas_Spec{},
+		},
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	canvasID := createResp.GetCanvas().GetMetadata().GetId()
+
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
-		context.Background(),
+		ctx,
 		r.Organization.ID.String(),
-		canvas.ID.String(),
+		canvasID,
 		"",
 		canvasRepository.CanvasYAMLRepositoryPath,
 	)
 	require.NoError(t, err)
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-
 	registry := NewDefaultRegistry(Dependencies{
 		Encryptor:      r.Encryptor,
 		Registry:       r.Registry,
 		AuthService:    r.AuthService,
+		GitProvider:    r.GitProvider,
 		WebhookBaseURL: "https://hooks.example.test",
 	})
 
@@ -103,7 +121,7 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
+		CanvasID:       canvasID,
 	}, Input{
 		Action:     "update_draft",
 		CanvasYAML: canvasYAML,
@@ -121,7 +139,7 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	described, err := canvasRepository.DescribeCanvasVersion(
 		ctx,
 		r.Organization.ID.String(),
-		canvas.ID.String(),
+		canvasID,
 		update.VersionID,
 	)
 	require.NoError(t, err)
@@ -133,7 +151,7 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
 		r.Organization.ID.String(),
-		canvas.ID.String(),
+		canvasID,
 		update.VersionID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 	)

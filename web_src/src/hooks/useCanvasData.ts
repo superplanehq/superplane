@@ -63,6 +63,7 @@ import {
   fetchCanvasVersionWithSpec,
   fetchCanvasVersionStagingSummary,
   fetchConsoleSpecFromRepository,
+  fetchRepositoryFileChangesVersusLive,
   fetchRepositorySpecFileContent,
 } from "../pages/app/lib/repository-spec-files";
 import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-files";
@@ -263,6 +264,11 @@ export const canvasKeys = {
   consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
+  // Whether a draft version has committed repository-file changes vs live. It
+  // prefix-extends `repository`, so committing staged files (which invalidates
+  // the whole repository subtree) also refetches this publish-readiness signal.
+  repositoryFileChanges: (canvasId: string, versionId: string | undefined) =>
+    [...canvasKeys.repository(canvasId), "file-changes", versionId ?? ""] as const,
   repositoryFile: (canvasId: string, path: string, versionId?: string) =>
     [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live"] as const,
   // Raw repository-file content keyed per stage so cached reads can be reused
@@ -2061,18 +2067,32 @@ export const useCanvasRepository = (canvasId: string, enabled: boolean = true) =
   });
 };
 
-export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true, branch?: string) => {
   return useQuery({
-    queryKey: canvasKeys.repositoryFiles(canvasId),
+    queryKey: [...canvasKeys.repositoryFiles(canvasId), branch ?? ""],
     queryFn: async () => {
       const response = await canvasesListCanvasRepositoryFiles(
         withOrganizationHeader({
           path: { canvasId },
+          query: branch ? { branch } : undefined,
         }),
       );
       return response.data;
     },
     enabled: enabled && !!canvasId,
+    staleTime: 15_000,
+  });
+};
+
+// useCanvasRepositoryFileChanges reports whether a draft version has committed
+// changes to arbitrary repository files (e.g. README.md) relative to live. The
+// graph/console spec diffs do not cover these files, so this drives the Publish
+// button's enabled state and the Files tab's committed-changes (blue) indicator.
+export const useCanvasRepositoryFileChanges = (canvasId: string, versionId: string | undefined, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.repositoryFileChanges(canvasId, versionId),
+    queryFn: () => fetchRepositoryFileChangesVersusLive(canvasId, versionId ?? ""),
+    enabled: enabled && !!canvasId && !!versionId,
     staleTime: 15_000,
   });
 };
@@ -2191,8 +2211,13 @@ export const useCommitCanvasStaging = (organizationId: string, canvasId: string,
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, CANVAS_YAML_PATH, versionId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, CONSOLE_YAML_PATH, versionId) });
+      // Commit writes staged files into the draft branch — not only the spec
+      // files (canvas.yaml / console.yaml) but also arbitrary repository files
+      // such as README.md. Invalidate the whole repository subtree so every
+      // file's committed and staged content caches refetch the committed
+      // content; otherwise the editor reconciles against a stale baseline and
+      // reverts the just-committed edit.
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
     },
   });
 };

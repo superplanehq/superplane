@@ -10,10 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -105,20 +105,18 @@ func CreateCanvas(
 		&usagepb.OrganizationState{Canvases: int32(canvasCount + 1)},
 		&usagepb.CanvasState{Nodes: int32(len(nodes))},
 	)
-
 	if err != nil {
 		return nil, err
 	}
 
 	canvasID := uuid.New()
-	versionID := uuid.New()
-
+	liveVersionID := uuid.New()
 	now := time.Now()
 	canvas := models.Canvas{
 		ID:             canvasID,
 		OrganizationID: organizationID,
-		LiveVersionID:  &versionID,
 		Name:           name,
+		LiveVersionID:  &liveVersionID,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -129,116 +127,122 @@ func CreateCanvas(
 		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
 			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 		}
-		if findErr != nil {
-			return findErr
+		return findErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	repoID := gitProvider.GetRepositoryID(git.RepositoryOptions{
+		OrganizationID: organizationID,
+		CanvasID:       canvasID,
+	})
+	repository := &models.Repository{
+		CanvasID:       canvasID,
+		OrganizationID: organizationID,
+		Provider:       gitProvider.Name(),
+		RepoID:         repoID,
+		Status:         models.RepositoryStatusPending,
+	}
+
+	user, err := models.FindActiveUserByID(organizationID.String(), userID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
+	}
+
+	commitSHA, seedErr := materialize.SeedMainRepository(ctx, gitProvider, repository, materialize.SeedRepositoryInput{
+		Name:                    name,
+		Description:             pbCanvas.Metadata.Description,
+		Nodes:                   nodes,
+		Edges:                   edges,
+		ChangeManagementEnabled: changeManagementEnabled,
+		ChangeRequestApprovers:  changeRequestApprovers,
+		Author: git.CommitAuthor{
+			Name:  user.Name,
+			Email: user.GetEmail(),
+		},
+	})
+	if seedErr != nil {
+		return nil, status.Errorf(codes.Internal, "failed to seed canvas repository: %v", seedErr)
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if createErr := tx.Clauses(clause.Returning{}).Create(&canvas).Error; createErr != nil {
+			return mapCanvasNameUniqueConstraintError(createErr)
 		}
 
-		//
-		// Create the workflow record
-		//
-		err := tx.Clauses(clause.Returning{}).Create(&canvas).Error
-		if err != nil {
-			return mapCanvasNameUniqueConstraintError(err)
-		}
-
-		//
-		// Create new empty canvas version record
-		//
-		emptyVersion := models.CanvasVersion{
-			ID:                      versionID,
+		// The placeholder live version is intentionally created empty (no nodes/
+		// edges). It only exists to satisfy the non-null workflows.live_version_id
+		// FK before materialization runs. Materializing the seeded git commit then
+		// diffs this empty live against the snapshot, so every node is treated as an
+		// add and the publisher creates the corresponding workflow_nodes records.
+		placeholderVersion := models.CanvasVersion{
+			ID:                      liveVersionID,
 			WorkflowID:              canvasID,
-			OwnerID:                 &createdBy,
 			State:                   models.CanvasVersionStatePublished,
 			Name:                    name,
 			Description:             pbCanvas.Metadata.Description,
 			ChangeManagementEnabled: changeManagementEnabled,
 			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
-			PublishedAt:             &now,
 			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
 			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
+			PublishedAt:             &now,
 			CreatedAt:               &now,
 			UpdatedAt:               &now,
 		}
-
-		if err := tx.Create(&emptyVersion).Error; err != nil {
-			return err
+		if versionErr := tx.Create(&placeholderVersion).Error; versionErr != nil {
+			return versionErr
 		}
 
-		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
-			OrganizationID: organizationID,
-			CanvasID:       canvasID,
-		}))
-
-		if err != nil {
-			return err
+		if repoErr := canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), repoID); repoErr != nil {
+			return repoErr
 		}
 
-		//
-		// If this is a canvas creation with no nodes,
-		// nothing else to do here.
-		//
-		if len(nodes) == 0 {
-			return nil
+		if markErr := tx.Model(&models.Repository{}).
+			Where("canvas_id = ?", canvasID).
+			Updates(map[string]any{
+				"status":     models.RepositoryStatusReady,
+				"updated_at": time.Now(),
+			}).Error; markErr != nil {
+			return markErr
 		}
 
-		//
-		// Otherwise. we generate and apply changeset to the draft version
-		//
-		changeset, err := changesets.NewChangesetBuilder([]models.Node{}, []models.Edge{}, nodes, edges).Build()
-		if err != nil {
-			return err
-		}
-
-		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, &emptyVersion)
-		if err := patcher.ApplyChangeset(changeset, nil); err != nil {
-			return err
-		}
-
-		updatedVersion := patcher.GetVersion()
-		if err := tx.Save(updatedVersion).Error; err != nil {
-			return err
-		}
-
-		//
-		// Publish the draft version as the live version
-		//
-		publisher, err := changesets.NewCanvasPublisher(tx, updatedVersion, &emptyVersion, changesets.CanvasPublisherOptions{
+		mat := &materialize.Materializer{
+			GitProvider:    gitProvider,
 			Registry:       registry,
-			OrgID:          organizationID,
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
-			GitProvider:    gitProvider,
-		})
-
-		if err != nil {
-			return err
 		}
-
-		return publisher.Publish(ctx)
+		_, matErr := mat.MaterializeFromGit(ctx, tx, organizationID, canvasID, models.CanvasGitBranchMain, commitSHA, materialize.ModeLive, &createdBy)
+		return matErr
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to materialize canvas: %v", err)
+	}
+
+	canvas.ChangeManagementEnabled = changeManagementEnabled
+	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
+	canvas.Description = pbCanvas.Metadata.Description
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvasID)
+	if err == nil && liveVersion != nil {
+		canvas.LiveVersionID = &liveVersion.ID
+		canvas.Name = liveVersion.Name
 	}
 
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
-	canvas.ChangeManagementEnabled = changeManagementEnabled
-	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
-	canvas.Description = pbCanvas.Metadata.Description
-
-	var user *models.User
+	var createdByUser *models.User
 	if canvas.CreatedBy != nil {
-		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		createdByUser, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	proto, err := SerializeCanvas(&canvas, false, user)
+	proto, err := SerializeCanvas(&canvas, false, createdByUser)
 	if err != nil {
 		return nil, err
 	}

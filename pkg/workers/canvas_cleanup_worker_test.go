@@ -73,11 +73,11 @@ func (p *cleanupGitProvider) DeleteRepository(_ context.Context, repoID string) 
 	return p.err
 }
 
-func (p *cleanupGitProvider) ListFiles(context.Context, string) ([]string, error) {
+func (p *cleanupGitProvider) ListFiles(context.Context, string, string) ([]string, error) {
 	return nil, errors.New("not used")
 }
 
-func (p *cleanupGitProvider) GetFile(context.Context, string, string) (io.ReadCloser, error) {
+func (p *cleanupGitProvider) GetFile(context.Context, string, string, string) (io.ReadCloser, error) {
 	return nil, errors.New("not used")
 }
 
@@ -85,8 +85,24 @@ func (p *cleanupGitProvider) Commit(context.Context, string, git.CommitOptions) 
 	return "", errors.New("not used")
 }
 
-func (p *cleanupGitProvider) Head(context.Context, string) (string, error) {
+func (p *cleanupGitProvider) Head(context.Context, string, string) (string, error) {
 	return "", errors.New("not used")
+}
+
+func (p *cleanupGitProvider) ListBranches(context.Context, string, string) ([]string, error) {
+	return nil, errors.New("not used")
+}
+
+func (p *cleanupGitProvider) CreateBranch(context.Context, string, string, string) error {
+	return errors.New("not used")
+}
+
+func (p *cleanupGitProvider) MergeBranch(context.Context, string, string, string, string, git.CommitAuthor) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (p *cleanupGitProvider) DeleteBranch(context.Context, string, string) error {
+	return errors.New("not used")
 }
 
 func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {

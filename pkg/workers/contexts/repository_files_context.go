@@ -82,7 +82,7 @@ func (c *repositoryFilesContext) List() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.gitProvider.ListFiles(context.Background(), repoID)
+	return c.gitProvider.ListFiles(context.Background(), repoID, "")
 }
 
 func (c *repositoryFilesContext) Read(path string) (io.ReadCloser, error) {
@@ -90,5 +90,5 @@ func (c *repositoryFilesContext) Read(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.gitProvider.GetFile(context.Background(), repoID, path)
+	return c.gitProvider.GetFile(context.Background(), repoID, path, "")
 }
