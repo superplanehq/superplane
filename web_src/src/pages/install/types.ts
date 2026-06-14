@@ -6,11 +6,14 @@ export interface OrganizationOption {
 export interface InstallParam {
   name: string;
   label: string;
-  type: string;
+  type: string; // "string" or "integration-resource"
   placeholder?: string;
   description?: string;
   default?: string;
   required: boolean;
+  // For type "integration-resource"
+  integration?: string; // integration type name (e.g. "digitalocean")
+  resourceType?: string; // resource type (e.g. "region", "size", "image")
 }
 
 export interface InstallPreview {

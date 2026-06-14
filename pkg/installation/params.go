@@ -14,11 +14,15 @@ const paramsFileName = "params.json"
 type InstallParam struct {
 	Name        string `json:"name"`
 	Label       string `json:"label"`
-	Type        string `json:"type"` // "string" for now
+	Type        string `json:"type"` // "string" or "integration-resource"
 	Placeholder string `json:"placeholder,omitempty"`
 	Description string `json:"description,omitempty"`
 	Default     string `json:"default,omitempty"`
 	Required    bool   `json:"required"`
+
+	// For type "integration-resource"
+	Integration  string `json:"integration,omitempty"`  // integration type name (e.g. "digitalocean")
+	ResourceType string `json:"resourceType,omitempty"` // resource type (e.g. "region", "size", "image")
 }
 
 // ParamsFile is the structure of params.json in the app repo.

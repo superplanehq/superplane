@@ -10,6 +10,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
@@ -204,13 +205,39 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
                   {param.label}
                   {param.required && <span className="text-red-500 ml-0.5">*</span>}
                 </Label>
-                <Input
-                  id={`param-${param.name}`}
-                  value={paramValues[param.name] ?? ""}
-                  placeholder={param.placeholder}
-                  className="h-8 text-xs"
-                  onChange={(e) => setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))}
-                />
+                {param.type === "integration-resource" && param.integration && param.resourceType ? (
+                  <IntegrationResourceFieldRenderer
+                    field={{
+                      name: param.name,
+                      label: param.label,
+                      type: "integration-resource",
+                      placeholder: param.placeholder,
+                      required: param.required,
+                      typeOptions: {
+                        resource: {
+                          type: param.resourceType,
+                        },
+                      },
+                    }}
+                    value={paramValues[param.name]}
+                    onChange={(val) =>
+                      setParamValues((prev) => ({
+                        ...prev,
+                        [param.name]: typeof val === "string" ? val : Array.isArray(val) ? (val[0] ?? "") : "",
+                      }))
+                    }
+                    organizationId={organizationId}
+                    integrationId={integrationSelections[param.integration]?.id}
+                  />
+                ) : (
+                  <Input
+                    id={`param-${param.name}`}
+                    value={paramValues[param.name] ?? ""}
+                    placeholder={param.placeholder}
+                    className="h-8 text-xs"
+                    onChange={(e) => setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))}
+                  />
+                )}
                 {param.description && <p className="text-[10px] text-slate-400">{param.description}</p>}
               </div>
             ))}
