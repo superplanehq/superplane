@@ -1,6 +1,6 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { isCancelledError, useQueryClient } from "@tanstack/react-query";
 
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
@@ -47,33 +47,47 @@ export function useCommittedDraftBaselines({
     // The console read shares its key/fetcher with the draft console query, so
     // the two committed console.yaml reads are deduped into a single request.
     // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
-    void Promise.all([
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
-        staleTime: 30_000,
-      }),
-      queryClient.fetchQuery({
-        queryKey: canvasKeys.console(canvasId, versionId),
-        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
-        staleTime: 30_000,
-      }),
-    ]).then(([version, consoleData]) => {
-      if (cancelled) {
-        return;
-      }
+    //
+    // Wrapped in an async IIFE with try/catch so that CancelledError (raised
+    // when an in-flight query is cancelled, e.g. by `queryClient.cancelQueries`
+    // or rapid effect re-runs) does not surface as an unhandled rejection that
+    // gets reported to Sentry.
+    void (async () => {
+      try {
+        const [version, consoleData] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: canvasKeys.versionDetail(canvasId, versionId),
+            queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
+            staleTime: 30_000,
+          }),
+          queryClient.fetchQuery({
+            queryKey: canvasKeys.console(canvasId, versionId),
+            queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
+            staleTime: 30_000,
+          }),
+        ]);
 
-      setBaselines({
-        canvasSpec: version?.spec,
-        console: consoleData
-          ? {
-              panels: consoleData.panels,
-              layout: consoleData.layout,
-            }
-          : { panels: [], layout: [] },
-        ready: true,
-      });
-    });
+        if (cancelled) {
+          return;
+        }
+
+        setBaselines({
+          canvasSpec: version?.spec,
+          console: consoleData
+            ? {
+                panels: consoleData.panels,
+                layout: consoleData.layout,
+              }
+            : { panels: [], layout: [] },
+          ready: true,
+        });
+      } catch (error) {
+        if (cancelled || isCancelledError(error)) {
+          return;
+        }
+        throw error;
+      }
+    })();
 
     return () => {
       cancelled = true;
