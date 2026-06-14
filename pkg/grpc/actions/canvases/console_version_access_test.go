@@ -32,7 +32,7 @@ func TestEnsureConsoleVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing.T
 	r := support.Setup(t)
 	authorCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(authorCtx, t, r, "snapshot-access-cr")
+	canvasID := createCanvasWithChangeManagement(authorCtx, t, r, "snapshot-access-cr")
 	draftVersionID := createDraftVersion(authorCtx, t, r, canvasID, "Draft One")
 
 	createCRResponse, err := CreateCanvasChangeRequest(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID)

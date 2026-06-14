@@ -50,6 +50,10 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		metadata.BranchName = *version.BranchName
 	}
 	metadata.DisplayName = version.DisplayName
+	metadata.CommitSha = version.CommitSHA
+	metadata.GitBranch = version.GitBranch
+	metadata.MaterializationStatus = version.MaterializationStatus
+	metadata.MaterializationError = version.MaterializationError
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,

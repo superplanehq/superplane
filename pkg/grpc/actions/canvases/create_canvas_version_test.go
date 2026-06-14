@@ -19,7 +19,7 @@ func TestCreateCanvasVersion(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CreateCanvasVersion(context.Background(), r.Organization.ID.String(), uuid.New().String(), "")
+		_, err := CreateCanvasVersion(context.Background(), r.GitProvider, r.Registry, r.Organization.ID.String(), uuid.New().String(), "")
 		s, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -29,7 +29,7 @@ func TestCreateCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-create")
 		canvasUUID := uuid.MustParse(canvasID)
 
-		response, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "")
+		response, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
 		require.NoError(t, err)
 
 		version := response.GetVersion()
@@ -55,7 +55,7 @@ func TestCreateCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-named")
 		canvasUUID := uuid.MustParse(canvasID)
 
-		response, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "Release prep")
+		response, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "Release prep")
 		require.NoError(t, err)
 
 		version := response.GetVersion()

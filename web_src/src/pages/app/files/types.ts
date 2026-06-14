@@ -8,15 +8,14 @@ export type AppFile = {
   errorMessage?: string;
 };
 
-// Diff for a path whose edits live in the draft's staging layer rather than in
-// the in-session pending changes: the virtual spec files (canvas.yaml /
-// console.yaml), and repository files whose staged edits outlive a page refresh.
-// Computed from the committed (stage=false) vs effective (stage=true) server
-// reads.
-export type StagedFileDiff = {
+// Diff of a single file's effective draft content against the live (main)
+// version, mirroring the canvas tab's "draft vs live" comparison. liveContent is
+// the baseline (live/main); draftContent is the effective draft (committed draft
+// plus uncommitted staging, or the in-session pending edit when present).
+export type FileDiffVersusLive = {
   path: string;
-  committedContent: string;
-  effectiveContent: string;
+  liveContent: string;
+  draftContent: string;
 };
 
 export type PendingFileChange =
