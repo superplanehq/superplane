@@ -403,26 +403,18 @@ function IntegrationsStep({
             getIntegrationTypeDisplayName(undefined, data.name) ||
             data.name.charAt(0).toUpperCase() + data.name.slice(1);
 
-          // No ready instances — show badge to create
+          // No ready instances — same row style as dropdown, but with "create new" only
           if (data.readyInstances.length === 0) {
-            const state = data.pendingState || "missing";
             return (
               <div key={data.name} className="flex items-center gap-2">
+                <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
+                <span className="text-xs text-slate-500">No {displayName} connected</span>
                 <button
                   type="button"
                   onClick={() => setDialogIntegrationName(data.name)}
-                  title={
-                    state === "pending"
-                      ? `Pending: ${displayName} — ${data.stateDescription || "setup in progress"}`
-                      : state === "error"
-                        ? `Error: ${displayName} — ${data.stateDescription || "setup failed"}`
-                        : `Connect ${displayName}`
-                  }
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${badgeClassName(state)}`}
+                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
                 >
-                  <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
-                  <span>{displayName}</span>
-                  {badgeDot(state)}
+                  create new
                 </button>
               </div>
             );
