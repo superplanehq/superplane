@@ -2,7 +2,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { parseGitHubRepoParam } from "@/lib/githubRepo";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { InstallErrorView } from "./InstallErrorView";
 import { InstallLoadingView } from "./InstallLoadingView";
 import { InstallShell } from "./InstallShell";
@@ -23,6 +23,7 @@ export function InstallPage() {
 function InstallPageContent() {
   usePageTitle(["Install App"]);
 
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const repoParam = searchParams.get("repo");
   const presetOrganizationId = searchParams.get("organizationId")?.trim() || "";
@@ -82,7 +83,11 @@ function InstallPageContent() {
       )}
 
       {effectiveOrgId ? (
-        <InstallProgressPanel app={app} organizationId={effectiveOrgId} onClose={() => window.history.back()} />
+        <InstallProgressPanel
+          app={app}
+          organizationId={effectiveOrgId}
+          onClose={() => navigate(`/${effectiveOrgId}/apps/new`)}
+        />
       ) : (
         <p className="text-sm text-slate-500">Select an organization to continue.</p>
       )}
