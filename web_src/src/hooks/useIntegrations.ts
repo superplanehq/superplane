@@ -73,6 +73,7 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     queryFn: async () => {
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );
@@ -146,6 +147,7 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
     }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             integrationName: data.integrationName,
