@@ -5281,6 +5281,8 @@ export function AppPage() {
             headerActionsSlotId: filesHeaderActionsSlotId,
             stagingResetNonce,
             suspendRepositoryFileStaging: isPreparingVersionAction,
+            hasCanvasSpecDiffVersusLive: draftChangeIndicators.hasUnpublishedCanvasDraftChanges,
+            hasConsoleSpecDiffVersusLive: draftChangeIndicators.hasUnpublishedConsoleDraftChanges,
             onSpecFileChange,
             onLocalFilesStagingChange: handleLocalFilesStagingChange,
             onFlushRepositoryFileStagingReady: handleFlushRepositoryFileStagingReady,

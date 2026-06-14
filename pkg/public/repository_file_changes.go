@@ -17,7 +17,8 @@ import (
 )
 
 type repositoryFileChangesResponse struct {
-	HasUnpublishedFileChanges bool `json:"hasUnpublishedFileChanges"`
+	HasUnpublishedFileChanges bool     `json:"hasUnpublishedFileChanges"`
+	ChangedPaths              []string `json:"changedPaths"`
 }
 
 // handleRepositoryFileChanges reports whether a draft version has committed changes
@@ -72,7 +73,7 @@ func (s *Server) handleRepositoryFileChanges(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		// No repository means there are no files to diff against live.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			writeRepositoryFileChanges(w, false)
+			writeRepositoryFileChanges(w, nil)
 			return
 		}
 		http.Error(w, "Repository not found", http.StatusNotFound)
@@ -80,7 +81,7 @@ func (s *Server) handleRepositoryFileChanges(w http.ResponseWriter, r *http.Requ
 	}
 
 	ctx := authentication.SetUserIdInMetadata(r.Context(), user.ID.String())
-	changed, err := canvases.HasUnpublishedRepositoryFileChanges(
+	changedPaths, err := canvases.ListUnpublishedRepositoryFileChanges(
 		ctx,
 		s.gitProvider,
 		repository.RepoID,
@@ -94,12 +95,16 @@ func (s *Server) handleRepositoryFileChanges(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	writeRepositoryFileChanges(w, changed)
+	writeRepositoryFileChanges(w, changedPaths)
 }
 
-func writeRepositoryFileChanges(w http.ResponseWriter, changed bool) {
+func writeRepositoryFileChanges(w http.ResponseWriter, changedPaths []string) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(repositoryFileChangesResponse{HasUnpublishedFileChanges: changed}); err != nil {
+	response := repositoryFileChangesResponse{
+		HasUnpublishedFileChanges: len(changedPaths) > 0,
+		ChangedPaths:              changedPaths,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Errorf("Failed to encode repository file changes response: %v", err)
 	}
 }

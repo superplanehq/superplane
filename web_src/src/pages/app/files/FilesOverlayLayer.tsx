@@ -13,6 +13,8 @@ interface FilesOverlayLayerProps {
   headerActionsSlotId?: string;
   stagingResetNonce?: number;
   suspendRepositoryFileStaging?: boolean;
+  hasCanvasSpecDiffVersusLive?: boolean;
+  hasConsoleSpecDiffVersusLive?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
   onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
@@ -28,6 +30,8 @@ export function FilesOverlayLayer({
   headerActionsSlotId,
   stagingResetNonce,
   suspendRepositoryFileStaging,
+  hasCanvasSpecDiffVersusLive,
+  hasConsoleSpecDiffVersusLive,
   onSpecFileChange,
   onLocalFilesStagingChange,
   onFlushRepositoryFileStagingReady,
@@ -44,6 +48,8 @@ export function FilesOverlayLayer({
       headerActionsSlotId={headerActionsSlotId}
       stagingResetNonce={stagingResetNonce}
       suspendRepositoryFileStaging={suspendRepositoryFileStaging}
+      hasCanvasSpecDiffVersusLive={hasCanvasSpecDiffVersusLive}
+      hasConsoleSpecDiffVersusLive={hasConsoleSpecDiffVersusLive}
       onSpecFileChange={onSpecFileChange}
       onLocalFilesStagingChange={onLocalFilesStagingChange}
       onFlushRepositoryFileStagingReady={onFlushRepositoryFileStagingReady}

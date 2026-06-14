@@ -281,6 +281,11 @@ func TestHasUnpublishedRepositoryFileChanges(t *testing.T) {
 	repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
 	require.NoError(t, err)
 
+	changedPaths := func() []string {
+		paths, changedErr := ListUnpublishedRepositoryFileChanges(ctx, r.GitProvider, repository.RepoID, orgID, canvasID, versionID)
+		require.NoError(t, changedErr)
+		return paths
+	}
 	hasChanges := func() bool {
 		changed, changedErr := HasUnpublishedRepositoryFileChanges(ctx, r.GitProvider, repository.RepoID, orgID, canvasID, versionID)
 		require.NoError(t, changedErr)
@@ -289,6 +294,7 @@ func TestHasUnpublishedRepositoryFileChanges(t *testing.T) {
 
 	// A fresh draft branched from live has no committed file changes.
 	assert.False(t, hasChanges(), "fresh draft must report no unpublished file changes")
+	assert.Empty(t, changedPaths(), "fresh draft must report no changed paths")
 
 	// Committing a repository file to the draft branch is an unpublished change.
 	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
@@ -299,6 +305,7 @@ func TestHasUnpublishedRepositoryFileChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, hasChanges(), "committing a repository file to the draft must report unpublished file changes")
+	assert.Equal(t, []string{"README.md"}, changedPaths(), "the committed repository file must be listed as changed vs live")
 }
 
 func TestStagedReadRequiresDraftOwner(t *testing.T) {

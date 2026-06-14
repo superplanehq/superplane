@@ -82,7 +82,7 @@ export function useCanvasConsoleVersionDiff({
   // backend compares the draft branch against live and returns whether any non-spec
   // file differs.
   const repositoryFileChangesQuery = useCanvasRepositoryFileChanges(canvasId, draftDiffVersionId || undefined, enabled);
-  const hasDraftFilesDiffVersusLive = !!repositoryFileChangesQuery.data;
+  const hasDraftFilesDiffVersusLive = !!repositoryFileChangesQuery.data?.hasUnpublishedFileChanges;
 
   // The on-canvas diff surfaces (X-ray panel badges, the diff summary, and the
   // "Show diff" modal) mirror the canvas tab, which diffs the *effective* draft

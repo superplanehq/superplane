@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -308,12 +309,6 @@ func ReadCommittedRepositoryFile(
 // (main) branch. It powers the publish-readiness and unpublished-change indicators
 // for files such as README.md, which the spec-based graph/console version diffs do
 // not cover.
-//
-// Spec files (canvas.yaml/console.yaml) are intentionally excluded: their
-// publishable differences are already surfaced by the graph/console diffs, and
-// comparing raw YAML bytes here would report false positives for semantically equal
-// but reformatted specs. A version without a draft branch (e.g. the live version)
-// has nothing unpublished and returns false.
 func HasUnpublishedRepositoryFileChanges(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
@@ -322,68 +317,106 @@ func HasUnpublishedRepositoryFileChanges(
 	canvasID string,
 	versionID string,
 ) (bool, error) {
+	paths, err := ListUnpublishedRepositoryFileChanges(ctx, gitProvider, repoID, organizationID, canvasID, versionID)
+	if err != nil {
+		return false, err
+	}
+	return len(paths) > 0, nil
+}
+
+// ListUnpublishedRepositoryFileChanges returns the arbitrary (non-spec) repository
+// file paths that a draft version's branch changes — added, removed, or modified —
+// relative to the live (main) branch. It backs both the publish-readiness indicator
+// and the Files-tab "diff vs live" view, which compares the effective draft against
+// live just like the canvas tab.
+//
+// Spec files (canvas.yaml/console.yaml) are intentionally excluded: their
+// publishable differences are already surfaced by the graph/console diffs, and
+// comparing raw YAML bytes here would report false positives for semantically equal
+// but reformatted specs. A version without a draft branch (e.g. the live version)
+// has nothing unpublished and returns nil.
+func ListUnpublishedRepositoryFileChanges(
+	ctx context.Context,
+	gitProvider gitprovider.Provider,
+	repoID string,
+	organizationID string,
+	canvasID string,
+	versionID string,
+) ([]string, error) {
 	if strings.TrimSpace(versionID) == "" {
-		return false, nil
+		return nil, nil
 	}
 
 	_, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	if version.BranchName == nil {
-		return false, nil
+		return nil, nil
 	}
 	draftBranch := strings.TrimSpace(*version.BranchName)
 	if draftBranch == "" || draftBranch == models.CanvasGitBranchMain {
-		return false, nil
+		return nil, nil
 	}
 
 	// A draft branch that has not advanced past main (identical head) cannot hold
 	// any committed file changes, so skip the file walk entirely.
 	draftHead, err := gitProvider.Head(ctx, repoID, draftBranch)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	liveHead, err := gitProvider.Head(ctx, repoID, models.CanvasGitBranchMain)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if draftHead == liveHead {
-		return false, nil
+		return nil, nil
 	}
 
 	draftPaths, err := nonSpecRepositoryFilePaths(ctx, gitProvider, repoID, draftBranch)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	livePaths, err := nonSpecRepositoryFilePaths(ctx, gitProvider, repoID, models.CanvasGitBranchMain)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	// Added or removed non-spec files are unpublished changes outright.
-	if !stringSetsEqual(draftPaths, livePaths) {
-		return true, nil
-	}
-
-	// Same file set: an unpublished change exists only if some file's content
-	// differs between the draft branch and live.
+	changed := make(map[string]struct{})
 	for path := range draftPaths {
+		// Added on the draft branch, or present on both with differing content.
+		if _, onLive := livePaths[path]; !onLive {
+			changed[path] = struct{}{}
+			continue
+		}
+
 		draftContent, err := readGitFile(ctx, gitProvider, repoID, path, draftBranch)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		liveContent, err := readGitFile(ctx, gitProvider, repoID, path, models.CanvasGitBranchMain)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		if draftContent != liveContent {
-			return true, nil
+			changed[path] = struct{}{}
 		}
 	}
 
-	return false, nil
+	// Removed on the draft branch (present on live only).
+	for path := range livePaths {
+		if _, onDraft := draftPaths[path]; !onDraft {
+			changed[path] = struct{}{}
+		}
+	}
+
+	result := make([]string, 0, len(changed))
+	for path := range changed {
+		result = append(result, path)
+	}
+	sort.Strings(result)
+	return result, nil
 }
 
 // nonSpecRepositoryFilePaths returns the set of repository file paths on a ref,
@@ -413,18 +446,6 @@ func nonSpecRepositoryFilePaths(
 	}
 
 	return result, nil
-}
-
-func stringSetsEqual(a, b map[string]struct{}) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for key := range a {
-		if _, ok := b[key]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func readGitFile(
