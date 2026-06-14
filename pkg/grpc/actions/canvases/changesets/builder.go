@@ -192,10 +192,6 @@ func blockNameFromNode(node models.Node) string {
 		return node.Ref.Trigger.Name
 	}
 
-	if node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "" {
-		return node.Ref.Blueprint.ID
-	}
-
 	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
 		return node.Ref.Widget.Name
 	}

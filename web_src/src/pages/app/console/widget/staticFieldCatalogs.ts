@@ -39,7 +39,6 @@ export const EXECUTIONS_FIELDS: MemoryFieldSummary[] = sortFields([
   { field: "id", sample: "00000000-0000-0000-0000-000000000000" },
   { field: "nodeId", sample: "00000000-0000-0000-0000-000000000000" },
   { field: "canvasId", sample: "00000000-0000-0000-0000-000000000000" },
-  { field: "parentExecutionId", sample: "" },
   { field: "previousExecutionId", sample: "" },
   { field: "createdAt", sample: "2026-01-01T12:00:00Z" },
   { field: "updatedAt", sample: "2026-01-01T12:05:00Z" },

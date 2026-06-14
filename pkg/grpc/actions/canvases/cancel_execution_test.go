@@ -33,7 +33,7 @@ func Test__CancelExecution__CancelsExecutionSuccessfully(t *testing.T) {
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 
 	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
 	require.NoError(t, err)

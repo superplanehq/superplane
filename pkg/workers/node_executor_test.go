@@ -6,7 +6,6 @@ import (
 	"log"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +48,7 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Create a root event and a pending execution for the component node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Have two workers call LockAndProcessNodeExecution concurrently on the same execution.
@@ -108,7 +107,7 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
@@ -126,46 +125,6 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedExecution.State)
 	assert.Empty(t, updatedExecution.Result)
-}
-
-func Test__NodeExecutor_BlueprintNodeExecutionIsRejected(t *testing.T) {
-	r := support.Setup(t)
-
-	triggerNode := "trigger-1"
-	blueprintNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: uuid.New().String()}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
-		},
-	)
-
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
-
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
-	require.NoError(t, err)
-
-	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
-	assert.Contains(t, updatedExecution.ResultMessage, "no longer supported")
 }
 
 func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
@@ -217,7 +176,7 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// Create a root event and a pending execution for the approval node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil, approvalConfiguration)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, approvalConfiguration)
 
 	//
 	// Process the execution and verify the execution is started but NOT finished.
@@ -284,7 +243,7 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// Create a root event and a pending execution for the noop node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Process the execution and verify the execution is both started AND finished.

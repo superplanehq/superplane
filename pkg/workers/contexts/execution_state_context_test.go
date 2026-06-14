@@ -45,7 +45,7 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 	t.Run("rejects large payload", func(t *testing.T) {
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
 		largePayload := strings.Repeat("a", DefaultMaxPayloadSize+100)
@@ -59,7 +59,7 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 	t.Run("rejects too many payloads", func(t *testing.T) {
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
 		payloads := make([]any, core.MaxEmitCount+1)
@@ -81,7 +81,7 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 
 		rootData := map[string]any{"root": "event"}
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 		err := ctx.Emit("default", "test.payload", []any{map[string]any{"n": 1}})
