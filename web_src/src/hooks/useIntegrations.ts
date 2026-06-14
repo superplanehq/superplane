@@ -73,6 +73,7 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     queryFn: async () => {
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );
@@ -134,7 +135,10 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
+export const useCreateIntegration = (
+  organizationId: string,
+  source: "node_configuration" | "integrations_page" | "install_wizard",
+) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -146,6 +150,7 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
     }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             integrationName: data.integrationName,
