@@ -13,6 +13,7 @@ import (
 const (
 	CanvasUpdatedEvent        = "canvas_updated"
 	CanvasVersionUpdatedEvent = "canvas_version_updated"
+	CanvasStagingUpdatedEvent = "staging_updated"
 	CanvasDeletedEvent        = "canvas_deleted"
 )
 
@@ -36,21 +37,29 @@ func HandleCanvasDeleted(messageBody []byte, wsHub *ws.Hub) error {
 }
 
 func HandleCanvasVersionUpdated(messageBody []byte, wsHub *ws.Hub) error {
+	return handleCanvasVersion(messageBody, wsHub, CanvasVersionUpdatedEvent)
+}
+
+func HandleCanvasStagingUpdated(messageBody []byte, wsHub *ws.Hub) error {
+	return handleCanvasVersion(messageBody, wsHub, CanvasStagingUpdatedEvent)
+}
+
+func handleCanvasVersion(messageBody []byte, wsHub *ws.Hub, eventName string) error {
 	pbMsg := &pb.CanvasVersionMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal %s message: %w", CanvasVersionUpdatedEvent, err)
+		return fmt.Errorf("failed to unmarshal %s message: %w", eventName, err)
 	}
 
 	if pbMsg.CanvasId == "" {
-		return fmt.Errorf("missing canvas id in %s message", CanvasVersionUpdatedEvent)
+		return fmt.Errorf("missing canvas id in %s message", eventName)
 	}
 
 	if pbMsg.VersionId == "" {
-		return fmt.Errorf("missing version id in %s message", CanvasVersionUpdatedEvent)
+		return fmt.Errorf("missing version id in %s message", eventName)
 	}
 
 	wsEvent, err := json.Marshal(CanvasStateWebsocketEvent{
-		Event: CanvasVersionUpdatedEvent,
+		Event: eventName,
 		Payload: CanvasStatePayload{
 			ID:        pbMsg.CanvasId,
 			CanvasID:  pbMsg.CanvasId,
@@ -58,11 +67,11 @@ func HandleCanvasVersionUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal %s websocket event: %w", CanvasVersionUpdatedEvent, err)
+		return fmt.Errorf("failed to marshal %s websocket event: %w", eventName, err)
 	}
 
 	wsHub.BroadcastToWorkflow(pbMsg.CanvasId, wsEvent)
-	log.Debugf("Broadcasted %s event to workflow %s", CanvasVersionUpdatedEvent, pbMsg.CanvasId)
+	log.Debugf("Broadcasted %s event to workflow %s", eventName, pbMsg.CanvasId)
 
 	return nil
 }
