@@ -95,6 +95,12 @@ spec:
               value: /app/oidc-keys
             - name: OTEL_ENABLED
               value: "yes"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ printf "k8s.deployment.name=%s-workers,service.instance.id=$(POD_NAME)" .Release.Name | quote }}
             - name: GIT_STORAGE_PROVIDER
               value: supergit
             - name: GIT_STORAGE_SUPERGIT_BASE_URL

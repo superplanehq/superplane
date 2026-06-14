@@ -120,6 +120,12 @@ spec:
 {{- end }}
             - name: OTEL_ENABLED
               value: "yes"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ printf "k8s.deployment.name=%s-api,service.instance.id=$(POD_NAME)" .Release.Name | quote }}
             - name: SUPERPLANE_BEACON_ENABLED
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
