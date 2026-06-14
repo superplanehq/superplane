@@ -71,9 +71,16 @@ export function InstallProgressPanel({
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // Clear selections when org changes (e.g. user switches org on /install page)
+  // Clear selections and org-specific param values when org changes
   useEffect(() => {
     setIntegrationSelections({});
+    // Reset param values to defaults (clears org-specific values like resource IDs)
+    const defaults: Record<string, string> = {};
+    for (const p of preview.installParams) {
+      if (p.default) defaults[p.name] = p.default;
+    }
+    preview.setParamValues(defaults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset on org change
   }, [organizationId]);
 
   const doInstall = useCallback(
@@ -118,7 +125,16 @@ export function InstallProgressPanel({
   const hasIntegrations = integrations.length > 0;
   const hasParams = preview.installParams.length > 0;
   const allIntegrationsSelected = !hasIntegrations || integrations.every((name) => integrationSelections[name]);
-  const canInstall = !isInstalling && !preview.previewLoading && !preview.previewError && allIntegrationsSelected;
+  const allRequiredParamsFilled = preview.installParams
+    .filter((p) => p.required && !p.default)
+    .every((p) => (preview.paramValues[p.name] ?? "").trim() !== "");
+  const canInstall =
+    !!organizationId &&
+    !isInstalling &&
+    !preview.previewLoading &&
+    !preview.previewError &&
+    allIntegrationsSelected &&
+    allRequiredParamsFilled;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
