@@ -180,7 +180,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.Can
 			Id:                  execution.ID.String(),
 			CanvasId:            execution.WorkflowID.String(),
 			NodeId:              execution.NodeID,
-			ParentExecutionId:   execution.GetParentExecutionID(),
 			PreviousExecutionId: execution.GetPreviousExecutionID(),
 			State:               NodeExecutionStateToProto(execution.State),
 			Result:              NodeExecutionResultToProto(execution.Result),
