@@ -8,7 +8,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -18,6 +20,10 @@ type IntegrationSecretStorage struct {
 	integration *models.Integration
 	secrets     []models.IntegrationSecret
 	loaded      bool
+
+	// Identifies the call path that created this storage, used to attribute
+	// secret writes in metrics and logs.
+	trigger string
 }
 
 func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
@@ -26,7 +32,15 @@ func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integr
 		encryptor:   encryptor,
 		integration: integration,
 		secrets:     []models.IntegrationSecret{},
+		trigger:     telemetry.IntegrationSecretTriggerUnknown,
 	}
+}
+
+// SetTrigger records which call path created this storage so secret writes
+// can be attributed in metrics and logs. Returns the storage for chaining.
+func (s *IntegrationSecretStorage) SetTrigger(trigger string) *IntegrationSecretStorage {
+	s.trigger = trigger
+	return s
 }
 
 func (s *IntegrationSecretStorage) loadSecrets() error {
@@ -149,6 +163,7 @@ func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) 
 	}
 
 	s.secrets = append(s.secrets, secret)
+	s.recordSecretWrite(def.Name, telemetry.IntegrationSecretOperationCreate)
 	return nil
 }
 
@@ -186,5 +201,28 @@ func (s *IntegrationSecretStorage) Update(name string, value string) error {
 	now := time.Now()
 	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
-	return s.tx.Save(secret).Error
+	if err := s.tx.Save(secret).Error; err != nil {
+		return err
+	}
+
+	s.recordSecretWrite(name, telemetry.IntegrationSecretOperationUpdate)
+	return nil
+}
+
+// recordSecretWrite emits the metric and structured log for a write to
+// app_installation_secrets. The secret value is never logged.
+func (s *IntegrationSecretStorage) recordSecretWrite(name, operation string) {
+	telemetry.RecordIntegrationSecretWrite(
+		context.Background(),
+		s.integration.AppName,
+		s.trigger,
+		s.integration.ID.String(),
+		operation,
+	)
+
+	logging.ForIntegration(*s.integration).WithFields(map[string]any{
+		"secret_name": name,
+		"trigger":     s.trigger,
+		"operation":   operation,
+	}).Info("Integration secret write")
 }
