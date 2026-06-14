@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -87,10 +87,11 @@ export function InstallProgressPanel({
   const [isInstalling, setIsInstalling] = useState(false);
 
   // Clear selections when org changes
+  const resetParamValuesRef = useRef(preview.resetParamValues);
+  resetParamValuesRef.current = preview.resetParamValues;
   useEffect(() => {
     setIntegrationSelections({});
-    preview.resetParamValues();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset on org change
+    resetParamValuesRef.current();
   }, [organizationId]);
 
   const doInstall = useCallback(
