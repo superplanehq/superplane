@@ -5,9 +5,11 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,14 +20,19 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
+	orgID := uuid.MustParse(organizationID)
+	canvas, err := findCanvas(ctx, orgID, canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
-		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		err = telemetry.RunSpan(ctx, "canvases.load_creator", func(ctx context.Context) error {
+			var loadErr error
+			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(database.DB(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
+			return loadErr
+		})
 		if err != nil {
 			return nil, err
 		}

@@ -87,7 +87,7 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
 	require.NoError(t, err)
@@ -98,7 +98,6 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 	assert.Equal(t, parentExecution.ID.String(), execution.Id)
 	assert.Equal(t, canvas.ID.String(), execution.CanvasId)
 	assert.Equal(t, "node-1", execution.NodeId)
-	assert.Empty(t, execution.ParentExecutionId)
 }
 
 func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *testing.T) {
@@ -127,8 +126,8 @@ func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *tes
 	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
-	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent2.ID, event2.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent2.ID, event2.ID)
 
 	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent1.ID.String())
 	require.NoError(t, err)

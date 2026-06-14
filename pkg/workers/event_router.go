@@ -288,7 +288,7 @@ func (w *EventRouter) processExecutionEvent(
 ) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	now := time.Now()
 
-	logger = logging.WithExecution(logger, execution, nil)
+	logger = logging.WithExecution(logger, execution)
 	w.logger.Infof("Processing event")
 
 	var createdQueueItems []models.CanvasNodeQueueItem

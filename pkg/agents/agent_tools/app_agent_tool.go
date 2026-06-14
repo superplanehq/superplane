@@ -111,7 +111,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"resource": {
 				Type:        "string",
-				Enum:        []string{"memory", "runs", "canvas_events", "event_executions", "node_executions", "node_queue_items", "node_events", "child_executions"},
+				Enum:        []string{"memory", "runs", "canvas_events", "event_executions", "node_executions", "node_queue_items", "node_events"},
 				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read.",
 			},
 			"namespace": {
@@ -128,7 +128,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"execution_id": {
 				Type:        "string",
-				Description: "For read_runtime resource child_executions.",
+				Description: "Reserved for future runtime resources that target a specific execution.",
 			},
 			"limit": {
 				Type:        "integer",

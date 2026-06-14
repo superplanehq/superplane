@@ -234,7 +234,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.processNodeExecution(tx, execution, node, onNewEvents)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -260,20 +260,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
-	if node.Type == models.NodeTypeBlueprint {
-		executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
-		return executionState.Fail(models.CanvasNodeExecutionResultReasonError, "blueprint nodes are no longer supported")
-	}
-
-	return w.executeActionNode(tx, execution, node, onNewEvents)
-}
-
 func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
-		nil,
 	)
 
 	err := execution.StartInTransaction(tx)

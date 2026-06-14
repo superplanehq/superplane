@@ -308,7 +308,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
-	logger := logging.ForExecution(execution, nil)
+	logger := logging.ForExecution(execution)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
