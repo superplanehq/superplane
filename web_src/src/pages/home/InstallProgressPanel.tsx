@@ -31,25 +31,42 @@ type IntegrationSelections = Record<string, { id: string; name: string }>;
 interface InstallProgressPanelProps {
   app: AppEntry;
   organizationId?: string;
+  /** If provided, skips the preview fetch (caller already loaded it). */
+  preloadedIntegrations?: string[];
+  preloadedParams?: InstallParam[];
   onClose: () => void;
 }
 
-export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }: InstallProgressPanelProps) {
+export function InstallProgressPanel({
+  app,
+  organizationId: propOrgId,
+  preloadedIntegrations,
+  preloadedParams,
+  onClose,
+}: InstallProgressPanelProps) {
   const { organizationId: routeOrgId } = useParams<{ organizationId: string }>();
   const organizationId = propOrgId || routeOrgId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [installParams, setInstallParams] = useState<InstallParam[]>([]);
-  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  const hasPreloaded = Boolean(preloadedIntegrations || preloadedParams);
+  const [installParams, setInstallParams] = useState<InstallParam[]>(preloadedParams ?? []);
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
+    const defaults: Record<string, string> = {};
+    for (const p of preloadedParams ?? []) {
+      if (p.default) defaults[p.name] = p.default;
+    }
+    return defaults;
+  });
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewLoading, setPreviewLoading] = useState(!hasPreloaded);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>([]);
+  const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>(preloadedIntegrations ?? []);
 
-  // Fetch preview to discover params and integrations
+  // Fetch preview to discover params and integrations (skip if preloaded)
   useEffect(() => {
+    if (hasPreloaded) return;
     fetch(`/apps/install/preview?repo=${encodeURIComponent(app.repo)}`, { credentials: "include" })
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load app configuration (${r.status})`);
@@ -72,7 +89,7 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
         setPreviewError(err instanceof Error ? err.message : "Failed to load app configuration");
       })
       .finally(() => setPreviewLoading(false));
-  }, [app.repo]);
+  }, [app.repo, hasPreloaded]);
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
@@ -128,7 +145,7 @@ export function InstallProgressPanel({ app, organizationId: propOrgId, onClose }
         showErrorToast(message);
       }
     },
-    [organizationId, app, paramValues, integrationSelections, isInstalling, queryClient, navigate],
+    [organizationId, app, paramValues, installParams, integrationSelections, isInstalling, queryClient, navigate],
   );
 
   // Always use auto-detected integrations from canvas (source of truth).

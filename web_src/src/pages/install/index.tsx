@@ -86,6 +86,8 @@ function InstallPageContent() {
         <InstallProgressPanel
           app={app}
           organizationId={effectiveOrgId}
+          preloadedIntegrations={preview.integrations}
+          preloadedParams={preview.installParams}
           onClose={() => navigate(`/${effectiveOrgId}`)}
         />
       ) : (

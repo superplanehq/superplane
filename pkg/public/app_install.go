@@ -58,7 +58,7 @@ func (s *Server) installApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1 MB limit
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
