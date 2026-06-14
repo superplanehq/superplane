@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { syncCommittedCanvasDraftState } from "./lib/sync-committed-canvas-draft";
+import { isNotFoundError } from "./workflowPageHelpers";
 
 type CommitMutation = { mutateAsync: () => Promise<unknown> };
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
@@ -28,6 +29,8 @@ type UseDraftStagingActionsOptions = {
   flushRepositoryFileStaging?: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
+  /** Invoked when commit/reset fails because the draft version no longer exists. */
+  onMissingDraft?: (versionId: string) => void | Promise<void>;
 };
 
 async function restoreCommittedCanvasDraftState({
@@ -93,6 +96,7 @@ export function useDraftStagingActions({
   flushRepositoryFileStaging,
   cancelPendingCanvasSaves,
   onCanvasDraftRestoredToCommitted,
+  onMissingDraft,
 }: UseDraftStagingActionsOptions) {
   const queryClient = useQueryClient();
 
@@ -117,6 +121,10 @@ export function useDraftStagingActions({
       setStagingResetNonce((nonce) => nonce + 1);
       showSuccessToast("Changes committed");
     } catch (error) {
+      if (isNotFoundError(error) && onMissingDraft) {
+        await onMissingDraft(activeCanvasVersionId);
+        return;
+      }
       showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
     } finally {
       setIsPreparingVersionAction(false);
@@ -130,6 +138,7 @@ export function useDraftStagingActions({
     ensureVersionActionDraftReady,
     flushRepositoryFileStaging,
     hasEditableVersion,
+    onMissingDraft,
     queryClient,
     setDraftCanvasSpec,
     setIsPreparingVersionAction,
@@ -160,6 +169,10 @@ export function useDraftStagingActions({
       setStagingResetNonce((nonce) => nonce + 1);
       showSuccessToast("Reverted to last commit");
     } catch (error) {
+      if (isNotFoundError(error) && onMissingDraft) {
+        await onMissingDraft(activeCanvasVersionId);
+        return;
+      }
       showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
     } finally {
       setIsPreparingVersionAction(false);
@@ -173,6 +186,7 @@ export function useDraftStagingActions({
     draftCanvasSpecsRef,
     hasEditableVersion,
     onCanvasDraftRestoredToCommitted,
+    onMissingDraft,
     organizationId,
     queryClient,
     setActiveCanvasVersion,
