@@ -5,9 +5,11 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,7 +27,7 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
 
-	_, err = models.FindCanvas(orgUUID, canvasUUID)
+	_, err = findCanvas(ctx, orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")
@@ -33,7 +35,12 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
-	records, err := models.ListCanvasMemories(canvasUUID)
+	var records []models.CanvasMemory
+	err = telemetry.RunSpan(ctx, "memories.list", func(ctx context.Context) error {
+		var listErr error
+		records, listErr = models.ListCanvasMemoriesInTransaction(database.DB(ctx), canvasUUID)
+		return listErr
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list canvas memories")
 	}
