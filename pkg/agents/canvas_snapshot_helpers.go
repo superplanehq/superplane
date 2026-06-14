@@ -73,8 +73,6 @@ func nodeRefName(ref models.NodeRef) string {
 		return ref.Component.Name
 	case ref.Trigger != nil:
 		return ref.Trigger.Name
-	case ref.Blueprint != nil:
-		return ref.Blueprint.ID
 	case ref.Widget != nil:
 		return ref.Widget.Name
 	default:
