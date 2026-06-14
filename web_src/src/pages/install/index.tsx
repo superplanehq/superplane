@@ -86,7 +86,7 @@ function InstallPageContent() {
         <InstallProgressPanel
           app={app}
           organizationId={effectiveOrgId}
-          onClose={() => navigate(`/${effectiveOrgId}/apps/new`)}
+          onClose={() => navigate(`/${effectiveOrgId}`)}
         />
       ) : (
         <p className="text-sm text-slate-500">Select an organization to continue.</p>
