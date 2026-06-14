@@ -20,10 +20,7 @@ const listExecutionsResponse = `{
 			"outputs": {"data": "large-output"},
 			"metadata": {"key": "value"},
 			"createdAt": "2025-01-15T10:00:00Z",
-			"updatedAt": "2025-01-15T10:01:00Z",
-			"childExecutions": [
-				{"id": "child-001", "nodeId": "node-002"}
-			]
+			"updatedAt": "2025-01-15T10:01:00Z"
 		}
 	]
 }`
@@ -67,7 +64,6 @@ func TestListExecutionsReturnsFullJSON(t *testing.T) {
 
 	raw := stdout.String()
 	require.Contains(t, raw, "large-output")
-	require.Contains(t, raw, "child-001")
 	require.Contains(t, raw, "exec-001")
 }
 

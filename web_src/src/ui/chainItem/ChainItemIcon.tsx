@@ -1,9 +1,8 @@
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
-import type { ChainItemData, ChildExecution } from "./types";
+import type { ChainItemData } from "./types";
 
-type ChainItemIconSource = Pick<ChainItemData, "nodeIcon" | "nodeIconSlug" | "nodeIconSrc"> &
-  Pick<ChildExecution, "componentIcon" | "componentIconSrc">;
+type ChainItemIconSource = Pick<ChainItemData, "nodeIcon" | "nodeIconSlug" | "nodeIconSrc">;
 
 interface ChainItemIconProps {
   item: Partial<ChainItemIconSource>;
@@ -16,8 +15,8 @@ export function ChainItemIcon({
   size = 16,
   className = "text-gray-800",
 }: ChainItemIconProps): React.ReactElement | null {
-  const iconSrc = item.nodeIconSrc || item.componentIconSrc;
-  const iconSlug = item.nodeIconSlug || item.nodeIcon || item.componentIcon;
+  const iconSrc = item.nodeIconSrc;
+  const iconSlug = item.nodeIconSlug || item.nodeIcon;
   if (!iconSrc && !iconSlug) {
     return null;
   }
