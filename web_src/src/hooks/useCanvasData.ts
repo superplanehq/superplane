@@ -2162,6 +2162,7 @@ export const useCommitCanvasStaging = (organizationId: string, canvasId: string,
       return response.data;
     },
     onSuccess: () => {
+      queryClient.setQueryData(canvasKeys.versionStaging(canvasId, versionId), { hasStaging: false, stagedPaths: [] });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
