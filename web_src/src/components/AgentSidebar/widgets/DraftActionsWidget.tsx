@@ -42,10 +42,19 @@ export function DraftActionsWidget({
       const response = await run();
       if (response.ok) {
         onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
+        return;
       }
+      const text = await response.text();
+      // The draft can disappear between when the widget was rendered and when the
+      // user clicks (e.g. discarded/published from another tab, auto-cleaned, or
+      // a stale chat message). A 404 here means the version is already gone, so
+      // dismiss the widget instead of logging to console.error (which Sentry
+      // captures and reports as an application error).
+      if (response.status === 404) {
+        onDismiss?.();
+        return;
+      }
+      console.error(`${action} failed:`, response.status, text);
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
     } finally {
