@@ -28,7 +28,6 @@ var runtimeResources = []string{
 	"node_executions",
 	"node_queue_items",
 	"node_events",
-	"child_executions",
 }
 
 type readRuntimeAction struct {
@@ -149,15 +148,6 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 			return nil, fmt.Errorf("node_id is required for node_events")
 		}
 		return protoPayload(canvasactions.ListNodeEvents(ctx, a.registry, canvasID, input.NodeID, input.Limit, before))
-	case "child_executions":
-		if strings.TrimSpace(input.ExecutionID) == "" {
-			return nil, fmt.Errorf("execution_id is required for child_executions")
-		}
-		executionID, err := uuid.Parse(input.ExecutionID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid execution_id: %w", err)
-		}
-		return protoPayload(canvasactions.ListChildExecutions(ctx, a.registry, canvasID, executionID))
 	default:
 		return nil, fmt.Errorf("unsupported runtime resource %q", resource)
 	}

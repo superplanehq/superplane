@@ -29,7 +29,6 @@ import {
   canvasesCreateCanvasMemoryNamespace,
   canvasesUpdateCanvasMemoryNamespace,
   canvasesListEventExecutions,
-  canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
   canvasesGetCanvasRepository,
@@ -237,9 +236,6 @@ export const canvasKeys = {
     ] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
-  childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
-  childExecution: (canvasId: string, executionId: string) =>
-    [...canvasKeys.childExecutions(), canvasId, executionId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
   nodeQueueItem: (canvasId: string, nodeId: string) => [...canvasKeys.nodeQueueItems(), canvasId, nodeId] as const,
   nodeEvents: () => [...canvasKeys.all, "nodeEvents"] as const,
@@ -1566,26 +1562,6 @@ export const useEventExecutionsBatch = (canvasId: string, eventIds: string[]) =>
   });
   const isLoading = queries.some((q) => q.isLoading);
   return { queries, isLoading };
-};
-
-export const useChildExecutions = (canvasId: string, executionId: string | null) => {
-  return useQuery({
-    queryKey: canvasKeys.childExecution(canvasId, executionId!),
-    queryFn: async () => {
-      const response = await canvasesListChildExecutions(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId: executionId!,
-          },
-          body: {},
-        }),
-      );
-      return response.data;
-    },
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && !!executionId,
-  });
 };
 
 export const useNodeQueueItems = (canvasId: string, nodeId: string) => {
