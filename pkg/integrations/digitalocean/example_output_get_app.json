@@ -111,7 +111,9 @@
     },
     "region": {
       "continent": "Asia",
-      "data_centers": ["blr1"],
+      "data_centers": [
+        "blr1"
+      ],
       "flag": "india",
       "label": "Bangalore",
       "slug": "blr"

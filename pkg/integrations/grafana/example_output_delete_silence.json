@@ -1,5 +1,8 @@
 {
-  "data": {"silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c", "deleted": true},
+  "data": {
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "deleted": true
+  },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.silence.deleted"
 }

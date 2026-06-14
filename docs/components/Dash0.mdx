@@ -166,51 +166,36 @@ The trigger normalizes these labels into a flat `{key: value}` map in the emitte
       "id": "issue_789",
       "issueIdentifier": "synthetic-check-api-health",
       "labels": [
-        [
-          "0",
-          {
-            "key": "dash0.resource.type",
-            "value": {
-              "stringValue": "synthetic"
-            }
+        {
+          "key": "dash0.resource.type",
+          "value": {
+            "stringValue": "synthetic"
           }
-        ],
-        [
-          "1",
-          {
-            "key": "dash0.synthetic_check.attempt_id",
-            "value": {
-              "stringValue": "73768e2c"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.attempt_id",
+          "value": {
+            "stringValue": "73768e2c"
           }
-        ],
-        [
-          "2",
-          {
-            "key": "dash0.synthetic_check.failed_critical_assertions",
-            "value": {
-              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.failed_critical_assertions",
+          "value": {
+            "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
           }
-        ],
-        [
-          "3",
-          {
-            "key": "dash0.synthetic_check.id",
-            "value": {
-              "stringValue": "api-health-check"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.id",
+          "value": {
+            "stringValue": "64617368-3073-796e-7468-73599f287bf4"
           }
-        ],
-        [
-          "4",
-          {
-            "key": "dash0.synthetic_check.name",
-            "value": {
-              "stringValue": "API Health Check"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.name",
+          "value": {
+            "stringValue": "API Health Check"
           }
-        ]
+        }
       ],
       "start": "2026-02-20T12:00:00Z",
       "status": "critical",
@@ -657,16 +642,7 @@ Note: Metrics are fetched on a best-effort basis. If Prometheus metrics are unav
                   }
                 }
               ],
-              "degradedAssertions": [
-                {
-                  "kind": "timing",
-                  "spec": {
-                    "operator": "lte",
-                    "type": "total",
-                    "value": "2000ms"
-                  }
-                }
-              ]
+              "degradedAssertions": []
             },
             "request": {
               "headers": [],
@@ -755,6 +731,8 @@ Returns a list of issues with:
       "result": [
         {
           "metric": {
+            "issue_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "otel_metric_name": "dash0.issue.status",
             "service_name": "test"
           },
           "value": [

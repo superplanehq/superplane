@@ -9,7 +9,9 @@
       "enabled": true,
       "proxied": true,
       "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
-      "default_pools": ["17b5962d775c646f3f9725cbc7a53df4"],
+      "default_pools": [
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
       "steering_policy": "random",
       "session_affinity": "none"
     }

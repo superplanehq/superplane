@@ -123,15 +123,21 @@ Each event contains the full Container Analysis Occurrence resource, including `
       "cvssScore": 7.5,
       "packageIssue": [
         {
+          "affectedCpeUri": "cpe:/o:debian:debian_linux:12",
           "affectedPackage": "libssl1.1",
           "affectedVersion": {
             "kind": "NORMAL",
             "name": "1.1.1n-0+deb11u3"
           },
+          "effectiveSeverity": "HIGH",
+          "fixAvailable": true,
+          "fixedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "fixedPackage": "libssl3",
           "fixedVersion": {
             "kind": "NORMAL",
             "name": "1.1.1n-0+deb11u5"
-          }
+          },
+          "packageType": "OS"
         }
       ],
       "severity": "HIGH"
@@ -268,12 +274,14 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 {
   "data": {
     "data": {
+      "insertId": "1k1z9d4d3vkc",
       "protoPayload": {
         "methodName": "v1.compute.instances.insert",
         "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
         "serviceName": "compute.googleapis.com"
       }
     },
+    "insertId": "1k1z9d4d3vkc",
     "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
     "methodName": "v1.compute.instances.insert",
     "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
@@ -379,7 +387,27 @@ Each event contains the decoded message payload plus Pub/Sub metadata:
     "attributes": {
       "eventType": "order.created"
     },
-    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
+    "data": {
+      "createdAt": "2026-03-04T09:41:17Z",
+      "currency": "USD",
+      "customerId": "cus_7d2e9f1a",
+      "event": "order.created",
+      "items": [
+        {
+          "quantity": 2,
+          "sku": "SNK-PLUSH-RED",
+          "unitPriceCents": 1499
+        },
+        {
+          "quantity": 1,
+          "sku": "SNK-STICKER-PACK",
+          "unitPriceCents": 499
+        }
+      ],
+      "orderId": "ord_8f3a2b1c",
+      "region": "us-central1",
+      "totalCents": 3497
+    },
     "messageId": "1234567890",
     "publishTime": "2025-01-01T00:00:00Z"
   },
