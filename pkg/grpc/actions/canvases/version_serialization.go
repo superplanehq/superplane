@@ -1,9 +1,14 @@
 package canvases
 
 import (
+	"context"
+
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -66,4 +71,22 @@ func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationI
 	return &pb.CanvasVersion{
 		Metadata: full.GetMetadata(),
 	}
+}
+
+func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
+	var protoVersions []*pb.CanvasVersion
+	_ = telemetry.RunSpan(ctx, "canvases.serialize_versions", func(ctx context.Context) error {
+		protoVersions = make([]*pb.CanvasVersion, 0, len(versions))
+		for i := range versions {
+			protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID))
+		}
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("canvases.version_count", len(versions)))
+		}
+
+		return nil
+	})
+
+	return protoVersions
 }
