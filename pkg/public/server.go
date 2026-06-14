@@ -741,6 +741,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 			s.encryptor,
 			s.registry,
 			onNewEvents,
+			telemetry.IntegrationSecretSourceOAuthCallback,
 		),
 	})
 
@@ -1216,7 +1217,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents, telemetry.IntegrationSecretSourceWebhook)
 	}
 
 	return trigger.HandleWebhook(core.WebhookRequestContext{
@@ -1251,7 +1252,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents, telemetry.IntegrationSecretSourceWebhook)
 	}
 
 	return action.HandleWebhook(core.WebhookRequestContext{

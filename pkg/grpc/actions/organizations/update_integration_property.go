@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -61,7 +62,7 @@ func UpdateIntegrationProperty(
 			Value:        value,
 			Logger:       logrus.WithField("integration_id", integration.ID),
 			HTTP:         registry.HTTPContextInTransaction(tx),
-			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
+			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
 			Properties:   contexts.NewIntegrationPropertyStorage(integration),
 			Capabilities: contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities),
 		})

@@ -340,7 +340,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents, telemetry.IntegrationSecretSourceExecution)
 	}
 
 	ctx.Logger = logger
