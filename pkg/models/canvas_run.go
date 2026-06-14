@@ -190,7 +190,6 @@ func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID,
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Where("run_id IN ?", runIDs).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC").
 		Find(&executions).
 		Error

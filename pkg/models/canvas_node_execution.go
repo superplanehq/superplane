@@ -51,13 +51,6 @@ type CanvasNodeExecution struct {
 	PreviousExecutionID *uuid.UUID
 
 	//
-	// Reference to the parent execution.
-	// This is used for node executions inside of a blueprint node,
-	// to reference the parent blueprint node execution.
-	//
-	ParentExecutionID *uuid.UUID
-
-	//
 	// The reference to a WorkflowEvent record,
 	// which holds the input for this execution.
 	//
@@ -103,23 +96,6 @@ func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
 
 	e.RunID = run.ID
 	return nil
-}
-
-// NOTE: this is only used in EventRouter, when processing events for blueprint child nodes.
-func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
-	var execution CanvasNodeExecution
-
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("id = ?", id).
-		First(&execution).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
 }
 
 func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
@@ -205,7 +181,6 @@ func ListParentExecutionsForRootEventsInTransaction(tx *gorm.DB, canvasID uuid.U
 	query := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("root_event_id IN ?", rootEventIDs).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC")
 
 	err := query.Find(&executions).Error
@@ -371,14 +346,6 @@ func (e *CanvasNodeExecution) GetPreviousExecutionID() string {
 	}
 
 	return e.PreviousExecutionID.String()
-}
-
-func (e *CanvasNodeExecution) GetParentExecutionID() string {
-	if e.ParentExecutionID == nil {
-		return ""
-	}
-
-	return e.ParentExecutionID.String()
 }
 
 func (e *CanvasNodeExecution) Start() error {
@@ -713,7 +680,6 @@ func FindLastExecutionPerNode(workflowID uuid.UUID) ([]CanvasNodeExecution, erro
 				ON wne.workflow_id = wn.workflow_id
 				AND wne.node_id = wn.node_id
 			WHERE wne.workflow_id = ?
-			AND wne.parent_execution_id IS NULL
 			AND wn.deleted_at IS NULL
 			ORDER BY wne.node_id, wne.created_at DESC
 		`, workflowID).

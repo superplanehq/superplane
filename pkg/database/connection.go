@@ -186,7 +186,6 @@ func TruncateTables() error {
 			role_metadata,
 			group_metadata,
 			installation_metadata,
-			blueprints,
 			workflows,
 			workflow_runs,
 			workflow_nodes,
