@@ -2,14 +2,7 @@ const getOrganizationIdFromUrl = (): string | null => {
   const pathSegments = window.location.pathname.split("/");
 
   // Check if we're in the /:organizationId route pattern (for settings, canvas, etc.)
-  if (
-    pathSegments[1] &&
-    pathSegments[1] !== "auth" &&
-    pathSegments[1] !== "login" &&
-    pathSegments[1] !== "register" &&
-    pathSegments[1] !== "install" &&
-    pathSegments[1] !== "create"
-  ) {
+  if (pathSegments[1] && pathSegments[1] !== "auth" && pathSegments[1] !== "login" && pathSegments[1] !== "register") {
     return pathSegments[1];
   }
 
