@@ -280,7 +280,7 @@ func InitMetrics(ctx context.Context) error {
 
 	integrationSecretWritesCounter, err = meter.Int64Counter(
 		"integration.secret.writes.total",
-		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration and operation"),
+		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration type and operation"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -490,7 +490,7 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 	)
 }
 
-func RecordIntegrationSecretWrite(ctx context.Context, appName, installationID, operation string) {
+func RecordIntegrationSecretWrite(ctx context.Context, appName, operation string) {
 	if !metricsReady.Load() {
 		return
 	}
@@ -500,7 +500,6 @@ func RecordIntegrationSecretWrite(ctx context.Context, appName, installationID, 
 		1,
 		metric.WithAttributes(
 			attribute.String("app_name", appName),
-			attribute.String("installation_id", installationID),
 			attribute.String("operation", operation),
 		),
 	)

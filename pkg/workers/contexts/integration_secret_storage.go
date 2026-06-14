@@ -203,7 +203,6 @@ func (s *IntegrationSecretStorage) recordSecretWrite(name, operation string) {
 	telemetry.RecordIntegrationSecretWrite(
 		context.Background(),
 		s.integration.AppName,
-		s.integration.ID.String(),
 		operation,
 	)
 
