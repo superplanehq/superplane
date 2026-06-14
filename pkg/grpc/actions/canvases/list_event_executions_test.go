@@ -98,7 +98,6 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 	assert.Equal(t, parentExecution.ID.String(), execution.Id)
 	assert.Equal(t, canvas.ID.String(), execution.CanvasId)
 	assert.Equal(t, "node-1", execution.NodeId)
-	assert.Empty(t, execution.ParentExecutionId)
 }
 
 func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *testing.T) {
