@@ -15,16 +15,64 @@ const draft: CanvasesCanvasVersion = {
 };
 
 describe("DraftBranchRow", () => {
-  it("renders draft metadata and highlights the active row", () => {
+  it("shows ready to publish badge and blue background when active and ready", () => {
     const { container } = render(
-      <DraftBranchRow draft={draft} isActive canUpdateCanvas onOpen={vi.fn()} onDelete={vi.fn()} />,
+      <DraftBranchRow draft={draft} isActive editStatus="ready" canUpdateCanvas onOpen={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    expect(screen.getByText("Draft #1")).toBeInTheDocument();
-    expect(screen.getByText("drafts/user-1")).toBeInTheDocument();
-    expect(screen.getByText(/Ada ·/)).toBeInTheDocument();
+    expect(screen.getByText("Ready to publish")).toBeInTheDocument();
     expect(container.firstChild).toHaveClass("bg-blue-50");
-    expect(screen.queryByText("Ready to publish")).not.toBeInTheDocument();
+  });
+
+  it("shows uncommitted changes badge and orange background when active and uncommitted", () => {
+    const { container } = render(
+      <DraftBranchRow
+        draft={draft}
+        isActive
+        editStatus="uncommitted"
+        canUpdateCanvas
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Uncommitted changes")).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("bg-orange-50");
+  });
+
+  it("shows gray badge and background when inactive with edit status", () => {
+    const { container } = render(
+      <DraftBranchRow
+        draft={draft}
+        isActive={false}
+        editStatus="ready"
+        canUpdateCanvas
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const badge = screen.getByText("Ready to publish");
+    expect(badge).toHaveClass("bg-slate-100");
+    expect(badge).toHaveClass("text-slate-600");
+    expect(container.firstChild).toHaveClass("bg-slate-50");
+  });
+
+  it("shows gray no changes badge when the draft matches live", () => {
+    const { container } = render(
+      <DraftBranchRow
+        draft={draft}
+        isActive
+        editStatus="no-changes"
+        canUpdateCanvas
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No changes")).toBeInTheDocument();
+    expect(screen.getByText("No changes")).toHaveClass("bg-slate-100");
+    expect(container.firstChild).toHaveClass("bg-blue-50");
   });
 
   it("opens and deletes the draft branch", async () => {

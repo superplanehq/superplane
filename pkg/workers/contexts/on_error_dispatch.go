@@ -158,8 +158,6 @@ func componentNameForNode(node *models.CanvasNode) string {
 		return ref.Component.Name
 	case ref.Trigger != nil && ref.Trigger.Name != "":
 		return ref.Trigger.Name
-	case ref.Blueprint != nil && ref.Blueprint.ID != "":
-		return ref.Blueprint.ID
 	default:
 		return ""
 	}

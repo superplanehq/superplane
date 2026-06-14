@@ -21,8 +21,10 @@ var (
 	queueWorkerNodesCountHistogram metric.Int64Histogram
 	queueWorkerStuckItems          metric.Int64Histogram
 
-	executorWorkerTickHistogram       metric.Float64Histogram
-	executorWorkerNodesCountHistogram metric.Int64Histogram
+	executorWorkerTickHistogram              metric.Float64Histogram
+	executorWorkerNodesCountHistogram        metric.Int64Histogram
+	executorWorkerExecutionsCounter          metric.Int64Counter
+	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
 	eventWorkerTickHistogram        metric.Float64Histogram
 	eventWorkerEventsCountHistogram metric.Int64Histogram
@@ -36,6 +38,13 @@ var (
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 
+	dbPoolConnectionsMaxGauge   metric.Int64Gauge
+	dbPoolConnectionsOpenGauge  metric.Int64Gauge
+	dbPoolConnectionsInUseGauge metric.Int64Gauge
+	dbPoolConnectionsIdleGauge  metric.Int64Gauge
+	dbPoolWaitCountCounter      metric.Int64Counter
+	dbPoolWaitDurationHistogram metric.Float64Histogram
+
 	dbRowsAffectedCounter metric.Int64Counter
 
 	pendingEventsGauge     metric.Int64Gauge
@@ -48,7 +57,13 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	res, err := otelResource(ctx)
+	if err != nil {
+		return err
+	}
+
 	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(
 			sdkmetric.NewPeriodicReader(exporter),
 		),
@@ -88,6 +103,24 @@ func InitMetrics(ctx context.Context) error {
 		"executor_worker.tick.nodes.pending",
 		metric.WithDescription("Number of pending workflow node executions each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerExecutionsCounter, err = meter.Int64Counter(
+		"executor_worker.executions.total",
+		metric.WithDescription("WorkflowNodeExecutor execution processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerExecutionDurationHistogram, err = meter.Float64Histogram(
+		"executor_worker.execution.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeExecutor execution processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -160,6 +193,60 @@ func InitMetrics(ctx context.Context) error {
 		"db.long_queries.count",
 		metric.WithDescription("Number of long-running database queries"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsMaxGauge, err = meter.Int64Gauge(
+		"db.pool.connections.max",
+		metric.WithDescription("Configured maximum open database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsOpenGauge, err = meter.Int64Gauge(
+		"db.pool.connections.open",
+		metric.WithDescription("Number of open database connections"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsInUseGauge, err = meter.Int64Gauge(
+		"db.pool.connections.in_use",
+		metric.WithDescription("Number of database connections currently in use"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsIdleGauge, err = meter.Int64Gauge(
+		"db.pool.connections.idle",
+		metric.WithDescription("Number of idle database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitCountCounter, err = meter.Int64Counter(
+		"db.pool.wait.count",
+		metric.WithDescription("Number of times a request waited for a database connection"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitDurationHistogram, err = meter.Float64Histogram(
+		"db.pool.wait.duration.seconds",
+		metric.WithDescription("Time spent waiting for a database connection"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -250,6 +337,28 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordExecutorWorkerExecution(ctx context.Context, d time.Duration, outcome, reason, component string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+		attribute.String("component", component),
+	)
+
+	executorWorkerExecutionsCounter.Add(ctx, 1, attrs)
+	executorWorkerExecutionDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+			attribute.String("component", component),
+		),
+	)
+}
+
 func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !metricsReady.Load() {
 		return
@@ -320,6 +429,33 @@ func RecordDBLongQueriesCount(ctx context.Context, count int64) {
 	}
 
 	dbLongQueriesCountHistogram.Record(ctx, count)
+}
+
+func RecordDBPoolStats(ctx context.Context, maxOpen, open, inUse, idle int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbPoolConnectionsMaxGauge.Record(ctx, maxOpen)
+	dbPoolConnectionsOpenGauge.Record(ctx, open)
+	dbPoolConnectionsInUseGauge.Record(ctx, inUse)
+	dbPoolConnectionsIdleGauge.Record(ctx, idle)
+}
+
+func RecordDBPoolWaitCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() || count <= 0 {
+		return
+	}
+
+	dbPoolWaitCountCounter.Add(ctx, count)
+}
+
+func RecordDBPoolWaitDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() || d <= 0 {
+		return
+	}
+
+	dbPoolWaitDurationHistogram.Record(ctx, d.Seconds())
 }
 
 func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation string) {

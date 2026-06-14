@@ -49,6 +49,7 @@ func UpdateCanvasVersion(
 		autoLayout,
 		webhookBaseURL,
 		authService,
+		false,
 	)
 }
 
@@ -64,6 +65,7 @@ func UpdateCanvasVersionWithUsage(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
+	discardStaging bool,
 ) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -106,18 +108,13 @@ func UpdateCanvasVersionWithUsage(
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
-	expandedNodes, err := expandNodes(organizationID, nodes)
-	if err != nil {
-		return nil, err
-	}
-
 	err = usage.EnsureOrganizationWithinLimits(
 		ctx,
 		usageService,
 		organizationID,
 		&usagepb.OrganizationState{},
 		&usagepb.CanvasState{
-			Nodes: int32(len(expandedNodes)),
+			Nodes: int32(len(nodes)),
 		},
 	)
 
@@ -181,7 +178,15 @@ func UpdateCanvasVersionWithUsage(
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 
-		return tx.Save(version).Error
+		if err := tx.Save(version).Error; err != nil {
+			return err
+		}
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
+		return nil
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

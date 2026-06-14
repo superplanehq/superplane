@@ -6,12 +6,14 @@ export function TabBar({
   openTabs,
   selectedPath,
   pendingChangesByPath,
+  specDraftByPath,
   onOpenFile,
   onCloseTab,
 }: {
   openTabs: string[];
   selectedPath: string | null;
   pendingChangesByPath: Record<string, PendingFileChange>;
+  specDraftByPath: Record<string, string>;
   onOpenFile: (path: string) => void;
   onCloseTab: (path: string) => void;
 }) {
@@ -20,6 +22,7 @@ export function TabBar({
       <div className="flex min-w-0 flex-1 items-start self-stretch overflow-x-auto overflow-y-hidden">
         {openTabs.map((path) => {
           const change = pendingChangesByPath[path];
+          const hasSpecDraft = specDraftByPath[path] !== undefined;
           const active = selectedPath === path;
 
           return (
@@ -36,7 +39,9 @@ export function TabBar({
                 className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left"
                 onClick={() => onOpenFile(path)}
               >
-                {change ? <span className="size-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden /> : null}
+                {change || hasSpecDraft ? (
+                  <span className="size-1.5 shrink-0 rounded-full bg-orange-500" aria-hidden />
+                ) : null}
                 <span className="min-w-0 truncate">{path}</span>
               </button>
               <button

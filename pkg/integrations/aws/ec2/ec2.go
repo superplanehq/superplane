@@ -49,6 +49,10 @@ const (
 	ManageInstancePowerRebootPayloadType    = "aws.ec2.instance.power.rebooted"
 	ManageInstancePowerHibernatePayloadType = "aws.ec2.instance.power.hibernated"
 	UpdateInstancePayloadType               = "aws.ec2.instance.updated"
+	AllocateElasticIPPayloadType            = "aws.ec2.elastic-ip.allocated"
+	ReleaseElasticIPPayloadType             = "aws.ec2.elastic-ip.released"
+	ManageElasticIPAssociatePayloadType     = "aws.ec2.elastic-ip.associated"
+	ManageElasticIPDisassociatePayloadType  = "aws.ec2.elastic-ip.disassociated"
 
 	CreateAlarmPayloadType = "aws.ec2.alarm"
 	GetAlarmPayloadType    = "aws.ec2.alarm"
