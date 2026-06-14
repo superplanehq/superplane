@@ -276,4 +276,84 @@ describe("useCanvasWebsocket", () => {
       queryKey: canvasKeys.consoleAll(testCanvasId),
     });
   });
+
+  it("invalidates staged caches for staging_updated events", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const onCanvasStagingEvent = vi.fn();
+
+    renderHook(
+      () =>
+        useCanvasWebsocket(
+          testCanvasId,
+          testOrganizationId,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          false,
+          true,
+          onCanvasStagingEvent,
+        ),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
+    emitWebsocketMessage("staging_updated", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    expect(onCanvasStagingEvent).toHaveBeenCalledWith(
+      { canvasId: testCanvasId, versionId: "version-1" },
+      "staging_updated",
+    );
+    expect(
+      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
+    ).toHaveLength(1);
+    const stagedPredicateCalls = invalidateQueriesSpy.mock.calls.filter((call: unknown[]) => {
+      const args = call[0] as { predicate?: unknown };
+      return typeof args.predicate === "function";
+    });
+    expect(stagedPredicateCalls).toHaveLength(1);
+  });
+
+  it("skips staging invalidation when onCanvasStagingEvent returns false", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const onCanvasStagingEvent = vi.fn().mockReturnValue(false);
+
+    renderHook(
+      () =>
+        useCanvasWebsocket(
+          testCanvasId,
+          testOrganizationId,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          false,
+          true,
+          onCanvasStagingEvent,
+        ),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
+    emitWebsocketMessage("staging_updated", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
+    expect(
+      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
+    ).toHaveLength(0);
+  });
 });

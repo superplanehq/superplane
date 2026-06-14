@@ -6,14 +6,25 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
+
+// publishStagingUpdated notifies other tabs/replicas that a draft version's
+// staging layer changed so they can refetch staged caches. Failures are logged
+// but never block the staging write.
+func publishStagingUpdated(canvasID, versionID uuid.UUID) {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvasID.String(), versionID.String()).PublishStagingUpdated(); err != nil {
+		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
+	}
+}
 
 // loadOwnedDraftVersion resolves the canvas and draft version for a staging
 // write/commit/discard, enforcing that the caller owns the registered draft.
@@ -184,6 +195,8 @@ func StageRepositorySpecFileOperations(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
 	}
+
+	publishStagingUpdated(canvas.ID, version.ID)
 
 	return buildStagingSummary(version.ID, rows), nil
 }

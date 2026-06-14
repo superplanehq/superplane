@@ -70,6 +70,7 @@ import { analytics } from "@/lib/analytics";
 import { appPath } from "@/lib/appPaths";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
+import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -2147,6 +2148,63 @@ export function AppPage() {
     [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
   );
 
+  // A remote `staging_updated` (another tab editing the same draft) changed the
+  // draft's staging layer without committing. The console/files caches and diff
+  // badge refresh through the websocket hook's invalidations, but the rendered
+  // graph reads `draftCanvasSpec` (React state), so the active draft needs its
+  // effective staged spec re-applied here.
+  const resyncDraftToStaged = useCallback(
+    async (versionId: string) => {
+      if (!organizationId || !canvasId) {
+        return;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+
+      // Only the actively-edited draft drives the rendered graph, so the spec
+      // re-apply is reserved for it. Other branches just drop their cached spec
+      // so a later switch refetches the staged content.
+      if (activeCanvasVersionIdRef.current !== versionId) {
+        draftCanvasSpecsRef.current.delete(versionId);
+        return;
+      }
+
+      consoleMutationGenerationRef.current += 1;
+      const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
+      const stagedSpec = stagedVersion?.spec ?? null;
+
+      if (stagedVersion) {
+        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
+      }
+      if (stagedSpec) {
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
+          current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current,
+        );
+        draftCanvasSpecsRef.current.set(versionId, stagedSpec);
+      } else {
+        draftCanvasSpecsRef.current.delete(versionId);
+      }
+      setDraftCanvasSpec(stagedSpec);
+      setActiveCanvasVersion((current) =>
+        current?.metadata?.id === versionId ? { ...current, spec: stagedSpec ?? current.spec } : current,
+      );
+
+      // Treat the applied staged spec as the saved baseline so it is not
+      // mistaken for a local edit (which would re-stage and echo back to the
+      // originating tab, creating a feedback loop).
+      const restored = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      if (restored) {
+        setLastSavedWorkflowSnapshot(restored);
+      }
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
+      setStagingResetNonce((nonce) => nonce + 1);
+    },
+    [organizationId, canvasId, queryClient, setLastSavedWorkflowSnapshot],
+  );
+
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {
       if (eventName === "canvas_deleted") {
@@ -2213,6 +2271,32 @@ export function AppPage() {
     [isViewingLiveVersion, hasPendingLocalCanvasState, canvasDeletedRemotely],
   );
 
+  const handleCanvasStagingEvent = useCallback(
+    (payload: { canvasId: string; versionId?: string }) => {
+      if (!payload.versionId) {
+        return false;
+      }
+
+      // This tab's own staging writes broadcast back to it; skip the refetch so
+      // it does not clobber newer, still in-flight local edits.
+      if (consumeLocalStagingWrite(canvasId, payload.versionId)) {
+        return false;
+      }
+
+      // Defer when this tab has its own unsaved canvas edits to avoid clobbering
+      // them; the deferred-apply effect refreshes once they settle. The console
+      // and files staged caches still refresh through the websocket hook.
+      if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
+        setRemoteCanvasUpdatePending(true);
+        return true;
+      }
+
+      void resyncDraftToStaged(payload.versionId);
+      return true;
+    },
+    [canvasId, activeCanvasVersionId, hasPendingLocalCanvasState, resyncDraftToStaged],
+  );
+
   useCanvasWebsocket(
     canvasId!,
     organizationId!,
@@ -2223,6 +2307,7 @@ export function AppPage() {
     shouldApplyCanvasUpdate,
     isViewingLiveVersion,
     true,
+    handleCanvasStagingEvent,
   );
 
   const rawLogNodes = canvasNodes;
