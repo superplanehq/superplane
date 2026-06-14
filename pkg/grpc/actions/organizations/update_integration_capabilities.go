@@ -221,7 +221,7 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},
 		HTTP:         registry.HTTPContextInTransaction(tx),
 		Properties:   contexts.NewIntegrationPropertyStorage(integration),
-		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretTriggerSetup),
+		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
 		Capabilities: capabilityCtx,
 	})
 

@@ -69,7 +69,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		registry.Encryptor,
 		registry,
 		nil,
-		telemetry.IntegrationSecretTriggerListResources,
+		telemetry.IntegrationSecretSourceListResources,
 	)
 
 	listCtx := core.ListResourcesContext{

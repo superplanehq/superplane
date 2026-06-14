@@ -92,7 +92,7 @@ func UpdateIntegration(
 		registry.Encryptor,
 		registry,
 		nil,
-		telemetry.IntegrationSecretTriggerSetup,
+		telemetry.IntegrationSecretSourceSetup,
 	)
 
 	syncErr := integration.Sync(core.SyncContext{

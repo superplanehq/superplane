@@ -438,7 +438,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Encryptor,
 			p.options.Registry,
 			nil,
-			telemetry.IntegrationSecretTriggerSetup,
+			telemetry.IntegrationSecretSourceSetup,
 		)
 	}
 
@@ -478,7 +478,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 			p.options.Encryptor,
 			p.options.Registry,
 			nil,
-			telemetry.IntegrationSecretTriggerSetup,
+			telemetry.IntegrationSecretSourceSetup,
 		)
 	}
 

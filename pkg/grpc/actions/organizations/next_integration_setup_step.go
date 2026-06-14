@@ -137,7 +137,7 @@ func submitStep(
 			OrganizationID:  integration.OrganizationID.String(),
 			HTTP:            registry.HTTPContextInTransaction(tx),
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretTriggerSetup),
+			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration, telemetry.IntegrationSecretSourceSetup),
 			Capabilities:    capabilityCtx,
 		})
 

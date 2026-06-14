@@ -102,7 +102,7 @@ func InvokeNodeExecutionHook(
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents, telemetry.IntegrationSecretTriggerExecution)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents, telemetry.IntegrationSecretSourceExecution)
 	}
 
 	actionCtx.Logger = logger

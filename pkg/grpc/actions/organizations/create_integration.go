@@ -137,7 +137,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
-			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration, telemetry.IntegrationSecretTriggerSetup),
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration, telemetry.IntegrationSecretSourceSetup),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{
@@ -180,7 +180,7 @@ func syncIntegration(
 		registry.Encryptor,
 		registry,
 		nil,
-		telemetry.IntegrationSecretTriggerSetup,
+		telemetry.IntegrationSecretSourceSetup,
 	)
 
 	syncErr := integrationImpl.Sync(core.SyncContext{

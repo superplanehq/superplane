@@ -108,7 +108,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			logger = logging.WithIntegration(logger, *integration)
-			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil, telemetry.IntegrationSecretTriggerExecution)
+			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil, telemetry.IntegrationSecretSourceExecution)
 		}
 
 		ctx.Logger = logger

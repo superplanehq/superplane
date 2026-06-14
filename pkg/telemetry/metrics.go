@@ -53,18 +53,18 @@ var (
 	pendingExecutionsGauge metric.Int64Gauge
 )
 
-// Trigger values for integration secret writes, used as the "trigger"
+// Source values for integration secret writes, used as the "source"
 // attribute on the integration.secret.writes.total counter.
 const (
-	IntegrationSecretTriggerSync              = "sync"
-	IntegrationSecretTriggerExecution         = "execution"
-	IntegrationSecretTriggerSetup             = "setup"
-	IntegrationSecretTriggerUserUpdate        = "user_update"
-	IntegrationSecretTriggerWebhook           = "webhook"
-	IntegrationSecretTriggerOAuthCallback     = "oauth_callback"
-	IntegrationSecretTriggerCleanup           = "cleanup"
-	IntegrationSecretTriggerIntegrationAction = "integration_action"
-	IntegrationSecretTriggerListResources     = "list_resources"
+	IntegrationSecretSourceSync              = "sync"
+	IntegrationSecretSourceExecution         = "execution"
+	IntegrationSecretSourceSetup             = "setup"
+	IntegrationSecretSourceUserUpdate        = "user_update"
+	IntegrationSecretSourceWebhook           = "webhook"
+	IntegrationSecretSourceOAuthCallback     = "oauth_callback"
+	IntegrationSecretSourceCleanup           = "cleanup"
+	IntegrationSecretSourceIntegrationAction = "integration_action"
+	IntegrationSecretSourceListResources     = "list_resources"
 )
 
 // Operation values for integration secret writes.
@@ -504,7 +504,7 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 	)
 }
 
-func RecordIntegrationSecretWrite(ctx context.Context, appName, trigger, installationID, operation string) {
+func RecordIntegrationSecretWrite(ctx context.Context, appName, source, installationID, operation string) {
 	if !metricsReady.Load() {
 		return
 	}
@@ -514,7 +514,7 @@ func RecordIntegrationSecretWrite(ctx context.Context, appName, trigger, install
 		1,
 		metric.WithAttributes(
 			attribute.String("app_name", appName),
-			attribute.String("trigger", trigger),
+			attribute.String("source", source),
 			attribute.String("installation_id", installationID),
 			attribute.String("operation", operation),
 		),
