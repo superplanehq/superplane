@@ -1,6 +1,6 @@
 import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
+import { useCanvasConsole, useCanvasRepositoryFileChanges, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
 import {
   buildDraftConsoleDiffSummary,
@@ -77,6 +77,13 @@ export function useCanvasConsoleVersionDiff({
     [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],
   );
 
+  // Arbitrary repository files (e.g. README.md) committed to the draft branch are
+  // publishable changes the spec-based graph/console diffs above cannot see. The
+  // backend compares the draft branch against live and returns whether any non-spec
+  // file differs.
+  const repositoryFileChangesQuery = useCanvasRepositoryFileChanges(canvasId, draftDiffVersionId || undefined, enabled);
+  const hasDraftFilesDiffVersusLive = !!repositoryFileChangesQuery.data?.hasUnpublishedFileChanges;
+
   // The on-canvas diff surfaces (X-ray panel badges, the diff summary, and the
   // "Show diff" modal) mirror the canvas tab, which diffs the *effective* draft
   // against live. Prefer the staged console; fall back to the committed draft
@@ -111,12 +118,14 @@ export function useCanvasConsoleVersionDiff({
       setConsoleDiffOpen(false);
     }
   }, [consoleDiffOpen, consoleYamlDiffPayload]);
-  const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
+  const hasDraftDiffVersusLive =
+    hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive || hasDraftFilesDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
     hasLatestDraftVersion: !!(versionIds.active || versionIds.draft),
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
+    hasDraftFilesDiffVersusLive,
     hasDraftDiffVersusLive,
   });
   const updateConsoleMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {

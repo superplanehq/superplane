@@ -15,15 +15,15 @@ func TestReadRepositorySpecFileEmptyDraftIncludesNodeList(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	response, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), "")
+	canvasID := createGitCanvas(ctx, t, r, "empty-draft-node-list", nil)
+	response, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
 	require.NoError(t, err)
 
 	versionID := response.GetVersion().GetMetadata().GetId()
 	yamlText, err := ReadRepositorySpecFile(
 		ctx,
 		r.Organization.ID.String(),
-		canvas.ID.String(),
+		canvasID,
 		versionID,
 		CanvasYAMLRepositoryPath,
 	)
