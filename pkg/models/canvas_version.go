@@ -85,6 +85,106 @@ func (c *CanvasVersion) ensureDefaultChangeRequestApprovers() {
 	c.ChangeRequestApprovers = datatypes.NewJSONSlice(DefaultCanvasChangeRequestApprovers())
 }
 
+func IsUserOwnedDraftVersion(version *CanvasVersion, userID uuid.UUID) bool {
+	if version == nil {
+		return false
+	}
+	if version.State != CanvasVersionStateDraft {
+		return false
+	}
+	if version.OwnerID == nil || *version.OwnerID != userID {
+		return false
+	}
+	return true
+}
+
+func IsRegisteredDraftVersion(version *CanvasVersion) bool {
+	return version != nil &&
+		version.State == CanvasVersionStateDraft &&
+		version.BranchName != nil &&
+		*version.BranchName != ""
+}
+
+func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
+	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
+}
+
+func FindVersionByCommitSHA(workflowID uuid.UUID, commitSHA string) (*CanvasVersion, error) {
+	return FindVersionByCommitSHAInTransaction(database.Conn(), workflowID, commitSHA)
+}
+
+func FindDraftVersionByBranch(canvasID uuid.UUID, branchName string) (*CanvasVersion, error) {
+	return FindDraftVersionByBranchInTransaction(database.Conn(), canvasID, branchName)
+}
+
+func ListAllDraftBranchVersionsForCanvas(canvasID uuid.UUID) ([]CanvasVersion, error) {
+	return ListAllDraftBranchVersionsForCanvasInTransaction(database.Conn(), canvasID)
+}
+
+func DeleteDraftVersionByBranch(canvasID uuid.UUID, branchName string) error {
+	return DeleteDraftVersionByBranchInTransaction(database.Conn(), canvasID, branchName)
+}
+
+func UpsertMaterializedVersion(version *CanvasVersion) error {
+	return UpsertMaterializedVersionInTransaction(database.Conn(), version)
+}
+
+func ListVersionsForBranch(workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
+	return ListVersionsForBranchInTransaction(database.Conn(), workflowID, gitBranch)
+}
+
+func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
+	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
+}
+
+func ListDraftCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
+	var versions []CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStateDraft).
+		Order("created_at DESC").
+		Find(&versions).
+		Error
+	return versions, err
+}
+
+func FindLatestPublishedCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
+	var version CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStatePublished).
+		Order("published_at DESC").
+		First(&version).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &version, nil
+}
+
+func CreateDraftBranchFromLive(
+	canvasID uuid.UUID,
+	userID uuid.UUID,
+	displayName string,
+	nodes []Node,
+	edges []Edge,
+) (*CanvasVersion, error) {
+	var draft *CanvasVersion
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		created, createErr := CreateDraftBranchFromLiveInTransaction(tx, canvasID, userID, displayName, nodes, edges)
+		draft = created
+		return createErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return draft, nil
+}
+
+func FindLiveCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
+	return FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
+}
+
 func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
@@ -98,10 +198,6 @@ func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID
 	}
 
 	return &version, nil
-}
-
-func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
-	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
 }
 
 func FindVersionByCommitSHAInTransaction(tx *gorm.DB, workflowID uuid.UUID, commitSHA string) (*CanvasVersion, error) {
@@ -123,10 +219,6 @@ func FindVersionByCommitSHAInTransaction(tx *gorm.DB, workflowID uuid.UUID, comm
 	return &version, nil
 }
 
-func FindVersionByCommitSHA(workflowID uuid.UUID, commitSHA string) (*CanvasVersion, error) {
-	return FindVersionByCommitSHAInTransaction(database.Conn(), workflowID, commitSHA)
-}
-
 func FindDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, branchName string) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
@@ -140,10 +232,6 @@ func FindDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, bran
 	}
 
 	return &version, nil
-}
-
-func FindDraftVersionByBranch(canvasID uuid.UUID, branchName string) (*CanvasVersion, error) {
-	return FindDraftVersionByBranchInTransaction(database.Conn(), canvasID, branchName)
 }
 
 func ListAllDraftBranchVersionsForCanvasInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasVersion, error) {
@@ -162,10 +250,6 @@ func ListAllDraftBranchVersionsForCanvasInTransaction(tx *gorm.DB, canvasID uuid
 	return versions, nil
 }
 
-func ListAllDraftBranchVersionsForCanvas(canvasID uuid.UUID) ([]CanvasVersion, error) {
-	return ListAllDraftBranchVersionsForCanvasInTransaction(database.Conn(), canvasID)
-}
-
 func DeleteDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, branchName string) error {
 	return tx.
 		Where("workflow_id = ?", canvasID).
@@ -173,10 +257,6 @@ func DeleteDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, br
 		Where("branch_name = ?", branchName).
 		Delete(&CanvasVersion{}).
 		Error
-}
-
-func DeleteDraftVersionByBranch(canvasID uuid.UUID, branchName string) error {
-	return DeleteDraftVersionByBranchInTransaction(database.Conn(), canvasID, branchName)
 }
 
 func UpsertMaterializedVersionInTransaction(tx *gorm.DB, version *CanvasVersion) error {
@@ -224,10 +304,6 @@ func UpsertMaterializedVersionInTransaction(tx *gorm.DB, version *CanvasVersion)
 	return tx.Create(version).Error
 }
 
-func UpsertMaterializedVersion(version *CanvasVersion) error {
-	return UpsertMaterializedVersionInTransaction(database.Conn(), version)
-}
-
 func ListVersionsForBranchInTransaction(tx *gorm.DB, workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
 	var versions []CanvasVersion
 	err := tx.
@@ -241,10 +317,6 @@ func ListVersionsForBranchInTransaction(tx *gorm.DB, workflowID uuid.UUID, gitBr
 	}
 
 	return versions, nil
-}
-
-func ListVersionsForBranch(workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
-	return ListVersionsForBranchInTransaction(database.Conn(), workflowID, gitBranch)
 }
 
 func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
@@ -275,35 +347,6 @@ func ListCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Canva
 	}
 
 	return versions, nil
-}
-
-func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
-	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
-}
-
-func ListDraftCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
-	var versions []CanvasVersion
-	err := database.Conn().
-		Where("workflow_id = ?", workflowID).
-		Where("state = ?", CanvasVersionStateDraft).
-		Order("created_at DESC").
-		Find(&versions).
-		Error
-	return versions, err
-}
-
-func FindLatestPublishedCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
-	var version CanvasVersion
-	err := database.Conn().
-		Where("workflow_id = ?", workflowID).
-		Where("state = ?", CanvasVersionStatePublished).
-		Order("published_at DESC").
-		First(&version).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	return &version, nil
 }
 
 func ListPublishedCanvasVersionsInTransaction(
@@ -396,26 +439,6 @@ func CountDraftBranchesForCanvasInTransaction(tx *gorm.DB, canvasID uuid.UUID, o
 	return count, nil
 }
 
-func IsUserOwnedDraftVersion(version *CanvasVersion, userID uuid.UUID) bool {
-	if version == nil {
-		return false
-	}
-	if version.State != CanvasVersionStateDraft {
-		return false
-	}
-	if version.OwnerID == nil || *version.OwnerID != userID {
-		return false
-	}
-	return true
-}
-
-func IsRegisteredDraftVersion(version *CanvasVersion) bool {
-	return version != nil &&
-		version.State == CanvasVersionStateDraft &&
-		version.BranchName != nil &&
-		*version.BranchName != ""
-}
-
 func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
@@ -431,35 +454,6 @@ func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*C
 	}
 
 	return &version, nil
-}
-
-func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Canvas, error) {
-	var canvas Canvas
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE"}).
-		// This locks workflows directly, so select only columns that physically
-		// exist on workflows; metadata fields are projected from live versions.
-		Select(
-			"id",
-			"organization_id",
-			"live_version_id",
-			"folder_id",
-			"name",
-			"next_draft_display_number",
-			"created_by",
-			"created_at",
-			"updated_at",
-			"deleted_at",
-		).
-		Where("id = ?", workflowID).
-		First(&canvas).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &canvas, nil
 }
 
 func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Node, edges []Edge) error {
@@ -494,12 +488,6 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 		Error)
 }
 
-const canvasDraftBranchNamePrefix = "drafts/"
-
-func newDraftBranchName() string {
-	return canvasDraftBranchNamePrefix + uuid.New().String()
-}
-
 // NextDraftDisplayNameInTransaction assigns a canvas-wide monotonic display
 // label so deleted draft numbers are never reused on the same app.
 func NextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string, error) {
@@ -522,25 +510,6 @@ func NextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string,
 	}
 
 	return fmt.Sprintf("Draft #%d", number), nil
-}
-
-func CreateDraftBranchFromLive(
-	canvasID uuid.UUID,
-	userID uuid.UUID,
-	displayName string,
-	nodes []Node,
-	edges []Edge,
-) (*CanvasVersion, error) {
-	var draft *CanvasVersion
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		created, createErr := CreateDraftBranchFromLiveInTransaction(tx, canvasID, userID, displayName, nodes, edges)
-		draft = created
-		return createErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return draft, nil
 }
 
 func CreateDraftBranchFromLiveInTransaction(
@@ -685,10 +654,6 @@ func PublishCanvasDraftInTransaction(
 	return version, nil
 }
 
-func FindLiveCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
-	return FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
-}
-
 func FindLiveCanvasVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasVersion, error) {
 	canvas, err := FindCanvasWithoutOrgScopeInTransaction(tx, workflowID)
 	if err != nil {
@@ -715,4 +680,39 @@ func FindLiveCanvasSpecInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Node,
 	nodes := append([]Node(nil), version.Nodes...)
 	edges := append([]Edge(nil), version.Edges...)
 	return nodes, edges, nil
+}
+
+const canvasDraftBranchNamePrefix = "drafts/"
+
+func newDraftBranchName() string {
+	return canvasDraftBranchNamePrefix + uuid.New().String()
+}
+
+func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		// This locks workflows directly, so select only columns that physically
+		// exist on workflows; metadata fields are projected from live versions.
+		Select(
+			"id",
+			"organization_id",
+			"live_version_id",
+			"folder_id",
+			"name",
+			"next_draft_display_number",
+			"created_by",
+			"created_at",
+			"updated_at",
+			"deleted_at",
+		).
+		Where("id = ?", workflowID).
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
 }
