@@ -30,11 +30,9 @@ type InstallRequest struct {
 	OrganizationID uuid.UUID
 	AccountID      uuid.UUID
 	InstallParams  map[string]string
-	Integrations   map[string]IntegrationMapping // integration type name → instance to wire
+	Integrations   map[string]IntegrationMapping
 }
 
-// IntegrationMapping identifies a specific integration instance to wire
-// into canvas nodes of the corresponding integration type.
 type IntegrationMapping struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -74,53 +72,25 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	user, err := FindActiveUserForAccountInOrganization(req.AccountID, req.OrganizationID)
+	user, err := checkInstallPermission(s.AuthService, req.AccountID, req.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 
-	allowed, err := s.AuthService.CheckOrganizationPermission(context.Background(), user.ID.String(),
-		req.OrganizationID.String(),
-		"canvases",
-		"create",
-	)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to check canvas create permission: %v", err)
-	}
-
-	if !allowed {
-		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
-	}
-
-	canvas, console, err := s.resolveCanvasFromRepo(repo, name, req)
+	canvas, err := s.fetchAndConfigureCanvas(repo, name, req)
 	if err != nil {
 		return nil, err
+	}
+
+	console, err := FetchConsole(repo, repo.Ref)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
 	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
-	response, err := canvases.CreateCanvas(
-		ctx,
-		s.Registry,
-		s.Encryptor,
-		s.AuthService,
-		s.GitProvider,
-		s.WebhooksBaseURL,
-		req.OrganizationID,
-		canvas,
-		nil,
-		s.UsageService,
-	)
+	canvasID, err := s.createCanvas(ctx, req.OrganizationID, canvas)
 	if err != nil {
 		return nil, err
-	}
-
-	canvasID := ""
-	if response != nil && response.Canvas != nil && response.Canvas.Metadata != nil {
-		canvasID = response.Canvas.Metadata.Id
-	}
-
-	if canvasID == "" {
-		return nil, fmt.Errorf("failed to install app")
 	}
 
 	if err := persistInstalledConsole(canvasID, console); err != nil {
@@ -133,44 +103,62 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	}, nil
 }
 
-// resolveCanvasFromRepo fetches, parametrizes, and prepares a canvas for creation.
-func (s *Service) resolveCanvasFromRepo(
+// ─── Install helpers ─────────────────────────────────────────────────────────
+
+func checkInstallPermission(
+	authService authorization.Authorization,
+	accountID, organizationID uuid.UUID,
+) (*models.User, error) {
+	user, err := FindActiveUserForAccountInOrganization(accountID, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	allowed, err := authService.CheckOrganizationPermission(
+		context.Background(),
+		user.ID.String(),
+		organizationID.String(),
+		"canvases",
+		"create",
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check canvas create permission: %v", err)
+	}
+
+	if !allowed {
+		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
+	}
+
+	return user, nil
+}
+
+func (s *Service) fetchAndConfigureCanvas(
 	repo *Repository,
 	name string,
 	req InstallRequest,
-) (*pb.Canvas, *models.ConsoleYAML, error) {
-	canvasBody, _, err := fetchRawCanvasFile(repo)
+) (*pb.Canvas, error) {
+	canvasBody, err := fetchAndSubstituteParams(repo, req.InstallParams)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	canvasBody, err = applyInstallParams(canvasBody, repo, req.InstallParams)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	canvas, err := parseCanvasYAML(canvasBody)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	console, err := FetchConsole(repo, repo.Ref)
-	if err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		return nil, err
 	}
 
 	canvas.Metadata.Name = name
+	wireIntegrations(canvas, req.Integrations, s.Registry)
 
-	if len(req.Integrations) > 0 {
-		wireIntegrations(canvas, req.Integrations, s.Registry)
-	}
-
-	return canvas, console, nil
+	return canvas, nil
 }
 
-// applyInstallParams validates and substitutes template parameters in raw YAML.
-// Returns the substituted YAML bytes, ready for parsing.
-func applyInstallParams(canvasBody []byte, repo *Repository, userParams map[string]string) ([]byte, error) {
+func fetchAndSubstituteParams(repo *Repository, userParams map[string]string) ([]byte, error) {
+	canvasBody, _, err := fetchRawCanvasFile(repo)
+	if err != nil {
+		return nil, err
+	}
+
 	params, err := FetchParams(repo, repo.Ref)
 	if err != nil {
 		log.Warnf("failed to load params.json for %s: %v", repo.String(), err)
@@ -184,19 +172,44 @@ func applyInstallParams(canvasBody []byte, repo *Repository, userParams map[stri
 		if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 		}
-		return SubstituteInstallParams(canvasBody, ResolveInstallParams(params.InstallParams, userParams)), nil
+		resolved := ResolveInstallParams(params.InstallParams, userParams)
+		return SubstituteInstallParams(canvasBody, resolved), nil
 	}
 
 	return SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams)), nil
 }
 
-// persistInstalledConsole writes the optional console for a freshly created
-// canvas. A nil console is a no-op (the repo did not ship a console.yaml).
-//
-// Note: this runs after canvases.CreateCanvas, in its own transaction. If the
-// upsert fails, the canvas already exists; the user can re-import the console
-// from the UI. We accept that trade-off to avoid changing CreateCanvas's
-// signature just for this side-effect.
+func (s *Service) createCanvas(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	canvas *pb.Canvas,
+) (string, error) {
+	response, err := canvases.CreateCanvas(
+		ctx,
+		s.Registry,
+		s.Encryptor,
+		s.AuthService,
+		s.GitProvider,
+		s.WebhooksBaseURL,
+		organizationID,
+		canvas,
+		nil,
+		s.UsageService,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	canvasID := response.GetCanvas().GetMetadata().GetId()
+	if canvasID == "" {
+		return "", fmt.Errorf("failed to install app: empty canvas ID in response")
+	}
+
+	return canvasID, nil
+}
+
+// ─── Console persistence ─────────────────────────────────────────────────────
+
 func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error {
 	if console == nil {
 		return nil
@@ -223,25 +236,17 @@ func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error
 	})
 }
 
-// wireIntegrations sets the Integration ref on each canvas node whose
-// component belongs to an integration type present in the mapping.
+// ─── Integration wiring ──────────────────────────────────────────────────────
+
 func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping, reg *registry.Registry) {
-	if canvas.Spec == nil {
+	if canvas.Spec == nil || len(mappings) == 0 {
 		return
 	}
 
 	componentToIntegration := buildComponentIntegrationMap(reg)
 
 	for _, node := range canvas.Spec.Nodes {
-		if node.Component == "" {
-			continue
-		}
-
 		integrationName := componentToIntegration[node.Component]
-		if integrationName == "" {
-			continue
-		}
-
 		mapping, ok := mappings[integrationName]
 		if !ok {
 			continue
@@ -254,8 +259,6 @@ func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping,
 	}
 }
 
-// buildComponentIntegrationMap creates a lookup from component name to
-// integration name using the registry. Built once, used for all nodes.
 func buildComponentIntegrationMap(reg *registry.Registry) map[string]string {
 	result := make(map[string]string)
 	if reg == nil {
@@ -274,16 +277,15 @@ func buildComponentIntegrationMap(reg *registry.Registry) map[string]string {
 	return result
 }
 
-// findIntegrationForComponent returns the integration name that owns
-// the given node's component (trigger or action). Returns "" if not found.
 func findIntegrationForComponent(node *componentpb.Node, reg *registry.Registry) string {
 	if node.Component == "" || reg == nil {
 		return ""
 	}
 
-	result := buildComponentIntegrationMap(reg)
-	return result[node.Component]
+	return buildComponentIntegrationMap(reg)[node.Component]
 }
+
+// ─── Account / org resolution ────────────────────────────────────────────────
 
 func FindActiveUserForAccountInOrganization(accountID, organizationID uuid.UUID) (*models.User, error) {
 	account, err := models.FindAccountByID(accountID.String())
