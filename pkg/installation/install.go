@@ -77,7 +77,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, err
 	}
 
-	canvas, err := s.fetchAndConfigureCanvas(repo, name, req)
+	canvas, err := s.prepareCanvasForInstall(repo, name, req.InstallParams, req.Integrations)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +132,13 @@ func checkInstallPermission(
 	return user, nil
 }
 
-func (s *Service) fetchAndConfigureCanvas(
+func (s *Service) prepareCanvasForInstall(
 	repo *Repository,
 	name string,
-	req InstallRequest,
+	userParams map[string]string,
+	integrations map[string]IntegrationMapping,
 ) (*pb.Canvas, error) {
-	canvasBody, err := fetchAndSubstituteParams(repo, req.InstallParams)
+	canvasBody, err := fetchAndSubstituteParams(repo, userParams)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (s *Service) fetchAndConfigureCanvas(
 	}
 
 	canvas.Metadata.Name = name
-	wireIntegrations(canvas, req.Integrations, s.Registry)
+	wireIntegrations(canvas, integrations, s.Registry)
 
 	return canvas, nil
 }
