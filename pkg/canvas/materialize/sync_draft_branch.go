@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -62,7 +63,7 @@ func SyncDraftBranchFromGit(
 	if draftVersion == nil {
 		label := strings.TrimSpace(opts.DisplayNameOverride)
 		if label == "" {
-			label, err = NextDraftDisplayName(canvasID)
+			label, err = nextDraftDisplayNameInTransaction(tx, canvasID)
 			if err != nil {
 				return nil, err
 			}
@@ -108,6 +109,91 @@ func SyncDraftBranchFromGit(
 	return version, nil
 }
 
+// RegisterPendingDraftOptions configures RegisterPendingDraftVersion.
+type RegisterPendingDraftOptions struct {
+	CreatedBy           *uuid.UUID
+	DisplayNameOverride string
+}
+
+// RegisterPendingDraftVersion records (or updates) the draft workflow_versions
+// row for branchName in the "pending" materialization state, without loading the
+// git snapshot. Handlers call it after committing to git so the response carries
+// a stable version ID and an existing row, then ask the materializer worker to
+// fill in nodes/edges/console asynchronously (see RequestBranchMaterialization).
+//
+// The transaction-scoped advisory lock serializes this against the worker
+// materializing the same branch, so the worker reuses this row instead of
+// inserting a duplicate that would violate idx_workflow_versions_draft_branch.
+func RegisterPendingDraftVersion(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	branchName string,
+	headSHA string,
+	opts RegisterPendingDraftOptions,
+) (*models.CanvasVersion, error) {
+	if !isDraftBranch(branchName) {
+		return nil, fmt.Errorf("branch %q is not a draft branch", branchName)
+	}
+
+	if err := lockBranchMaterialization(tx, canvasID, branchName); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branchName)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	if existing != nil {
+		existing.CommitSHA = headSHA
+		existing.GitBranch = branchName
+		existing.MaterializationStatus = models.MaterializationStatusPending
+		existing.MaterializationError = ""
+		existing.UpdatedAt = &now
+		if label := strings.TrimSpace(opts.DisplayNameOverride); label != "" {
+			existing.DisplayName = label
+		}
+		if saveErr := tx.Save(existing).Error; saveErr != nil {
+			return nil, saveErr
+		}
+		return existing, nil
+	}
+
+	label := strings.TrimSpace(opts.DisplayNameOverride)
+	if label == "" {
+		label, err = nextDraftDisplayNameInTransaction(tx, canvasID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ownerID := OwnerFromDraftBranchName(branchName)
+	if ownerID == nil {
+		ownerID = opts.CreatedBy
+	}
+
+	branch := branchName
+	version := &models.CanvasVersion{
+		ID:                    uuid.New(),
+		WorkflowID:            canvasID,
+		OwnerID:               ownerID,
+		State:                 models.CanvasVersionStateDraft,
+		BranchName:            &branch,
+		GitBranch:             branchName,
+		DisplayName:           label,
+		CommitSHA:             headSHA,
+		MaterializationStatus: models.MaterializationStatusPending,
+		CreatedAt:             &now,
+		UpdatedAt:             &now,
+	}
+	if createErr := tx.Create(version).Error; createErr != nil {
+		return nil, createErr
+	}
+
+	return version, nil
+}
+
 var draftDisplayNamePattern = regexp.MustCompile(`^Draft #(\d+)$`)
 
 // OwnerFromDraftBranchName returns the user ID encoded in drafts/{uuid} or
@@ -133,7 +219,11 @@ func OwnerFromDraftBranchName(branchName string) *uuid.UUID {
 
 // NextDraftDisplayName returns a sequential label such as "Draft #1", "Draft #2".
 func NextDraftDisplayName(canvasID uuid.UUID) (string, error) {
-	branches, err := models.ListAllDraftBranchVersionsForCanvas(canvasID)
+	return nextDraftDisplayNameInTransaction(database.Conn(), canvasID)
+}
+
+func nextDraftDisplayNameInTransaction(tx *gorm.DB, canvasID uuid.UUID) (string, error) {
+	branches, err := models.ListAllDraftBranchVersionsForCanvasInTransaction(tx, canvasID)
 	if err != nil {
 		return "", err
 	}

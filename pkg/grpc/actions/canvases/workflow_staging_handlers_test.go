@@ -125,7 +125,10 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
-	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
+	// The response is optimistic (the commit is authoritative; materialization is
+	// async), so it identifies the version; the materialized name is asserted via
+	// the version row below.
+	assert.Equal(t, versionID, resp.GetVersion().GetMetadata().GetId())
 
 	// Version row is updated and staging is cleared.
 	updated, err := models.FindCanvasVersion(canvasUUID, versionUUID)

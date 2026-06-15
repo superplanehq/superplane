@@ -119,22 +119,32 @@ func CommitCanvasStaging(
 		return nil, status.Errorf(codes.Internal, "failed to commit staged files: %v", err)
 	}
 
-	orgUUID := canvas.OrganizationID
+	var pending *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		mat := &materialize.DraftMaterializer{GitProvider: gitProvider, Registry: registry}
-		_, matErr := mat.MaterializeDraft(ctx, tx, orgUUID, canvas.ID, draftBranch, commitSHA, version.OwnerID)
-		if matErr != nil {
-			return matErr
+		registered, registerErr := materialize.RegisterPendingDraftVersion(
+			tx,
+			canvas.ID,
+			draftBranch,
+			commitSHA,
+			materialize.RegisterPendingDraftOptions{CreatedBy: version.OwnerID},
+		)
+		if registerErr != nil {
+			return registerErr
 		}
+		pending = registered
+
+		// A commit re-materializes the draft from git, so any staged DB edits
+		// for this version are now stale and must be cleared.
 		return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to materialize draft: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to commit staged changes: %v", err)
 	}
 
-	committed, err := models.FindCanvasVersion(version.WorkflowID, version.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to reload version: %v", err)
+	// Worker-authoritative materialization: the commit and the pending row are
+	// persisted, so hand the snapshot load to the worker (inline in tests).
+	if err := materialize.RequestBranchMaterialization(ctx, canvas.ID, draftBranch, commitSHA, &userUUID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request draft materialization: %v", err)
 	}
 
 	summary, _, err := stagingSummaryForVersion(version.ID)
@@ -142,10 +152,10 @@ func CommitCanvasStaging(
 		return nil, err
 	}
 
-	_ = userUUID
-
+	// Optimistic response: returns the pending version metadata at the new commit;
+	// nodes/edges are materialized asynchronously by the worker.
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(committed, organizationID),
+		Version:        SerializeCanvasVersionMetadata(pending, organizationID),
 		StagingSummary: summary,
 	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -126,6 +127,16 @@ func publishDraftVersionInTransaction(
 
 	draftBranch := strings.TrimSpace(*version.BranchName)
 
+	// Validate the name precondition synchronously, before mutating git: the live
+	// materialization is deferred to the worker, so a duplicate name would
+	// otherwise only surface asynchronously as a materialization error.
+	if nameErr := ensureCanvasNameAvailableInTransaction(database.Conn(), organizationUUID, canvasUUID, version.Name); nameErr != nil {
+		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
+			return nil, status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to check canvas name availability: %v", nameErr)
+	}
+
 	repository, err := models.FindRepository(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
@@ -148,46 +159,41 @@ func publishDraftVersionInTransaction(
 		return nil, status.Errorf(codes.Internal, "failed to merge draft branch: %v", err)
 	}
 
-	var publishedVersion *models.CanvasVersion
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		synced, syncErr := materialize.SyncLiveFromGit(
-			ctx,
-			tx,
-			gitProv,
-			reg,
-			encryptor,
-			authService,
-			webhookBaseURL,
-			organizationUUID,
-			canvasUUID,
-			materialize.SyncLiveFromGitOptions{
-				HeadSHA:                   mergeSHA,
-				SkipChangeManagementCheck: true,
-			},
-		)
-		if syncErr != nil {
-			return syncErr
-		}
-
-		publishedVersion = synced
-		return nil
-	})
-	if err != nil {
-		if status.Code(err) != codes.Unknown {
-			return nil, err
-		}
-		if errors.Is(err, models.ErrCanvasNameAlreadyExists) {
-			return nil, status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to publish canvas: %v", err)
-	}
-
 	if err := gitProv.DeleteBranch(ctx, repository.RepoID, draftBranch); err != nil && !errors.Is(err, gitprovider.ErrInvalidRef) {
 		return nil, status.Errorf(codes.Internal, "failed to delete draft branch after publish: %v", err)
 	}
 
+	var publishedVersion *models.CanvasVersion
 	var removed []string
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Register a pending published version at the merge commit. It is NOT
+		// promoted to live here: the worker's live materialization diffs the
+		// current (old) live version against the git snapshot to reconcile
+		// workflow_nodes, so the live pointer must not move until then. The worker
+		// later reuses this row (matched by commit SHA) and promotes it.
+		now := time.Now()
+		publishedVersion = &models.CanvasVersion{
+			WorkflowID:              canvasUUID,
+			State:                   models.CanvasVersionStatePublished,
+			Name:                    version.Name,
+			Description:             version.Description,
+			ChangeManagementEnabled: version.ChangeManagementEnabled,
+			ChangeRequestApprovers:  version.ChangeRequestApprovers,
+			Nodes:                   version.Nodes,
+			Edges:                   version.Edges,
+			ConsolePanels:           version.ConsolePanels,
+			ConsoleLayout:           version.ConsoleLayout,
+			CommitSHA:               mergeSHA,
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusPending,
+			PublishedAt:             &now,
+			CreatedAt:               &now,
+			UpdatedAt:               &now,
+		}
+		if upsertErr := models.UpsertMaterializedVersionInTransaction(tx, publishedVersion); upsertErr != nil {
+			return upsertErr
+		}
+
 		var reconcileErr error
 		removed, reconcileErr = materialize.ReconcileDraftBranchDeletionsFromGit(
 			ctx,
@@ -199,9 +205,25 @@ func publishDraftVersionInTransaction(
 		return reconcileErr
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to reconcile draft branch deletion after publish: %v", err)
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
+		if errors.Is(err, models.ErrCanvasNameAlreadyExists) {
+			return nil, status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to publish canvas: %v", err)
 	}
 	materialize.PublishDraftBranchDeletionEvents(canvasUUID.String(), removed)
 
+	// Worker-authoritative materialization: main now points at the merge commit,
+	// so the worker (inline in tests) materializes the live projection and promotes
+	// the published version above.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasUUID, models.CanvasGitBranchMain, mergeSHA, &userUUID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request live materialization: %v", err)
+	}
+
+	// Optimistic response: returns the promoted draft content as the published
+	// version; the live projection (workflow_nodes, live pointer) is reconciled
+	// asynchronously by the worker.
 	return publishedVersion, nil
 }

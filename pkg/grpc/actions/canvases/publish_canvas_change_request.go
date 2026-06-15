@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -182,32 +183,38 @@ func PublishCanvasChangeRequest(
 
 	var liveVersion *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		synced, syncErr := materialize.SyncLiveFromGit(
-			ctx,
-			tx,
-			gitProv,
-			registry,
-			encryptor,
-			authService,
-			webhookBaseURL,
-			organizationUUID,
-			canvasUUID,
-			materialize.SyncLiveFromGitOptions{
-				HeadSHA:                   mergeSHA,
-				SkipChangeManagementCheck: true,
-			},
-		)
-		if syncErr != nil {
-			return syncErr
+		// Register a pending published version holding the merged result. It is
+		// NOT promoted to live here: the worker's live materialization diffs the
+		// current (old) live against the git snapshot to reconcile workflow_nodes,
+		// then reuses this row (matched by commit SHA) and promotes it.
+		now := time.Now()
+		liveVersion = &models.CanvasVersion{
+			WorkflowID:              canvasUUID,
+			State:                   models.CanvasVersionStatePublished,
+			Name:                    version.Name,
+			Description:             version.Description,
+			ChangeManagementEnabled: version.ChangeManagementEnabled,
+			ChangeRequestApprovers:  version.ChangeRequestApprovers,
+			Nodes:                   datatypes.NewJSONSlice(mergedNodes),
+			Edges:                   datatypes.NewJSONSlice(mergedEdges),
+			ConsolePanels:           version.ConsolePanels,
+			ConsoleLayout:           version.ConsoleLayout,
+			CommitSHA:               mergeSHA,
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusPending,
+			PublishedAt:             &now,
+			CreatedAt:               &now,
+			UpdatedAt:               &now,
 		}
-		liveVersion = synced
+		if upsertErr := models.UpsertMaterializedVersionInTransaction(tx, liveVersion); upsertErr != nil {
+			return upsertErr
+		}
 
 		request, err = models.FindCanvasChangeRequestInTransaction(tx, canvasUUID, changeRequestUUID)
 		if err != nil {
 			return err
 		}
 
-		now := time.Now()
 		request.Status = models.CanvasChangeRequestStatusPublished
 		request.PublishedAt = &now
 		request.UpdatedAt = &now
@@ -218,6 +225,13 @@ func PublishCanvasChangeRequest(
 			return nil, nil, err
 		}
 		return nil, nil, status.Errorf(codes.Internal, "failed to publish change request: %v", err)
+	}
+
+	// Worker-authoritative materialization: main now points at the merge commit,
+	// so the worker (inline in tests) materializes the live projection and promotes
+	// the published version registered above.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasUUID, models.CanvasGitBranchMain, mergeSHA, &actorUserUUID); err != nil {
+		return nil, nil, status.Errorf(codes.Internal, "failed to request live materialization: %v", err)
 	}
 
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {

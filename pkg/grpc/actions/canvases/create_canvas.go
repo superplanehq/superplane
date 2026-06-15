@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -184,6 +186,8 @@ func CreateCanvas(
 		// FK before materialization runs. Materializing the seeded git commit then
 		// diffs this empty live against the snapshot, so every node is treated as an
 		// add and the publisher creates the corresponding workflow_nodes records.
+		// It must stay empty for the worker, so the optimistic response below is
+		// built from the parsed spec rather than from this row.
 		placeholderVersion := models.CanvasVersion{
 			ID:                      liveVersionID,
 			WorkflowID:              canvasID,
@@ -194,6 +198,9 @@ func CreateCanvas(
 			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
 			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
 			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
+			CommitSHA:               commitSHA,
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusPending,
 			PublishedAt:             &now,
 			CreatedAt:               &now,
 			UpdatedAt:               &now,
@@ -206,37 +213,27 @@ func CreateCanvas(
 			return repoErr
 		}
 
-		if markErr := tx.Model(&models.Repository{}).
+		return tx.Model(&models.Repository{}).
 			Where("canvas_id = ?", canvasID).
 			Updates(map[string]any{
 				"status":     models.RepositoryStatusReady,
 				"updated_at": time.Now(),
-			}).Error; markErr != nil {
-			return markErr
-		}
-
-		mat := &materialize.Materializer{
-			GitProvider:    gitProvider,
-			Registry:       registry,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		}
-		_, matErr := mat.MaterializeFromGit(ctx, tx, organizationID, canvasID, models.CanvasGitBranchMain, commitSHA, materialize.ModeLive, &createdBy)
-		return matErr
+			}).Error
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to materialize canvas: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to create canvas: %v", err)
+	}
+
+	// Worker-authoritative materialization: git main holds the seeded commit and
+	// the canvas row exists, so the materializer worker (inline in tests) loads the
+	// snapshot, creates workflow_nodes and webhooks, and promotes the live version.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasID, models.CanvasGitBranchMain, commitSHA, &createdBy); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request canvas materialization: %v", err)
 	}
 
 	canvas.ChangeManagementEnabled = changeManagementEnabled
 	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
 	canvas.Description = pbCanvas.Metadata.Description
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvasID)
-	if err == nil && liveVersion != nil {
-		canvas.LiveVersionID = &liveVersion.ID
-		canvas.Name = liveVersion.Name
-	}
 
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
@@ -250,12 +247,36 @@ func CreateCanvas(
 		}
 	}
 
-	proto, err := SerializeCanvas(&canvas, false, createdByUser)
-	if err != nil {
-		return nil, err
+	var createdByRef *pb.UserRef
+	if createdByUser != nil {
+		createdByRef = &pb.UserRef{Id: createdByUser.ID.String(), Name: createdByUser.Name}
 	}
 
+	canvasFolderID := ""
+	if canvas.CanvasFolderID != nil {
+		canvasFolderID = canvas.CanvasFolderID.String()
+	}
+
+	// Optimistic response: the live projection is materialized asynchronously, so
+	// the canvas spec is echoed from the just-committed (parsed + laid-out) nodes
+	// and edges rather than read back from the still-empty placeholder live row.
 	return &pb.CreateCanvasResponse{
-		Canvas: proto,
+		Canvas: &pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{
+				Id:             canvas.ID.String(),
+				OrganizationId: canvas.OrganizationID.String(),
+				Name:           name,
+				Description:    pbCanvas.Metadata.Description,
+				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:      createdByRef,
+				FolderId:       canvasFolderID,
+			},
+			Spec: &pb.Canvas_Spec{
+				Nodes:            actions.NodesToProto(nodes),
+				Edges:            actions.EdgesToProto(edges),
+				ChangeManagement: serializeChangeManagement(changeManagementEnabled, changeRequestApprovers),
+			},
+		},
 	}, nil
 }

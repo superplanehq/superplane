@@ -67,23 +67,28 @@ func CreateCanvasVersion(
 		createdGitBranch = true
 	}
 
+	headSHA, err := gitProvider.Head(ctx, repository.RepoID, branchName)
+	if err != nil {
+		if createdGitBranch {
+			_ = gitProvider.DeleteBranch(ctx, repository.RepoID, branchName)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to read draft branch head: %v", err)
+	}
+
 	var version *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var syncErr error
-		version, syncErr = materialize.SyncDraftBranchFromGit(
-			ctx,
+		var registerErr error
+		version, registerErr = materialize.RegisterPendingDraftVersion(
 			tx,
-			gitProvider,
-			registry,
-			orgUUID,
 			canvasUUID,
 			branchName,
-			materialize.SyncDraftBranchOptions{
+			headSHA,
+			materialize.RegisterPendingDraftOptions{
 				CreatedBy:           &userUUID,
 				DisplayNameOverride: strings.TrimSpace(displayName),
 			},
 		)
-		return syncErr
+		return registerErr
 	})
 	if err != nil {
 		if createdGitBranch {
@@ -95,6 +100,16 @@ func CreateCanvasVersion(
 		return nil, status.Errorf(codes.Internal, "failed to create canvas version: %v", err)
 	}
 
+	// Worker-authoritative materialization: git is the source of truth and the
+	// pending row above is now committed, so hand off the snapshot load to the
+	// materializer worker (run inline in tests) instead of blocking the request.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasUUID, branchName, headSHA, &userUUID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request draft materialization: %v", err)
+	}
+
+	// Optimistic response: the draft branch is registered in the "pending"
+	// materialization state; nodes/edges are filled in asynchronously by the
+	// worker, so only metadata is guaranteed here.
 	return &pb.CreateCanvasVersionResponse{
 		Version: SerializeCanvasVersion(version, organizationID),
 	}, nil

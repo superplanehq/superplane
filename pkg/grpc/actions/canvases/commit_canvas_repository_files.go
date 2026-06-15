@@ -148,23 +148,33 @@ func CommitCanvasRepositoryFiles(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		mat := &materialize.DraftMaterializer{GitProvider: gitProvider, Registry: registry}
-		materialized, matErr := mat.MaterializeDraft(ctx, tx, orgID, canvasID, branch, newCommitSha, ownerID)
-		if matErr != nil {
-			return matErr
+		registered, registerErr := materialize.RegisterPendingDraftVersion(
+			tx,
+			canvasID,
+			branch,
+			newCommitSha,
+			materialize.RegisterPendingDraftOptions{CreatedBy: ownerID},
+		)
+		if registerErr != nil {
+			return registerErr
 		}
 
 		// A direct commit re-materializes the draft from git, so any staged DB
 		// edits for this version are now stale and must be cleared.
-		if materialized != nil {
-			return models.DiscardWorkflowStagingInTransaction(tx, materialized.ID, nil)
-		}
-		return nil
+		return models.DiscardWorkflowStagingInTransaction(tx, registered.ID, nil)
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to materialize draft: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
 	}
 
+	// Worker-authoritative materialization: git holds the new commit and the
+	// pending row is persisted, so the worker (inline in tests) loads the snapshot.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasID, branch, newCommitSha, ownerID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request draft materialization: %v", err)
+	}
+
+	// Optimistic response: the commit SHA is authoritative; the materialized
+	// version content follows asynchronously from the worker.
 	return &pb.CommitCanvasRepositoryFilesResponse{
 		CommitSha: newCommitSha,
 	}, nil

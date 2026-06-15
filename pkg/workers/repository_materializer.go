@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -21,7 +20,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
 )
 
 const (
@@ -129,140 +127,37 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		return nil
 	}
 
+	// Deletion notifications carry no branch tip to materialize; draft-branch
+	// deletions are reconciled as a side effect of any other branch update.
+	if message.GetMaterializationStatus() == models.MaterializationStatusDeleted {
+		return nil
+	}
+
 	if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 		return err
 	}
 	defer w.semaphore.Release(1)
 
-	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
-	if err != nil {
-		w.log("Error finding canvas %s: %v", canvasID, err)
-		return err
-	}
-
-	if message.GetMaterializationStatus() == models.MaterializationStatusDeleted {
-		return nil
-	}
-
-	var removed []string
-	reconcileErr := database.Conn().Transaction(func(tx *gorm.DB) error {
-		var err error
-		removed, err = materialize.ReconcileDraftBranchDeletionsFromGit(
-			context.Background(),
-			tx,
-			w.GitProvider,
-			canvasID,
-			materialize.ReconcileDraftBranchDeletionsOptions{},
-		)
-		return err
-	})
-	if reconcileErr != nil {
-		w.log("Error reconciling draft branch deletions for canvas %s: %v", canvasID, reconcileErr)
-		return reconcileErr
-	}
-	materialize.PublishDraftBranchDeletionEvents(canvasID.String(), removed)
-
-	headSHA := message.GetHeadSha()
-	if headSHA == "" {
-		repository, headErr := models.FindRepositoryUnscoped(canvasID)
-		if headErr != nil {
-			w.log("Error finding repository for canvas %s: %v", canvasID, headErr)
-			return headErr
-		}
-
-		headSHA, err = w.GitProvider.Head(context.Background(), repository.RepoID, message.GetBranch())
-		if err != nil {
-			w.log("Error reading branch head for canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
-			return err
+	var pushedBy *uuid.UUID
+	if pushedByUserID := strings.TrimSpace(message.GetPushedByUserId()); pushedByUserID != "" {
+		if userID, parseErr := uuid.Parse(pushedByUserID); parseErr == nil {
+			pushedBy = &userID
 		}
 	}
 
-	if message.GetBranch() == models.CanvasGitBranchMain {
-		if w.shouldSkipMainMaterialization(canvasID, headSHA) {
-			return nil
-		}
-
-		err = database.Conn().Transaction(func(tx *gorm.DB) error {
-			_, syncErr := materialize.SyncLiveFromGit(
-				context.Background(),
-				tx,
-				w.GitProvider,
-				w.Registry,
-				w.Encryptor,
-				w.AuthService,
-				w.WebhookBaseURL,
-				canvas.OrganizationID,
-				canvasID,
-				materialize.SyncLiveFromGitOptions{HeadSHA: headSHA},
-			)
-			return syncErr
-		})
-		if err != nil {
-			w.log("Error materializing live canvas %s at %s: %v", canvasID, headSHA, err)
-			return err
-		}
-
-		return nil
+	materializer := &materialize.BranchMaterializer{
+		GitProvider:    w.GitProvider,
+		Registry:       w.Registry,
+		Encryptor:      w.Encryptor,
+		AuthService:    w.AuthService,
+		WebhookBaseURL: w.WebhookBaseURL,
 	}
-
-	state, err := models.FindRepositoryMaterializationState(canvasID, message.GetBranch())
-	if err == nil && state.MaterializedSHA == headSHA && state.Status == models.MaterializationStatusReady {
-		draftVersion, draftErr := models.FindDraftVersionByBranch(canvasID, message.GetBranch())
-		if draftErr == nil && draftVersion != nil && draftVersion.CommitSHA == headSHA {
-			return nil
-		}
-	}
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var createdBy *uuid.UUID
-		if pushedByUserID := strings.TrimSpace(message.GetPushedByUserId()); pushedByUserID != "" {
-			if userID, parseErr := uuid.Parse(pushedByUserID); parseErr == nil {
-				createdBy = &userID
-			}
-		}
-
-		_, syncErr := materialize.SyncDraftBranchFromGit(
-			context.Background(),
-			tx,
-			w.GitProvider,
-			w.Registry,
-			canvas.OrganizationID,
-			canvasID,
-			message.GetBranch(),
-			materialize.SyncDraftBranchOptions{
-				HeadSHA:   headSHA,
-				CreatedBy: createdBy,
-			},
-		)
-		return syncErr
-	})
-	if err != nil {
+	if err := materializer.MaterializeBranch(context.Background(), canvasID, message.GetBranch(), message.GetHeadSha(), pushedBy); err != nil {
 		w.log("Error materializing canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
 		return err
 	}
 
 	return nil
-}
-
-func (w *RepositoryMaterializerWorker) shouldSkipMainMaterialization(canvasID uuid.UUID, headSHA string) bool {
-	state, err := models.FindRepositoryMaterializationState(canvasID, models.CanvasGitBranchMain)
-	if err != nil {
-		return false
-	}
-	if state.MaterializedSHA != headSHA || state.Status != models.MaterializationStatusReady {
-		return false
-	}
-
-	if _, err = models.FindCanvasWithoutOrgScope(canvasID); err != nil {
-		return false
-	}
-
-	liveVersion, err := models.FindLiveCanvasVersion(canvasID)
-	if err != nil {
-		return false
-	}
-
-	return liveVersion.CommitSHA == headSHA
 }
 
 func (w *RepositoryMaterializerWorker) log(format string, v ...any) {
