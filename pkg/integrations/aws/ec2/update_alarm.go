@@ -406,7 +406,9 @@ func buildUpdateAlarmInput(
 		Threshold:          existing.Threshold,
 		ComparisonOperator: existing.ComparisonOperator,
 		TreatMissingData:   existing.TreatMissingData,
-		OmitAlarmActions:   true,
+		// Seed with existing actions so they are preserved by default.
+		// The action-update block below replaces specific types when toggled.
+		AlarmActions: existing.AlarmActions,
 	}
 
 	if hasConfigKey(rawConfiguration, "alarmDescription") {
@@ -445,7 +447,6 @@ func buildUpdateAlarmInput(
 	}
 
 	if hasConfigKey(rawConfiguration, "alarmAction") || hasConfigKey(rawConfiguration, "snsTopic") {
-		input.OmitAlarmActions = false
 		alarmActionToggled := hasConfigKey(rawConfiguration, "alarmAction")
 		snsTopicToggled := hasConfigKey(rawConfiguration, "snsTopic")
 
