@@ -263,14 +263,10 @@ func commitChangeRequestMergeToMain(
 		return "", status.Errorf(codes.Internal, "failed to find user: %v", err)
 	}
 
-	canvasYAML, err := materialize.BuildCanvasYAML(
-		version.Name,
-		version.Description,
-		mergedNodes,
-		mergedEdges,
-		version.ChangeManagementEnabled,
-		version.ChangeRequestApprovers,
-	)
+	canvas := materialize.CanvasYAMLFromVersion(version)
+	canvas.Spec.Nodes = mergedNodes
+	canvas.Spec.Edges = mergedEdges
+	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(canvas)
 	if err != nil {
 		return "", status.Errorf(codes.Internal, "failed to build canvas yaml: %v", err)
 	}

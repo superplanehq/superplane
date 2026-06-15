@@ -32,23 +32,26 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 	_, err = gitProvider.CreateRepository(ctx, repoID)
 	require.NoError(t, err)
 
-	canvasYAML, err := materialize.BuildCanvasYAML(
-		"Health Monitor",
-		"watches services",
-		[]models.Node{
-			{
-				ID:   "node-1",
-				Name: "Check",
-				Type: models.NodeTypeComponent,
-				Ref: models.NodeRef{
-					Component: &models.ComponentRef{Name: "noop"},
+	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(&materialize.CanvasYAML{
+		APIVersion: "v1",
+		Kind:       "Canvas",
+		Metadata: materialize.CanvasYAMLMetadata{
+			Name:        "Health Monitor",
+			Description: "watches services",
+		},
+		Spec: materialize.CanvasYAMLSpec{
+			Nodes: []models.Node{
+				{
+					ID:   "node-1",
+					Name: "Check",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
 				},
 			},
 		},
-		nil,
-		false,
-		nil,
-	)
+	})
 	require.NoError(t, err)
 
 	consoleYAML, err := materialize.BuildEmptyConsoleYAML(canvasID.String(), "Health Monitor")

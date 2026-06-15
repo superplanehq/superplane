@@ -14,16 +14,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// CanvasYAML is the canonical YAML representation of a canvas spec used when
+// seeding or backfilling git repositories.
+type CanvasYAML struct {
+	APIVersion string             `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string             `json:"kind" yaml:"kind"`
+	Metadata   CanvasYAMLMetadata `json:"metadata" yaml:"metadata"`
+	Spec       CanvasYAMLSpec     `json:"spec" yaml:"spec"`
+}
+
+type CanvasYAMLMetadata struct {
+	Name        string `json:"name" yaml:"name"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+type CanvasYAMLSpec struct {
+	Nodes                   []models.Node
+	Edges                   []models.Edge
+	ChangeManagementEnabled bool
+	ChangeRequestApprovers  []models.CanvasChangeRequestApprover
+}
+
 type canvasYAMLResource struct {
 	APIVersion string             `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string             `json:"kind" yaml:"kind"`
-	Metadata   canvasYAMLMetadata `json:"metadata" yaml:"metadata"`
+	Metadata   CanvasYAMLMetadata `json:"metadata" yaml:"metadata"`
 	Spec       canvasYAMLSpec     `json:"spec" yaml:"spec"`
-}
-
-type canvasYAMLMetadata struct {
-	Name        string `json:"name" yaml:"name"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 type canvasYAMLSpec struct {
@@ -32,29 +48,57 @@ type canvasYAMLSpec struct {
 	ChangeManagement *pb.Canvas_ChangeManagement `json:"changeManagement,omitempty" yaml:"changeManagement,omitempty"`
 }
 
-func BuildCanvasYAML(
-	name string,
-	description string,
-	nodes []models.Node,
-	edges []models.Edge,
-	changeManagementEnabled bool,
-	approvers []models.CanvasChangeRequestApprover,
-) ([]byte, error) {
-	resource := canvasYAMLResource{
+func CanvasYAMLFromVersion(version *models.CanvasVersion) *CanvasYAML {
+	if version == nil {
+		return nil
+	}
+
+	return &CanvasYAML{
 		APIVersion: "v1",
 		Kind:       "Canvas",
-		Metadata: canvasYAMLMetadata{
-			Name:        name,
-			Description: description,
+		Metadata: CanvasYAMLMetadata{
+			Name:        version.Name,
+			Description: version.Description,
 		},
+		Spec: CanvasYAMLSpec{
+			Nodes:                   version.Nodes,
+			Edges:                   version.Edges,
+			ChangeManagementEnabled: version.ChangeManagementEnabled,
+			ChangeRequestApprovers:  version.EffectiveChangeRequestApprovers(),
+		},
+	}
+}
+
+func BuildCanvasYAMLFromCanvas(canvas *CanvasYAML) ([]byte, error) {
+	if canvas == nil {
+		return nil, fmt.Errorf("canvas yaml is required")
+	}
+
+	apiVersion := strings.TrimSpace(canvas.APIVersion)
+	if apiVersion == "" {
+		apiVersion = "v1"
+	}
+
+	kind := strings.TrimSpace(canvas.Kind)
+	if kind == "" {
+		kind = "Canvas"
+	}
+
+	resource := canvasYAMLResource{
+		APIVersion: apiVersion,
+		Kind:       kind,
+		Metadata:   canvas.Metadata,
 		Spec: canvasYAMLSpec{
-			Nodes: actions.NodesToProto(nodes),
-			Edges: actions.EdgesToProto(edges),
+			Nodes: actions.NodesToProto(canvas.Spec.Nodes),
+			Edges: actions.EdgesToProto(canvas.Spec.Edges),
 		},
 	}
 
-	if changeManagementEnabled || len(approvers) > 0 {
-		resource.Spec.ChangeManagement = serializeChangeManagement(changeManagementEnabled, approvers)
+	if canvas.Spec.ChangeManagementEnabled || len(canvas.Spec.ChangeRequestApprovers) > 0 {
+		resource.Spec.ChangeManagement = serializeChangeManagement(
+			canvas.Spec.ChangeManagementEnabled,
+			canvas.Spec.ChangeRequestApprovers,
+		)
 	}
 
 	jsonBytes, err := json.Marshal(resource)

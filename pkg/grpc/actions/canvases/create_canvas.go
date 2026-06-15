@@ -151,12 +151,20 @@ func CreateCanvas(
 	}
 
 	commitSHA, seedErr := materialize.SeedMainRepository(ctx, gitProvider, repository, materialize.SeedRepositoryInput{
-		Name:                    name,
-		Description:             pbCanvas.Metadata.Description,
-		Nodes:                   nodes,
-		Edges:                   edges,
-		ChangeManagementEnabled: changeManagementEnabled,
-		ChangeRequestApprovers:  changeRequestApprovers,
+		Canvas: &materialize.CanvasYAML{
+			APIVersion: "v1",
+			Kind:       "Canvas",
+			Metadata: materialize.CanvasYAMLMetadata{
+				Name:        name,
+				Description: pbCanvas.Metadata.Description,
+			},
+			Spec: materialize.CanvasYAMLSpec{
+				Nodes:                   nodes,
+				Edges:                   edges,
+				ChangeManagementEnabled: changeManagementEnabled,
+				ChangeRequestApprovers:  changeRequestApprovers,
+			},
+		},
 		Author: git.CommitAuthor{
 			Name:  user.Name,
 			Email: user.GetEmail(),

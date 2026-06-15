@@ -80,13 +80,8 @@ func backfillMainBranch(
 ) error {
 	if !GitBranchExists(ctx, gitProvider, repository.RepoID, models.CanvasGitBranchMain) {
 		_, err := SeedMainRepository(ctx, gitProvider, repository, SeedRepositoryInput{
-			Name:                    liveVersion.Name,
-			Description:             liveVersion.Description,
-			Nodes:                   liveVersion.Nodes,
-			Edges:                   liveVersion.Edges,
-			ChangeManagementEnabled: liveVersion.ChangeManagementEnabled,
-			ChangeRequestApprovers:  liveVersion.EffectiveChangeRequestApprovers(),
-			Author:                  backfillCommitAuthor,
+			Canvas: CanvasYAMLFromVersion(liveVersion),
+			Author: backfillCommitAuthor,
 		})
 		return err
 	}
@@ -160,14 +155,7 @@ func seedMissingSpecFiles(
 
 	ops := make([]git.FileOperation, 0, 2)
 	if !hasCanvas {
-		canvasYAML, buildErr := BuildCanvasYAML(
-			version.Name,
-			version.Description,
-			version.Nodes,
-			version.Edges,
-			version.ChangeManagementEnabled,
-			version.EffectiveChangeRequestApprovers(),
-		)
+		canvasYAML, buildErr := BuildCanvasYAMLFromCanvas(CanvasYAMLFromVersion(version))
 		if buildErr != nil {
 			return buildErr
 		}

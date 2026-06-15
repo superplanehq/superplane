@@ -492,20 +492,24 @@ func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID)
 	require.NoError(t, err)
 
 	input := materialize.SeedRepositoryInput{
-		Name:                    canvas.Name,
-		Description:             canvas.Description,
-		ChangeManagementEnabled: canvas.ChangeManagementEnabled,
-		ChangeRequestApprovers:  models.DefaultCanvasChangeRequestApprovers(),
-		Author:                  git.CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"},
+		Canvas: &materialize.CanvasYAML{
+			APIVersion: "v1",
+			Kind:       "Canvas",
+			Metadata: materialize.CanvasYAMLMetadata{
+				Name:        canvas.Name,
+				Description: canvas.Description,
+			},
+			Spec: materialize.CanvasYAMLSpec{
+				ChangeManagementEnabled: canvas.ChangeManagementEnabled,
+				ChangeRequestApprovers:  models.DefaultCanvasChangeRequestApprovers(),
+			},
+		},
+		Author: git.CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"},
 	}
 	if canvas.LiveVersionID != nil {
 		liveVersion, liveErr := models.FindCanvasVersionInTransaction(database.Conn(), canvasID, *canvas.LiveVersionID)
 		require.NoError(t, liveErr)
-		input.Description = liveVersion.Description
-		input.Nodes = liveVersion.Nodes
-		input.Edges = liveVersion.Edges
-		input.ChangeManagementEnabled = liveVersion.ChangeManagementEnabled
-		input.ChangeRequestApprovers = liveVersion.EffectiveChangeRequestApprovers()
+		input.Canvas = materialize.CanvasYAMLFromVersion(liveVersion)
 	}
 
 	_, err = materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)

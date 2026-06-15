@@ -12,14 +12,9 @@ import (
 )
 
 type SeedRepositoryInput struct {
-	Name                    string
-	Description             string
-	Nodes                   []models.Node
-	Edges                   []models.Edge
-	ChangeManagementEnabled bool
-	ChangeRequestApprovers  []models.CanvasChangeRequestApprover
-	Console                 *models.ConsoleYAML
-	Author                  git.CommitAuthor
+	Canvas  *CanvasYAML
+	Console *models.ConsoleYAML
+	Author  git.CommitAuthor
 }
 
 func SeedMainRepository(
@@ -42,14 +37,11 @@ func SeedMainRepository(
 		}
 	}
 
-	canvasYAML, err := BuildCanvasYAML(
-		input.Name,
-		input.Description,
-		input.Nodes,
-		input.Edges,
-		input.ChangeManagementEnabled,
-		input.ChangeRequestApprovers,
-	)
+	if input.Canvas == nil {
+		return "", fmt.Errorf("canvas yaml is required")
+	}
+
+	canvasYAML, err := BuildCanvasYAMLFromCanvas(input.Canvas)
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +53,7 @@ func SeedMainRepository(
 			return "", err
 		}
 	} else {
-		consoleYAML, err = BuildEmptyConsoleYAML(repository.CanvasID.String(), input.Name)
+		consoleYAML, err = BuildEmptyConsoleYAML(repository.CanvasID.String(), input.Canvas.Metadata.Name)
 		if err != nil {
 			return "", err
 		}

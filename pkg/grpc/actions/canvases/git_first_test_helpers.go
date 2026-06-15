@@ -141,14 +141,10 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 		}
 	}
 
-	canvasYAML, err := materialize.BuildCanvasYAML(
-		liveVersion.Name,
-		liveVersion.Description,
-		nodes,
-		edges,
-		liveVersion.ChangeManagementEnabled,
-		liveVersion.EffectiveChangeRequestApprovers(),
-	)
+	canvas := materialize.CanvasYAMLFromVersion(liveVersion)
+	canvas.Spec.Nodes = nodes
+	canvas.Spec.Edges = edges
+	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(canvas)
 	require.NoError(t, err)
 
 	consoleYAML, err := materialize.BuildConsoleYAMLFromVersion(liveVersion)
@@ -197,14 +193,12 @@ func commitDraftMetadataOnly(
 	nodes := append([]models.Node(nil), version.Nodes...)
 	edges := append([]models.Edge(nil), version.Edges...)
 
-	canvasYAML, err := materialize.BuildCanvasYAML(
-		newCanvasName,
-		newDescription,
-		nodes,
-		edges,
-		version.ChangeManagementEnabled,
-		version.EffectiveChangeRequestApprovers(),
-	)
+	canvas := materialize.CanvasYAMLFromVersion(version)
+	canvas.Metadata.Name = newCanvasName
+	canvas.Metadata.Description = newDescription
+	canvas.Spec.Nodes = nodes
+	canvas.Spec.Edges = edges
+	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(canvas)
 	require.NoError(t, err)
 
 	consoleYAML, err := materialize.BuildConsoleYAMLFromVersion(version)
@@ -273,14 +267,7 @@ func commitDraftConsoleOnly(
 	})
 	require.NoError(t, err)
 
-	canvasYAML, err := materialize.BuildCanvasYAML(
-		version.Name,
-		version.Description,
-		version.Nodes,
-		version.Edges,
-		version.ChangeManagementEnabled,
-		version.EffectiveChangeRequestApprovers(),
-	)
+	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(materialize.CanvasYAMLFromVersion(version))
 	require.NoError(t, err)
 
 	commitResp, err := CommitCanvasRepositoryFiles(
