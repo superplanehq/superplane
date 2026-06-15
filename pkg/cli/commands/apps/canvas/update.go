@@ -79,15 +79,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("failed to read canvas yaml: %w", err)
 	}
 
-	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	if changeManagementEnabled && !draftMode {
-		return fmt.Errorf("change management is enabled for this canvas; pass --draft-id <id> to update a draft (create one with `superplane apps drafts create`), then publish with `superplane apps change-requests create`")
-	}
-
 	var targetVersionID string
 	if draftMode {
 		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)

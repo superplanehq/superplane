@@ -1,7 +1,7 @@
-import type { CanvasesCanvas, OrganizationsOrganization, RolesRole, SuperplaneUsersUser } from "@/api-client";
+import type { CanvasesCanvas, OrganizationsOrganization } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvas, useUpdateCanvas } from "@/hooks/useCanvasData";
-import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Loader2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
@@ -72,21 +72,15 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = appPath(orgId, resolvedCanvasId);
-  const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
   const { canAct } = usePermissions();
   const canUpdateCanvas = canAct("canvases", "update");
 
-  const { data: organizationUsers = [] } = useOrganizationUsers(orgId);
-  const { data: organizationRoles = [] } = useOrganizationRoles(orgId);
-
   const updateCanvasMutation = useUpdateCanvas(orgId, resolvedCanvasId);
 
   const initialValues = useMemo(() => buildSettingsInitialValues(canvas), [canvas]);
-  const approverUsers = useApproverUsers(organizationUsers);
-  const approverRoles = useApproverRoles(organizationRoles);
   const onSave = useSaveCallback(resolvedCanvasId, orgId);
 
   return (
@@ -97,53 +91,12 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
         <SettingsView
           initialValues={initialValues}
           canUpdateCanvas={canUpdateCanvas}
-          orgChangeManagementEnabled={isOrgChangeManagementEnabled}
           isSaving={updateCanvasMutation.isPending}
-          availableUsers={approverUsers}
-          availableRoles={approverRoles}
           onSave={onSave}
           onBackToCanvas={() => navigate(baseCanvasPath)}
         />
       </div>
     </div>
-  );
-}
-
-function useApproverUsers(organizationUsers: SuperplaneUsersUser[]) {
-  return useMemo(
-    () =>
-      organizationUsers
-        .map((user) => {
-          const id = user.metadata?.id || "";
-          if (!id) {
-            return null;
-          }
-          return {
-            id,
-            name: user.spec?.displayName || user.metadata?.email || id,
-          };
-        })
-        .filter((item): item is { id: string; name: string } => !!item),
-    [organizationUsers],
-  );
-}
-
-function useApproverRoles(organizationRoles: RolesRole[]) {
-  return useMemo(
-    () =>
-      organizationRoles
-        .map((role) => {
-          const name = role.metadata?.name || "";
-          if (!name) {
-            return null;
-          }
-          return {
-            name,
-            label: role.spec?.displayName || name,
-          };
-        })
-        .filter((item): item is { name: string; label: string } => !!item),
-    [organizationRoles],
   );
 }
 
@@ -160,7 +113,6 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        changeManagement: values.changeManagement,
       });
 
       navigate(baseCanvasPath, { replace: true });

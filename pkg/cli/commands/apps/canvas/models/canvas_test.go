@@ -76,8 +76,6 @@ kind: Canvas
 metadata:
   name: unknown-field-test
 spec:
-  changeManagement:
-    enabled: false
   edges: []
   nodes:
     - id: wait-1
