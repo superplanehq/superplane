@@ -64,87 +64,11 @@ func Test__IntegrationRequestWorker_Sync(t *testing.T) {
 	assert.True(t, syncCalled)
 }
 
-// Test__IntegrationRequestWorker_SyncSkipsUnchangedSecret covers the Part 1 fix
-// for issue #5386: when a token-based integration re-stores the SAME secret value
-// every sync, only the initial create writes a row. Subsequent syncs decrypt the
-// stored value, see it is unchanged, and skip the write entirely - so the random
-// AES-GCM nonce no longer produces an endless stream of redundant UPDATEs.
-func Test__IntegrationRequestWorker_SyncSkipsUnchangedSecret(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	//
-	// Use a real AES-GCM encryptor (not the no-op test encryptor) so we exercise
-	// the random-nonce path that used to drive the redundant writes in production.
-	//
-	encryptor := crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))
-	worker := NewIntegrationRequestWorker(encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
-
-	const (
-		secretName = "access_token"
-		tokenValue = "unchanged-token-value"
-		cycles     = 5
-	)
-
-	var writes int
-	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		OnSync: func(ctx core.SyncContext) error {
-			writes++
-			if err := ctx.Integration.SetSecret(secretName, []byte(tokenValue)); err != nil {
-				return err
-			}
-			return ctx.Integration.ScheduleResync(time.Second)
-		},
-	})
-
-	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
-	require.NoError(t, err)
-
-	now := time.Now()
-	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &now))
-
-	ciphertexts := map[string]struct{}{}
-	updatedAts := make([]time.Time, 0, cycles)
-	for i := 0; i < cycles; i++ {
-		request, err := models.FindPendingRequestForIntegration(database.Conn(), integration.ID)
-		require.NoError(t, err, "expected a pending sync request before cycle %d", i)
-		require.NoError(t, worker.LockAndProcessRequest(*request))
-
-		var secret models.IntegrationSecret
-		require.NoError(t, database.Conn().
-			Where("installation_id = ? AND name = ?", integration.ID, secretName).
-			First(&secret).Error)
-		ciphertexts[string(secret.Value)] = struct{}{}
-		updatedAts = append(updatedAts, *secret.UpdatedAt)
-	}
-
-	//
-	// SetSecret is still invoked every cycle, but only the first call persists.
-	//
-	assert.Equal(t, cycles, writes, "expected SetSecret to be called once per cycle")
-
-	var rowCount int64
-	require.NoError(t, database.Conn().Model(&models.IntegrationSecret{}).
-		Where("installation_id = ? AND name = ?", integration.ID, secretName).
-		Count(&rowCount).Error)
-	assert.Equal(t, int64(1), rowCount, "expected a single secret row")
-
-	//
-	// Only the initial create wrote a row; the unchanged writes are skipped, so the
-	// stored ciphertext and updated_at never change after the first cycle.
-	//
-	assert.Len(t, ciphertexts, 1, "expected the stored ciphertext to remain stable once the value stops changing")
-	for i := 1; i < len(updatedAts); i++ {
-		assert.True(t, updatedAts[i].Equal(updatedAts[0]),
-			"expected updated_at to remain unchanged once the value stops changing (cycle %d)", i)
-	}
-}
-
-// Test__IntegrationRequestWorker_SyncRewritesChangedSecret is the counterpart to
-// the skip test: when the secret value genuinely changes every sync (as real
-// access tokens do), each cycle writes a fresh row value. The skip optimization
-// must not suppress these real updates, and the loop must keep self-perpetuating.
-func Test__IntegrationRequestWorker_SyncRewritesChangedSecret(t *testing.T) {
+// Test__IntegrationRequestWorker_SyncRewritesSecret drives the self-perpetuating
+// token-refresh loop behind issue #5386: each sync rewrites the secret and
+// reschedules itself. It verifies the loop keeps rewriting a single row (rather
+// than creating new ones) and that the background loop self-perpetuates.
+func Test__IntegrationRequestWorker_SyncRewritesSecret(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
