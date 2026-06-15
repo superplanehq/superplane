@@ -521,6 +521,51 @@ func TestCountActiveWorkflows(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountDailyWorkflowMetrics(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	activeSteps.CreateWorkflowNode()
+
+	inactiveSteps := stuckQueueItemsTestSteps{t: t}
+	inactiveSteps.CreateWorkflow()
+	inactiveSteps.CreateWorkflowNode()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	deletedSteps.CreateWorkflowNode()
+
+	now := time.Now()
+	activeRun := createWorkflowRunReturning(t, activeSteps.workflow.ID, *activeSteps.workflow.LiveVersionID, now)
+	inactiveRun := createWorkflowRunReturning(t, inactiveSteps.workflow.ID, *inactiveSteps.workflow.LiveVersionID, now.Add(-25*time.Hour))
+	deletedRun := createWorkflowRunReturning(t, deletedSteps.workflow.ID, *deletedSteps.workflow.LiveVersionID, now)
+	require.NoError(t, deletedSteps.workflow.SoftDelete())
+
+	activeEvent := createWorkflowEventReturning(t, activeSteps.workflow.ID, activeSteps.node.NodeID, activeRun.ID, now)
+	createWorkflowEvent(t, activeSteps.workflow.ID, activeSteps.node.NodeID, activeRun.ID, now.Add(-time.Minute))
+	inactiveEvent := createWorkflowEventReturning(t, inactiveSteps.workflow.ID, inactiveSteps.node.NodeID, inactiveRun.ID, now.Add(-25*time.Hour))
+	createWorkflowEvent(t, deletedSteps.workflow.ID, deletedSteps.node.NodeID, deletedRun.ID, now)
+
+	createWorkflowNodeExecution(t, activeSteps.workflow.ID, activeSteps.node.NodeID, activeEvent.ID, activeEvent.ID, activeRun.ID, now)
+	createWorkflowNodeExecution(t, activeSteps.workflow.ID, activeSteps.node.NodeID, activeEvent.ID, activeEvent.ID, activeRun.ID, now.Add(-time.Minute))
+	createWorkflowNodeExecution(t, inactiveSteps.workflow.ID, inactiveSteps.node.NodeID, inactiveEvent.ID, inactiveEvent.ID, inactiveRun.ID, now.Add(-25*time.Hour))
+	deletedEvent := createWorkflowEventReturning(t, deletedSteps.workflow.ID, deletedSteps.node.NodeID, deletedRun.ID, now)
+	createWorkflowNodeExecution(t, deletedSteps.workflow.ID, deletedSteps.node.NodeID, deletedEvent.ID, deletedEvent.ID, deletedRun.ID, now)
+
+	runCount, err := countWorkflowRunsCreated(24 * time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), runCount)
+
+	eventCount, err := countWorkflowEventsCreated(24 * time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), eventCount)
+
+	executionCount, err := countWorkflowNodeExecutionsCreated(24 * time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), executionCount)
+}
+
 func TestRecordUserDatabaseActivity_UpdatesUserLastActiveAt(t *testing.T) {
 	database.TruncateTables()
 	resetUserActivityThrottleForTests()
@@ -559,6 +604,11 @@ func createActiveUserTestFixtures(t *testing.T) (*models.Organization, uuid.UUID
 
 func createWorkflowRun(t *testing.T, workflowID, versionID uuid.UUID, createdAt time.Time) {
 	t.Helper()
+	_ = createWorkflowRunReturning(t, workflowID, versionID, createdAt)
+}
+
+func createWorkflowRunReturning(t *testing.T, workflowID, versionID uuid.UUID, createdAt time.Time) *models.CanvasRun {
+	t.Helper()
 
 	run := &models.CanvasRun{
 		ID:         uuid.New(),
@@ -569,4 +619,50 @@ func createWorkflowRun(t *testing.T, workflowID, versionID uuid.UUID, createdAt 
 		UpdatedAt:  &createdAt,
 	}
 	require.NoError(t, database.Conn().Create(run).Error)
+	return run
+}
+
+func createWorkflowEvent(t *testing.T, workflowID uuid.UUID, nodeID string, runID uuid.UUID, createdAt time.Time) {
+	t.Helper()
+	_ = createWorkflowEventReturning(t, workflowID, nodeID, runID, createdAt)
+}
+
+func createWorkflowEventReturning(t *testing.T, workflowID uuid.UUID, nodeID string, runID uuid.UUID, createdAt time.Time) *models.CanvasEvent {
+	t.Helper()
+
+	event := &models.CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		NodeID:     nodeID,
+		Channel:    "default",
+		Data:       models.JSONValue{},
+		RunID:      runID,
+		State:      models.CanvasEventStatePending,
+		CreatedAt:  &createdAt,
+	}
+	require.NoError(t, database.Conn().Create(event).Error)
+	return event
+}
+
+func createWorkflowNodeExecution(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	rootEventID, eventID, runID uuid.UUID,
+	createdAt time.Time,
+) {
+	t.Helper()
+
+	execution := &models.CanvasNodeExecution{
+		ID:          uuid.New(),
+		WorkflowID:  workflowID,
+		NodeID:      nodeID,
+		RootEventID: rootEventID,
+		RunID:       runID,
+		EventID:     eventID,
+		State:       models.CanvasNodeExecutionStatePending,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &createdAt,
+	}
+	require.NoError(t, database.Conn().Create(execution).Error)
 }

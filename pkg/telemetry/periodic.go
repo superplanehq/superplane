@@ -53,6 +53,9 @@ func (p *Periodic) report() {
 	p.reportIntegrationSecretsTotal()
 	p.reportUsersActive()
 	p.reportWorkflowsActive()
+	p.reportWorkflowRunsDaily()
+	p.reportWorkflowEventsDaily()
+	p.reportWorkflowNodeExecutionsDaily()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -212,6 +215,33 @@ func (p *Periodic) reportWorkflowsActive() {
 	}
 
 	RecordWorkflowsActiveCount(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowRunsDaily() {
+	count, err := countWorkflowRunsCreated(activeWindow)
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowRunsDailyCount(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowEventsDaily() {
+	count, err := countWorkflowEventsCreated(activeWindow)
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowEventsDailyCount(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowNodeExecutionsDaily() {
+	count, err := countWorkflowNodeExecutionsCreated(activeWindow)
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowNodeExecutionsDailyCount(p.ctx, count)
 }
 
 func countStuckQueueNodes() (int64, error) {
@@ -381,6 +411,60 @@ func countActiveWorkflows(window time.Duration) (int64, error) {
 		Where("wr.created_at >= ?", since).
 		Where("w.deleted_at IS NULL").
 		Distinct("wr.workflow_id").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowRunsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_runs AS wr").
+		Joins("JOIN workflows AS w ON w.id = wr.workflow_id").
+		Where("wr.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowEventsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_events AS we").
+		Joins("JOIN workflows AS w ON w.id = we.workflow_id").
+		Where("we.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowNodeExecutionsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_node_executions AS wne").
+		Joins("JOIN workflows AS w ON w.id = wne.workflow_id").
+		Where("wne.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {

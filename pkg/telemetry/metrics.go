@@ -52,15 +52,18 @@ var (
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
 
-	organizationsTotalGauge      metric.Int64Gauge
-	usersTotalGauge              metric.Int64Gauge
-	workflowsTotalGauge          metric.Int64Gauge
-	workflowNodesTotalGauge      metric.Int64Gauge
-	draftsTotalGauge             metric.Int64Gauge
-	integrationsTotalGauge       metric.Int64Gauge
-	integrationSecretsTotalGauge metric.Int64Gauge
-	usersActiveGauge             metric.Int64Gauge
-	workflowsActiveGauge         metric.Int64Gauge
+	organizationsTotalGauge          metric.Int64Gauge
+	usersTotalGauge                  metric.Int64Gauge
+	workflowsTotalGauge              metric.Int64Gauge
+	workflowNodesTotalGauge          metric.Int64Gauge
+	draftsTotalGauge                 metric.Int64Gauge
+	integrationsTotalGauge           metric.Int64Gauge
+	integrationSecretsTotalGauge     metric.Int64Gauge
+	usersActiveGauge                 metric.Int64Gauge
+	workflowsActiveGauge             metric.Int64Gauge
+	workflowRunsDailyGauge           metric.Int64Gauge
+	workflowEventsDailyGauge         metric.Int64Gauge
+	workflowNodeExecutionsDailyGauge metric.Int64Gauge
 )
 
 // Operation values for integration secret writes.
@@ -396,6 +399,33 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	workflowRunsDailyGauge, err = meter.Int64Gauge(
+		"workflow_runs.daily.count",
+		metric.WithDescription("Number of workflow runs created in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowEventsDailyGauge, err = meter.Int64Gauge(
+		"workflow_events.daily.count",
+		metric.WithDescription("Number of workflow events created in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowNodeExecutionsDailyGauge, err = meter.Int64Gauge(
+		"workflow_node_executions.daily.count",
+		metric.WithDescription("Number of workflow node executions created in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	err = registerDBOperationMetricsCallbacks()
 	if err != nil {
 		return err
@@ -682,4 +712,28 @@ func RecordWorkflowsActiveCount(ctx context.Context, count int64) {
 	}
 
 	workflowsActiveGauge.Record(ctx, count)
+}
+
+func RecordWorkflowRunsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowRunsDailyGauge.Record(ctx, count)
+}
+
+func RecordWorkflowEventsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowEventsDailyGauge.Record(ctx, count)
+}
+
+func RecordWorkflowNodeExecutionsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowNodeExecutionsDailyGauge.Record(ctx, count)
 }
