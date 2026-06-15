@@ -3,6 +3,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvas, useUpdateCanvas } from "@/hooks/useCanvasData";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Loader2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -21,6 +22,10 @@ export function CanvasSettingsPage() {
 
   const { data: organization } = useOrganization(organizationId, canReadOrg);
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId, canvasId);
+
+  useReportPageReady(!canvasLoading && !!canvas && !!organizationId && !!organization, {
+    failed: !!canvasError,
+  });
 
   if (!organizationId || !canvasId || !organization) {
     return <ErrorView organizationId={organizationId} error="Missing organization or canvas." />;

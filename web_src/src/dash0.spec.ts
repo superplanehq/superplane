@@ -38,6 +38,9 @@ describe("dash0 init", () => {
           authToken: "test-token",
         },
         ignoreUrls: [/\/ws\//],
+        pageViewInstrumentation: expect.objectContaining({
+          generateMetadata: expect.any(Function),
+        }),
       }),
     );
   });

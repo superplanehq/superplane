@@ -1,4 +1,5 @@
 import { init } from "@dash0/sdk-web";
+import { pageObservabilityMetadata } from "@/lib/dash0Observability";
 
 interface Dash0Window extends Window {
   SUPERPLANE_DASH0_OTLP_ENDPOINT?: string;
@@ -22,5 +23,8 @@ if (endpointUrl && authToken) {
       authToken,
     },
     ignoreUrls: [/\/ws\//],
+    pageViewInstrumentation: {
+      generateMetadata: (url) => pageObservabilityMetadata(url.pathname),
+    },
   });
 }
