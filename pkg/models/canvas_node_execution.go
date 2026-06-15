@@ -446,6 +446,14 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		return nil, err
 	}
 
+	//
+	// If execution produced events, we know for sure that the run is not finished yet.
+	// If the events produced are terminal, the EventRouter will handle the run finalization.
+	//
+	if len(events) > 0 {
+		return events, nil
+	}
+
 	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
 	if err != nil {
 		return nil, err
