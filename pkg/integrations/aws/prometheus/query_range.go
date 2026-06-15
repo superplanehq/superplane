@@ -36,7 +36,7 @@ func (c *QueryRange) Description() string {
 }
 
 func (c *QueryRange) Documentation() string {
-	return `The Query Range component executes a range PromQL query against an Amazon Managed Service for Prometheus workspace (` + "`GET /api/v1/query_range`" + `).
+	return `The Query Range component executes a range PromQL query against an Amazon Managed Service for Prometheus workspace.
 
 ## Configuration
 

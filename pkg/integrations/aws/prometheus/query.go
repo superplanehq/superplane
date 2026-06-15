@@ -34,7 +34,7 @@ func (c *Query) Description() string {
 }
 
 func (c *Query) Documentation() string {
-	return `The Query component executes an instant PromQL query against an Amazon Managed Service for Prometheus workspace (` + "`GET /api/v1/query`" + `).
+	return `The Query component executes an instant PromQL query against an Amazon Managed Service for Prometheus workspace.
 
 ## Configuration
 
