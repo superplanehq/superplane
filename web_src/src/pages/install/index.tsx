@@ -87,7 +87,7 @@ function InstallPageContent() {
         <InstallProgressPanel
           app={app}
           organizationId={effectiveOrgId}
-          canvasName={presetName || undefined}
+          canvasName={presetName || preview.defaultName || undefined}
           skipPreviewFetch
           preloadedIntegrations={preview.integrations}
           preloadedParams={preview.installParams}
