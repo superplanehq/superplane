@@ -39,6 +39,14 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.dash0Web.name" }}
+{{- if eq .Values.dash0Web.secretName "" }}
+{{- printf "%s-dash0-web" .Release.Name }}
+{{- else }}
+{{- .Values.dash0Web.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}
