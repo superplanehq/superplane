@@ -67,8 +67,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, err
 	}
 
-	allowed, err := s.AuthService.CheckOrganizationPermission(
-		user.ID.String(),
+	allowed, err := s.AuthService.CheckOrganizationPermission(context.Background(), user.ID.String(),
 		req.OrganizationID.String(),
 		"canvases",
 		"create",
