@@ -14,7 +14,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
-  ActionsAction,
+  SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -2283,7 +2283,7 @@ export function AppPage() {
       if (!node) return null;
 
       // Get configuration fields from metadata based on node type
-      let configurationFields: ActionsAction["configuration"] = [];
+      let configurationFields: SuperplaneActionsAction["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let integrationName: string | undefined;
       let integrationLabel: string | undefined;

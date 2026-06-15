@@ -6,7 +6,7 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
-  ActionsAction,
+  SuperplaneActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
@@ -70,7 +70,7 @@ export function hydrateRunExecution(
 export function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
-  components: ActionsAction[],
+  components: SuperplaneActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -118,7 +118,7 @@ export function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  components: ActionsAction[],
+  components: SuperplaneActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -168,7 +168,7 @@ export function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 export function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
-  components: ActionsAction[],
+  components: SuperplaneActionsAction[],
   triggers: TriggersTrigger[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,

@@ -43,7 +43,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
-  ActionsAction,
+  SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -402,7 +402,7 @@ export interface CanvasPageProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ActionsAction[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
 
   logEntries?: LogEntry[];
@@ -1670,7 +1670,7 @@ function Sidebar({
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
-  components?: ActionsAction[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
