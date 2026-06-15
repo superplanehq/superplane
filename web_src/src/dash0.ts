@@ -13,7 +13,7 @@ const authToken = dash0Window?.SUPERPLANE_DASH0_AUTH_TOKEN?.trim();
 
 export const isDash0Enabled = !!(endpointUrl && authToken);
 
-if (isDash0Enabled) {
+if (endpointUrl && authToken) {
   init({
     serviceName: dash0Window?.SUPERPLANE_DASH0_SERVICE_NAME?.trim() || "superplane-web",
     environment: dash0Window?.SUPERPLANE_DASH0_ENVIRONMENT?.trim() || undefined,
