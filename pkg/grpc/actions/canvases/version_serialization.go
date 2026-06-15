@@ -12,15 +12,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string) *pb.CanvasVersion {
+func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
-		ownerID := version.OwnerID.String()
-		ownerName := ""
-		if user, err := models.FindMaybeDeletedUserByID(organizationID, ownerID); err == nil && user != nil {
-			ownerName = user.Name
-		}
-		owner = &pb.UserRef{Id: ownerID, Name: ownerName}
+		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
 	}
 
 	state := pb.CanvasVersion_STATE_UNSPECIFIED
@@ -66,19 +61,66 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	}
 }
 
-func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string) *pb.CanvasVersion {
-	full := SerializeCanvasVersion(version, organizationID)
+func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
+	full := SerializeCanvasVersion(version, organizationID, ownersByID)
 	return &pb.CanvasVersion{
 		Metadata: full.GetMetadata(),
 	}
 }
 
+func canvasVersionOwnerRef(organizationID, ownerID string, ownersByID map[string]*models.User) *pb.UserRef {
+	ownerName := ""
+	if ownersByID != nil {
+		if user := ownersByID[ownerID]; user != nil {
+			ownerName = user.Name
+		}
+	} else if user, err := models.FindMaybeDeletedUserByID(organizationID, ownerID); err == nil && user != nil {
+		ownerName = user.Name
+	}
+
+	return &pb.UserRef{Id: ownerID, Name: ownerName}
+}
+
+func ownersByIDForCanvasVersions(orgID string, versions []models.CanvasVersion) (map[string]*models.User, error) {
+	idSet := make(map[string]struct{})
+	for i := range versions {
+		if versions[i].OwnerID != nil {
+			idSet[versions[i].OwnerID.String()] = struct{}{}
+		}
+	}
+	if len(idSet) == 0 {
+		return map[string]*models.User{}, nil
+	}
+
+	ids := make([]string, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+
+	users, err := models.FindUsersByIDsInOrganization(orgID, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	ownersByID := make(map[string]*models.User, len(users))
+	for i := range users {
+		ownersByID[users[i].ID.String()] = &users[i]
+	}
+
+	return ownersByID, nil
+}
+
 func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
 	var protoVersions []*pb.CanvasVersion
 	_ = telemetry.RunSpan(ctx, "canvases.serialize_versions", func(ctx context.Context) error {
+		ownersByID, err := ownersByIDForCanvasVersions(organizationID, versions)
+		if err != nil {
+			ownersByID = nil
+		}
+
 		protoVersions = make([]*pb.CanvasVersion, 0, len(versions))
 		for i := range versions {
-			protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID))
+			protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
 		}
 
 		if span := trace.SpanFromContext(ctx); span.IsRecording() {
