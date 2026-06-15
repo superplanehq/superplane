@@ -11,6 +11,7 @@ const {
   canvasesCommitCanvasStaging,
   canvasesDiscardCanvasStaging,
   canvasesDescribeCanvasVersion,
+  canvasesListCanvasVersions,
 } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
@@ -18,6 +19,7 @@ const {
   canvasesCommitCanvasStaging: vi.fn(),
   canvasesDiscardCanvasStaging: vi.fn(),
   canvasesDescribeCanvasVersion: vi.fn(),
+  canvasesListCanvasVersions: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -30,11 +32,13 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     canvasesCommitCanvasStaging,
     canvasesDiscardCanvasStaging,
     canvasesDescribeCanvasVersion,
+    canvasesListCanvasVersions,
   };
 });
 
 import {
   canvasKeys,
+  ensureDraftVersionExists,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
   useUpdateCanvasFolderMembership,
@@ -441,5 +445,43 @@ describe("useUpdateCanvasConsole", () => {
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
     });
+  });
+});
+
+describe("ensureDraftVersionExists", () => {
+  beforeEach(() => {
+    canvasesListCanvasVersions.mockReset();
+  });
+
+  it("returns true when the draft version is still present", async () => {
+    canvasesListCanvasVersions.mockResolvedValue({
+      data: { versions: [{ metadata: { id: "v-1" } }, { metadata: { id: "v-2" } }] },
+    });
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "v-2");
+
+    expect(exists).toBe(true);
+    expect(canvasesListCanvasVersions).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false when the draft version is gone", async () => {
+    canvasesListCanvasVersions.mockResolvedValue({
+      data: { versions: [{ metadata: { id: "v-1" } }] },
+    });
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "deleted");
+
+    expect(exists).toBe(false);
+  });
+
+  it("short-circuits to false without calling the API when args are missing", async () => {
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "");
+
+    expect(exists).toBe(false);
+    expect(canvasesListCanvasVersions).not.toHaveBeenCalled();
   });
 });
