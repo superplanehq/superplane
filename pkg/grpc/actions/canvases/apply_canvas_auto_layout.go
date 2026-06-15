@@ -61,9 +61,8 @@ func ApplyCanvasAutoLayout(
 			Description: pbCanvas.GetMetadata().GetDescription(),
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes:            actions.NodesToProto(laidOutNodes),
-			Edges:            actions.EdgesToProto(laidOutEdges),
-			ChangeManagement: pbCanvas.GetSpec().GetChangeManagement(),
+			Nodes: actions.NodesToProto(laidOutNodes),
+			Edges: actions.EdgesToProto(laidOutEdges),
 		},
 	}
 

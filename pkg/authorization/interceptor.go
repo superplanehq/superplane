@@ -285,36 +285,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_CreateCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_DescribeCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "publish",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ResolveCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_DeleteCanvas_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "delete",

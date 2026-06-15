@@ -13,9 +13,6 @@ describe("normalizeSpecFileContentForDiff", () => {
       "  id: canvas-1",
       "  name: fierce-apex",
       "spec:",
-      "  changeManagement:",
-      "    approvals:",
-      "      - type: TYPE_ANYONE",
       "  edges: []",
       "  nodes:",
       "    - configuration: {}",
@@ -48,9 +45,6 @@ describe("normalizeSpecFileContentForDiff", () => {
       "      type: TYPE_ACTION",
       "      isCollapsed: false",
       "  edges: []",
-      "  changeManagement:",
-      "    approvals:",
-      "      - type: TYPE_ANYONE",
       "",
     ].join("\n");
 
