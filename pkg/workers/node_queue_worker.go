@@ -87,9 +87,10 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 				}
 
 				go func(node models.CanvasNode) {
+					attemptStart := time.Now()
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(logger, node); err != nil {
+					if err := w.LockAndProcessNode(logger, node, attemptStart); err != nil {
 						logger.Errorf("Error processing: %v", err)
 					}
 				}(node)
@@ -129,6 +130,8 @@ func (w *NodeQueueWorker) StartRabbitMQConsumer(ctx context.Context) {
 }
 
 func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
+	start := time.Now()
+
 	data := &pb.CanvasNodeQueueItemMessage{}
 	err := proto.Unmarshal(delivery.Body(), data)
 	if err != nil {
@@ -153,6 +156,12 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 	//
 	if node.State != models.CanvasNodeStateReady {
 		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
+		telemetry.RecordQueueWorkerNodeProcessing(
+			context.Background(),
+			time.Since(start),
+			executorOutcomeSkipped,
+			executorReasonNone,
+		)
 		return nil
 	}
 
@@ -160,10 +169,26 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 	// Node is ready for processing, let's lock it and process it.
 	//
 	logger := logging.WithNode(w.logger, *node)
-	return w.LockAndProcessNode(logger, *node)
+	return w.LockAndProcessNode(logger, *node, start)
 }
 
-func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
+func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode, attemptStart time.Time) error {
+	//
+	// For every node we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, internal
+	//
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	defer func() {
+		telemetry.RecordQueueWorkerNodeProcessing(
+			context.Background(),
+			time.Since(attemptStart),
+			metricOutcome,
+			metricReason,
+		)
+	}()
+
 	var executionIDs []*uuid.UUID
 	var queueItem *models.CanvasNodeQueueItem
 
@@ -176,11 +201,19 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return nil
 		}
 
 		executionIDs, queueItem, err = w.processNode(tx, logger, n, onNewEvents)
-		return err
+		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(err)
+			return err
+		}
+
+		return nil
 	})
 
 	if err == nil {
@@ -227,7 +260,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	configFields, err := w.configurationFieldsForNode(tx, node)
+	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -255,7 +288,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		// we create a failed execution and delete the queue item.
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
-		executions, err := w.handleNodeConfigurationError(tx, logger, configErr, onNewEvents)
+		executions, err := w.handleNodeConfigurationError(tx, configErr, onNewEvents)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -283,7 +316,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
+func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
@@ -317,7 +350,7 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 	return action.ProcessQueueItem(*ctx)
 }
 
-func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, error) {
+func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *contexts.ConfigurationBuildError, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
 	if err != nil {
 		return nil, err
