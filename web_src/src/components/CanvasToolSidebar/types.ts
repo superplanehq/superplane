@@ -34,6 +34,11 @@ export type AgentSessionWebsocketEvent =
     }
   | {
       sessionId: string;
+      event: "session_notice";
+      error?: string;
+    }
+  | {
+      sessionId: string;
       event: "outcome_evaluation_start" | "outcome_evaluation_end";
       extra?: {
         iteration?: number;

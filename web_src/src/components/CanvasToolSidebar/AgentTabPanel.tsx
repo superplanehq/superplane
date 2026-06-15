@@ -117,6 +117,7 @@ function ChatConversation({
   const outcomeMutation = useDefineAgentOutcome(organizationId);
   const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
@@ -165,10 +166,14 @@ function ChatConversation({
     interruptMutation,
     sendMutation,
     setError,
+    setNotice,
     setOutcomeState,
   });
 
-  const wsCallbacks = useMemo(() => createWebsocketCallbacks(setStatus, setError, setOutcomeState), [setOutcomeState]);
+  const wsCallbacks = useMemo(
+    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+    [setOutcomeState],
+  );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
@@ -181,6 +186,7 @@ function ChatConversation({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
+        notice={notice}
         canvasId={canvasId}
         organizationId={organizationId}
         messageGroups={messageGroups}
@@ -295,6 +301,7 @@ function useConversationHandlers({
   interruptMutation,
   sendMutation,
   setError,
+  setNotice,
   setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
@@ -303,6 +310,7 @@ function useConversationHandlers({
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   setError: (value: string | null) => void;
+  setNotice: (value: string | null) => void;
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void;
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
@@ -316,12 +324,13 @@ function useConversationHandlers({
       const { sendMutation: send } = mutationsRef.current;
       if (!content.trim() || send.isPending) return;
       setError(null);
+      setNotice(null);
       await send.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, setError],
+    [agentMode, chatId, setError, setNotice],
   );
 
   const handleStop = useCallback(() => {

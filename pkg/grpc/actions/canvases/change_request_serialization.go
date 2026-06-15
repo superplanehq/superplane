@@ -9,8 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -44,15 +42,12 @@ func SerializeCanvasChangeRequest(
 	request *models.CanvasChangeRequest,
 	version *models.CanvasVersion,
 	organizationID string,
+	approvals []models.CanvasChangeRequestApproval,
+	usersByID map[string]*models.User,
 ) *pb.CanvasChangeRequest {
-	approvals, err := models.ListCanvasChangeRequestApprovals(request.WorkflowID, request.ID)
-	if err != nil {
-		approvals = nil
-	}
-
 	var owner *pb.UserRef
 	if request.OwnerID != nil {
-		owner = findCanvasChangeRequestUserRef(organizationID, request.OwnerID)
+		owner = canvasChangeRequestUserRef(request.OwnerID, usersByID)
 	}
 
 	metadata := &pb.CanvasChangeRequest_Metadata{
@@ -85,19 +80,19 @@ func SerializeCanvasChangeRequest(
 			ChangedNodeIds:     request.ChangedNodeIDs,
 			ConflictingNodeIds: request.ConflictingNodeIDs,
 		},
-		Approvals: serializeCanvasChangeRequestApprovals(organizationID, approvals),
+		Approvals: serializeCanvasChangeRequestApprovals(approvals, usersByID),
 	}
 
 	if version != nil {
-		protoRequest.Version = SerializeCanvasVersion(version, organizationID, nil)
+		protoRequest.Version = SerializeCanvasVersion(version, organizationID, usersByID)
 	}
 
 	return protoRequest
 }
 
 func serializeCanvasChangeRequestApprovals(
-	organizationID string,
 	approvals []models.CanvasChangeRequestApproval,
+	usersByID map[string]*models.User,
 ) []*pb.CanvasChangeRequestApproval {
 	serialized := make([]*pb.CanvasChangeRequestApproval, 0, len(approvals))
 	for _, approval := range approvals {
@@ -115,7 +110,7 @@ func serializeCanvasChangeRequestApprovals(
 			item.Approver.RoleName = *approval.ApproverRole
 		}
 		if approval.ActorUserID != nil {
-			item.Actor = findCanvasChangeRequestUserRef(organizationID, approval.ActorUserID)
+			item.Actor = canvasChangeRequestUserRef(approval.ActorUserID, usersByID)
 		}
 		if approval.CreatedAt != nil {
 			item.CreatedAt = timestamppb.New(*approval.CreatedAt)
@@ -130,14 +125,14 @@ func serializeCanvasChangeRequestApprovals(
 	return serialized
 }
 
-func findCanvasChangeRequestUserRef(organizationID string, userID *uuid.UUID) *pb.UserRef {
+func canvasChangeRequestUserRef(userID *uuid.UUID, usersByID map[string]*models.User) *pb.UserRef {
 	if userID == nil {
 		return nil
 	}
 
 	id := userID.String()
 	name := ""
-	if user, err := models.FindMaybeDeletedUserByID(organizationID, id); err == nil && user != nil {
+	if user := usersByID[id]; user != nil {
 		name = user.Name
 	}
 
@@ -151,15 +146,27 @@ func serializeCanvasChangeRequests(
 ) ([]*pb.CanvasChangeRequest, error) {
 	var protoRequests []*pb.CanvasChangeRequest
 	err := telemetry.RunSpan(ctx, "change_requests.serialize", func(ctx context.Context) error {
+		data, loadErr := loadCanvasChangeRequestsSerializationData(requests, organizationID)
+		if loadErr != nil {
+			return loadErr
+		}
+
 		protoRequests = make([]*pb.CanvasChangeRequest, 0, len(requests))
 		for i := range requests {
 			request := requests[i]
-			version, versionErr := models.FindCanvasVersion(request.WorkflowID, request.VersionID)
+			version, versionErr := versionForCanvasChangeRequestSerialization(data, request)
 			if versionErr != nil {
-				return status.Errorf(codes.Internal, "failed to load change request version: %v", versionErr)
+				return versionErr
 			}
 
-			protoRequests = append(protoRequests, SerializeCanvasChangeRequest(&request, version, organizationID))
+			approvals := data.approvalsByRequestID[request.ID]
+			protoRequests = append(protoRequests, SerializeCanvasChangeRequest(
+				&request,
+				version,
+				organizationID,
+				approvals,
+				data.usersByID,
+			))
 		}
 
 		if span := trace.SpanFromContext(ctx); span.IsRecording() {
