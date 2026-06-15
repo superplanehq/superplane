@@ -6,12 +6,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -50,14 +52,18 @@ const testProviderName = "test"
 type fakeProvider struct {
 	mu                  sync.Mutex
 	createCalled        int
+	memoryStoreCalled   int
 	sendCalled          int
 	interruptCalled     int
 	interruptedSessions []string
 	sentSessions        []string
 	defineSessions      []string
+	createOptions       []agents.CreateSessionOptions
 	lastPreamble        string
 	lastOutcomeOpts     agents.DefineOutcomeOptions
 	createSessionErr    error
+	createMemoryErr     error
+	createMemoryHook    func()
 	createHook          func() error
 	sendErr             error
 	sendErrs            []error
@@ -68,10 +74,11 @@ type fakeProvider struct {
 
 func (f *fakeProvider) Name() string { return testProviderName }
 
-func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
+func (f *fakeProvider) CreateSession(_ context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.createCalled++
+	f.createOptions = append(f.createOptions, opts)
 	if f.createSessionErr != nil {
 		return nil, f.createSessionErr
 	}
@@ -81,6 +88,23 @@ func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOp
 		}
 	}
 	return &agents.CreateSessionResult{ProviderSessionID: "provider-session-" + uuid.NewString()}, nil
+}
+
+func (f *fakeProvider) CreateMemoryStore(_ context.Context, _ agents.CreateMemoryStoreOptions) (*agents.CreateMemoryStoreResult, error) {
+	f.mu.Lock()
+	f.memoryStoreCalled++
+	err := f.createMemoryErr
+	hook := f.createMemoryHook
+	f.mu.Unlock()
+
+	if hook != nil {
+		hook()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &agents.CreateMemoryStoreResult{ProviderMemoryStoreID: "memstore-" + uuid.NewString()}, nil
 }
 
 func (f *fakeProvider) SendMessage(_ context.Context, providerSessionID string, _ string, opts agents.SendMessageOptions) error {
@@ -127,6 +151,12 @@ func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.P
 
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
 	t.Helper()
+	return agents.NewService(provider, r.AuthService)
+}
+
+func newMemoryService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
+	t.Helper()
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgentMemory))
 	return agents.NewService(provider, r.AuthService)
 }
 
@@ -209,6 +239,120 @@ func TestService_EnsureSession_IsIdempotent(t *testing.T) {
 
 	assert.Equal(t, first.ID, second.ID)
 	assert.Equal(t, 1, provider.createCalled, "second call must not provision a new upstream session")
+}
+
+func TestService_EnsureSession_DoesNotAttachMemoryStoreWithoutFeature(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	assert.Equal(t, 0, provider.memoryStoreCalled)
+	require.Len(t, provider.createOptions, 1)
+	assert.Empty(t, provider.createOptions[0].MemoryStores)
+}
+
+func TestService_EnsureSession_AttachesMemoryStoreWhenEnabled(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newMemoryService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	require.Equal(t, 1, provider.memoryStoreCalled)
+	require.Len(t, provider.createOptions, 1)
+	require.Len(t, provider.createOptions[0].MemoryStores, 1)
+	resource := provider.createOptions[0].MemoryStores[0]
+	assert.NotEmpty(t, resource.MemoryStoreID)
+	assert.Equal(t, agents.MemoryStoreAccessReadWrite, resource.Access)
+	assert.Contains(t, resource.Instructions, "Do not store secrets")
+
+	store, err := models.FindAgentMemoryStoreByScope(r.Organization.ID, r.User, canvas.ID, testProviderName)
+	require.NoError(t, err)
+	assert.Equal(t, resource.MemoryStoreID, store.ProviderMemoryStoreID)
+}
+
+func TestService_EnsureSession_ProvisionsMemoryStoreForExistingSessionWhenEnabledLater(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	first, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+	require.Len(t, provider.createOptions, 1)
+	assert.Empty(t, provider.createOptions[0].MemoryStores)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgentMemory))
+
+	second, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, 1, provider.createCalled, "existing provider session must not be replaced just to attach memory")
+	assert.Equal(t, 1, provider.memoryStoreCalled)
+
+	store, err := models.FindAgentMemoryStoreByScope(r.Organization.ID, r.User, canvas.ID, testProviderName)
+	require.NoError(t, err)
+	assert.NotEmpty(t, store.ProviderMemoryStoreID)
+}
+
+func TestService_EnsureSession_ContinuesWithoutMemoryWhenProviderMemoryFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{createMemoryErr: errors.New("memory unsupported")}
+	svc := newMemoryService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	assert.Equal(t, 1, provider.memoryStoreCalled)
+	require.Len(t, provider.createOptions, 1)
+	assert.Empty(t, provider.createOptions[0].MemoryStores)
+}
+
+func TestService_EnsureSession_ReusesMemoryStoreAfterProviderSessionFailure(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{createSessionErr: errors.New("provider boom")}
+	svc := newMemoryService(t, r, provider)
+
+	_, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.Error(t, err)
+	assert.Equal(t, 1, provider.memoryStoreCalled)
+
+	store, err := models.FindAgentMemoryStoreByScope(r.Organization.ID, r.User, canvas.ID, testProviderName)
+	require.NoError(t, err, "memory store mapping must survive provider session creation failure")
+
+	provider.createSessionErr = nil
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	require.Len(t, provider.createOptions, 2)
+	require.Len(t, provider.createOptions[1].MemoryStores, 1)
+	assert.Equal(t, store.ProviderMemoryStoreID, provider.createOptions[1].MemoryStores[0].MemoryStoreID)
+	assert.Equal(t, 1, provider.memoryStoreCalled, "retry must reuse the committed memory store mapping")
 }
 
 func TestService_EnsureSession_FailsWhenProviderErrors(t *testing.T) {
@@ -346,6 +490,83 @@ func TestService_SendMessage_RecreatesUnavailableProviderSession(t *testing.T) {
 	assert.Equal(t, refreshed.ProviderSessionID, provider.sentSessions[1])
 	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
+func TestService_SendMessage_ReusesMemoryStoreWhenRecoveringProviderSession(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{
+		sendErrs: []error{agents.ErrProviderSessionUnavailable, nil},
+	}
+	svc := newMemoryService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.Len(t, provider.createOptions, 1)
+	require.Len(t, provider.createOptions[0].MemoryStores, 1)
+	originalStoreID := provider.createOptions[0].MemoryStores[0].MemoryStoreID
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+
+	require.Len(t, provider.createOptions, 2)
+	require.Len(t, provider.createOptions[1].MemoryStores, 1)
+	assert.Equal(t, originalStoreID, provider.createOptions[1].MemoryStores[0].MemoryStoreID)
+	assert.Equal(t, 1, provider.memoryStoreCalled)
+}
+
+func TestService_SendMessage_ConcurrentRecoveryCreatesOneMemoryStore(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgentMemory))
+
+	provider.sendErrs = []error{
+		agents.ErrProviderSessionUnavailable,
+		agents.ErrProviderSessionUnavailable,
+		nil,
+		nil,
+	}
+	provider.createMemoryHook = func() {
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	type result struct {
+		err error
+	}
+	results := make(chan result, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			_, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+			results <- result{err: err}
+		}()
+	}
+
+	first := <-results
+	second := <-results
+	require.NoError(t, acceptableConcurrentRecoveryError(first.err))
+	require.NoError(t, acceptableConcurrentRecoveryError(second.err))
+
+	assert.Equal(t, 1, provider.memoryStoreCalled)
+	store, err := models.FindAgentMemoryStoreByScope(r.Organization.ID, r.User, canvas.ID, testProviderName)
+	require.NoError(t, err)
+	assert.NotEmpty(t, store.ProviderMemoryStoreID)
+}
+
+func acceptableConcurrentRecoveryError(err error) error {
+	if err == nil || errors.Is(err, agents.ErrSessionBusy) {
+		return nil
+	}
+	return err
 }
 
 func TestService_SendMessage_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *testing.T) {

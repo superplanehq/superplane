@@ -117,11 +117,32 @@ type FileResource struct {
 	MountPath string
 }
 
+const (
+	MemoryStoreAccessReadOnly  = "read_only"
+	MemoryStoreAccessReadWrite = "read_write"
+)
+
+type MemoryStoreResource struct {
+	MemoryStoreID string
+	Access        string
+	Instructions  string
+}
+
+type CreateMemoryStoreOptions struct {
+	Name        string
+	Description string
+}
+
+type CreateMemoryStoreResult struct {
+	ProviderMemoryStoreID string
+}
+
 type CreateSessionOptions struct {
 	InitialContext string
 	Title          string
 	VaultIDs       []string
 	Resources      []FileResource
+	MemoryStores   []MemoryStoreResource
 }
 
 type DefineOutcomeOptions struct {
@@ -158,6 +179,10 @@ type Provider interface {
 	// cancelled, or onEvent errors. Implementations must not call onEvent
 	// after returning.
 	StreamEvents(ctx context.Context, providerSessionID string, onEvent func(ProviderEvent) error) error
+}
+
+type MemoryStoreCreator interface {
+	CreateMemoryStore(ctx context.Context, opts CreateMemoryStoreOptions) (*CreateMemoryStoreResult, error)
 }
 
 type ProviderSessionCleaner interface {

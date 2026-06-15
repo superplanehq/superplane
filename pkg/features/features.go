@@ -15,6 +15,10 @@ type Feature struct {
 // per-organization basis until the integration is generally available.
 const FeatureClaudeManagedAgents = "claude_managed_agents"
 
+// FeatureClaudeManagedAgentMemory enables Anthropic Managed Agents memory
+// stores for organizations that already use managed agents.
+const FeatureClaudeManagedAgentMemory = "claude_managed_agent_memory"
+
 func released() *bool {
 	v := true
 	return &v
@@ -22,6 +26,7 @@ func released() *bool {
 
 var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
+	{ID: FeatureClaudeManagedAgentMemory, Label: "Claude Managed Agent Memory", Description: "Persist canvas-specific agent memory across managed-agent sessions"},
 }
 
 func All() []Feature {
