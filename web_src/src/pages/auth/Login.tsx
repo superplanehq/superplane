@@ -6,6 +6,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/useAccount";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   readLastUsedLoginMethod,
   recordLastUsedLoginMethod,
@@ -222,6 +223,11 @@ export const Login: React.FC = () => {
   const activeProviders = allowedProviders.filter((provider) => providers.includes(provider));
   const hasProviders = activeProviders.length > 0;
   const canSignup = authConfig.signupEnabled || inviteToken;
+
+  useReportPageReady(!configLoading && !accountLoading, {
+    failed: !!configError,
+  });
+
   const canSignupWithPassword = authConfig.passwordLoginEnabled && canSignup;
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
