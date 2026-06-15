@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -36,6 +39,12 @@ func CommitCanvasRepositoryFiles(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	_ = usageService
+	_ = encryptor
+	_ = webhookBaseURL
+	_ = authService
+	_ = autoLayout
+
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -59,72 +68,43 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
 	}
 
-	resolvedAutoLayout := resolveCommitCanvasAutoLayout(autoLayout != nil, autoLayout)
-	specOps, gitOps := splitRepositoryFileOperations(operations)
-
-	// canvas.yaml and console.yaml are persisted in the database, while the
-	// remaining files are committed to git, so the two stores cannot share a
-	// single transaction. Commit the git files first: if the git commit fails
-	// (for example on a stale head SHA), the request returns before any spec
-	// change is written, keeping the database consistent with the failed commit.
-	var commitSha string
-	if len(gitOps) > 0 {
-		commitSha, err = commitGitFileOperations(ctx, gitProvider, orgID, canvasID, organizationID, userID, expectedHeadSha, message, gitOps)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Direct commit: write the spec straight into the draft version row and drop
-	// any staged edits for that version in the same transaction as the write so a
-	// CLI/API commit always supersedes pending staging atomically.
-	if len(specOps) > 0 {
-		if err := ApplyRepositorySpecFileOperations(
-			ctx,
-			usageService,
-			encryptor,
-			registry,
-			organizationID,
-			id,
-			versionID,
-			webhookBaseURL,
-			authService,
-			resolvedAutoLayout,
-			true,
-			specOps,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	return &pb.CommitCanvasRepositoryFilesResponse{
-		CommitSha: commitSha,
-	}, nil
-}
-
-func commitGitFileOperations(
-	ctx context.Context,
-	gitProvider git.Provider,
-	orgID uuid.UUID,
-	canvasID uuid.UUID,
-	organizationID string,
-	userID string,
-	expectedHeadSha string,
-	message string,
-	gitOps []*pb.CanvasRepositoryFileOperation,
-) (string, error) {
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
-		return "", status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
 	if err != nil {
-		return "", status.Errorf(codes.Internal, "failed to find user: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
 	}
 
-	gitOperations := make([]git.FileOperation, 0, len(gitOps))
-	for _, operation := range gitOps {
+	branch := models.CanvasGitBranchMain
+	var ownerID *uuid.UUID
+	if strings.TrimSpace(versionID) != "" {
+		versionUUID, parseErr := uuid.Parse(versionID)
+		if parseErr != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", parseErr)
+		}
+
+		version, findErr := models.FindCanvasVersion(canvasID, versionUUID)
+		if findErr != nil {
+			return nil, status.Errorf(codes.NotFound, "version not found: %v", findErr)
+		}
+		if version.BranchName == nil || strings.TrimSpace(*version.BranchName) == "" {
+			return nil, status.Error(codes.FailedPrecondition, "draft branch is required")
+		}
+		branch = strings.TrimSpace(*version.BranchName)
+		ownerID = version.OwnerID
+	} else {
+		branch = materialize.DefaultDraftBranchName(uuid.MustParse(userID))
+	}
+
+	if branch == models.CanvasGitBranchMain {
+		return nil, status.Error(codes.InvalidArgument, "commits must target a draft branch")
+	}
+
+	gitOperations := make([]git.FileOperation, 0, len(operations))
+	for _, operation := range operations {
 		content := operation.GetContent()
 		var reader io.Reader
 		if !operation.GetDelete() {
@@ -139,9 +119,17 @@ func commitGitFileOperations(
 		})
 	}
 
+	if len(gitOperations) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one file operation is required")
+	}
+
+	if strings.TrimSpace(message) == "" {
+		message = "Update repository files"
+	}
+
 	newCommitSha, err := gitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
+		Branch:          branch,
+		BaseBranch:      branch,
 		ExpectedHeadSHA: expectedHeadSha,
 		Message:         message,
 		Operations:      gitOperations,
@@ -151,8 +139,43 @@ func commitGitFileOperations(
 		},
 	})
 	if err != nil {
-		return "", status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
 	}
 
-	return newCommitSha, nil
+	userUUID := uuid.MustParse(userID)
+	if ownerID == nil {
+		ownerID = &userUUID
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		registered, registerErr := materialize.RegisterPendingDraftVersion(
+			tx,
+			canvasID,
+			branch,
+			newCommitSha,
+			materialize.RegisterPendingDraftOptions{CreatedBy: ownerID},
+		)
+		if registerErr != nil {
+			return registerErr
+		}
+
+		// A direct commit re-materializes the draft from git, so any staged DB
+		// edits for this version are now stale and must be cleared.
+		return models.DiscardWorkflowStagingInTransaction(tx, registered.ID, nil)
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+	}
+
+	// Worker-authoritative materialization: git holds the new commit and the
+	// pending row is persisted, so the worker (inline in tests) loads the snapshot.
+	if err := materialize.RequestBranchMaterialization(ctx, canvasID, branch, newCommitSha, ownerID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to request draft materialization: %v", err)
+	}
+
+	// Optimistic response: the commit SHA is authoritative; the materialized
+	// version content follows asynchronously from the worker.
+	return &pb.CommitCanvasRepositoryFilesResponse{
+		CommitSha: newCommitSha,
+	}, nil
 }

@@ -4,20 +4,46 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func commitCanvasYAMLForTest(
+	ctx context.Context,
+	t *testing.T,
+	r *support.ResourceRegistry,
+	canvasID string,
+	draftVersionID string,
+	yamlText string,
+) {
+	t.Helper()
+
+	version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+	require.NoError(t, err)
+
+	_, err = commitCanvasRepositoryFilesForTest(
+		ctx,
+		r,
+		r.Organization.ID.String(),
+		canvasID,
+		draftVersionID,
+		version.CommitSHA,
+		"Update canvas.yaml",
+		[]*pb.CanvasRepositoryFileOperation{
+			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
+		},
+	)
+	require.NoError(t, err)
+}
+
 func TestCommitCanvasYAMLWithFilterExpressionDollar(t *testing.T) {
 	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
-	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	canvas, draftVersionID := createGitCanvasWithDraft(ctx, t, r, "commit-yaml-filter-dollar")
 
 	yamlText := `apiVersion: v1
 kind: Canvas
@@ -40,32 +66,15 @@ spec:
       targetId: f
 `
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersion.ID.String(),
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 
-	exported, err := ReadRepositorySpecFile(ctx, r.Organization.ID.String(), canvas.ID.String(), draftVersion.ID.String(), CanvasYAMLRepositoryPath)
+	exported, err := ReadRepositorySpecFile(ctx, r.Organization.ID.String(), canvas.ID.String(), draftVersionID, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 	require.Contains(t, exported, "sourceId")
 	require.Contains(t, exported, "targetId")
 	require.Contains(t, exported, "channel: default")
 
-	spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), draftVersion.ID.String())
+	spec := canvasSpecFromVersionYAML(ctx, t, r.Organization.ID.String(), canvas.ID.String(), draftVersionID)
 	require.Len(t, spec.Edges, 1)
 	require.Equal(t, "s", spec.Edges[0].SourceId)
 	require.Equal(t, "f", spec.Edges[0].TargetId)
@@ -73,10 +82,8 @@ spec:
 
 func TestCommitCanvasYAMLRoundtripFilterExpressionUpdate(t *testing.T) {
 	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
-	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	canvas, draftVersionID := createGitCanvasWithDraft(ctx, t, r, "commit-yaml-roundtrip")
 
 	baseYAML := func(expression string) string {
 		return `apiVersion: v1
@@ -105,50 +112,14 @@ spec:
 `
 	}
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersion.ID.String(),
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("true"))},
-		},
-	)
-	require.NoError(t, err)
-
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersion.ID.String(),
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("$"))},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, baseYAML("true"))
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, baseYAML("$"))
 }
 
 func TestCommitCanvasYAMLWithoutEdgeChannel(t *testing.T) {
 	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
-	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	canvas, draftVersionID := createGitCanvasWithDraft(ctx, t, r, "commit-yaml-no-channel")
 
 	yamlText := `apiVersion: v1
 kind: Canvas
@@ -171,32 +142,13 @@ spec:
       targetId: filter-filter-xyz
 `
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersion.ID.String(),
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 }
 
 func TestCommitCanvasYAMLWithMetadataID(t *testing.T) {
 	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
-	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	canvas, draftVersionID := createGitCanvasWithDraft(ctx, t, r, "commit-yaml-metadata-id")
 
 	yamlText := `apiVersion: v1
 kind: Canvas
@@ -227,22 +179,5 @@ spec:
       channel: default
 `
 
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersion.ID.String(),
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 }
