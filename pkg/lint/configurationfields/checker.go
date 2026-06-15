@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 
-	_ "github.com/superplanehq/superplane/pkg/server"
+	_ "github.com/superplanehq/superplane/pkg/server" // register all components, triggers, and integrations
 )
 
 type Issue struct {
