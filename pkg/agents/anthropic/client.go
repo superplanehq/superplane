@@ -125,6 +125,12 @@ type fileMetadata struct {
 	Filename string `json:"filename"`
 }
 
+type memoryStoreMetadata struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 type apiError struct {
 	StatusCode int
 	Message    string
@@ -216,6 +222,31 @@ func (c *Client) listFiles(ctx context.Context) ([]fileMetadata, error) {
 
 func (c *Client) uploadFileContent(ctx context.Context, content []byte, filename string) (fileMetadata, error) {
 	return c.uploadFileReader(ctx, bytes.NewReader(content), filename)
+}
+
+func (c *Client) createMemoryStore(ctx context.Context, name, description string) (memoryStoreMetadata, error) {
+	body := map[string]string{
+		"name":        name,
+		"description": description,
+	}
+	data, err := c.executeHTTP(ctx, http.MethodPost, "/memory_stores", body)
+	if err != nil {
+		return memoryStoreMetadata{}, err
+	}
+
+	var store memoryStoreMetadata
+	if err := json.Unmarshal(data, &store); err != nil {
+		return memoryStoreMetadata{}, fmt.Errorf("decode memory store: %w", err)
+	}
+	if store.ID == "" {
+		return memoryStoreMetadata{}, fmt.Errorf("provider returned empty memory store id")
+	}
+	return store, nil
+}
+
+func (c *Client) deleteMemoryStore(ctx context.Context, memoryStoreID string) error {
+	_, err := c.executeHTTP(ctx, http.MethodDelete, "/memory_stores/"+url.PathEscape(memoryStoreID), nil)
+	return err
 }
 
 func (c *Client) uploadFileReader(ctx context.Context, file io.Reader, filename string) (fileMetadata, error) {
