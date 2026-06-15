@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -797,20 +798,20 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Cleanup(func() {
-		_ = models.DisableExperimentalFeature(r.Organization.ID, "runner")
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("enables a known feature", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {
@@ -825,7 +826,7 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
@@ -836,18 +837,18 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("disables a previously enabled feature", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runner"))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents))
 
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
@@ -862,7 +863,7 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)

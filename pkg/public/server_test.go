@@ -536,7 +536,7 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, account.Email, user.GetEmail())
 
-		roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
+		roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 	})
