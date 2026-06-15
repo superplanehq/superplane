@@ -88,6 +88,44 @@ func Test__UpdateAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one alarm property to update is required")
 	})
 
+	t.Run("null toggle values are not counted as updates", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":            "us-east-1",
+				"alarm":             "HighCPU",
+				"statistic":         nil,
+				"period":            nil,
+				"evaluationPeriods": nil,
+				"alarmDescription":  nil,
+				"treatMissingData":  nil,
+				"alarmAction":       nil,
+				"snsTopic":          nil,
+			},
+		})
+		require.ErrorContains(t, err, "at least one alarm property to update is required")
+	})
+
+	t.Run("null toggle alongside real update is ignored", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":           "us-east-1",
+				"alarm":            "HighCPU",
+				"statistic":        "Average",
+				"period":           nil,
+				"alarmDescription": nil,
+				"snsTopic":         nil,
+			},
+			Metadata: metadata,
+		})
+		require.NoError(t, err)
+
+		stored, ok := metadata.Get().(UpdateAlarmNodeMetadata)
+		require.True(t, ok)
+		// Only the non-null field should appear in updated fields.
+		assert.Equal(t, []string{"Statistic"}, stored.UpdatedFields)
+	})
+
 	t.Run("threshold condition missing threshold -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{

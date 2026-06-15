@@ -110,8 +110,8 @@ func hasConfigKey(configuration any, key string) bool {
 		return false
 	}
 
-	_, exists := configurationMap[key]
-	return exists
+	value, exists := configurationMap[key]
+	return exists && value != nil
 }
 
 func requireThreshold(configuration any, threshold float64) (float64, error) {
