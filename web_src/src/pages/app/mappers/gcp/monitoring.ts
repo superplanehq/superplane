@@ -211,6 +211,14 @@ interface SnoozeSelectorConfiguration {
   snooze?: string;
 }
 
+// Resolved at Setup time by the backend so the collapsed node can show the
+// snooze's display name instead of its numeric ID.
+interface SnoozeNodeMetadata {
+  snoozeName?: string;
+  displayName?: string;
+  id?: string;
+}
+
 function snoozeDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
   if (context.execution.createdAt) {
@@ -240,7 +248,9 @@ function snoozeCreateMetadata(node: NodeInfo): MetadataItem[] {
 
 function snoozeSelectorMetadata(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as SnoozeSelectorConfiguration | undefined;
-  const label = lastSegment(config?.snooze);
+  const nodeMeta = node.metadata as SnoozeNodeMetadata | undefined;
+  // Prefer the resolved display name; fall back to the snooze ID from the value.
+  const label = nodeMeta?.displayName || nodeMeta?.id || lastSegment(config?.snooze);
   return label ? [{ icon: "bell-off", label }] : [];
 }
 

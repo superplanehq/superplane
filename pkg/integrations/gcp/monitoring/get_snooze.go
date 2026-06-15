@@ -72,7 +72,10 @@ func (g *GetSnooze) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validateSnoozeSelection(spec.Snooze)
+	if err := validateSnoozeSelection(spec.Snooze); err != nil {
+		return err
+	}
+	return resolveSnoozeMetadata(ctx, spec.Snooze)
 }
 
 func (g *GetSnooze) Execute(ctx core.ExecutionContext) error {

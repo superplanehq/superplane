@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,29 +138,88 @@ func Test__GetSnooze__Execute(t *testing.T) {
 
 func Test__ExpireSnooze__Execute(t *testing.T) {
 	e := &ExpireSnooze{}
-	var patchURL string
-	var patchBody map[string]any
-	mc := &mockClient{
-		projectID: "my-project",
-		patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
-			patchURL = url
-			patchBody, _ = body.(map[string]any)
-			return snoozeJSON("projects/my-project/snoozes/55", "Deploy window",
-				[]string{"projects/my-project/alertPolicies/1"}, "2025-01-01T00:00:00Z", "2025-01-01T00:30:00Z"), nil
-		},
-	}
-	withFactory(mc)
 
-	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	require.NoError(t, e.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"snooze": "projects/my-project/snoozes/55"},
-		ExecutionState: state,
-	}))
-	assert.True(t, state.Passed)
-	assert.Equal(t, "gcp.monitoring.snooze.expired", state.Type)
-	assert.Contains(t, patchURL, "updateMask=interval.endTime")
-	interval := patchBody["interval"].(map[string]any)
-	assert.NotEmpty(t, interval["endTime"])
+	newExpireClient := func(start string) (*mockClient, *string, *map[string]any) {
+		var patchURL string
+		var patchBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, url string) ([]byte, error) {
+				return snoozeJSON("projects/my-project/snoozes/55", "Deploy window",
+					[]string{"projects/my-project/alertPolicies/1"}, start, "2999-01-01T00:00:00Z"), nil
+			},
+			patchFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				patchURL = url
+				patchBody, _ = body.(map[string]any)
+				return snoozeJSON("projects/my-project/snoozes/55", "Deploy window",
+					[]string{"projects/my-project/alertPolicies/1"}, start, start), nil
+			},
+		}
+		return mc, &patchURL, &patchBody
+	}
+
+	t.Run("cancels a snooze younger than a minute with a zero-length interval", func(t *testing.T) {
+		start := time.Now().UTC().Add(-2 * time.Second).Format(time.RFC3339)
+		mc, patchURL, patchBody := newExpireClient(start)
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, e.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"snooze": "projects/my-project/snoozes/55"},
+			ExecutionState: state,
+		}))
+		assert.True(t, state.Passed)
+		assert.Equal(t, "gcp.monitoring.snooze.expired", state.Type)
+		assert.Contains(t, *patchURL, "updateMask=interval.endTime")
+		interval := (*patchBody)["interval"].(map[string]any)
+		// Collapses to length 0 so GCP accepts the cancellation.
+		assert.Equal(t, start, interval["endTime"])
+	})
+
+	t.Run("ends an older snooze at now", func(t *testing.T) {
+		start := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+		mc, patchURL, patchBody := newExpireClient(start)
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, e.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"snooze": "projects/my-project/snoozes/55"},
+			ExecutionState: state,
+		}))
+		assert.True(t, state.Passed)
+		assert.Contains(t, *patchURL, "updateMask=interval.endTime")
+		interval := (*patchBody)["interval"].(map[string]any)
+		assert.NotEqual(t, start, interval["endTime"])
+		ended, err := time.Parse(time.RFC3339, interval["endTime"].(string))
+		require.NoError(t, err)
+		assert.WithinDuration(t, time.Now().UTC(), ended, time.Minute)
+	})
+}
+
+func Test__expireEndTime(t *testing.T) {
+	now := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	t.Run("young snooze collapses to its start time", func(t *testing.T) {
+		start := now.Add(-30 * time.Second).Format(time.RFC3339)
+		s := &snooze{Interval: &struct {
+			StartTime string `json:"startTime"`
+			EndTime   string `json:"endTime"`
+		}{StartTime: start}}
+		assert.Equal(t, start, expireEndTime(s, now))
+	})
+
+	t.Run("older snooze ends at now", func(t *testing.T) {
+		start := now.Add(-10 * time.Minute).Format(time.RFC3339)
+		s := &snooze{Interval: &struct {
+			StartTime string `json:"startTime"`
+			EndTime   string `json:"endTime"`
+		}{StartTime: start}}
+		assert.Equal(t, now.Format(time.RFC3339), expireEndTime(s, now))
+	})
+
+	t.Run("missing interval ends at now", func(t *testing.T) {
+		assert.Equal(t, now.Format(time.RFC3339), expireEndTime(&snooze{}, now))
+	})
 }
 
 func firstData(t *testing.T, state *contexts.ExecutionStateContext) map[string]any {

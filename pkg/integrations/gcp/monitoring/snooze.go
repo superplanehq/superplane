@@ -1,11 +1,14 @@
 package monitoring
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // maxSnoozePolicies is the number of alert policies a single snooze may target
@@ -112,4 +115,61 @@ func validateSnoozeSelection(value string) error {
 	}
 	_, err := parseSnoozeName(value)
 	return err
+}
+
+// SnoozeNodeMetadata is stored on the node at Setup so the collapsed UI can show
+// the snooze's human-readable display name instead of its numeric ID.
+type SnoozeNodeMetadata struct {
+	SnoozeName  string `json:"snoozeName" mapstructure:"snoozeName"`
+	DisplayName string `json:"displayName" mapstructure:"displayName"`
+	ID          string `json:"id" mapstructure:"id"`
+}
+
+// resolveSnoozeMetadata best-effort resolves the selected snooze's display name
+// via the API and stores it on the node. It falls back to the parsed ID when the
+// value is an expression or the API is unavailable, so Setup never fails just
+// because the display name could not be fetched. Mirrors resolveAlertPolicyMetadata.
+func resolveSnoozeMetadata(ctx core.SetupContext, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	// Expressions are resolved at execution time; store the raw value so the UI
+	// still shows something meaningful.
+	if strings.Contains(value, "{{") {
+		return ctx.Metadata.Set(SnoozeNodeMetadata{SnoozeName: value})
+	}
+
+	name, err := parseSnoozeName(value)
+	if err != nil {
+		return err
+	}
+
+	fallback := SnoozeNodeMetadata{SnoozeName: name, ID: lastSegment(name)}
+	if ctx.Integration == nil {
+		return ctx.Metadata.Set(fallback)
+	}
+
+	client, err := getClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+
+	body, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))
+	if err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+	var s snooze
+	if err := json.Unmarshal(body, &s); err != nil {
+		return ctx.Metadata.Set(fallback)
+	}
+	display := s.DisplayName
+	if display == "" {
+		display = lastSegment(name)
+	}
+	return ctx.Metadata.Set(SnoozeNodeMetadata{
+		SnoozeName:  name,
+		DisplayName: display,
+		ID:          lastSegment(name),
+	})
 }

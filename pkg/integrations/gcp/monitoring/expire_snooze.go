@@ -33,7 +33,9 @@ func (e *ExpireSnooze) Description() string {
 }
 
 func (e *ExpireSnooze) Documentation() string {
-	return `The Expire Snooze component ends an active snooze immediately by moving its end time to now, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+	return `The Expire Snooze component ends an active snooze immediately, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+
+It moves the snooze's end time to now. Cloud Monitoring requires a snooze window to be at least a minute long, so a snooze that started less than a minute ago is instead cancelled outright (collapsed to a zero-length window) — either way alerting resumes right away.
 
 ## Use Cases
 
@@ -75,7 +77,10 @@ func (e *ExpireSnooze) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
-	return validateSnoozeSelection(spec.Snooze)
+	if err := validateSnoozeSelection(spec.Snooze); err != nil {
+		return err
+	}
+	return resolveSnoozeMetadata(ctx, spec.Snooze)
 }
 
 func (e *ExpireSnooze) Execute(ctx core.ExecutionContext) error {
@@ -94,8 +99,22 @@ func (e *ExpireSnooze) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
+	// Read the snooze first so the new end time respects Cloud Monitoring's rule
+	// that a patched interval be either at least one minute long or exactly
+	// length 0 (a cancellation). Setting the end time to "now" on a snooze that
+	// started less than a minute ago would produce a sub-minute interval, which
+	// the API rejects with HTTP 400.
+	current, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to read snooze", roleHintRead, err))
+	}
+	var existing snooze
+	if err := json.Unmarshal(current, &existing); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("parse snooze response: %v", err))
+	}
+
 	body := map[string]any{
-		"interval": map[string]any{"endTime": time.Now().UTC().Format(time.RFC3339)},
+		"interval": map[string]any{"endTime": expireEndTime(&existing, time.Now().UTC())},
 	}
 	q := url.Values{}
 	q.Set("updateMask", "interval.endTime")
@@ -116,6 +135,23 @@ func (e *ExpireSnooze) Execute(ctx core.ExecutionContext) error {
 		"gcp.monitoring.snooze.expired",
 		[]any{snoozePayload(&updated)},
 	)
+}
+
+// expireEndTime picks the interval end time that stops a snooze now while
+// satisfying Cloud Monitoring's constraint that a patched interval be at least a
+// minute long or exactly length 0. When the snooze has already been active for a
+// minute or more it is ended at "now"; otherwise it is collapsed to a
+// zero-length interval (endTime == startTime), which cancels it outright so its
+// policies can notify again immediately.
+func expireEndTime(s *snooze, now time.Time) string {
+	if s.Interval != nil && s.Interval.StartTime != "" {
+		if start, err := time.Parse(time.RFC3339, s.Interval.StartTime); err == nil {
+			if now.Sub(start) < time.Minute {
+				return s.Interval.StartTime
+			}
+		}
+	}
+	return now.Format(time.RFC3339)
 }
 
 func (e *ExpireSnooze) Cancel(ctx core.ExecutionContext) error {

@@ -1621,7 +1621,9 @@ Returns the deleted policy reference:
 
 **Component key:** `gcp.monitoring.expireSnooze`
 
-The Expire Snooze component ends an active snooze immediately by moving its end time to now, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+The Expire Snooze component ends an active snooze immediately, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+
+It moves the snooze's end time to now. Cloud Monitoring requires a snooze window to be at least a minute long, so a snooze that started less than a minute ago is instead cancelled outright (collapsed to a zero-length window) — either way alerting resumes right away.
 
 ### Use Cases
 
