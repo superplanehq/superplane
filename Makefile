@@ -167,8 +167,11 @@ dev.pr.clean.checkout:
 check.example.payloads:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
 
-check.canvas.yaml:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_canvas_yaml.go"
+check.configuration.fields:
+	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
+
+check.configuration.fields.baseline.update:
+	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go --update-baseline"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
