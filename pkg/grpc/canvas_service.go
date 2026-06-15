@@ -89,62 +89,17 @@ func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateC
 	if req.DisplayName != nil {
 		displayName = *req.DisplayName
 	}
-	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId, displayName)
+	return canvases.CreateCanvasVersion(ctx, s.gitProvider, s.registry, organizationID, req.CanvasId, displayName)
 }
 
 func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
+	return canvases.DeleteCanvasVersion(ctx, s.gitProvider, organizationID, req.CanvasId, req.VersionId)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DescribeCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
-}
-
-func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb.ApplyCanvasVersionChangesetRequest) (*pb.ApplyCanvasVersionChangesetResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
-	}
-
-	versionID, err := uuid.Parse(req.VersionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	return canvases.ApplyCanvasVersionChangeset(
-		ctx,
-		s.registry,
-		uuid.MustParse(organizationID),
-		canvasID,
-		versionID,
-		req.Changeset,
-		req.AutoLayout,
-	)
-}
-
-func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req *pb.ValidateCanvasVersionChangesetRequest) (*pb.ValidateCanvasVersionChangesetResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
-	}
-
-	versionID, err := uuid.Parse(req.VersionId)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-	}
-
-	return canvases.ValidateCanvasVersionChangeset(
-		ctx,
-		s.registry,
-		uuid.MustParse(organizationID),
-		canvasID,
-		versionID,
-		req.Changeset,
-	)
 }
 
 func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
@@ -361,7 +316,7 @@ func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanv
 
 func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
+	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.GetBranch(), req.GetRef())
 }
 
 func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
