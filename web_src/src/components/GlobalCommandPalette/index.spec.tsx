@@ -17,6 +17,8 @@ const {
   inviteLinkState,
   navigateMock,
   permissionsState,
+  connectedIntegrationsQueryState,
+  serviceAccountsQueryState,
   writeTextMock,
 } = vi.hoisted(() => {
   const defaultAccount = {
@@ -51,6 +53,8 @@ const {
     inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
     navigateMock: vi.fn(),
     permissionsState: { permissions: defaultPermissions },
+    connectedIntegrationsQueryState: { enabledValues: [] as boolean[] },
+    serviceAccountsQueryState: { enabledValues: [] as boolean[] },
     writeTextMock: vi.fn(),
   };
 });
@@ -126,24 +130,30 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: () => ({
-    data: [
-      {
-        metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
-        status: { state: "ready" },
-      },
-      {
-        metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
-        status: { state: "ready" },
-      },
-    ],
-  }),
+  useConnectedIntegrations: (_organizationId: string, options?: { enabled?: boolean }) => {
+    connectedIntegrationsQueryState.enabledValues.push(options?.enabled ?? true);
+    return {
+      data: [
+        {
+          metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
+          status: { state: "ready" },
+        },
+        {
+          metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
+          status: { state: "ready" },
+        },
+      ],
+    };
+  },
 }));
 
 vi.mock("@/hooks/useServiceAccounts", () => ({
-  useServiceAccounts: () => ({
-    data: [{ id: "sa-1", name: "deploy-bot" }],
-  }),
+  useServiceAccounts: (_organizationId: string, options?: { enabled?: boolean }) => {
+    serviceAccountsQueryState.enabledValues.push(options?.enabled ?? true);
+    return {
+      data: [{ id: "sa-1", name: "deploy-bot" }],
+    };
+  },
 }));
 
 vi.mock("@/lib/canvasNameGenerator", () => ({
@@ -190,6 +200,8 @@ describe("GlobalCommandPalette", () => {
     navigateMock.mockReset();
     inviteLinkQueryState.enabledValues = [];
     inviteLinkState.data = { token: "test-invite-token", enabled: true };
+    connectedIntegrationsQueryState.enabledValues = [];
+    serviceAccountsQueryState.enabledValues = [];
     permissionsState.permissions = [...defaultPermissions];
     writeTextMock.mockReset();
     writeTextMock.mockResolvedValue(undefined);
@@ -225,6 +237,37 @@ describe("GlobalCommandPalette", () => {
 
     await waitFor(() => {
       expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not fetch palette-only data until the palette opens", () => {
+    renderPalette();
+
+    expect(connectedIntegrationsQueryState.enabledValues.every((enabled) => !enabled)).toBe(true);
+    expect(inviteLinkQueryState.enabledValues.every((enabled) => !enabled)).toBe(true);
+    expect(serviceAccountsQueryState.enabledValues.every((enabled) => !enabled)).toBe(true);
+  });
+
+  it("loads invite and integration data only after opening the palette", async () => {
+    renderPalette();
+
+    openPalette();
+    await screen.findByPlaceholderText("Find apps, integrations, and commands...");
+
+    expect(connectedIntegrationsQueryState.enabledValues).toContain(true);
+    expect(inviteLinkQueryState.enabledValues).toContain(true);
+    expect(serviceAccountsQueryState.enabledValues).not.toContain(true);
+  });
+
+  it("loads service accounts only while searching", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    openPalette();
+    await user.type(await screen.findByPlaceholderText("Find apps, integrations, and commands..."), "deploy");
+
+    await waitFor(() => {
+      expect(serviceAccountsQueryState.enabledValues).toContain(true);
     });
   });
 

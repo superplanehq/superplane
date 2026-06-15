@@ -15,7 +15,7 @@ export const serviceAccountKeys = {
   detail: (orgId: string, id: string) => [...serviceAccountKeys.all, "detail", orgId, id] as const,
 };
 
-export const useServiceAccounts = (organizationId: string) => {
+export const useServiceAccounts = (organizationId: string, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: serviceAccountKeys.list(organizationId),
     queryFn: async () => {
@@ -24,7 +24,7 @@ export const useServiceAccounts = (organizationId: string) => {
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options?.enabled ?? true),
   });
 };
 

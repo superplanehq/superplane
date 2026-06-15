@@ -20,11 +20,15 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
     if (!model.open) setExpandedSection(null);
   }, [model.open]);
 
+  const paletteOpen = model.open && !!organizationId;
+
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
-    enabled: !!organizationId,
+    enabled: paletteOpen,
   });
-  const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId && model.canManageInviteLink);
-  const { data: serviceAccounts = [] } = useServiceAccounts(organizationId);
+  const { data: inviteLink } = useOrganizationInviteLink(organizationId, paletteOpen && model.canManageInviteLink);
+  const { data: serviceAccounts = [] } = useServiceAccounts(organizationId, {
+    enabled: paletteOpen && !!model.search,
+  });
   const inviteLinkToken = inviteLink?.enabled ? inviteLink.token : undefined;
 
   const integrations = useMemo<IntegrationItem[]>(
