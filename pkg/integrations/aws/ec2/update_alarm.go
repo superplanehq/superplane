@@ -355,6 +355,14 @@ func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfigura
 		}
 	}
 
+	if hasConfigKey(rawConfiguration, "period") && config.Period <= 0 {
+		return fmt.Errorf("period must be greater than 0")
+	}
+
+	if hasConfigKey(rawConfiguration, "evaluationPeriods") && config.EvaluationPeriods <= 0 {
+		return fmt.Errorf("evaluation periods must be greater than 0")
+	}
+
 	return nil
 }
 
@@ -423,11 +431,11 @@ func buildUpdateAlarmInput(
 		input.ComparisonOperator = comparisonOperator
 	}
 
-	if hasConfigKey(rawConfiguration, "period") && config.Period > 0 {
+	if hasConfigKey(rawConfiguration, "period") {
 		input.Period = config.Period
 	}
 
-	if hasConfigKey(rawConfiguration, "evaluationPeriods") && config.EvaluationPeriods > 0 {
+	if hasConfigKey(rawConfiguration, "evaluationPeriods") {
 		input.EvaluationPeriods = config.EvaluationPeriods
 	}
 
@@ -437,17 +445,50 @@ func buildUpdateAlarmInput(
 
 	if hasConfigKey(rawConfiguration, "alarmAction") || hasConfigKey(rawConfiguration, "snsTopic") {
 		input.OmitAlarmActions = false
+		alarmActionToggled := hasConfigKey(rawConfiguration, "alarmAction")
+		snsTopicToggled := hasConfigKey(rawConfiguration, "snsTopic")
+
+		// Seed with existing actions, dropping only the types being replaced.
 		var alarmActions []string
-		if action := strings.TrimSpace(config.AlarmAction); action != "" {
-			alarmActions = append(alarmActions, fmt.Sprintf("arn:aws:automate:%s:ec2:%s", region, action))
+		for _, existingARN := range existing.AlarmActions {
+			switch {
+			case isEC2AutomationARN(existingARN):
+				if !alarmActionToggled {
+					alarmActions = append(alarmActions, existingARN)
+				}
+			case isSNSTopicARN(existingARN):
+				if !snsTopicToggled {
+					alarmActions = append(alarmActions, existingARN)
+				}
+			default:
+				alarmActions = append(alarmActions, existingARN)
+			}
 		}
-		if topic := strings.TrimSpace(config.SNSTopicARN); topic != "" {
-			alarmActions = append(alarmActions, topic)
+
+		// Append the new values for toggled fields (empty value means clear).
+		if alarmActionToggled {
+			if action := strings.TrimSpace(config.AlarmAction); action != "" {
+				alarmActions = append(alarmActions, fmt.Sprintf("arn:aws:automate:%s:ec2:%s", region, action))
+			}
 		}
+		if snsTopicToggled {
+			if topic := strings.TrimSpace(config.SNSTopicARN); topic != "" {
+				alarmActions = append(alarmActions, topic)
+			}
+		}
+
 		input.AlarmActions = alarmActions
 	}
 
 	return input, nil
+}
+
+func isEC2AutomationARN(arn string) bool {
+	return strings.HasPrefix(arn, "arn:aws:automate:")
+}
+
+func isSNSTopicARN(arn string) bool {
+	return strings.HasPrefix(arn, "arn:aws:sns:")
 }
 
 func instanceIDFromAlarm(alarm *MetricAlarm) (string, error) {

@@ -3,6 +3,7 @@ package ec2
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -11,6 +12,40 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// describeAlarmsWithActionsXML has an existing SNS topic and EC2 automation action.
+const describeAlarmsWithActionsXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>HighCPU</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPU</AlarmArn>
+        <AlarmDescription>High CPU utilization alarm</AlarmDescription>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <Statistic>Average</Statistic>
+        <Period>300</Period>
+        <EvaluationPeriods>1</EvaluationPeriods>
+        <Threshold>80</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <StateReason>Threshold Crossed: no datapoints</StateReason>
+        <TreatMissingData>missing</TreatMissingData>
+        <Dimensions>
+          <member>
+            <Name>InstanceId</Name>
+            <Value>i-abc123</Value>
+          </member>
+        </Dimensions>
+        <AlarmActions>
+          <member>arn:aws:automate:us-east-1:ec2:recover</member>
+          <member>arn:aws:sns:us-east-1:123456789012:existing-topic</member>
+        </AlarmActions>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
 
 func Test__UpdateAlarm__Setup(t *testing.T) {
 	component := &UpdateAlarm{}
@@ -86,6 +121,28 @@ func Test__UpdateAlarm__Setup(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, []string{"Threshold", "Statistic"}, stored.UpdatedFields)
 	})
+
+	t.Run("period = 0 -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region": "us-east-1",
+				"alarm":  "HighCPU",
+				"period": 0,
+			},
+		})
+		require.ErrorContains(t, err, "period must be greater than 0")
+	})
+
+	t.Run("evaluationPeriods = 0 -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":            "us-east-1",
+				"alarm":             "HighCPU",
+				"evaluationPeriods": 0,
+			},
+		})
+		require.ErrorContains(t, err, "evaluation periods must be greater than 0")
+	})
 }
 
 func Test__UpdateAlarm__Execute(t *testing.T) {
@@ -141,5 +198,105 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "HighCPU", data["alarmName"])
 		assert.Equal(t, float64(80), data["threshold"])
+	})
+
+	t.Run("updating only alarmAction preserves existing SNS topic", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":      "us-east-1",
+				"alarm":       "HighCPU",
+				"alarmAction": "reboot",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		// Inspect the PutMetricAlarm request body (second HTTP call).
+		require.Len(t, httpContext.Requests, 3)
+		putBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		params, err := url.ParseQuery(string(putBody))
+		require.NoError(t, err)
+
+		// Both the new EC2 action and the preserved SNS topic must be present.
+		actions := []string{params.Get("AlarmActions.member.1"), params.Get("AlarmActions.member.2")}
+		assert.Contains(t, actions, "arn:aws:automate:us-east-1:ec2:reboot")
+		assert.Contains(t, actions, "arn:aws:sns:us-east-1:123456789012:existing-topic")
+	})
+
+	t.Run("updating only snsTopic preserves existing EC2 automation action", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"alarm":    "HighCPU",
+				"snsTopic": "arn:aws:sns:us-east-1:123456789012:new-topic",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 3)
+		putBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		params, err := url.ParseQuery(string(putBody))
+		require.NoError(t, err)
+
+		// New SNS topic should be present.
+		actions := []string{params.Get("AlarmActions.member.1"), params.Get("AlarmActions.member.2")}
+		assert.Contains(t, actions, "arn:aws:sns:us-east-1:123456789012:new-topic")
+		// Existing EC2 automation action must not have been dropped.
+		assert.Contains(t, actions, "arn:aws:automate:us-east-1:ec2:recover")
 	})
 }
