@@ -3,8 +3,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasVersion } from "@/api-client";
+import { showErrorToast } from "@/lib/toast";
 import type { CanvasPageHeaderMode } from "./viewState";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
+import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
@@ -28,6 +30,18 @@ function makeDraftVersion(versionId: string): CanvasesCanvasVersion {
   } as CanvasesCanvasVersion;
 }
 
+function makePublishedVersion(versionId: string): CanvasesCanvasVersion {
+  return {
+    metadata: {
+      id: versionId,
+      state: "STATE_PUBLISHED",
+    },
+    spec: {
+      nodes: [],
+    },
+  } as CanvasesCanvasVersion;
+}
+
 function dispatchDraftReady(versionId: string) {
   act(() => {
     window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId } }));
@@ -43,6 +57,7 @@ function setupHook({
   hasPendingLocalCanvasState = false,
   activeCanvasVersionId = "live-version",
   activateCanvasVersionForEditing = vi.fn(() => true),
+  selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]),
 }: {
   canvasId: string;
   versionId: string;
@@ -52,12 +67,12 @@ function setupHook({
   hasPendingLocalCanvasState?: boolean;
   activeCanvasVersionId?: string;
   activateCanvasVersionForEditing?: (versionId: string, version: CanvasesCanvasVersion) => boolean;
+  selectableVersionsById?: Map<string, CanvasesCanvasVersion>;
 }) {
   const queryClient = new QueryClient();
   const activeCanvasVersionIdRef = { current: activeCanvasVersionId };
   const setSuppressUnpublishedDraftDiscard = vi.fn();
   const onActiveDraftMissing = vi.fn();
-  const selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -195,5 +210,23 @@ describe("useAgentDraftEditor", () => {
     hook.updateProps({ hasPendingLocalCanvasState: true });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not show an error when auto-open finds the agent draft was already published", async () => {
+    const versionId = "draft-published-before-auto-open";
+    vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(makePublishedVersion(versionId));
+    const hook = setupHook({
+      canvasId: "canvas-published-before-auto-open",
+      versionId,
+      selectableVersionsById: new Map(),
+    });
+
+    dispatchDraftReady(versionId);
+
+    await waitFor(() =>
+      expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-published-before-auto-open", versionId),
+    );
+    expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
+    expect(showErrorToast).not.toHaveBeenCalledWith("Agent draft is no longer available");
   });
 });
