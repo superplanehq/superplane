@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState, type UIEvent } from "react";
+import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { applyTableWhere } from "./evalTableWhere";
@@ -24,6 +25,15 @@ interface WidgetTableProps {
   render: WidgetTableRender;
   rows: unknown[];
   isLoading: boolean;
+  /**
+   * Progressive-pagination affordances. When `hasMore` is true the footer
+   * shows a "Load more" button and the scrollable area auto-fetches as the
+   * user scrolls near the bottom. Wired only by the table panel; chart and
+   * number panels render the full configured limit at once.
+   */
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const STATUS_PILL_CLASS: Record<string, string> = {
@@ -45,7 +55,7 @@ const ACTION_ICONS = {
   "external-link": ExternalLink,
 } as const;
 
-export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
+export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
@@ -70,6 +80,18 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     }
     return Array.from(ids);
   }, [render.rowActions, ctx]);
+
+  const handleScrollLoadMore = useAutoLoadMoreOnScroll({
+    hasMore,
+    isLoading: isFetchingMore,
+    onLoadMore,
+  });
+  const onScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      handleScrollLoadMore(event.currentTarget);
+    },
+    [handleScrollLoadMore],
+  );
 
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
@@ -97,7 +119,7 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
 
   return (
     <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-      <div className="overflow-auto" data-testid="widget-table">
+      <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
         <table className="w-full border-collapse text-xs">
           <thead className="bg-slate-50">
             <tr>
@@ -151,8 +173,33 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
             })}
           </tbody>
         </table>
+        {hasMore && onLoadMore ? (
+          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
       </div>
     </WidgetTableActionLockProvider>
+  );
+}
+
+function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
+  return (
+    <div
+      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2"
+      data-testid="widget-table-load-more"
+    >
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onLoadMore}
+        disabled={isFetchingMore}
+        className="h-7 gap-1 text-xs"
+        data-testid="widget-table-load-more-button"
+      >
+        {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+        {isFetchingMore ? "Loading…" : "Load more"}
+      </Button>
+    </div>
   );
 }
 
