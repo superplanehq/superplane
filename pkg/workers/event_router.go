@@ -169,7 +169,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	}()
 
 	var createdQueueItems []models.CanvasNodeQueueItem
-	var execution *models.CanvasNodeExecution
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
@@ -180,7 +179,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
-		createdQueueItems, execution, runID, err = w.processEvent(tx, logger, lockedEvent)
+		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
@@ -204,15 +203,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		}
 	}
 
-	if execution != nil {
-		messages.NewCanvasExecutionMessage(
-			event.WorkflowID.String(),
-			execution.ID.String(),
-			execution.NodeID,
-		).Publish()
-	}
-
-	if execution == nil && runID != uuid.Nil {
+	if runID != uuid.Nil {
 		err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
 		if err != nil {
 			logger.WithError(err).Warnf(
@@ -226,29 +217,28 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, uuid.UUID, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
-		return nil, nil, uuid.Nil, err
+		return nil, uuid.Nil, err
 	}
 
 	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
 	if err != nil {
-		return nil, nil, uuid.Nil, err
+		return nil, uuid.Nil, err
 	}
 
 	if event.ExecutionID == nil {
-		queueItems, runID, err := w.processRootEvent(tx, canvas, liveEdges, event)
-		return queueItems, nil, runID, err
+		return w.processRootEvent(tx, canvas, liveEdges, event)
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
-		return nil, nil, uuid.Nil, err
+		return nil, uuid.Nil, err
 	}
 
 	queueItems, runID, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
-	return queueItems, execution, runID, err
+	return queueItems, runID, err
 }
 
 func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []models.Edge {
@@ -366,10 +356,14 @@ func (w *EventRouter) processExecutionEvent(
 		return nil, uuid.Nil, err
 	}
 
-	_, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
+	finalized, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
 	if err != nil {
 		return nil, uuid.Nil, err
 	}
 
-	return createdQueueItems, execution.RunID, nil
+	if finalized {
+		return createdQueueItems, execution.RunID, nil
+	}
+
+	return createdQueueItems, uuid.Nil, nil
 }
