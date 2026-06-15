@@ -125,6 +125,12 @@ export function useCanvasWebsocket(
     [queryClient, canvasId],
   );
 
+  const invalidateMemoryEntries = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
@@ -269,13 +275,9 @@ export function useCanvasWebsocket(
           // another tab). Invalidate the shared memory cache so the Memory tab
           // and any memory-bound widget refetches once.
           const memoryMessage = payload as Partial<CanvasWebsocketPayload>;
-          if (!memoryMessage.canvasId || memoryMessage.canvasId !== canvasId) {
-            break;
+          if (memoryMessage.canvasId === canvasId) {
+            invalidateMemoryEntries();
           }
-
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.canvasMemoryEntries(canvasId),
-          });
           break;
         }
         default:
@@ -297,6 +299,7 @@ export function useCanvasWebsocket(
       patchRunInCache,
       patchRootEventInCache,
       patchExecutionInCache,
+      invalidateMemoryEntries,
     ],
   );
 
@@ -390,10 +393,8 @@ export function useCanvasWebsocket(
     });
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
-    queryClient.invalidateQueries({
-      queryKey: canvasKeys.canvasMemoryEntries(canvasId),
-    });
-  }, [queryClient, canvasId]);
+    invalidateMemoryEntries();
+  }, [queryClient, canvasId, invalidateMemoryEntries]);
 
   // Cleanup on unmount
   useEffect(() => {
