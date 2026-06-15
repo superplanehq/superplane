@@ -23,7 +23,7 @@ vi.mock("@/components/ui/chart", async () => {
   const actual = (await vi.importActual("@/components/ui/chart")) as Record<string, unknown>;
   const ChartTooltipContent = (props: Record<string, unknown>) => {
     tooltipContentProps.value = props;
-    const Original = actual.ChartTooltipContent as (p: unknown) => JSX.Element;
+    const Original = actual.ChartTooltipContent as (p: unknown) => ReactNode;
     return <Original {...props} />;
   };
   return { ...actual, ChartTooltipContent };
@@ -279,12 +279,12 @@ describe("WidgetChart axis formatting", () => {
   });
 
   it("passes a labelFormatter to the tooltip that mirrors xFormat", () => {
-    tooltipContentProps.value = null;
+    tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
       { kind: "chart", type: "bar", xField: "day", xFormat: "date", series: [{ field: "cost", label: "Cost" }] },
       { rows: [{ day: "2026-05-26T00:00:00Z", cost: 10 }] },
     );
-    const props = tooltipContentProps.value;
+    const props: Record<string, unknown> | null = tooltipContentProps.value;
     expect(props).not.toBeNull();
     const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
     expect(labelFormatter).toBeTypeOf("function");
@@ -294,14 +294,13 @@ describe("WidgetChart axis formatting", () => {
   });
 
   it("omits the tooltip labelFormatter when xFormat is unset (raw category text)", () => {
-    tooltipContentProps.value = null;
+    tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
       { kind: "chart", type: "bar", xField: "service", series: [{ field: "cost", label: "Cost" }] },
       { rows: [{ service: "ec2", cost: 1 }] },
     );
-    const labelFormatter = tooltipContentProps.value?.labelFormatter as
-      | ((label: unknown, payload?: unknown[]) => string)
-      | undefined;
+    const props: Record<string, unknown> | null = tooltipContentProps.value;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
     expect(labelFormatter?.("ec2", [])).toBe("ec2");
   });
 

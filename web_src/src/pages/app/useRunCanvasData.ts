@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
-  ActionsAction,
+  SuperplaneActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
@@ -22,7 +22,7 @@ type UseRunCanvasDataParams = {
   componentsLoading: boolean;
   isSelectedRunVersionLoading: boolean;
   allTriggers: TriggersTrigger[];
-  allComponents: ActionsAction[];
+  allComponents: SuperplaneActionsAction[];
   canvasId?: string;
   queryClient: QueryClient;
   me?: SuperplaneMeUser | null;
