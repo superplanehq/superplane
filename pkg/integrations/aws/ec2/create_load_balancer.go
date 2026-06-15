@@ -346,9 +346,8 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 	if lbType == LoadBalancerTypeGateway {
 		minSubnets = minSubnetsForGWLB
 	}
-	realSubnets := countNonEmpty(config.Subnets)
-	if realSubnets < minSubnets {
-		return fmt.Errorf("at least %d subnet(s) in different Availability Zones must be specified", minSubnets)
+	if err := validateLoadBalancerSubnets(ctx, region, config.Subnets, minSubnets); err != nil {
+		return err
 	}
 
 	if err := validateListenerConfig(config); err != nil {
@@ -545,6 +544,56 @@ func (c *CreateLoadBalancer) Cleanup(ctx core.SetupContext) error {
 
 func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
+}
+
+func validateLoadBalancerSubnets(ctx core.SetupContext, region string, subnets []string, minSubnets int) error {
+	subnetIDs := make([]string, 0, len(subnets))
+	for _, subnetID := range subnets {
+		if trimmed := strings.TrimSpace(subnetID); trimmed != "" {
+			subnetIDs = append(subnetIDs, trimmed)
+		}
+	}
+
+	if len(subnetIDs) < minSubnets {
+		if minSubnets >= minSubnetsForALBNLB {
+			return fmt.Errorf("at least %d subnet(s) in different Availability Zones must be specified", minSubnets)
+		}
+		return fmt.Errorf("at least %d subnet(s) must be specified", minSubnets)
+	}
+
+	if minSubnets < minSubnetsForALBNLB {
+		return nil
+	}
+
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		return nil
+	}
+
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	subnetsByAZ := make(map[string]string, len(subnetIDs))
+	for _, subnetID := range subnetIDs {
+		subnet, err := client.DescribeSubnet(subnetID)
+		if err != nil {
+			return fmt.Errorf("failed to describe subnet %s: %w", subnetID, err)
+		}
+
+		az := strings.TrimSpace(subnet.AvailabilityZone)
+		if az == "" {
+			return fmt.Errorf("subnet %s does not have an availability zone", subnetID)
+		}
+
+		if existingSubnetID, ok := subnetsByAZ[az]; ok {
+			return fmt.Errorf("subnets must be in different Availability Zones: %s and %s are both in %s", existingSubnetID, subnetID, az)
+		}
+		subnetsByAZ[az] = subnetID
+	}
+
+	return nil
 }
 
 func validateListenerConfig(config CreateLoadBalancerConfiguration) error {

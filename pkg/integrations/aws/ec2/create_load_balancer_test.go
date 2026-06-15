@@ -144,6 +144,117 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least 2 subnet(s)")
 	})
 
+	t.Run("subnets in same availability zone -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeSubnetsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<subnetSet>
+								<item>
+									<subnetId>subnet-abc123</subnetId>
+									<vpcId>vpc-123</vpcId>
+									<availabilityZone>us-east-1a</availabilityZone>
+								</item>
+							</subnetSet>
+						</DescribeSubnetsResponse>
+					`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeSubnetsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<subnetSet>
+								<item>
+									<subnetId>subnet-def456</subnetId>
+									<vpcId>vpc-123</vpcId>
+									<availabilityZone>us-east-1a</availabilityZone>
+								</item>
+							</subnetSet>
+						</DescribeSubnetsResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123", "subnet-def456"},
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "subnets must be in different Availability Zones")
+		require.ErrorContains(t, err, "us-east-1a")
+	})
+
+	t.Run("subnets in different availability zones -> valid configuration", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeSubnetsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<subnetSet>
+								<item>
+									<subnetId>subnet-abc123</subnetId>
+									<vpcId>vpc-123</vpcId>
+									<availabilityZone>us-east-1a</availabilityZone>
+								</item>
+							</subnetSet>
+						</DescribeSubnetsResponse>
+					`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeSubnetsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<subnetSet>
+								<item>
+									<subnetId>subnet-def456</subnetId>
+									<vpcId>vpc-123</vpcId>
+									<availabilityZone>us-east-1b</availabilityZone>
+								</item>
+							</subnetSet>
+						</DescribeSubnetsResponse>
+					`)),
+				},
+			},
+		}
+
+		metadata := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":    "my-lb",
+				"region":  "us-east-1",
+				"type":    LoadBalancerTypeApplication,
+				"scheme":  LoadBalancerSchemeInternetFacing,
+				"subnets": []string{"subnet-abc123", "subnet-def456"},
+			},
+			HTTP:     httpContext,
+			Metadata: metadata,
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("NLB with TCP listener and target group -> valid configuration", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
