@@ -34,6 +34,31 @@ var httpGet = func(rawURL string) (*http.Response, error) {
 	return client.Get(rawURL)
 }
 
+// fetchRawCanvasFile resolves the ref and downloads the raw canvas.yaml bytes.
+// It tries defaultRefs (main, master) when repo.Ref is empty. On success it
+// sets repo.Ref to the resolved ref and returns the raw YAML content.
+func fetchRawCanvasFile(repo *Repository) ([]byte, string, error) {
+	if repo.Ref == "" {
+		for _, ref := range defaultRefs {
+			body, fetchErr := fetchURL(rawFileURL(repo, ref, canvasFileName))
+			if fetchErr == nil {
+				repo.Ref = ref
+				return body, ref, nil
+			}
+			if !errors.Is(fetchErr, errFileNotFound) {
+				return nil, "", fetchErr
+			}
+		}
+		return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
+	}
+
+	body, err := fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
+	if err != nil {
+		return nil, "", err
+	}
+	return body, repo.Ref, nil
+}
+
 // FetchCanvas loads and parses canvas.yaml from a public GitHub repository.
 func FetchCanvas(repo *Repository) (*pb.Canvas, string, error) {
 	if repo.Ref == "" {
