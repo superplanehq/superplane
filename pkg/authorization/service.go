@@ -41,7 +41,7 @@ func NewAuthService() (*AuthService, error) {
 		return nil, fmt.Errorf("failed to load casbin model: %w", err)
 	}
 
-	adapter, err := gormadapter.NewTransactionalAdapterByDB(database.Conn())
+	adapter, err := newCasbinAdapter(database.Conn())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
@@ -126,12 +126,12 @@ func policyFiltersForDomain(domainType, domainID string) []gormadapter.Filter {
 }
 
 func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter.Filter) (casbin.IEnforcer, error) {
-	adapter, err := gormadapter.NewAdapterByDB(database.DB(ctx))
+	adapter, err := newCasbinFilteredAdapter(database.DB(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewEnforcer(a.casbinModel, adapter)
+	enforcer, err := casbin.NewEnforcer(a.casbinModel.Copy(), adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
