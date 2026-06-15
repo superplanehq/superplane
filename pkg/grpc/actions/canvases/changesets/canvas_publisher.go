@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -53,6 +54,7 @@ type CanvasPublisher struct {
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
+	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -212,9 +214,6 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		return nil
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
 	appInstallationID, err := p.getNodeIntegrationID(node)
 	if err != nil {
 		return err
@@ -301,9 +300,6 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 		return fmt.Errorf("node %s not found", updatedNode.ID)
 	}
 
-	//
-	// TODO: handle blueprint nodes once blueprints are enabled again
-	//
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
 	if err != nil {
 		return err
@@ -463,6 +459,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
+		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
 	}
 
 	if node.AppInstallationID != nil {

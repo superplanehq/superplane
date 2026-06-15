@@ -275,6 +275,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 								Required:    false,
 								Description: "JSON value Jira expects for that field",
 								Placeholder: `{"name":"High"}`,
+								TypeOptions: &configuration.TypeOptions{
+									Text: &configuration.TextTypeOptions{
+										Language: "json",
+									},
+								},
 							},
 						},
 					},

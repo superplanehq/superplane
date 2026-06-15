@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvasSummary } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { useCanvases, useCreateCanvas } from "@/hooks/useCanvasData";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
@@ -45,7 +45,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const [page, setPage] = useState<CommandPage>("root");
   const [search, setSearch] = useState("");
   const shortcutModifier = useShortcutModifierLabel();
-  const data = useCommandPaletteData(route.organizationId, route.canvasId, !!account);
+  const data = useCommandPaletteData(route.organizationId, route.canvasId);
   const closePalette = useClosePalette(setOpen, setPage, setSearch);
   const canvasNodeSearchProvider = useCanvasNodeSearchProvider();
   const navigation = usePaletteNavigation(closePalette, navigate);
@@ -96,7 +96,7 @@ type PaletteData = {
   canManageInviteLink: boolean;
   canReadCanvas: boolean;
   canUpdateCanvas: boolean;
-  canvases: CanvasesCanvas[];
+  canvases: CanvasesCanvasSummary[];
   canvasesLoading: boolean;
   createCanvasDisabled: boolean;
   createCanvasMutation: ReturnType<typeof useCreateCanvas>;
@@ -106,19 +106,15 @@ type PaletteData = {
   usageEnabled: boolean;
 };
 
-function useCommandPaletteData(
-  organizationId: string | null,
-  canvasId: string | null,
-  hasAccount: boolean,
-): PaletteData {
+function useCommandPaletteData(organizationId: string | null, canvasId: string | null): PaletteData {
   const queryOrganizationId = organizationId ?? "";
   const hasOrganization = organizationId !== null;
   const { data: organization } = useOrganization(queryOrganizationId);
   const { data: usageStatus, error: usageError } = useOrganizationUsage(queryOrganizationId, hasOrganization);
   const { data: canvases = [], isLoading: canvasesLoading } = useCanvases(queryOrganizationId);
-  const permissionState = usePalettePermissions(organizationId, hasAccount);
+  const permissionState = usePalettePermissions(organizationId);
   const createCanvasMutation = useCreateCanvas(queryOrganizationId);
-  const currentCanvas = canvases.find((canvas) => canvas.metadata?.id === canvasId);
+  const currentCanvas = canvases.find((canvas) => canvas.id === canvasId);
   const canCreateCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "create");
   const canManageInviteLink = canUsePermission(hasOrganization, permissionState.canAct, "members", "create");
   const canReadCanvas = canUsePermission(hasOrganization, permissionState.canAct, "canvases", "read");
@@ -150,8 +146,8 @@ function canUsePermission(
   return canAct(resource, action);
 }
 
-function currentCanvasNameFor(canvas: CanvasesCanvas | undefined) {
-  return canvas?.metadata?.name ?? "Current app";
+function currentCanvasNameFor(canvas: CanvasesCanvasSummary | undefined) {
+  return canvas?.name ?? "Current app";
 }
 
 function isUsageEnabled(enabled: boolean, error: unknown) {

@@ -1,7 +1,14 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
+
+# Auto-source local overrides from .env so host-side targets (e.g. profiling)
+# see the same values docker compose interpolates from it. Command-line
+# overrides still take precedence, and a missing .env file is ignored.
+-include .env
+export
+
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
@@ -165,12 +172,16 @@ check.db.structure:
 
 check.db.migrations:
 	bash ./scripts/verify_no_future_migrations.sh
+	bash ./scripts/verify_branch_migrations_are_latest.sh
 
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
 check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:coverage"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+
+check.test.ui.shard:
+	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
@@ -183,9 +194,6 @@ check.lint.ui.knip:
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
-
-check.templates:
-	$(COMPOSE) exec app go run ./scripts/check_canvases_templates/main.go
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
@@ -203,6 +211,19 @@ check.coverage.go:
 
 check.coverage.go.baseline.update:
 	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out --update-baseline
+
+#
+# Performance profiling against the running dev server (PPROF_ENABLED=yes).
+# See docs/contributing/profiling.md
+#
+profile.cpu:
+	$(COMPOSE) exec app go tool pprof -top "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/profile?seconds=$${SECONDS:-30}"
+
+profile.heap:
+	$(COMPOSE) exec app go tool pprof -top "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/heap"
+
+profile.goroutines:
+	$(COMPOSE) exec app curl -s "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/goroutine?debug=2"
 
 
 storybook:
@@ -273,8 +294,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents,usage
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,service_accounts,agents
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models

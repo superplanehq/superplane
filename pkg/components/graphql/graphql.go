@@ -198,6 +198,11 @@ func (e *GraphQL) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Placeholder: "query {\n  node {\n    id\n  }\n}",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "graphql",
+				},
+			},
 		},
 		{
 			Name:        "variables",

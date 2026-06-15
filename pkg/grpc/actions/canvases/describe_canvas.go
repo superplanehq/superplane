@@ -2,16 +2,16 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
 )
 
 func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
@@ -20,28 +20,25 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
+	orgID := uuid.MustParse(organizationID)
+	canvas, err := findCanvas(ctx, orgID, canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			template, templateErr := models.FindCanvasTemplate(canvasID)
-			if templateErr != nil {
-				return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-			}
-			canvas = template
-		} else {
-			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-		}
+		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
-		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		err = telemetry.RunSpan(ctx, "canvases.load_creator", func(ctx context.Context) error {
+			var loadErr error
+			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(database.DB(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
+			return loadErr
+		})
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	proto, err := SerializeCanvas(canvas, true, user)
+	proto, err := serializeCanvas(ctx, canvas, true, user)
 	if err != nil {
 		log.Errorf("failed to serialize canvas %s: %v", canvas.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to serialize workflow")

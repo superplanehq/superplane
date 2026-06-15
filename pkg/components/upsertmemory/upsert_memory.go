@@ -94,13 +94,13 @@ Always emits to the default channel. Check ` + "`data.operation`" + ` to know wh
 ## List Mode
 
 Enable "Input is a list" to iterate over a list expression and run one upsert per element.
-The ` + "`matchList`" + ` is evaluated once (same matches for every iteration), while each
-` + "`valueList`" + ` field value is evaluated per element with the iteration variable in scope
-(defaults to ` + "`item`" + `). All upserts are reported in a single ` + "`memory.upserted`" + ` event with per-item operation results.
+Both ` + "`matchList`" + ` and ` + "`valueList`" + ` field values are evaluated per element with the iteration
+variable in scope (defaults to ` + "`item`" + `), so expressions like ` + "`item.uuid`" + ` resolve to the current
+element's value on every iteration. This means each item upserts against its own matched row.
+All upserts are reported in a single ` + "`memory.upserted`" + ` event with per-item operation results.
 
-Note: when a non-empty ` + "`matchList`" + ` is configured in list mode, each iteration attempts to
-update the same matched rows. List mode is most useful for inserting multiple rows
-(empty ` + "`matchList`" + `) or when each item's values are meant to overwrite the matched rows.`
+To use a single global match across iterations, write a ` + "`{{ ... }}`" + ` template (resolved before
+iteration starts) instead of a bare expression.`
 }
 
 func (c *UpsertMemory) Icon() string {
@@ -132,7 +132,7 @@ func (c *UpsertMemory) Configuration() []configuration.Field {
 			Name:        "iterateList",
 			Label:       "Input is a list",
 			Type:        configuration.FieldTypeBool,
-			Description: "When enabled, iterate over a list expression and upsert once per element (matchList stays global)",
+			Description: "When enabled, iterate over a list expression and upsert once per element. Both matchList and valueList values are evaluated per element with the iteration variable in scope (e.g. item.uuid)",
 		},
 		{
 			Name:        "listSource",
@@ -304,8 +304,12 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return err
 	}
 
-	matches := buildPairs(spec.MatchList)
-	insertOnly := len(matches) == 0
+	insertOnly := len(memorywrite.FieldNames(spec.MatchList)) == 0
+
+	resolvedMatches, err := memorywrite.ResolveAllItemMatches(items, mode, spec.MatchList, ctx.Expressions)
+	if err != nil {
+		return err
+	}
 
 	resolved, err := memorywrite.ResolveAllItemValues(items, mode, spec.ValueList, ctx.Expressions)
 	if err != nil {
@@ -317,7 +321,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return fmt.Errorf("canvas memory record upsert operations are not supported")
 	}
 
-	return executeListModeWithRecords(ctx, spec, mode, recordCtx, matches, insertOnly, resolved)
+	return executeListModeWithRecords(ctx, spec, mode, recordCtx, resolvedMatches, insertOnly, resolved)
 }
 
 func executeListModeWithRecords(
@@ -325,7 +329,7 @@ func executeListModeWithRecords(
 	spec Spec,
 	mode memorywrite.ListMode,
 	upsertCtx canvasMemoryUpsertRecordsContext,
-	matches map[string]any,
+	resolvedMatches []map[string]any,
 	insertOnly bool,
 	resolved []map[string]any,
 ) error {
@@ -341,6 +345,11 @@ func executeListModeWithRecords(
 	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
 
+		var matches map[string]any
+		if i < len(resolvedMatches) {
+			matches = resolvedMatches[i]
+		}
+
 		operation, affected, upsertErr := upsertMemoryRecord(spec.Namespace, matches, values, upsertCtx, insertOnly)
 		if upsertErr != nil {
 			return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, upsertErr)
@@ -355,6 +364,7 @@ func executeListModeWithRecords(
 
 		itemResults = append(itemResults, map[string]any{
 			"operation": operation,
+			"matches":   matches,
 			"values":    values,
 			"records":   memorywrite.RecordValues(affected),
 		})
@@ -365,7 +375,6 @@ func executeListModeWithRecords(
 		"namespace":    spec.Namespace,
 		"matchFields":  memorywrite.FieldNames(spec.MatchList),
 		"valueFields":  memorywrite.FieldNames(spec.ValueList),
-		"matches":      matches,
 		"updatedCount": len(updatedRecords),
 		"createdCount": len(createdRecords),
 		"iterateList":  true,
@@ -384,7 +393,6 @@ func executeListModeWithRecords(
 			map[string]any{
 				"data": map[string]any{
 					"namespace": spec.Namespace,
-					"matches":   matches,
 					"values":    perItemValues,
 					"items":     itemResults,
 					"records":   recordValues,

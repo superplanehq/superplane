@@ -14,6 +14,7 @@ export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefi
       description: capability.description,
       configuration: capability.configuration,
       outputChannels: capability.outputChannels,
+      exampleOutput: capability.exampleOutput,
     }));
 }
 
@@ -25,6 +26,7 @@ export function triggersFromCapabilities(capabilities: IntegrationsCapabilityDef
       label: capability.label,
       description: capability.description,
       configuration: capability.configuration,
+      exampleData: capability.exampleData,
     }));
 }
 

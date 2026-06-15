@@ -25,11 +25,11 @@ type NodeConfigurationBuilder struct {
 	workflowID          uuid.UUID
 	nodeID              string
 	previousExecutionID *uuid.UUID
+	incomingEventID     *uuid.UUID
 	rootEventID         *uuid.UUID
 	rootPayload         any
 	input               any
 	expressionVariables map[string]any
-	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
 }
 
@@ -38,11 +38,6 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 		tx:         tx,
 		workflowID: workflowID,
 	}
-}
-
-func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.CanvasNode) *NodeConfigurationBuilder {
-	b.parentBlueprintNode = parentBlueprintNode
-	return b
 }
 
 func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationBuilder {
@@ -63,6 +58,11 @@ func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurati
 
 func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uuid.UUID) *NodeConfigurationBuilder {
 	b.previousExecutionID = previousExecutionID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithIncomingEventID(incomingEventID *uuid.UUID) *NodeConfigurationBuilder {
+	b.incomingEventID = incomingEventID
 	return b
 }
 
@@ -278,10 +278,6 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		"memory": b.buildMemoryExpressionNamespace(),
 	}
 
-	if b.parentBlueprintNode != nil {
-		env["config"] = normalizeExpressionValue(b.parentBlueprintNode.Configuration.Data())
-	}
-
 	for key, value := range variables {
 		if isReservedExpressionIdentifier(key) {
 			return "", fmt.Errorf("variable %q is reserved", key)
@@ -357,9 +353,38 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		if err != nil {
 			return nil, err
 		}
+
+		//
+		// listExecutionsInChain merges the current execution's linear lineage
+		// (walked via previous_execution_id) with every run-wide execution of
+		// upstream nodes. When the graph has a feedback cycle (e.g. a loop whose
+		// body points back at the loop), an upstream node has one execution per
+		// iteration, so the same name maps to many executions in the run. We must
+		// bind each name to the execution in the *current* lineage; otherwise
+		// expressions like a loop's until-condition would read a stale
+		// iteration's output. So a linear-chain execution always wins over a
+		// run-wide upstream match for the same node.
+		//
+		linearExecutions, err := b.listLinearExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		linearExecutionIDs := make(map[uuid.UUID]struct{}, len(linearExecutions))
+		for _, execution := range linearExecutions {
+			linearExecutionIDs[execution.ID] = struct{}{}
+		}
+
 		executionByNodeID = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 		for _, execution := range executionsInChain {
 			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+
+			if existing, ok := executionByNodeID[execution.NodeID]; ok {
+				_, existingIsLinear := linearExecutionIDs[existing.ID]
+				_, candidateIsLinear := linearExecutionIDs[execution.ID]
+				if existingIsLinear && !candidateIsLinear {
+					continue
+				}
+			}
 			executionByNodeID[execution.NodeID] = execution
 		}
 	}
@@ -436,6 +461,7 @@ func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any,
 			b.tx,
 			linearExecutions,
 			executionIDsFromExecutions(executionsInChain),
+			b.incomingEventID,
 		)
 		if err != nil {
 			return nil, err
@@ -811,6 +837,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		b.tx,
 		chainExecutions,
 		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+		b.incomingEventID,
 	)
 	if err != nil {
 		return err
@@ -943,6 +970,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		b.tx,
 		executionsInChain,
 		executionIDsFromExecutions(executionsInChain),
+		b.incomingEventID,
 	)
 	if err != nil {
 		return step, nil, err
@@ -1157,7 +1185,6 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 				root_event_id,
 				event_id,
 				previous_execution_id,
-				parent_execution_id,
 				state,
 				result,
 				result_reason,
@@ -1179,7 +1206,6 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 				wne.root_event_id,
 				wne.event_id,
 				wne.previous_execution_id,
-				wne.parent_execution_id,
 				wne.state,
 				wne.result,
 				wne.result_reason,

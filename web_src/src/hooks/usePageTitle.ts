@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 /**
  * usePageTitle
@@ -9,18 +9,17 @@ import { useEffect } from "react";
  * usePageTitle([workflow.name]) => "{workflow.name} · SuperPlane"
  */
 export function usePageTitle(parts: Array<string | undefined | null>) {
-  // Serialize to a stable string so the effect only fires when content
+  // Derive a stable title string so the effect only fires when the content
   // actually changes. Callers pass inline array literals whose reference
-  // changes every render.
-  const partsKey = JSON.stringify(parts);
+  // changes every render; the derived string stays stable across renders.
+  const title = useMemo(() => {
+    const cleaned = parts.filter((p): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim());
+    return [...cleaned, "SuperPlane"].join(" · ");
+  }, [parts]);
 
   useEffect(() => {
-    const cleaned = parts.filter((p): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim());
-
-    const segments = [...cleaned, "SuperPlane"];
-    document.title = segments.join(" · ");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on serialized value, not reference
-  }, [partsKey]);
+    document.title = title;
+  }, [title]);
 }
 
 export default usePageTitle;

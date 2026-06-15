@@ -18,6 +18,8 @@ export function SecondaryHeaderActions({
   saveIsPrimary,
   hasUnpublishedDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
   onShowDiff,
   onShowConsoleDiff,
   visualDiffEnabled,
@@ -32,6 +34,10 @@ export function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
   const onConsoleTab = mode === "console";
@@ -51,7 +57,9 @@ export function SecondaryHeaderActions({
 
       {isEditing ? (
         <>
-          {onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+          {onCanvasTab &&
+          (hasUnpublishedDraftChanges || hasUncommittedCanvasDraftChanges) &&
+          draftVisualDiff?.diffCounts ? (
             <DiffSummaryHoverCard
               diffCounts={draftVisualDiff.diffCounts}
               visualDiffEnabled={visualDiffEnabled}
@@ -60,7 +68,9 @@ export function SecondaryHeaderActions({
               onShowDiff={onShowDiff}
             />
           ) : null}
-          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+          {onConsoleTab &&
+          (hasUnpublishedConsoleDraftChanges || hasUncommittedConsoleDraftChanges) &&
+          draftConsoleDiff?.diffCounts ? (
             <ConsoleDiffSummaryHoverCard
               draftConsoleDiff={draftConsoleDiff}
               visualDiffEnabled={visualDiffEnabled}
@@ -69,7 +79,6 @@ export function SecondaryHeaderActions({
             />
           ) : null}
           <EditModePublishDiscardActions
-            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardVersion={onDiscardVersion}
             discardVersionDisabled={discardVersionDisabled}
             discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -77,6 +86,10 @@ export function SecondaryHeaderActions({
             publishVersionLabel={publishVersionLabel}
             publishVersionDisabled={publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+            hasStagingChanges={hasStagingChanges}
+            onCommitStaging={onCommitStaging}
+            commitStagingPending={commitStagingPending}
+            onResetStaging={onResetStaging}
           />
         </>
       ) : null}
@@ -119,7 +132,6 @@ function FilesHeaderActionsSlot({
 }
 
 function EditModePublishDiscardActions({
-  hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -127,9 +139,12 @@ function EditModePublishDiscardActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
 }: Pick<
   HeaderProps,
-  | "hasUnpublishedDraftChanges"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -137,13 +152,37 @@ function EditModePublishDiscardActions({
   | "publishVersionLabel"
   | "publishVersionDisabled"
   | "publishVersionDisabledTooltip"
+  | "hasStagingChanges"
+  | "onCommitStaging"
+  | "commitStagingPending"
+  | "onResetStaging"
 >) {
+  // Keep showing the staging controls while a commit is in flight even after
+  // `hasStagingChanges` optimistically flips false, so the commit button stays
+  // pending/disabled until staging settles and never flashes an enabled
+  // [Reset][Commit] (or a premature Discard/Publish).
+  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || !!commitStagingPending);
+
+  // Staging and committed states are mutually exclusive: while there are staged
+  // edits the user can only Reset/Commit them; once everything is committed they
+  // can Discard the draft or Publish it.
+  if (showStagingActions) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {onResetStaging ? (
+          <ResetStagingButton onReset={() => onResetStaging()} disabled={!!commitStagingPending} />
+        ) : null}
+        <CommitStagingButton onCommit={() => onCommitStaging?.()} pending={!!commitStagingPending} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5">
-      {hasUnpublishedDraftChanges ? (
+      {onDiscardVersion ? (
         <DiscardDraftButton
-          onDiscard={() => onDiscardVersion?.()}
-          disabled={discardVersionDisabled || !onDiscardVersion}
+          onDiscard={() => onDiscardVersion()}
+          disabled={!!discardVersionDisabled}
           disabledTooltip={discardVersionDisabledTooltip}
         />
       ) : null}
@@ -155,6 +194,45 @@ function EditModePublishDiscardActions({
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       />
     </div>
+  );
+}
+
+function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabled: boolean }) {
+  return (
+    <Tooltip delayDuration={2000}>
+      <TooltipTrigger asChild>
+        <UIButton
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
+          disabled={disabled}
+          data-testid="canvas-reset-staging-button"
+        >
+          Reset
+        </UIButton>
+      </TooltipTrigger>
+      <TooltipContent side="top">Reset to last commit</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// The label stays fixed (no "Committing…") so the button keeps a constant
+// width while a commit is in flight; the button is disabled instead to signal
+// the in-flight commit.
+function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
+  return (
+    <UIButton
+      type="button"
+      variant="default"
+      size="sm"
+      className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
+      onClick={onCommit}
+      disabled={pending}
+      data-testid="canvas-commit-staging-button"
+    >
+      Commit
+    </UIButton>
   );
 }
 

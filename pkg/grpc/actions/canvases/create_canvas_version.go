@@ -41,9 +41,6 @@ func CreateCanvasVersion(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
 
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion

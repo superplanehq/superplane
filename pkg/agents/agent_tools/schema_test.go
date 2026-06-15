@@ -34,6 +34,29 @@ func TestComponentSchemaAgentTool_ReturnsExactSlackSchema(t *testing.T) {
 	assert.NotContains(t, result.Notes, "Use output_channels.name exactly in edge sourceName values; labels are display-only.")
 }
 
+func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
+	tool := NewAppAgentTool(AppAgentToolOptions{})
+
+	schema := tool.InputSchema()
+	actionSchema := schema.Properties["action"]
+	resourceSchema := schema.Properties["resource"]
+
+	assert.Contains(t, actionSchema.Enum, "read_runtime")
+	assert.ElementsMatch(t, []string{
+		"memory",
+		"runs",
+		"canvas_events",
+		"event_executions",
+		"node_executions",
+		"node_queue_items",
+		"node_events",
+	}, resourceSchema.Enum)
+	assert.Contains(t, schema.Properties, "namespace")
+	assert.Contains(t, schema.Properties, "node_id")
+	assert.Contains(t, schema.Properties, "event_id")
+	assert.Contains(t, schema.Properties, "execution_id")
+}
+
 func TestComponentSchemaAgentTool_ReturnsCoreComponentSchema(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 

@@ -36,7 +36,9 @@ type Registry struct {
 // NewDefaultRegistry creates the standard superplane_app action registry.
 func NewDefaultRegistry(deps Dependencies) *Registry {
 	return NewRegistry(
-		readAction{},
+		newAccessAction(deps),
+		newReadAction(deps),
+		newReadRuntimeAction(deps),
 		newUpdateDraftAction(deps),
 		listIntegrationsAction{},
 	)

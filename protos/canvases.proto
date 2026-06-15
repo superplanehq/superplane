@@ -102,7 +102,19 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Commit canvas repository files";
-      description: "Commits file additions, updates, and deletions to the git repository attached to a canvas";
+      description: "Commits file additions, updates, and deletions directly to a canvas, discarding any existing draft staging for the target version in the same transaction";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc StageCanvasRepositoryFile(StageCanvasRepositoryFileRequest) returns (StageCanvasRepositoryFileResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/files"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Stage canvas repository file";
+      description: "Writes canvas.yaml/console.yaml edits to a draft version's staging layer without touching the version row";
       tags: "CanvasRepository";
     };
   }
@@ -184,6 +196,42 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Publish draft canvas version";
       description: "Publishes a user-owned draft canvas version directly to live";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DiscardCanvasStaging(DiscardCanvasStagingRequest) returns (DiscardCanvasStagingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/discard"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Discard canvas staging";
+      description: "Discards staged spec changes for a draft version; omit paths to discard all staged files";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc CommitCanvasStaging(CommitCanvasStagingRequest) returns (CommitCanvasStagingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/commit"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit canvas staging";
+      description: "Parses staged canvas.yaml and console.yaml into the draft version and clears staging";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc ApplyCanvasAutoLayout(ApplyCanvasAutoLayoutRequest) returns (ApplyCanvasAutoLayoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/auto-layout"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Apply canvas auto-layout";
+      description: "Lays out the staged canvas.yaml for a draft version and re-stages the positioned result";
       tags: "CanvasVersion";
     };
   }
@@ -348,18 +396,6 @@ service Canvases {
     };
   }
 
-  rpc ListChildExecutions(ListChildExecutionsRequest) returns (ListChildExecutionsResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/children"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List child executions for an execution";
-      description: "List child executions for an execution";
-      tags: "CanvasNodeExecution";
-    };
-  }
-
   rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel"
@@ -466,11 +502,10 @@ service Canvases {
 }
 
 message ListCanvasesRequest {
-  bool include_templates = 1;
 }
 
 message ListCanvasesResponse {
-  repeated Canvas canvases = 1;
+  repeated CanvasSummary canvases = 1;
 }
 
 message DescribeCanvasRequest {
@@ -582,6 +617,17 @@ message CommitCanvasRepositoryFilesResponse {
   string commit_sha = 1;
 }
 
+message StageCanvasRepositoryFileRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  // canvas.yaml/console.yaml additions, updates, or deletions to stage verbatim.
+  repeated CanvasRepositoryFileOperation operations = 3;
+}
+
+message StageCanvasRepositoryFileResponse {
+  StagingSummary staging_summary = 1;
+}
+
 message CreateCanvasVersionRequest {
   string canvas_id = 1;
   optional string display_name = 2;
@@ -611,8 +657,18 @@ message DescribeCanvasVersionRequest {
 }
 
 message DescribeCanvasVersionResponse {
-  // Version metadata only; workflow content is in canvas.yaml via the repository files API.
+  // Version metadata only; workflow content is read via the repository files API
+  // (use ?stage=true on the file GET to read effective staged content).
   CanvasVersion version = 1;
+  // Populated for draft versions to drive uncommitted/ready-to-publish indicators.
+  StagingSummary staging_summary = 2;
+}
+
+// StagingSummary reports the uncommitted spec edits held in workflow_staged_files for a draft version.
+message StagingSummary {
+  bool has_staging = 1;
+  repeated string staged_paths = 2;
+  optional string base_version_id = 3;
 }
 
 message ApplyCanvasVersionChangesetRequest {
@@ -650,6 +706,37 @@ message PublishCanvasVersionRequest {
 
 message PublishCanvasVersionResponse {
   CanvasVersion version = 1;
+}
+
+message DiscardCanvasStagingRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  // Optional per-file revert. When empty, all staged files are discarded.
+  repeated string paths = 3;
+}
+
+message DiscardCanvasStagingResponse {
+  StagingSummary staging_summary = 1;
+}
+
+message CommitCanvasStagingRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message CommitCanvasStagingResponse {
+  CanvasVersion version = 1;
+  StagingSummary staging_summary = 2;
+}
+
+message ApplyCanvasAutoLayoutRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  CanvasAutoLayout auto_layout = 3;
+}
+
+message ApplyCanvasAutoLayoutResponse {
+  StagingSummary staging_summary = 1;
 }
 
 message CreateCanvasChangeRequestRequest {
@@ -730,6 +817,23 @@ message UserRef {
   string name = 2;
 }
 
+message CanvasSummary {
+  message Node {
+    string id = 1;
+    Components.Position position = 2;
+  }
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  UserRef created_by = 7;
+  string folder_id = 8;
+  repeated Node nodes = 9;
+  repeated Components.Edge edges = 10;
+}
+
 message Canvas {
   message Metadata {
     string id = 1;
@@ -739,8 +843,7 @@ message Canvas {
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
-    bool is_template = 8;
-    string folder_id = 9;
+    string folder_id = 8;
   }
 
   message ChangeManagement {
@@ -925,18 +1028,9 @@ message ListNodeExecutionsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
-message ListChildExecutionsRequest {
-  string canvas_id = 1;
-  string execution_id = 2;
-}
-
-message ListChildExecutionsResponse {
-  repeated CanvasNodeExecution executions = 1;
-}
-
 //
 // More succint description of a canvas node execution.
-// No input, outputs, root event, children.
+// No input, outputs, or root event.
 // Used to embed execution information into other messages.
 //
 message CanvasNodeExecutionRef {
@@ -978,20 +1072,18 @@ message CanvasNodeExecution {
   string id = 1;
   string canvas_id = 2;
   string node_id = 3;
-  string parent_execution_id = 4;
-  string previous_execution_id = 5;
-  State state = 6;
-  Result result = 7;
-  ResultReason result_reason = 8;
-  string result_message = 9;
-  google.protobuf.Struct outputs = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  google.protobuf.Struct metadata = 13;
-  google.protobuf.Struct configuration = 14;
-  repeated CanvasNodeExecution child_executions = 15;
-  CanvasEvent root_event = 16;
-  UserRef cancelled_by = 17;
+  string previous_execution_id = 4;
+  State state = 5;
+  Result result = 6;
+  ResultReason result_reason = 7;
+  string result_message = 8;
+  google.protobuf.Struct outputs = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  google.protobuf.Struct metadata = 12;
+  google.protobuf.Struct configuration = 13;
+  CanvasEvent root_event = 14;
+  UserRef cancelled_by = 15;
 }
 
 message CanvasNodeQueueItem {

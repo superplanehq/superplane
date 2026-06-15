@@ -7,7 +7,15 @@ import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type HeaderMode =
+  | "default"
+  | "version-live"
+  | "version-edit"
+  | "runs"
+  | "versions"
+  | "console"
+  | "memory"
+  | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
@@ -40,6 +48,13 @@ export interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  /** True when the active draft has uncommitted staged spec edits (shows Commit/Reset). */
+  hasStagingChanges?: boolean;
+  /** Commit staged canvas.yaml/console.yaml into the draft version row. */
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  /** Discard staged edits, reverting to the last committed draft. */
+  onResetStaging?: () => void;
   mode?: HeaderMode;
   /** When true, the canvas draft is active regardless of the current Console / Canvas / Memory tab. */
   isEditing?: boolean;
@@ -52,6 +67,8 @@ export interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
+  /** Provided when Versions is available as a first-class tab; opens the Versions view. */
+  onSelectVersions?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
@@ -66,6 +83,17 @@ export interface HeaderProps {
   hasUnpublishedCanvasDraftChanges?: boolean;
   /** Draft indicator for the Console tab when console changes exist. */
   hasUnpublishedConsoleDraftChanges?: boolean;
+  /** Draft indicator for the Files tab when a non-spec repository file is staged. */
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
@@ -120,6 +148,32 @@ export function Header(props: HeaderProps) {
   );
 }
 
+interface PageHeaderBarProps {
+  organizationId?: string;
+  headerTitle: string;
+  showCanvasSettingsMenu?: boolean;
+  mode?: HeaderMode;
+  isEditing?: boolean;
+  hasUnpublishedDraftChanges?: boolean;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onDiscardDraftAndStartEdit?: () => void;
+  unpublishedDraftUpdatedAt?: string;
+  startEditingDrafts?: CanvasesCanvasVersion[];
+  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
+}
+
 function PageHeader({
   organizationId,
   headerTitle,
@@ -144,31 +198,7 @@ function PageHeader({
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
-}: {
-  organizationId?: string;
-  headerTitle: string;
-  showCanvasSettingsMenu?: boolean;
-  mode?: HeaderMode;
-  isEditing?: boolean;
-  hasUnpublishedDraftChanges?: boolean;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  unpublishedDraftUpdatedAt?: string;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
-}) {
+}: PageHeaderBarProps) {
   const {
     workflowId,
     canvasId: canvasIdParam,
@@ -218,7 +248,7 @@ function PageHeader({
             />
           </div>
         ) : null}
-        {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
+        {!isEditing && mode !== "versions" && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -244,6 +274,8 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? props.mode === "version-edit";
+  const editTabTone =
+    props.editTabTone ?? (editing ? (props.hasUncommittedDraftChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
@@ -255,12 +287,18 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onSelectCanvasView}
+              onSelectVersions={props.onSelectVersions}
               onSelectConsole={props.onSelectConsole}
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
-              hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
-              hasConsoleDraft={!!props.hasUnpublishedConsoleDraftChanges}
+              hasCanvasUncommitted={!!props.hasUncommittedCanvasDraftChanges}
+              hasCanvasCommitted={!!props.hasCommittedCanvasDraftChanges}
+              hasConsoleUncommitted={!!props.hasUncommittedConsoleDraftChanges}
+              hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
+              hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
+              hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
+              editTabTone={editTabTone}
             />
           ) : null}
         </div>
@@ -272,7 +310,7 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (!props.onSelectConsole && !props.onSelectMemory && !props.onSelectFiles) {
+  if (!props.onSelectConsole && !props.onSelectVersions && !props.onSelectMemory && !props.onSelectFiles) {
     return false;
   }
 
@@ -283,7 +321,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
   return (
     mode === "version-live" ||
     mode === "version-edit" ||
-    mode === "runs" ||
+    mode === "versions" ||
     mode === "console" ||
     mode === "memory" ||
     mode === "files"
@@ -291,7 +329,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "runs" || mode === "console" || mode === "memory" || mode === "files") {
+  if (mode === "versions" || mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 

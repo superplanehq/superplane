@@ -29,7 +29,7 @@ func updateConsoleFromProto(
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	modelLayout := deserializeConsoleLayout(layout)
-	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout)
+	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout, false)
 }
 
 func Test__UpdateConsole(t *testing.T) {
@@ -56,20 +56,6 @@ func Test__UpdateConsole(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-	})
-
-	t.Run("template canvas is read-only", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		require.NoError(t, database.Conn().Model(&models.Canvas{}).
-			Where("id = ?", canvas.ID).
-			Update("is_template", true).Error)
-
-		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
-			{Id: "a", Type: "markdown"},
-		}, []*pb.Console_LayoutItem{{I: "a", X: 0, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
 	})
 
 	t.Run("panel content must be an object", func(t *testing.T) {

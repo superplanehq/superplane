@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -22,20 +21,14 @@ import (
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
 
 type Service struct {
-	provider  Provider
-	auth      authorization.Authorization
-	jwtSigner *jwt.Signer
-	baseURL   string
-	clock     func() time.Time
+	provider Provider
+	auth     authorization.Authorization
 }
 
-func NewService(provider Provider, auth authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) *Service {
+func NewService(provider Provider, auth authorization.Authorization) *Service {
 	return &Service{
-		provider:  provider,
-		auth:      auth,
-		jwtSigner: jwtSigner,
-		baseURL:   baseURL,
-		clock:     time.Now,
+		provider: provider,
+		auth:     auth,
 	}
 }
 
@@ -114,15 +107,70 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
+// InterruptSession resets local state first and treats the provider call
+// as best-effort: the worker checks status per event, so flipping to idle
+// before the provider HTTP roundtrip lets late SSE events get dropped
+// during the network wait instead of after.
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+
+	closeOpenToolsForSession(sessionID)
+
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle); err != nil {
+		return fmt.Errorf("mark session idle: %w", err)
+	}
+
+	if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "turn_completed",
+		Status:    models.AgentSessionStatusIdle,
+	}); err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish status event")
+	}
+
+	// Best-effort: any provider error still leaves the row at idle so the
+	// stop button can't leave the UI gated; SendMessage's recovery paths
+	// reconcile on the next turn.
 	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
-		return fmt.Errorf("interrupt: %w", err)
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			log.WithField("session_id", sessionID).Info("interrupt: provider session unavailable, local reset already done")
+		} else {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: provider returned error, local reset already done")
+		}
 	}
 	return nil
+}
+
+// closeOpenToolsForSession mirrors agent_stream_worker.closeOpenTools;
+// duplicated to avoid a workers → agents → workers import cycle.
+func closeOpenToolsForSession(sessionID uuid.UUID) {
+	closed, err := models.CloseOpenToolMessages(sessionID)
+	if err != nil {
+		log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to close open tools")
+		return
+	}
+	for i := range closed {
+		row := &closed[i]
+		if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+			SessionID: sessionID.String(),
+			Event:     "tool_finished",
+			MessageID: row.ID.String(),
+			Message: &messages.AgentMessage{
+				ID:         row.ID.String(),
+				Role:       row.Role,
+				Content:    row.Content,
+				ToolCallID: row.ToolCallID,
+				ToolName:   row.ToolName,
+				ToolStatus: row.ToolStatus,
+				CreatedAt:  row.CreatedAt,
+			},
+		}); err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("interrupt: failed to publish tool_finished")
+		}
+	}
 }
 
 func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
@@ -130,11 +178,11 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
-
-	preamble, err := s.buildPreamble(session, organizationID, userID, ModeBuilder)
-	if err != nil {
-		return fmt.Errorf("build preamble: %w", err)
+	if session.Status == models.AgentSessionStatusStreaming {
+		return s.handleBusySession(sessionID, organizationID, userID)
 	}
+
+	preamble := s.buildPreamble(session, ModeBuilder)
 
 	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
 		Description:     description,
@@ -142,7 +190,31 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		MaxIterations:   maxIterations,
 		ContextPreamble: preamble,
 	}); err != nil {
-		return fmt.Errorf("define outcome: %w", err)
+		if errors.Is(err, ErrSessionBusy) {
+			return s.handleBusySession(sessionID, organizationID, userID)
+		}
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			recovered, recoverErr := s.recoverProviderSession(ctx, session)
+			if recoverErr != nil {
+				if errors.Is(recoverErr, ErrSessionBusy) {
+					return s.handleBusySession(sessionID, organizationID, userID)
+				}
+				return recoverErr
+			}
+			if err := s.provider.DefineOutcome(ctx, recovered.ProviderSessionID, DefineOutcomeOptions{
+				Description:     description,
+				Rubric:          rubric,
+				MaxIterations:   maxIterations,
+				ContextPreamble: preamble,
+			}); err != nil {
+				if errors.Is(err, ErrSessionBusy) {
+					return s.handleBusySession(sessionID, organizationID, userID)
+				}
+				return fmt.Errorf("define outcome after provider session recovery: %w", err)
+			}
+		} else {
+			return fmt.Errorf("define outcome: %w", err)
+		}
 	}
 
 	// Mark session as streaming and start the stream worker to pick up events
@@ -170,14 +242,30 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		agentMode = NormalizeMode(mode[0])
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
-	if err != nil {
-		return nil, fmt.Errorf("build preamble: %w", err)
-	}
+	preamble := s.buildPreamble(session, agentMode)
 
 	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		return nil, fmt.Errorf("forward to provider: %w", err)
+		if errors.Is(err, ErrSessionBusy) {
+			return nil, s.handleBusySession(sessionID, organizationID, userID)
+		}
+		if errors.Is(err, ErrProviderSessionUnavailable) {
+			recovered, recoverErr := s.recoverProviderSession(ctx, session)
+			if recoverErr != nil {
+				if errors.Is(recoverErr, ErrSessionBusy) {
+					return nil, s.handleBusySession(sessionID, organizationID, userID)
+				}
+				return nil, recoverErr
+			}
+			if err := s.provider.SendMessage(ctx, recovered.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+				if errors.Is(err, ErrSessionBusy) {
+					return nil, s.handleBusySession(sessionID, organizationID, userID)
+				}
+				return nil, fmt.Errorf("send message after provider session recovery: %w", err)
+			}
+		} else {
+			_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+			return nil, fmt.Errorf("forward to provider: %w", err)
+		}
 	}
 
 	messageRole := models.AgentMessageRoleUser
@@ -203,24 +291,133 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode Mode) (string, error) {
-	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
-	if err != nil {
-		return "", err
+func (s *Service) handleBusySession(sessionID, organizationID, userID uuid.UUID) error {
+	if err := s.enqueueStreamAfterBusySession(sessionID, organizationID, userID); err != nil {
+		return err
 	}
+	return ErrSessionBusy
+}
+
+func (s *Service) enqueueStreamAfterBusySession(sessionID, organizationID, userID uuid.UUID) error {
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
+		return fmt.Errorf("mark busy agent session as streaming: %w", err)
+	}
+	return s.enqueueStream(sessionID, organizationID, userID)
+}
+
+func (s *Service) recoverProviderSession(ctx context.Context, stale *models.AgentSession) (*models.AgentSession, error) {
+	target, err := s.providerSessionRecoveryTarget(stale)
+	if err != nil {
+		return nil, fmt.Errorf("recover provider session: %w", err)
+	}
+	if target.recovered != nil {
+		return target.recovered, nil
+	}
+
+	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
+		Title: sessionTitle(target.organizationID, target.canvasID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("recover provider session: create provider session: %w", err)
+	}
+
+	recovered, err := s.installRecoveredProviderSession(stale, upstream.ProviderSessionID)
+	if err != nil {
+		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
+		return nil, fmt.Errorf("recover provider session: %w", err)
+	}
+	if recovered.ProviderSessionID != upstream.ProviderSessionID {
+		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
+	}
+	return recovered, nil
+}
+
+type providerSessionRecoveryTarget struct {
+	organizationID uuid.UUID
+	canvasID       uuid.UUID
+	recovered      *models.AgentSession
+}
+
+func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession) (*providerSessionRecoveryTarget, error) {
+	target := &providerSessionRecoveryTarget{}
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockAgentSessionInTransaction(tx, stale.ID)
+		if err != nil {
+			return err
+		}
+		if locked.Status == models.AgentSessionStatusStreaming {
+			return ErrSessionBusy
+		}
+		if locked.ProviderSessionID != stale.ProviderSessionID {
+			target.recovered = locked
+			return nil
+		}
+
+		target.organizationID = locked.OrganizationID
+		target.canvasID = locked.CanvasID
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return target, nil
+}
+
+func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, providerSessionID string) (*models.AgentSession, error) {
+	var recovered *models.AgentSession
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockAgentSessionInTransaction(tx, stale.ID)
+		if err != nil {
+			return err
+		}
+		if locked.Status == models.AgentSessionStatusStreaming {
+			return ErrSessionBusy
+		}
+		if locked.ProviderSessionID != stale.ProviderSessionID {
+			recovered = locked
+			return nil
+		}
+
+		if err := models.UpdateAgentSessionProviderSessionInTransaction(
+			tx,
+			locked.ID,
+			providerSessionID,
+			models.AgentSessionStatusIdle,
+		); err != nil {
+			return err
+		}
+		locked.ProviderSessionID = providerSessionID
+		locked.Status = models.AgentSessionStatusIdle
+		recovered = locked
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return recovered, nil
+}
+
+func (s *Service) cleanupProviderSession(ctx context.Context, providerSessionID string) {
+	cleaner, ok := s.provider.(ProviderSessionCleaner)
+	if !ok {
+		return
+	}
+	if err := cleaner.DeleteSession(ctx, providerSessionID); err != nil {
+		log.WithError(err).WithField("provider_session_id", providerSessionID).Warn("failed to clean up unused recovered provider session")
+	}
+}
+
+func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
-		s.baseURL,
-		token,
-		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
 	canvasSnapshot := buildCanvasSnapshot(session)
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -241,27 +438,6 @@ func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) err
 	})
 	log.WithError(err).Error("failed to enqueue agent stream request")
 	return fmt.Errorf("enqueue stream: %w", err)
-}
-
-// mintAgentToken returns a JWT scoped to one canvas to bound the blast-
-// radius if it leaks out of the agent container.
-func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (string, time.Time, error) {
-	claims := jwt.ScopedTokenClaims{
-		Subject: userID,
-		OrgID:   organizationID,
-		Purpose: "agent-builder",
-		Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
-			{ResourceType: "org", Action: "read"},
-			{ResourceType: "integrations", Action: "read"},
-			{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-			{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
-		}),
-	}
-	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("mint agent token: %w", err)
-	}
-	return token, s.clock().Add(agentTokenTTL), nil
 }
 
 // checkAgentPermission enforces the org-level baseline. Per-canvas access is
@@ -328,11 +504,12 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		result := "[Draft Status]\n"
 		for _, draft := range drafts {
 			result += fmt.Sprintf(
-				"- Active draft: version %s (created %s)\n",
+				"- Existing draft: version %s (created %s)\n",
 				draft.ID.String(),
 				draftCreatedAt(draft),
 			)
 		}
+		result += "These drafts may belong to other sessions or users. To make changes, use 'superplane_app' action 'update_draft'; it automatically targets your own private draft, creating one from the live version if needed. Do not assume an unrelated draft is yours.\n"
 		return result
 	}
 

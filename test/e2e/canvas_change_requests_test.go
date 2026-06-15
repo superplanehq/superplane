@@ -22,6 +22,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Open")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop A", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -35,6 +36,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Publish")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Publish", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -50,6 +52,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Reject")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Reject", models.Position{X: 500, Y: 220})
+		steps.commitStagedDraftChanges()
 		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
@@ -95,25 +98,7 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
+	s.canvas.EnterEditMode()
 }
 
 // headerProposeChangeButton matches the Propose Change button in the canvas header.
@@ -126,6 +111,12 @@ func (s *canvasChangeRequestSteps) headerProposeChangeButton() pw.Locator {
 func (s *canvasChangeRequestSteps) addNoopNode(name string, pos models.Position) {
 	s.canvas.AddNoop(name, pos)
 	s.session.AssertText(name)
+}
+
+func (s *canvasChangeRequestSteps) commitStagedDraftChanges() {
+	s.canvas.ClickOnEmptyCanvasArea()
+	s.canvas.WaitForStagingOnCurrentDraft()
+	s.canvas.CommitStaging()
 }
 
 func (s *canvasChangeRequestSteps) waitForProposeChangeReady() {
@@ -177,15 +168,11 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.canvas.OpenVersionsSidebar()
 
-	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
-	// accessible-name collisions between pending and live preview rows or on :has() CSS support.
-	// "View Diff" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
 	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
 	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
-	viewDiff := previewRow.Locator(`[aria-label="View Diff"]`)
+	viewDiff := previewRow.First().Locator(`[aria-label="View Diff"]`)
 	require.NoError(s.t, viewDiff.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
 	require.NoError(s.t, viewDiff.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 

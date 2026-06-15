@@ -10,7 +10,7 @@ import (
 )
 
 type getCommand struct {
-	draft *bool
+	draftID *string
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -33,10 +33,15 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	useDraft := c.draft != nil && *c.draft
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+
+	useDraft := draftID != ""
 	versionID := ""
 	if useDraft {
-		versionID, err = resolveCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
 		if err != nil {
 			return err
 		}
@@ -94,28 +99,4 @@ func lookupCanvasName(ctx core.CommandContext, canvasID string) (string, error) 
 		return "", fmt.Errorf("canvas %q not found", canvasID)
 	}
 	return response.Canvas.Metadata.GetName(), nil
-}
-
-// resolveCurrentUserDraftVersionID returns the id of the current user's
-// existing draft version. Unlike the canvas update flow we do not create
-// a draft on read: an absent draft is an error so users get an immediate
-// signal that there is nothing to read yet.
-func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-	currentUserID := strings.TrimSpace(me.User.GetId())
-	if currentUserID == "" {
-		return "", fmt.Errorf("current user id not found")
-	}
-
-	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", fmt.Errorf("draft version not found for current user")
-	}
-	return versionID, nil
 }

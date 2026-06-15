@@ -30,7 +30,7 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	workflowNode, err := models.FindCanvasNode(database.Conn(), wfID, nodeID)
+	_, err = models.FindCanvasNode(database.Conn(), wfID, nodeID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas node not found")
@@ -65,7 +65,7 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutionsForSingleNode(workflowNode, executions)
+	serialized, err := SerializeNodeExecutions(executions)
 	if err != nil {
 		return nil, err
 	}
@@ -78,20 +78,7 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeExecutionsForSingleNode(node *models.CanvasNode, executions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
-	if node.Type != models.NodeTypeBlueprint {
-		return SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
-	}
-
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(executions))
-	if err != nil {
-		return nil, err
-	}
-
-	return SerializeNodeExecutions(executions, childExecutions)
-}
-
-func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecutions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
+func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
 	var rootEvents, outputEvents []models.CanvasEvent
 	var rootEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
@@ -189,11 +176,10 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			return nil, err
 		}
 
-		pbExecution := &pb.CanvasNodeExecution{
+		result = append(result, &pb.CanvasNodeExecution{
 			Id:                  execution.ID.String(),
 			CanvasId:            execution.WorkflowID.String(),
 			NodeId:              execution.NodeID,
-			ParentExecutionId:   execution.GetParentExecutionID(),
 			PreviousExecutionId: execution.GetPreviousExecutionID(),
 			State:               NodeExecutionStateToProto(execution.State),
 			Result:              NodeExecutionResultToProto(execution.Result),
@@ -206,35 +192,10 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
-		}
-
-		if len(childExecutions) == 0 {
-			result = append(result, pbExecution)
-			continue
-		}
-
-		children := filterChildrenForParent(execution.ID, childExecutions)
-		childExecutions, err := SerializeNodeExecutions(children, []models.CanvasNodeExecution{})
-		if err != nil {
-			return nil, err
-		}
-
-		pbExecution.ChildExecutions = append(pbExecution.ChildExecutions, childExecutions...)
-		result = append(result, pbExecution)
+		})
 	}
 
 	return result, nil
-}
-
-func filterChildrenForParent(parentExecutionID uuid.UUID, childExecutions []models.CanvasNodeExecution) []models.CanvasNodeExecution {
-	children := []models.CanvasNodeExecution{}
-	for _, child := range childExecutions {
-		if child.ParentExecutionID.String() == parentExecutionID.String() {
-			children = append(children, child)
-		}
-	}
-
-	return children
 }
 
 func validateExecutionStates(in []pb.CanvasNodeExecution_State) ([]string, error) {

@@ -15,13 +15,23 @@ function makePublishedVersion(id: string): CanvasesCanvasVersion {
   };
 }
 
+function makePendingApprovalVersion(id: string): CanvasesCanvasVersion {
+  return {
+    metadata: {
+      id,
+      owner: { name: "Alice" },
+      createdAt: "2026-05-19T12:00:00Z",
+      state: "STATE_DRAFT",
+    },
+  };
+}
+
 describe("VersionsTabPanel", () => {
   it("shows the empty state when there is no published history", () => {
     render(
       <VersionsTabPanel
         liveVersions={[]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -39,7 +49,6 @@ describe("VersionsTabPanel", () => {
         liveCanvasVersionId="version-2"
         liveVersions={[makePublishedVersion("version-2"), makePublishedVersion("version-1")]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -63,7 +72,6 @@ describe("VersionsTabPanel", () => {
         selectedCanvasVersion={null}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -79,7 +87,6 @@ describe("VersionsTabPanel", () => {
         selectedCanvasVersion={makePublishedVersion("version-9")}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
         onVersionNodeDiffContextChange={vi.fn()}
@@ -99,7 +106,6 @@ describe("VersionsTabPanel", () => {
       liveCanvasVersionId: "version-12",
       liveVersions,
       canUpdateCanvas: true,
-      isTemplate: false,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
       onVersionNodeDiffContextChange: vi.fn(),
@@ -117,6 +123,31 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
   });
 
+  it("shows View Diff for pending change requests before live history loads", () => {
+    const liveCanvasVersion = makePublishedVersion("live-version");
+    const pendingVersion = makePendingApprovalVersion("pending-version");
+
+    render(
+      <VersionsTabPanel
+        liveCanvasVersionId="live-version"
+        liveCanvasVersion={liveCanvasVersion}
+        liveVersions={[]}
+        pendingApprovalVersions={[
+          {
+            version: pendingVersion,
+            changeRequest: { metadata: { id: "cr-1", title: "Pending change" } },
+          },
+        ]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onVersionNodeDiffContextChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("View Diff")).toBeInTheDocument();
+  });
+
   it("loads older versions when the sidebar scroll reaches the end", () => {
     const onLoadMoreLiveVersions = vi.fn();
     const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];
@@ -125,7 +156,6 @@ describe("VersionsTabPanel", () => {
       selectedCanvasVersion: null,
       liveVersions,
       canUpdateCanvas: true,
-      isTemplate: false,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
       onVersionNodeDiffContextChange: vi.fn(),

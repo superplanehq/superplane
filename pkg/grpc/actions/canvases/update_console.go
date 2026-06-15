@@ -23,6 +23,7 @@ func UpdateConsole(
 	versionID string,
 	modelPanels []models.ConsolePanel,
 	modelLayout []models.ConsoleLayoutItem,
+	discardStaging bool,
 ) (*models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
@@ -46,10 +47,6 @@ func UpdateConsole(
 			return nil, status.Error(codes.NotFound, "canvas not found")
 		}
 		return nil, status.Error(codes.Internal, "failed to load canvas")
-	}
-
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	if err := validateConsoleInput(modelPanels, modelLayout); err != nil {
@@ -81,6 +78,11 @@ func UpdateConsole(
 		}
 
 		newVersion = v
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
 		return nil
 	})
 

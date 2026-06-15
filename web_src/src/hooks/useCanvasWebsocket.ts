@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -8,6 +8,15 @@ import type {
   CanvasesCanvasRun,
 } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import {
+  parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoInfiniteEventsData,
+  upsertExecutionIntoInfiniteRunsData,
+  upsertRootEventIntoInfiniteData,
+  upsertRunIntoInfiniteData,
+  type InfiniteEventsPage,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
 import { canvasKeys } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
@@ -18,6 +27,8 @@ type CanvasWebsocketPayload = {
 };
 
 type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
+
+type CanvasStagingEventName = "staging_updated";
 
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
@@ -34,6 +45,20 @@ interface QueuedMessage {
   timestamp: number;
 }
 
+// Refreshes the staged caches for a draft version. versionStagedDetail,
+// consoleStaged and staged repositoryFileContent keys all end with "staged" and
+// include the version id, so a single predicate refreshes the editor's
+// effective draft reads without touching the committed caches.
+function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
+  queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey;
+      return Array.isArray(key) && key[key.length - 1] === "staged" && (key as readonly unknown[]).includes(versionId);
+    },
+  });
+}
+
 export function useCanvasWebsocket(
   canvasId: string,
   organizationId: string,
@@ -44,6 +69,7 @@ export function useCanvasWebsocket(
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
+  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -52,12 +78,62 @@ export function useCanvasWebsocket(
   const messageQueues = useRef<Map<string, QueuedMessage[]>>(new Map());
   const processingNodes = useRef<Set<string>>(new Set());
 
+  const hasConnectedOnce = useRef(false);
+
+  const patchRunInCache = useCallback(
+    (run: CanvasesCanvasRun) => {
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
+
+        const filters = parseRunsFiltersFromQueryKey(queryKey);
+        const next = upsertRunIntoInfiniteData(data, run, filters);
+        if (next !== data) {
+          queryClient.setQueryData(queryKey, next);
+        }
+      }
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchRootEventInCache = useCallback(
+    (event: CanvasesCanvasEvent) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertRootEventIntoInfiniteData(old, event),
+      );
+    },
+    [queryClient, canvasId],
+  );
+
+  const patchExecutionInCache = useCallback(
+    (execution: CanvasesCanvasNodeExecution) => {
+      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
+        { queryKey: canvasKeys.infiniteEvents(canvasId) },
+        (old) => upsertExecutionIntoInfiniteEventsData(old, execution),
+      );
+      queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
+        { queryKey: canvasKeys.infiniteRuns(canvasId) },
+        (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
+      );
+    },
+    [queryClient, canvasId],
+  );
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
       const isCanvasLifecycleEvent =
         data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
-      if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
+      // Staging events fire while editing a draft (not the live version), so they
+      // must bypass the runtime-event gate that is disabled outside the live view.
+      const isCanvasStagingEvent = data.event === "staging_updated";
+      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -69,13 +145,11 @@ export function useCanvasWebsocket(
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
 
             /*
-             * We only invalidate the canvas root events query
-             * if the event being received is a root canvas event.
+             * Root canvas events are upserted into the infinite events cache
+             * instead of triggering a refetch.
              */
             if (workflowEvent.root) {
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
+              patchRootEventInCache(workflowEvent);
             }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
@@ -88,20 +162,9 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const execution = payload as CanvasesCanvasNodeExecution;
             if (execution.nodeId) {
-              const storeNodeId =
-                execution.parentExecutionId && execution.nodeId.includes(":")
-                  ? execution.nodeId.split(":")[0]
-                  : execution.nodeId;
+              nodeExecutionStore.updateNodeExecution(execution.nodeId, execution);
 
-              nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteEvents(canvasId),
-              });
-
-              queryClient.invalidateQueries({
-                queryKey: canvasKeys.infiniteRuns(canvasId),
-              });
+              patchExecutionInCache(execution);
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -136,9 +199,7 @@ export function useCanvasWebsocket(
             break;
           }
 
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.infiniteRuns(canvasId),
-          });
+          patchRunInCache(run);
           break;
         }
         case "canvas_updated":
@@ -184,6 +245,22 @@ export function useCanvasWebsocket(
           queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
           break;
         }
+        case "staging_updated": {
+          // A draft's staging layer changed in another tab (or this one). Refresh
+          // the staged caches so the diff badge, console and files tabs reflect
+          // the uncommitted changes.
+          const stagingMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId || !stagingMessage.versionId) {
+            break;
+          }
+
+          const shouldInvalidateStagingQueries =
+            onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
+          if (shouldInvalidateStagingQueries) {
+            invalidateStagedCanvasQueries(queryClient, canvasId, stagingMessage.versionId);
+          }
+          break;
+        }
         default:
           break;
       }
@@ -196,9 +273,13 @@ export function useCanvasWebsocket(
       onWorkflowEvent,
       onExecutionEvent,
       onCanvasLifecycleEvent,
+      onCanvasStagingEvent,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
       organizationId,
+      patchRunInCache,
+      patchRootEventInCache,
+      patchExecutionInCache,
     ],
   );
 
@@ -250,13 +331,6 @@ export function useCanvasWebsocket(
         let nodeId: string | undefined;
         if (payload && "nodeId" in payload && payload.nodeId) {
           nodeId = payload.nodeId as string;
-
-          // For child executions, use parent nodeId for queuing
-          if (data.event.startsWith("execution_") && "parentExecutionId" in payload && payload.parentExecutionId) {
-            if (nodeId.includes(":")) {
-              nodeId = nodeId.split(":")[0];
-            }
-          }
         }
 
         if (!nodeId) {
@@ -285,6 +359,20 @@ export function useCanvasWebsocket(
     [processMessage, processQueue],
   );
 
+  const handleWebSocketOpen = useCallback(() => {
+    if (!hasConnectedOnce.current) {
+      hasConnectedOnce.current = true;
+      return;
+    }
+
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteEvents(canvasId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   // Cleanup on unmount
   useEffect(() => {
     const queues = messageQueues.current;
@@ -302,7 +390,7 @@ export function useCanvasWebsocket(
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
       reconnectInterval: 3000,
-      onOpen: () => {},
+      onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
       share: false,

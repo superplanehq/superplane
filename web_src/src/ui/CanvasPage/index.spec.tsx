@@ -6,7 +6,7 @@ import type { BlockData } from "./Block";
 
 const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
-  fitViewMock: vi.fn(),
+  fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
@@ -180,6 +180,7 @@ describe("CanvasPage connection drop", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
     fitViewMock.mockClear();
+    fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
@@ -285,7 +286,7 @@ describe("CanvasPage connection drop", () => {
     });
   });
 
-  it("creates a starter placeholder when the add component button is clicked", async () => {
+  it("opens the building blocks sidebar without creating a placeholder when the add component button is clicked", async () => {
     const onPlaceholderAdd = vi.fn(
       async (_data: { position: { x: number; y: number }; sourceNodeId?: string; sourceHandleId?: string | null }) =>
         "placeholder-starter",
@@ -311,14 +312,8 @@ describe("CanvasPage connection drop", () => {
       fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
-    expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
-    const payload = onPlaceholderAdd.mock.calls[0]?.[0];
-    expect(payload).toBeDefined();
-    expect(payload).toMatchObject({
-      position: { x: expect.any(Number), y: expect.any(Number) },
-    });
-    expect(payload?.sourceNodeId).toBeUndefined();
-    expect(payload?.sourceHandleId).toBeUndefined();
+    expect(onPlaceholderAdd).not.toHaveBeenCalled();
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
   it("opens the canvas YAML modal without switching to the Files tab", async () => {
@@ -421,124 +416,5 @@ describe("CanvasPage connection drop", () => {
     );
 
     await waitFor(() => expect(loadSidebarData).toHaveBeenCalledWith("node-1"));
-  });
-
-  it("does not re-run fit all when only run canvas nodes change", () => {
-    vi.useFakeTimers();
-    const hasFitToViewRef = { current: true };
-    getNodesMock.mockReturnValue([
-      {
-        id: "run-node-1",
-        position: { x: 0, y: 0 },
-      },
-    ]);
-
-    const { rerender } = render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="runs"
-          nodes={[
-            {
-              id: "run-node-1",
-              position: { x: 0, y: 0 },
-              data: {
-                label: "Run 1",
-                state: "pending",
-                type: "component",
-              },
-            },
-          ]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="live-version"
-          hasFitToViewRef={hasFitToViewRef}
-          fitAllRequest={0}
-        />
-      </MemoryRouter>,
-    );
-
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(fitViewMock).toHaveBeenCalledTimes(1);
-
-    getNodesMock.mockReturnValue([
-      {
-        id: "run-node-1",
-        position: { x: 10, y: 20 },
-      },
-    ]);
-
-    rerender(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="runs"
-          nodes={[
-            {
-              id: "run-node-1",
-              position: { x: 10, y: 20 },
-              data: {
-                label: "Run 1",
-                state: "success",
-                type: "component",
-              },
-            },
-          ]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="live-version"
-          hasFitToViewRef={hasFitToViewRef}
-          fitAllRequest={0}
-        />
-      </MemoryRouter>,
-    );
-
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(fitViewMock).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
-  });
-
-  it("closes the run node detail pane when the canvas background is clicked in runs mode", () => {
-    const onRunNodeDetailClose = vi.fn();
-
-    render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="runs"
-          runNodeDetailNodeId="run-node-1"
-          onRunNodeDetailClose={onRunNodeDetailClose}
-          nodes={[
-            {
-              id: "run-node-1",
-              position: { x: 0, y: 0 },
-              data: {
-                label: "Run node",
-                state: "success",
-                type: "component",
-              },
-            },
-          ]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="live-version"
-        />
-      </MemoryRouter>,
-    );
-
-    act(() => {
-      reactFlowPropsRef.current?.onPaneClick?.();
-    });
-
-    expect(onRunNodeDetailClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -18,11 +18,26 @@ const (
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
 	// Agent is the managed agent id (use latest if Version is nil, else pin to Version).
-	Agent         string   `json:"agent" mapstructure:"agent"`
-	Version       *int     `json:"version" mapstructure:"version"`
-	EnvironmentID string   `json:"environmentId" mapstructure:"environmentId"`
-	Prompt        string   `json:"prompt" mapstructure:"prompt"`
-	VaultIDs      []string `json:"vaultIds" mapstructure:"vaultIds"`
+	Agent         string          `json:"agent" mapstructure:"agent"`
+	Version       *int            `json:"version" mapstructure:"version"`
+	EnvironmentID string          `json:"environmentId" mapstructure:"environmentId"`
+	Prompt        string          `json:"prompt" mapstructure:"prompt"`
+	VaultIDs      []string        `json:"vaultIds" mapstructure:"vaultIds"`
+	Files         []string        `json:"files" mapstructure:"files"`
+	Secrets       []SecretBinding `json:"secrets" mapstructure:"secrets"`
+}
+
+// SecretBinding maps a SuperPlane secret to an environment variable in the agent session.
+type SecretBinding struct {
+	EnvName      string    `json:"envName" mapstructure:"envName"`
+	Value        SecretRef `json:"value" mapstructure:"value"`
+	AllowedHosts []string  `json:"allowedHosts" mapstructure:"allowedHosts"`
+}
+
+// SecretRef references a SuperPlane secret by name and key.
+type SecretRef struct {
+	Secret string `json:"secret" mapstructure:"secret"`
+	Key    string `json:"key" mapstructure:"key"`
 }
 
 // ExecutionMetadata is persisted for the run.

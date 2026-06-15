@@ -18,6 +18,7 @@ import {
   PUBSUB_ACTION_STATE_REGISTRY,
 } from "./pubsub_mapper";
 import { onMessageTriggerRenderer } from "./on_message";
+import { onAlertTriggerRenderer } from "./on_alert";
 import { cloudDNSMapper } from "./clouddns";
 import { deleteVMInstanceMapper } from "./delete_vm_instance";
 import { getVMInstanceMapper } from "./get_vm_instance";
@@ -30,10 +31,19 @@ import {
   deleteAlertingPolicyMapper,
   updateAlertingPolicyMapper,
 } from "./monitoring";
+import { queryMapper, queryRangeMapper } from "./prometheus";
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
 import { deleteImageMapper } from "./delete_image";
 import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
+import {
+  createDatabaseMapper,
+  getDatabaseMapper,
+  deleteDatabaseMapper,
+  CLOUDSQL_CREATED_STATE_REGISTRY,
+  CLOUDSQL_FETCHED_STATE_REGISTRY,
+  CLOUDSQL_DELETED_STATE_REGISTRY,
+} from "./cloudsql_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: computeBaseMapper,
@@ -63,9 +73,14 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "monitoring.getAlertingPolicy": getAlertingPolicyMapper,
   "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
   "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
+  "prometheus.query": queryMapper,
+  "prometheus.queryRange": queryRangeMapper,
   "compute.createStaticIP": createStaticIPMapper,
   "compute.deleteStaticIP": deleteStaticIPMapper,
   "compute.manageStaticIP": manageStaticIPMapper,
+  "cloudsql.createDatabase": createDatabaseMapper,
+  "cloudsql.getDatabase": getDatabaseMapper,
+  "cloudsql.deleteDatabase": deleteDatabaseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -74,6 +89,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "artifactregistry.onArtifactPush": onArtifactPushTriggerRenderer,
   "artifactregistry.onArtifactAnalysis": onArtifactAnalysisTriggerRenderer,
   "pubsub.onMessage": onMessageTriggerRenderer,
+  "monitoring.onAlert": onAlertTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -104,9 +120,14 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "monitoring.getAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.deleteAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.updateAlertingPolicy": buildActionStateRegistry("completed"),
+  "prometheus.query": buildActionStateRegistry("completed"),
+  "prometheus.queryRange": buildActionStateRegistry("completed"),
   "compute.createStaticIP": buildActionStateRegistry("completed"),
   "compute.deleteStaticIP": buildActionStateRegistry("completed"),
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
+  "cloudsql.createDatabase": CLOUDSQL_CREATED_STATE_REGISTRY,
+  "cloudsql.getDatabase": CLOUDSQL_FETCHED_STATE_REGISTRY,
+  "cloudsql.deleteDatabase": CLOUDSQL_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

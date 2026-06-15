@@ -306,7 +306,7 @@ function noRunFoundMessage(select: MarkdownRunVariableSource["select"]): string 
  * a false empty state before the fetch settles — mirroring how run variables
  * wait on their query's `isLoading`.
  */
-function resolveMemoryVariable(
+export function resolveMemoryVariable(
   entries: CanvasMemoryEntry[],
   source: MarkdownMemoryVariableSource,
   loading: boolean,
@@ -315,20 +315,45 @@ function resolveMemoryVariable(
   if (!namespace) {
     return { value: null, error: "Missing namespace." };
   }
+  const isList = source.mode === "list";
   const filtered = entries.filter((entry) => entry.namespace === namespace);
   if (filtered.length === 0) {
+    // While the backing query is in flight, resolve to `null` for both modes
+    // (not `[]` for list) so the editor preview shows its shared "Loading
+    // preview…" state — gated on `value == null` — instead of flashing an
+    // empty list ("List · 0 items"). The settled empty state (`[]` for list,
+    // an error for single) only applies once loading completes.
     if (loading) return { value: null };
+    if (isList) return { value: [] };
     return { value: null, error: `No memory rows in namespace ${JSON.stringify(namespace)}.` };
   }
   const rows = filtered.map(memoryEntryToRow);
   const matched = applyMatches(rows, source.matches);
   if (matched.length === 0) {
+    if (isList) return { value: [] };
     return { value: null, error: "No memory row matched the filters." };
   }
   const sortField = source.orderBy?.trim() || "createdAt";
   const sortOrder = source.direction ?? "desc";
   const sorted = applySort(matched, { field: sortField, order: sortOrder });
-  return { value: sorted[0] };
+  return { value: pickMemoryRows(sorted, source) };
+}
+
+/**
+ * Reduce the sorted, match-filtered row set down to whatever the variable
+ * should expose to CEL. Kept as a tiny helper so `resolveMemoryVariable`
+ * stays under the ESLint complexity budget and so list-mode tests can drive
+ * the picker directly.
+ */
+export function pickMemoryRows(sorted: Record<string, unknown>[], source: MarkdownMemoryVariableSource): unknown {
+  if (source.mode !== "list") return sorted[0];
+  // Only a positive integer caps the list. A fractional limit would otherwise
+  // be floored by `Array.prototype.slice` (e.g. 1.5 -> 1 row), so fail soft to
+  // "no cap" and let the validator surface the real error on save.
+  if (typeof source.limit === "number" && Number.isInteger(source.limit) && source.limit > 0) {
+    return sorted.slice(0, source.limit);
+  }
+  return sorted;
 }
 
 /**

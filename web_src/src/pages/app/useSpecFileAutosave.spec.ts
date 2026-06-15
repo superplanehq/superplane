@@ -8,7 +8,7 @@ import { materializeCanvasSpec, materializeConsoleSpec } from "./lib/workflow-sp
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 
 const sampleCanvas: CanvasesCanvas = {
-  metadata: { id: "canvas-1", name: "Sample", description: "", isTemplate: false },
+  metadata: { id: "canvas-1", name: "Sample", description: "" },
   spec: {
     nodes: [{ id: "node-1", name: "Start", type: "TYPE_TRIGGER", component: "schedule", position: { x: 0, y: 0 } }],
     edges: [],
@@ -43,7 +43,7 @@ describe("useSpecFileAutosave", () => {
     vi.useRealTimers();
   });
 
-  it("materializes and auto-saves canvas.yaml edits after the debounce", () => {
+  it("materializes canvas.yaml locally immediately and auto-saves after the debounce", () => {
     const { onSpecFileChange, applyLocalWorkflowUpdate, handleSaveWorkflow } = setup();
     const nextYaml = materializeCanvasSpec({
       ...sampleCanvas,
@@ -51,7 +51,8 @@ describe("useSpecFileAutosave", () => {
     });
 
     act(() => onSpecFileChange(CANVAS_YAML_PATH, nextYaml));
-    expect(applyLocalWorkflowUpdate).not.toHaveBeenCalled();
+    expect(applyLocalWorkflowUpdate).toHaveBeenCalledTimes(1);
+    expect(handleSaveWorkflow).not.toHaveBeenCalled();
 
     act(() => vi.advanceTimersByTime(400));
 
@@ -61,15 +62,34 @@ describe("useSpecFileAutosave", () => {
     expect(saved.spec?.nodes?.[0]?.name).toBe("Renamed");
   });
 
-  it("auto-saves console.yaml edits as panels and layout", () => {
-    const { onSpecFileChange, mutate } = setup();
+  it("updates console.yaml locally immediately and auto-saves after the debounce", () => {
+    const onEffectiveConsoleChange = vi.fn();
+    const applyLocalWorkflowUpdate = vi.fn();
+    const handleSaveWorkflow = vi.fn().mockResolvedValue({ status: "saved" as const });
+    const mutate = vi.fn();
+    const updateConsoleMutation = { mutate } as never;
+
+    const { result } = renderHook(() =>
+      useSpecFileAutosave({
+        canvas: sampleCanvas,
+        isReadOnly: false,
+        applyLocalWorkflowUpdate,
+        handleSaveWorkflow,
+        updateConsoleMutation,
+        onEffectiveConsoleChange,
+      }),
+    );
+
     const consoleYaml = materializeConsoleSpec({
       panels: [{ id: "p1", type: "markdown", content: { body: "hi" } }],
       layout: [{ i: "p1", x: 0, y: 0, w: 4, h: 2 }],
       canvasId: "canvas-1",
     });
 
-    act(() => onSpecFileChange(CONSOLE_YAML_PATH, consoleYaml));
+    act(() => result.current.onSpecFileChange(CONSOLE_YAML_PATH, consoleYaml));
+    expect(onEffectiveConsoleChange).toHaveBeenCalledTimes(1);
+    expect(mutate).not.toHaveBeenCalled();
+
     act(() => vi.advanceTimersByTime(400));
 
     expect(mutate).toHaveBeenCalledTimes(1);

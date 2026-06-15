@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -43,13 +44,13 @@ func ListCanvasVersionsPaginated(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
 	}
 
-	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
+	canvas, err := findCanvas(ctx, orgUUID, canvasUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(organizationID, canvas, uuid.MustParse(userID), limit, before)
+		return listDraftCanvasVersions(ctx, organizationID, canvas, uuid.MustParse(userID), limit, before)
 	}
 
 	limit = getCanvasVersionLimit(limit)
@@ -57,29 +58,28 @@ func ListCanvasVersionsPaginated(
 
 	var publishedVersions []models.CanvasVersion
 	var publishedCount int64
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
-		if versionsErr != nil {
-			return versionsErr
-		}
-		publishedVersions = versions
+	err = telemetry.RunSpan(ctx, "canvases.list_published_versions", func(ctx context.Context) error {
+		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+			versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
+			if versionsErr != nil {
+				return versionsErr
+			}
+			publishedVersions = versions
 
-		count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvas.ID)
-		if countErr != nil {
-			return countErr
-		}
-		publishedCount = count
+			count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvas.ID)
+			if countErr != nil {
+				return countErr
+			}
+			publishedCount = count
 
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
 	}
 
-	protoVersions := make([]*pb.CanvasVersion, 0, len(publishedVersions))
-	for i := range publishedVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&publishedVersions[i], organizationID))
-	}
+	protoVersions := serializeCanvasVersions(ctx, publishedVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
@@ -90,6 +90,7 @@ func ListCanvasVersionsPaginated(
 }
 
 func listDraftCanvasVersions(
+	ctx context.Context,
 	organizationID string,
 	canvas *models.Canvas,
 	ownerID uuid.UUID,
@@ -101,29 +102,28 @@ func listDraftCanvasVersions(
 
 	var draftVersions []models.CanvasVersion
 	var draftCount int64
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID, int(limit), beforeTime)
-		if versionsErr != nil {
-			return versionsErr
-		}
-		draftVersions = versions
+	err := telemetry.RunSpan(ctx, "canvases.list_draft_versions", func(ctx context.Context) error {
+		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+			versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID, int(limit), beforeTime)
+			if versionsErr != nil {
+				return versionsErr
+			}
+			draftVersions = versions
 
-		count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID)
-		if countErr != nil {
-			return countErr
-		}
-		draftCount = count
+			count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID)
+			if countErr != nil {
+				return countErr
+			}
+			draftCount = count
 
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
 	}
 
-	protoVersions := make([]*pb.CanvasVersion, 0, len(draftVersions))
-	for i := range draftVersions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&draftVersions[i], organizationID))
-	}
+	protoVersions := serializeCanvasVersions(ctx, draftVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,

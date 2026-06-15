@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesCommitCanvasRepositoryFiles,
+  canvasesStageCanvasRepositoryFile,
+  canvasesCommitCanvasStaging,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { registerLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
@@ -58,12 +60,11 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
-  await canvasesCommitCanvasRepositoryFiles(
+  registerLocalStagingWrite(params.canvasId, params.versionId);
+  await canvasesStageCanvasRepositoryFile(
     withOrganizationHeader({
-      path: { canvasId: params.canvasId },
+      path: { canvasId: params.canvasId, versionId: params.versionId },
       body: {
-        versionId: params.versionId,
-        message: "Update canvas.yaml",
         operations: [
           {
             path: CANVAS_YAML_PATH,
@@ -71,6 +72,12 @@ async function commitUpdatedCanvasVersionYaml(params: {
           },
         ],
       },
+    }),
+  );
+  await canvasesCommitCanvasStaging(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId, versionId: params.versionId },
+      body: {},
     }),
   );
   params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);

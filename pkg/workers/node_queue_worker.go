@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,17 +27,19 @@ import (
 )
 
 type NodeQueueWorker struct {
-	registry  *registry.Registry
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	registry    *registry.Registry
+	gitProvider gitprovider.Provider
+	semaphore   *semaphore.Weighted
+	logger      *log.Entry
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
 	return &NodeQueueWorker{
 		registry:    registry,
+		gitProvider: gitProvider,
 		rabbitMQURL: rabbitMQURL,
 		semaphore:   semaphore.NewWeighted(25),
 		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
@@ -229,7 +232,9 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents)
+	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
+
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents, repoFiles)
 	if err != nil {
 
 		//
@@ -250,7 +255,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		// we create a failed execution and delete the queue item.
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
-		executions, err := w.handleNodeConfigurationError(tx, logger, configErr)
+		executions, err := w.handleNodeConfigurationError(tx, logger, configErr, onNewEvents)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -266,14 +271,13 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 * the processing.
 		 */
 		executionID, err = w.processComponentNode(ctx, node)
-	case models.NodeTypeBlueprint:
-		/*
-		 * For blueprint nodes, use the default processing logic.
-		 * Blueprint nodes do not have custom processing logic.
-		 */
-		executionID, err = ctx.DefaultProcessing()
 	default:
 		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
+	}
+
+	if errors.Is(err, core.ErrQueueItemDeferred) {
+		logger.Info("Queue item deferred")
+		return nil, nil, nil
 	}
 
 	return []*uuid.UUID{executionID}, queueItem, err
@@ -293,17 +297,6 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.C
 		}
 
 		return action.Configuration(), nil
-	case models.NodeTypeBlueprint:
-		if ref.Blueprint == nil || ref.Blueprint.ID == "" {
-			return nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
-		}
-
-		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
-		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
-		}
-
-		return blueprint.Configuration, nil
 	default:
 		return nil, nil
 	}
@@ -324,17 +317,8 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 	return action.ProcessQueueItem(*ctx)
 }
 
-func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
+func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// If we are creating a failed execution for a child node execution,
-	// we need to include the parent execution ID and fail the parent as well.
-	//
-	parentExecutionID, err := w.getParentExecutionID(tx, logger, configErr)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +331,6 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		RunID:               configErr.QueueItem.RunID,
 		EventID:             configErr.Event.ID,
 		PreviousExecutionID: configErr.Event.ExecutionID,
-		ParentExecutionID:   parentExecutionID,
 		State:               models.CanvasNodeExecutionStateFinished,
 		Configuration:       configErr.Node.Configuration,
 		Result:              models.CanvasNodeExecutionResultFailed,
@@ -362,41 +345,14 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		return nil, err
 	}
 
-	if parentExecutionID == nil {
-		if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
-			return nil, err
-		}
-
-		return []*uuid.UUID{&execution.ID}, nil
-	}
-
 	//
-	// If this execution has a parent, we need to propagate
-	// the failure to the parent execution.
+	// The errored node could not execute, so notify the canvas' On Error nodes.
 	//
-	parent, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
-	if err != nil {
+	contexts.DispatchOnError(tx, &execution, onNewEvents)
+
+	if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
 		return nil, err
 	}
 
-	err = parent.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, configErr.Err.Error())
-	if err != nil {
-		return nil, err
-	}
-
-	return []*uuid.UUID{&execution.ID, &parent.ID}, nil
-}
-
-func (w *NodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
-	if configErr.Event.ExecutionID == nil {
-		return nil, nil
-	}
-
-	previous, err := models.FindNodeExecutionInTransaction(tx, configErr.Node.WorkflowID, *configErr.Event.ExecutionID)
-	if err != nil {
-		logger.Errorf("Error finding previous execution: %v", err)
-		return nil, err
-	}
-
-	return previous.ParentExecutionID, nil
+	return []*uuid.UUID{&execution.ID}, nil
 }

@@ -1,0 +1,9 @@
+{
+  "data": {
+    "name": "app_db",
+    "instance": "my-instance",
+    "deleted": true
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}

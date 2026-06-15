@@ -1,6 +1,7 @@
 package canvases
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -14,53 +15,11 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
-	//
-	// Get all users with a single query, to avoid N+1 queries.
-	//
-	userIDs := []uuid.UUID{}
-	for _, canvas := range canvases {
-		if canvas.CreatedBy != nil {
-			userIDs = append(userIDs, *canvas.CreatedBy)
-		}
-	}
-
-	users, err := models.FindMaybeDeletedUsersByIDs(userIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	usersByID := make(map[string]models.User, len(users))
-	for _, user := range users {
-		usersByID[user.ID.String()] = user
-	}
-
-	//
-	// Serialize all canvases now
-	//
-	protoCanvases := make([]*pb.Canvas, len(canvases))
-	for i, canvas := range canvases {
-		var user *models.User
-		if canvas.CreatedBy != nil {
-			u, _ := usersByID[canvas.CreatedBy.String()]
-			user = &u
-		}
-
-		protoCanvas, err := SerializeCanvas(&canvas, false, user)
-		if err != nil {
-			return nil, err
-		}
-
-		protoCanvases[i] = protoCanvas
-	}
-
-	return protoCanvases, nil
-}
 
 func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
@@ -98,7 +57,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
-				IsTemplate:     canvas.IsTemplate,
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
@@ -116,17 +74,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	executionIDs := make([]string, len(lastExecutions))
-	for i, execution := range lastExecutions {
-		executionIDs[i] = execution.ID.String()
-	}
-
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +99,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
-			IsTemplate:     canvas.IsTemplate,
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
@@ -397,4 +344,18 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef,
 	}
 
 	return nil
+}
+
+func serializeCanvas(ctx context.Context, canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
+	var proto *pb.Canvas
+	err := telemetry.RunSpan(ctx, "canvases.serialize", func(ctx context.Context) error {
+		var serErr error
+		proto, serErr = SerializeCanvas(canvas, includeStatus, user)
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return proto, nil
 }

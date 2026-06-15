@@ -50,6 +50,8 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
+import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
+import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
 import {
   useCanvasToolSidebarState,
@@ -59,7 +61,15 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
+import {
+  allowsBuildingBlocksSidebar,
+  blocksBuildingBlocksShortcut,
+  isCanvasWorkflowTab,
+  isPanelHeaderMode,
+  normalizeCanvasHeaderMode,
+} from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
+import { LIVE_CANVAS_FIT_VIEW_OPTIONS, RUN_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -184,7 +194,14 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+  /** True when the active draft has uncommitted staged spec edits. Shows the Commit/Reset controls. */
+  hasStagingChanges?: boolean;
+  /** Commits staged canvas.yaml/console.yaml edits into the draft version row. */
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  /** Discards staged edits, reverting to the last committed draft. */
+  onResetStaging?: () => void;
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -195,9 +212,10 @@ export interface CanvasPageProps {
   exitEditModeDisabledTooltip?: string;
   /** Switches back to the Canvas tab without changing edit mode. */
   onSelectCanvasView?: () => void;
-  onSelectRuns?: () => void;
-  onExitRunsMode?: () => void;
+  isRunInspectionMode?: boolean;
   onSelectConsole?: () => void;
+  /** Switches the canvas surface to the Versions tab. Omitted on templates. */
+  onSelectVersions?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
@@ -212,6 +230,17 @@ export interface CanvasPageProps {
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  /** True when a non-spec repository file is staged; shows a dot on the Files tab. */
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasVersion[];
@@ -230,15 +259,10 @@ export interface CanvasPageProps {
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  hasAutoOpenedVersionControl?: boolean;
-  onVersionControlAutoOpened?: () => void;
-  onCloseVersionControl?: () => void;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
-  /** Hide the Agent / Runs / Versions left panel toggle (templates only); runs view keeps the tool sidebar visible. */
+  /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -770,13 +794,13 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
+  const workflowHeaderMode = normalizeCanvasHeaderMode(props.headerMode);
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
-  const isCreatingStarterPlaceholderRef = useRef(false);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
   const localIsSidebarOpenRef = useRef<boolean | null>(null);
@@ -808,44 +832,13 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const forceEnableToolSidebar = Boolean(
-    props.onSelectRuns ||
-      props.onOpenVersionControl ||
-      props.toolSidebarRunsContent ||
-      props.toolSidebarVersionsContent ||
-      props.headerMode === "runs" ||
-      props.isVersionControlOpen,
-  );
   const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
-    forceEnable: forceEnableToolSidebar,
     hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
-    onBeforeClose: () => {
-      if (props.headerMode === "runs") props.onExitRunsMode?.();
-      if (props.isVersionControlOpen) props.onCloseVersionControl?.();
-    },
   });
-  const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
-  const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
-
-  useEffect(() => {
-    if (props.headerMode === "runs" && previousHeaderModeRef.current !== "runs" && !isToolSidebarOpen)
-      openToolSidebar();
-
-    previousHeaderModeRef.current = props.headerMode;
-  }, [isToolSidebarOpen, openToolSidebar, props.headerMode]);
-
-  useEffect(() => {
-    if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
-  }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
-
-  const handleSelectRuns = () => {
-    openToolSidebar();
-    props.onSelectRuns?.();
-  };
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1096,23 +1089,16 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
-        const newNodeId = await props.onNodeAdd({
+        await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
           integrationName: block.integrationName,
         });
-
-        // Close building blocks sidebar
-        setIsBuildingBlocksSidebarOpen(false);
-
-        // Open component sidebar for the new node
-        state.componentSidebar.open(newNodeId);
-        setCurrentTab("settings");
       }
     },
-    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
+    [props, readOnly],
   );
 
   const handleSidebarToggle = useCallback(
@@ -1134,7 +1120,7 @@ function CanvasPage(props: CanvasPageProps) {
    * a free-floating node. Otherwise we place the new node at the viewport
    * center using the same algorithm as "Add Note".
    */
-  const handleBuildingBlockEnter = useCallback(
+  const handleBuildingBlockSelect = useCallback(
     (block: BuildingBlock) => {
       if (readOnly) return;
 
@@ -1156,69 +1142,21 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
-  const onPlaceholderAdd = props.onPlaceholderAdd;
-  const viewportRefProp = props.viewportRef;
-
-  const handleBuildingBlocksShortcutOpen = useCallback(async () => {
+  const handleBuildingBlocksShortcutOpen = useCallback(() => {
     if (readOnly) {
       return;
     }
 
-    if (templateNodeId) {
-      handleSidebarToggle(true);
-      state.componentSidebar.close();
-      return;
-    }
-
-    if (!onPlaceholderAdd) {
-      handleSidebarToggle(true);
-      return;
-    }
-
-    if (isCreatingStarterPlaceholderRef.current) {
-      return;
-    }
-
-    isCreatingStarterPlaceholderRef.current = true;
-    try {
-      const position = findFreePositionInViewport({
-        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
-        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
-        nodes: state.nodes || [],
-        nodeSize: { width: 420, height: 200 },
-        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
-      });
-      const placeholderId = await onPlaceholderAdd({ position });
-      if (!placeholderId) {
-        handleSidebarToggle(true);
-        return;
-      }
-
-      setTemplateNodeId(placeholderId);
-      setIsBuildingBlocksSidebarOpen(true);
-      state.componentSidebar.close();
-    } finally {
-      isCreatingStarterPlaceholderRef.current = false;
-    }
-  }, [
-    readOnly,
-    templateNodeId,
-    onPlaceholderAdd,
-    viewportRefProp,
-    state.nodes,
-    state.componentSidebar,
-    handleSidebarToggle,
-  ]);
+    handleSidebarToggle(true);
+    state.componentSidebar.close();
+  }, [readOnly, state.componentSidebar, handleSidebarToggle]);
 
   useBuildingBlocksShortcut({
     disabled:
       readOnly ||
       Boolean(props.hideAddControls) ||
       !props.isEditing ||
-      props.headerMode === "console" ||
-      props.headerMode === "memory" ||
-      props.headerMode === "files" ||
-      props.headerMode === "runs" ||
+      blocksBuildingBlocksShortcut(workflowHeaderMode) ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
@@ -1308,6 +1246,12 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props.headerMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
+  useEffect(() => {
+    if (props.isRunInspectionMode && state.componentSidebar.isOpen) {
+      handleSidebarClose();
+    }
+  }, [props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
@@ -1322,7 +1266,7 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "memory" ||
           props.headerMode === "files") &&
           "sp-canvas-live",
-        props.headerMode === "runs" && "sp-canvas-live",
+        props.isRunInspectionMode && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
       )}
     >
@@ -1349,6 +1293,10 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+          hasStagingChanges={props.hasStagingChanges}
+          onCommitStaging={props.onCommitStaging}
+          commitStagingPending={props.commitStagingPending}
+          onResetStaging={props.onResetStaging}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
           onSelectCanvasView={props.onSelectCanvasView}
@@ -1359,6 +1307,7 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectConsole={props.onSelectConsole}
+          onSelectVersions={props.onSelectVersions}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
           filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
@@ -1366,6 +1315,16 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+          hasFilesStagingChanges={props.hasFilesStagingChanges}
+          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+          hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
+          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+          hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
+          hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
+          readyToPublishDraftChanges={props.readyToPublishDraftChanges}
+          editTabTone={props.editTabTone}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           startEditingDrafts={props.startEditingDrafts}
@@ -1385,23 +1344,17 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CanvasToolSidebar
-          toolSidebarState={toolSidebarState}
-          mode={props.headerMode}
-          onSelectRuns={handleSelectRuns}
-          onExitRunsMode={props.onExitRunsMode}
-          runsContent={props.toolSidebarRunsContent}
-          isVersionControlOpen={props.isVersionControlOpen}
-          onOpenVersionControl={props.onOpenVersionControl}
-          hasAutoOpenedVersionControl={props.hasAutoOpenedVersionControl}
-          onVersionControlAutoOpened={props.onVersionControlAutoOpened}
-          onCloseVersionControl={props.onCloseVersionControl}
-          versionsContent={props.toolSidebarVersionsContent}
-        />
+        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
 
-        {props.headerMode === "runs" ||
-        props.headerMode === "memory" ||
-        props.headerMode === "files" ? null : props.isEditing ? (
+        <CanvasRunsSidebar isOpen={isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null}>
+          {props.toolSidebarRunsContent ?? null}
+        </CanvasRunsSidebar>
+
+        <CanvasVersionsSidebar isOpen={props.headerMode === "versions" && props.toolSidebarVersionsContent != null}>
+          {props.toolSidebarVersionsContent ?? null}
+        </CanvasVersionsSidebar>
+
+        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1421,28 +1374,21 @@ function CanvasPage(props: CanvasPageProps) {
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={
-              isBuildingBlocksSidebarOpen &&
-              !!props.isEditing &&
-              props.headerMode !== "console" &&
-              props.headerMode !== "memory" &&
-              props.headerMode !== "files" &&
-              props.headerMode !== "runs"
-            }
+            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockClick}
-            onEnterSubmit={handleBuildingBlockEnter}
+            onBlockClick={handleBuildingBlockSelect}
+            onEnterSubmit={handleBuildingBlockSelect}
           />
         )}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="relative min-h-0 flex-1">
-            {props.runCanvasLoading && props.headerMode === "runs" ? (
+            {props.runCanvasLoading && props.isRunInspectionMode ? (
               <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
                   <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
@@ -1530,7 +1476,7 @@ function CanvasPage(props: CanvasPageProps) {
                   workflowNodes={props.workflowNodes}
                   setCurrentTab={setCurrentTab}
                   showBottomStatusControls={props.showBottomStatusControls}
-                  headerMode={props.headerMode}
+                  isRunInspectionMode={props.isRunInspectionMode}
                   isEditing={props.isEditing}
                   isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
@@ -1543,10 +1489,9 @@ function CanvasPage(props: CanvasPageProps) {
                   fitAllRequest={props.fitAllRequest}
                   fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                   runParticipantNodeIds={props.runParticipantNodeIds}
-                  runSelectedNodeId={props.headerMode === "runs" ? props.runNodeDetailNodeId : null}
-                  onRunNodeDetailClose={props.onRunNodeDetailClose}
+                  runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
                   runNodeDetailPaneOpen={
-                    props.headerMode === "runs" &&
+                    props.isRunInspectionMode &&
                     !!props.runNodeDetailRun &&
                     !!props.runNodeDetailNodeId &&
                     !!props.runNodeDetailCanvasId
@@ -1563,7 +1508,7 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {isComponentSidebarVisibleMode(props.headerMode) ? (
+            {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode ? (
               <Sidebar
                 state={state}
                 getSidebarData={props.getSidebarData}
@@ -1610,7 +1555,7 @@ function CanvasPage(props: CanvasPageProps) {
               />
             ) : null}
           </div>
-          {props.headerMode === "runs" &&
+          {props.isRunInspectionMode &&
           props.runNodeDetailRun &&
           props.runNodeDetailNodeId &&
           props.runNodeDetailCanvasId ? (
@@ -1929,6 +1874,10 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  hasStagingChanges,
+  onCommitStaging,
+  commitStagingPending,
+  onResetStaging,
   headerMode,
   isEditing,
   onSelectCanvasView,
@@ -1939,6 +1888,7 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectConsole,
+  onSelectVersions,
   onSelectMemory,
   onSelectFiles,
   filesHeaderActionsSlotId,
@@ -1946,6 +1896,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasFilesStagingChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
+  hasUncommittedFilesDraftChanges,
+  hasCommittedCanvasDraftChanges,
+  hasCommittedConsoleDraftChanges,
+  hasCommittedFilesDraftChanges,
+  hasUncommittedDraftChanges,
+  readyToPublishDraftChanges,
+  editTabTone,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   startEditingDrafts,
@@ -1990,6 +1950,10 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  hasStagingChanges?: boolean;
+  onCommitStaging?: () => void;
+  commitStagingPending?: boolean;
+  onResetStaging?: () => void;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
   onSelectCanvasView?: () => void;
@@ -2000,6 +1964,7 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
+  onSelectVersions?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   filesHeaderActionsSlotId?: string;
@@ -2007,6 +1972,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasFilesStagingChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasCommittedFilesDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  editTabTone?: "uncommitted" | "ready" | "neutral";
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasVersion[];
@@ -2051,6 +2026,10 @@ function CanvasContentHeader({
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+      hasStagingChanges={hasStagingChanges}
+      onCommitStaging={onCommitStaging}
+      commitStagingPending={commitStagingPending}
+      onResetStaging={onResetStaging}
       mode={headerMode}
       isEditing={isEditing}
       onSelectCanvasView={onSelectCanvasView}
@@ -2061,6 +2040,7 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectConsole={onSelectConsole}
+      onSelectVersions={onSelectVersions}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
       filesHeaderActionsSlotId={filesHeaderActionsSlotId}
@@ -2068,6 +2048,16 @@ function CanvasContentHeader({
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
+      hasFilesStagingChanges={hasFilesStagingChanges}
+      hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
+      hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+      hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
+      hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
+      hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+      hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
+      hasUncommittedDraftChanges={hasUncommittedDraftChanges}
+      readyToPublishDraftChanges={readyToPublishDraftChanges}
+      editTabTone={editTabTone}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       startEditingDrafts={startEditingDrafts}
@@ -2177,7 +2167,7 @@ function CanvasContent({
   workflowNodes,
   setCurrentTab,
   showBottomStatusControls = true,
-  headerMode,
+  isRunInspectionMode = false,
   isEditing = false,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
@@ -2191,7 +2181,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  onRunNodeDetailClose,
   runNodeDetailPaneOpen,
   runsEvents,
   runsNodes,
@@ -2237,7 +2226,7 @@ function CanvasContent({
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
-  headerMode?: CanvasPageProps["headerMode"];
+  isRunInspectionMode?: boolean;
   isEditing?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
@@ -2251,7 +2240,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  onRunNodeDetailClose?: () => void;
   runNodeDetailPaneOpen?: boolean;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
@@ -2312,6 +2300,7 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
+  const lastFitAllRequestRef = useRef<{ nonce: number; runMode: boolean } | null>(null);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(() => {
     const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
     return saved !== null ? saved === "true" : false;
@@ -2325,11 +2314,11 @@ function CanvasContent({
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isEditMode = isEditing;
   const runSelectableSet = useMemo(() => {
-    if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
+    if (!isRunInspectionMode || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
       return null;
     }
     return new Set(runParticipantNodeIds);
-  }, [headerMode, runParticipantNodeIds]);
+  }, [isRunInspectionMode, runParticipantNodeIds]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -2578,7 +2567,7 @@ function CanvasContent({
   const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
 
   useEffect(() => {
-    if (headerMode !== "runs") {
+    if (!isRunInspectionMode) {
       return;
     }
 
@@ -2604,7 +2593,7 @@ function CanvasContent({
         selected: node.id === runSelectedNodeId,
       }));
     });
-  }, [headerMode, runSelectedNodeId, runCanvasNodeIdsKey]);
+  }, [isRunInspectionMode, runSelectedNodeId, runCanvasNodeIdsKey]);
 
   // Listen for agent sidebar node chip clicks to zoom to nodes
   useEffect(() => {
@@ -2653,8 +2642,7 @@ function CanvasContent({
 
     previouslySelectedRef.current = new Set();
 
-    if (headerMode === "runs" && runSelectedNodeId) {
-      onRunNodeDetailClose?.();
+    if (isRunInspectionMode && runSelectedNodeId) {
       return;
     }
 
@@ -2673,7 +2661,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [headerMode, onBuildingBlocksSidebarToggle, onRunNodeDetailClose, runSelectedNodeId]);
+  }, [isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
@@ -2687,8 +2675,7 @@ function CanvasContent({
         if (focusNode) {
           fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
         } else if (hasNodes) {
-          // Fit to view but don't zoom in too much (max zoom of 1.0)
-          fitView({ maxZoom: 1.0, padding: 0.5 });
+          fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
         }
 
         if (hasNodes) {
@@ -2720,22 +2707,28 @@ function CanvasContent({
   // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching
   // between runs whose participating nodes have different coordinates) before fitting.
   useEffect(() => {
-    if (fitAllRequest == null) return;
+    if (fitAllRequest == null) {
+      lastFitAllRequestRef.current = null;
+      return;
+    }
+    const last = lastFitAllRequestRef.current;
+    if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
+    lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
     const id = window.setTimeout(() => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
       const renderedNodes = getNodes();
       const nodeSubset =
         focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
+      const fitOptions = isRunInspectionMode ? RUN_CANVAS_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
       fitView({
         ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
+        ...fitOptions,
         duration: 500,
-        maxZoom: 1.0,
-        padding: 0.2,
       });
     }, 0);
     return () => window.clearTimeout(id);
-  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef]);
+  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef, isRunInspectionMode]);
 
   const showHeader = !isReadOnly;
 

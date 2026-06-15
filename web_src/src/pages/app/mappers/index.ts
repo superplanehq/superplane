@@ -123,6 +123,7 @@ import {
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
   componentMappers as jfrogArtifactoryComponentMappers,
@@ -258,6 +259,7 @@ import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
+import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -284,6 +286,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   updateMemory: updateMemoryMapper,
   upsertMemory: upsertMemoryMapper,
   if: ifMapper,
+  loop: loopMapper,
   http: httpMapper,
   graphql: graphqlMapper,
   ssh: sshMapper,
@@ -337,6 +340,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  coolify: coolifyComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
@@ -455,6 +459,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   filter: FILTER_STATE_REGISTRY,
   forEach: FOR_EACH_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
+  loop: LOOP_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,

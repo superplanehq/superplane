@@ -27,10 +27,6 @@ func (a updateDraftAction) Name() string {
 }
 
 func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.deps.Encryptor == nil || a.deps.Registry == nil || a.deps.AuthService == nil {
-		return updateResult{}, fmt.Errorf("custom tool executor is missing canvas update dependencies")
-	}
-
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
@@ -43,13 +39,14 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 
 	operations := []*pb.CanvasRepositoryFileOperation{}
 	hasCanvasUpdate := strings.TrimSpace(input.CanvasYAML) != ""
+	hasConsoleUpdate := strings.TrimSpace(input.ConsoleYAML) != ""
 	if hasCanvasUpdate {
 		operations = append(operations, &pb.CanvasRepositoryFileOperation{
 			Path:    canvasRepository.CanvasYAMLRepositoryPath,
 			Content: []byte(input.CanvasYAML),
 		})
 	}
-	if strings.TrimSpace(input.ConsoleYAML) != "" {
+	if hasConsoleUpdate {
 		operations = append(operations, &pb.CanvasRepositoryFileOperation{
 			Path:    canvasRepository.ConsoleYAMLRepositoryPath,
 			Content: []byte(input.ConsoleYAML),
@@ -59,34 +56,79 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("canvas_yaml or console_yaml is required for update_draft")
 	}
 
-	if err := canvasRepository.ApplyRepositorySpecFileOperations(
+	// Validate edits up front with the same parse + registry validation the
+	// commit path runs. Staging stores content verbatim, so rejecting malformed
+	// YAML here keeps invalid content out of the staging layer the UI reads.
+	var nodes []models.Node
+	var edges []models.Edge
+	if hasCanvasUpdate {
+		nodes, edges, err = canvasRepository.ParseAndValidateCanvasYAML(a.deps.Registry, session.OrganizationID, input.CanvasYAML)
+		if err != nil {
+			return updateResult{}, err
+		}
+	}
+	if hasConsoleUpdate {
+		if err := canvasRepository.ValidateConsoleYAML(input.ConsoleYAML); err != nil {
+			return updateResult{}, err
+		}
+	}
+
+	// Write to the UI staging layer instead of committing into the draft version
+	// row. This mirrors how the UI editor saves edits: the agent's changes become
+	// the user's pending staged edits, which the user then reviews, commits, and
+	// publishes. The `read` action reads from the same staging layer, so the
+	// agent observes exactly what it staged.
+	if _, err := canvasRepository.StageRepositorySpecFileOperations(
 		ctx,
-		a.deps.UsageService,
-		a.deps.Encryptor,
-		a.deps.Registry,
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
-		a.deps.WebhookBaseURL,
-		a.deps.AuthService,
-		resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate),
 		operations,
 	); err != nil {
 		return updateResult{}, err
 	}
 
-	updated, err := models.FindCanvasVersion(canvasID, draft.ID)
-	if err != nil {
-		return updateResult{}, fmt.Errorf("load updated draft: %w", err)
+	// Auto-layout runs against the staged canvas.yaml and re-stages the
+	// positioned result, matching the UI's layout-on-save behavior. The agent
+	// never computes node positions itself.
+	if layout := resolveCustomToolAutoLayout(input.AutoLayout, hasCanvasUpdate); layout != nil {
+		if _, err := canvasRepository.ApplyCanvasAutoLayout(
+			ctx,
+			session.OrganizationID,
+			session.CanvasID,
+			draft.ID.String(),
+			layout,
+		); err != nil {
+			return updateResult{}, err
+		}
+	}
+
+	// Console-only updates leave the staged graph untouched, so summarize the
+	// effective staged canvas to keep node/edge counts accurate.
+	if !hasCanvasUpdate {
+		canvasYAML, readErr := canvasRepository.ReadRepositorySpecFileStaged(
+			ctx,
+			session.OrganizationID,
+			session.CanvasID,
+			draft.ID.String(),
+			canvasRepository.CanvasYAMLRepositoryPath,
+		)
+		if readErr != nil {
+			return updateResult{}, fmt.Errorf("read staged canvas yaml: %w", readErr)
+		}
+		nodes, edges, err = canvasRepository.ParseAndValidateCanvasYAML(a.deps.Registry, session.OrganizationID, canvasYAML)
+		if err != nil {
+			return updateResult{}, fmt.Errorf("summarize staged canvas: %w", err)
+		}
 	}
 
 	return updateResult{
 		Action:     "update_draft",
 		CanvasID:   session.CanvasID,
-		VersionID:  updated.ID.String(),
-		Draft:      draftResult{VersionID: updated.ID.String(), DisplayName: updated.DisplayName, BranchName: stringValue(updated.BranchName)},
-		NodeIssues: collectNodeIssues(updated.Nodes),
-		Summary:    summarizeCanvasVersion(nil, updated),
+		VersionID:  draft.ID.String(),
+		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: stringValue(draft.BranchName)},
+		NodeIssues: collectNodeIssues(nodes),
+		Summary:    summarizeParsedCanvas(draft.Name, nodes, edges),
 	}, nil
 }
 

@@ -183,7 +183,168 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
       return null;
     }
   },
+  // Join the elements of a list with a separator. Exposed as a builtin (not a
+  // method) because cel-js's parser refuses `.foo()` chains after a
+  // function-call result — so `list.map(x, expr).join("")` would not parse.
+  // Authors instead write `join(list.map(x, expr), "")`. Fail-soft: anything
+  // that isn't a list returns the empty string, missing/non-string separators
+  // collapse to "", and null/undefined elements become "" so a careless map
+  // doesn't smear `null` strings into the output.
+  join: (list: unknown, sep: unknown): string => {
+    if (!Array.isArray(list)) return "";
+    const separator = typeof sep === "string" ? sep : "";
+    return list.map((item) => stringifyJoinItem(item)).join(separator);
+  },
+  // String-trimming helpers below all return scalars directly. They exist
+  // because cel-js doesn't allow postfix `[i]` / `.method()` after a
+  // function-call result, so an author can't write `split(s, "\n")[0]` or
+  // `s.substring(0, 80)` — they have to call a single helper that already
+  // returns the scalar they want. This matches the expr-lang surface used at
+  // node-config / write time (see `web_src/src/lib/exprEvaluator.ts`).
+  // Fail-soft: non-string `s` coerces via `String(s)` (matching `lower`/
+  // `upper`); `null` / `undefined` input returns `""`.
+  substring: (s: unknown, start: unknown, end?: unknown): string => {
+    const text = coerceToString(s);
+    if (text === "") return "";
+    const startIndex = clampIndex(start, text.length);
+    if (end === undefined) return text.slice(startIndex);
+    const endIndex = clampIndex(end, text.length);
+    if (endIndex <= startIndex) return "";
+    return text.slice(startIndex, endIndex);
+  },
+  // First `n` characters of `s`, with an optional suffix (e.g. "…") appended
+  // only when truncation actually happened. Authors reach for this to keep
+  // long run outputs from blowing up table cells while still hinting that the
+  // value was clipped.
+  truncate: (s: unknown, n: unknown, suffix?: unknown): string => {
+    const text = coerceToString(s);
+    const limit = Number(n);
+    if (!Number.isFinite(limit) || limit < 0) return text;
+    if (text.length <= limit) return text;
+    const tail = typeof suffix === "string" ? suffix : "";
+    return text.slice(0, Math.trunc(limit)) + tail;
+  },
+  // Text before the first newline. Treats `\r\n` and bare `\r` the same as
+  // `\n` so Windows / classic-Mac line endings don't sneak through. Empty
+  // input stays empty.
+  firstLine: (s: unknown): string => {
+    const text = coerceToString(s);
+    if (text === "") return "";
+    const newline = text.search(/\r\n|\r|\n/);
+    return newline === -1 ? text : text.slice(0, newline);
+  },
+  // Nth segment of `split(s, sep)`, returned as a scalar so authors don't run
+  // into the no-postfix-after-call-result limitation. Negative `i` counts
+  // from the end (`-1` = last). Out-of-range / non-numeric `i` returns "".
+  //
+  // The separator is run through `unescapeSeparator` because cel-js does
+  // **not** interpret backslash escapes in string literals — `"\n"` written
+  // in a CEL expression is the literal two-character string `\n`. Without
+  // unescaping, the natural `splitIndex(message, "\n", 0)` form would never
+  // match an actual newline. We translate `\n`, `\r`, `\t`, and `\\` so the
+  // common cases just work.
+  //
+  // When the separator is a bare newline we split on `/\r\n|\r|\n/` so that
+  // `\r\n` (Windows) and bare `\r` (classic Mac) line endings are treated the
+  // same as `\n`. This keeps `splitIndex(value, "\n", 0)` in agreement with
+  // `firstLine` — otherwise CRLF text would leave a trailing `\r` on segments.
+  splitIndex: (s: unknown, sep: unknown, i: unknown): string => {
+    const text = coerceToString(s);
+    const separator = unescapeSeparator(typeof sep === "string" ? sep : String(sep ?? ""));
+    if (separator === "") return text;
+    const parts = separator === "\n" ? text.split(/\r\n|\r|\n/) : text.split(separator);
+    const raw = Number(i);
+    if (!Number.isFinite(raw)) return "";
+    const index = raw < 0 ? parts.length + Math.trunc(raw) : Math.trunc(raw);
+    if (index < 0 || index >= parts.length) return "";
+    return parts[index];
+  },
+  // Rounds out string parity with expr-lang. `trim` removes leading /
+  // trailing whitespace (or, when `chars` is supplied, leading / trailing
+  // characters from `chars`). `replace` swaps every `old` with `new`.
+  // `indexOf` returns -1 when missing, matching JS / expr-lang behavior.
+  trim: (s: unknown, chars?: unknown): string => {
+    const text = coerceToString(s);
+    if (chars === undefined) return text.trim();
+    const charset = coerceToString(chars);
+    if (charset === "") return text;
+    let start = 0;
+    let end = text.length;
+    while (start < end && charset.includes(text[start])) start++;
+    while (end > start && charset.includes(text[end - 1])) end--;
+    return text.slice(start, end);
+  },
+  replace: (s: unknown, oldStr: unknown, newStr: unknown): string => {
+    const text = coerceToString(s);
+    const search = coerceToString(oldStr);
+    if (search === "") return text;
+    const replacement = coerceToString(newStr);
+    return text.split(search).join(replacement);
+  },
+  indexOf: (s: unknown, sub: unknown): number => {
+    const text = coerceToString(s);
+    const needle = coerceToString(sub);
+    return text.indexOf(needle);
+  },
 };
+
+function coerceToString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return String(value);
+}
+
+function clampIndex(value: unknown, length: number): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return 0;
+  const truncated = Math.trunc(raw);
+  if (truncated < 0) return Math.max(0, length + truncated);
+  if (truncated > length) return length;
+  return truncated;
+}
+
+/**
+ * Translate the common backslash escapes (`\n`, `\r`, `\t`, `\\`) in a
+ * separator string into their literal characters. cel-js's lexer copies
+ * string literals verbatim — it does not honor escape sequences — so a
+ * separator authored as `"\n"` arrives here as two characters. Anything
+ * other than the recognized pair is preserved as-is so a literal `\` in
+ * (for example) a Windows path separator still works.
+ */
+function unescapeSeparator(raw: string): string {
+  if (!raw.includes("\\")) return raw;
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch !== "\\" || i + 1 >= raw.length) {
+      out += ch;
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === "n") {
+      out += "\n";
+      i++;
+    } else if (next === "r") {
+      out += "\r";
+      i++;
+    } else if (next === "t") {
+      out += "\t";
+      i++;
+    } else if (next === "\\") {
+      out += "\\";
+      i++;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function stringifyJoinItem(item: unknown): string {
+  if (item === null || item === undefined) return "";
+  if (typeof item === "string") return item;
+  return String(item);
+}
 
 function toInt(value: unknown): number {
   if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;

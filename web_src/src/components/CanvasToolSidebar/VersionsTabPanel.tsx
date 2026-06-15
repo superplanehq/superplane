@@ -2,6 +2,7 @@ import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanva
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
+import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { DraftBranchRow } from "./DraftBranchRow";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
@@ -10,6 +11,7 @@ import { VersionRow } from "./VersionsTabPanelRow";
 export interface VersionsTabPanelProps {
   scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
+  liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   pendingApprovalVersions?: Array<{
     version: CanvasesCanvasVersion;
@@ -22,7 +24,6 @@ export interface VersionsTabPanelProps {
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
-  isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
@@ -32,6 +33,7 @@ export interface VersionsTabPanelProps {
   changeRequestApprovalConfig?: CanvasChangeManagement;
   draftBranches?: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
+  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   onOpenDraftBranch?: (branchName: string) => void;
   onDeleteDraftBranch?: (versionId: string) => void;
   deleteDraftBranchPending?: boolean;
@@ -52,13 +54,13 @@ type VersionRowItem = {
 export function VersionsTabPanel({
   scrollPersistenceKey,
   liveCanvasVersionId,
+  liveCanvasVersion,
   selectedCanvasVersion,
   pendingApprovalVersions,
   rejectedVersions,
   liveVersions,
   liveVersionChangeRequestsByVersionId,
   canUpdateCanvas,
-  isTemplate,
   canvasDeletedRemotely,
   onUseVersion,
   onVersionNodeDiffContextChange,
@@ -68,6 +70,7 @@ export function VersionsTabPanel({
   changeRequestApprovalConfig,
   draftBranches,
   activeDraftBranch,
+  draftBranchEditStatusByVersionId,
   onOpenDraftBranch,
   onDeleteDraftBranch,
   deleteDraftBranchPending,
@@ -83,6 +86,7 @@ export function VersionsTabPanel({
     setRejectedVersionsExpanded,
   } = useVersionsPanelData({
     liveCanvasVersionId,
+    liveCanvasVersion,
     selectedCanvasVersion,
     pendingApprovalVersions,
     rejectedVersions,
@@ -108,15 +112,12 @@ export function VersionsTabPanel({
         data-testid="versions-sidebar-scroll"
         onScroll={handleScroll}
       >
-        <VersionsNotices
-          canUpdateCanvas={canUpdateCanvas}
-          canvasDeletedRemotely={canvasDeletedRemotely}
-          isTemplate={isTemplate}
-        />
+        <VersionsNotices canUpdateCanvas={canUpdateCanvas} canvasDeletedRemotely={canvasDeletedRemotely} />
 
         <DraftBranchesSection
           drafts={draftBranches ?? []}
           activeDraftBranch={activeDraftBranch}
+          draftBranchEditStatusByVersionId={draftBranchEditStatusByVersionId}
           canUpdateCanvas={canUpdateCanvas}
           deleteDraftBranchPending={deleteDraftBranchPending}
           onOpenDraftBranch={onOpenDraftBranch}
@@ -151,6 +152,7 @@ export function VersionsTabPanel({
 
 function useVersionsPanelData({
   liveCanvasVersionId,
+  liveCanvasVersion,
   selectedCanvasVersion,
   pendingApprovalVersions,
   rejectedVersions,
@@ -162,6 +164,7 @@ function useVersionsPanelData({
 }: Pick<
   VersionsTabPanelProps,
   | "liveCanvasVersionId"
+  | "liveCanvasVersion"
   | "selectedCanvasVersion"
   | "pendingApprovalVersions"
   | "rejectedVersions"
@@ -184,7 +187,8 @@ function useVersionsPanelData({
     },
     [onVersionNodeDiffContextChange],
   );
-  const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, liveVersions[0]);
+  const baselineVersion = liveVersions[0] ?? liveCanvasVersion ?? undefined;
+  const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, baselineVersion);
   const liveItems = buildLiveItems({
     liveCanvasVersionId,
     liveVersions,
@@ -193,7 +197,7 @@ function useVersionsPanelData({
     onLoadMoreLiveVersions,
     selectedVersionId,
   });
-  const rejectedItems = buildRejectedItems(rejectedList, selectedVersionId, liveVersions[0]);
+  const rejectedItems = buildRejectedItems(rejectedList, selectedVersionId, baselineVersion);
   const hasNoVersions = liveVersions.length === 0 && pendingItems.length === 0 && rejectedItems.length === 0;
 
   return {
@@ -211,6 +215,7 @@ function useVersionsPanelData({
 function DraftBranchesSection({
   drafts,
   activeDraftBranch,
+  draftBranchEditStatusByVersionId,
   canUpdateCanvas,
   deleteDraftBranchPending,
   onOpenDraftBranch,
@@ -218,6 +223,7 @@ function DraftBranchesSection({
 }: {
   drafts: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
+  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   canUpdateCanvas: boolean;
   deleteDraftBranchPending?: boolean;
   onOpenDraftBranch?: (branchName: string) => void;
@@ -242,6 +248,7 @@ function DraftBranchesSection({
             key={branchName || draftVersionId(draft)}
             draft={draft}
             isActive={branchName === activeDraftBranch}
+            editStatus={draftBranchEditStatusByVersionId?.get(draftVersionId(draft) ?? "") ?? "no-changes"}
             canUpdateCanvas={canUpdateCanvas}
             deletePending={deleteDraftBranchPending}
             onOpen={(nextBranchName) => onOpenDraftBranch?.(nextBranchName)}
@@ -256,11 +263,9 @@ function DraftBranchesSection({
 function VersionsNotices({
   canUpdateCanvas,
   canvasDeletedRemotely,
-  isTemplate,
 }: {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
-  isTemplate: boolean;
 }) {
   return (
     <>
@@ -270,7 +275,6 @@ function VersionsNotices({
       {canvasDeletedRemotely ? (
         <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
-      {isTemplate ? <p className="px-4 py-2 text-xs text-slate-600">Template canvases are read-only.</p> : null}
     </>
   );
 }
