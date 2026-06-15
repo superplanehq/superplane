@@ -121,6 +121,51 @@ func Test__CreateAlertingPolicy__Execute(t *testing.T) {
 		assert.Equal(t, []string{"projects/my-project/notificationChannels/9"}, postBody["notificationChannels"])
 	})
 
+	t.Run("PromQL condition -> builds conditionPrometheusQueryLanguage", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return alertPolicyJSON("projects/my-project/alertPolicies/777", "PromQL alert", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		cfg := map[string]any{
+			"displayName":              "PromQL alert",
+			"conditionKind":            conditionKindPromQL,
+			"promqlQuery":              "rate(http_requests_total[5m]) > 100",
+			"promqlDuration":           "60s",
+			"promqlEvaluationInterval": "30s",
+		}
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{Configuration: cfg, ExecutionState: state}))
+		assert.True(t, state.Passed)
+
+		conditions := postBody["conditions"].([]any)
+		require.Len(t, conditions, 1)
+		cond := conditions[0].(map[string]any)
+		pql := cond["conditionPrometheusQueryLanguage"].(map[string]any)
+		assert.Equal(t, "rate(http_requests_total[5m]) > 100", pql["query"])
+		assert.Equal(t, "60s", pql["duration"])
+		assert.Equal(t, "30s", pql["evaluationInterval"])
+		// No threshold condition is built for a PromQL policy.
+		_, hasThreshold := cond["conditionThreshold"]
+		assert.False(t, hasThreshold)
+	})
+
+	t.Run("PromQL condition requires a query", func(t *testing.T) {
+		withFactory(&mockClient{projectID: "my-project"})
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"displayName": "x", "conditionKind": conditionKindPromQL},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "promqlQuery is required")
+	})
+
 	t.Run("multiple conditions + AND combiner + strategy", func(t *testing.T) {
 		var postBody map[string]any
 		mc := &mockClient{
