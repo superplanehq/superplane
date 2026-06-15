@@ -28,6 +28,10 @@ func canvasFromYAMLText(text string) (*pb.Canvas, error) {
 		return nil, status.Error(codes.InvalidArgument, "canvas_yaml is empty")
 	}
 
+	if err := lintCanvasConfigurationFieldNames(trimmed); err != nil {
+		return nil, err
+	}
+
 	canvas, err := canvasyaml.ParseCanvasResource([]byte(trimmed))
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas_yaml: %v", err)

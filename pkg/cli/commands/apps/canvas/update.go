@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/cli/layout"
+	canvaslint "github.com/superplanehq/superplane/pkg/lint/canvasyaml"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -77,6 +78,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	yamlBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read canvas yaml: %w", err)
+	}
+
+	if issues, lintErr := canvaslint.LintConfigurationFieldNames(yamlBytes); lintErr != nil {
+		return fmt.Errorf("failed to lint canvas yaml: %w", lintErr)
+	} else if len(issues) > 0 {
+		return fmt.Errorf("%s", canvaslint.FormatIssues(issues))
 	}
 
 	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
