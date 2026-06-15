@@ -17,7 +17,6 @@ var criticalHTTPRoutes = map[string]struct{}{
 	"/api/v1/canvases/{canvas_id}/versions":        {},
 	"/api/v1/canvases/{canvas_id}/runs":            {},
 	"/api/v1/canvases/{canvas_id}/events":          {},
-	"/api/v1/canvases/{canvas_id}/change-requests": {},
 	"/api/v1/canvases/{canvas_id}/repository/file": {},
 	"/api/v1/canvases/{canvas_id}/memory":          {},
 }
@@ -34,7 +33,6 @@ var criticalGRPCMethods = map[string]struct{}{
 	pbCanvases.Canvases_ListCanvasVersions_FullMethodName:             {},
 	pbCanvases.Canvases_ListRuns_FullMethodName:                       {},
 	pbCanvases.Canvases_ListCanvasEvents_FullMethodName:               {},
-	pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName:       {},
 	pbCanvases.Canvases_ListCanvasMemories_FullMethodName:             {},
 }
 
@@ -95,7 +93,7 @@ func MayTraceHTTPRequest(r *http.Request) bool {
 	}
 
 	switch parts[1] {
-	case "runs", "events", "versions", "change-requests", "memory":
+	case "runs", "events", "versions", "memory":
 		return true
 	case "repository":
 		return len(parts) >= 3 && parts[2] == "file"

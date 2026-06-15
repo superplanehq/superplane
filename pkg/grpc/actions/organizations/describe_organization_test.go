@@ -35,7 +35,5 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
 		require.NotNil(t, response.Organization.Spec)
-		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
-		assert.Equal(t, r.Organization.ChangeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
 	})
 }

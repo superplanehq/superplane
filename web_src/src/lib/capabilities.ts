@@ -1,11 +1,11 @@
 import type {
   IntegrationsCapabilityDefinition,
   IntegrationsIntegrationDefinition,
-  SuperplaneActionsAction,
+  ActionsAction,
   TriggersTrigger,
 } from "@/api-client";
 
-export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): SuperplaneActionsAction[] {
+export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): ActionsAction[] {
   return capabilities
     .filter((capability) => capability.type === "TYPE_ACTION")
     .map((capability) => ({

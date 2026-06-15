@@ -9,7 +9,7 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode,
   TriggersTrigger,
-  SuperplaneActionsAction,
+  ActionsAction,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
 import { getExecutionDetails } from "@/pages/app/mappers";
@@ -78,7 +78,7 @@ function buildExecutionTabData(
 function convertSidebarEventToChainItem(
   triggerEvent: SidebarEvent,
   workflowNodes: SuperplaneComponentsNode[] = [],
-  _actions: SuperplaneActionsAction[] = [],
+  _actions: ActionsAction[] = [],
   triggers: TriggersTrigger[] = [],
   getTabData?: (event: SidebarEvent) => any,
 ): ChainItemData {
@@ -138,7 +138,7 @@ interface ExecutionChainPageProps {
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
   workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
-  actions?: SuperplaneActionsAction[]; // Component metadata
+  actions?: ActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   organizationId?: string;

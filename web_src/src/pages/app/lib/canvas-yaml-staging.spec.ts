@@ -81,65 +81,12 @@ kind: Canvas
 metadata:
   name: Empty
 spec:
-  changeManagement:
-    enabled: true
 `;
 
     expect(parseCanvasYamlToSpec(yamlText)).toEqual({
       nodes: [],
       edges: [],
-      changeManagement: { enabled: true },
     });
-  });
-
-  it("canonicalizes change management so default fields do not create spurious diffs", () => {
-    // Live spec as returned by the API: proto3 defaults populated.
-    const live: CanvasesCanvas = {
-      metadata: { id: "canvas-1", name: "galactic-vector", description: "" },
-      spec: {
-        nodes: [],
-        edges: [],
-        changeManagement: {
-          enabled: false,
-          approvals: [{ type: "TYPE_ANYONE", userId: "", roleName: "" }],
-        },
-      },
-    };
-
-    // Draft spec from local edits: defaults omitted.
-    const draft: CanvasesCanvas = {
-      metadata: { id: "canvas-1", name: "galactic-vector", description: "" },
-      spec: {
-        nodes: [],
-        edges: [],
-        changeManagement: {
-          approvals: [{ type: "TYPE_ANYONE" }],
-        },
-      },
-    };
-
-    const liveYaml = buildCanvasYamlFromWorkflow(live);
-    const draftYaml = buildCanvasYamlFromWorkflow(draft);
-
-    expect(liveYaml).toBe(draftYaml);
-    expect(liveYaml).not.toContain("enabled:");
-    expect(liveYaml).not.toContain("userId:");
-    expect(liveYaml).not.toContain("roleName:");
-    expect(liveYaml).toContain("type: TYPE_ANYONE");
-  });
-
-  it("keeps a real change management change visible in the diff", () => {
-    const enabled: CanvasesCanvas = {
-      metadata: { id: "canvas-1", name: "galactic-vector", description: "" },
-      spec: { nodes: [], edges: [], changeManagement: { enabled: true, approvals: [{ type: "TYPE_ANYONE" }] } },
-    };
-    const disabled: CanvasesCanvas = {
-      metadata: { id: "canvas-1", name: "galactic-vector", description: "" },
-      spec: { nodes: [], edges: [], changeManagement: { enabled: false, approvals: [{ type: "TYPE_ANYONE" }] } },
-    };
-
-    expect(buildCanvasYamlFromWorkflow(enabled)).toContain("enabled: true");
-    expect(buildCanvasYamlFromWorkflow(disabled)).not.toContain("enabled:");
   });
 
   it("quotes position y keys when exporting yaml", () => {

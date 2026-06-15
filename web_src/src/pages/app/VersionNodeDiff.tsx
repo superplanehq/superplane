@@ -1,16 +1,13 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import { useMemo } from "react";
 import "react-diff-view/style/index.css";
-import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 import type { VersionNodeDiffItem, VersionNodeDiffSummary } from "./summarizeNodeDiff";
-import { buildInitials } from "./versionNodeDiffUtils";
 
 type DiffLine = VersionNodeDiffItem["lines"][number];
 
-/** Shared +N added / ~M updated / -K removed row (Create Change Request + version diff accordions). */
+/** Shared +N added / ~M updated / -K removed row for version diff accordions. */
 export function NodeDiffSummaryCounts({
   addedCount,
   updatedCount,
@@ -138,46 +135,6 @@ export function VersionNodeDiffAccordion({
           ))}
         </Accordion>
       )}
-    </div>
-  );
-}
-
-export function ChangeRequestDescriptionCard({
-  ownerName,
-  ownerAvatarUrl,
-  timestamp,
-  content,
-  actionLabel = "commented",
-}: {
-  ownerName: string;
-  ownerAvatarUrl?: string;
-  timestamp?: string;
-  content: string;
-  actionLabel?: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <Avatar className="mt-1 h-8 w-8">
-        <AvatarImage src={ownerAvatarUrl} alt={ownerName} />
-        <AvatarFallback className="text-[10px] font-medium">{buildInitials(ownerName)}</AvatarFallback>
-      </Avatar>
-      <div className="relative min-w-0 flex-1">
-        <div className="rounded-md border border-slate-200 bg-white">
-          <div className="relative border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            <span className="pointer-events-none absolute -left-2 top-1/2 z-10 h-0 w-0 -translate-y-1/2 border-y-[8px] border-y-transparent border-r-[8px] border-r-slate-200" />
-            <span className="pointer-events-none absolute -left-[7px] top-1/2 z-10 h-0 w-0 -translate-y-1/2 border-y-[7px] border-y-transparent border-r-[7px] border-r-slate-50" />
-            <span className="font-semibold text-slate-900">{ownerName}</span>
-            <span>
-              {" "}
-              {actionLabel}
-              {timestamp ? ` on ${timestamp}` : ""}
-            </span>
-          </div>
-          <div className="p-3">
-            <WorkflowMarkdownPreview content={content} />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
