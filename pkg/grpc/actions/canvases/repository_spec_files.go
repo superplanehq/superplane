@@ -7,13 +7,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -174,83 +170,6 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-// ApplyRepositorySpecFileOperations parses canvas.yaml/console.yaml content into
-// the draft version row. It is the validated write path shared by the
-// staging-commit flow (CommitCanvasStaging) and the direct-commit flow
-// (CommitCanvasRepositoryFiles). When autoLayout is set it lays out canvas.yaml
-// during the write; when discardStaging is set it drops any staged edits for the
-// version in the same transaction as the version-row write.
-func ApplyRepositorySpecFileOperations(
-	ctx context.Context,
-	usageService usage.Service,
-	encryptor crypto.Encryptor,
-	registry *registry.Registry,
-	organizationID string,
-	canvasID string,
-	versionID string,
-	webhookBaseURL string,
-	authService authorization.Authorization,
-	autoLayout *pb.CanvasAutoLayout,
-	discardStaging bool,
-	operations []*pb.CanvasRepositoryFileOperation,
-) error {
-	if strings.TrimSpace(versionID) == "" {
-		return status.Error(codes.InvalidArgument, "version_id is required for canvas.yaml and console.yaml updates")
-	}
-
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-		if operation.GetDelete() {
-			return status.Errorf(codes.InvalidArgument, "%q cannot be deleted", operation.GetPath())
-		}
-
-		normalized := normalizeRepositoryFilePath(operation.GetPath())
-		content := string(operation.GetContent())
-
-		switch normalized {
-		case CanvasYAMLRepositoryPath:
-			pbCanvas, err := canvasFromYAMLText(content)
-			if err != nil {
-				return err
-			}
-
-			_, err = UpdateCanvasVersionWithUsage(
-				ctx,
-				usageService,
-				encryptor,
-				registry,
-				organizationID,
-				canvasID,
-				versionID,
-				pbCanvas,
-				autoLayout,
-				webhookBaseURL,
-				authService,
-				discardStaging,
-			)
-			if err != nil {
-				return err
-			}
-		case ConsoleYAMLRepositoryPath:
-			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
-			if err != nil {
-				return err
-			}
-
-			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging)
-			if err != nil {
-				return err
-			}
-		default:
-			return status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", operation.GetPath())
-		}
-	}
-
-	return nil
-}
-
 // ParseAndValidateCanvasYAML parses canvas.yaml text and runs the same registry
 // validation as the commit path, returning materialized nodes/edges (carrying
 // per-node error/warning messages) without persisting anything. Agent tools use
@@ -268,33 +187,4 @@ func ParseAndValidateCanvasYAML(registry *registry.Registry, organizationID, tex
 func ValidateConsoleYAML(text string) error {
 	_, _, err := consolePanelsLayoutFromYAMLText(text)
 	return err
-}
-
-func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
-	if !hasAutoLayout {
-		return nil
-	}
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
-		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
-		len(autoLayout.NodeIds) == 0 {
-		return nil
-	}
-	return autoLayout
-}
-
-func splitRepositoryFileOperations(operations []*pb.CanvasRepositoryFileOperation) (specOps []*pb.CanvasRepositoryFileOperation, gitOps []*pb.CanvasRepositoryFileOperation) {
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-		if IsRepositorySpecFilePath(operation.GetPath()) {
-			specOps = append(specOps, operation)
-			continue
-		}
-		gitOps = append(gitOps, operation)
-	}
-	return specOps, gitOps
 }

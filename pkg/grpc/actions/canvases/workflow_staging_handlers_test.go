@@ -20,11 +20,11 @@ func setupStagingDraft(t *testing.T) (*support.ResourceRegistry, context.Context
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	created, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), "")
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "staging-draft")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
 	require.NoError(t, err)
 
-	return r, ctx, canvas.ID.String(), created.GetVersion().GetMetadata().GetId()
+	return r, ctx, canvasID, created.GetVersion().GetMetadata().GetId()
 }
 
 func TestStageRepositorySpecFileOperations(t *testing.T) {
@@ -122,10 +122,13 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
-	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
+	// The response is optimistic (the commit is authoritative; materialization is
+	// async), so it identifies the version; the materialized name is asserted via
+	// the version row below.
+	assert.Equal(t, versionID, resp.GetVersion().GetMetadata().GetId())
 
 	// Version row is updated and staging is cleared.
 	updated, err := models.FindCanvasVersion(canvasUUID, versionUUID)
@@ -142,11 +145,14 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	created, err := CreateCanvasVersion(ctx, orgID, canvas.ID.String(), "")
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "stage-arbitrary-file")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, orgID, canvasID, "")
 	require.NoError(t, err)
-	canvasID := canvas.ID.String()
 	versionID := created.GetVersion().GetMetadata().GetId()
+
+	repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
+	require.NoError(t, err)
+	_ = repository
 
 	// Staging an arbitrary (non-spec) repository file flips the staging state and
 	// reports the path so the UI switches to Reset/Commit.
@@ -175,7 +181,12 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
-	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+	// Staged files are committed to the draft branch, not main.
+	draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(versionID))
+	require.NoError(t, err)
+	require.NotNil(t, draftVersion.BranchName)
+
+	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", *draftVersion.BranchName)
 	require.NoError(t, err)
 	committed, err := io.ReadAll(reader)
 	require.NoError(t, err)
@@ -185,6 +196,119 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	hasStaging, err := models.HasWorkflowStaging(uuid.MustParse(versionID))
 	require.NoError(t, err)
 	assert.False(t, hasStaging)
+}
+
+// TestCommitCanvasStagingUpdatesExistingFile reproduces the Files tab bug: a
+// repository file is committed once (README.md = "test"), then edited and
+// committed again ("test modified"). The second commit must persist the new
+// content to the draft branch instead of reverting to the original.
+func TestCommitCanvasStagingUpdatesExistingFile(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "commit-update-existing")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, orgID, canvasID, "")
+	require.NoError(t, err)
+	versionID := created.GetVersion().GetMetadata().GetId()
+
+	repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
+	require.NoError(t, err)
+
+	draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(versionID))
+	require.NoError(t, err)
+	require.NotNil(t, draftVersion.BranchName)
+	draftBranch := *draftVersion.BranchName
+
+	readReadme := func() string {
+		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", draftBranch)
+		require.NoError(t, err)
+		content, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		require.NoError(t, reader.Close())
+		return string(content)
+	}
+
+	// readCommitted mirrors the editor's read path (GET /repository/file with the
+	// draft version_id), which must reflect content committed to the draft branch.
+	readCommitted := func() (string, error) {
+		return ReadCommittedRepositoryFile(ctx, r.GitProvider, repository.RepoID, orgID, canvasID, versionID, "README.md")
+	}
+
+	// First cycle: create README.md = "test".
+	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: "README.md", Content: []byte("test")},
+	})
+	require.NoError(t, err)
+	_, err = CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.NoError(t, err)
+	require.Equal(t, "test", readReadme())
+
+	committed, err := readCommitted()
+	require.NoError(t, err)
+	require.Equal(t, "test", committed)
+
+	// Second cycle: modify README.md = "test modified".
+	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: "README.md", Content: []byte("test modified")},
+	})
+	require.NoError(t, err)
+	_, err = CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.NoError(t, err)
+
+	// Git on the draft branch has the new content...
+	assert.Equal(t, "test modified", readReadme(), "second commit must persist the updated content to the draft branch")
+
+	// ...and the editor's committed read for the draft version must return it too
+	// (the bug read the default branch instead, reverting to the original).
+	committed, err = readCommitted()
+	require.NoError(t, err)
+	assert.Equal(t, "test modified", committed, "committed read for a draft version must come from the draft branch")
+}
+
+// TestHasUnpublishedRepositoryFileChanges confirms the publish-readiness bug: a
+// draft with a committed repository file (README.md) must report unpublished file
+// changes, since the spec-based graph/console diffs do not cover arbitrary files.
+// Without this signal the Publish button stays disabled and the Files tab shows no
+// blue dot after committing a file edit.
+func TestHasUnpublishedRepositoryFileChanges(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "unpublished-file-changes")
+	created, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, orgID, canvasID, "")
+	require.NoError(t, err)
+	versionID := created.GetVersion().GetMetadata().GetId()
+
+	repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
+	require.NoError(t, err)
+
+	changedPaths := func() []string {
+		paths, changedErr := ListUnpublishedRepositoryFileChanges(ctx, r.GitProvider, repository.RepoID, orgID, canvasID, versionID)
+		require.NoError(t, changedErr)
+		return paths
+	}
+	hasChanges := func() bool {
+		changed, changedErr := HasUnpublishedRepositoryFileChanges(ctx, r.GitProvider, repository.RepoID, orgID, canvasID, versionID)
+		require.NoError(t, changedErr)
+		return changed
+	}
+
+	// A fresh draft branched from live has no committed file changes.
+	assert.False(t, hasChanges(), "fresh draft must report no unpublished file changes")
+	assert.Empty(t, changedPaths(), "fresh draft must report no changed paths")
+
+	// Committing a repository file to the draft branch is an unpublished change.
+	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: "README.md", Content: []byte("hello")},
+	})
+	require.NoError(t, err)
+	_, err = CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.NoError(t, err)
+
+	assert.True(t, hasChanges(), "committing a repository file to the draft must report unpublished file changes")
+	assert.Equal(t, []string{"README.md"}, changedPaths(), "the committed repository file must be listed as changed vs live")
 }
 
 func TestStagedReadRequiresDraftOwner(t *testing.T) {

@@ -1,4 +1,4 @@
-package canvases
+package changerequests
 
 import (
 	"testing"
@@ -16,7 +16,7 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalNodeAddition(t *te
 		Position:      models.Position{X: 10, Y: 20},
 	}
 
-	diff := computeCanvasChangeRequestDiff(
+	changed, conflicting := ComputeCanvasChangeRequestDiff(
 		nil,
 		nil,
 		[]models.Node{node},
@@ -25,8 +25,8 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalNodeAddition(t *te
 		nil,
 	)
 
-	assert.Equal(t, []string{"node-a"}, diff.ChangedNodeIDs)
-	assert.Empty(t, diff.ConflictingNodeIDs)
+	assert.Equal(t, []string{"node-a"}, changed)
+	assert.Empty(t, conflicting)
 }
 
 func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalNodeUpdate(t *testing.T) {
@@ -43,7 +43,7 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalNodeUpdate(t *test
 		Configuration: map[string]any{"foo": "new"},
 	}
 
-	diff := computeCanvasChangeRequestDiff(
+	changed, conflicting := ComputeCanvasChangeRequestDiff(
 		[]models.Node{baseNode},
 		nil,
 		[]models.Node{updatedNode},
@@ -52,8 +52,8 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalNodeUpdate(t *test
 		nil,
 	)
 
-	assert.Equal(t, []string{"node-a"}, diff.ChangedNodeIDs)
-	assert.Empty(t, diff.ConflictingNodeIDs)
+	assert.Equal(t, []string{"node-a"}, changed)
+	assert.Empty(t, conflicting)
 }
 
 func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalEdgeAddition(t *testing.T) {
@@ -61,7 +61,7 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalEdgeAddition(t *te
 	nodeB := models.Node{ID: "node-b", Name: "Node B", Type: models.NodeTypeComponent}
 	edge := models.Edge{SourceID: "node-a", TargetID: "node-b", Channel: "default"}
 
-	diff := computeCanvasChangeRequestDiff(
+	changed, conflicting := ComputeCanvasChangeRequestDiff(
 		[]models.Node{nodeA, nodeB},
 		nil,
 		[]models.Node{nodeA, nodeB},
@@ -70,8 +70,8 @@ func TestComputeCanvasChangeRequestDiff_NoConflictForIdenticalEdgeAddition(t *te
 		[]models.Edge{edge},
 	)
 
-	assert.ElementsMatch(t, []string{"node-a", "node-b"}, diff.ChangedNodeIDs)
-	assert.Empty(t, diff.ConflictingNodeIDs)
+	assert.ElementsMatch(t, []string{"node-a", "node-b"}, changed)
+	assert.Empty(t, conflicting)
 }
 
 func TestComputeCanvasChangeRequestDiff_ConflictForDifferentNodeUpdate(t *testing.T) {
@@ -94,7 +94,7 @@ func TestComputeCanvasChangeRequestDiff_ConflictForDifferentNodeUpdate(t *testin
 		Configuration: map[string]any{"foo": "version"},
 	}
 
-	diff := computeCanvasChangeRequestDiff(
+	changed, conflicting := ComputeCanvasChangeRequestDiff(
 		[]models.Node{baseNode},
 		nil,
 		[]models.Node{liveNode},
@@ -103,6 +103,6 @@ func TestComputeCanvasChangeRequestDiff_ConflictForDifferentNodeUpdate(t *testin
 		nil,
 	)
 
-	assert.Equal(t, []string{"node-a"}, diff.ChangedNodeIDs)
-	assert.Equal(t, []string{"node-a"}, diff.ConflictingNodeIDs)
+	assert.Equal(t, []string{"node-a"}, changed)
+	assert.Equal(t, []string{"node-a"}, conflicting)
 }

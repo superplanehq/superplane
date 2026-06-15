@@ -1,4 +1,4 @@
-package canvases
+package changerequests
 
 import (
 	"reflect"
@@ -21,6 +21,20 @@ type comparableCanvasNode struct {
 type canvasChangeRequestDiff struct {
 	ChangedNodeIDs     []string
 	ConflictingNodeIDs []string
+}
+
+// ComputeCanvasChangeRequestDiff reports the node IDs changed by a version
+// relative to its base, and those that conflict with concurrent live changes.
+func ComputeCanvasChangeRequestDiff(
+	baseNodes []models.Node,
+	baseEdges []models.Edge,
+	liveNodes []models.Node,
+	liveEdges []models.Edge,
+	versionNodes []models.Node,
+	versionEdges []models.Edge,
+) (changedNodeIDs []string, conflictingNodeIDs []string) {
+	diff := computeCanvasChangeRequestDiff(baseNodes, baseEdges, liveNodes, liveEdges, versionNodes, versionEdges)
+	return diff.ChangedNodeIDs, diff.ConflictingNodeIDs
 }
 
 func computeCanvasChangeRequestDiff(
