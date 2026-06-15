@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -358,6 +359,22 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 		}
 
 		c.recordSecretWrite(name, telemetry.IntegrationSecretOperationCreate)
+		return nil
+	}
+
+	//
+	// Skip the write when the value is unchanged. We compare decrypted plaintext
+	// because the random AES-GCM nonce makes the stored ciphertext differ on every
+	// encryption, so a ciphertext comparison would never match.
+	//
+	currentValue, err := c.encryptor.Decrypt(
+		context.Background(),
+		secret.Value,
+		[]byte(c.integration.ID.String()),
+	)
+	if err == nil && bytes.Equal(currentValue, value) {
+		logging.ForIntegration(*c.integration).WithField("secret_name", name).
+			Debug("Integration secret write skipped (unchanged)")
 		return nil
 	}
 

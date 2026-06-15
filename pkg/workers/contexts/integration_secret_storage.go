@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -175,6 +176,22 @@ func (s *IntegrationSecretStorage) Update(name string, value string) error {
 	secret, err := s.findSecret(name)
 	if err != nil {
 		return err
+	}
+
+	//
+	// Skip the write when the value is unchanged. We compare decrypted plaintext
+	// because the random AES-GCM nonce makes the stored ciphertext differ on every
+	// encryption, so a ciphertext comparison would never match.
+	//
+	currentValue, err := s.encryptor.Decrypt(
+		context.Background(),
+		secret.Value,
+		[]byte(s.integration.ID.String()),
+	)
+	if err == nil && bytes.Equal(currentValue, []byte(value)) {
+		logging.ForIntegration(*s.integration).WithField("secret_name", name).
+			Debug("Integration secret write skipped (unchanged)")
+		return nil
 	}
 
 	encryptedValue, err := s.encryptor.Encrypt(
