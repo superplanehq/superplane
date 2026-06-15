@@ -227,7 +227,9 @@ export function useAgentDraftEditor({
       }
 
       if (!isDraftVersion(version)) {
-        showErrorToast("Agent draft is no longer available");
+        if (source === "button") {
+          showErrorToast("Agent draft is no longer available");
+        }
         return "unavailable";
       }
 

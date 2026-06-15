@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	gormlogger "gorm.io/gorm/logger"
@@ -51,7 +52,9 @@ func TestGormTimeoutLoggerTraceRecordsDatabaseSpan(t *testing.T) {
 	logger := newGormTimeoutLogger(gormlogger.Discard)
 	begin := time.Now().Add(-10 * time.Millisecond)
 	logger.Trace(ctx, begin, func() (string, int64) {
-		return "SELECT * FROM users WHERE id = $1", 1
+		sql, params := `SELECT * FROM "secrets" WHERE "secrets"."value" = $1`, []interface{}{"super-secret-token"}
+		sql, params = logger.(*gormTimeoutLogger).ParamsFilter(ctx, sql, params...)
+		return `SELECT * FROM "secrets" WHERE "secrets"."value" = '` + params[0].(string) + `'`, 1
 	}, nil)
 	parent.End()
 
@@ -60,12 +63,26 @@ func TestGormTimeoutLoggerTraceRecordsDatabaseSpan(t *testing.T) {
 
 	var dbSpan tracetest.SpanStub
 	for _, span := range spans {
-		if span.Name == "db.select users" {
+		if strings.HasPrefix(span.Name, "db.select") && strings.Contains(span.Name, "secrets") {
 			dbSpan = span
 			break
 		}
 	}
-	require.Equal(t, "db.select users", dbSpan.Name)
+	require.NotEmpty(t, dbSpan.Name)
+
+	statement := attributeValue(dbSpan.Attributes, "db.statement")
+	require.NotEmpty(t, statement)
+	assert.NotContains(t, statement, "super-secret-token")
+	assert.Contains(t, statement, `'?'`)
+}
+
+func attributeValue(attrs []attribute.KeyValue, key string) string {
+	for _, attr := range attrs {
+		if string(attr.Key) == key {
+			return attr.Value.AsString()
+		}
+	}
+	return ""
 }
 
 func TestGormTimeoutLoggerTraceDelegatesWithoutRecordingSpan(t *testing.T) {

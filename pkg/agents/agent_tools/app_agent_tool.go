@@ -104,7 +104,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"canvas_yaml": {
 				Type:        "string",
-				Description: "For update_draft. Complete canonical canvas.yaml content to save.",
+				Description: "For update_draft. Complete canonical live canvas.yaml content to save. Unknown fields are rejected; do not include template-only or UI-only fields such as metadata.isTemplate.",
 			},
 			"console_yaml": {
 				Type:        "string",
