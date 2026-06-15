@@ -12,6 +12,8 @@ import (
 // Reports metrics at periodic intervals.
 //
 
+const activeWindow = 24 * time.Hour
+
 type Periodic struct {
 	ctx                  context.Context
 	lastPoolWaitCount    int64
@@ -49,6 +51,8 @@ func (p *Periodic) report() {
 	p.reportDraftsTotal()
 	p.reportIntegrationsTotal()
 	p.reportIntegrationSecretsTotal()
+	p.reportUsersActive()
+	p.reportWorkflowsActive()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -192,6 +196,24 @@ func (p *Periodic) reportIntegrationSecretsTotal() {
 	RecordIntegrationSecretsTotal(p.ctx, count)
 }
 
+func (p *Periodic) reportUsersActive() {
+	count, err := countActiveUsers(activeWindow)
+	if err != nil {
+		return
+	}
+
+	RecordUsersActiveCount(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowsActive() {
+	count, err := countActiveWorkflows(activeWindow)
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowsActiveCount(p.ctx, count)
+}
+
 func countStuckQueueNodes() (int64, error) {
 	db := database.Conn()
 
@@ -326,6 +348,41 @@ func countIntegrations() (int64, error) {
 	var count int64
 
 	err := database.Conn().Model(&models.Integration{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countActiveUsers(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Model(&models.User{}).
+		Where("last_active_at >= ?", since).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countActiveWorkflows(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_runs AS wr").
+		Joins("JOIN workflows AS w ON w.id = wr.workflow_id").
+		Where("wr.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Distinct("wr.workflow_id").
+		Count(&count).
+		Error
 	if err != nil {
 		return 0, err
 	}

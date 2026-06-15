@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"google.golang.org/grpc/metadata"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -473,4 +475,98 @@ func (s *stuckQueueItemsTestSteps) CreateRootEvent() {
 	}
 
 	require.NoError(s.t, database.Conn().Create(s.rootEvent).Error)
+}
+
+func TestCountActiveUsers(t *testing.T) {
+	database.TruncateTables()
+
+	org, userID := createActiveUserTestFixtures(t)
+	now := time.Now()
+
+	require.NoError(t, models.TouchUserLastActiveAt(userID, now))
+
+	inactiveUser, err := models.CreateServiceAccount(database.Conn(), org.ID, "inactive", nil, userID)
+	require.NoError(t, err)
+	require.NoError(t, models.TouchUserLastActiveAt(inactiveUser.ID, now.Add(-25*time.Hour)))
+
+	deletedUser, err := models.CreateServiceAccount(database.Conn(), org.ID, "deleted", nil, userID)
+	require.NoError(t, err)
+	require.NoError(t, models.TouchUserLastActiveAt(deletedUser.ID, now))
+	require.NoError(t, deletedUser.Delete())
+
+	count, err := countActiveUsers(24 * time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountActiveWorkflows(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	inactiveSteps := stuckQueueItemsTestSteps{t: t}
+	inactiveSteps.CreateWorkflow()
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+
+	now := time.Now()
+	createWorkflowRun(t, activeSteps.workflow.ID, *activeSteps.workflow.LiveVersionID, now)
+	createWorkflowRun(t, inactiveSteps.workflow.ID, *inactiveSteps.workflow.LiveVersionID, now.Add(-25*time.Hour))
+	createWorkflowRun(t, deletedSteps.workflow.ID, *deletedSteps.workflow.LiveVersionID, now)
+	createWorkflowRun(t, activeSteps.workflow.ID, *activeSteps.workflow.LiveVersionID, now.Add(-time.Minute))
+	require.NoError(t, deletedSteps.workflow.SoftDelete())
+
+	count, err := countActiveWorkflows(24 * time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestRecordUserDatabaseActivity_UpdatesUserLastActiveAt(t *testing.T) {
+	database.TruncateTables()
+	resetUserActivityThrottleForTests()
+
+	org, userID := createActiveUserTestFixtures(t)
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", userID.String()))
+	recordUserDatabaseActivity(ctx)
+
+	require.Eventually(t, func() bool {
+		user, err := models.FindActiveUserByID(org.ID.String(), userID.String())
+		if err != nil {
+			return false
+		}
+
+		return user.LastActiveAt != nil
+	}, time.Second, 10*time.Millisecond)
+}
+
+func createActiveUserTestFixtures(t *testing.T) (*models.Organization, uuid.UUID) {
+	t.Helper()
+
+	tx := database.Conn().Begin()
+	org, err := models.CreateOrganizationInTransaction(tx, "active-user-org", "Active User Org")
+	require.NoError(t, err)
+
+	account, err := models.CreateAccountInTransaction(tx, "active-user@example.com", "Active User")
+	require.NoError(t, err)
+
+	user, err := models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit().Error)
+
+	return org, user.ID
+}
+
+func createWorkflowRun(t *testing.T, workflowID, versionID uuid.UUID, createdAt time.Time) {
+	t.Helper()
+
+	run := &models.CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		VersionID:  versionID,
+		State:      models.CanvasRunStateStarted,
+		CreatedAt:  &createdAt,
+		UpdatedAt:  &createdAt,
+	}
+	require.NoError(t, database.Conn().Create(run).Error)
 }

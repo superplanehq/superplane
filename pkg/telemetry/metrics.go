@@ -59,6 +59,8 @@ var (
 	draftsTotalGauge             metric.Int64Gauge
 	integrationsTotalGauge       metric.Int64Gauge
 	integrationSecretsTotalGauge metric.Int64Gauge
+	usersActiveGauge             metric.Int64Gauge
+	workflowsActiveGauge         metric.Int64Gauge
 )
 
 // Operation values for integration secret writes.
@@ -376,6 +378,24 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	usersActiveGauge, err = meter.Int64Gauge(
+		"users.active.count",
+		metric.WithDescription("Number of users with database-modifying activity in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowsActiveGauge, err = meter.Int64Gauge(
+		"workflows.active.count",
+		metric.WithDescription("Number of workflows with at least one run in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	err = registerDBOperationMetricsCallbacks()
 	if err != nil {
 		return err
@@ -646,4 +666,20 @@ func RecordIntegrationSecretsTotal(ctx context.Context, count int64) {
 	}
 
 	integrationSecretsTotalGauge.Record(ctx, count)
+}
+
+func RecordUsersActiveCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	usersActiveGauge.Record(ctx, count)
+}
+
+func RecordWorkflowsActiveCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowsActiveGauge.Record(ctx, count)
 }
