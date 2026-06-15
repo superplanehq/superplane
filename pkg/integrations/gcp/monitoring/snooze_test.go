@@ -44,6 +44,24 @@ func Test__ParseSnoozeName(t *testing.T) {
 	})
 }
 
+func Test__resolveSnoozeName(t *testing.T) {
+	t.Run("same project resolves", func(t *testing.T) {
+		name, err := resolveSnoozeName("projects/elffie/snoozes/9", "elffie")
+		require.NoError(t, err)
+		assert.Equal(t, "projects/elffie/snoozes/9", name)
+	})
+	t.Run("cross-project rejected", func(t *testing.T) {
+		_, err := resolveSnoozeName("projects/other/snoozes/9", "elffie")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cross-project")
+	})
+	t.Run("empty bound project does not block", func(t *testing.T) {
+		name, err := resolveSnoozeName("projects/elffie/snoozes/9", "")
+		require.NoError(t, err)
+		assert.Equal(t, "projects/elffie/snoozes/9", name)
+	})
+}
+
 func Test__CreateSnooze__Execute(t *testing.T) {
 	c := &CreateSnooze{}
 
@@ -136,6 +154,17 @@ func Test__GetSnooze__Execute(t *testing.T) {
 	assert.Equal(t, "Deploy window", data["displayName"])
 }
 
+func Test__GetSnooze__RejectsCrossProject(t *testing.T) {
+	withFactory(&mockClient{projectID: "my-project"})
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	require.NoError(t, (&GetSnooze{}).Execute(core.ExecutionContext{
+		Configuration:  map[string]any{"snooze": "projects/other-project/snoozes/55"},
+		ExecutionState: state,
+	}))
+	assert.False(t, state.Passed)
+	assert.Contains(t, state.FailureMessage, "cross-project")
+}
+
 func Test__ExpireSnooze__Execute(t *testing.T) {
 	e := &ExpireSnooze{}
 
@@ -219,6 +248,14 @@ func Test__expireEndTime(t *testing.T) {
 
 	t.Run("missing interval ends at now", func(t *testing.T) {
 		assert.Equal(t, now.Format(time.RFC3339), expireEndTime(&snooze{}, now))
+	})
+
+	t.Run("unparseable start time collapses to that value (never sub-minute now)", func(t *testing.T) {
+		s := &snooze{Interval: &struct {
+			StartTime string `json:"startTime"`
+			EndTime   string `json:"endTime"`
+		}{StartTime: "not-a-timestamp"}}
+		assert.Equal(t, "not-a-timestamp", expireEndTime(s, now))
 	})
 }
 

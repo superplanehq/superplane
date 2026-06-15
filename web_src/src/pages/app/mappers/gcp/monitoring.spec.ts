@@ -2,12 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { eventStateRegistry } from ".";
 import { buildComponentCtx, buildDetailsCtx, buildExecution, buildOutput } from "./vm_mapper_test_helpers";
-import {
-  createAlertingPolicyMapper,
-  createSnoozeMapper,
-  expireSnoozeMapper,
-  getSnoozeMapper,
-} from "./monitoring";
+import { createAlertingPolicyMapper, createSnoozeMapper, expireSnoozeMapper, getSnoozeMapper } from "./monitoring";
 
 const EXECUTED_AT = "2026-06-08T09:01:00Z";
 
@@ -105,7 +100,13 @@ describe("createAlertingPolicyMapper.getExecutionDetails (PromQL)", () => {
           createdAt: EXECUTED_AT,
           outputs: {
             default: [
-              buildOutput({ displayName: "Demo PromQL Policy", id: "123", enabled: true, severity: "WARNING", conditionsCount: 1 }),
+              buildOutput({
+                displayName: "Demo PromQL Policy",
+                id: "123",
+                enabled: true,
+                severity: "WARNING",
+                conditionsCount: 1,
+              }),
             ],
           },
         },

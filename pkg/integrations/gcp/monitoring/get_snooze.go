@@ -84,14 +84,14 @@ func (g *GetSnooze) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	name, err := parseSnoozeName(spec.Snooze)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", err.Error())
-	}
-
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
+	}
+
+	name, err := resolveSnoozeName(spec.Snooze, client.ProjectID())
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	body, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))

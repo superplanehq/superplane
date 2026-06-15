@@ -44,7 +44,10 @@ export function buildDetailsCtx(overrides?: {
   return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
 }
 
-export function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>, componentName = "gcp.monitoring.createSnooze"): ComponentBaseContext {
+export function buildComponentCtx(
+  nodeOverrides?: Partial<NodeInfo>,
+  componentName = "gcp.monitoring.createSnooze",
+): ComponentBaseContext {
   const node = buildNode({ componentName, ...nodeOverrides });
   return {
     nodes: [node],

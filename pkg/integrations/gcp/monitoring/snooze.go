@@ -90,6 +90,26 @@ func parseSnoozeName(value string) (string, error) {
 	return rel, nil
 }
 
+// resolveSnoozeName parses the selected value into a relative snooze name and
+// verifies it belongs to the integration's project, mirroring resolvePolicyName
+// so cross-project snooze operations are rejected rather than silently hitting
+// another project.
+func resolveSnoozeName(value, project string) (string, error) {
+	name, err := parseSnoozeName(value)
+	if err != nil {
+		return "", err
+	}
+	// parseSnoozeName guarantees the shape projects/<project>/snoozes/<id>.
+	urlProject := strings.Split(name, "/")[1]
+	if project != "" && urlProject != project {
+		return "", fmt.Errorf(
+			"snooze belongs to project %q but this GCP integration is bound to project %q; cross-project operations are not supported",
+			urlProject, project,
+		)
+	}
+	return name, nil
+}
+
 // snoozeSelectorField is the shared "pick a snooze" field used by Get and Expire.
 func snoozeSelectorField() configuration.Field {
 	return configuration.Field{

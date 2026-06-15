@@ -89,14 +89,14 @@ func (e *ExpireSnooze) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	name, err := parseSnoozeName(spec.Snooze)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", err.Error())
-	}
-
 	client, err := getClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
+	}
+
+	name, err := resolveSnoozeName(spec.Snooze, client.ProjectID())
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	// Read the snooze first so the new end time respects Cloud Monitoring's rule
@@ -145,11 +145,15 @@ func (e *ExpireSnooze) Execute(ctx core.ExecutionContext) error {
 // policies can notify again immediately.
 func expireEndTime(s *snooze, now time.Time) string {
 	if s.Interval != nil && s.Interval.StartTime != "" {
-		if start, err := time.Parse(time.RFC3339, s.Interval.StartTime); err == nil {
-			if now.Sub(start) < time.Minute {
-				return s.Interval.StartTime
-			}
+		// End at "now" only when the snooze has already been active for a minute or
+		// more. Otherwise — including when the start time cannot be parsed —
+		// collapse to a zero-length interval (endTime == startTime), which Cloud
+		// Monitoring always accepts as a cancellation. Falling back to "now" here
+		// could yield a sub-minute interval that the API rejects with HTTP 400.
+		if start, err := time.Parse(time.RFC3339, s.Interval.StartTime); err == nil && now.Sub(start) >= time.Minute {
+			return now.Format(time.RFC3339)
 		}
+		return s.Interval.StartTime
 	}
 	return now.Format(time.RFC3339)
 }
