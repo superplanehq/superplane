@@ -81,7 +81,7 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	// - Node state is updated to processing
 	// - Queue item is deleted
 	//
-	err = worker.LockAndProcessNode(logger, *node)
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
@@ -150,7 +150,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
 
-	require.NoError(t, worker.LockAndProcessNode(logger, *node))
+	require.NoError(t, worker.LockAndProcessNode(logger, *node, time.Now()))
 
 	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
@@ -245,7 +245,7 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
 
-	err = worker.LockAndProcessNode(logger, *node)
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
 	// Verify the execution was created with the oldest event
@@ -311,7 +311,7 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	//
 	// Process the node with an empty queue - this should succeed but do nothing.
 	//
-	err = worker.LockAndProcessNode(logger, *node)
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
 	// Verify no executions were created
@@ -379,13 +379,13 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	go func() {
 		worker1 := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 		logger := log.NewEntry(log.New())
-		results <- worker1.LockAndProcessNode(logger, *node)
+		results <- worker1.LockAndProcessNode(logger, *node, time.Now())
 	}()
 
 	go func() {
 		worker2 := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 		logger := log.NewEntry(log.New())
-		results <- worker2.LockAndProcessNode(logger, *node)
+		results <- worker2.LockAndProcessNode(logger, *node, time.Now())
 	}()
 
 	// Collect results - both should succeed (return nil)
@@ -480,7 +480,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	// - Node state should remain ready (not updated to processing)
 	// - Queue item should be deleted
 	//
-	err = worker.LockAndProcessNode(logger, *node)
+	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
 	// Verify execution was created with finished state and failed result
