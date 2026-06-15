@@ -116,7 +116,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 			}
 		}
 
-		return s.writeRepositoryGitFile(ctx, w, user.OrganizationID, canvas, canvasID, path)
+		return s.writeRepositoryGitFile(ctx, w, user, canvas, canvasID, path, versionID)
 	})
 	if errors.Is(err, errRepositoryFileNotFound) {
 		http.Error(w, "File not found", http.StatusNotFound)
@@ -208,28 +208,39 @@ func (s *Server) tryWriteStagedRepositoryFile(
 func (s *Server) writeRepositoryGitFile(
 	ctx context.Context,
 	w http.ResponseWriter,
-	organizationID uuid.UUID,
+	user *models.User,
 	canvas *models.Canvas,
 	canvasID uuid.UUID,
 	path string,
+	versionID string,
 ) error {
-	repository, repoErr := models.FindRepository(organizationID, canvas.ID)
+	repository, repoErr := models.FindRepository(user.OrganizationID, canvas.ID)
 	if repoErr != nil {
 		return errRepositoryNotFound
 	}
 
-	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path)
+	// Reads scoped to a draft version must come from that draft's branch, where
+	// committed Files-tab edits live. Reading the default branch here would
+	// silently return the live content and revert just-committed draft edits.
+	authCtx := authentication.SetUserIdInMetadata(ctx, user.ID.String())
+	content, fileErr := canvases.ReadCommittedRepositoryFile(
+		authCtx,
+		s.gitProvider,
+		repository.RepoID,
+		user.OrganizationID.String(),
+		canvas.ID.String(),
+		versionID,
+		path,
+	)
 	if fileErr != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), fileErr)
 		return errRepositoryFileReadFailed
 	}
 
-	defer reader.Close()
-
 	setInlineFileHeaders(w, path, "application/octet-stream")
-	if _, copyErr := io.Copy(w, reader); copyErr != nil {
-		log.Errorf("Failed to copy file %s in canvas %s: %v", path, canvasID.String(), copyErr)
-		return copyErr
+	if _, writeErr := io.WriteString(w, content); writeErr != nil {
+		log.Errorf("Failed to write file %s in canvas %s: %v", path, canvasID.String(), writeErr)
+		return writeErr
 	}
 
 	return nil

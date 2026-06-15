@@ -1,9 +1,12 @@
 package e2e
 
 import (
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -44,8 +47,11 @@ func (steps *TestHomePageSteps) VisitHomePage() {
 }
 
 func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
-	url := steps.session.Page().URL()
-	assert.Regexp(steps.t, `/apps/[0-9a-f-]{36}`, url)
+	require.Eventually(steps.t, func() bool {
+		url := steps.session.Page().URL()
+		matched, _ := regexp.MatchString(`/apps/[0-9a-f-]{36}`, url)
+		return matched
+	}, 30*time.Second, 500*time.Millisecond)
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
@@ -78,5 +84,4 @@ func (steps *TestHomePageSteps) ClickNewApp() {
 	}
 
 	steps.session.Click(q.Text("Start from scratch"))
-	steps.session.Sleep(3000)
 }
