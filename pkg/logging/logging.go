@@ -13,28 +13,18 @@ func ForEvent(logger *log.Entry, event models.CanvasEvent) *log.Entry {
 	})
 }
 
-func ForExecution(execution *models.CanvasNodeExecution, parent *models.CanvasNodeExecution) *log.Entry {
-	return WithExecution(log.NewEntry(log.StandardLogger()), execution, parent)
+func ForExecution(execution *models.CanvasNodeExecution) *log.Entry {
+	return WithExecution(log.NewEntry(log.StandardLogger()), execution)
 }
 
 func WithExecution(
 	logger *log.Entry,
 	execution *models.CanvasNodeExecution,
-	parent *models.CanvasNodeExecution,
 ) *log.Entry {
-	logEntry := logger.WithFields(log.Fields{
+	return logger.WithFields(log.Fields{
 		"root_event": execution.RootEventID,
 		"execution":  execution.ID,
 	})
-
-	if parent != nil {
-		logEntry = logEntry.WithFields(log.Fields{
-			"parent_execution": parent.ID,
-			"parent":           parent.NodeID,
-		})
-	}
-
-	return logEntry
 }
 
 func ForNode(node models.CanvasNode) *log.Entry {
@@ -42,13 +32,6 @@ func ForNode(node models.CanvasNode) *log.Entry {
 }
 
 func WithNode(logger *log.Entry, node models.CanvasNode) *log.Entry {
-	if node.ParentNodeID != nil {
-		return logger.WithFields(log.Fields{
-			"node_id": node.NodeID,
-			"parent":  node.ParentNodeID,
-		})
-	}
-
 	return logger.WithFields(log.Fields{
 		"node_id": node.NodeID,
 	})

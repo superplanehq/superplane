@@ -265,6 +265,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
@@ -446,7 +447,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -463,7 +464,7 @@ func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) htt
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-account-id", account.ID.String())
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -1283,7 +1284,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
-				Logger:         logging.ForExecution(execution, nil),
+				Logger:         logging.ForExecution(execution),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),

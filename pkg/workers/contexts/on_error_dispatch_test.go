@@ -76,7 +76,7 @@ func Test__DispatchOnError(t *testing.T) {
 		}
 
 		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, map[string]any{"version": "1.4.2"})
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 		require.NoError(t, ctx.Fail(models.CanvasNodeExecutionResultReasonError, "request timeout after 30s"))
@@ -123,7 +123,7 @@ func Test__DispatchOnError(t *testing.T) {
 		}
 
 		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 		require.NoError(t, ctx.Fail("rejected", "approval was rejected"))
@@ -168,7 +168,7 @@ func Test__DispatchOnError__NoOnErrorNodes(t *testing.T) {
 	}
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 	ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 	require.NoError(t, ctx.Fail(models.CanvasNodeExecutionResultReasonError, "boom"))
@@ -217,7 +217,7 @@ func Test__DispatchOnError__LoopPrevention(t *testing.T) {
 	// chains would loop forever).
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, onErrorNodeID, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 	ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
 	require.NoError(t, ctx.Fail(models.CanvasNodeExecutionResultReasonError, "handler blew up"))

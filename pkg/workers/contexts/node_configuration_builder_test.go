@@ -300,7 +300,7 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	// Create executions for the chain
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 	node1Data := map[string]any{"result": "first-filter"}
 	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", &execution1.ID, node1Data)
 
@@ -365,7 +365,7 @@ func Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage(t *testing.
 
 	// The long-lived loop session. Each body iteration branches off it (as in the
 	// real feedback-model loop), so the body executions are siblings.
-	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "loop", rootEvent.ID, rootEvent.ID, nil)
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "loop", rootEvent.ID, rootEvent.ID)
 
 	body1 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body1.ID, map[string]any{"result": "tail"})
@@ -548,7 +548,6 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
-		nil,
 	)
 	node1Data := map[string]any{
 		"step":   1,
@@ -651,15 +650,15 @@ func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *t
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, startNode, "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, action1Node, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, action1Node, rootEvent.ID, rootEvent.ID)
 	action1Data := map[string]any{"value": "from-action-1"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action1Node, "default", &execution1.ID, action1Data)
 
-	execution2 := support.CreateCanvasNodeExecution(t, canvas.ID, action2Node, rootEvent.ID, rootEvent.ID, nil)
+	execution2 := support.CreateCanvasNodeExecution(t, canvas.ID, action2Node, rootEvent.ID, rootEvent.ID)
 	action2Data := map[string]any{"value": "from-action-2"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action2Node, "default", &execution2.ID, action2Data)
 
-	execution3 := support.CreateCanvasNodeExecution(t, canvas.ID, action3Node, rootEvent.ID, rootEvent.ID, nil)
+	execution3 := support.CreateCanvasNodeExecution(t, canvas.ID, action3Node, rootEvent.ID, rootEvent.ID)
 	action3Data := map[string]any{"value": "from-action-3"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action3Node, "default", &execution3.ID, action3Data)
 
@@ -730,7 +729,6 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
-		nil,
 	)
 	node1Data := map[string]any{
 		"step":   1,
@@ -840,7 +838,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution1.ID).
@@ -1095,7 +1093,7 @@ func Test_NodeConfigurationBuilder_Config_ViaNodeReference(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com", "timeout": 30}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputData := map[string]any{"status": "ok"}
@@ -1154,7 +1152,7 @@ func Test_NodeConfigurationBuilder_Config_ViaPrevious(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
 
 	node1Config := map[string]any{"method": "POST", "endpoint": "/api/deploy"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(node1Config)).Error)
 
 	node1Data := map[string]any{"result": "deployed"}
@@ -1216,7 +1214,7 @@ func Test_NodeConfigurationBuilder_Config_ExistingExpressionsStillWork(t *testin
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputData := map[string]any{"status": "ok", "code": 200}
@@ -1277,7 +1275,7 @@ func Test_NodeConfigurationBuilder_Config_ViaPreviousDepthRootPath(t *testing.T)
 
 	rootEventData := map[string]any{"origin": "root"}
 	bootstrapRoot := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", nil, map[string]any{"bootstrap": true})
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, bootstrapRoot.ID, bootstrapRoot.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, bootstrapRoot.ID, bootstrapRoot.ID)
 	node1Config := map[string]any{"region": "us-east-1"}
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(node1Config)).Error)
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", &execution1.ID, rootEventData)
@@ -1341,7 +1339,7 @@ func Test_NodeConfigurationBuilder_Config_DoesNotMutateInputPayload(t *testing.T
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	inputPayload := map[string]any{"status": "ok"}
@@ -1400,7 +1398,7 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://internal.example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputWithConfig := map[string]any{
@@ -1482,7 +1480,7 @@ func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
 		map[string]any{"items": []any{"a", "b", "c"}},
 	)
 
-	forEachExecution := support.CreateCanvasNodeExecution(t, canvas.ID, forEachNode, rootEvent.ID, rootEvent.ID, nil)
+	forEachExecution := support.CreateCanvasNodeExecution(t, canvas.ID, forEachNode, rootEvent.ID, rootEvent.ID)
 
 	now := time.Now()
 	emitItem := func(item string, index int) *models.CanvasEvent {

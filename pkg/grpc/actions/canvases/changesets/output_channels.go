@@ -61,11 +61,6 @@ func listSourceNodeOutputChannels(
 		return []core.OutputChannel{core.DefaultOutputChannel}, nil
 	}
 
-	if sourceNode.Type == models.NodeTypeBlueprint {
-		// TODO: Validate blueprint output channels without doing a blueprint lookup per edge.
-		return nil, nil
-	}
-
 	return nil, fmt.Errorf("node type %s is not supported", sourceNode.Type)
 }
 

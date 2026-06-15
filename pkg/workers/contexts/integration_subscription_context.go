@@ -145,7 +145,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
-		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
+		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution),
 		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
 		CanvasMemory:   NewCanvasMemoryContext(c.tx, execution.WorkflowID),
 	}, nil
