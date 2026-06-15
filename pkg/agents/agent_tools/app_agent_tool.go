@@ -10,6 +10,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitpkg "github.com/superplanehq/superplane/pkg/git"
+	"github.com/superplanehq/superplane/pkg/git/inmemory"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -24,6 +27,7 @@ func init() {
 			WebhookBaseURL: deps.WebhookBaseURL,
 			AuthService:    deps.AuthService,
 			UsageService:   deps.UsageService,
+			GitProvider:    deps.GitProvider,
 		})
 	})
 }
@@ -40,9 +44,19 @@ type AppAgentToolOptions struct {
 	WebhookBaseURL string
 	AuthService    authorization.Authorization
 	UsageService   usage.Service
+	GitProvider    git.Provider
 }
 
 func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
+	gitProvider := opts.GitProvider
+	if gitProvider == nil {
+		var err error
+		gitProvider, err = gitpkg.NewProvider()
+		if err != nil || gitProvider == nil {
+			gitProvider = inmemory.NewProvider()
+		}
+	}
+
 	return &AppAgentTool{
 		actions: canvasactions.NewDefaultRegistry(canvasactions.Dependencies{
 			Encryptor:      opts.Encryptor,
@@ -50,6 +64,7 @@ func NewAppAgentTool(opts AppAgentToolOptions) *AppAgentTool {
 			WebhookBaseURL: opts.WebhookBaseURL,
 			AuthService:    opts.AuthService,
 			UsageService:   opts.UsageService,
+			GitProvider:    gitProvider,
 		}),
 	}
 }

@@ -20,6 +20,8 @@ export function FilesView({
   headerActionsSlotId,
   stagingResetNonce,
   suspendRepositoryFileStaging,
+  hasCanvasSpecDiffVersusLive,
+  hasConsoleSpecDiffVersusLive,
   onSpecFileChange,
   onLocalFilesStagingChange,
   onFlushRepositoryFileStagingReady,
@@ -32,6 +34,8 @@ export function FilesView({
   headerActionsSlotId?: string;
   stagingResetNonce?: number;
   suspendRepositoryFileStaging?: boolean;
+  hasCanvasSpecDiffVersusLive?: boolean;
+  hasConsoleSpecDiffVersusLive?: boolean;
   onSpecFileChange?: (path: string, content: string) => void;
   onLocalFilesStagingChange?: (hasStaging: boolean) => void;
   onFlushRepositoryFileStagingReady?: (flush: (() => Promise<void>) | null) => void;
@@ -45,6 +49,8 @@ export function FilesView({
     headerActionsSlotId,
     stagingResetNonce,
     suspendRepositoryFileStaging,
+    hasCanvasSpecDiffVersusLive,
+    hasConsoleSpecDiffVersusLive,
     onSpecFileChange,
     onLocalFilesStagingChange,
     onFlushRepositoryFileStagingReady,
@@ -107,10 +113,7 @@ export function FilesView({
       {editor.isDiffOpen ? (
         <Suspense fallback={null}>
           <DiffDialog
-            changes={editor.pendingChanges}
-            committedContentByPath={editor.committedContentByPath}
-            loadedContentByPath={editor.loadedContentByPath}
-            stagedFileDiffs={editor.stagedFileDiffs}
+            fileDiffs={editor.fileDiffsVersusLive}
             open={editor.isDiffOpen}
             onOpenChange={editor.setIsDiffOpen}
           />
@@ -118,10 +121,7 @@ export function FilesView({
       ) : null}
       {editor.canManageRepositoryFiles && editor.headerActionsHost
         ? createPortal(
-            <DiffHeaderAction
-              hasPendingChanges={editor.pendingChanges.length > 0 || editor.stagedDiffPaths.length > 0}
-              onDiffOpen={() => editor.setIsDiffOpen(true)}
-            />,
+            <DiffHeaderAction hasChanges={editor.hasChangesVersusLive} onDiffOpen={() => editor.setIsDiffOpen(true)} />,
             editor.headerActionsHost,
           )
         : null}

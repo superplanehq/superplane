@@ -144,8 +144,37 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	r.UserModel = user
 	r.Organization = organization
 
+	// Canvas write handlers are worker-authoritative: they commit to git, register
+	// a pending version row, and ask the RepositoryMaterializerWorker to do the
+	// heavy materialization. Unit tests don't run that worker, so test packages can
+	// install a synchronous in-process materializer via InProcessMaterializerHook,
+	// which runs the same logic inline. This keeps materialized DB state observable
+	// right after a handler returns while exercising the production request path.
+	//
+	// The materializer is wired through a hook (instead of importing the
+	// materialize package here) to avoid an import cycle: materialize transitively
+	// imports packages whose tests import this support package.
+	if InProcessMaterializerHook != nil {
+		InProcessMaterializerHook(r.GitProvider, r.Registry, r.Encryptor, r.AuthService, TestWebhookBaseURL)
+	}
+
 	return &r
 }
+
+// TestWebhookBaseURL is the webhook base URL used by the in-process materializer
+// and by canvas write handlers in tests.
+const TestWebhookBaseURL = "http://localhost:3000/api/v1"
+
+// InProcessMaterializerHook, when set by a test package, installs a synchronous
+// in-process canvas materializer using the per-test dependencies. See the note in
+// Setup for why this is a hook rather than a direct materialize import.
+var InProcessMaterializerHook func(
+	gitProvider git.Provider,
+	reg *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+)
 
 func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
