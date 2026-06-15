@@ -1457,6 +1457,11 @@ function normalizeCanvasMemorySource(source: string | undefined): CanvasMemoryEn
 }
 
 export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
+  // Memory updates are pushed via the `memory_updated` websocket event
+  // (see useCanvasWebsocket), so we no longer poll on an interval. The
+  // websocket handler invalidates this query whenever memory changes from a
+  // node execution, manual mutation, or another tab; a reconnect also
+  // invalidates so we never miss updates received while disconnected.
   return useQuery({
     queryKey: canvasKeys.canvasMemoryEntries(canvasId),
     queryFn: async () => {
@@ -1476,7 +1481,6 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
       }));
     },
     refetchOnWindowFocus: false,
-    refetchInterval: 3000,
     enabled: !!canvasId && enabled,
   });
 };

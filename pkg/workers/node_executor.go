@@ -198,6 +198,15 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		newEvents = append(newEvents, events...)
 	}
 
+	//
+	// We also track whether memory was modified during the execution so we can
+	// broadcast a memory_updated event after the transaction commits.
+	//
+	var memoryChangedCanvasID uuid.UUID
+	onMemoryChanged := func(canvasID uuid.UUID) {
+		memoryChangedCanvasID = canvasID
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -234,7 +243,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -257,10 +266,16 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	if memoryChangedCanvasID != uuid.Nil {
+		if err := messages.NewCanvasMemoryUpdatedMessage(memoryChangedCanvasID.String()).PublishMemoryUpdated(); err != nil {
+			w.logger.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
+		}
+	}
+
 	return nil
 }
 
-func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent), onMemoryChanged func(uuid.UUID)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -321,10 +336,11 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
-		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		Files:          contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
-		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-		Expressions:    contexts.NewExpressionContext(builder),
+		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
+			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
+		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
+		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Expressions: contexts.NewExpressionContext(builder),
 	}
 
 	if node.AppInstallationID != nil {

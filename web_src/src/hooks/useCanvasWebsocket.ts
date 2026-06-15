@@ -125,6 +125,12 @@ export function useCanvasWebsocket(
     [queryClient, canvasId],
   );
 
+  const invalidateMemoryEntries = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+    });
+  }, [queryClient, canvasId]);
+
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
@@ -133,7 +139,10 @@ export function useCanvasWebsocket(
       // Staging events fire while editing a draft (not the live version), so they
       // must bypass the runtime-event gate that is disabled outside the live view.
       const isCanvasStagingEvent = data.event === "staging_updated";
-      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !processRuntimeEvents) {
+      // Memory updates can happen from manual mutations regardless of the live
+      // view, so they bypass the runtime-event gate as well.
+      const isMemoryUpdatedEvent = data.event === "memory_updated";
+      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !isMemoryUpdatedEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -261,6 +270,16 @@ export function useCanvasWebsocket(
           }
           break;
         }
+        case "memory_updated": {
+          // Canvas memory changed (from a node execution, manual mutation, or
+          // another tab). Invalidate the shared memory cache so the Memory tab
+          // and any memory-bound widget refetches once.
+          const memoryMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (memoryMessage.canvasId === canvasId) {
+            invalidateMemoryEntries();
+          }
+          break;
+        }
         default:
           break;
       }
@@ -280,6 +299,7 @@ export function useCanvasWebsocket(
       patchRunInCache,
       patchRootEventInCache,
       patchExecutionInCache,
+      invalidateMemoryEntries,
     ],
   );
 
@@ -371,7 +391,10 @@ export function useCanvasWebsocket(
     queryClient.invalidateQueries({
       queryKey: canvasKeys.infiniteRuns(canvasId),
     });
-  }, [queryClient, canvasId]);
+    // Refresh memory in case mutations happened while we were disconnected; we
+    // no longer poll, so the websocket is the only push channel.
+    invalidateMemoryEntries();
+  }, [queryClient, canvasId, invalidateMemoryEntries]);
 
   // Cleanup on unmount
   useEffect(() => {
