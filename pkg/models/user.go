@@ -22,6 +22,7 @@ type User struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      gorm.DeletedAt
+	LastActiveAt   *time.Time
 }
 
 func (u *User) IsServiceAccount() bool {
@@ -74,6 +75,14 @@ func ClearTokenHashesForAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) e
 			"updated_at": time.Now(),
 		}).
 		Error
+}
+
+func TouchUserLastActiveAt(userID uuid.UUID, activeAt time.Time) error {
+	return database.Conn().Exec(
+		"UPDATE users SET last_active_at = ? WHERE id = ? AND deleted_at IS NULL",
+		activeAt.UTC(),
+		userID,
+	).Error
 }
 
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
