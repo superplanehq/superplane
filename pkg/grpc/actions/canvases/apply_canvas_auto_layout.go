@@ -10,6 +10,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strings"
 )
 
 // ApplyCanvasAutoLayout lays out the effective staged canvas.yaml for a draft
@@ -76,6 +77,7 @@ func ApplyCanvasAutoLayout(
 		canvas.OrganizationID,
 		CanvasYAMLRepositoryPath,
 		positionedYAML,
+		strings.TrimSpace(version.CommitSHA),
 		&userUUID,
 	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to stage canvas layout: %v", err)
