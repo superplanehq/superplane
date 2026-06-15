@@ -1,0 +1,19 @@
+{{- if eq .Values.dash0Web.secretName "" }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.dash0Web.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+{{ if .Values.dash0Web.enabled }}
+  {{ $endpoint := .Values.dash0Web.otlpEndpoint | required ".Values.dash0Web.otlpEndpoint is required." -}}
+  {{ $authToken := .Values.dash0Web.authToken | required ".Values.dash0Web.authToken is required." -}}
+  {{ $serviceName := .Values.dash0Web.serviceName | required ".Values.dash0Web.serviceName is required." -}}
+  {{ $environment := .Values.dash0Web.environment | required ".Values.dash0Web.environment is required." -}}
+  DASH0_WEB_OTLP_ENDPOINT: {{ $endpoint }}
+  DASH0_WEB_AUTH_TOKEN: {{ $authToken }}
+  DASH0_WEB_SERVICE_NAME: {{ $serviceName }}
+  DASH0_WEB_ENVIRONMENT: {{ $environment }}
+{{- end }}
+{{- end }}
