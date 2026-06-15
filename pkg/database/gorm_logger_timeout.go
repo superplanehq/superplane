@@ -65,7 +65,7 @@ func (w *gormTimeoutLogger) Trace(
 		span.SetAttributes(
 			semconv.DBSystemNamePostgreSQL,
 			attribute.String("db.operation", dbOperation(sql)),
-			attribute.String("db.statement", truncateSQL(sql)),
+			attribute.String("db.statement", truncateSQL(sanitizeSQLStatement(sql))),
 			attribute.Int64("db.rows_affected", rowsAffected),
 		)
 		if err != nil {
@@ -77,6 +77,14 @@ func (w *gormTimeoutLogger) Trace(
 	}
 
 	w.base.Trace(ctx, begin, fc, err)
+}
+
+func (w *gormTimeoutLogger) ParamsFilter(
+	ctx context.Context,
+	sql string,
+	params ...interface{},
+) (string, []interface{}) {
+	return sql, redactSQLParams(params...)
 }
 
 func dbOperation(sql string) string {
