@@ -2610,6 +2610,7 @@ type MetricAlarm struct {
 	StateReason        string           `json:"stateReason" mapstructure:"stateReason"`
 	TreatMissingData   string           `json:"treatMissingData" mapstructure:"treatMissingData"`
 	Dimensions         []AlarmDimension `json:"dimensions" mapstructure:"dimensions"`
+	AlarmActions       []string         `json:"alarmActions" mapstructure:"alarmActions"`
 	Region             string           `json:"region" mapstructure:"region"`
 }
 
@@ -2643,6 +2644,7 @@ type xmlMetricAlarm struct {
 	StateReason        string              `xml:"StateReason"`
 	TreatMissingData   string              `xml:"TreatMissingData"`
 	Dimensions         []xmlAlarmDimension `xml:"Dimensions>member"`
+	AlarmActions       []string            `xml:"AlarmActions>member"`
 }
 
 type xmlAlarmDimension struct {
@@ -2811,6 +2813,7 @@ func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
 		StateReason:        x.StateReason,
 		TreatMissingData:   x.TreatMissingData,
 		Dimensions:         dimensions,
+		AlarmActions:       x.AlarmActions,
 		Region:             region,
 	}
 }
@@ -2840,6 +2843,7 @@ func alarmToMap(alarm *MetricAlarm) map[string]any {
 		"stateReason":        alarm.StateReason,
 		"treatMissingData":   alarm.TreatMissingData,
 		"dimensions":         dims,
+		"alarmActions":       alarm.AlarmActions,
 		"region":             alarm.Region,
 	}
 }
