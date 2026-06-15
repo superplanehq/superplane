@@ -59,13 +59,13 @@ func (w *EventRouter) Start(ctx context.Context) {
 			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
 
 			for _, event := range events {
-				logger := logging.ForEvent(w.logger, event)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
 				go func(event models.CanvasEvent) {
+					logger := logging.ForEvent(w.logger, event)
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessEvent(logger, event); err != nil {
