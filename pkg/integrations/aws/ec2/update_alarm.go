@@ -411,6 +411,7 @@ func buildUpdateAlarmInput(
 
 	if hasConfigKey(rawConfiguration, "alarmDescription") {
 		input.AlarmDescription = config.AlarmDescription
+		input.IncludeAlarmDescription = true
 	}
 
 	if hasConfigKey(rawConfiguration, "statistic") {
