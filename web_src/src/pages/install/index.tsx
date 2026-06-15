@@ -26,13 +26,14 @@ function InstallPageContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const repoParam = searchParams.get("repo");
+  const presetName = searchParams.get("name")?.trim() || "";
   const presetOrganizationId = searchParams.get("organizationId")?.trim() || "";
   const parsedRepo = useMemo(() => parseGitHubRepoParam(repoParam), [repoParam]);
 
   const { preview, organizations, defaultOrganizationId, loadError, isLoading } = useInstallPreview({
     repoParam,
     hasValidRepo: Boolean(parsedRepo),
-    presetName: "",
+    presetName,
     presetOrganizationId,
   });
 
@@ -86,6 +87,7 @@ function InstallPageContent() {
         <InstallProgressPanel
           app={app}
           organizationId={effectiveOrgId}
+          canvasName={presetName || undefined}
           preloadedIntegrations={preview.integrations}
           preloadedParams={preview.installParams}
           onClose={() => navigate(`/${effectiveOrgId}`)}

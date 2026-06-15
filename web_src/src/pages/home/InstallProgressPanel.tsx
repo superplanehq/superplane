@@ -30,6 +30,7 @@ function normalizeResourceValue(val: string | string[] | undefined): string {
 interface InstallProgressPanelProps {
   app: AppEntry;
   organizationId?: string;
+  canvasName?: string;
   preloadedIntegrations?: string[];
   preloadedParams?: InstallParam[];
   onClose: () => void;
@@ -38,6 +39,7 @@ interface InstallProgressPanelProps {
 export function InstallProgressPanel({
   app,
   organizationId: propOrgId,
+  canvasName,
   preloadedIntegrations,
   preloadedParams,
   onClose,
@@ -60,6 +62,7 @@ export function InstallProgressPanel({
   const { doInstall, isInstalling } = useInstallAction({
     organizationId,
     app,
+    canvasName,
     installParams: preview.installParams,
     paramValues: preview.paramValues,
     integrationSelections,

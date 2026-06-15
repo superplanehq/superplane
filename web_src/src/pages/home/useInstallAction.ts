@@ -15,12 +15,13 @@ import type { InstallParam } from "../install/types";
 async function executeInstall(opts: {
   repo: string;
   organizationId: string;
+  name?: string;
   installParams?: Record<string, string>;
   integrations: IntegrationSelections;
 }): Promise<{ canvasId: string; organizationId: string }> {
   const body: Record<string, unknown> = {
     repo: opts.repo,
-    name: generateCanvasName(),
+    name: opts.name || generateCanvasName(),
     organizationId: opts.organizationId,
   };
   if (opts.installParams) body.installParams = opts.installParams;
@@ -38,6 +39,7 @@ async function executeInstall(opts: {
 interface UseInstallActionOptions {
   organizationId: string | undefined;
   app: AppEntry;
+  canvasName?: string;
   installParams: InstallParam[];
   paramValues: Record<string, string>;
   integrationSelections: IntegrationSelections;
@@ -48,6 +50,7 @@ interface UseInstallActionOptions {
 export function useInstallAction({
   organizationId,
   app,
+  canvasName,
   installParams,
   paramValues,
   integrationSelections,
@@ -66,6 +69,7 @@ export function useInstallAction({
         const result = await executeInstall({
           repo: app.repo,
           organizationId,
+          name: canvasName,
           installParams: !skipParams && installParams.length > 0 ? paramValues : undefined,
           integrations: integrationSelections,
         });
@@ -85,7 +89,7 @@ export function useInstallAction({
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install")));
       }
     },
-    [organizationId, app, paramValues, installParams, integrationSelections, queryClient, navigate],
+    [organizationId, app, canvasName, paramValues, installParams, integrationSelections, queryClient, navigate],
   );
 
   return { doInstall, isInstalling };
