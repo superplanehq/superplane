@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/proto"
 )
 
 /*
@@ -33,33 +34,43 @@ func TraceGatewayServe(ctx context.Context, w http.ResponseWriter, gateway http.
 	})
 }
 
-type tracedGatewayResponseWriter struct {
-	http.ResponseWriter
-	ctx         context.Context
-	span        trace.Span
-	spanStarted bool
-	statusCode  int
-	bytes       int
+/*
+ * GatewayForwardResponseTraceOption starts a marshal span before grpc-gateway
+ * encodes the proto response to JSON. The span ends on the first response write.
+ */
+func GatewayForwardResponseTraceOption() func(context.Context, http.ResponseWriter, proto.Message) error {
+	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+		capture, ok := w.(*tracedGatewayResponseWriter)
+		if !ok || !telemetry.TracingEnabled() {
+			return nil
+		}
+
+		_, span := telemetry.StartSpan(ctx, "grpc_gateway.marshal_response")
+		capture.marshalSpan = span
+		return nil
+	}
 }
 
-func (w *tracedGatewayResponseWriter) startSpanIfNeeded() {
-	if w.spanStarted || !telemetry.TracingEnabled() {
-		return
-	}
-
-	w.spanStarted = true
-	_, span := telemetry.StartSpan(w.ctx, "grpc_gateway.write_response")
-	w.span = span
+type tracedGatewayResponseWriter struct {
+	http.ResponseWriter
+	ctx          context.Context
+	marshalSpan  trace.Span
+	writeSpan    trace.Span
+	writeStarted bool
+	statusCode   int
+	bytes        int
 }
 
 func (w *tracedGatewayResponseWriter) WriteHeader(statusCode int) {
-	w.startSpanIfNeeded()
+	w.finishMarshalSpan(0)
+	w.startWriteSpanIfNeeded()
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *tracedGatewayResponseWriter) Write(b []byte) (int, error) {
-	w.startSpanIfNeeded()
+	w.finishMarshalSpan(len(b))
+	w.startWriteSpanIfNeeded()
 	n, err := w.ResponseWriter.Write(b)
 	w.bytes += n
 	return n, err
@@ -71,14 +82,38 @@ func (w *tracedGatewayResponseWriter) Flush() {
 	}
 }
 
-func (w *tracedGatewayResponseWriter) finish() {
-	if w.span == nil {
+func (w *tracedGatewayResponseWriter) finishMarshalSpan(bodySize int) {
+	if w.marshalSpan == nil {
 		return
 	}
 
-	w.span.SetAttributes(
+	if bodySize > 0 {
+		w.marshalSpan.SetAttributes(attribute.Int("http.response.body.size", bodySize))
+	}
+	w.marshalSpan.End()
+	w.marshalSpan = nil
+}
+
+func (w *tracedGatewayResponseWriter) startWriteSpanIfNeeded() {
+	if w.writeStarted || !telemetry.TracingEnabled() {
+		return
+	}
+
+	w.writeStarted = true
+	_, span := telemetry.StartSpan(w.ctx, "grpc_gateway.write_response")
+	w.writeSpan = span
+}
+
+func (w *tracedGatewayResponseWriter) finish() {
+	w.finishMarshalSpan(0)
+
+	if w.writeSpan == nil {
+		return
+	}
+
+	w.writeSpan.SetAttributes(
 		semconv.HTTPResponseStatusCodeKey.Int(w.statusCode),
 		attribute.Int("http.response.body.size", w.bytes),
 	)
-	w.span.End()
+	w.writeSpan.End()
 }
