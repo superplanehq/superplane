@@ -11,6 +11,7 @@ const (
 	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
 	CanvasStagingUpdatedRoutingKey = "canvas-staging-updated"
 	CanvasDeletedRoutingKey        = "canvas-deleted"
+	CanvasMemoryUpdatedRoutingKey  = "canvas-memory-updated"
 )
 
 type CanvasMessage struct {
@@ -54,6 +55,16 @@ func NewCanvasDeletedMessage(canvasID string, organizationID string) CanvasMessa
 	}
 }
 
+func NewCanvasMemoryUpdatedMessage(canvasID string) CanvasMessage {
+	return CanvasMessage{
+		message: &pb.CanvasMessage{
+			Id:        canvasID,
+			CanvasId:  canvasID,
+			Timestamp: timestamppb.Now(),
+		},
+	}
+}
+
 func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVersionMessage {
 	return CanvasVersionMessage{
 		message: &pb.CanvasVersionMessage{
@@ -74,6 +85,10 @@ func (m CanvasMessage) PublishUpdated() error {
 
 func (m CanvasMessage) PublishDeleted() error {
 	return Publish(CanvasExchange, CanvasDeletedRoutingKey, toBytes(m.message))
+}
+
+func (m CanvasMessage) PublishMemoryUpdated() error {
+	return Publish(CanvasExchange, CanvasMemoryUpdatedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasVersionMessage) PublishVersionUpdated() error {

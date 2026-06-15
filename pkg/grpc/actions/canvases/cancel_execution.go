@@ -38,6 +38,11 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		return nil, status.Error(codes.NotFound, "execution not found")
 	}
 
+	memoryChanged := false
+	onMemoryChanged := func() {
+		memoryChanged = true
+	}
+
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
@@ -45,7 +50,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 			return status.Error(codes.NotFound, "Node not found for execution")
 		}
 
-		err = cancelExecutionInTransaction(tx, authService, encryptor, organizationID, registry, execution, node, user)
+		err = cancelExecutionInTransaction(tx, authService, encryptor, organizationID, registry, execution, node, user, onMemoryChanged)
 
 		if err != nil {
 			return status.Error(codes.Internal, "It was not possible to cancel the execution")
@@ -60,10 +65,16 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 
 	messages.NewCanvasExecutionMessage(workflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 
+	if memoryChanged {
+		if err := messages.NewCanvasMemoryUpdatedMessage(workflowID.String()).PublishMemoryUpdated(); err != nil {
+			log.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
+		}
+	}
+
 	return &pb.CancelExecutionResponse{}, nil
 }
 
-func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.CanvasNodeExecution, node *models.CanvasNode, user *models.User) error {
+func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.CanvasNodeExecution, node *models.CanvasNode, user *models.User, onMemoryChanged func()) error {
 	if node.Type != models.NodeTypeComponent {
 		return nil
 	}
@@ -96,7 +107,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			Requests:       contexts.NewExecutionRequestContext(tx, execution),
 			Auth:           contexts.NewAuthReader(tx, orgUUID, authService, user),
 			Notifications:  contexts.NewNotificationContext(tx, orgUUID, execution.WorkflowID),
-			CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+			CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).WithChangeCallback(onMemoryChanged),
 		}
 
 		if node.AppInstallationID != nil {
