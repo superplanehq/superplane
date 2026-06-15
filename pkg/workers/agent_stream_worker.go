@@ -473,6 +473,9 @@ func handleProviderEvent(
 		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusStarted, "tool_started", publish)
 	case agents.ProviderEventThreadMessageReceived:
 		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+	case agents.ProviderEventSessionNotice:
+		// Ephemeral notice: no status change, no DB row, stream continues.
+		publish(messages.AgentSessionEventMessage{Event: "session_notice", Error: evt.ErrorMessage})
 	case agents.ProviderEventSessionFailed:
 		// Don't publish here — the post-loop block owns
 		// session_failed broadcasting so it stays single-source.

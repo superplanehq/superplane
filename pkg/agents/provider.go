@@ -18,10 +18,12 @@ const (
 	ProviderEventCustomToolResultsRequired ProviderEventType = "custom_tool_results_required"
 	ProviderEventTurnCompleted             ProviderEventType = "turn_completed"
 	ProviderEventSessionFailed             ProviderEventType = "session_failed"
-	ProviderEventOutcomeEvaluation         ProviderEventType = "outcome_evaluation"
-	ProviderEventOutcomeEvaluationStart    ProviderEventType = "outcome_evaluation_start"
-	ProviderEventThreadMessageSent         ProviderEventType = "thread_message_sent"
-	ProviderEventThreadMessageReceived     ProviderEventType = "thread_message_received"
+	// Recoverable provider error; the session keeps running.
+	ProviderEventSessionNotice          ProviderEventType = "session_notice"
+	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
+	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
+	ProviderEventThreadMessageSent      ProviderEventType = "thread_message_sent"
+	ProviderEventThreadMessageReceived  ProviderEventType = "thread_message_received"
 )
 
 type ProviderEvent struct {
