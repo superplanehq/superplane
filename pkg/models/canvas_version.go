@@ -92,6 +92,37 @@ func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) 
 	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
 }
 
+func FindCanvasVersionsByIDs(workflowID uuid.UUID, versionIDs []uuid.UUID) (map[uuid.UUID]*CanvasVersion, error) {
+	return FindCanvasVersionsByIDsInTransaction(database.Conn(), workflowID, versionIDs)
+}
+
+func FindCanvasVersionsByIDsInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	versionIDs []uuid.UUID,
+) (map[uuid.UUID]*CanvasVersion, error) {
+	result := make(map[uuid.UUID]*CanvasVersion)
+	if len(versionIDs) == 0 {
+		return result, nil
+	}
+
+	var versions []CanvasVersion
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", versionIDs).
+		Find(&versions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range versions {
+		result[versions[i].ID] = &versions[i]
+	}
+
+	return result, nil
+}
+
 func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
