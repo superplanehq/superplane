@@ -1,0 +1,15 @@
+{
+  "type": "gcp.monitoring.snooze.fetched",
+  "data": {
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "id": "1234567890123456789",
+    "displayName": "Deploy maintenance window",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z",
+    "endTime": "2025-02-14T13:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:30:00Z"
+}
