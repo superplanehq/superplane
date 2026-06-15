@@ -45,7 +45,7 @@ configured with "superplane apps active" is used.`,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
-	updateCmd.Flags().StringVar(&updateDraftID, "draft-id", "", "update a specific draft by id instead of auto-publishing (required when change management is enabled; see `superplane apps drafts list`)")
+	updateCmd.Flags().StringVar(&updateDraftID, "draft-id", "", "update a specific draft by id instead of auto-publishing")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")

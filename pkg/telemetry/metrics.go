@@ -17,17 +17,21 @@ var (
 	meter        = otel.Meter("superplane")
 	metricsReady atomic.Bool
 
-	queueWorkerTickHistogram       metric.Float64Histogram
-	queueWorkerNodesCountHistogram metric.Int64Histogram
-	queueWorkerStuckItems          metric.Int64Histogram
+	queueWorkerTickHistogram         metric.Float64Histogram
+	queueWorkerNodesCountHistogram   metric.Int64Histogram
+	queueWorkerNodesCounter          metric.Int64Counter
+	queueWorkerNodeDurationHistogram metric.Float64Histogram
+	queueWorkerStuckItems            metric.Int64Histogram
 
 	executorWorkerTickHistogram              metric.Float64Histogram
 	executorWorkerNodesCountHistogram        metric.Int64Histogram
 	executorWorkerExecutionsCounter          metric.Int64Counter
 	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
-	eventWorkerTickHistogram        metric.Float64Histogram
-	eventWorkerEventsCountHistogram metric.Int64Histogram
+	eventWorkerTickHistogram          metric.Float64Histogram
+	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsCounter          metric.Int64Counter
+	eventWorkerEventDurationHistogram metric.Float64Histogram
 
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
@@ -72,6 +76,28 @@ const (
 	IntegrationSecretOperationUpdate = "update"
 )
 
+// durationSecondsHistogramBoundaries matches Prometheus DefBuckets and is
+// appropriate for latency histograms recorded in seconds. The OTel SDK default
+// boundaries assume milliseconds, which collapses sub-second values into the
+// (0, 5] bucket and makes histogram_quantile estimates misleading.
+var durationSecondsHistogramBoundaries = []float64{
+	0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+}
+
+func durationSecondsHistogramView() sdkmetric.Option {
+	return sdkmetric.WithView(sdkmetric.NewView(
+		sdkmetric.Instrument{
+			Name: "*duration.seconds",
+			Unit: "s",
+		},
+		sdkmetric.Stream{
+			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: durationSecondsHistogramBoundaries,
+			},
+		},
+	))
+}
+
 func InitMetrics(ctx context.Context) error {
 	exporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
@@ -88,6 +114,7 @@ func InitMetrics(ctx context.Context) error {
 		sdkmetric.WithReader(
 			sdkmetric.NewPeriodicReader(exporter),
 		),
+		durationSecondsHistogramView(),
 	)
 
 	otel.SetMeterProvider(provider)
@@ -106,6 +133,24 @@ func InitMetrics(ctx context.Context) error {
 		"queue_worker.tick.nodes.ready",
 		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodesCounter, err = meter.Int64Counter(
+		"queue_worker.nodes.total",
+		metric.WithDescription("WorkflowNodeQueueWorker node processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodeDurationHistogram, err = meter.Float64Histogram(
+		"queue_worker.node.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeQueueWorker node processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -160,6 +205,24 @@ func InitMetrics(ctx context.Context) error {
 		"event_worker.tick.events.pending",
 		metric.WithDescription("Number of pending workflow events each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventsCounter, err = meter.Int64Counter(
+		"event_worker.events.total",
+		metric.WithDescription("WorkflowEventRouter event processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventDurationHistogram, err = meter.Float64Histogram(
+		"event_worker.event.duration.seconds",
+		metric.WithDescription("Duration of WorkflowEventRouter event processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -459,6 +522,26 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordQueueWorkerNodeProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	queueWorkerNodesCounter.Add(ctx, 1, attrs)
+	queueWorkerNodeDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
 func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !metricsReady.Load() {
 		return
@@ -511,6 +594,26 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 	}
 
 	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordEventWorkerEventProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	eventWorkerEventsCounter.Add(ctx, 1, attrs)
+	eventWorkerEventDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {

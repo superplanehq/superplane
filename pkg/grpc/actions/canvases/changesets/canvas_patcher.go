@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -59,21 +58,19 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 
 func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
-		ID:                      p.originalVersion.ID,
-		WorkflowID:              p.originalVersion.WorkflowID,
-		OwnerID:                 p.originalVersion.OwnerID,
-		State:                   p.originalVersion.State,
-		Name:                    p.originalVersion.Name,
-		Description:             p.originalVersion.Description,
-		ChangeManagementEnabled: p.originalVersion.ChangeManagementEnabled,
-		ChangeRequestApprovers:  datatypes.NewJSONSlice(p.originalVersion.EffectiveChangeRequestApprovers()),
-		PublishedAt:             p.originalVersion.PublishedAt,
-		ConsolePanels:           p.originalVersion.ConsolePanels,
-		ConsoleLayout:           p.originalVersion.ConsoleLayout,
-		BranchName:              p.originalVersion.BranchName,
-		DisplayName:             p.originalVersion.DisplayName,
-		CreatedAt:               p.originalVersion.CreatedAt,
-		UpdatedAt:               p.originalVersion.UpdatedAt,
+		ID:            p.originalVersion.ID,
+		WorkflowID:    p.originalVersion.WorkflowID,
+		OwnerID:       p.originalVersion.OwnerID,
+		State:         p.originalVersion.State,
+		Name:          p.originalVersion.Name,
+		Description:   p.originalVersion.Description,
+		PublishedAt:   p.originalVersion.PublishedAt,
+		ConsolePanels: p.originalVersion.ConsolePanels,
+		ConsoleLayout: p.originalVersion.ConsoleLayout,
+		BranchName:    p.originalVersion.BranchName,
+		DisplayName:   p.originalVersion.DisplayName,
+		CreatedAt:     p.originalVersion.CreatedAt,
+		UpdatedAt:     p.originalVersion.UpdatedAt,
 	}
 
 	nodeIDs := make([]string, 0, len(p.nodes))
