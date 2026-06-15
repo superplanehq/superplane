@@ -57,6 +57,17 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, schema.Properties, "execution_id")
 }
 
+func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {
+	tool := NewAppAgentTool(AppAgentToolOptions{})
+
+	schema := tool.InputSchema()
+	canvasYAMLSchema := schema.Properties["canvas_yaml"]
+
+	assert.Contains(t, canvasYAMLSchema.Description, "canonical live canvas.yaml")
+	assert.Contains(t, canvasYAMLSchema.Description, "Unknown fields are rejected")
+	assert.Contains(t, canvasYAMLSchema.Description, "metadata.isTemplate")
+}
+
 func TestComponentSchemaAgentTool_ReturnsCoreComponentSchema(t *testing.T) {
 	tool := newComponentSchemaTool(t)
 
