@@ -347,4 +347,101 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		assert.True(t, hasDescription, "AlarmDescription must be sent to clear an existing description")
 		assert.Empty(t, params.Get("AlarmDescription"))
 	})
+
+	t.Run("clearing both alarm action and SNS topic sends no AlarmActions members", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":      "us-east-1",
+				"alarm":       "HighCPU",
+				"alarmAction": "",
+				"snsTopic":    "",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 3)
+		putBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		params, err := url.ParseQuery(string(putBody))
+		require.NoError(t, err)
+
+		// No AlarmActions members should be present — empty list signals CloudWatch to clear them.
+		assert.Empty(t, params.Get("AlarmActions.member.1"), "clearing both action fields must send no AlarmActions members")
+	})
+
+	t.Run("not toggling alarm actions re-sends existing actions to preserve them", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":    "us-east-1",
+				"alarm":     "HighCPU",
+				"statistic": "Sum",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 3)
+		putBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		params, err := url.ParseQuery(string(putBody))
+		require.NoError(t, err)
+
+		// Existing actions must be re-sent explicitly to preserve them.
+		actions := []string{params.Get("AlarmActions.member.1"), params.Get("AlarmActions.member.2")}
+		assert.Contains(t, actions, "arn:aws:automate:us-east-1:ec2:recover")
+		assert.Contains(t, actions, "arn:aws:sns:us-east-1:123456789012:existing-topic")
+	})
 }

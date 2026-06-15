@@ -2391,12 +2391,11 @@ type PutMetricAlarmInput struct {
 	Threshold          float64
 	ComparisonOperator string
 	TreatMissingData   string
-	// AlarmActions is a list of ARNs to invoke when the alarm enters ALARM state.
+	// AlarmActions is the complete desired list of action ARNs.
 	// Entries may be SNS topic ARNs or EC2 automation ARNs
 	// (arn:aws:automate:<region>:ec2:recover|reboot|stop|terminate).
+	// An empty (nil) slice is sent as no members, which clears all actions in CloudWatch.
 	AlarmActions []string
-	// OmitAlarmActions skips AlarmActions parameters so existing actions are preserved (CloudWatch PutMetricAlarm).
-	OmitAlarmActions bool
 	// IncludeAlarmDescription always sends AlarmDescription, including when empty (to clear an existing description).
 	IncludeAlarmDescription bool
 }
@@ -2496,12 +2495,10 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 		params.Set("TreatMissingData", treatMissing)
 	}
 
-	if !input.OmitAlarmActions {
-		for i, arn := range input.AlarmActions {
-			arn = strings.TrimSpace(arn)
-			if arn != "" {
-				params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
-			}
+	for i, arn := range input.AlarmActions {
+		arn = strings.TrimSpace(arn)
+		if arn != "" {
+			params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
 		}
 	}
 
