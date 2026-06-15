@@ -502,7 +502,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		var allowed bool
 		err = telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
 			var checkErr error
-			allowed, checkErr = a.authService.CheckOrganizationPermission(userID, org.ID.String(), rule.Resource, rule.Action)
+			allowed, checkErr = a.authService.CheckOrganizationPermission(ctx, userID, org.ID.String(), rule.Resource, rule.Action)
 			return checkErr
 		})
 		if err != nil {

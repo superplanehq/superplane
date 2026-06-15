@@ -93,6 +93,7 @@ func UpdateIntegration(
 		nil,
 	)
 
+	logging.ForIntegration(*instance).WithField("source", "integration_update").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            registry.HTTPContext(),

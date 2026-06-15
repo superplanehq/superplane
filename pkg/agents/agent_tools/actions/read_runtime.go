@@ -50,7 +50,7 @@ func (a readRuntimeAction) Execute(ctx context.Context, session agents.AgentSess
 	if a.registry == nil {
 		return runtimeReadResult{}, fmt.Errorf("component registry is not configured")
 	}
-	if err := a.checkReadPermission(session); err != nil {
+	if err := a.checkReadPermission(ctx, session); err != nil {
 		return runtimeReadResult{}, err
 	}
 
@@ -75,12 +75,12 @@ func (a readRuntimeAction) Execute(ctx context.Context, session agents.AgentSess
 	}, nil
 }
 
-func (a readRuntimeAction) checkReadPermission(session agents.AgentSessionContext) error {
+func (a readRuntimeAction) checkReadPermission(ctx context.Context, session agents.AgentSessionContext) error {
 	if a.auth == nil {
 		return fmt.Errorf("authorization service is unavailable")
 	}
 
-	allowed, err := a.auth.CheckOrganizationPermission(session.UserID, session.OrganizationID, "canvases", "read")
+	allowed, err := a.auth.CheckOrganizationPermission(ctx, session.UserID, session.OrganizationID, "canvases", "read")
 	if err != nil {
 		return fmt.Errorf("check canvases:read permission: %w", err)
 	}
