@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -78,6 +80,10 @@ func CreateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registr
 			return nil, statusErr.Err()
 		}
 		return nil, status.Error(codes.Internal, "failed to create canvas memory namespace")
+	}
+
+	if err := messages.NewCanvasMemoryUpdatedMessage(canvasUUID.String()).PublishMemoryUpdated(); err != nil {
+		log.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
 	}
 
 	items := make([]*pb.CanvasMemory, 0, len(stored))
