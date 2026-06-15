@@ -28,6 +28,9 @@ type UseDraftStagingActionsOptions = {
   flushRepositoryFileStaging?: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
+  // Recovers from a deleted draft when a mutation fails; returns whether it
+  // handled the error (only true when the draft is confirmed gone).
+  recoverIfDraftMissing?: (error: unknown, versionId: string) => Promise<boolean>;
 };
 
 async function restoreCommittedCanvasDraftState({
@@ -93,6 +96,7 @@ export function useDraftStagingActions({
   flushRepositoryFileStaging,
   cancelPendingCanvasSaves,
   onCanvasDraftRestoredToCommitted,
+  recoverIfDraftMissing,
 }: UseDraftStagingActionsOptions) {
   const queryClient = useQueryClient();
 
@@ -117,6 +121,9 @@ export function useDraftStagingActions({
       setStagingResetNonce((nonce) => nonce + 1);
       showSuccessToast("Changes committed");
     } catch (error) {
+      if (await recoverIfDraftMissing?.(error, activeCanvasVersionId)) {
+        return;
+      }
       showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
     } finally {
       setIsPreparingVersionAction(false);
@@ -130,6 +137,7 @@ export function useDraftStagingActions({
     ensureVersionActionDraftReady,
     flushRepositoryFileStaging,
     hasEditableVersion,
+    recoverIfDraftMissing,
     queryClient,
     setDraftCanvasSpec,
     setIsPreparingVersionAction,
@@ -160,6 +168,9 @@ export function useDraftStagingActions({
       setStagingResetNonce((nonce) => nonce + 1);
       showSuccessToast("Reverted to last commit");
     } catch (error) {
+      if (await recoverIfDraftMissing?.(error, activeCanvasVersionId)) {
+        return;
+      }
       showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
     } finally {
       setIsPreparingVersionAction(false);
@@ -173,6 +184,7 @@ export function useDraftStagingActions({
     draftCanvasSpecsRef,
     hasEditableVersion,
     onCanvasDraftRestoredToCommitted,
+    recoverIfDraftMissing,
     organizationId,
     queryClient,
     setActiveCanvasVersion,

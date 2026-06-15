@@ -130,7 +130,7 @@ func ResolveCanvasChangeRequest(
 	}
 
 	return &pb.ResolveCanvasChangeRequestResponse{
-		Version:       SerializeCanvasVersion(version, organizationID),
+		Version:       SerializeCanvasVersion(version, organizationID, nil),
 		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
 	}, nil
 }

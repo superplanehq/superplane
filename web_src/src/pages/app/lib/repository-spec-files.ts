@@ -3,6 +3,20 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+import { isNotFoundError } from "../workflowPageHelpers";
+
+// Confirms whether a canvas version still exists. Used to distinguish a deleted
+// version from an incidental repository-file 404, since fetchCanvasVersionWithSpec
+// loads the version and its canvas.yaml in parallel. A non-404 describe error is
+// treated as "exists" so the original failure is surfaced as transient.
+export async function canvasVersionExists(canvasId: string, versionId: string): Promise<boolean> {
+  try {
+    const response = await canvasesDescribeCanvasVersion(withOrganizationHeader({ path: { canvasId, versionId } }));
+    return Boolean(response.data?.version?.metadata?.id);
+  } catch (error) {
+    return !isNotFoundError(error);
+  }
+}
 
 // fetchRepositorySpecFileContent reads a canvas.yaml/console.yaml file. When
 // `stage` is set (only meaningful for a draft version), the server returns the

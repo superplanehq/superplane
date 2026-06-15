@@ -64,6 +64,6 @@ func ValidateCanvasVersionChangeset(
 	}
 
 	return &pb.ValidateCanvasVersionChangesetResponse{
-		Version: SerializeCanvasVersion(patcher.GetVersion(), organizationID.String()),
+		Version: SerializeCanvasVersion(patcher.GetVersion(), organizationID.String(), nil),
 	}, nil
 }

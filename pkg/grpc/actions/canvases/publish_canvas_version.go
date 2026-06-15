@@ -82,7 +82,7 @@ func PublishCanvasVersion(
 	}
 
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(publishedVersion, organizationID),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
 	}, nil
 }
 
