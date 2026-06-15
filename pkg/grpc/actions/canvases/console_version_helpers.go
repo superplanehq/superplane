@@ -48,23 +48,8 @@ func ensureConsoleVersionReadable(
 	}
 	userUUID := uuid.MustParse(userID)
 
-	// Drafts are user-private work-in-progress: only the draft owner can
-	// read them. Reviewers don't need to see in-flight drafts because the
-	// review surface is the change request snapshot, not the draft.
 	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
 		return nil
-	}
-
-	// Snapshot versions are exposed through a change request. Change
-	// requests themselves are described to any authenticated org member
-	// (see DescribeCanvasChangeRequest, which returns the snapshot's full
-	// spec), so the matching console must be readable too — otherwise
-	// reviewers can see the proposed graph but get a 403 when the UI
-	// fetches its console. Drafts are still gated by the check above.
-	if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
-		return nil
-	} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
-		return requestErr
 	}
 
 	return status.Error(codes.PermissionDenied, "version is not visible in current flow")

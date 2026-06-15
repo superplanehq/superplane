@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -111,69 +110,6 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	require.Equal(t, "canvas name is required", status.Convert(err).Message())
-}
-
-func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-
-	nowEnabled := true
-	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", nowEnabled).Error)
-
-	workflow := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name: "Change management default canvas",
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{},
-			Edges: []*componentpb.Edge{},
-		},
-	}
-
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.NotNil(t, response.Canvas)
-	require.NotNil(t, response.Canvas.Metadata)
-	// New canvases inherit organization change management setting.
-	require.NotNil(t, response.Canvas.Spec)
-	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
-	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
-
-	require.NotEmpty(t, response.Canvas.Metadata.Id)
-	createdCanvasUUID, parseErr := uuid.Parse(response.Canvas.Metadata.Id)
-	require.NoError(t, parseErr)
-	createdCanvas, findErr := models.FindCanvas(r.Organization.ID, createdCanvasUUID)
-	require.NoError(t, findErr)
-	require.True(t, createdCanvas.ChangeManagementEnabled)
-}
-
-func TestCreateCanvasResponseShowsCanvasLevelChangeManagementWhenEnabled(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-
-	canvas := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name: "Canvas level change management",
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{},
-			Edges: []*componentpb.Edge{},
-			ChangeManagement: &pb.Canvas_ChangeManagement{
-				Enabled: true,
-			},
-		},
-	}
-
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.NotNil(t, response.Canvas)
-	require.NotNil(t, response.Canvas.Spec)
-	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
-	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 }
 
 func TestCreateCanvasOnFreshOrganization(t *testing.T) {

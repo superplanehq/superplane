@@ -1,4 +1,4 @@
-import type { IntegrationsIntegrationDefinition, SuperplaneActionsAction, TriggersTrigger } from "@/api-client";
+import type { IntegrationsIntegrationDefinition, ActionsAction, TriggersTrigger } from "@/api-client";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
 
@@ -8,7 +8,7 @@ export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): Buil
 
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
+  components: ActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const runnerCategory = runners(triggers, components);
@@ -22,7 +22,7 @@ export function buildBuildingBlockCategories(
   ];
 }
 
-function core(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+function core(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory {
   return {
     name: "Core",
     blocks: [
@@ -32,7 +32,7 @@ function core(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]
   };
 }
 
-function runners(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory | null {
+function runners(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory | null {
   const blocks: BuildingBlock[] = [
     ...triggers.filter((t) => isRunnerBlock(t)).map((t) => toTriggerBlock(t)),
     ...components.filter((c) => isRunnerBlock(c)).map((c) => toComponentBlock(c)),
@@ -50,7 +50,7 @@ function runners(triggers: TriggersTrigger[], components: SuperplaneActionsActio
   };
 }
 
-function debugging(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+function debugging(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory {
   return {
     name: "Debugging",
     blocks: [
@@ -60,7 +60,7 @@ function debugging(triggers: TriggersTrigger[], components: SuperplaneActionsAct
   };
 }
 
-function memory(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+function memory(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory {
   return {
     name: "Memory",
     blocks: [
@@ -117,7 +117,7 @@ function toTriggerBlock(trigger: TriggersTrigger, integrationName?: string): Bui
   };
 }
 
-function toComponentBlock(component: SuperplaneActionsAction, integrationName?: string): BuildingBlock {
+function toComponentBlock(component: ActionsAction, integrationName?: string): BuildingBlock {
   return {
     name: component.name!,
     label: component.label,
