@@ -53,7 +53,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	var roles []*authorization.RoleDefinition
 	err = telemetry.RunSpan(ctx, "auth.load_user_roles", func(ctx context.Context) error {
 		var loadErr error
-		roles, loadErr = authService.GetUserRolesForOrg(userID, user.OrganizationID.String())
+		roles, loadErr = authService.GetUserRolesForOrg(ctx, userID, user.OrganizationID.String())
 		return loadErr
 	})
 	if err != nil {
@@ -87,7 +87,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	var groups []string
 	err = telemetry.RunSpan(ctx, "auth.load_user_groups", func(ctx context.Context) error {
 		var loadErr error
-		groups, loadErr = authService.GetUserGroups(user.OrganizationID.String(), models.DomainTypeOrganization, userID)
+		groups, loadErr = authService.GetUserGroups(ctx, user.OrganizationID.String(), models.DomainTypeOrganization, userID)
 		return loadErr
 	})
 	if err != nil {

@@ -270,6 +270,14 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, err
 	}
 
+	//
+	// If we created any queue items, we know for sure that the run is not finished yet,
+	// so there is no need to lock the run record to check it.
+	//
+	if len(queueItems) > 0 {
+		return queueItems, run.ID, nil
+	}
+
 	_, err = models.MaybeFinalizeRunInTransaction(tx, run.ID)
 	if err != nil {
 		return nil, uuid.Nil, err

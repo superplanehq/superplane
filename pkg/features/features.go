@@ -21,7 +21,6 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 }
 

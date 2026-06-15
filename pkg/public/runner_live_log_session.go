@@ -20,7 +20,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	allowed, err := s.authService.CheckOrganizationPermission(
+	allowed, err := s.authService.CheckOrganizationPermission(r.Context(),
 		user.ID.String(),
 		user.OrganizationID.String(),
 		"canvases",
