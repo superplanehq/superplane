@@ -141,65 +141,96 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
 
   return (
     <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-      <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
-        <table className="w-full border-collapse text-xs">
-          <thead className="bg-slate-50">
-            <tr>
-              {render.columns.map((col, i) => (
-                <th
-                  key={`${col.field}-${i}`}
-                  className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
-                >
-                  {col.label ?? col.field}
-                </th>
-              ))}
-              {render.rowActions && render.rowActions.length > 0 ? (
-                <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">
-                  Actions
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row, idx) => {
-              const rowKey = rowKeyForRow(row, idx);
-              const toneClass = resolveRowStyle?.(row);
-              return (
-                <tr
-                  key={rowKey}
-                  data-row-tone={toneClass ? "true" : undefined}
-                  className={cn(
-                    "border-b border-slate-100 last:border-0",
-                    // Drop the default hover wash when a tone is applied so the
-                    // tint isn't overridden — the row already has a deliberate
-                    // background and a hover bg would mask it.
-                    toneClass ? toneClass : "hover:bg-slate-50/60",
-                  )}
-                >
-                  {render.columns.map((col, ci) => (
-                    <Cell key={`${col.field}-${ci}`} col={col} row={row} />
-                  ))}
-                  {render.rowActions && render.rowActions.length > 0 ? (
-                    <td className="px-3 py-1.5 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        {render.rowActions
-                          .filter((action) => evaluateRowShow(action.show, row))
-                          .map((action, ai) => (
-                            <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
-                          ))}
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {hasMore && onLoadMore ? (
-          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
-        ) : null}
-      </div>
+      <WidgetTableGrid
+        render={render}
+        filtered={filtered}
+        resolveRowStyle={resolveRowStyle}
+        hasMore={hasMore}
+        isFetchingMore={isFetchingMore}
+        onLoadMore={onLoadMore}
+        onScroll={onScroll}
+      />
     </WidgetTableActionLockProvider>
+  );
+}
+
+interface WidgetTableGridProps {
+  render: WidgetTableRender;
+  filtered: Record<string, unknown>[];
+  resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
+  onScroll: (event: UIEvent<HTMLDivElement>) => void;
+}
+
+function WidgetTableGrid({
+  render,
+  filtered,
+  resolveRowStyle,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  onScroll,
+}: WidgetTableGridProps) {
+  const hasActions = Boolean(render.rowActions && render.rowActions.length > 0);
+  return (
+    <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
+      <table className="w-full border-collapse text-xs">
+        <thead className="bg-slate-50">
+          <tr>
+            {render.columns.map((col, i) => (
+              <th
+                key={`${col.field}-${i}`}
+                className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
+              >
+                {col.label ?? col.field}
+              </th>
+            ))}
+            {hasActions ? (
+              <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">Actions</th>
+            ) : null}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((row, idx) => {
+            const rowKey = rowKeyForRow(row, idx);
+            const toneClass = resolveRowStyle?.(row);
+            return (
+              <tr
+                key={rowKey}
+                data-row-tone={toneClass ? "true" : undefined}
+                className={cn(
+                  "border-b border-slate-100 last:border-0",
+                  // Drop the default hover wash when a tone is applied so the
+                  // tint isn't overridden — the row already has a deliberate
+                  // background and a hover bg would mask it.
+                  toneClass ? toneClass : "hover:bg-slate-50/60",
+                )}
+              >
+                {render.columns.map((col, ci) => (
+                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                ))}
+                {hasActions ? (
+                  <td className="px-3 py-1.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {render.rowActions
+                        ?.filter((action) => evaluateRowShow(action.show, row))
+                        .map((action, ai) => (
+                          <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                        ))}
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {hasMore && onLoadMore ? (
+        <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+      ) : null}
+    </div>
   );
 }
 
