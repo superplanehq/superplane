@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -116,8 +117,11 @@ func (w *IntegrationRequestWorker) claimRequest(request models.IntegrationReques
 	})
 
 	if err != nil {
-		w.log("Request %s already being processed - skipping", request.ID)
-		return nil, nil //nolint:nilerr
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			w.log("Request %s already being processed - skipping", request.ID)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to lease request %s: %w", request.ID, err)
 	}
 
 	return claimed, nil
