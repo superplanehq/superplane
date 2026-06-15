@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/changerequests"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
@@ -440,19 +441,19 @@ func reopenCanvasChangeRequestInTransaction(
 		return status.Error(codes.FailedPrecondition, "only rejected change requests can be reopened")
 	}
 
-	baseNodes, baseEdges, liveNodes, liveEdges, err := resolveCanvasChangeRequestBaseAndLiveInTransaction(tx, canvas, request)
+	baseNodes, baseEdges, liveNodes, liveEdges, err := changerequests.ResolveCanvasChangeRequestBaseAndLiveInTransaction(tx, canvas, request)
 	if err != nil {
 		return err
 	}
 
-	diff := computeCanvasChangeRequestDiff(baseNodes, baseEdges, liveNodes, liveEdges, version.Nodes, version.Edges)
+	changedNodeIDs, conflictingNodeIDs := changerequests.ComputeCanvasChangeRequestDiff(baseNodes, baseEdges, liveNodes, liveEdges, version.Nodes, version.Edges)
 	now := time.Now()
 	if err := models.InvalidateCanvasChangeRequestApprovalsInTransaction(tx, canvas.ID, request.ID, now); err != nil {
 		return err
 	}
 
-	request.ChangedNodeIDs = datatypes.NewJSONSlice(diff.ChangedNodeIDs)
-	request.ConflictingNodeIDs = datatypes.NewJSONSlice(diff.ConflictingNodeIDs)
+	request.ChangedNodeIDs = datatypes.NewJSONSlice(changedNodeIDs)
+	request.ConflictingNodeIDs = datatypes.NewJSONSlice(conflictingNodeIDs)
 	request.UpdatedAt = &now
 	request.Status = models.CanvasChangeRequestStatusOpen
 

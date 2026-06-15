@@ -166,3 +166,18 @@ func edgeReferencesKnownNodes(edge models.Edge, nodeSet map[string]struct{}) boo
 	}
 	return true
 }
+
+func isOpenCanvasChangeRequestStatus(status string) bool {
+	return status == models.CanvasChangeRequestStatusOpen
+}
+
+func mapNodesByID(nodes []models.Node) map[string]models.Node {
+	result := make(map[string]models.Node, len(nodes))
+	for _, node := range nodes {
+		if node.ID == "" {
+			continue
+		}
+		result[node.ID] = node
+	}
+	return result
+}

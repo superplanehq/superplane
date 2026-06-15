@@ -1,4 +1,4 @@
-package canvases
+package changerequests
 
 import (
 	"errors"
@@ -36,7 +36,8 @@ func refreshCanvasChangeRequestDiffInTransaction(
 	return tx.Save(request).Error
 }
 
-func refreshOpenCanvasChangeRequestsInTransaction(
+// RefreshOpenCanvasChangeRequestsInTransaction recomputes diff/conflict flags for open change requests.
+func RefreshOpenCanvasChangeRequestsInTransaction(
 	tx *gorm.DB,
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
@@ -74,4 +75,14 @@ func refreshOpenCanvasChangeRequestsInTransaction(
 	}
 
 	return nil
+}
+
+// RefreshCanvasChangeRequestDiffInTransaction recomputes diff/conflict flags for one change request.
+func RefreshCanvasChangeRequestDiffInTransaction(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	request *models.CanvasChangeRequest,
+) error {
+	return refreshCanvasChangeRequestDiffInTransaction(tx, canvas, version, request)
 }
