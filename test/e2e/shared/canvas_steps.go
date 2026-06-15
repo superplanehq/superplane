@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -57,6 +58,9 @@ func (s *CanvasSteps) EnterEditMode() {
 
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
+	if draft := s.FindCurrentDraft(); draft != nil {
+		s.WaitForVersionMaterialized(draft.ID)
+	}
 }
 
 // CreateNewDraftFromEditMenu opens the Edit menu and creates an additional draft branch.
@@ -70,6 +74,9 @@ func (s *CanvasSteps) CreateNewDraftFromEditMenu() {
 	require.NoError(s.t, createButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
+	if draft := s.FindCurrentDraft(); draft != nil {
+		s.WaitForVersionMaterialized(draft.ID)
+	}
 }
 
 // ExitEditMode leaves the current draft and returns to the live canvas view.
@@ -340,6 +347,33 @@ func (s *CanvasSteps) CommitAndPublish() {
 	s.Publish()
 }
 
+// WaitForVersionMaterialized waits until the materializer worker finishes projecting
+// a draft or published version row at its git commit.
+func (s *CanvasSteps) WaitForVersionMaterialized(versionID uuid.UUID) {
+	require.Eventually(s.t, func() bool {
+		version, err := models.FindCanvasVersion(s.WorkflowID, versionID)
+		if err != nil {
+			return false
+		}
+		return version.MaterializationStatus == models.MaterializationStatusReady
+	}, 60*time.Second, 200*time.Millisecond)
+}
+
+// WaitForLiveMaterialized waits until the live version row matches a materialized main commit.
+func (s *CanvasSteps) WaitForLiveMaterialized() {
+	require.Eventually(s.t, func() bool {
+		canvas, err := models.FindCanvasWithoutOrgScope(s.WorkflowID)
+		if err != nil || canvas.LiveVersionID == nil {
+			return false
+		}
+		version, err := models.FindCanvasVersion(s.WorkflowID, *canvas.LiveVersionID)
+		if err != nil {
+			return false
+		}
+		return version.MaterializationStatus == models.MaterializationStatusReady && version.CommitSHA != ""
+	}, 60*time.Second, 200*time.Millisecond)
+}
+
 // CommitStaging clicks the orange Commit button and waits for staging to clear.
 func (s *CanvasSteps) CommitStaging() {
 	commitButton := q.TestID("canvas-commit-staging-button").Run(s.session)
@@ -348,13 +382,17 @@ func (s *CanvasSteps) CommitStaging() {
 		return err == nil && visible
 	}, 15*time.Second, 200*time.Millisecond)
 
+	draft := s.FindActiveDraftInEditor()
+	require.NotNil(s.t, draft)
+
 	require.NoError(s.t, commitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
 	require.Eventually(s.t, func() bool {
-		visible, err := commitButton.IsVisible()
-		return err == nil && !visible
-	}, 15*time.Second, 200*time.Millisecond)
+		hasStaging, err := models.HasWorkflowStaging(draft.ID)
+		return err == nil && !hasStaging
+	}, 30*time.Second, 200*time.Millisecond)
 
+	s.WaitForVersionMaterialized(draft.ID)
 	s.WaitForPublishEnabled()
 }
 
@@ -455,6 +493,7 @@ func (s *CanvasSteps) Publish() {
 	}, 30*time.Second, 500*time.Millisecond)
 
 	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+	s.WaitForLiveMaterialized()
 	s.session.Sleep(500)
 }
 
@@ -467,6 +506,31 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 	}
 
 	return &drafts[0]
+}
+
+// FindActiveDraftInEditor returns the draft branch currently open in the editor URL, falling
+// back to the newest draft when the URL does not carry a branch query param.
+func (s *CanvasSteps) FindActiveDraftInEditor() *models.CanvasVersion {
+	pageURL, err := url.Parse(s.session.Page().URL())
+	if err != nil {
+		return s.FindCurrentDraft()
+	}
+
+	branch := strings.TrimSpace(pageURL.Query().Get("branch"))
+	if branch == "" {
+		return s.FindCurrentDraft()
+	}
+
+	for _, draft := range s.ListDraftVersions() {
+		if draft.BranchName != nil && *draft.BranchName == branch {
+			return &draft
+		}
+		if draft.GitBranch == branch {
+			return &draft
+		}
+	}
+
+	return s.FindCurrentDraft()
 }
 
 // ProvisionCanvasGitRepository creates and seeds a ready git repository for a
@@ -512,10 +576,18 @@ func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID)
 		input.Canvas = materialize.CanvasYAMLFromVersion(liveVersion)
 	}
 
-	_, err = materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)
+	headSHA, err := materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)
 	require.NoError(t, err)
 
 	require.NoError(t, repository.MarkReady(database.Conn()))
+
+	require.NoError(t, materialize.RequestBranchMaterialization(
+		context.Background(),
+		canvasID,
+		models.CanvasGitBranchMain,
+		headSHA,
+		nil,
+	))
 }
 
 func (s *CanvasSteps) Create() {
@@ -531,6 +603,7 @@ func (s *CanvasSteps) Create() {
 	require.NoError(s.t, err)
 
 	ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
+	s.WaitForLiveMaterialized()
 
 	s.Visit()
 }
@@ -590,6 +663,7 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 	require.NoError(s.t, err)
 
 	ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
+	s.WaitForLiveMaterialized()
 
 	s.Visit()
 }

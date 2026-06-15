@@ -2148,6 +2148,19 @@ export function AppPage() {
         return true;
       }
 
+      if (eventName === "repository_branch_updated") {
+        const branchUpdate = payload as { materializationStatus?: string };
+        if (
+          branchUpdate.materializationStatus === "ready" &&
+          activeCanvasVersionId &&
+          hasEditableVersion &&
+          !isViewingLiveVersion
+        ) {
+          void resyncDraftToCommitted(activeCanvasVersionId);
+        }
+        return true;
+      }
+
       if (eventName !== "canvas_updated") {
         return true;
       }
@@ -2165,8 +2178,10 @@ export function AppPage() {
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
+      hasEditableVersion,
       hasPendingLocalCanvasState,
       invalidateCanvasVersionData,
+      isViewingLiveVersion,
       resyncDraftToCommitted,
     ],
   );
