@@ -2397,6 +2397,8 @@ type PutMetricAlarmInput struct {
 	AlarmActions []string
 	// OmitAlarmActions skips AlarmActions parameters so existing actions are preserved (CloudWatch PutMetricAlarm).
 	OmitAlarmActions bool
+	// IncludeAlarmDescription always sends AlarmDescription, including when empty (to clear an existing description).
+	IncludeAlarmDescription bool
 }
 
 type MetricAlarm struct {
@@ -2485,7 +2487,7 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 	params.Set("EvaluationPeriods", strconv.Itoa(evaluationPeriods))
 
 	description := strings.TrimSpace(input.AlarmDescription)
-	if description != "" {
+	if input.IncludeAlarmDescription || description != "" {
 		params.Set("AlarmDescription", description)
 	}
 
