@@ -1,4 +1,4 @@
-export type IntegrationSource = IntegrationSource;
+export type IntegrationSource = "node_configuration" | "integrations_page" | "install_wizard";
 
 import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
