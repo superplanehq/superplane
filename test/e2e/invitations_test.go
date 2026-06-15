@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -190,7 +191,7 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	roles, err := authService.GetUserRolesForOrg(user.ID.String(), s.session.OrgID.String())
+	roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), s.session.OrgID.String())
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, roles)
 

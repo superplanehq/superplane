@@ -29,7 +29,6 @@ import {
   canvasesCreateCanvasMemoryNamespace,
   canvasesUpdateCanvasMemoryNamespace,
   canvasesListEventExecutions,
-  canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
   canvasesGetCanvasRepository,
@@ -56,6 +55,8 @@ import type {
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
+import { draftVersionId } from "../lib/draftVersion";
 import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
 import {
@@ -87,6 +88,7 @@ async function stageSpecOperations(
   versionId: string,
   operations: CanvasesCanvasRepositoryFileOperation[],
 ) {
+  registerLocalStagingWrite(canvasId, versionId);
   await canvasesStageCanvasRepositoryFile(
     withOrganizationHeader({
       path: { canvasId, versionId },
@@ -96,6 +98,7 @@ async function stageSpecOperations(
 }
 
 async function discardStagedPaths(canvasId: string, versionId: string, paths: string[]) {
+  registerLocalStagingWrite(canvasId, versionId);
   await canvasesDiscardCanvasStaging(
     withOrganizationHeader({
       path: { canvasId, versionId },
@@ -106,6 +109,7 @@ async function discardStagedPaths(canvasId: string, versionId: string, paths: st
 
 // applyCanvasStagingAutoLayout lays out the staged canvas.yaml and re-stages it.
 async function applyCanvasStagingAutoLayout(canvasId: string, versionId: string, autoLayout: SpecAutoLayout) {
+  registerLocalStagingWrite(canvasId, versionId);
   await canvasesApplyCanvasAutoLayout(
     withOrganizationHeader({
       path: { canvasId, versionId },
@@ -238,9 +242,6 @@ export const canvasKeys = {
     ] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
-  childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
-  childExecution: (canvasId: string, executionId: string) =>
-    [...canvasKeys.childExecutions(), canvasId, executionId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
   nodeQueueItem: (canvasId: string, nodeId: string) => [...canvasKeys.nodeQueueItems(), canvasId, nodeId] as const,
   nodeEvents: () => [...canvasKeys.all, "nodeEvents"] as const,
@@ -967,6 +968,37 @@ export const useListDraftBranches = (organizationId: string, canvasId: string, e
   });
 };
 
+// Refetches the draft branches and reports whether the given version still
+// exists, so commit/publish can pre-check a possibly-stale draft id.
+export const ensureDraftVersionExists = async (
+  queryClient: QueryClient,
+  organizationId: string,
+  canvasId: string,
+  versionId: string,
+): Promise<boolean> => {
+  if (!organizationId || !canvasId || !versionId) {
+    return false;
+  }
+
+  const branches = await queryClient.fetchQuery({
+    queryKey: canvasKeys.draftBranches(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: { state: "STATE_DRAFT" },
+        }),
+      );
+      return response.data?.versions ?? [];
+    },
+    // Always hit the network — a cached list (app-wide 5-min staleTime) could
+    // still contain a draft that was just deleted, defeating the guard.
+    staleTime: 0,
+  });
+
+  return branches.some((branch) => draftVersionId(branch) === versionId);
+};
+
 export const useCreateDraftBranch = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
@@ -1574,26 +1606,6 @@ export const useEventExecutionsBatch = (canvasId: string, eventIds: string[]) =>
   return { queries, isLoading };
 };
 
-export const useChildExecutions = (canvasId: string, executionId: string | null) => {
-  return useQuery({
-    queryKey: canvasKeys.childExecution(canvasId, executionId!),
-    queryFn: async () => {
-      const response = await canvasesListChildExecutions(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId: executionId!,
-          },
-          body: {},
-        }),
-      );
-      return response.data;
-    },
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && !!executionId,
-  });
-};
-
 export const useNodeQueueItems = (canvasId: string, nodeId: string) => {
   return useQuery({
     queryKey: canvasKeys.nodeQueueItem(canvasId, nodeId),
@@ -2180,6 +2192,7 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
 export const useStageCanvasSpecFiles = (canvasId: string, versionId: string) => {
   return useMutation({
     mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
+      registerLocalStagingWrite(canvasId, versionId);
       const response = await canvasesStageCanvasRepositoryFile(
         withOrganizationHeader({
           path: { canvasId, versionId },
@@ -2206,6 +2219,7 @@ export const useCommitCanvasStaging = (organizationId: string, canvasId: string,
       return response.data;
     },
     onSuccess: () => {
+      queryClient.setQueryData(canvasKeys.versionStaging(canvasId, versionId), { hasStaging: false, stagedPaths: [] });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
@@ -2228,6 +2242,7 @@ export const useDiscardCanvasStaging = (organizationId: string, canvasId: string
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (paths?: string[]) => {
+      registerLocalStagingWrite(canvasId, versionId);
       const response = await canvasesDiscardCanvasStaging(
         withOrganizationHeader({
           path: { canvasId, versionId },
@@ -2257,6 +2272,7 @@ export const useStageRepositoryFiles = (canvasId: string, versionId: string) => 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
+      registerLocalStagingWrite(canvasId, versionId);
       const response = await canvasesStageCanvasRepositoryFile(
         withOrganizationHeader({
           path: { canvasId, versionId },
@@ -2288,6 +2304,7 @@ export const useDiscardRepositoryFilePaths = (canvasId: string, versionId: strin
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (paths: string[]) => {
+      registerLocalStagingWrite(canvasId, versionId);
       const response = await canvasesDiscardCanvasStaging(
         withOrganizationHeader({
           path: { canvasId, versionId },

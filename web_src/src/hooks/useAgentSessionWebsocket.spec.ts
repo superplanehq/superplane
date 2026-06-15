@@ -187,6 +187,15 @@ describe("useAgentSessionWebsocket", () => {
     expect(onStatus).toHaveBeenNthCalledWith(3, "failed", "boom");
   });
 
+  it("forwards a session_notice to onNotice without changing status", () => {
+    const onNotice = vi.fn();
+    const onStatus = vi.fn();
+    render({ onNotice, onStatusChange: onStatus });
+    emit("session_notice", { sessionId: "session-1", error: "transient provider error" });
+    expect(onNotice).toHaveBeenCalledWith("transient provider error");
+    expect(onStatus).not.toHaveBeenCalled();
+  });
+
   it("ignores malformed payloads without crashing", () => {
     const onPersisted = vi.fn();
     render({ onPersistedMessage: onPersisted });

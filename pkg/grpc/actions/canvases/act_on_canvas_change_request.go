@@ -62,8 +62,13 @@ func ActOnCanvasChangeRequest(
 			return nil, err
 		}
 
+		approvals, usersByID, loadErr := loadCanvasChangeRequestSerializationData(organizationID, request, version)
+		if loadErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to load change request data: %v", loadErr)
+		}
+
 		return &pb.ActOnCanvasChangeRequestResponse{
-			ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
+			ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID, approvals, usersByID),
 		}, nil
 	}
 
@@ -101,8 +106,13 @@ func ActOnCanvasChangeRequest(
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
+	approvals, usersByID, err := loadCanvasChangeRequestSerializationData(organizationID, request, version)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load change request data: %v", err)
+	}
+
 	return &pb.ActOnCanvasChangeRequestResponse{
-		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
+		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID, approvals, usersByID),
 	}, nil
 }
 
@@ -458,7 +468,7 @@ func resolveActingApprover(
 	actorUserID uuid.UUID,
 	allowAlreadyApproved bool,
 ) (int, models.CanvasChangeRequestApprover, error) {
-	roles, err := authService.GetUserRolesForOrg(actorUserID.String(), organizationID)
+	roles, err := authService.GetUserRolesForOrg(context.Background(), actorUserID.String(), organizationID)
 	if err != nil {
 		return -1, models.CanvasChangeRequestApprover{}, status.Errorf(codes.Internal, "failed to resolve user roles: %v", err)
 	}

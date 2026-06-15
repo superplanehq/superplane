@@ -301,22 +301,20 @@ func CreateNodeExecutionWithConfiguration(
 	nodeID string,
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
-	parentExecutionID *uuid.UUID,
 	configuration map[string]any,
 ) *models.CanvasNodeExecution {
 	ensureCanvasNodeExists(t, workflowID, nodeID)
 
 	now := time.Now()
 	execution := models.CanvasNodeExecution{
-		WorkflowID:        workflowID,
-		NodeID:            nodeID,
-		RootEventID:       rootEventID,
-		EventID:           eventID,
-		ParentExecutionID: parentExecutionID,
-		State:             models.CanvasNodeExecutionStatePending,
-		Configuration:     datatypes.NewJSONType(configuration),
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		WorkflowID:    workflowID,
+		NodeID:        nodeID,
+		RootEventID:   rootEventID,
+		EventID:       eventID,
+		State:         models.CanvasNodeExecutionStatePending,
+		Configuration: datatypes.NewJSONType(configuration),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
 	require.NoError(t, database.Conn().Create(&execution).Error)
@@ -329,21 +327,19 @@ func CreateCanvasNodeExecution(
 	nodeID string,
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
-	parentExecutionID *uuid.UUID,
 ) *models.CanvasNodeExecution {
 	ensureCanvasNodeExists(t, canvasID, nodeID)
 
 	now := time.Now()
 	execution := models.CanvasNodeExecution{
-		WorkflowID:        canvasID,
-		NodeID:            nodeID,
-		RootEventID:       rootEventID,
-		EventID:           eventID,
-		ParentExecutionID: parentExecutionID,
-		State:             models.CanvasNodeExecutionStatePending,
-		Configuration:     datatypes.NewJSONType(map[string]any{}),
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		WorkflowID:    canvasID,
+		NodeID:        nodeID,
+		RootEventID:   rootEventID,
+		EventID:       eventID,
+		State:         models.CanvasNodeExecutionStatePending,
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
 	require.NoError(t, database.Conn().Create(&execution).Error)

@@ -172,12 +172,16 @@ check.db.structure:
 
 check.db.migrations:
 	bash ./scripts/verify_no_future_migrations.sh
+	bash ./scripts/verify_branch_migrations_are_latest.sh
 
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
 check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:coverage"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+
+check.test.ui.shard:
+	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"

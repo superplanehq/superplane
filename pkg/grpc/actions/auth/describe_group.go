@@ -17,7 +17,7 @@ func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, 
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	role, err := authService.GetGroupRole(domainID, domainType, groupName)
+	role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
@@ -34,7 +34,7 @@ func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, 
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
+	groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}

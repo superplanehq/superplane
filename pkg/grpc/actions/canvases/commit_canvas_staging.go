@@ -64,7 +64,7 @@ func CommitCanvasStaging(
 		}
 
 		return &pb.CommitCanvasStagingResponse{
-			Version:        SerializeCanvasVersionMetadata(version, organizationID),
+			Version:        SerializeCanvasVersionMetadata(version, organizationID, nil),
 			StagingSummary: summary,
 		}, nil
 	}
@@ -155,7 +155,7 @@ func CommitCanvasStaging(
 	// Optimistic response: returns the pending version metadata at the new commit;
 	// nodes/edges are materialized asynchronously by the worker.
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(pending, organizationID),
+		Version:        SerializeCanvasVersionMetadata(pending, organizationID, nil),
 		StagingSummary: summary,
 	}, nil
 }

@@ -60,7 +60,7 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	rootEvent1.CustomName = &customName
 	require.NoError(t, database.Conn().Save(rootEvent1).Error)
 
-	firstExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
+	firstExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID)
 	_, err := firstExecution.Pass(map[string][]any{
 		"default": {map[string]any{"data": "first"}},
 	})

@@ -60,7 +60,7 @@ func Test_UpdateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := r.AuthService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
+		roleDef, err := r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.Len(t, roleDef.Permissions, 3)
@@ -86,7 +86,7 @@ func Test_UpdateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := r.AuthService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
+		roleDef, err := r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)

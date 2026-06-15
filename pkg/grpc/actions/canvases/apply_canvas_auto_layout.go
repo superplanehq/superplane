@@ -89,5 +89,7 @@ func ApplyCanvasAutoLayout(
 		return nil, err
 	}
 
+	publishStagingUpdated(canvas.ID, version.ID)
+
 	return &pb.ApplyCanvasAutoLayoutResponse{StagingSummary: state}, nil
 }

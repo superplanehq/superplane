@@ -111,6 +111,6 @@ func CreateCanvasVersion(
 	// materialization state; nodes/edges are filled in asynchronously by the
 	// worker, so only metadata is guaranteed here.
 	return &pb.CreateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersion(version, organizationID, nil),
 	}, nil
 }

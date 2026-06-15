@@ -55,6 +55,7 @@ func UpdateIntegrationProperty(
 		return nil, err
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "property_update").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		setupStep, err := setupProvider.OnPropertyUpdate(core.PropertyUpdateContext{
 			PropertyName: propertyName,

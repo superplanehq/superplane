@@ -37,7 +37,7 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 	}
 
 	// Remove all RBAC roles before deleting
-	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
+	roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
 	if err != nil {
 		log.Errorf("Error determining roles for service account %s: %v", user.ID, err)
 	} else {

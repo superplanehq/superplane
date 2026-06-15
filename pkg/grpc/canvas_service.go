@@ -339,20 +339,6 @@ func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEve
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
 }
 
-func (s *CanvasService) ListChildExecutions(ctx context.Context, req *pb.ListChildExecutionsRequest) (*pb.ListChildExecutionsResponse, error) {
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
-	}
-
-	executionID, err := uuid.Parse(req.ExecutionId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
-	}
-
-	return canvases.ListChildExecutions(ctx, s.registry, canvasID, executionID)
-}
-
 func (s *CanvasService) CancelExecution(ctx context.Context, req *pb.CancelExecutionRequest) (*pb.CancelExecutionResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {

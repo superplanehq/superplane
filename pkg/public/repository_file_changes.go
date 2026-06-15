@@ -47,6 +47,7 @@ func (s *Server) handleRepositoryFileChanges(w http.ResponseWriter, r *http.Requ
 	}
 
 	allowed, err := s.authService.CheckOrganizationPermission(
+		r.Context(),
 		user.ID.String(),
 		user.OrganizationID.String(),
 		"canvases",
