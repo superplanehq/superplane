@@ -572,6 +572,13 @@ func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID)
 		require.NoError(t, liveErr)
 		input.Canvas = materialize.CanvasYAMLFromVersion(liveVersion)
 	}
+	if input.Canvas != nil {
+		// support.CreateCanvas seeds a random workflow name on the live version row.
+		// Tests often rename the workflow afterward; keep git metadata aligned so
+		// live materialization does not overwrite the display name from git.
+		input.Canvas.Metadata.Name = canvas.Name
+		input.Canvas.Metadata.Description = canvas.Description
+	}
 
 	headSHA, err := materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)
 	require.NoError(t, err)
