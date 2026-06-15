@@ -131,7 +131,7 @@ func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewEnforcer(a.casbinModel, adapter)
+	enforcer, err := casbin.NewEnforcer(a.casbinModel.Copy(), adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
