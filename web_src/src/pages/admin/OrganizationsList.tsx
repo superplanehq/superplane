@@ -1,6 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Building, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link } from "react-router-dom";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
@@ -150,6 +151,8 @@ const OrganizationsList: React.FC = () => {
       setSortDirection(field === "name" ? "asc" : "desc");
     }
   };
+
+  useReportPageReady(!loading || organizations.length > 0);
 
   if (loading && organizations.length === 0) {
     return (
