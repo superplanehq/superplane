@@ -7,7 +7,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -33,15 +32,10 @@ func Test__UpdateOrganization(t *testing.T) {
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
-		changeManagementEnabled := true
-
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
 				Name:        "updated-org",
 				Description: "Updated description",
-			},
-			Spec: &protos.Organization_Spec{
-				ChangeManagementEnabled: &changeManagementEnabled,
 			},
 		}
 
@@ -56,12 +50,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))
 		require.NotNil(t, response.Organization.Spec)
-		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
-		assert.Equal(t, changeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
-
-		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
-		require.NoError(t, err)
-		assert.Equal(t, changeManagementEnabled, organization.ChangeManagementEnabled)
 	})
 
 	t.Run("nil organization -> error", func(t *testing.T) {

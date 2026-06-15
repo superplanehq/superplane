@@ -30,8 +30,6 @@ type UseCanvasDraftBranchActionsOptions = {
   handleCreateVersion: () => Promise<void>;
   queryClient: QueryClient;
   setSearchParams: SetURLSearchParams;
-  setIsCreateChangeRequestMode: (value: boolean) => void;
-  setSelectedChangeRequestId: (value: string) => void;
   setActiveCanvasVersion: (value: CanvasesCanvasVersion | null) => void;
   setDraftCanvasSpec: (value: CanvasesCanvas["spec"] | null) => void;
   setHasUnsavedChanges: (value: boolean) => void;
@@ -57,8 +55,6 @@ export function useCanvasDraftBranchActions({
   handleCreateVersion,
   queryClient,
   setSearchParams,
-  setIsCreateChangeRequestMode,
-  setSelectedChangeRequestId,
   setActiveCanvasVersion,
   setDraftCanvasSpec,
   setHasUnsavedChanges,
@@ -135,8 +131,6 @@ export function useCanvasDraftBranchActions({
         handleUseVersion,
         queryClient,
         setSearchParams,
-        setIsCreateChangeRequestMode,
-        setSelectedChangeRequestId,
         setActiveCanvasVersion,
         setDraftCanvasSpec,
         setHasUnsavedChanges,
@@ -164,8 +158,6 @@ export function useCanvasDraftBranchActions({
     canvasId,
     setSearchParams,
     setLastSavedWorkflowSnapshot,
-    setIsCreateChangeRequestMode,
-    setSelectedChangeRequestId,
     setActiveCanvasVersion,
     setDraftCanvasSpec,
     setHasUnsavedChanges,
