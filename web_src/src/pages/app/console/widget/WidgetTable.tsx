@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,15 @@ interface WidgetTableProps {
   render: WidgetTableRender;
   rows: unknown[];
   isLoading: boolean;
+  /**
+   * Progressive-pagination affordances. When `hasMore` is true the footer
+   * shows a "Load more" button and the scrollable area auto-fetches as the
+   * user scrolls near the bottom. Wired only by the table panel; chart and
+   * number panels render the full configured limit at once.
+   */
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const STATUS_PILL_CLASS: Record<string, string> = {
@@ -45,7 +54,10 @@ const ACTION_ICONS = {
   "external-link": ExternalLink,
 } as const;
 
-export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
+/** Distance from the bottom (px) at which scrolling auto-requests more rows. */
+const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
+
+export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
@@ -71,6 +83,30 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     return Array.from(ids);
   }, [render.rowActions, ctx]);
 
+  // Auto-load more rows as the user scrolls near the bottom. The table's
+  // `loadMore()` is dual-mode: it usually just widens the display window over
+  // rows already in the infinite-query cache (no network fetch), and only
+  // sometimes triggers an actual page fetch. So we can't rely on a fetching
+  // flag flipping to re-arm the guard (it would stay armed forever after a
+  // cache-only reveal). Instead we re-arm whenever the rendered row set grows
+  // or a fetch settles, which covers both modes.
+  const loadMoreRequestedRef = useRef(false);
+  useEffect(() => {
+    loadMoreRequestedRef.current = false;
+  }, [rows.length, isFetchingMore]);
+
+  const onScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget;
+      if (!hasMore || !onLoadMore || isFetchingMore || loadMoreRequestedRef.current) return;
+      const remainingScroll = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remainingScroll > AUTO_LOAD_SCROLL_THRESHOLD_PX) return;
+      loadMoreRequestedRef.current = true;
+      onLoadMore();
+    },
+    [hasMore, onLoadMore, isFetchingMore],
+  );
+
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
     return (
@@ -88,71 +124,135 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     );
   }
   if (filtered.length === 0) {
+    // The current pages produced no matching rows, but later server pages
+    // might — so keep the "Load more" affordance available instead of
+    // dead-ending on the empty message.
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
-        {render.emptyMessage ?? "No data to display."}
+      <div data-testid="widget-table-empty-wrap">
+        <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
+          {render.emptyMessage ?? "No data to display."}
+        </div>
+        {hasMore && onLoadMore ? (
+          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
       </div>
     );
   }
 
   return (
     <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-      <div className="overflow-auto" data-testid="widget-table">
-        <table className="w-full border-collapse text-xs">
-          <thead className="bg-slate-50">
-            <tr>
-              {render.columns.map((col, i) => (
-                <th
-                  key={`${col.field}-${i}`}
-                  className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
-                >
-                  {col.label ?? col.field}
-                </th>
-              ))}
-              {render.rowActions && render.rowActions.length > 0 ? (
-                <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">
-                  Actions
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row, idx) => {
-              const rowKey = rowKeyForRow(row, idx);
-              const toneClass = resolveRowStyle?.(row);
-              return (
-                <tr
-                  key={rowKey}
-                  data-row-tone={toneClass ? "true" : undefined}
-                  className={cn(
-                    "border-b border-slate-100 last:border-0",
-                    // Drop the default hover wash when a tone is applied so the
-                    // tint isn't overridden — the row already has a deliberate
-                    // background and a hover bg would mask it.
-                    toneClass ? toneClass : "hover:bg-slate-50/60",
-                  )}
-                >
-                  {render.columns.map((col, ci) => (
-                    <Cell key={`${col.field}-${ci}`} col={col} row={row} />
-                  ))}
-                  {render.rowActions && render.rowActions.length > 0 ? (
-                    <td className="px-3 py-1.5 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        {render.rowActions
-                          .filter((action) => evaluateRowShow(action.show, row))
-                          .map((action, ai) => (
-                            <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
-                          ))}
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <WidgetTableGrid
+        render={render}
+        filtered={filtered}
+        resolveRowStyle={resolveRowStyle}
+        hasMore={hasMore}
+        isFetchingMore={isFetchingMore}
+        onLoadMore={onLoadMore}
+        onScroll={onScroll}
+      />
     </WidgetTableActionLockProvider>
+  );
+}
+
+interface WidgetTableGridProps {
+  render: WidgetTableRender;
+  filtered: Record<string, unknown>[];
+  resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
+  onScroll: (event: UIEvent<HTMLDivElement>) => void;
+}
+
+function WidgetTableGrid({
+  render,
+  filtered,
+  resolveRowStyle,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  onScroll,
+}: WidgetTableGridProps) {
+  const hasActions = Boolean(render.rowActions && render.rowActions.length > 0);
+  return (
+    <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
+      <table className="w-full border-collapse text-xs">
+        <thead className="bg-slate-50">
+          <tr>
+            {render.columns.map((col, i) => (
+              <th
+                key={`${col.field}-${i}`}
+                className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
+              >
+                {col.label ?? col.field}
+              </th>
+            ))}
+            {hasActions ? (
+              <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">Actions</th>
+            ) : null}
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((row, idx) => {
+            const rowKey = rowKeyForRow(row, idx);
+            const toneClass = resolveRowStyle?.(row);
+            return (
+              <tr
+                key={rowKey}
+                data-row-tone={toneClass ? "true" : undefined}
+                className={cn(
+                  "border-b border-slate-100 last:border-0",
+                  // Drop the default hover wash when a tone is applied so the
+                  // tint isn't overridden — the row already has a deliberate
+                  // background and a hover bg would mask it.
+                  toneClass ? toneClass : "hover:bg-slate-50/60",
+                )}
+              >
+                {render.columns.map((col, ci) => (
+                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                ))}
+                {hasActions ? (
+                  <td className="px-3 py-1.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {render.rowActions
+                        ?.filter((action) => evaluateRowShow(action.show, row))
+                        .map((action, ai) => (
+                          <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                        ))}
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {hasMore && onLoadMore ? (
+        <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+      ) : null}
+    </div>
+  );
+}
+
+function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
+  return (
+    <div
+      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2"
+      data-testid="widget-table-load-more"
+    >
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onLoadMore}
+        disabled={isFetchingMore}
+        className="h-7 gap-1 text-xs"
+        data-testid="widget-table-load-more-button"
+      >
+        {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+        {isFetchingMore ? "Loading…" : "Load more"}
+      </Button>
+    </div>
   );
 }
 

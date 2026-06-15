@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { registerLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
@@ -59,6 +60,7 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
+  registerLocalStagingWrite(params.canvasId, params.versionId);
   await canvasesStageCanvasRepositoryFile(
     withOrganizationHeader({
       path: { canvasId: params.canvasId, versionId: params.versionId },
