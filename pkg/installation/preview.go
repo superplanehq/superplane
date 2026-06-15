@@ -64,10 +64,12 @@ func detectIntegrations(canvas *pb.Canvas, reg *registry.Registry) []string {
 		return nil
 	}
 
+	componentToIntegration := buildComponentIntegrationMap(reg)
 	seen := make(map[string]bool)
 	var result []string
+
 	for _, node := range canvas.Spec.Nodes {
-		name := findIntegrationForComponent(node, reg)
+		name := componentToIntegration[node.Component]
 		if name == "" || seen[name] {
 			continue
 		}

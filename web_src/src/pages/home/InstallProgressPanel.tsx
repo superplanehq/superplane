@@ -19,14 +19,7 @@ import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegr
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import type { InstallParam } from "../install/types";
 
-function checkCanProceed(
-  organizationId: string | undefined,
-  isInstalling: boolean,
-  preview: { previewLoading: boolean; previewError: string | null },
-  integrations: string[],
-  selections: IntegrationSelections,
-): boolean {
-  if (!organizationId || isInstalling || preview.previewLoading || preview.previewError) return false;
+function allIntegrationsSelected(integrations: string[], selections: IntegrationSelections): boolean {
   return integrations.length === 0 || integrations.every((name) => selections[name]);
 }
 
@@ -85,6 +78,7 @@ export function InstallProgressPanel({
 
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
   const [isInstalling, setIsInstalling] = useState(false);
+  const isInstallingRef = useRef(false);
 
   // Clear selections when org changes
   const resetParamValuesRef = useRef(preview.resetParamValues);
@@ -96,7 +90,8 @@ export function InstallProgressPanel({
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
-      if (!organizationId || isInstalling) return;
+      if (!organizationId || isInstallingRef.current) return;
+      isInstallingRef.current = true;
       setIsInstalling(true);
       try {
         const result = await executeInstall({
@@ -116,29 +111,22 @@ export function InstallProgressPanel({
         localStorage.setItem("canvasSidebarOpen", "false");
         navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
       } catch (error) {
+        isInstallingRef.current = false;
         setIsInstalling(false);
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install")));
       }
     },
-    [
-      organizationId,
-      app,
-      preview.paramValues,
-      preview.installParams,
-      integrationSelections,
-      isInstalling,
-      queryClient,
-      navigate,
-    ],
+    [organizationId, app, preview.paramValues, preview.installParams, integrationSelections, queryClient, navigate],
   );
 
   const integrations = preview.detectedIntegrations.length > 0 ? preview.detectedIntegrations : app.integrations;
   const hasIntegrations = integrations.length > 0;
   const hasParams = preview.installParams.length > 0;
-  const canProceed = checkCanProceed(organizationId, isInstalling, preview, integrations, integrationSelections);
+  const readyToInstall = !!organizationId && !isInstalling && !preview.previewLoading && !preview.previewError;
+  const canProceed = readyToInstall && allIntegrationsSelected(integrations, integrationSelections);
   const canInstall = canProceed && checkRequiredParams(preview.installParams, preview.paramValues);
-  // Skip only needs org + not installing + preview loaded — skips both integrations and params
-  const canSkip = !!organizationId && !isInstalling && !preview.previewLoading && !preview.previewError;
+  // Skip only needs base readiness — skips both integrations and params
+  const canSkip = readyToInstall;
 
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">

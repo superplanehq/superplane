@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -92,48 +93,9 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Error(codes.PermissionDenied, "You do not have permission to create apps in this organization")
 	}
 
-	canvasBody, _, err := fetchRawCanvasFile(repo)
+	canvas, console, err := s.resolveCanvasFromRepo(repo, name, req)
 	if err != nil {
 		return nil, err
-	}
-
-	// Substitute install params in raw YAML before parsing.
-	// If the template has params, we always need to substitute something
-	// so the YAML is valid ({{ install_params.xxx }} is not valid YAML).
-	params, _ := FetchParams(repo, repo.Ref)
-	if params != nil && len(params.InstallParams) > 0 {
-		if req.InstallParams != nil {
-			// Wizard flow: validate raw user input BEFORE resolving defaults,
-			// so required fields with no value are caught.
-			if err := ValidateInstallParams(params.InstallParams, req.InstallParams); err != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-			}
-			resolved := ResolveInstallParams(params.InstallParams, req.InstallParams)
-			canvasBody = SubstituteInstallParams(canvasBody, resolved)
-		} else {
-			// One-click flow: no params sent, substitute with defaults/placeholders.
-			canvasBody = SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams))
-		}
-	}
-
-	canvas, err := parseCanvasYAML(canvasBody)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pre-parse the optional console.yaml from the same ref. Doing this
-	// before CreateCanvas means a malformed console aborts the install
-	// without leaving an orphan canvas behind.
-	console, err := FetchConsole(repo, repo.Ref)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-
-	canvas.Metadata.Name = name
-
-	// Wire integration instances into canvas nodes.
-	if len(req.Integrations) > 0 {
-		wireIntegrations(canvas, req.Integrations, s.Registry)
 	}
 
 	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
@@ -170,6 +132,63 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		CanvasID:       canvasID,
 		OrganizationID: req.OrganizationID.String(),
 	}, nil
+}
+
+// resolveCanvasFromRepo fetches, parametrizes, and prepares a canvas for creation.
+func (s *Service) resolveCanvasFromRepo(
+	repo *Repository,
+	name string,
+	req InstallRequest,
+) (*pb.Canvas, *models.ConsoleYAML, error) {
+	canvasBody, _, err := fetchRawCanvasFile(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	canvasBody, err = applyInstallParams(canvasBody, repo, req.InstallParams)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	canvas, err := parseCanvasYAML(canvasBody)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	console, err := FetchConsole(repo, repo.Ref)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	canvas.Metadata.Name = name
+
+	if len(req.Integrations) > 0 {
+		wireIntegrations(canvas, req.Integrations, s.Registry)
+	}
+
+	return canvas, console, nil
+}
+
+// applyInstallParams validates and substitutes template parameters in raw YAML.
+// Returns the substituted YAML bytes, ready for parsing.
+func applyInstallParams(canvasBody []byte, repo *Repository, userParams map[string]string) ([]byte, error) {
+	params, err := FetchParams(repo, repo.Ref)
+	if err != nil {
+		log.Warnf("failed to load params.json for %s: %v", repo.String(), err)
+	}
+
+	if params == nil || len(params.InstallParams) == 0 {
+		return canvasBody, nil
+	}
+
+	if userParams != nil {
+		if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		}
+		return SubstituteInstallParams(canvasBody, ResolveInstallParams(params.InstallParams, userParams)), nil
+	}
+
+	return SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams)), nil
 }
 
 // persistInstalledConsole writes the optional console for a freshly created
@@ -212,12 +231,14 @@ func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping,
 		return
 	}
 
+	componentToIntegration := buildComponentIntegrationMap(reg)
+
 	for _, node := range canvas.Spec.Nodes {
 		if node.Component == "" {
 			continue
 		}
 
-		integrationName := findIntegrationForComponent(node, reg)
+		integrationName := componentToIntegration[node.Component]
 		if integrationName == "" {
 			continue
 		}
@@ -234,28 +255,35 @@ func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping,
 	}
 }
 
-// findIntegrationForComponent returns the integration name that owns
-// the given node's component (trigger or action). Returns "" if not found.
-func findIntegrationForComponent(node *componentpb.Node, reg *registry.Registry) string {
-	if node.Component == "" {
-		return ""
+// buildComponentIntegrationMap creates a lookup from component name to
+// integration name using the registry. Built once, used for all nodes.
+func buildComponentIntegrationMap(reg *registry.Registry) map[string]string {
+	result := make(map[string]string)
+	if reg == nil {
+		return result
 	}
 
 	for _, integration := range reg.ListIntegrations() {
 		for _, trigger := range integration.Triggers() {
-			if trigger.Name() == node.Component {
-				return integration.Name()
-			}
+			result[trigger.Name()] = integration.Name()
 		}
-
 		for _, action := range integration.Actions() {
-			if action.Name() == node.Component {
-				return integration.Name()
-			}
+			result[action.Name()] = integration.Name()
 		}
 	}
 
-	return ""
+	return result
+}
+
+// findIntegrationForComponent returns the integration name that owns
+// the given node's component (trigger or action). Returns "" if not found.
+func findIntegrationForComponent(node *componentpb.Node, reg *registry.Registry) string {
+	if node.Component == "" || reg == nil {
+		return ""
+	}
+
+	result := buildComponentIntegrationMap(reg)
+	return result[node.Component]
 }
 
 func FindActiveUserForAccountInOrganization(accountID, organizationID uuid.UUID) (*models.User, error) {

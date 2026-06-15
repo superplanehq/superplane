@@ -1,4 +1,4 @@
-import type { OrganizationsBrowserAction } from "@/api-client";
+import type { OrganizationsIntegration } from "@/api-client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -137,11 +137,7 @@ export function IntegrationsSection({
 function useCreateDialogProps(
   dialogIntegrationName: string | null,
   availableIntegrations: Array<{ name?: string; [key: string]: unknown }>,
-  connected: Array<{
-    metadata?: { id?: string; name?: string; integrationName?: string };
-    status?: { state?: string; metadata?: { [key: string]: unknown }; browserAction?: OrganizationsBrowserAction };
-    spec?: { configuration?: unknown };
-  }>,
+  connected: OrganizationsIntegration[],
   existingIntegrationNames: Set<string>,
 ) {
   const dialogDefinition = useMemo(
@@ -210,25 +206,14 @@ function IntegrationRow({
             <SelectValue placeholder={`Select ${displayName}`} />
           </SelectTrigger>
           <SelectContent>
-            {data.allInstances.map((instance) => {
-              const state = instance.status?.state;
-              return (
-                <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
-                  <span className="flex items-center gap-1.5">
-                    <span>{instance.metadata?.name || instance.metadata?.id}</span>
-                    {state === "ready" && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    )}
-                    {state === "pending" && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                    )}
-                    {state === "error" && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                    )}
-                  </span>
-                </SelectItem>
-              );
-            })}
+            {data.allInstances.map((instance) => (
+              <SelectItem key={instance.metadata?.id} value={instance.metadata?.id ?? ""}>
+                <span className="flex items-center gap-1.5">
+                  <span>{instance.metadata?.name || instance.metadata?.id}</span>
+                  <StatusDot state={instance.status?.state} />
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       ) : (
@@ -243,4 +228,16 @@ function IntegrationRow({
       </button>
     </div>
   );
+}
+
+const STATUS_DOT_COLORS: Record<string, string> = {
+  ready: "bg-emerald-500",
+  pending: "bg-amber-500",
+  error: "bg-red-500",
+};
+
+function StatusDot({ state }: { state?: string }) {
+  const color = state ? STATUS_DOT_COLORS[state] : undefined;
+  if (!color) return null;
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />;
 }
