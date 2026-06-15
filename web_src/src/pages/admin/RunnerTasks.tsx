@@ -1,5 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { formatRelativeTime } from "@/lib/timezone";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { showErrorToast } from "@/lib/toast";
 import { Terminal } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
@@ -154,6 +155,8 @@ const RunnerTasks: React.FC = () => {
 
     return () => window.clearInterval(interval);
   }, [loadTasks]);
+
+  useReportPageReady(!loading || configured !== null);
 
   if (loading && configured === null) {
     return (
