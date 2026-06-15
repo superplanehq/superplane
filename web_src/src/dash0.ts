@@ -14,6 +14,8 @@ const authToken = dash0Window?.SUPERPLANE_DASH0_AUTH_TOKEN?.trim();
 
 export const isDash0Enabled = !!(endpointUrl && authToken);
 
+const dash0IgnoredUrls = [/\/ws\//, /posthog\.com/];
+
 if (endpointUrl && authToken) {
   init({
     serviceName: dash0Window?.SUPERPLANE_DASH0_SERVICE_NAME?.trim() || "superplane-web",
@@ -22,7 +24,7 @@ if (endpointUrl && authToken) {
       url: endpointUrl,
       authToken,
     },
-    ignoreUrls: [/\/ws\//],
+    ignoreUrls: dash0IgnoredUrls,
     pageViewInstrumentation: {
       generateMetadata: (url) => pageObservabilityMetadata(url.pathname),
     },
