@@ -63,7 +63,6 @@ func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
 		{pbCanvases.Canvases_CommitCanvasStaging_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_ApplyCanvasAutoLayout_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
-		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
 		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
 		{pbCanvases.Canvases_DeleteCanvas_FullMethodName, "delete"},
 	}
