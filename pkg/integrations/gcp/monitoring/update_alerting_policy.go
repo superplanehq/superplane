@@ -160,9 +160,19 @@ func (u *UpdateAlertingPolicy) Setup(ctx core.SetupContext) error {
 	return resolveAlertPolicyMetadata(ctx, spec.AlertPolicy)
 }
 
+// isPromQLConditionUpdate reports whether the spec asks to replace the policy's
+// conditions with a PromQL condition. A saved conditionKind of "promql" alone is
+// not enough — the query must also be present — so that an update toggled to
+// PromQL but left without a query does not block unrelated field updates (e.g.
+// severity or display name), mirroring how the threshold path only acts when its
+// "conditions" key is present.
+func isPromQLConditionUpdate(spec UpdateAlertingPolicySpec) bool {
+	return spec.PromQL.ConditionKind == conditionKindPromQL && strings.TrimSpace(spec.PromQL.Query) != ""
+}
+
 func validateUpdateFields(spec UpdateAlertingPolicySpec, cfg any) error {
 	switch {
-	case spec.PromQL.ConditionKind == conditionKindPromQL:
+	case isPromQLConditionUpdate(spec):
 		if _, err := buildPromQLConditions(spec.PromQL); err != nil {
 			return err
 		}
@@ -204,7 +214,7 @@ func configHasKey(cfg any, key string) bool {
 func hasUpdates(spec UpdateAlertingPolicySpec, cfg any) bool {
 	return strings.TrimSpace(spec.DisplayName) != "" ||
 		configHasKey(cfg, "conditions") ||
-		(spec.PromQL.ConditionKind == conditionKindPromQL && strings.TrimSpace(spec.PromQL.Query) != "") ||
+		isPromQLConditionUpdate(spec) ||
 		spec.Combiner != "" ||
 		spec.Severity != "" ||
 		spec.Enabled != "" ||
@@ -292,7 +302,7 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		mask = append(mask, "displayName")
 	}
 	switch {
-	case spec.PromQL.ConditionKind == conditionKindPromQL:
+	case isPromQLConditionUpdate(spec):
 		conditions, err := buildPromQLConditions(spec.PromQL)
 		if err != nil {
 			return ctx.ExecutionState.Fail("error", err.Error())
