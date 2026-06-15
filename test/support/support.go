@@ -347,8 +347,6 @@ func CreateNextNodeExecution(
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
-	changeManagementEnabled, err := models.IsChangeManagementEnabled(orgID)
-	require.NoError(t, err)
 
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
@@ -368,15 +366,14 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	// Create canvas
 	//
 	workflow := &models.Canvas{
-		ID:                      uuid.New(),
-		OrganizationID:          orgID,
-		LiveVersionID:           &liveVersionID,
-		ChangeManagementEnabled: changeManagementEnabled,
-		Name:                    RandomName("canvas"),
-		Description:             "Test canvas",
-		CreatedBy:               &userID,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		LiveVersionID:  &liveVersionID,
+		Name:           RandomName("canvas"),
+		Description:    "Test canvas",
+		CreatedBy:      &userID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
 
 	var createdNodes []models.CanvasNode
@@ -408,37 +405,23 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		}
 
 		version := models.CanvasVersion{
-			ID:                      liveVersionID,
-			WorkflowID:              workflow.ID,
-			OwnerID:                 &userID,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    workflow.Name,
-			Description:             workflow.Description,
-			ChangeManagementEnabled: workflow.ChangeManagementEnabled,
-			ChangeRequestApprovers:  datatypes.NewJSONSlice(models.DefaultCanvasChangeRequestApprovers()),
-			PublishedAt:             &now,
-			Nodes:                   datatypes.NewJSONSlice(inputNodes),
-			Edges:                   datatypes.NewJSONSlice(edges),
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			ID:          liveVersionID,
+			WorkflowID:  workflow.ID,
+			OwnerID:     &userID,
+			State:       models.CanvasVersionStatePublished,
+			Name:        workflow.Name,
+			Description: workflow.Description,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice(inputNodes),
+			Edges:       datatypes.NewJSONSlice(edges),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}
 
 		return tx.Create(&version).Error
 	}))
 
 	return workflow, createdNodes
-}
-
-func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
-	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
-	require.NoError(t, err)
-	require.NotNil(t, canvas.LiveVersionID)
-
-	require.NoError(t, database.Conn().
-		Model(&models.CanvasVersion{}).
-		Where("id = ?", *canvas.LiveVersionID).
-		Update("change_management_enabled", enabled).
-		Error)
 }
 
 func VerifyCanvasEventsCount(t require.TestingT, canvasID uuid.UUID, expected int) {

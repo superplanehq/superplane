@@ -88,21 +88,6 @@ func UpdateCanvasVersionWithUsage(
 		return nil, err
 	}
 
-	changeManagementEnabled := false
-	var changeRequestApprovers []models.CanvasChangeRequestApprover
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		changeManagementEnabled = changeManagement.Enabled
-
-		changeRequestApprovers, err = parseAndValidateCanvasChangeRequestApprovers(
-			authService,
-			organizationID,
-			changeManagement,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
@@ -168,12 +153,6 @@ func UpdateCanvasVersionWithUsage(
 		now := time.Now()
 		version.Name = nextName
 		version.Description = pbCanvas.GetMetadata().GetDescription()
-		if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
-			version.ChangeManagementEnabled = changeManagementEnabled
-			if changeRequestApprovers != nil {
-				version.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
-			}
-		}
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now

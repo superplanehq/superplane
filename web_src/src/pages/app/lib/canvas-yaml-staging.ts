@@ -1,5 +1,5 @@
 import * as yaml from "js-yaml";
-import type { CanvasChangeManagement, CanvasesCanvas, ChangeManagementApprover } from "@/api-client";
+import type { CanvasesCanvas } from "@/api-client";
 import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
@@ -15,11 +15,6 @@ type ParsedCanvasYaml = {
   spec?: {
     nodes?: ComponentsNode[];
     edges?: ComponentsEdge[];
-    changeManagement?: CanvasesCanvas["spec"] extends infer Spec
-      ? Spec extends { changeManagement?: infer ChangeManagement }
-        ? ChangeManagement
-        : never
-      : never;
   };
 };
 
@@ -55,7 +50,6 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
   return {
     nodes: (parsed.spec.nodes ?? []).map(normalizeCanvasYamlNode),
     edges: (parsed.spec.edges ?? []).map(normalizeCanvasYamlEdge),
-    changeManagement: parsed.spec.changeManagement,
   };
 }
 
@@ -118,47 +112,7 @@ function quoteYamlPositionYKeys(text: string): string {
   return text.replace(/^(\s+)y: /gm, '$1"y": ');
 }
 
-// The live canvas spec comes from the API with proto3 default fields populated
-// (enabled: false, empty userId/roleName), while the locally-edited draft spec
-// omits them. Without canonicalizing, the YAML diff surfaces these defaults as
-// spurious changeManagement edits. Drop falsy enabled and empty approver fields
-// so only real change-management edits appear in the diff.
-function normalizeCanvasYamlChangeManagement(
-  changeManagement: CanvasChangeManagement | undefined,
-): CanvasChangeManagement | undefined {
-  if (!changeManagement) {
-    return undefined;
-  }
-
-  const normalized: CanvasChangeManagement = {};
-  if (changeManagement.enabled) {
-    normalized.enabled = true;
-  }
-
-  const approvals = (changeManagement.approvals ?? []).map(normalizeChangeManagementApprover);
-  if (approvals.length > 0) {
-    normalized.approvals = approvals;
-  }
-
-  return Object.keys(normalized).length > 0 ? normalized : undefined;
-}
-
-function normalizeChangeManagementApprover(approver: ChangeManagementApprover): ChangeManagementApprover {
-  const normalized: ChangeManagementApprover = {};
-  if (approver.type) {
-    normalized.type = approver.type;
-  }
-  if (approver.userId) {
-    normalized.userId = approver.userId;
-  }
-  if (approver.roleName) {
-    normalized.roleName = approver.roleName;
-  }
-  return normalized;
-}
-
 export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
-  const changeManagement = normalizeCanvasYamlChangeManagement(workflow.spec?.changeManagement);
   const document = {
     apiVersion: "v1",
     kind: "Canvas",
@@ -170,7 +124,6 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
     spec: {
       nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
       edges: (workflow.spec?.edges ?? []).map(normalizeCanvasYamlEdge),
-      ...(changeManagement ? { changeManagement } : {}),
     },
   };
 

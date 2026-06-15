@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, SuperplaneActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 
@@ -546,7 +546,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     });
   }
 
-  private resolveNodeOutputChannels(node: ComponentsNode, components: SuperplaneActionsAction[]): string[] {
+  private resolveNodeOutputChannels(node: ComponentsNode, components: ActionsAction[]): string[] {
     const defaultChannels = ["default"];
 
     if (node.type === "TYPE_ACTION" && node.component) {
@@ -557,10 +557,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     return defaultChannels;
   }
 
-  private buildOutputChannelsByNodeId(
-    workflow: CanvasesCanvas,
-    components: SuperplaneActionsAction[],
-  ): Map<string, string[]> {
+  private buildOutputChannelsByNodeId(workflow: CanvasesCanvas, components: ActionsAction[]): Map<string, string[]> {
     const map = new Map<string, string[]>();
     for (const node of workflow.spec?.nodes || []) {
       if (!node.id) {
