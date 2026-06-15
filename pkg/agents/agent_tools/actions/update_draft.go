@@ -7,9 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const updateDraftActionName = "update_draft"
@@ -32,7 +34,14 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	draft, err := ensureOwnedDraftVersion(canvasID, uuid.MustParse(session.UserID))
+	draft, err := ensureOwnedDraftVersion(
+		ctx,
+		a.deps.GitProvider,
+		a.deps.Registry,
+		session.OrganizationID,
+		canvasID,
+		uuid.MustParse(session.UserID),
+	)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("ensure draft: %w", err)
 	}
@@ -145,12 +154,31 @@ func ownedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error
 	return nil, nil
 }
 
-func ensureOwnedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error) {
+func ensureOwnedDraftVersion(
+	ctx context.Context,
+	gitProvider git.Provider,
+	reg *registry.Registry,
+	organizationID string,
+	canvasID uuid.UUID,
+	userID uuid.UUID,
+) (*models.CanvasVersion, error) {
 	if draft, err := ownedDraftVersion(canvasID, userID); err != nil || draft != nil {
 		return draft, err
 	}
 
-	return models.CreateDraftBranchFromLive(canvasID, userID, "", nil, nil)
+	_, err := canvasRepository.CreateCanvasVersion(
+		ctx,
+		gitProvider,
+		reg,
+		organizationID,
+		canvasID.String(),
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return ownedDraftVersion(canvasID, userID)
 }
 
 func resolveCustomToolAutoLayout(input *AutoLayoutInput, hasCanvasUpdate bool) *pb.CanvasAutoLayout {

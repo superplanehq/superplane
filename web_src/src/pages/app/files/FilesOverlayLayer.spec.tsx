@@ -55,6 +55,11 @@ vi.mock("@/hooks/useCanvasData", () => ({
     isLoading: false,
     error: null,
   }),
+  useCanvasRepositoryFileChanges: () => ({
+    data: { hasUnpublishedFileChanges: false, changedPaths: [] },
+    isLoading: false,
+    error: null,
+  }),
   fetchRepositoryFileContentCached: (_queryClient: unknown, _canvasId: string, path: string) =>
     Promise.resolve(repositoryFileContents[path] ?? ""),
 }));

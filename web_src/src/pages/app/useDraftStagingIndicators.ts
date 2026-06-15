@@ -119,6 +119,8 @@ function buildDraftChangeFlags({
       isEditing && !hasCanvasStagingChanges && draftChangeIndicators.hasUnpublishedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges:
       isEditing && !hasConsoleStagingChanges && draftChangeIndicators.hasUnpublishedConsoleDraftChanges,
+    hasCommittedFilesDraftChanges:
+      isEditing && !hasFilesStagingChanges && draftChangeIndicators.hasUnpublishedFilesDraftChanges,
   };
 }
 
@@ -255,6 +257,7 @@ export function useDraftStagingIndicators({
     hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
+    hasCommittedFilesDraftChanges,
   } = buildDraftChangeFlags({
     isEditing,
     hasStagingChanges,
@@ -280,5 +283,6 @@ export function useDraftStagingIndicators({
     hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
+    hasCommittedFilesDraftChanges,
   };
 }
