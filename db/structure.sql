@@ -459,7 +459,8 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid
+    created_by uuid,
+    last_active_at timestamp with time zone
 );
 
 
@@ -1308,6 +1309,13 @@ CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canv
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_users_last_active_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_last_active_at ON public.users USING btree (last_active_at) WHERE (deleted_at IS NULL);
 
 
 --

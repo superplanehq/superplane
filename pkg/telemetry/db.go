@@ -76,4 +76,5 @@ func recordRowsAffectedMetric(tx *gorm.DB, operation string) {
 	}
 
 	RecordDBRowsAffected(ctx, tx.RowsAffected, tableName, operation)
+	recordUserDatabaseActivity(ctx)
 }
