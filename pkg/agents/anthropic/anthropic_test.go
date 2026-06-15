@@ -65,6 +65,103 @@ func TestCreateSession_SendsCorrectRequest(t *testing.T) {
 	assert.Equal(t, "sesn_abc", res.ProviderSessionID)
 	assert.Equal(t, "agent-123", capturedBody["agent"])
 	assert.Equal(t, "env-456", capturedBody["environment_id"])
+	assert.NotContains(t, capturedBody, "resources")
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestCreateSession_SendsFileAndMemoryStoreResources(t *testing.T) {
+	var capturedBody map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/sessions", r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"sesn_abc","status":"idle"}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	_, err := p.CreateSession(context.Background(), agents.CreateSessionOptions{
+		Resources: []agents.FileResource{
+			{FileID: "file_123", MountPath: "ref/spec.md"},
+		},
+		MemoryStores: []agents.MemoryStoreResource{
+			{
+				MemoryStoreID: "memstore_123",
+				Access:        agents.MemoryStoreAccessReadWrite,
+				Instructions:  "Use durable app memory.",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	resources, ok := capturedBody["resources"].([]any)
+	require.True(t, ok)
+	require.Len(t, resources, 2)
+	assert.Equal(t, map[string]any{
+		"type":       "file",
+		"file_id":    "file_123",
+		"mount_path": "ref/spec.md",
+	}, resources[0])
+	assert.Equal(t, map[string]any{
+		"type":            "memory_store",
+		"memory_store_id": "memstore_123",
+		"access":          agents.MemoryStoreAccessReadWrite,
+		"instructions":    "Use durable app memory.",
+	}, resources[1])
+}
+
+func TestCreateMemoryStore_SendsCorrectRequest(t *testing.T) {
+	var capturedBody map[string]any
+	var capturedHeaders http.Header
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/memory_stores", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"memstore_123","name":"Memory","description":"Durable memory.","type":"memory_store"}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	store, err := p.CreateMemoryStore(context.Background(), agents.CreateMemoryStoreOptions{
+		Name:        "Memory",
+		Description: "Durable memory.",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "memstore_123", store.ProviderMemoryStoreID)
+	assert.Equal(t, "Memory", capturedBody["name"])
+	assert.Equal(t, "Durable memory.", capturedBody["description"])
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestDeleteMemoryStore_SendsCorrectRequest(t *testing.T) {
+	var capturedHeaders http.Header
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/memory_stores/memstore_123", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"memstore_123","type":"memory_store"}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.DeleteMemoryStore(context.Background(), "memstore_123")
+	require.NoError(t, err)
+
 	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
 	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
 }
