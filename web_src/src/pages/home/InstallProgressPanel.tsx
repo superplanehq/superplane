@@ -31,6 +31,8 @@ interface InstallProgressPanelProps {
   app: AppEntry;
   organizationId?: string;
   canvasName?: string;
+  /** When true, skips preview fetch (caller already loaded data via preloaded props). */
+  skipPreviewFetch?: boolean;
   preloadedIntegrations?: string[];
   preloadedParams?: InstallParam[];
   onClose: () => void;
@@ -40,6 +42,7 @@ export function InstallProgressPanel({
   app,
   organizationId: propOrgId,
   canvasName,
+  skipPreviewFetch,
   preloadedIntegrations,
   preloadedParams,
   onClose,
@@ -49,7 +52,12 @@ export function InstallProgressPanel({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const preview = useInstallPreviewData({ repo: app.repo, preloadedIntegrations, preloadedParams });
+  const preview = useInstallPreviewData({
+    repo: app.repo,
+    skipFetch: skipPreviewFetch,
+    preloadedIntegrations,
+    preloadedParams,
+  });
   const [integrationSelections, setIntegrationSelections] = useState<IntegrationSelections>({});
 
   const resetParamValuesRef = useRef(preview.resetParamValues);

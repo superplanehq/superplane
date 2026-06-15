@@ -88,6 +88,7 @@ function InstallPageContent() {
           app={app}
           organizationId={effectiveOrgId}
           canvasName={presetName || undefined}
+          skipPreviewFetch
           preloadedIntegrations={preview.integrations}
           preloadedParams={preview.installParams}
           onClose={() => navigate(`/${effectiveOrgId}`)}

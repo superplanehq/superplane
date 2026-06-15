@@ -3,6 +3,8 @@ import type { InstallParam } from "../install/types";
 
 interface UseInstallPreviewDataOptions {
   repo: string;
+  /** When true, skips the preview fetch (caller already loaded data). */
+  skipFetch?: boolean;
   preloadedIntegrations?: string[];
   preloadedParams?: InstallParam[];
 }
@@ -15,8 +17,13 @@ function buildDefaultValues(params: InstallParam[]): Record<string, string> {
   return defaults;
 }
 
-export function useInstallPreviewData({ repo, preloadedIntegrations, preloadedParams }: UseInstallPreviewDataOptions) {
-  const hasPreloaded = Boolean(preloadedIntegrations || preloadedParams);
+export function useInstallPreviewData({
+  repo,
+  skipFetch,
+  preloadedIntegrations,
+  preloadedParams,
+}: UseInstallPreviewDataOptions) {
+  const hasPreloaded = skipFetch ?? Boolean(preloadedIntegrations || preloadedParams);
   const [installParams, setInstallParams] = useState<InstallParam[]>(preloadedParams ?? []);
   const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
     buildDefaultValues(preloadedParams ?? []),
