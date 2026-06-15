@@ -94,6 +94,6 @@ func ApplyCanvasVersionChangeset(
 	}
 
 	return &pb.ApplyCanvasVersionChangesetResponse{
-		Version: SerializeCanvasVersion(newVersion, organizationID.String()),
+		Version: SerializeCanvasVersion(newVersion, organizationID.String(), nil),
 	}, nil
 }
