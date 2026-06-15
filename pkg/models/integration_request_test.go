@@ -8,57 +8,89 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
-func Test__ResetStuckProcessingIntegrationRequests(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
+func Test__LeaseIntegrationRequest(t *testing.T) {
+	const lease = 5 * time.Minute
 
-	organization, err := CreateOrganization("org-"+uuid.NewString(), "")
-	require.NoError(t, err)
+	newDueRequest := func(t *testing.T) *IntegrationRequest {
+		require.NoError(t, database.TruncateTables())
 
-	integration, err := CreateIntegration(uuid.New(), organization.ID, "dummy", "integration-"+uuid.NewString(), nil)
-	require.NoError(t, err)
+		organization, err := CreateOrganization("org-"+uuid.NewString(), "")
+		require.NoError(t, err)
+		integration, err := CreateIntegration(uuid.New(), organization.ID, "dummy", "integration-"+uuid.NewString(), nil)
+		require.NoError(t, err)
 
-	now := time.Now()
-
-	//
-	// A request stuck in "processing" longer than the timeout should be reset.
-	//
-	stale := &IntegrationRequest{
-		ID:                uuid.New(),
-		AppInstallationID: integration.ID,
-		State:             IntegrationRequestStateProcessing,
-		Type:              IntegrationRequestTypeSync,
-		RunAt:             now,
-		CreatedAt:         now.Add(-time.Hour),
-		UpdatedAt:         now.Add(-20 * time.Minute),
+		runAt := time.Now().Add(-time.Second)
+		require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+		request, err := FindPendingRequestForIntegration(database.Conn(), integration.ID)
+		require.NoError(t, err)
+		return request
 	}
-	require.NoError(t, database.Conn().Create(stale).Error)
 
-	//
-	// A request that just started processing must be left alone (it may still be
-	// in flight on another replica during a rolling deploy).
-	//
-	fresh := &IntegrationRequest{
-		ID:                uuid.New(),
-		AppInstallationID: integration.ID,
-		State:             IntegrationRequestStateProcessing,
-		Type:              IntegrationRequestTypeSync,
-		RunAt:             now,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	require.NoError(t, database.Conn().Create(fresh).Error)
+	t.Run("leasing a due request excludes it from the poll", func(t *testing.T) {
+		request := newDueRequest(t)
 
-	count, err := ResetStuckProcessingIntegrationRequests(15 * time.Minute)
-	require.NoError(t, err)
-	assert.Equal(t, int64(1), count, "expected only the stale request to be reset")
+		before := time.Now()
+		leased, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		require.NoError(t, err)
 
-	reloadedStale := &IntegrationRequest{}
-	require.NoError(t, database.Conn().Where("id = ?", stale.ID).First(reloadedStale).Error)
-	assert.Equal(t, IntegrationRequestStatePending, reloadedStale.State)
+		//
+		// run_at is pushed roughly a lease into the future, so the request drops
+		// out of the due-pending poll while it is being processed.
+		//
+		assert.True(t, leased.RunAt.After(before.Add(lease-time.Minute)),
+			"expected run_at to be pushed ~lease into the future")
 
-	reloadedFresh := &IntegrationRequest{}
-	require.NoError(t, database.Conn().Where("id = ?", fresh.ID).First(reloadedFresh).Error)
-	assert.Equal(t, IntegrationRequestStateProcessing, reloadedFresh.State)
+		listed, err := ListIntegrationRequests()
+		require.NoError(t, err)
+		assert.Empty(t, listed, "a leased request must not be listed as due")
+	})
+
+	t.Run("a second lease attempt while leased returns not found", func(t *testing.T) {
+		request := newDueRequest(t)
+
+		_, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		require.NoError(t, err)
+
+		_, err = LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound,
+			"a request that is already leased (future run_at) must not be leased again")
+	})
+
+	t.Run("an expired lease becomes due again", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		organization, err := CreateOrganization("org-"+uuid.NewString(), "")
+		require.NoError(t, err)
+		integration, err := CreateIntegration(uuid.New(), organization.ID, "dummy", "integration-"+uuid.NewString(), nil)
+		require.NoError(t, err)
+
+		//
+		// Simulate a worker that leased the request and then died: the row stays
+		// pending with a run_at in the past (lease expired). It must show up as due
+		// again so it gets retried, with no separate reset mechanism.
+		//
+		now := time.Now()
+		expired := &IntegrationRequest{
+			ID:                uuid.New(),
+			AppInstallationID: integration.ID,
+			State:             IntegrationRequestStatePending,
+			Type:              IntegrationRequestTypeSync,
+			RunAt:             now.Add(-time.Second),
+			CreatedAt:         now.Add(-time.Hour),
+			UpdatedAt:         now.Add(-time.Hour),
+		}
+		require.NoError(t, database.Conn().Create(expired).Error)
+
+		listed, err := ListIntegrationRequests()
+		require.NoError(t, err)
+		require.Len(t, listed, 1, "an expired lease must be listed as due again")
+		assert.Equal(t, expired.ID, listed[0].ID)
+
+		leased, err := LeaseIntegrationRequest(database.Conn(), expired.ID, lease)
+		require.NoError(t, err, "an expired lease must be re-leasable")
+		assert.True(t, leased.RunAt.After(now), "re-leasing pushes run_at into the future again")
+	})
 }

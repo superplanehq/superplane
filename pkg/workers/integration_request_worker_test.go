@@ -102,6 +102,13 @@ func Test__IntegrationRequestWorker_SyncRewritesSecret(t *testing.T) {
 	for i := 0; i < cycles; i++ {
 		request, err := models.FindPendingRequestForIntegration(database.Conn(), integration.ID)
 		require.NoError(t, err, "expected a pending sync request before cycle %d", i)
+
+		//
+		// ScheduleResync schedules the next request ~1s out; make it due now so the
+		// worker processes it immediately instead of waiting for the lease/interval.
+		//
+		require.NoError(t, database.Conn().Model(request).
+			Update("run_at", time.Now().Add(-time.Second)).Error)
 		require.NoError(t, worker.LockAndProcessRequest(*request))
 
 		var secret models.IntegrationSecret
@@ -150,11 +157,11 @@ func Test__IntegrationRequestWorker_SyncRewritesSecret(t *testing.T) {
 	}
 }
 
-// Test__IntegrationRequestWorker_ClaimsBeforeProcessing covers the Part 2 fix:
-// the request is claimed (pending -> processing) in a short transaction before the
+// Test__IntegrationRequestWorker_LeasesBeforeProcessing covers the lease: the
+// request's run_at is pushed past the work window in a short transaction before the
 // external work runs, so the work happens outside any DB transaction and the
-// in-flight request is no longer re-listed by the poll loop.
-func Test__IntegrationRequestWorker_ClaimsBeforeProcessing(t *testing.T) {
+// in-flight request (still pending, but no longer due) is not re-listed by the poll loop.
+func Test__IntegrationRequestWorker_LeasesBeforeProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -162,6 +169,7 @@ func Test__IntegrationRequestWorker_ClaimsBeforeProcessing(t *testing.T) {
 
 	var installationID uuid.UUID
 	var stateDuringSync string
+	var runAtDuringSync time.Time
 	var listedDuringSync int
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		OnSync: func(ctx core.SyncContext) error {
@@ -170,6 +178,7 @@ func Test__IntegrationRequestWorker_ClaimsBeforeProcessing(t *testing.T) {
 				Where("app_installation_id = ?", installationID).
 				First(&request).Error)
 			stateDuringSync = request.State
+			runAtDuringSync = request.RunAt
 
 			listed, err := models.ListIntegrationRequests()
 			require.NoError(t, err)
@@ -195,10 +204,12 @@ func Test__IntegrationRequestWorker_ClaimsBeforeProcessing(t *testing.T) {
 
 	require.NoError(t, worker.LockAndProcessRequest(*request))
 
-	assert.Equal(t, models.IntegrationRequestStateProcessing, stateDuringSync,
-		"request should be in processing state while the external work runs")
+	assert.Equal(t, models.IntegrationRequestStatePending, stateDuringSync,
+		"a leased request stays pending while the external work runs")
+	assert.True(t, runAtDuringSync.After(time.Now()),
+		"a leased request has its run_at pushed into the future while processing")
 	assert.Equal(t, 0, listedDuringSync,
-		"an in-flight (processing) request must not be re-listed by the poll loop")
+		"a leased (not-due) request must not be re-listed by the poll loop")
 
 	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)

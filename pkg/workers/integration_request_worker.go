@@ -39,21 +39,15 @@ func NewIntegrationRequestWorker(encryptor crypto.Encryptor, registry *registry.
 	}
 }
 
-// stuckProcessingTimeout is how long a request may stay in the "processing"
-// state before the reaper assumes the worker that claimed it died and resets
-// it back to "pending". It must be larger than the longest expected Sync/HandleHook
-// so we never reset a request that is still legitimately in flight on another replica.
-const stuckProcessingTimeout = 15 * time.Minute
+// requestLeaseDuration is how far into the future a claimed request's run_at is
+// pushed while it is processed. It is simultaneously (a) the worst-case recovery
+// latency for a request whose worker died mid-process (it becomes due again once
+// the lease expires) and (b) a lower bound that must exceed the longest expected
+// Sync/HandleHook duration, so a request still legitimately in flight is never
+// re-leased by another worker.
+const requestLeaseDuration = 5 * time.Minute
 
 func (w *IntegrationRequestWorker) Start(ctx context.Context) {
-	// On startup, reset any requests stuck in "processing" state from a previous
-	// crash back to "pending" so they get retried.
-	if count, err := models.ResetStuckProcessingIntegrationRequests(stuckProcessingTimeout); err != nil {
-		w.log("Error resetting stuck processing requests: %v", err)
-	} else if count > 0 {
-		w.log("Reset %d stuck processing request(s) back to pending", count)
-	}
-
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -88,7 +82,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 // LockAndProcessRequest processes a request in 3 phases so the external
 // HTTP call (Sync/HandleHook) never holds a DB transaction open:
 //
-//   - Phase 1 (short tx): Claim the request, flipping state pending -> processing
+//   - Phase 1 (short tx): Lease the request by pushing run_at past the work window
 //   - Phase 2 (no tx): Run integration.Sync / HandleHook with a non-transactional context
 //   - Phase 3 (short tx): Persist instance state and mark the request completed
 func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) error {
@@ -97,21 +91,22 @@ func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.Integrat
 		return err
 	}
 	if claimed == nil {
-		// Already claimed by another worker, or no longer pending.
+		// Already claimed by another worker, or no longer due.
 		return nil
 	}
 
 	return w.processRequest(claimed)
 }
 
-// claimRequest acquires a row lock and transitions the request from "pending"
-// to "processing" in a short transaction. Returns nil if the request was
-// already picked up by another worker.
+// claimRequest leases the request in a short transaction by pushing its run_at
+// past the work window, so the poll loop (which only lists due pending requests)
+// will not pick it up again while the external work runs outside this transaction.
+// Returns nil if the request was already picked up by another worker.
 func (w *IntegrationRequestWorker) claimRequest(request models.IntegrationRequest) (*models.IntegrationRequest, error) {
 	var claimed *models.IntegrationRequest
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.ClaimIntegrationRequest(tx, request.ID)
+		r, err := models.LeaseIntegrationRequest(tx, request.ID, requestLeaseDuration)
 		if err != nil {
 			return err
 		}
