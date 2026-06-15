@@ -438,6 +438,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
+		logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
 	}
 
 	triggerCtx.Logger = logger
@@ -477,6 +478,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 			p.options.Registry,
 			nil,
 		)
+		logger.WithField("source", "action_setup").Info("Integration operation may write secrets")
 	}
 
 	setupCtx.Logger = logger
