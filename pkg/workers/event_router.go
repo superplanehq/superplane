@@ -366,14 +366,6 @@ func (w *EventRouter) processExecutionEvent(
 		return nil, uuid.Nil, err
 	}
 
-	//
-	// If we created any queue items, we know for sure that the run is not finished yet,
-	// so there is no need to lock the run record to check it.
-	//
-	if len(createdQueueItems) > 0 {
-		return createdQueueItems, execution.RunID, nil
-	}
-
 	_, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
 	if err != nil {
 		return nil, uuid.Nil, err
