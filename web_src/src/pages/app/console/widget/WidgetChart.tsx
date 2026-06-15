@@ -26,8 +26,9 @@ import {
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
+import { formatValue } from "./widgetFormat";
 import { WidgetEmptyState } from "../WidgetEmptyState";
-import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
+import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -110,7 +111,15 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
         {render.type === "donut" ? (
           <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} />
         ) : (
-          <CartesianChartView type={render.type} data={data} series={series} legendMode={render.legend ?? "auto"} />
+          <CartesianChartView
+            type={render.type}
+            data={data}
+            series={series}
+            legendMode={render.legend ?? "auto"}
+            xFormat={render.xFormat}
+            yLabel={render.yLabel}
+            yFormat={render.yFormat}
+          />
         )}
       </div>
     </div>
@@ -131,11 +140,17 @@ function CartesianChartView({
   data,
   series,
   legendMode,
+  xFormat,
+  yLabel,
+  yFormat,
 }: {
   type: Exclude<WidgetChartRender["type"], "donut">;
   data: Array<Record<string, unknown>>;
   series: ChartSeries[];
   legendMode: WidgetChartLegendMode;
+  xFormat?: WidgetColumnFormat;
+  yLabel?: string;
+  yFormat?: WidgetColumnFormat;
 }) {
   const chartConfig = useMemo<ChartConfig>(() => {
     const config: ChartConfig = {};
@@ -148,7 +163,15 @@ function CartesianChartView({
   const showLegend = legendMode === "show" || (legendMode === "auto" && series.length > 1);
   const stacked = type === "stacked-bar";
 
-  const sharedAxes = <CartesianFrame stacked={stacked || type === "bar"} seriesByKey={seriesByKey} />;
+  const sharedAxes = (
+    <CartesianFrame
+      stacked={stacked || type === "bar"}
+      seriesByKey={seriesByKey}
+      xFormat={xFormat}
+      yLabel={yLabel}
+      yFormat={yFormat}
+    />
+  );
   const legend = showLegend ? <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" /> : null;
 
   return (
@@ -204,7 +227,19 @@ function CartesianChartView({
   );
 }
 
-function CartesianFrame({ stacked, seriesByKey }: { stacked: boolean; seriesByKey: Map<string, ChartSeries> }) {
+function CartesianFrame({
+  stacked,
+  seriesByKey,
+  xFormat,
+  yLabel,
+  yFormat,
+}: {
+  stacked: boolean;
+  seriesByKey: Map<string, ChartSeries>;
+  xFormat?: WidgetColumnFormat;
+  yLabel?: string;
+  yFormat?: WidgetColumnFormat;
+}) {
   const tooltipFormatter = (value: unknown, name: unknown) => {
     const key = String(name ?? "");
     const s = seriesByKey.get(key);
@@ -217,6 +252,13 @@ function CartesianFrame({ stacked, seriesByKey }: { stacked: boolean; seriesByKe
       </div>
     );
   };
+  const xTickFormatter = (v: unknown) => formatXTick(v, xFormat);
+  const yTick = (v: number) => formatYTick(v, yFormat);
+  const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
+  // Widen the Y-axis gutter when a rotated label is present so the title
+  // doesn't overlap the tick numbers. The default 36px is enough for ticks
+  // alone but clips a vertical label.
+  const yWidth = trimmedYLabel ? 56 : 36;
   return (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -227,20 +269,61 @@ function CartesianFrame({ stacked, seriesByKey }: { stacked: boolean; seriesByKe
         fontSize={11}
         interval="preserveStartEnd"
         minTickGap={16}
-        tickFormatter={(v: unknown) => String(v ?? "")}
+        tickFormatter={xTickFormatter}
       />
-      <YAxis tickLine={false} axisLine={false} fontSize={11} width={36} tickFormatter={yTickFormatter} />
+      <YAxis
+        tickLine={false}
+        axisLine={false}
+        fontSize={11}
+        width={yWidth}
+        tickFormatter={yTick}
+        label={
+          trimmedYLabel
+            ? {
+                value: trimmedYLabel,
+                angle: -90,
+                position: "insideLeft",
+                style: { textAnchor: "middle", fontSize: 11, fill: "currentColor" },
+              }
+            : undefined
+        }
+      />
       <ChartTooltip
         cursor={stacked ? { fill: "rgba(148, 163, 184, 0.12)" } : true}
         wrapperStyle={TOOLTIP_WRAPPER_STYLE}
-        content={<ChartTooltipContent formatter={tooltipFormatter} indicator="dot" className={TOOLTIP_CONTENT_CLASS} />}
+        content={
+          <ChartTooltipContent
+            formatter={tooltipFormatter}
+            labelFormatter={xTickFormatter}
+            indicator="dot"
+            className={TOOLTIP_CONTENT_CLASS}
+          />
+        }
       />
     </>
   );
 }
 
-function yTickFormatter(value: number) {
+/**
+ * Format an X-axis tick. The bucket key is always a raw string (built in
+ * `buildChartData`), so we let `formatValue` decide whether the requested
+ * format (date, duration, number, ...) actually applies — it falls through
+ * to the raw string when it can't.
+ */
+function formatXTick(value: unknown, format: WidgetColumnFormat | undefined): string {
+  if (value == null || value === "") return "";
+  if (!format) return String(value);
+  return formatValue(value, format);
+}
+
+/**
+ * Format a Y-axis tick. Honors the configured `yFormat` (currency, duration,
+ * percent, ...); otherwise falls back to a locale-aware numeric default with
+ * thousands separators above 1k.
+ */
+function formatYTick(value: number, format: WidgetColumnFormat | undefined): string {
   if (!Number.isFinite(value)) return String(value);
+  if (format) return formatValue(value, format);
   if (Math.abs(value) >= 1000) return value.toLocaleString();
   return String(value);
 }
