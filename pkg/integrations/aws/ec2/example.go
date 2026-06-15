@@ -70,6 +70,12 @@ var exampleOutputReleaseElasticIPBytes []byte
 //go:embed example_output_manage_elastic_ip.json
 var exampleOutputManageElasticIPBytes []byte
 
+//go:embed example_output_update_alarm.json
+var exampleOutputUpdateAlarmBytes []byte
+
+//go:embed example_output_delete_alarm.json
+var exampleOutputDeleteAlarmBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -132,6 +138,12 @@ var exampleOutputReleaseElasticIP map[string]any
 
 var exampleOutputManageElasticIPOnce sync.Once
 var exampleOutputManageElasticIP map[string]any
+
+var exampleOutputUpdateAlarmOnce sync.Once
+var exampleOutputUpdateAlarm map[string]any
+
+var exampleOutputDeleteAlarmOnce sync.Once
+var exampleOutputDeleteAlarm map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -270,5 +282,21 @@ func (c *ManageElasticIP) ExampleOutput() map[string]any {
 		&exampleOutputManageElasticIPOnce,
 		exampleOutputManageElasticIPBytes,
 		&exampleOutputManageElasticIP,
+	)
+}
+
+func (c *UpdateAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateAlarmOnce,
+		exampleOutputUpdateAlarmBytes,
+		&exampleOutputUpdateAlarm,
+	)
+}
+
+func (c *DeleteAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteAlarmOnce,
+		exampleOutputDeleteAlarmBytes,
+		&exampleOutputDeleteAlarm,
 	)
 }
