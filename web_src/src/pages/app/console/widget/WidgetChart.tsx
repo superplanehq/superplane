@@ -254,7 +254,7 @@ function CartesianFrame({
   };
   const xTickFormatter = (v: unknown) => formatXTick(v, xFormat);
   const yTick = (v: number) => formatYTick(v, yFormat);
-  const trimmedYLabel = yLabel?.trim() ? yLabel : undefined;
+  const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
   // Widen the Y-axis gutter when a rotated label is present so the title
   // doesn't overlap the tick numbers. The default 36px is enough for ticks
   // alone but clips a vertical label.

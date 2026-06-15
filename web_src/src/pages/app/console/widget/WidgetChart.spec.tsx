@@ -254,6 +254,19 @@ describe("WidgetChart axis formatting", () => {
     expect(labels).toContain("USD");
   });
 
+  it("trims surrounding whitespace from yLabel before rendering it", () => {
+    const { container } = renderChart({
+      kind: "chart",
+      type: "bar",
+      xField: "service",
+      yLabel: "  USD  ",
+      series: [{ field: "cost", label: "Cost" }],
+    });
+    const labels = Array.from(container.querySelectorAll(".recharts-label")).map((node) => node.textContent ?? "");
+    expect(labels).toContain("USD");
+    expect(labels).not.toContain("  USD  ");
+  });
+
   it("does not render a Y-axis label when yLabel is blank", () => {
     const { container } = renderChart({
       kind: "chart",
