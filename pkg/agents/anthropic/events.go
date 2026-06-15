@@ -61,9 +61,9 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	case "session.status_terminated":
 		return sessionFailedEvent(raw), true
 	case "session.error":
-		// Managed Agents can emit recoverable internal errors and keep the
-		// session running; only status_terminated is terminal for us.
-		return agents.ProviderEvent{}, false
+		// Recoverable error: surface a notice but keep streaming. Only
+		// status_terminated is terminal.
+		return sessionNoticeEvent(raw), true
 	case "span.outcome_evaluation_start":
 		return outcomeEvaluationStartEvent(raw), true
 	case "agent.thread_message_sent":
@@ -135,6 +135,17 @@ func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
 	return agents.ProviderEvent{
 		Type:         agents.ProviderEventSessionFailed,
 		ErrorMessage: msg,
+	}
+}
+
+func sessionNoticeEvent(raw anthropicEvent) agents.ProviderEvent {
+	msg := "the agent hit a recoverable error and is retrying"
+	if raw.Error != nil && raw.Error.Message != "" {
+		msg = raw.Error.Message
+	}
+	return agents.ProviderEvent{
+		Type:         agents.ProviderEventSessionNotice,
+		ErrorMessage: redactSensitive(msg),
 	}
 }
 

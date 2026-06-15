@@ -152,7 +152,12 @@ func CreateCanvasChangeRequestWithMetadata(
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
+	approvals, usersByID, err := loadCanvasChangeRequestSerializationData(organizationID, request, version)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load change request data: %v", err)
+	}
+
 	return &pb.CreateCanvasChangeRequestResponse{
-		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID),
+		ChangeRequest: SerializeCanvasChangeRequest(request, version, organizationID, approvals, usersByID),
 	}, nil
 }

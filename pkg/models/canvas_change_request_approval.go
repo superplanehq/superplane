@@ -35,6 +35,13 @@ func ListCanvasChangeRequestApprovals(workflowID, changeRequestID uuid.UUID) ([]
 	return ListCanvasChangeRequestApprovalsInTransaction(database.Conn(), workflowID, changeRequestID)
 }
 
+func ListCanvasChangeRequestApprovalsByRequestIDs(
+	workflowID uuid.UUID,
+	changeRequestIDs []uuid.UUID,
+) (map[uuid.UUID][]CanvasChangeRequestApproval, error) {
+	return ListCanvasChangeRequestApprovalsByRequestIDsInTransaction(database.Conn(), workflowID, changeRequestIDs)
+}
+
 func ListCanvasChangeRequestApprovalsInTransaction(
 	tx *gorm.DB,
 	workflowID, changeRequestID uuid.UUID,
