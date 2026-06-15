@@ -208,6 +208,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(request *models.Integ
 	//
 	logger := logging.ForIntegration(*integration)
 	integrationCtx := contexts.NewIntegrationContext(db, nil, integration, w.encryptor, w.registry, nil)
+	logger.WithField("source", "integration_action").Info("Integration operation may write secrets")
 	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,
