@@ -58,6 +58,34 @@ describe("queryMapper.getExecutionDetails", () => {
     expect(details["Workspace ID"]).toBeUndefined();
     expect(details.Query).toBeUndefined();
   });
+
+  it("counts scalar query output as one result", () => {
+    const details = queryMapper.getExecutionDetails(
+      buildDetailsCtx({
+        execution: {
+          outputs: {
+            default: [buildOutput({ resultType: "scalar", result: [1717846800, "1"] })],
+          },
+        },
+      }),
+    );
+
+    expect(details.Results).toBe("1");
+  });
+
+  it("counts string query output as one result", () => {
+    const details = queryMapper.getExecutionDetails(
+      buildDetailsCtx({
+        execution: {
+          outputs: {
+            default: [buildOutput({ resultType: "string", result: [1717846800, "ready"] })],
+          },
+        },
+      }),
+    );
+
+    expect(details.Results).toBe("1");
+  });
 });
 
 describe("eventStateRegistry.prometheus.query", () => {

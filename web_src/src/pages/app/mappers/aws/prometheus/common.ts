@@ -55,7 +55,7 @@ export interface QueryRangeConfiguration extends QueryConfiguration {
 
 export interface PrometheusQueryPayload {
   resultType?: string;
-  result?: unknown[];
+  result?: unknown;
 }
 
 export function buildPrometheusComponentProps(
@@ -226,7 +226,15 @@ function resultCount(payload: PrometheusQueryPayload | undefined): string {
     return "-";
   }
 
+  if (isSingleValueResult(payload.resultType)) {
+    return "1";
+  }
+
   return String(Array.isArray(payload.result) ? payload.result.length : 0);
+}
+
+function isSingleValueResult(resultType: string | undefined): boolean {
+  return resultType === "scalar" || resultType === "string";
 }
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
