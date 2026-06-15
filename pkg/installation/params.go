@@ -66,19 +66,14 @@ func ValidateInstallParams(schema []InstallParam, values map[string]string) erro
 	return nil
 }
 
-// ResolveInstallParams merges user values with defaults from the schema.
+// ResolveInstallParams merges user values with schema defaults.
+// Every schema param is resolved — user value takes priority, then
+// the same default → placeholder → name fallback as DefaultParamValues.
 func ResolveInstallParams(schema []InstallParam, values map[string]string) map[string]string {
-	resolved := make(map[string]string, len(schema))
+	resolved := DefaultParamValues(schema)
 	for _, p := range schema {
 		if val, ok := values[p.Name]; ok && strings.TrimSpace(val) != "" {
 			resolved[p.Name] = val
-		} else if p.Default != "" {
-			resolved[p.Name] = p.Default
-		} else if p.Placeholder != "" {
-			resolved[p.Name] = p.Placeholder
-		} else {
-			// Always resolve every param so no {{ install_params.xxx }} tokens remain.
-			resolved[p.Name] = p.Name
 		}
 	}
 	return resolved

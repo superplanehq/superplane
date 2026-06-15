@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -35,7 +36,10 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		return nil, err
 	}
 
-	params, _ := FetchParams(repo, ref)
+	params, err := FetchParams(repo, ref)
+	if err != nil {
+		log.Warnf("failed to load params.json for %s: %v", repo.String(), err)
+	}
 	if params != nil && len(params.InstallParams) > 0 {
 		canvasBody = SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams))
 	}
