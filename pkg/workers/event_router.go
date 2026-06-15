@@ -65,10 +65,11 @@ func (w *EventRouter) Start(ctx context.Context) {
 				}
 
 				go func(event models.CanvasEvent) {
+					attemptStart := time.Now()
 					logger := logging.ForEvent(w.logger, event)
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessEvent(logger, event); err != nil {
+					if err := w.LockAndProcessEvent(logger, event, attemptStart); err != nil {
 						logger.Errorf("Error processing event: %v", err)
 					}
 				}(event)
@@ -108,6 +109,8 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 }
 
 func (w *EventRouter) Consume(delivery tackle.Delivery) error {
+	start := time.Now()
+
 	data := &pb.CanvasNodeEventMessage{}
 	err := proto.Unmarshal(delivery.Body(), data)
 	if err != nil {
@@ -129,11 +132,17 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 
 	if event.State == models.CanvasEventStateRouted {
 		w.logger.Infof("Event %s is already routed - skipping", event.ID)
+		telemetry.RecordEventWorkerEventProcessing(
+			context.Background(),
+			time.Since(start),
+			executorOutcomeSkipped,
+			executorReasonNone,
+		)
 		return nil
 	}
 
 	logger := logging.ForEvent(w.logger, *event)
-	err = w.LockAndProcessEvent(logger, *event)
+	err = w.LockAndProcessEvent(logger, *event, start)
 	if err != nil {
 		logger.Errorf("Error processing event: %v", err)
 		return err
@@ -142,19 +151,39 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 	return nil
 }
 
-func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
+func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent, attemptStart time.Time) error {
+	//
+	// For every event we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, internal
+	//
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	defer func() {
+		telemetry.RecordEventWorkerEventProcessing(
+			context.Background(),
+			time.Since(attemptStart),
+			metricOutcome,
+			metricReason,
+		)
+	}()
+
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var execution *models.CanvasNodeExecution
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		event, err := models.LockCanvasEvent(tx, event.ID)
+		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return nil
 		}
 
-		createdQueueItems, execution, runID, err = w.processEvent(tx, logger, event)
+		createdQueueItems, execution, runID, err = w.processEvent(tx, logger, lockedEvent)
 		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(err)
 			return err
 		}
 
