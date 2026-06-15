@@ -11,6 +11,12 @@ import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 
 export type IntegrationSelections = Record<string, { id: string; name: string }>;
 
+type IntegrationInstanceSummary = {
+  name: string;
+  allInstances: OrganizationsIntegration[];
+  readyInstances: OrganizationsIntegration[];
+};
+
 export function IntegrationsSection({
   integrations,
   organizationId,
@@ -134,6 +140,22 @@ export function IntegrationsSection({
   );
 }
 
+function buildWebhookSetup(pending: OrganizationsIntegration | undefined) {
+  const webhookUrl = getIntegrationWebhookUrl(pending?.status?.metadata);
+  if (!webhookUrl || !pending?.metadata?.id) return undefined;
+  return { id: pending.metadata.id, webhookUrl, config: { ...(pending.spec?.configuration ?? {}) } };
+}
+
+function resolveDefaultDialogName(
+  dialogIntegrationName: string | null,
+  pending: OrganizationsIntegration | undefined,
+  existingNames: Set<string>,
+): string {
+  if (pending?.metadata?.name) return pending.metadata.name;
+  if (!dialogIntegrationName) return "";
+  return getNextIntegrationName(dialogIntegrationName, existingNames);
+}
+
 function useCreateDialogProps(
   dialogIntegrationName: string | null,
   availableIntegrations: Array<{ name?: string; [key: string]: unknown }>,
@@ -144,24 +166,22 @@ function useCreateDialogProps(
     () => (dialogIntegrationName ? availableIntegrations.find((d) => d.name === dialogIntegrationName) : undefined),
     [availableIntegrations, dialogIntegrationName],
   );
-  const dialogPendingInstance = useMemo(() => {
-    if (!dialogIntegrationName) return undefined;
-    return connected.find((i) => i.metadata?.integrationName === dialogIntegrationName && i.status?.state !== "ready");
-  }, [dialogIntegrationName, connected]);
-  const initialWebhookSetup = useMemo(() => {
-    const webhookUrl = getIntegrationWebhookUrl(dialogPendingInstance?.status?.metadata);
-    if (!webhookUrl || !dialogPendingInstance?.metadata?.id) return undefined;
-    return {
-      id: dialogPendingInstance.metadata.id,
-      webhookUrl,
-      config: { ...(dialogPendingInstance.spec?.configuration ?? {}) },
-    };
-  }, [dialogPendingInstance]);
-  const defaultDialogName = useMemo(() => {
-    if (dialogPendingInstance?.metadata?.name) return dialogPendingInstance.metadata.name;
-    if (!dialogIntegrationName) return "";
-    return getNextIntegrationName(dialogIntegrationName, existingIntegrationNames);
-  }, [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames]);
+
+  const dialogPendingInstance = useMemo(
+    () =>
+      dialogIntegrationName
+        ? connected.find((i) => i.metadata?.integrationName === dialogIntegrationName && i.status?.state !== "ready")
+        : undefined,
+    [dialogIntegrationName, connected],
+  );
+
+  const initialWebhookSetup = useMemo(() => buildWebhookSetup(dialogPendingInstance), [dialogPendingInstance]);
+
+  const defaultDialogName = useMemo(
+    () => resolveDefaultDialogName(dialogIntegrationName, dialogPendingInstance, existingIntegrationNames),
+    [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames],
+  );
+
   return { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName };
 }
 
@@ -172,10 +192,7 @@ function IntegrationRow({
   onConfigure,
   onCreateNew,
 }: {
-  data: {
-    name: string;
-    allInstances: Array<{ metadata?: { id?: string; name?: string }; status?: { state?: string } }>;
-  };
+  data: IntegrationInstanceSummary;
   selectedId?: string;
   onSelect: (id: string, name: string) => void;
   onConfigure: (id: string) => void;
@@ -184,24 +201,23 @@ function IntegrationRow({
   const displayName =
     getIntegrationTypeDisplayName(undefined, data.name) || data.name.charAt(0).toUpperCase() + data.name.slice(1);
 
+  const handleInstanceSelect = (instanceId: string) => {
+    const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
+    if (!instance?.metadata?.id) return;
+    if (instance.status?.state !== "ready") {
+      onConfigure(instance.metadata.id);
+      return;
+    }
+    if (instance.metadata.name) {
+      onSelect(instance.metadata.id, instance.metadata.name);
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <IntegrationIcon integrationName={data.name} className="h-4 w-4" size={16} />
       {data.allInstances.length > 0 ? (
-        <Select
-          value={selectedId || ""}
-          onValueChange={(instanceId) => {
-            const instance = data.allInstances.find((i) => i.metadata?.id === instanceId);
-            if (!instance?.metadata?.id) return;
-            if (instance.status?.state !== "ready") {
-              onConfigure(instance.metadata.id);
-              return;
-            }
-            if (instance.metadata.name) {
-              onSelect(instance.metadata.id, instance.metadata.name);
-            }
-          }}
-        >
+        <Select value={selectedId || ""} onValueChange={handleInstanceSelect}>
           <SelectTrigger className="w-56 h-7 text-xs">
             <SelectValue placeholder={`Select ${displayName}`} />
           </SelectTrigger>

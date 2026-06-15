@@ -20,7 +20,7 @@ import type {
 } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { analytics } from "@/lib/analytics";
+import { analytics, type IntegrationSource } from "@/lib/analytics";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -137,10 +137,7 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (
-  organizationId: string,
-  source: "node_configuration" | "integrations_page" | "install_wizard",
-) => {
+export const useCreateIntegration = (organizationId: string, source: IntegrationSource) => {
   const queryClient = useQueryClient();
 
   return useMutation({

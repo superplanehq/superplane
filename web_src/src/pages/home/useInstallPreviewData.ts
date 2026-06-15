@@ -7,16 +7,20 @@ interface UseInstallPreviewDataOptions {
   preloadedParams?: InstallParam[];
 }
 
+function buildDefaultValues(params: InstallParam[]): Record<string, string> {
+  const defaults: Record<string, string> = {};
+  for (const p of params) {
+    if (p.default) defaults[p.name] = p.default;
+  }
+  return defaults;
+}
+
 export function useInstallPreviewData({ repo, preloadedIntegrations, preloadedParams }: UseInstallPreviewDataOptions) {
   const hasPreloaded = Boolean(preloadedIntegrations || preloadedParams);
   const [installParams, setInstallParams] = useState<InstallParam[]>(preloadedParams ?? []);
-  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
-    const defaults: Record<string, string> = {};
-    for (const p of preloadedParams ?? []) {
-      if (p.default) defaults[p.name] = p.default;
-    }
-    return defaults;
-  });
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
+    buildDefaultValues(preloadedParams ?? []),
+  );
   const [previewLoading, setPreviewLoading] = useState(!hasPreloaded);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [detectedIntegrations, setDetectedIntegrations] = useState<string[]>(preloadedIntegrations ?? []);
@@ -31,11 +35,7 @@ export function useInstallPreviewData({ repo, preloadedIntegrations, preloadedPa
       .then((data) => {
         if (data.installParams && data.installParams.length > 0) {
           setInstallParams(data.installParams);
-          const defaults: Record<string, string> = {};
-          for (const p of data.installParams) {
-            if (p.default) defaults[p.name] = p.default;
-          }
-          setParamValues(defaults);
+          setParamValues(buildDefaultValues(data.installParams));
         }
         if (data.integrations && data.integrations.length > 0) {
           setDetectedIntegrations(data.integrations);
@@ -48,11 +48,7 @@ export function useInstallPreviewData({ repo, preloadedIntegrations, preloadedPa
   }, [repo, hasPreloaded]);
 
   const resetParamValues = useCallback(() => {
-    const defaults: Record<string, string> = {};
-    for (const p of installParams) {
-      if (p.default) defaults[p.name] = p.default;
-    }
-    setParamValues(defaults);
+    setParamValues(buildDefaultValues(installParams));
   }, [installParams]);
 
   return {

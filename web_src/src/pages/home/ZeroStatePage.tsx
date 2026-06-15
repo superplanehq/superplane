@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
@@ -83,12 +83,15 @@ export function ZeroStatePage() {
 
         <div className="flex flex-col gap-4">
           {visible.map((app) => (
-            <React.Fragment key={app.repo}>
-              <AppListItem app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
-              {installingApp?.repo === app.repo && (
-                <InstallProgressPanel app={installingApp} onClose={() => setInstallingApp(null)} />
-              )}
-            </React.Fragment>
+            <AppListItem
+              key={app.repo}
+              app={app}
+              busy={busy}
+              isInstalling={installingApp?.repo === app.repo}
+              onSelect={setSelectedApp}
+              onInstall={handleInstall}
+              onCloseInstall={() => setInstallingApp(null)}
+            />
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
@@ -118,55 +121,62 @@ function BlankAppButton({ busy, onCreate }: { busy: boolean; onCreate: () => voi
 function AppListItem({
   app,
   busy,
+  isInstalling,
   onInstall,
   onSelect,
+  onCloseInstall,
 }: {
   app: AppEntry;
   busy: boolean;
+  isInstalling?: boolean;
   onInstall: (app: AppEntry) => void;
   onSelect: (app: AppEntry) => void;
+  onCloseInstall: () => void;
 }) {
   return (
-    <div
-      onClick={() => onSelect(app)}
-      className="cursor-pointer rounded-md bg-white px-4 py-3 outline outline-slate-950/10 transition-colors hover:outline-slate-950/20 dark:bg-gray-900"
-    >
-      <div className="flex min-h-[34px] items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          <div className="shrink-0">
-            <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
+    <>
+      <div
+        onClick={() => onSelect(app)}
+        className="cursor-pointer rounded-md bg-white px-4 py-3 outline outline-slate-950/10 transition-colors hover:outline-slate-950/20 dark:bg-gray-900"
+      >
+        <div className="flex min-h-[34px] items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div className="shrink-0">
+              <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="text-base font-medium text-slate-900">{app.title}</p>
+              <IntegrationIcons integrations={app.integrations} />
+            </div>
           </div>
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="text-base font-medium text-slate-900">{app.title}</p>
-            <IntegrationIcons integrations={app.integrations} />
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(app);
+              }}
+              aria-label={`Preview ${app.title}`}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              className="shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onInstall(app);
+              }}
+              disabled={busy}
+            >
+              Install
+              <ArrowRight className="ml-1 h-4 w-4 text-gray-400" />
+            </Button>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(app);
-            }}
-            aria-label={`Preview ${app.title}`}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            className="shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onInstall(app);
-            }}
-            disabled={busy}
-          >
-            Install
-            <ArrowRight className="ml-1 h-4 w-4 text-gray-400" />
-          </Button>
         </div>
       </div>
-    </div>
+      {isInstalling && <InstallProgressPanel app={app} onClose={onCloseInstall} />}
+    </>
   );
 }
