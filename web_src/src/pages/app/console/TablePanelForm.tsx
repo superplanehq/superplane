@@ -35,7 +35,11 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   return (
     <div className="space-y-4">
       <TablePanelTitleField value={value} onChange={onChange} />
-      <DataSourceForm value={value.dataSource} onChange={(dataSource) => onChange({ ...value, dataSource })} />
+      <DataSourceForm
+        value={value.dataSource}
+        onChange={(dataSource) => onChange({ ...value, dataSource })}
+        loadAllWhenBlank
+      />
       <TablePanelMemorySourcePicker value={value} canvasId={canvasId} onChange={onChange} />
       <TablePanelColumnsSection value={value} fields={fields} fieldOptions={fieldOptions} actions={actions} />
       <TablePanelFiltersSection value={value} fieldOptions={fieldOptions} actions={actions} />
