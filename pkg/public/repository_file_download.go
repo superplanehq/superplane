@@ -60,7 +60,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 	var allowed bool
 	err = telemetry.RunSpan(ctx, "repository.check_permission", func(ctx context.Context) error {
 		var checkErr error
-		allowed, checkErr = s.authService.CheckOrganizationPermission(
+		allowed, checkErr = s.authService.CheckOrganizationPermission(ctx,
 			user.ID.String(),
 			user.OrganizationID.String(),
 			"canvases",

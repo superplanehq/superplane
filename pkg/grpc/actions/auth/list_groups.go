@@ -13,19 +13,19 @@ import (
 )
 
 func ListGroups(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
-	groupNames, err := authService.GetGroups(domainID, domainType)
+	groupNames, err := authService.GetGroups(ctx, domainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get groups")
 	}
 
 	groups := make([]*pb.Group, len(groupNames))
 	for i, groupName := range groupNames {
-		role, err := authService.GetGroupRole(domainID, domainType, groupName)
+		role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to get group roles")
 		}
 
-		groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
+		groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to get group members count")
 		}

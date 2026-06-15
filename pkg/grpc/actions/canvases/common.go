@@ -58,7 +58,7 @@ func validateCanvasChangeRequestApprovers(
 	}
 
 	for _, roleName := range requestedRoles {
-		_, roleErr := authService.GetRoleDefinition(roleName, models.DomainTypeOrganization, organizationID)
+		_, roleErr := authService.GetRoleDefinition(context.Background(), roleName, models.DomainTypeOrganization, organizationID)
 		if roleErr != nil {
 			return fmt.Errorf("approver role %s was not found in this organization", roleName)
 		}
