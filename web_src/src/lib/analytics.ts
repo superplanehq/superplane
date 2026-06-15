@@ -1,3 +1,5 @@
+export type IntegrationSource = IntegrationSource;
+
 import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
 import type { OrganizationsIntegration } from "@/api-client";
@@ -153,11 +155,7 @@ export const analytics = {
     });
   },
 
-  integrationConnectStart: (
-    integration: string,
-    source: "node_configuration" | "integrations_page",
-    organizationId: string,
-  ) => {
+  integrationConnectStart: (integration: string, source: IntegrationSource, organizationId: string) => {
     integrationConnectStartTimes.set(integration, Date.now());
     posthog.capture("integration:connect_start", {
       integration,
@@ -196,7 +194,7 @@ export const analytics = {
 
   integrationConnectSubmit: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: IntegrationSource,
     status: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -214,7 +212,7 @@ export const analytics = {
 
   integrationConfigureOpen: (
     integration: string,
-    source: "node_configuration" | "integrations_page",
+    source: IntegrationSource,
     previousStatus: "ready" | "error" | "pending",
     organizationId: string,
   ) => {
@@ -250,7 +248,7 @@ export const analytics = {
 export function useIntegrationConfigureOpen(
   integration: OrganizationsIntegration | undefined,
   integrationId: string | null | undefined,
-  source: "node_configuration" | "integrations_page",
+  source: IntegrationSource,
   organizationId: string | undefined,
 ) {
   const firedRef = useRef<string | null>(null);
