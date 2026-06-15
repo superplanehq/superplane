@@ -57,6 +57,36 @@ func TestTraceGatewayServeRecordsGatewaySpans(t *testing.T) {
 	assert.Contains(t, spanNames, "grpc_gateway.write_response")
 }
 
+func TestGatewayForwardResponseTraceOptionRecordsMarshalSpan(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	cleanup := telemetry.ConfigureTestTracerProvider(exporter)
+	defer cleanup()
+
+	ctx, parent := telemetry.StartSpan(context.Background(), "grpc_gateway.serve")
+	defer parent.End()
+
+	capture := &tracedGatewayResponseWriter{
+		ResponseWriter: httptest.NewRecorder(),
+		ctx:            ctx,
+		statusCode:     http.StatusOK,
+	}
+
+	opt := GatewayForwardResponseTraceOption()
+	require.NoError(t, opt(ctx, capture, nil))
+
+	_, err := capture.Write([]byte(`{"ok":true}`))
+	require.NoError(t, err)
+	capture.finish()
+
+	spanNames := make([]string, 0, len(exporter.GetSpans()))
+	for _, span := range exporter.GetSpans() {
+		spanNames = append(spanNames, span.Name)
+	}
+
+	assert.Contains(t, spanNames, "grpc_gateway.marshal_response")
+	assert.Contains(t, spanNames, "grpc_gateway.write_response")
+}
+
 func TestTraceGatewayServeSkipsNonCriticalRouteWhenTracingEnabled(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	cleanup := telemetry.ConfigureTestTracerProvider(exporter)
