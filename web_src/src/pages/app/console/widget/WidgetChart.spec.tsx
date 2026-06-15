@@ -17,6 +17,18 @@ vi.mock("recharts", async () => {
   };
 });
 
+const tooltipContentProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+
+vi.mock("@/components/ui/chart", async () => {
+  const actual = (await vi.importActual("@/components/ui/chart")) as Record<string, unknown>;
+  const ChartTooltipContent = (props: Record<string, unknown>) => {
+    tooltipContentProps.value = props;
+    const Original = actual.ChartTooltipContent as (p: unknown) => JSX.Element;
+    return <Original {...props} />;
+  };
+  return { ...actual, ChartTooltipContent };
+});
+
 import { WidgetChart } from "./WidgetChart";
 import type { WidgetChartRender } from "./types";
 
@@ -193,6 +205,127 @@ describe("WidgetChart legend visibility", () => {
       legend: "hide",
     });
     expect(container.querySelector(".recharts-legend-wrapper")).toBeNull();
+  });
+});
+
+describe("WidgetChart axis formatting", () => {
+  function tickTexts(container: HTMLElement, axis: "xAxis" | "yAxis"): string[] {
+    const labels = container.querySelectorAll(`.recharts-${axis}-tick-labels .recharts-cartesian-axis-tick-value`);
+    return Array.from(labels).map((node) => node.textContent ?? "");
+  }
+
+  it("formats X-axis tick values when xFormat is set", () => {
+    const TIME_ROWS = [
+      { day: "2026-05-26T00:00:00Z", cost: 10 },
+      { day: "2026-05-27T00:00:00Z", cost: 12 },
+    ];
+    const { container } = renderChart(
+      { kind: "chart", type: "bar", xField: "day", xFormat: "date", series: [{ field: "cost", label: "Cost" }] },
+      { rows: TIME_ROWS },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    expect(ticks.length).toBeGreaterThan(0);
+    // No tick should still contain the raw ISO timestamp.
+    expect(ticks.some((text) => text.includes("T00:00:00Z"))).toBe(false);
+  });
+
+  it("falls back to raw stringification when xFormat is omitted", () => {
+    const TIME_ROWS = [
+      { day: "2026-05-26T00:00:00Z", cost: 10 },
+      { day: "2026-05-27T00:00:00Z", cost: 12 },
+    ];
+    const { container } = renderChart(
+      { kind: "chart", type: "bar", xField: "day", series: [{ field: "cost", label: "Cost" }] },
+      { rows: TIME_ROWS },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    expect(ticks.some((text) => text.includes("2026-05-"))).toBe(true);
+  });
+
+  it("renders a Y-axis title when yLabel is set", () => {
+    const { container } = renderChart({
+      kind: "chart",
+      type: "bar",
+      xField: "service",
+      yLabel: "USD",
+      series: [{ field: "cost", label: "Cost" }],
+    });
+    const labels = Array.from(container.querySelectorAll(".recharts-label")).map((node) => node.textContent ?? "");
+    expect(labels).toContain("USD");
+  });
+
+  it("trims surrounding whitespace from yLabel before rendering it", () => {
+    const { container } = renderChart({
+      kind: "chart",
+      type: "bar",
+      xField: "service",
+      yLabel: "  USD  ",
+      series: [{ field: "cost", label: "Cost" }],
+    });
+    const labels = Array.from(container.querySelectorAll(".recharts-label")).map((node) => node.textContent ?? "");
+    expect(labels).toContain("USD");
+    expect(labels).not.toContain("  USD  ");
+  });
+
+  it("does not render a Y-axis label when yLabel is blank", () => {
+    const { container } = renderChart({
+      kind: "chart",
+      type: "bar",
+      xField: "service",
+      yLabel: "   ",
+      series: [{ field: "cost", label: "Cost" }],
+    });
+    expect(container.querySelector(".recharts-label")).toBeNull();
+  });
+
+  it("passes a labelFormatter to the tooltip that mirrors xFormat", () => {
+    tooltipContentProps.value = null;
+    renderChart(
+      { kind: "chart", type: "bar", xField: "day", xFormat: "date", series: [{ field: "cost", label: "Cost" }] },
+      { rows: [{ day: "2026-05-26T00:00:00Z", cost: 10 }] },
+    );
+    const props = tooltipContentProps.value;
+    expect(props).not.toBeNull();
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    expect(labelFormatter).toBeTypeOf("function");
+    const formatted = labelFormatter?.("2026-05-26T00:00:00Z", []);
+    expect(formatted).not.toContain("T00:00:00Z");
+    expect(formatted).toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
+  });
+
+  it("omits the tooltip labelFormatter when xFormat is unset (raw category text)", () => {
+    tooltipContentProps.value = null;
+    renderChart(
+      { kind: "chart", type: "bar", xField: "service", series: [{ field: "cost", label: "Cost" }] },
+      { rows: [{ service: "ec2", cost: 1 }] },
+    );
+    const labelFormatter = tooltipContentProps.value?.labelFormatter as
+      | ((label: unknown, payload?: unknown[]) => string)
+      | undefined;
+    expect(labelFormatter?.("ec2", [])).toBe("ec2");
+  });
+
+  it("formats Y-axis ticks with yFormat", () => {
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "service",
+        yFormat: "duration",
+        series: [{ field: "ms", label: "Latency" }],
+      },
+      {
+        rows: [
+          { service: "ec2", ms: 4500 },
+          { service: "s3", ms: 1200 },
+        ],
+      },
+    );
+    const ticks = tickTexts(container, "yAxis");
+    // yFormat=duration converts ms tick values into a "ms" or "s" suffix.
+    expect(ticks.some((text) => /(ms|s)$/.test(text))).toBe(true);
+    // No tick should be a bare integer like "1000" or locale-formatted "1,000".
+    expect(ticks.every((text) => text !== "1000" && text !== "1,000")).toBe(true);
   });
 });
 
