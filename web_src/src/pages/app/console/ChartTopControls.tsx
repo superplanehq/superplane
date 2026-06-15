@@ -2,16 +2,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { CHART_KIND_LABELS, CHART_KINDS, CHART_LEGEND_MODE_LABELS } from "./chartPanelFormConstants";
+import {
+  CHART_KIND_LABELS,
+  CHART_KINDS,
+  CHART_LEGEND_MODE_LABELS,
+  CHART_X_AXIS_FORMATS,
+  CHART_Y_AXIS_FORMATS,
+} from "./chartPanelFormConstants";
 import type { ChartPanelContent } from "./panelTypes";
 import {
   WIDGET_CHART_LEGEND_MODES,
   WIDGET_SORT_ORDERS,
   type WidgetChartKind,
   type WidgetChartLegendMode,
+  type WidgetColumnFormat,
   type WidgetSort,
   type WidgetSortOrder,
 } from "./widget/types";
+
+const NONE_VALUE = "__none__";
 
 export function ChartTopControls({
   value,
@@ -86,6 +95,7 @@ export function ChartTopControls({
           </Select>
         </div>
       </div>
+      <ChartAxisFormatRow value={value} onChange={onChange} />
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5 col-span-2">
           <Label className="text-xs font-medium text-slate-600">Stack by field (optional)</Label>
@@ -102,6 +112,95 @@ export function ChartTopControls({
         </div>
       </div>
       <ChartSortRow value={value} onChange={onChange} fieldListId={fieldListId} />
+    </div>
+  );
+}
+
+function ChartAxisFormatRow({
+  value,
+  onChange,
+}: {
+  value: ChartPanelContent;
+  onChange: (next: ChartPanelContent) => void;
+}) {
+  const updateAxisFormat = (key: "xFormat" | "yFormat", next: string) => {
+    if (next === NONE_VALUE) {
+      const { [key]: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    onChange({ ...value, render: { ...value.render, [key]: next as WidgetColumnFormat } });
+  };
+
+  const updateYLabel = (next: string) => {
+    if (next.trim() === "") {
+      const { yLabel: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    onChange({ ...value, render: { ...value.render, yLabel: next } });
+  };
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <AxisFormatSelect
+        label="X-axis format"
+        value={value.render.xFormat}
+        formats={CHART_X_AXIS_FORMATS}
+        testId="chart-x-format"
+        onValueChange={(v) => updateAxisFormat("xFormat", v)}
+      />
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-slate-600">Y-axis label</Label>
+        <Input
+          value={value.render.yLabel ?? ""}
+          onChange={(e) => updateYLabel(e.target.value)}
+          placeholder="e.g. USD or Errors / day"
+          data-testid="chart-y-label"
+        />
+      </div>
+      <AxisFormatSelect
+        label="Y-axis format"
+        value={value.render.yFormat}
+        formats={CHART_Y_AXIS_FORMATS}
+        testId="chart-y-format"
+        onValueChange={(v) => updateAxisFormat("yFormat", v)}
+      />
+    </div>
+  );
+}
+
+function AxisFormatSelect({
+  label,
+  value,
+  formats,
+  testId,
+  onValueChange,
+}: {
+  label: string;
+  value: WidgetColumnFormat | undefined;
+  formats: readonly WidgetColumnFormat[];
+  testId: string;
+  onValueChange: (next: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-slate-600">{label}</Label>
+      <Select value={value ?? NONE_VALUE} onValueChange={onValueChange}>
+        <SelectTrigger className="w-full" data-testid={testId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NONE_VALUE}>Default</SelectItem>
+          {formats.map((f) => (
+            <SelectItem key={f} value={f}>
+              {f}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

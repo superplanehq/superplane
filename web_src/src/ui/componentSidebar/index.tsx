@@ -18,7 +18,7 @@ import type {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
-  ActionsAction,
+  SuperplaneActionsAction,
   TriggersTrigger,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
@@ -132,7 +132,7 @@ interface ComponentSidebarProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  actions?: ActionsAction[];
+  actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
 
   // Highlighting callback for execution chain nodes

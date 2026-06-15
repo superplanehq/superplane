@@ -1,6 +1,6 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
-import type { ActionsAction, TriggersTrigger } from "@/api-client";
+import type { SuperplaneActionsAction, TriggersTrigger } from "@/api-client";
 
 export type AutocompleteExampleContext = {
   canvasNodes: ComponentsNode[];
@@ -8,7 +8,7 @@ export type AutocompleteExampleContext = {
   incomingNodeIdsByTargetId: Map<string, string[]>;
   visibleNodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
-  allComponentsByName: Map<string | undefined, ActionsAction>;
+  allComponentsByName: Map<string | undefined, SuperplaneActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
 };
 
