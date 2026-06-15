@@ -133,7 +133,10 @@ export function useCanvasWebsocket(
       // Staging events fire while editing a draft (not the live version), so they
       // must bypass the runtime-event gate that is disabled outside the live view.
       const isCanvasStagingEvent = data.event === "staging_updated";
-      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !processRuntimeEvents) {
+      // Memory updates can happen from manual mutations regardless of the live
+      // view, so they bypass the runtime-event gate as well.
+      const isMemoryUpdatedEvent = data.event === "memory_updated";
+      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !isMemoryUpdatedEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -261,6 +264,20 @@ export function useCanvasWebsocket(
           }
           break;
         }
+        case "memory_updated": {
+          // Canvas memory changed (from a node execution, manual mutation, or
+          // another tab). Invalidate the shared memory cache so the Memory tab
+          // and any memory-bound widget refetches once.
+          const memoryMessage = payload as Partial<CanvasWebsocketPayload>;
+          if (!memoryMessage.canvasId || memoryMessage.canvasId !== canvasId) {
+            break;
+          }
+
+          queryClient.invalidateQueries({
+            queryKey: canvasKeys.canvasMemoryEntries(canvasId),
+          });
+          break;
+        }
         default:
           break;
       }
@@ -370,6 +387,11 @@ export function useCanvasWebsocket(
     });
     queryClient.invalidateQueries({
       queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+    // Refresh memory in case mutations happened while we were disconnected; we
+    // no longer poll, so the websocket is the only push channel.
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.canvasMemoryEntries(canvasId),
     });
   }, [queryClient, canvasId]);
 
