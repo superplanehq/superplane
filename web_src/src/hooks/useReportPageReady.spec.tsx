@@ -18,11 +18,7 @@ function createWrapper(path: string) {
     return createElement(
       MemoryRouter,
       { initialEntries: [path] },
-      createElement(
-        Routes,
-        null,
-        createElement(Route, { path: "/:organizationId", element: children }),
-      ),
+      createElement(Routes, null, createElement(Route, { path: "/:organizationId", element: children })),
     );
   };
 }
