@@ -59,17 +59,17 @@ func (w *EventRouter) Start(ctx context.Context) {
 			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
 
 			for _, event := range events {
-				logger := logging.ForEvent(w.logger, event)
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
 				go func(event models.CanvasEvent) {
+					logger := logging.ForEvent(w.logger, event)
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessEvent(logger, event); err != nil {
-						w.logger.Errorf("Error processing event %s: %v", event.ID, err)
+						logger.Errorf("Error processing event: %v", err)
 					}
 				}(event)
 			}
@@ -133,7 +133,13 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 	}
 
 	logger := logging.ForEvent(w.logger, *event)
-	return w.LockAndProcessEvent(logger, *event)
+	err = w.LockAndProcessEvent(logger, *event)
+	if err != nil {
+		logger.Errorf("Error processing event: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
