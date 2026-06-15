@@ -12,13 +12,42 @@ import (
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
-// roleHintAdmin is the IAM role required to manage Cloud SQL databases.
-const roleHintAdmin = "roles/cloudsql.admin (or roles/cloudsql.editor)"
+// Cloud SQL instance lifecycle states the poll loop branches on.
+const (
+	instanceStateRunnable = "RUNNABLE"
+	instanceStateFailed   = "FAILED"
+)
 
+// Instance create/delete are long-running (minutes), so the components poll via
+// scheduled internal "poll" hooks instead of blocking a single execution.
+const (
+	pollHookName            = "poll"
+	instancePollInterval    = 15 * time.Second
+	instanceMaxPollAttempts = 80 // ~20 minutes at the 15s interval
+	maxPollErrors           = 10 // consecutive fetch errors before giving up
+)
+
+// Database operations are short-lived, so they wait inline for the operation.
 const (
 	operationPollInterval = 2 * time.Second
 	operationWaitTimeout  = 5 * time.Minute
 	operationStatusDone   = "DONE"
+)
+
+// instanceExecMetadata is the per-execution state the poll hook reads to track a
+// long-running instance operation across scheduled invocations.
+type instanceExecMetadata struct {
+	Instance     string `json:"instance" mapstructure:"instance"`
+	PollAttempts int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	PollErrors   int    `json:"pollErrors" mapstructure:"pollErrors"`
+}
+
+// roleHintAdmin is the IAM role required to manage (create/delete) Cloud SQL
+// instances and databases; roleHintViewer is the read-only role sufficient for
+// the get components.
+const (
+	roleHintAdmin  = "roles/cloudsql.admin (or roles/cloudsql.editor)"
+	roleHintViewer = "roles/cloudsql.viewer (or roles/cloudsql.admin)"
 )
 
 // Database models a Cloud SQL database resource.
@@ -33,13 +62,38 @@ type Database struct {
 	Etag      string `json:"etag"`
 }
 
-// Instance is the subset of a Cloud SQL instance used to populate the dropdown.
+// Instance models the subset of a Cloud SQL instance resource the components use.
 type Instance struct {
-	Name            string `json:"name"`
-	ConnectionName  string `json:"connectionName"`
-	Region          string `json:"region"`
-	DatabaseVersion string `json:"databaseVersion"`
-	State           string `json:"state"`
+	Name            string            `json:"name"`
+	State           string            `json:"state"`
+	DatabaseVersion string            `json:"databaseVersion"`
+	Region          string            `json:"region"`
+	ConnectionName  string            `json:"connectionName"`
+	SelfLink        string            `json:"selfLink"`
+	Settings        *InstanceSettings `json:"settings"`
+	IPAddresses     []ipMapping       `json:"ipAddresses"`
+}
+
+type InstanceSettings struct {
+	Tier           string `json:"tier"`
+	DataDiskSizeGb string `json:"dataDiskSizeGb"`
+	Edition        string `json:"edition"`
+}
+
+type ipMapping struct {
+	Type      string `json:"type"`
+	IPAddress string `json:"ipAddress"`
+}
+
+// Tier models a Cloud SQL machine tier from the tiers.list endpoint. RAM and
+// DiskQuota are returned as int64-formatted strings; Region lists the regions
+// where the tier is offered. Note the API does not enumerate custom machine
+// types (db-custom-*) here.
+type Tier struct {
+	Tier      string   `json:"tier"`
+	RAM       int64    `json:"RAM,string"`
+	DiskQuota int64    `json:"DiskQuota,string"`
+	Region    []string `json:"region"`
 }
 
 // DatabaseNodeMetadata is the node metadata shared by the create/get/delete
@@ -49,10 +103,20 @@ type DatabaseNodeMetadata struct {
 	Database string `json:"database,omitempty" mapstructure:"database"`
 }
 
+// InstanceNodeMetadata is the node metadata shared by the instance components so
+// the collapsed node can show what it targets.
+type InstanceNodeMetadata struct {
+	Instance string `json:"instance,omitempty" mapstructure:"instance"`
+}
+
+// operation models the long-running operation envelope returned by the Cloud SQL
+// Admin API. Database operations wait on Status/Error; instance operations are
+// long-running and return the operation reference (TargetID) without waiting.
 type operation struct {
 	Name          string          `json:"name"`
 	Status        string          `json:"status"`
 	OperationType string          `json:"operationType"`
+	TargetID      string          `json:"targetId"`
 	Error         *operationError `json:"error"`
 }
 
@@ -74,6 +138,14 @@ func databaseURL(project, instance, database string) string {
 
 func instancesURL(project string) string {
 	return fmt.Sprintf("%s/projects/%s/instances", sqlAdminBaseURL, project)
+}
+
+func instanceURL(project, instance string) string {
+	return fmt.Sprintf("%s/projects/%s/instances/%s", sqlAdminBaseURL, project, instance)
+}
+
+func tiersURL(project string) string {
+	return fmt.Sprintf("%s/projects/%s/tiers", sqlAdminBaseURL, project)
 }
 
 func operationURL(project, operationName string) string {
@@ -131,6 +203,41 @@ func ListDatabases(ctx context.Context, client Client, project, instance string)
 	return resp.Items, nil
 }
 
+// createInstance starts provisioning a Cloud SQL instance and returns the
+// long-running operation. It does not wait: instance creation takes several
+// minutes, so callers emit the operation and poll the instance (Get Instance)
+// for readiness.
+func createInstance(ctx context.Context, client Client, project string, body map[string]any) (*operation, error) {
+	respBody, err := client.PostURL(ctx, instancesURL(project), body)
+	if err != nil {
+		return nil, err
+	}
+	return parseOperation(respBody)
+}
+
+// getInstance fetches a single instance.
+func getInstance(ctx context.Context, client Client, project, name string) (*Instance, error) {
+	respBody, err := client.GetURL(ctx, instanceURL(project, name))
+	if err != nil {
+		return nil, err
+	}
+	var inst Instance
+	if err := json.Unmarshal(respBody, &inst); err != nil {
+		return nil, fmt.Errorf("parse instance response: %w", err)
+	}
+	return &inst, nil
+}
+
+// deleteInstance starts deleting a Cloud SQL instance and returns the
+// long-running operation (it does not wait).
+func deleteInstance(ctx context.Context, client Client, project, name string) (*operation, error) {
+	respBody, err := client.DeleteURL(ctx, instanceURL(project, name))
+	if err != nil {
+		return nil, err
+	}
+	return parseOperation(respBody)
+}
+
 // ListInstances lists the Cloud SQL instances in the project, following
 // pagination so projects with more instances than one page are fully listed.
 func ListInstances(ctx context.Context, client Client, project string) ([]Instance, error) {
@@ -160,6 +267,31 @@ func ListInstances(ctx context.Context, client Client, project string) ([]Instan
 	}
 }
 
+// ListTiers lists the predefined machine tiers available to the project. The
+// tiers.list endpoint is not paginated and does not include custom machine
+// types (db-custom-*).
+func ListTiers(ctx context.Context, client Client, project string) ([]Tier, error) {
+	respBody, err := client.GetURL(ctx, tiersURL(project))
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Items []Tier `json:"items"`
+	}
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("parse tiers list: %w", err)
+	}
+	return resp.Items, nil
+}
+
+func parseOperation(body []byte) (*operation, error) {
+	var op operation
+	if err := json.Unmarshal(body, &op); err != nil {
+		return nil, fmt.Errorf("parse operation response: %w", err)
+	}
+	return &op, nil
+}
+
 // databasePayload converts a Database into the component output payload.
 func databasePayload(db *Database) map[string]any {
 	return map[string]any{
@@ -170,6 +302,30 @@ func databasePayload(db *Database) map[string]any {
 		"collation": db.Collation,
 		"selfLink":  db.SelfLink,
 	}
+}
+
+// instancePayload converts an Instance into the component output payload.
+func instancePayload(i *Instance) map[string]any {
+	payload := map[string]any{
+		"name":            i.Name,
+		"state":           i.State,
+		"databaseVersion": i.DatabaseVersion,
+		"region":          i.Region,
+		"connectionName":  i.ConnectionName,
+		"selfLink":        i.SelfLink,
+	}
+	if i.Settings != nil {
+		payload["tier"] = i.Settings.Tier
+		payload["diskSizeGb"] = i.Settings.DataDiskSizeGb
+		payload["edition"] = i.Settings.Edition
+	}
+	for _, ip := range i.IPAddresses {
+		if ip.Type == "PRIMARY" || ip.Type == "" {
+			payload["ipAddress"] = ip.IPAddress
+			break
+		}
+	}
+	return payload
 }
 
 // waitForOperation polls the operation referenced by the API response until it
@@ -223,12 +379,13 @@ func operationResultError(op operation) error {
 	return fmt.Errorf("Cloud SQL operation failed: %s", msg)
 }
 
-// apiErrorMessage formats an API error for the execution state, appending an IAM
-// hint on 403 since a missing Cloud SQL admin role is the most common cause.
-func apiErrorMessage(action string, err error) string {
+// apiErrorMessage formats an API error for the execution state, appending the
+// IAM role the component needs on a 403 (a missing role is the most common
+// cause). Callers pass the role appropriate to the operation (read vs. write).
+func apiErrorMessage(action string, err error, roleHint string) string {
 	var apiErr *gcpcommon.GCPAPIError
 	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
-		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHintAdmin)
+		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHint)
 	}
 	return fmt.Sprintf("%s: %v", action, err)
 }
