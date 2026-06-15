@@ -299,4 +299,52 @@ func Test__UpdateAlarm__Execute(t *testing.T) {
 		// Existing EC2 automation action must not have been dropped.
 		assert.Contains(t, actions, "arn:aws:automate:us-east-1:ec2:recover")
 	})
+
+	t.Run("clearing alarm description sends empty AlarmDescription", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(describeAlarmsWithActionsXML)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":           "us-east-1",
+				"alarm":            "HighCPU",
+				"alarmDescription": "",
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 3)
+		putBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		params, err := url.ParseQuery(string(putBody))
+		require.NoError(t, err)
+
+		_, hasDescription := params["AlarmDescription"]
+		assert.True(t, hasDescription, "AlarmDescription must be sent to clear an existing description")
+		assert.Empty(t, params.Get("AlarmDescription"))
+	})
 }
