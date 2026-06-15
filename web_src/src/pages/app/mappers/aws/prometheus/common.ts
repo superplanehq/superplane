@@ -21,6 +21,11 @@ export interface WorkspaceStatus {
   statusCode?: string;
 }
 
+export interface RuleGroupNamespaceStatus {
+  statusCode?: string;
+  statusReason?: string;
+}
+
 export interface PrometheusWorkspace {
   alias?: string;
   arn?: string;
@@ -35,10 +40,32 @@ export interface WorkspaceOutput {
   workspace?: PrometheusWorkspace;
 }
 
+export interface RuleGroupNamespace {
+  arn?: string;
+  createdAt?: number | string;
+  data?: string;
+  modifiedAt?: number | string;
+  name?: string;
+  status?: RuleGroupNamespaceStatus;
+  tags?: Record<string, string>;
+}
+
+export interface RuleGroupNamespaceOutput {
+  ruleGroupNamespace?: RuleGroupNamespace;
+  workspaceAlias?: string;
+  workspaceId?: string;
+  namespace?: string;
+  deleted?: boolean;
+}
+
 export interface WorkspaceNodeMetadata {
   region?: string;
   workspaceId?: string;
   workspaceAlias?: string;
+}
+
+export interface RuleGroupNamespaceNodeMetadata extends WorkspaceNodeMetadata {
+  namespace?: string;
 }
 
 export function buildPrometheusComponentProps(
@@ -127,6 +154,33 @@ export function workspaceExecutionDetails(
   return details;
 }
 
+export function ruleGroupNamespaceExecutionDetails(
+  namespace: RuleGroupNamespace | undefined,
+  execution: ExecutionInfo,
+  options: {
+    timestampLabel: string;
+    fallbackName?: string;
+    timestampSource?: "created" | "completed";
+    showStatus?: boolean;
+  },
+): Record<string, string> {
+  const details: Record<string, string> = {
+    [options.timestampLabel]: stringOrDash(formatExecutionTimestamp(execution, options.timestampSource)),
+  };
+
+  if (!namespace) {
+    details.Namespace = stringOrDash(options.fallbackName);
+    return details;
+  }
+
+  details.Namespace = stringOrDash(namespace.name ?? options.fallbackName);
+  if (options.showStatus ?? true) {
+    details.Status = stringOrDash(namespace.status?.statusCode);
+  }
+
+  return details;
+}
+
 export function formatExecutionTimestamp(
   execution: ExecutionInfo,
   timestampSource: "created" | "completed" = "completed",
@@ -142,6 +196,11 @@ export function formatExecutionTimestamp(
 export function workspaceAliasFromMetadata(node: NodeInfo): string | undefined {
   const metadata = node.metadata as WorkspaceNodeMetadata | undefined;
   return metadata?.workspaceAlias?.trim() || undefined;
+}
+
+export function ruleGroupNamespaceFromMetadata(node: NodeInfo): string | undefined {
+  const metadata = node.metadata as RuleGroupNamespaceNodeMetadata | undefined;
+  return metadata?.namespace?.trim() || undefined;
 }
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {

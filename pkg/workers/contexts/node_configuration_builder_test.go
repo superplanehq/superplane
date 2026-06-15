@@ -8,11 +8,37 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
+
+func Test_NodeConfigurationBuilder_LiteralTextFieldPreservesTemplates(t *testing.T) {
+	allowExpressions := false
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithConfigurationFields([]configuration.Field{
+			{
+				Name: "data",
+				Type: configuration.FieldTypeText,
+				TypeOptions: &configuration.TypeOptions{
+					Text: &configuration.TextTypeOptions{AllowExpressions: &allowExpressions},
+				},
+			},
+			{Name: "name", Type: configuration.FieldTypeString},
+		})
+
+	ruleYAML := `summary: "High CPU usage for {{ $labels.component }} with value {{ $value }}"`
+	result, err := builder.Build(map[string]any{
+		"data": ruleYAML,
+		"name": "{{ \"rules\" }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ruleYAML, result["data"])
+	assert.Equal(t, "rules", result["name"])
+}
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)

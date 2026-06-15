@@ -55,3 +55,50 @@ func Test__ListWorkspaces(t *testing.T) {
 		assert.Equal(t, "https://aps.us-east-1.amazonaws.com/workspaces?maxResults=1000", httpContext.Requests[0].URL.String())
 	})
 }
+
+func Test__ListRuleGroupsNamespaces(t *testing.T) {
+	t.Run("missing workspace -> error", func(t *testing.T) {
+		_, err := ListRuleGroupsNamespaces(core.ListResourcesContext{
+			Integration: validIntegrationContext(),
+			Parameters: map[string]string{
+				"region": "us-east-1",
+			},
+		}, ruleGroupsNamespaceResourceType)
+
+		require.ErrorContains(t, err, "workspace is required")
+	})
+
+	t.Run("valid request -> returns namespace resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"ruleGroupsNamespaces": [
+							{"name": "application-rules", "status": {"statusCode": "ACTIVE"}},
+							{"name": "platform-rules", "status": {"statusCode": "CREATING"}}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := ListRuleGroupsNamespaces(core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: validIntegrationContext(),
+			Parameters: map[string]string{
+				"region":    "us-east-1",
+				"workspace": "ws-abc123",
+			},
+		}, ruleGroupsNamespaceResourceType)
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ruleGroupsNamespaceResourceType, Name: "application-rules", ID: "application-rules"},
+			{Type: ruleGroupsNamespaceResourceType, Name: "platform-rules", ID: "platform-rules"},
+		}, resources)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://aps.us-east-1.amazonaws.com/workspaces/ws-abc123/rulegroupsnamespaces?maxResults=1000", httpContext.Requests[0].URL.String())
+	})
+}

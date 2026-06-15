@@ -138,6 +138,10 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
+	if isLiteralTextField(field) {
+		return value, nil
+	}
+
 	if field.TypeOptions != nil {
 		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 			if obj, ok := asAnyMap(value); ok {
@@ -153,6 +157,14 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 	}
 
 	return b.resolveValue(value)
+}
+
+func isLiteralTextField(field configuration.Field) bool {
+	return field.Type == configuration.FieldTypeText &&
+		field.TypeOptions != nil &&
+		field.TypeOptions.Text != nil &&
+		field.TypeOptions.Text.AllowExpressions != nil &&
+		!*field.TypeOptions.Text.AllowExpressions
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {

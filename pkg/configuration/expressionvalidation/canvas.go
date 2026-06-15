@@ -79,6 +79,10 @@ func validateNodeExpressions(nodeID, nodeName string, config map[string]any, fie
 }
 
 func validateString(fieldPath string, field configuration.Field, value string, knownNodeNames map[string]struct{}) []ExpressionError {
+	if isLiteralTextField(field) {
+		return nil
+	}
+
 	if field.Type == configuration.FieldTypeString &&
 		field.TypeOptions != nil &&
 		field.TypeOptions.String != nil &&
@@ -124,6 +128,14 @@ func validateString(fieldPath string, field configuration.Field, value string, k
 		}
 	}
 	return errs
+}
+
+func isLiteralTextField(field configuration.Field) bool {
+	return field.Type == configuration.FieldTypeText &&
+		field.TypeOptions != nil &&
+		field.TypeOptions.Text != nil &&
+		field.TypeOptions.Text.AllowExpressions != nil &&
+		!*field.TypeOptions.Text.AllowExpressions
 }
 
 var startTemplatePayloadFieldPattern = regexp.MustCompile(`^templates\[\d+\]\.payload(\.|$)`)

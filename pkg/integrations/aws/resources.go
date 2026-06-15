@@ -100,6 +100,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "prometheus.workspace":
 		return prometheus.ListWorkspaces(ctx, resourceType)
 
+	case "prometheus.ruleGroupNamespace":
+		return prometheus.ListRuleGroupsNamespaces(ctx, resourceType)
+
 	case "route53.hostedZone":
 		return route53.ListHostedZones(ctx, resourceType)
 

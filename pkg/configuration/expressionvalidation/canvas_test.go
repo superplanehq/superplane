@@ -53,6 +53,26 @@ func TestValidateNodeExpressions_FieldTypes(t *testing.T) {
 		assertOneError(t, errs, "message", "unknown node reference 'Missing'")
 	})
 
+	t.Run("literal text with prometheus annotations passes", func(t *testing.T) {
+		allowExpressions := false
+		fields := []configuration.Field{
+			{
+				Name: "data",
+				Type: configuration.FieldTypeText,
+				TypeOptions: &configuration.TypeOptions{
+					Text: &configuration.TextTypeOptions{AllowExpressions: &allowExpressions},
+				},
+			},
+		}
+
+		errs := validateNodeExpressions("n1", "Rules", map[string]any{
+			"data": `summary: "High CPU usage for {{ $labels.component }} with value {{ $value }}"`,
+		}, fields, knownSet())
+		if len(errs) != 0 {
+			t.Fatalf("expected no errors, got %+v", errs)
+		}
+	})
+
 	t.Run("expression bare literals pass", func(t *testing.T) {
 		fields := []configuration.Field{{Name: "value", Type: configuration.FieldTypeExpression}}
 		for _, raw := range []string{"true", "default", "ok", "down", "1 + 2", `"plain"`, `$["Build"].x + 1`} {
