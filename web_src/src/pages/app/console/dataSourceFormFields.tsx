@@ -8,41 +8,36 @@ import type { ChartPanelDataSource } from "./panelTypes";
 export function DataSourceRunsFields({
   value,
   hideLimit,
+  loadAllWhenBlank,
   onChange,
 }: {
   value: Extract<ChartPanelDataSource, { kind: "runs" }>;
   hideLimit?: boolean;
+  loadAllWhenBlank?: boolean;
   onChange: (next: ChartPanelDataSource) => void;
 }) {
   if (hideLimit) return null;
 
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Limit</Label>
-      <Input
-        type="number"
-        min={1}
-        value={value.limit ?? ""}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            limit: e.target.value === "" ? undefined : Number(e.target.value),
-          })
-        }
-        placeholder="100"
-      />
-    </div>
+    <LimitField
+      value={value.limit}
+      loadAllWhenBlank={loadAllWhenBlank}
+      defaultPlaceholder="100"
+      onChange={(limit) => onChange({ ...value, limit })}
+    />
   );
 }
 
 export function DataSourceExecutionsFields({
   value,
   hideLimit,
+  loadAllWhenBlank,
   nodes,
   onChange,
 }: {
   value: Extract<ChartPanelDataSource, { kind: "executions" }>;
   hideLimit?: boolean;
+  loadAllWhenBlank?: boolean;
   nodes: SuperplaneComponentsNode[];
   onChange: (next: ChartPanelDataSource) => void;
 }) {
@@ -73,23 +68,47 @@ export function DataSourceExecutionsFields({
         </Select>
       </div>
       {hideLimit ? null : (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Limit</Label>
-          <Input
-            type="number"
-            min={1}
-            value={value.limit ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                limit: e.target.value === "" ? undefined : Number(e.target.value),
-              })
-            }
-            placeholder="50"
-          />
-        </div>
+        <LimitField
+          value={value.limit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          defaultPlaceholder="50"
+          onChange={(limit) => onChange({ ...value, limit })}
+        />
       )}
     </>
+  );
+}
+
+function LimitField({
+  value,
+  loadAllWhenBlank,
+  defaultPlaceholder,
+  onChange,
+}: {
+  value: number | undefined;
+  loadAllWhenBlank: boolean | undefined;
+  defaultPlaceholder: string;
+  onChange: (limit: number | undefined) => void;
+}) {
+  const placeholder = loadAllWhenBlank ? "On demand" : defaultPlaceholder;
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-slate-600">Limit</Label>
+      <Input
+        type="number"
+        min={1}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        placeholder={placeholder}
+        data-testid="data-source-limit"
+      />
+      {loadAllWhenBlank ? (
+        <p className="text-[11px] text-slate-500">
+          Leave blank to load rows on demand — scroll or use the "Load more" button to reveal more. Very long histories
+          are capped for performance; set a number to fix how many rows are fetched.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

@@ -265,6 +265,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*

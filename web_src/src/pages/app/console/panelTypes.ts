@@ -474,7 +474,7 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
 function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
   const ds = asObject(raw);
   if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return { kind: "runs", limit: typeof ds.limit === "number" ? ds.limit : 100 };
+  if (ds?.kind === "runs") return { kind: "runs", limit: optionalNumber(ds.limit) };
   if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
   return { kind: "memory", namespace: "" };
 }
@@ -483,8 +483,12 @@ function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelD
   return {
     kind: "executions",
     node: stringOrUndefined(ds.node),
-    limit: typeof ds.limit === "number" ? ds.limit : 50,
+    limit: optionalNumber(ds.limit),
   };
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
