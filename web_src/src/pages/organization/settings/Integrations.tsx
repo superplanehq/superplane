@@ -2,6 +2,7 @@ import { Loader2, Plug, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -62,6 +63,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
+
+  useReportPageReady(!isLoading && !permissionsLoading);
+
   const integrationNames = useMemo(() => {
     return new Set(
       organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],

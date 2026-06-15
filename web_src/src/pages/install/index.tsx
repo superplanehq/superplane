@@ -1,5 +1,6 @@
 import AuthGuard from "@/components/AuthGuard";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { parseGitHubRepoParam } from "@/lib/githubRepo";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -42,6 +43,10 @@ function InstallPageContent() {
   // Set org once loaded
   const effectiveOrgId = organizationId || defaultOrganizationId;
   const showOrgPicker = organizations.length > 1;
+
+  useReportPageReady(!isLoading, {
+    failed: !!(loadError || !preview || !repoParam),
+  });
 
   if (isLoading) {
     return <InstallLoadingView message="Loading installation..." />;

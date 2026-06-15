@@ -1,5 +1,6 @@
 import { Breadcrumbs } from "@/components/Breadcrumbs/breadcrumbs";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Textarea } from "@/components/Textarea/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,11 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
 
   const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   usePageTitle(["Secrets", secret?.metadata?.name]);
+
+  useReportPageReady(!isLoading && !!secretId, {
+    failed: !!error,
+  });
+
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingKeyName, setEditingKeyName] = useState("");
   const [editingValue, setEditingValue] = useState("");

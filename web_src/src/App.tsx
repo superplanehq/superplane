@@ -31,6 +31,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -73,6 +74,7 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
         <div className="flex-1 overflow-auto">
@@ -126,6 +128,11 @@ function AppRouter() {
       </div>
     </BrowserRouter>
   );
+}
+
+function PageObservabilityScope() {
+  usePageObservability();
+  return null;
 }
 
 function OrganizationScope() {
