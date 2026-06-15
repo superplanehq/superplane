@@ -31,6 +31,18 @@ var exampleOutputDeleteWorkspaceBytes []byte
 var exampleOutputDeleteWorkspaceOnce sync.Once
 var exampleOutputDeleteWorkspace map[string]any
 
+//go:embed example_output_query.json
+var exampleOutputQueryBytes []byte
+
+var exampleOutputQueryOnce sync.Once
+var exampleOutputQuery map[string]any
+
+//go:embed example_output_query_range.json
+var exampleOutputQueryRangeBytes []byte
+
+var exampleOutputQueryRangeOnce sync.Once
+var exampleOutputQueryRange map[string]any
+
 func (c *CreateWorkspace) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleOutputCreateWorkspaceOnce,
@@ -60,5 +72,21 @@ func (c *DeleteWorkspace) ExampleOutput() map[string]any {
 		&exampleOutputDeleteWorkspaceOnce,
 		exampleOutputDeleteWorkspaceBytes,
 		&exampleOutputDeleteWorkspace,
+	)
+}
+
+func (c *Query) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputQueryOnce,
+		exampleOutputQueryBytes,
+		&exampleOutputQuery,
+	)
+}
+
+func (c *QueryRange) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputQueryRangeOnce,
+		exampleOutputQueryRangeBytes,
+		&exampleOutputQueryRange,
 	)
 }
