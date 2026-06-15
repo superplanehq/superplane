@@ -7,7 +7,6 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
-  CanvasChangesetChange,
   CanvasesCanvas,
   CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
@@ -21,7 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import {
@@ -1216,6 +1215,7 @@ export function AppPage() {
     hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
+    hasCommittedFilesDraftChanges,
     hasFilesStagingChanges,
   } = useAppDraftStagingData({
     organizationId: organizationId!,
@@ -3149,121 +3149,6 @@ export function AppPage() {
       isReadOnly,
       applyLocalWorkflowUpdate,
       availableIntegrations,
-    ],
-  );
-
-  const handleApplyAiOperations = useCallback(
-    async (operations: CanvasChangesetChange[]) => {
-      if (!operations.length || !organizationId || !canvasId) {
-        return;
-      }
-
-      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
-      if (!versionId) {
-        throw new Error("Enable edit mode before applying AI changes.");
-      }
-
-      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
-      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
-      const autoLayoutNodeIds = Array.from(
-        new Set(
-          operations
-            .filter((operation) => operation.type === "ADD_NODE")
-            .map((operation) => operation.node?.id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-
-      try {
-        const response = await canvasesApplyCanvasVersionChangeset(
-          withOrganizationHeader({
-            path: {
-              canvasId,
-              versionId,
-            },
-            body: {
-              changeset: {
-                changes: operations,
-              },
-              ...(autoLayoutNodeIds.length > 0
-                ? {
-                    autoLayout: {
-                      algorithm: "ALGORITHM_HORIZONTAL",
-                      scope: "SCOPE_CONNECTED_COMPONENT",
-                      nodeIds: autoLayoutNodeIds,
-                    },
-                  }
-                : {}),
-            },
-          }),
-        );
-
-        const version = response.data?.version;
-        if (!version) {
-          throw new Error("Failed to apply AI changes.");
-        }
-
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), version);
-        queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          let found = false;
-          const next = current.map((item) => {
-            if (item?.metadata?.id === version.metadata?.id) {
-              found = true;
-              return version;
-            }
-            return item;
-          });
-
-          if (!found) {
-            next.unshift(version);
-          }
-
-          next.sort(
-            (left, right) =>
-              versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
-              versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
-          );
-          return next;
-        });
-
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-          if (!current || !version.spec) {
-            return current;
-          }
-
-          return {
-            ...current,
-            spec: {
-              ...current.spec,
-              ...version.spec,
-            },
-          };
-        });
-
-        setActiveCanvasVersion(version);
-        setLastSavedWorkflowSnapshot(
-          queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null,
-        );
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-      } catch (error) {
-        releaseCanvasUpdatedEcho();
-        releaseCanvasVersionUpdatedEcho();
-        throw error;
-      }
-    },
-    [
-      activeCanvasVersionId,
-      canvasId,
-      organizationId,
-      queryClient,
-      registerIgnoredCanvasUpdatedEcho,
-      registerIgnoredCanvasVersionUpdatedEcho,
-      setLastSavedWorkflowSnapshot,
     ],
   );
 
@@ -5354,6 +5239,8 @@ export function AppPage() {
             headerActionsSlotId: filesHeaderActionsSlotId,
             stagingResetNonce,
             suspendRepositoryFileStaging: isPreparingVersionAction,
+            hasCanvasSpecDiffVersusLive: draftChangeIndicators.hasUnpublishedCanvasDraftChanges,
+            hasConsoleSpecDiffVersusLive: draftChangeIndicators.hasUnpublishedConsoleDraftChanges,
             onSpecFileChange,
             onLocalFilesStagingChange: handleLocalFilesStagingChange,
             onFlushRepositoryFileStagingReady: handleFlushRepositoryFileStagingReady,
@@ -5409,7 +5296,6 @@ export function AppPage() {
           isEditing={isEditing}
           activeCanvasVersionId={activeCanvasVersionId}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
-          onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
@@ -5488,6 +5374,7 @@ export function AppPage() {
           hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+          hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
           onCommitStaging={handleCommitStaging}
           commitStagingPending={isPreparingVersionAction || commitCanvasStagingMutation.isPending}

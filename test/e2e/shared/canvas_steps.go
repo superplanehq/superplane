@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -11,8 +12,11 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitfactory "github.com/superplanehq/superplane/pkg/git"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -465,6 +469,55 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 	return &drafts[0]
 }
 
+// ProvisionCanvasGitRepository creates and seeds a ready git repository for a
+// canvas that was created directly in the database (via support.CreateCanvas),
+// bringing it in line with the git-first backend. The canvas draft/commit/publish
+// flow requires a provisioned repository with a seeded main branch, which the
+// production CreateCanvas RPC sets up synchronously; tests that bypass the RPC
+// need the same setup so that entering edit mode (creating a draft version) works.
+func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID) {
+	gitProvider, err := gitfactory.NewProvider()
+	require.NoError(t, err)
+
+	canvas, err := models.FindCanvas(orgID, canvasID)
+	require.NoError(t, err)
+
+	repoID := gitProvider.GetRepositoryID(git.RepositoryOptions{
+		OrganizationID: orgID,
+		CanvasID:       canvasID,
+	})
+	require.NoError(t, canvas.CreatePendingRepository(gitProvider.Name(), repoID))
+
+	repository, err := models.FindRepository(orgID, canvasID)
+	require.NoError(t, err)
+
+	input := materialize.SeedRepositoryInput{
+		Canvas: &materialize.CanvasYAML{
+			APIVersion: "v1",
+			Kind:       "Canvas",
+			Metadata: materialize.CanvasYAMLMetadata{
+				Name:        canvas.Name,
+				Description: canvas.Description,
+			},
+			Spec: materialize.CanvasYAMLSpec{
+				ChangeManagementEnabled: canvas.ChangeManagementEnabled,
+				ChangeRequestApprovers:  models.DefaultCanvasChangeRequestApprovers(),
+			},
+		},
+		Author: git.CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"},
+	}
+	if canvas.LiveVersionID != nil {
+		liveVersion, liveErr := models.FindCanvasVersionInTransaction(database.Conn(), canvasID, *canvas.LiveVersionID)
+		require.NoError(t, liveErr)
+		input.Canvas = materialize.CanvasYAMLFromVersion(liveVersion)
+	}
+
+	_, err = materialize.SeedMainRepository(context.Background(), gitProvider, repository, input)
+	require.NoError(t, err)
+
+	require.NoError(t, repository.MarkReady(database.Conn()))
+}
+
 func (s *CanvasSteps) Create() {
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
@@ -476,6 +529,8 @@ func (s *CanvasSteps) Create() {
 		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
+
+	ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
 
 	s.Visit()
 }
@@ -533,6 +588,8 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
+
+	ProvisionCanvasGitRepository(s.t, s.session.OrgID, s.WorkflowID)
 
 	s.Visit()
 }

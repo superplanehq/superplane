@@ -21,6 +21,7 @@ type DraftChangeIndicatorsInput = {
   hasLatestDraftVersion: boolean;
   hasDraftGraphDiffVersusLive: boolean;
   hasDraftConsoleDiffVersusLive: boolean;
+  hasDraftFilesDiffVersusLive: boolean;
   hasDraftDiffVersusLive: boolean;
 };
 
@@ -28,6 +29,7 @@ type DraftChangeIndicators = {
   hasUnpublishedDraftChanges: boolean;
   hasUnpublishedCanvasDraftChanges: boolean;
   hasUnpublishedConsoleDraftChanges: boolean;
+  hasUnpublishedFilesDraftChanges: boolean;
 };
 
 export function getDraftChangeIndicators({
@@ -35,6 +37,7 @@ export function getDraftChangeIndicators({
   hasLatestDraftVersion,
   hasDraftGraphDiffVersusLive,
   hasDraftConsoleDiffVersusLive,
+  hasDraftFilesDiffVersusLive,
   hasDraftDiffVersusLive,
 }: DraftChangeIndicatorsInput): DraftChangeIndicators {
   if (suppressUnpublishedDraftDiscard || !hasLatestDraftVersion) {
@@ -42,6 +45,7 @@ export function getDraftChangeIndicators({
       hasUnpublishedDraftChanges: false,
       hasUnpublishedCanvasDraftChanges: false,
       hasUnpublishedConsoleDraftChanges: false,
+      hasUnpublishedFilesDraftChanges: false,
     };
   }
 
@@ -49,6 +53,7 @@ export function getDraftChangeIndicators({
     hasUnpublishedDraftChanges: hasDraftDiffVersusLive,
     hasUnpublishedCanvasDraftChanges: hasDraftGraphDiffVersusLive,
     hasUnpublishedConsoleDraftChanges: hasDraftConsoleDiffVersusLive,
+    hasUnpublishedFilesDraftChanges: hasDraftFilesDiffVersusLive,
   };
 }
 

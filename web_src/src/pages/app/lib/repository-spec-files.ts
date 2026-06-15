@@ -48,6 +48,39 @@ export async function fetchRepositorySpecFileContent(
   return response.text();
 }
 
+// fetchRepositoryFileChangesVersusLive reports whether a draft version has
+// committed changes to arbitrary repository files (e.g. README.md) relative to
+// live. The graph/console spec diffs do not cover these files, so this drives the
+// Publish button, the Files tab's committed-changes (blue) indicator, and the
+// Files-tab "diff vs live" view (which mirrors the canvas tab by always comparing
+// the effective draft against live).
+export type RepositoryFileChangesVersusLive = {
+  hasUnpublishedFileChanges: boolean;
+  changedPaths: string[];
+};
+
+export async function fetchRepositoryFileChangesVersusLive(
+  canvasId: string,
+  versionId: string,
+): Promise<RepositoryFileChangesVersusLive> {
+  const params = new URLSearchParams({ version_id: versionId });
+  const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file-changes?${params}`, {
+    credentials: "include",
+    headers: withOrganizationHeader().headers,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to load repository file changes");
+  }
+
+  const data = (await response.json()) as Partial<RepositoryFileChangesVersusLive>;
+  return {
+    hasUnpublishedFileChanges: !!data.hasUnpublishedFileChanges,
+    changedPaths: data.changedPaths ?? [],
+  };
+}
+
 // fetchCanvasVersionStagingSummary returns the uncommitted staging summary for a
 // draft version, used to drive the orange "uncommitted changes" indicators.
 export async function fetchCanvasVersionStagingSummary(
