@@ -47,6 +47,14 @@ func New(cfg Config) (*Provider, error) {
 
 func (p *Provider) Name() string { return ProviderName }
 
+func (p *Provider) CreateMemoryStore(ctx context.Context, opts agents.CreateMemoryStoreOptions) (*agents.CreateMemoryStoreResult, error) {
+	store, err := p.client.createMemoryStore(ctx, opts.Name, opts.Description)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic: create memory store: %w", err)
+	}
+	return &agents.CreateMemoryStoreResult{ProviderMemoryStoreID: store.ID}, nil
+}
+
 func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	body := map[string]any{
 		"agent":          p.agentID,
@@ -58,21 +66,9 @@ func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionO
 	if len(opts.VaultIDs) > 0 {
 		body["vault_ids"] = opts.VaultIDs
 	}
-	// Mount reference files
-	resources := opts.Resources
-	if len(p.resources) > 0 && len(resources) == 0 {
-		resources = p.resources
-	}
+	resources := p.sessionResources(opts)
 	if len(resources) > 0 {
-		fileResources := make([]map[string]string, len(resources))
-		for i, r := range resources {
-			fileResources[i] = map[string]string{
-				"type":       "file",
-				"file_id":    r.FileID,
-				"mount_path": r.MountPath,
-			}
-		}
-		body["resources"] = fileResources
+		body["resources"] = resources
 	}
 	data, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions", body)
 	if err != nil {
@@ -89,6 +85,37 @@ func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionO
 		return nil, fmt.Errorf("anthropic: provider returned empty session id")
 	}
 	return &agents.CreateSessionResult{ProviderSessionID: resp.ID}, nil
+}
+
+func (p *Provider) sessionResources(opts agents.CreateSessionOptions) []map[string]any {
+	fileResources := opts.Resources
+	if len(p.resources) > 0 && len(fileResources) == 0 {
+		fileResources = p.resources
+	}
+
+	resources := make([]map[string]any, 0, len(fileResources)+len(opts.MemoryStores))
+	for _, r := range fileResources {
+		resources = append(resources, map[string]any{
+			"type":       "file",
+			"file_id":    r.FileID,
+			"mount_path": r.MountPath,
+		})
+	}
+	for _, r := range opts.MemoryStores {
+		resource := map[string]any{
+			"type":            "memory_store",
+			"memory_store_id": r.MemoryStoreID,
+		}
+		if r.Access != "" {
+			resource["access"] = r.Access
+		}
+		if r.Instructions != "" {
+			resource["instructions"] = r.Instructions
+		}
+		resources = append(resources, resource)
+	}
+
+	return resources
 }
 
 func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message string, opts agents.SendMessageOptions) error {

@@ -102,6 +102,24 @@ CREATE TABLE public.accounts (
 
 
 --
+-- Name: agent_memory_stores; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_memory_stores (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    provider character varying(40) NOT NULL,
+    provider_memory_store_id text NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: agent_session_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -742,6 +760,14 @@ ALTER TABLE ONLY public.accounts
 
 
 --
+-- Name: agent_memory_stores agent_memory_stores_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_memory_stores
+    ADD CONSTRAINT agent_memory_stores_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: agent_session_messages agent_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1091,6 +1117,20 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_memory_stores_provider_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_memory_stores_provider_id_idx ON public.agent_memory_stores USING btree (provider, provider_memory_store_id);
+
+
+--
+-- Name: agent_memory_stores_scope_provider_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agent_memory_stores_scope_provider_idx ON public.agent_memory_stores USING btree (organization_id, user_id, canvas_id, provider);
 
 
 --
@@ -1558,6 +1598,30 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
+-- Name: agent_memory_stores agent_memory_stores_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_memory_stores
+    ADD CONSTRAINT agent_memory_stores_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_memory_stores agent_memory_stores_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_memory_stores
+    ADD CONSTRAINT agent_memory_stores_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_memory_stores agent_memory_stores_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_memory_stores
+    ADD CONSTRAINT agent_memory_stores_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: agent_session_messages agent_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1997,7 +2061,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260615161605	f
+20260615193406	f
 \.
 
 
