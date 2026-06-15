@@ -34,6 +34,7 @@ type ActionHookContext struct {
 	Integration    IntegrationContext
 	Notifications  NotificationContext
 	Secrets        SecretsContext
+	Files          RepositoryFilesContext
 }
 
 /*
