@@ -4,8 +4,10 @@ import (
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -36,8 +38,9 @@ func CriticalHTTPTraceMiddleware(resolveRoute criticalHTTPRouteResolver) func(ht
 			}
 
 			spanName := r.Method + " " + r.URL.Path
+			ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 			ctx, span := telemetry.StartSpan(
-				r.Context(),
+				ctx,
 				spanName,
 				trace.WithSpanKind(trace.SpanKindServer),
 			)

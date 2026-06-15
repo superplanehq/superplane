@@ -62,6 +62,7 @@ func (e *EventDistributer) Start() error {
 		{messages.CanvasExchange, messages.CanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
 		{messages.CanvasExchange, messages.CanvasStagingUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasStagingUpdated)},
 		{messages.CanvasExchange, messages.CanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
+		{messages.CanvasExchange, messages.CanvasMemoryUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasMemoryUpdated)},
 		{messages.CanvasExchange, messages.AgentSessionEventRoutingKey, e.createHandler(eventdistributer.HandleAgentSessionEvent)},
 	}
 
