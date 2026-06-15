@@ -1,0 +1,8 @@
+{
+  "data": {
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "state": "deleted"
+  },
+  "timestamp": "2026-05-21T12:05:00Z",
+  "type": "aws.ec2.loadBalancer.deleted"
+}
