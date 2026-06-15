@@ -69,7 +69,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessEvent(logger, event); err != nil {
-						w.logger.Errorf("Error processing event %s: %v", event.ID, err)
+						logger.Errorf("Error processing event: %v", err)
 					}
 				}(event)
 			}
@@ -133,7 +133,13 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 	}
 
 	logger := logging.ForEvent(w.logger, *event)
-	return w.LockAndProcessEvent(logger, *event)
+	err = w.LockAndProcessEvent(logger, *event)
+	if err != nil {
+		logger.Errorf("Error processing event: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
