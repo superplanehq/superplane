@@ -17,14 +17,14 @@ func DeleteRole(ctx context.Context, domainType, domainID, roleName string, auth
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
+	_, err := authService.GetRoleDefinition(ctx, roleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", roleName, err)
 		return nil, status.Error(codes.NotFound, "role not found")
 	}
 
 	if domainType == models.DomainTypeOrganization {
-		if err := reassignGroupsForDeletedRole(authService, domainID, domainType, roleName); err != nil {
+		if err := reassignGroupsForDeletedRole(ctx, authService, domainID, domainType, roleName); err != nil {
 			return nil, err
 		}
 		if err := removeUsersForDeletedRole(ctx, authService, domainID, domainType, roleName); err != nil {
@@ -43,15 +43,15 @@ func DeleteRole(ctx context.Context, domainType, domainID, roleName string, auth
 	return &pb.DeleteRoleResponse{}, nil
 }
 
-func reassignGroupsForDeletedRole(authService authorization.Authorization, domainID, domainType, roleName string) error {
-	groups, err := authService.GetGroups(domainID, domainType)
+func reassignGroupsForDeletedRole(ctx context.Context, authService authorization.Authorization, domainID, domainType, roleName string) error {
+	groups, err := authService.GetGroups(ctx, domainID, domainType)
 	if err != nil {
 		log.Errorf("failed to get groups for org %s: %v", domainID, err)
 		return status.Error(codes.Internal, "failed to get groups for org")
 	}
 
 	for _, groupName := range groups {
-		groupRole, err := authService.GetGroupRole(domainID, domainType, groupName)
+		groupRole, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 		if err != nil {
 			log.Errorf("failed to get role for group %s: %v", groupName, err)
 			return status.Error(codes.Internal, "failed to get group role")
@@ -72,14 +72,14 @@ func reassignGroupsForDeletedRole(authService authorization.Authorization, domai
 }
 
 func removeUsersForDeletedRole(ctx context.Context, authService authorization.Authorization, domainID, domainType, roleName string) error {
-	userIDs, err := authService.GetOrgUsersForRole(roleName, domainID)
+	userIDs, err := authService.GetOrgUsersForRole(ctx, roleName, domainID)
 	if err != nil {
 		log.Errorf("failed to get users for role %s: %v", roleName, err)
 		return status.Error(codes.Internal, "failed to get users for role")
 	}
 
 	for _, userID := range userIDs {
-		userRoles, err := authService.GetUserRolesForOrg(userID, domainID)
+		userRoles, err := authService.GetUserRolesForOrg(ctx, userID, domainID)
 		if err != nil {
 			log.Errorf("failed to get roles for user %s: %v", userID, err)
 			return status.Error(codes.Internal, "failed to get user roles")

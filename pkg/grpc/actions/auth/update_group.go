@@ -18,7 +18,7 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	currentRole, err := authService.GetGroupRole(domainID, domainType, groupName)
+	currentRole, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
@@ -61,7 +61,7 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", groupName, currentRole, groupSpec.Role, domainID, domainType)
 	}
 
-	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
+	groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}

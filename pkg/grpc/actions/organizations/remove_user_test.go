@@ -64,7 +64,7 @@ func Test_RemoveUser(t *testing.T) {
 		//
 		// Verify no organization roles exist anymore for that user anymore
 		//
-		roles, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), newUser.ID.String(), orgID)
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})

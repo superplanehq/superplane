@@ -205,6 +205,44 @@ describe("validatePanelContent — table", () => {
   });
 });
 
+describe("normalizeTablePanelContent — data source limits", () => {
+  it("preserves an explicit numeric limit for runs and executions", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs", limit: 250 },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: 250 });
+
+    const executions = normalizeTablePanelContent({
+      dataSource: { kind: "executions", node: "deploy", limit: 75 },
+      render: { kind: "table", columns: [] },
+    });
+    expect(executions.dataSource).toEqual({ kind: "executions", node: "deploy", limit: 75 });
+  });
+
+  it("leaves limit undefined when not provided, so blank means 'load all'", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: undefined });
+
+    const executions = normalizeTablePanelContent({
+      dataSource: { kind: "executions" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(executions.dataSource).toEqual({ kind: "executions", node: undefined, limit: undefined });
+  });
+
+  it("drops a non-numeric limit rather than coercing it to a default", () => {
+    const runs = normalizeTablePanelContent({
+      dataSource: { kind: "runs", limit: "many" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(runs.dataSource).toEqual({ kind: "runs", limit: undefined });
+  });
+});
+
 describe("normalizeTablePanelContent — rowStyles round-trip", () => {
   it("preserves valid rowStyles entries verbatim", () => {
     const normalized = normalizeTablePanelContent({
