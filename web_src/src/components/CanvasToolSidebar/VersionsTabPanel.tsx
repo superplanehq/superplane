@@ -1,6 +1,5 @@
-import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useState } from "react";
+import type { CanvasesCanvasVersion } from "@/api-client";
+import { useCallback } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
@@ -13,16 +12,7 @@ export interface VersionsTabPanelProps {
   liveCanvasVersionId?: string;
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  pendingApprovalVersions?: Array<{
-    version: CanvasesCanvasVersion;
-    changeRequest: CanvasesCanvasChangeRequest;
-  }>;
-  rejectedVersions?: Array<{
-    version: CanvasesCanvasVersion;
-    changeRequest: CanvasesCanvasChangeRequest;
-  }>;
   liveVersions: CanvasesCanvasVersion[];
-  liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
@@ -30,7 +20,6 @@ export interface VersionsTabPanelProps {
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
-  changeRequestApprovalConfig?: CanvasChangeManagement;
   draftBranches?: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
   draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
@@ -42,8 +31,6 @@ export interface VersionsTabPanelProps {
 type VersionRowItem = {
   key: string;
   version: CanvasesCanvasVersion;
-  changeRequest?: CanvasesCanvasChangeRequest;
-  variant?: "default" | "rejected";
   isActive: boolean;
   isCurrentLive: boolean;
   isFirstCanvasVersion?: boolean;
@@ -56,10 +43,7 @@ export function VersionsTabPanel({
   liveCanvasVersionId,
   liveCanvasVersion,
   selectedCanvasVersion,
-  pendingApprovalVersions,
-  rejectedVersions,
   liveVersions,
-  liveVersionChangeRequestsByVersionId,
   canUpdateCanvas,
   canvasDeletedRemotely,
   onUseVersion,
@@ -67,7 +51,6 @@ export function VersionsTabPanel({
   onLoadMoreLiveVersions,
   loadMoreLiveVersionsDisabled,
   loadMoreLiveVersionsPending,
-  changeRequestApprovalConfig,
   draftBranches,
   activeDraftBranch,
   draftBranchEditStatusByVersionId,
@@ -75,23 +58,11 @@ export function VersionsTabPanel({
   onDeleteDraftBranch,
   deleteDraftBranchPending,
 }: VersionsTabPanelProps) {
-  const {
-    hasNoVersions,
-    handleViewDiff,
-    liveItems,
-    pendingItems,
-    rejectedItems,
-    rejectedList,
-    rejectedVersionsExpanded,
-    setRejectedVersionsExpanded,
-  } = useVersionsPanelData({
+  const { hasNoVersions, handleViewDiff, liveItems } = useVersionsPanelData({
     liveCanvasVersionId,
     liveCanvasVersion,
     selectedCanvasVersion,
-    pendingApprovalVersions,
-    rejectedVersions,
     liveVersions,
-    liveVersionChangeRequestsByVersionId,
     loadMoreLiveVersionsDisabled,
     onLoadMoreLiveVersions,
     onVersionNodeDiffContextChange,
@@ -101,7 +72,7 @@ export function VersionsTabPanel({
     hasMore: Boolean(onLoadMoreLiveVersions) && !loadMoreLiveVersionsDisabled,
     isLoading: loadMoreLiveVersionsPending,
     onLoadMore: onLoadMoreLiveVersions,
-    itemCount: liveItems.length + pendingItems.length + rejectedItems.length,
+    itemCount: liveItems.length,
   });
 
   return (
@@ -128,22 +99,8 @@ export function VersionsTabPanel({
           {hasNoVersions ? (
             <p className="px-4 py-2 text-xs text-slate-600">No published history yet.</p>
           ) : (
-            <VersionHistorySection
-              items={[...pendingItems, ...liveItems]}
-              changeRequestApprovalConfig={changeRequestApprovalConfig}
-              onUseVersion={onUseVersion}
-              onViewDiff={handleViewDiff}
-            />
+            <VersionRowList items={liveItems} onUseVersion={onUseVersion} onViewDiff={handleViewDiff} />
           )}
-          <RejectedVersionsSection
-            count={rejectedList.length}
-            expanded={rejectedVersionsExpanded}
-            items={rejectedItems}
-            changeRequestApprovalConfig={changeRequestApprovalConfig}
-            onToggleExpanded={() => setRejectedVersionsExpanded((value) => !value)}
-            onUseVersion={onUseVersion}
-            onViewDiff={handleViewDiff}
-          />
         </section>
       </div>
     </div>
@@ -154,10 +111,7 @@ function useVersionsPanelData({
   liveCanvasVersionId,
   liveCanvasVersion,
   selectedCanvasVersion,
-  pendingApprovalVersions,
-  rejectedVersions,
   liveVersions,
-  liveVersionChangeRequestsByVersionId,
   loadMoreLiveVersionsDisabled,
   onLoadMoreLiveVersions,
   onVersionNodeDiffContextChange,
@@ -166,49 +120,31 @@ function useVersionsPanelData({
   | "liveCanvasVersionId"
   | "liveCanvasVersion"
   | "selectedCanvasVersion"
-  | "pendingApprovalVersions"
-  | "rejectedVersions"
   | "liveVersions"
-  | "liveVersionChangeRequestsByVersionId"
   | "loadMoreLiveVersionsDisabled"
   | "onLoadMoreLiveVersions"
   | "onVersionNodeDiffContextChange"
 >) {
-  const rejectedList = rejectedVersions ?? [];
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
-  const [rejectedVersionsExpanded, setRejectedVersionsExpanded] = useState(false);
   const handleViewDiff = useCallback(
-    (
-      version: CanvasesCanvasVersion,
-      previousVersion: CanvasesCanvasVersion,
-      changeRequest?: CanvasesCanvasChangeRequest,
-    ) => {
-      onVersionNodeDiffContextChange({ version, previousVersion, changeRequest });
+    (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => {
+      onVersionNodeDiffContextChange({ version, previousVersion });
     },
     [onVersionNodeDiffContextChange],
   );
-  const baselineVersion = liveVersions[0] ?? liveCanvasVersion ?? undefined;
-  const pendingItems = buildPendingItems(pendingApprovalVersions ?? [], selectedVersionId, baselineVersion);
   const liveItems = buildLiveItems({
     liveCanvasVersionId,
     liveVersions,
     loadMoreLiveVersionsDisabled,
-    liveVersionChangeRequestsByVersionId,
     onLoadMoreLiveVersions,
     selectedVersionId,
   });
-  const rejectedItems = buildRejectedItems(rejectedList, selectedVersionId, baselineVersion);
-  const hasNoVersions = liveVersions.length === 0 && pendingItems.length === 0 && rejectedItems.length === 0;
+  const hasNoVersions = liveVersions.length === 0 && !liveCanvasVersion;
 
   return {
     hasNoVersions,
     handleViewDiff,
     liveItems,
-    pendingItems,
-    rejectedItems,
-    rejectedList,
-    rejectedVersionsExpanded,
-    setRejectedVersionsExpanded,
   };
 }
 
@@ -279,54 +215,20 @@ function VersionsNotices({
   );
 }
 
-function VersionHistorySection({
-  items,
-  changeRequestApprovalConfig,
-  onUseVersion,
-  onViewDiff,
-}: {
-  items: VersionRowItem[];
-  changeRequestApprovalConfig?: CanvasChangeManagement;
-  onUseVersion: (versionID: string) => void;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
-}) {
-  return (
-    <VersionRowList
-      items={items}
-      changeRequestApprovalConfig={changeRequestApprovalConfig}
-      onUseVersion={onUseVersion}
-      onViewDiff={onViewDiff}
-    />
-  );
-}
-
 function VersionRowList({
   items,
-  changeRequestApprovalConfig,
   onUseVersion,
   onViewDiff,
 }: {
   items: VersionRowItem[];
-  changeRequestApprovalConfig?: CanvasChangeManagement;
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
+  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
 }) {
   return items.map((item) => (
     <VersionRow
       key={item.key}
       rowTestId={item.rowTestId}
       version={item.version}
-      changeRequest={item.changeRequest}
-      changeRequestApprovalConfig={changeRequestApprovalConfig}
-      variant={item.variant}
       isActive={item.isActive}
       isCurrentLive={item.isCurrentLive}
       isFirstCanvasVersion={item.isFirstCanvasVersion}
@@ -337,87 +239,16 @@ function VersionRowList({
   ));
 }
 
-function RejectedVersionsSection({
-  count,
-  expanded,
-  items,
-  changeRequestApprovalConfig,
-  onToggleExpanded,
-  onUseVersion,
-  onViewDiff,
-}: {
-  count: number;
-  expanded: boolean;
-  items: VersionRowItem[];
-  changeRequestApprovalConfig?: CanvasChangeManagement;
-  onToggleExpanded: () => void;
-  onUseVersion: (versionID: string) => void;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
-}) {
-  if (count === 0) return null;
-
-  return (
-    <div className="border-t border-slate-200">
-      <button
-        type="button"
-        className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-slate-500"
-        onClick={onToggleExpanded}
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-        )}
-        <span>Rejected ({count})</span>
-      </button>
-      {expanded ? (
-        <VersionRowList
-          items={items}
-          changeRequestApprovalConfig={changeRequestApprovalConfig}
-          onUseVersion={onUseVersion}
-          onViewDiff={onViewDiff}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function buildPendingItems(
-  pendingApprovalVersions: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }>,
-  selectedVersionId: string,
-  previousVersion?: CanvasesCanvasVersion,
-): VersionRowItem[] {
-  return pendingApprovalVersions.map((item) => {
-    const versionID = item.version.metadata?.id || "";
-    return {
-      key: `pending-${versionID || item.changeRequest.metadata?.id || "unknown"}`,
-      rowTestId: "canvas-pending-change-request-version-row",
-      version: item.version,
-      changeRequest: item.changeRequest,
-      isActive: versionID === selectedVersionId,
-      isCurrentLive: false,
-      previousVersion,
-    };
-  });
-}
-
 function buildLiveItems({
   liveCanvasVersionId,
   liveVersions,
   loadMoreLiveVersionsDisabled,
-  liveVersionChangeRequestsByVersionId,
   onLoadMoreLiveVersions,
   selectedVersionId,
 }: {
   liveCanvasVersionId?: string;
   liveVersions: CanvasesCanvasVersion[];
   loadMoreLiveVersionsDisabled?: boolean;
-  liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   onLoadMoreLiveVersions?: () => void;
   selectedVersionId: string;
 }): VersionRowItem[] {
@@ -429,30 +260,10 @@ function buildLiveItems({
       key: versionID,
       rowTestId: "canvas-live-version-row",
       version,
-      changeRequest: versionID ? liveVersionChangeRequestsByVersionId?.get(versionID) : undefined,
       isActive: versionID === selectedVersionId,
       isCurrentLive: liveCanvasVersionId === versionID,
       isFirstCanvasVersion,
       previousVersion: liveVersions[index + 1],
-    };
-  });
-}
-
-function buildRejectedItems(
-  rejectedVersions: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }>,
-  selectedVersionId: string,
-  previousVersion?: CanvasesCanvasVersion,
-): VersionRowItem[] {
-  return rejectedVersions.map((item) => {
-    const versionID = item.version.metadata?.id || "";
-    return {
-      key: `rejected-${versionID || item.changeRequest.metadata?.id || "unknown"}`,
-      version: item.version,
-      changeRequest: item.changeRequest,
-      variant: "rejected",
-      isActive: versionID === selectedVersionId,
-      isCurrentLive: false,
-      previousVersion,
     };
   });
 }

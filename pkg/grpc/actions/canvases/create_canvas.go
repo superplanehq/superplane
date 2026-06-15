@@ -70,29 +70,6 @@ func CreateCanvas(
 	}
 
 	createdBy := uuid.MustParse(userID)
-	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
-	}
-
-	changeManagementEnabled := organizationChangeManagementEnabled
-	changeRequestApprovers := models.DefaultCanvasChangeRequestApprovers()
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		changeManagementEnabled = changeManagement.Enabled
-
-		approvers, approversErr := parseAndValidateCanvasChangeRequestApprovers(
-			authService,
-			organizationID.String(),
-			changeManagement,
-		)
-		if approversErr != nil {
-			return nil, approversErr
-		}
-		if approvers != nil {
-			changeRequestApprovers = approvers
-		}
-	}
-
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
@@ -145,19 +122,17 @@ func CreateCanvas(
 		// Create new empty canvas version record
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:                      versionID,
-			WorkflowID:              canvasID,
-			OwnerID:                 &createdBy,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    name,
-			Description:             pbCanvas.Metadata.Description,
-			ChangeManagementEnabled: changeManagementEnabled,
-			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
-			PublishedAt:             &now,
-			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
-			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			ID:          versionID,
+			WorkflowID:  canvasID,
+			OwnerID:     &createdBy,
+			State:       models.CanvasVersionStatePublished,
+			Name:        name,
+			Description: pbCanvas.Metadata.Description,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
@@ -226,8 +201,6 @@ func CreateCanvas(
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
-	canvas.ChangeManagementEnabled = changeManagementEnabled
-	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
 	canvas.Description = pbCanvas.Metadata.Description
 
 	var user *models.User

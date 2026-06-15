@@ -23,8 +23,6 @@ type ConfirmDeleteDraftBranchOptions = {
   handleUseVersion: (versionId: string) => void;
   queryClient: QueryClient;
   setSearchParams: SetURLSearchParams;
-  setIsCreateChangeRequestMode: (value: boolean) => void;
-  setSelectedChangeRequestId: (value: string) => void;
   setActiveCanvasVersion: (value: CanvasesCanvasVersion | null) => void;
   setDraftCanvasSpec: (value: CanvasesCanvas["spec"] | null) => void;
   setHasUnsavedChanges: (value: boolean) => void;
@@ -48,8 +46,6 @@ export async function confirmDeleteDraftBranch({
   handleUseVersion,
   queryClient,
   setSearchParams,
-  setIsCreateChangeRequestMode,
-  setSelectedChangeRequestId,
   setActiveCanvasVersion,
   setDraftCanvasSpec,
   setHasUnsavedChanges,
@@ -71,8 +67,6 @@ export async function confirmDeleteDraftBranch({
     await deleteDraftBranch(versionId);
 
     if (isActiveDraft) {
-      setIsCreateChangeRequestMode(false);
-      setSelectedChangeRequestId("");
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
