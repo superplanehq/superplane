@@ -15,7 +15,7 @@ func DeleteGroup(ctx context.Context, domainType, domainID, groupName string, au
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	_, err := authService.GetGroupRole(domainID, domainType, groupName)
+	_, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 	if err != nil {
 		log.Errorf("failed to get group %s role in domain %s: %v", groupName, domainID, err)
 		return nil, status.Error(codes.NotFound, "group not found")

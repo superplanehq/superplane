@@ -37,7 +37,7 @@ func (s *Service) ProviderName() string { return s.provider.Name() }
 // EnsureSession returns the user's single chat session for the given canvas,
 // provisioning it on the upstream provider on first call.
 func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	if err := s.checkAgentPermission(userID.String(), organizationID.String()); err != nil {
+	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
 		return nil, err
 	}
 
@@ -442,13 +442,13 @@ func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) err
 
 // checkAgentPermission enforces the org-level baseline. Per-canvas access is
 // gated by the gRPC handler's models.FindCanvas(orgID, canvasID).
-func (s *Service) checkAgentPermission(userID, organizationID string) error {
+func (s *Service) checkAgentPermission(ctx context.Context, userID, organizationID string) error {
 	checks := []struct{ resource, action string }{
 		{"agents", "create"},
 		{"canvases", "read"},
 	}
 	for _, c := range checks {
-		allowed, err := s.auth.CheckOrganizationPermission(userID, organizationID, c.resource, c.action)
+		allowed, err := s.auth.CheckOrganizationPermission(ctx, userID, organizationID, c.resource, c.action)
 		if err != nil {
 			return fmt.Errorf("resolve %s:%s permission: %w", c.resource, c.action, err)
 		}

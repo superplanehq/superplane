@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -128,7 +129,7 @@ func (c *NotificationEmailConsumer) resolveRecipients(orgID uuid.UUID, data *pro
 	}
 
 	for _, group := range data.Groups {
-		userIDs, err := c.AuthService.GetGroupUsers(orgID.String(), models.DomainTypeOrganization, group)
+		userIDs, err := c.AuthService.GetGroupUsers(context.Background(), orgID.String(), models.DomainTypeOrganization, group)
 		if err != nil {
 			log.Warnf("Error finding users in group %s: %v", group, err)
 			continue
@@ -138,7 +139,7 @@ func (c *NotificationEmailConsumer) resolveRecipients(orgID uuid.UUID, data *pro
 	}
 
 	for _, role := range data.Roles {
-		userIDs, err := c.AuthService.GetOrgUsersForRole(role, orgID.String())
+		userIDs, err := c.AuthService.GetOrgUsersForRole(context.Background(), role, orgID.String())
 		if err != nil {
 			log.Warnf("Error finding users for role %s: %v", role, err)
 			continue
