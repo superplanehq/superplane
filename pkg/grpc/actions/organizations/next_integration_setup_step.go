@@ -125,6 +125,7 @@ func submitStep(
 		}
 	}
 
+	logging.ForIntegration(*integration).WithField("source", "setup_step_submit").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities, integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
