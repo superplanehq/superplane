@@ -8,10 +8,12 @@ import { useAgentDraftEditor } from "./useAgentDraftEditor";
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }));
 
 vi.mock("./lib/repository-spec-files", () => ({
   fetchCanvasVersionWithSpec: vi.fn(),
+  canvasVersionExists: vi.fn(),
 }));
 
 function makeDraftVersion(versionId: string): CanvasesCanvasVersion {
@@ -54,6 +56,7 @@ function setupHook({
   const queryClient = new QueryClient();
   const activeCanvasVersionIdRef = { current: activeCanvasVersionId };
   const setSuppressUnpublishedDraftDiscard = vi.fn();
+  const onActiveDraftMissing = vi.fn();
   const selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -69,6 +72,7 @@ function setupHook({
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
     setSuppressUnpublishedDraftDiscard,
+    onActiveDraftMissing,
   };
 
   const hook = renderHook((props) => useAgentDraftEditor(props), { initialProps, wrapper });
@@ -79,6 +83,7 @@ function setupHook({
     activateCanvasVersionForEditing,
     selectableVersionsById,
     setSuppressUnpublishedDraftDiscard,
+    onActiveDraftMissing,
     updateProps: (overrides: Partial<typeof initialProps>) => hook.rerender({ ...initialProps, ...overrides }),
   };
 }
