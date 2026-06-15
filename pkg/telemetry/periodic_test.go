@@ -180,6 +180,203 @@ func TestCountPendingExecutions(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountOrganizations(t *testing.T) {
+	database.TruncateTables()
+
+	org := &models.Organization{Name: "Acme"}
+	require.NoError(t, database.Conn().Create(org).Error)
+
+	deletedOrg := &models.Organization{Name: "Deleted Co"}
+	require.NoError(t, database.Conn().Create(deletedOrg).Error)
+	require.NoError(t, database.Conn().Delete(deletedOrg).Error)
+
+	count, err := countOrganizations()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountUsers(t *testing.T) {
+	database.TruncateTables()
+
+	org := &models.Organization{Name: "Acme"}
+	require.NoError(t, database.Conn().Create(org).Error)
+
+	user := &models.User{
+		OrganizationID: org.ID,
+		Name:           "Alice",
+		Type:           models.UserTypeHuman,
+		TokenHash:      "hash",
+	}
+	require.NoError(t, database.Conn().Create(user).Error)
+
+	deletedUser := &models.User{
+		OrganizationID: org.ID,
+		Name:           "Bob",
+		Type:           models.UserTypeHuman,
+		TokenHash:      "hash",
+	}
+	require.NoError(t, database.Conn().Create(deletedUser).Error)
+	require.NoError(t, database.Conn().Delete(deletedUser).Error)
+
+	count, err := countUsers()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountWorkflows(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	require.NoError(t, deletedSteps.workflow.SoftDelete())
+
+	count, err := countWorkflows()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountWorkflowNodes(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+	steps.CreateWorkflowNode()
+
+	deletedNode := &models.CanvasNode{
+		WorkflowID: steps.workflow.ID,
+		NodeID:     "node-2",
+	}
+	require.NoError(t, database.Conn().Create(deletedNode).Error)
+	require.NoError(t, database.Conn().Delete(deletedNode).Error)
+
+	count, err := countWorkflowNodes()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountWorkflowNodes_DeletedWorkflowIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+	steps.CreateWorkflowNode()
+	require.NoError(t, steps.workflow.SoftDelete())
+
+	count, err := countWorkflowNodes()
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count)
+}
+
+func TestCountDrafts(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+
+	branchName := "drafts/" + uuid.New().String()
+	now := time.Now()
+	draft := &models.CanvasVersion{
+		ID:          uuid.New(),
+		WorkflowID:  steps.workflow.ID,
+		State:       models.CanvasVersionStateDraft,
+		BranchName:  &branchName,
+		DisplayName: "Draft #1",
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(draft).Error)
+
+	count, err := countDrafts()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountDrafts_DeletedWorkflowIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+
+	branchName := "drafts/" + uuid.New().String()
+	now := time.Now()
+	draft := &models.CanvasVersion{
+		ID:          uuid.New(),
+		WorkflowID:  steps.workflow.ID,
+		State:       models.CanvasVersionStateDraft,
+		BranchName:  &branchName,
+		DisplayName: "Draft #1",
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(draft).Error)
+	require.NoError(t, steps.workflow.SoftDelete())
+
+	count, err := countDrafts()
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count)
+}
+
+func TestCountIntegrations(t *testing.T) {
+	database.TruncateTables()
+
+	org := &models.Organization{Name: "Acme"}
+	require.NoError(t, database.Conn().Create(org).Error)
+
+	_, err := models.CreateIntegration(uuid.New(), org.ID, "slack", "active", map[string]any{})
+	require.NoError(t, err)
+
+	_, err = models.CreateIntegration(uuid.New(), org.ID, "github", "deleted", map[string]any{})
+	require.NoError(t, err)
+	deletedIntegration, err := models.FindIntegrationByName(org.ID, "deleted")
+	require.NoError(t, err)
+	require.NoError(t, deletedIntegration.SoftDelete())
+
+	count, err := countIntegrations()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountIntegrationSecrets(t *testing.T) {
+	database.TruncateTables()
+
+	org := &models.Organization{Name: "Acme"}
+	require.NoError(t, database.Conn().Create(org).Error)
+
+	integration, err := models.CreateIntegration(uuid.New(), org.ID, "slack", "active", map[string]any{})
+	require.NoError(t, err)
+
+	now := time.Now()
+	secret := &models.IntegrationSecret{
+		OrganizationID: org.ID,
+		InstallationID: integration.ID,
+		Name:           "token",
+		Value:          []byte("secret"),
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	require.NoError(t, database.Conn().Create(secret).Error)
+
+	deletedIntegration, err := models.CreateIntegration(uuid.New(), org.ID, "github", "deleted", map[string]any{})
+	require.NoError(t, err)
+	deletedSecret := &models.IntegrationSecret{
+		OrganizationID: org.ID,
+		InstallationID: deletedIntegration.ID,
+		Name:           "token",
+		Value:          []byte("secret"),
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	require.NoError(t, database.Conn().Create(deletedSecret).Error)
+	require.NoError(t, deletedIntegration.SoftDelete())
+
+	count, err := countIntegrationSecrets()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 func TestCountPendingExecutions_DeletedWorkflowIsNotCounted(t *testing.T) {
 	database.TruncateTables()
 

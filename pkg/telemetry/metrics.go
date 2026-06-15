@@ -51,6 +51,14 @@ var (
 
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
+
+	organizationsTotalGauge      metric.Int64Gauge
+	usersTotalGauge              metric.Int64Gauge
+	workflowsTotalGauge          metric.Int64Gauge
+	workflowNodesTotalGauge      metric.Int64Gauge
+	draftsTotalGauge             metric.Int64Gauge
+	integrationsTotalGauge       metric.Int64Gauge
+	integrationSecretsTotalGauge metric.Int64Gauge
 )
 
 // Operation values for integration secret writes.
@@ -305,6 +313,69 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	organizationsTotalGauge, err = meter.Int64Gauge(
+		"organizations.total",
+		metric.WithDescription("Current number of organizations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	usersTotalGauge, err = meter.Int64Gauge(
+		"users.total",
+		metric.WithDescription("Current number of organization users"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowsTotalGauge, err = meter.Int64Gauge(
+		"workflows.total",
+		metric.WithDescription("Current number of workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowNodesTotalGauge, err = meter.Int64Gauge(
+		"workflow_nodes.total",
+		metric.WithDescription("Current number of workflow nodes on active workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	draftsTotalGauge, err = meter.Int64Gauge(
+		"drafts.total",
+		metric.WithDescription("Current number of workflow draft versions on active workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	integrationsTotalGauge, err = meter.Int64Gauge(
+		"integrations.total",
+		metric.WithDescription("Current number of app integrations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	integrationSecretsTotalGauge, err = meter.Int64Gauge(
+		"integration_secrets.total",
+		metric.WithDescription("Current number of integration secrets on active integrations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	err = registerDBOperationMetricsCallbacks()
 	if err != nil {
 		return err
@@ -519,4 +590,60 @@ func RecordPendingExecutionsCount(ctx context.Context, count int64) {
 	}
 
 	pendingExecutionsGauge.Record(ctx, count)
+}
+
+func RecordOrganizationsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	organizationsTotalGauge.Record(ctx, count)
+}
+
+func RecordUsersTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	usersTotalGauge.Record(ctx, count)
+}
+
+func RecordWorkflowsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowsTotalGauge.Record(ctx, count)
+}
+
+func RecordWorkflowNodesTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowNodesTotalGauge.Record(ctx, count)
+}
+
+func RecordDraftsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	draftsTotalGauge.Record(ctx, count)
+}
+
+func RecordIntegrationsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationsTotalGauge.Record(ctx, count)
+}
+
+func RecordIntegrationSecretsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretsTotalGauge.Record(ctx, count)
 }

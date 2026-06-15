@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 //
@@ -41,6 +42,13 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+	p.reportOrganizationsTotal()
+	p.reportUsersTotal()
+	p.reportWorkflowsTotal()
+	p.reportWorkflowNodesTotal()
+	p.reportDraftsTotal()
+	p.reportIntegrationsTotal()
+	p.reportIntegrationSecretsTotal()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -121,6 +129,69 @@ func (p *Periodic) reportPendingExecutions() {
 	RecordPendingExecutionsCount(p.ctx, count)
 }
 
+func (p *Periodic) reportOrganizationsTotal() {
+	count, err := countOrganizations()
+	if err != nil {
+		return
+	}
+
+	RecordOrganizationsTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportUsersTotal() {
+	count, err := countUsers()
+	if err != nil {
+		return
+	}
+
+	RecordUsersTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowsTotal() {
+	count, err := countWorkflows()
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowsTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportWorkflowNodesTotal() {
+	count, err := countWorkflowNodes()
+	if err != nil {
+		return
+	}
+
+	RecordWorkflowNodesTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportDraftsTotal() {
+	count, err := countDrafts()
+	if err != nil {
+		return
+	}
+
+	RecordDraftsTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportIntegrationsTotal() {
+	count, err := countIntegrations()
+	if err != nil {
+		return
+	}
+
+	RecordIntegrationsTotal(p.ctx, count)
+}
+
+func (p *Periodic) reportIntegrationSecretsTotal() {
+	count, err := countIntegrationSecrets()
+	if err != nil {
+		return
+	}
+
+	RecordIntegrationSecretsTotal(p.ctx, count)
+}
+
 func countStuckQueueNodes() (int64, error) {
 	db := database.Conn()
 
@@ -176,6 +247,99 @@ func countPendingExecutions() (int64, error) {
 		Joins("JOIN workflows AS w ON wne.workflow_id = w.id").
 		Where("wne.state = ?", "pending").
 		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countOrganizations() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Organization{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countUsers() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.User{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflows() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Canvas{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowNodes() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.CanvasNode{}).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflows.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countDrafts() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.CanvasVersion{}).
+		Joins("JOIN workflows ON workflows.id = workflow_versions.workflow_id").
+		Where("workflow_versions.state = ?", models.CanvasVersionStateDraft).
+		Where("workflows.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countIntegrations() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Integration{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countIntegrationSecrets() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.IntegrationSecret{}).
+		Joins("JOIN app_installations ON app_installations.id = app_installation_secrets.installation_id").
+		Where("app_installations.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {
