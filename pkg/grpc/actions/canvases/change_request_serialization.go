@@ -89,7 +89,7 @@ func SerializeCanvasChangeRequest(
 	}
 
 	if version != nil {
-		protoRequest.Version = SerializeCanvasVersion(version, organizationID)
+		protoRequest.Version = SerializeCanvasVersion(version, organizationID, nil)
 	}
 
 	return protoRequest
