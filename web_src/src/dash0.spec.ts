@@ -37,7 +37,7 @@ describe("dash0 init", () => {
           url: "https://ingress.us-west-2.aws.dash0.com:4318",
           authToken: "test-token",
         },
-        ignoreUrls: [/\/ws\//],
+        ignoreUrls: [/\/ws\//, /posthog\.com/],
       }),
     );
   });
@@ -54,6 +54,17 @@ describe("dash0 init", () => {
         serviceName: "superplane-web",
       }),
     );
+  });
+
+  it("ignores PostHog analytics traffic", async () => {
+    (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT =
+      "https://ingress.us-west-2.aws.dash0.com:4318";
+    (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN = "test-token";
+
+    await import("@/dash0");
+
+    const ignoreUrls = init.mock.calls[0]?.[0]?.ignoreUrls as RegExp[];
+    expect(ignoreUrls.some((pattern) => pattern.test("https://us.i.posthog.com/e/"))).toBe(true);
   });
 
   it("does not call init when endpoint is missing", async () => {
