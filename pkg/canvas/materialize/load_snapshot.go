@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/google/uuid"
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
@@ -17,14 +16,12 @@ import (
 )
 
 type RepoSnapshot struct {
-	Name                    string
-	Description             string
-	ChangeManagementEnabled bool
-	ChangeRequestApprovers  []models.CanvasChangeRequestApprover
-	Nodes                   []models.Node
-	Edges                   []models.Edge
-	ConsolePanels           []models.ConsolePanel
-	ConsoleLayout           []models.ConsoleLayoutItem
+	Name          string
+	Description   string
+	Nodes         []models.Node
+	Edges         []models.Edge
+	ConsolePanels []models.ConsolePanel
+	ConsoleLayout []models.ConsoleLayoutItem
 }
 
 func LoadRepoSnapshot(
@@ -57,17 +54,6 @@ func LoadRepoSnapshot(
 		Description: pbCanvas.GetMetadata().GetDescription(),
 		Nodes:       nodes,
 		Edges:       edges,
-	}
-
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		snapshot.ChangeManagementEnabled = changeManagement.GetEnabled()
-		approvers, approversErr := parseChangeRequestApprovers(changeManagement)
-		if approversErr != nil {
-			return nil, fmt.Errorf("parse change management: %w", approversErr)
-		}
-		if approvers != nil {
-			snapshot.ChangeRequestApprovers = approvers
-		}
 	}
 
 	consoleYAML, err := readGitFile(ctx, gitProvider, repoID, ConsoleFileName, sha)
@@ -117,35 +103,4 @@ func snapshotNodesAndEdges(canvas *pb.Canvas) ([]models.Node, []models.Edge, err
 	}
 
 	return actions.ProtoToNodes(canvas.GetSpec().GetNodes()), actions.ProtoToEdges(canvas.GetSpec().GetEdges()), nil
-}
-
-func parseChangeRequestApprovers(config *pb.Canvas_ChangeManagement) ([]models.CanvasChangeRequestApprover, error) {
-	if config == nil || len(config.Approvals) == 0 {
-		return nil, nil
-	}
-
-	approvers := make([]models.CanvasChangeRequestApprover, 0, len(config.Approvals))
-	for index, item := range config.Approvals {
-		if item == nil {
-			return nil, fmt.Errorf("approver %d is required", index+1)
-		}
-
-		approver := models.CanvasChangeRequestApprover{}
-		switch item.Type {
-		case pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE:
-			approver.Type = models.CanvasChangeRequestApproverTypeAnyone
-		case pb.Canvas_ChangeManagement_Approver_TYPE_USER:
-			approver.Type = models.CanvasChangeRequestApproverTypeUser
-			approver.User = strings.TrimSpace(item.UserId)
-		case pb.Canvas_ChangeManagement_Approver_TYPE_ROLE:
-			approver.Type = models.CanvasChangeRequestApproverTypeRole
-			approver.Role = strings.TrimSpace(item.RoleName)
-		default:
-			return nil, fmt.Errorf("approver %d: unsupported approver type", index+1)
-		}
-
-		approvers = append(approvers, approver)
-	}
-
-	return approvers, nil
 }

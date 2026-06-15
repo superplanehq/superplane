@@ -88,22 +88,20 @@ func (m *LiveMaterializer) MaterializeLive(
 
 	now := time.Now()
 	nextVersion := &models.CanvasVersion{
-		WorkflowID:              canvasID,
-		State:                   models.CanvasVersionStatePublished,
-		Name:                    snapshot.Name,
-		Description:             snapshot.Description,
-		ChangeManagementEnabled: snapshot.ChangeManagementEnabled,
-		ChangeRequestApprovers:  datatypes.NewJSONSlice(snapshot.ChangeRequestApprovers),
-		Nodes:                   datatypes.NewJSONSlice(snapshot.Nodes),
-		Edges:                   datatypes.NewJSONSlice(snapshot.Edges),
-		ConsolePanels:           datatypes.NewJSONType(snapshot.ConsolePanels),
-		ConsoleLayout:           datatypes.NewJSONType(snapshot.ConsoleLayout),
-		CommitSHA:               commitSHA,
-		GitBranch:               models.CanvasGitBranchMain,
-		MaterializationStatus:   models.MaterializationStatusReady,
-		PublishedAt:             &now,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		WorkflowID:            canvasID,
+		State:                 models.CanvasVersionStatePublished,
+		Name:                  snapshot.Name,
+		Description:           snapshot.Description,
+		Nodes:                 datatypes.NewJSONSlice(snapshot.Nodes),
+		Edges:                 datatypes.NewJSONSlice(snapshot.Edges),
+		ConsolePanels:         datatypes.NewJSONType(snapshot.ConsolePanels),
+		ConsoleLayout:         datatypes.NewJSONType(snapshot.ConsoleLayout),
+		CommitSHA:             commitSHA,
+		GitBranch:             models.CanvasGitBranchMain,
+		MaterializationStatus: models.MaterializationStatusReady,
+		PublishedAt:           &now,
+		CreatedAt:             &now,
+		UpdatedAt:             &now,
 	}
 
 	if err := models.UpsertMaterializedVersionInTransaction(tx, nextVersion); err != nil {

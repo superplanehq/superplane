@@ -9,21 +9,17 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/canvas/changerequests"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 type SyncLiveFromGitOptions struct {
-	HeadSHA                   string
-	SkipChangeManagementCheck bool
+	HeadSHA string
 }
 
 // SyncLiveFromGit materializes the main branch tip from git into the live DB projection.
@@ -66,19 +62,6 @@ func SyncLiveFromGit(
 		return nil, err
 	}
 
-	if !opts.SkipChangeManagementCheck {
-		changeManagementEnabled, cmErr := isChangeManagementEnabledInTransaction(tx, canvas)
-		if cmErr != nil {
-			return nil, cmErr
-		}
-		if changeManagementEnabled {
-			cmErr := status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
-			persistLiveMaterializationError(canvasID, headSHA, cmErr)
-			publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, cmErr.Error())
-			return nil, cmErr
-		}
-	}
-
 	if version, done, idempotentErr := syncLiveAlreadyMaterialized(tx, canvasID, canvas, headSHA); idempotentErr != nil {
 		return nil, idempotentErr
 	} else if done {
@@ -113,10 +96,6 @@ func SyncLiveFromGit(
 	if matErr != nil {
 		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, matErr.Error())
 		return nil, matErr
-	}
-
-	if refreshErr := changerequests.RefreshOpenCanvasChangeRequestsInTransaction(tx, orgID, canvasID, uuid.Nil); refreshErr != nil {
-		return nil, refreshErr
 	}
 
 	publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusReady, "")
@@ -157,22 +136,6 @@ func syncLiveAlreadyMaterialized(
 	}
 
 	return version, true, nil
-}
-
-func isChangeManagementEnabledInTransaction(tx *gorm.DB, canvas *models.Canvas) (bool, error) {
-	if canvas == nil {
-		return false, nil
-	}
-
-	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabledInTransaction(tx, canvas.OrganizationID)
-	if err != nil {
-		return false, err
-	}
-	if organizationChangeManagementEnabled {
-		return true, nil
-	}
-
-	return canvas.ChangeManagementEnabled, nil
 }
 
 func ensureCanvasNameAvailableInTransaction(

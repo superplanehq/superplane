@@ -36,22 +36,6 @@ func ResolveAppNameOrIDArg(ctx core.CommandContext, arg string) (string, error) 
 	return FindAppID(ctx, ctx.API, trimmed)
 }
 
-// ChangeManagementEnabled reports whether change management is enabled on
-// the app identified by `appID`.
-func ChangeManagementEnabled(ctx core.CommandContext, appID string) (bool, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, appID).Execute()
-	if err != nil {
-		return false, err
-	}
-	if response.Canvas == nil {
-		return false, fmt.Errorf("app %q not found", appID)
-	}
-
-	spec := response.Canvas.GetSpec()
-	cm := spec.GetChangeManagement()
-	return cm.GetEnabled(), nil
-}
-
 func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
 	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
 	if err != nil {

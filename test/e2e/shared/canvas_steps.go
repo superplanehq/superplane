@@ -563,10 +563,7 @@ func ProvisionCanvasGitRepository(t require.TestingT, orgID, canvasID uuid.UUID)
 				Name:        canvas.Name,
 				Description: canvas.Description,
 			},
-			Spec: materialize.CanvasYAMLSpec{
-				ChangeManagementEnabled: canvas.ChangeManagementEnabled,
-				ChangeRequestApprovers:  models.DefaultCanvasChangeRequestApprovers(),
-			},
+			Spec: materialize.CanvasYAMLSpec{},
 		},
 		Author: git.CommitAuthor{Name: "SuperPlane", Email: "bot@superplane.local"},
 	}

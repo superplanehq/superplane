@@ -4,9 +4,7 @@ import { getDraftChangeIndicators, getVersionActionAvailability } from "./versio
 describe("getVersionActionAvailability", () => {
   it("keeps publish enabled while local draft changes are still being saved", () => {
     const result = getVersionActionAvailability({
-      isChangeManagementDisabled: true,
       hasEditableVersion: true,
-      createChangeRequestPending: false,
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
@@ -19,9 +17,7 @@ describe("getVersionActionAvailability", () => {
 
   it("keeps publish enabled after local save activity has settled but draft changes are still pending", () => {
     const result = getVersionActionAvailability({
-      isChangeManagementDisabled: true,
       hasEditableVersion: true,
-      createChangeRequestPending: false,
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
@@ -32,49 +28,38 @@ describe("getVersionActionAvailability", () => {
     expect(result.publishVersionDisabledTooltip).toBeUndefined();
   });
 
-  it("keeps change request creation enabled when draft changes are pending locally", () => {
+  it("disables publish while publish is pending", () => {
     const result = getVersionActionAvailability({
-      isChangeManagementDisabled: false,
       hasEditableVersion: true,
-      createChangeRequestPending: false,
-      publishPending: false,
+      publishPending: true,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
       hasDraftDiffVersusLive: true,
     });
 
-    expect(result.createChangeRequestDisabled).toBe(false);
-    expect(result.createChangeRequestDisabledTooltip).toBeUndefined();
-    expect(result.publishVersionDisabled).toBe(false);
+    expect(result.publishVersionDisabled).toBe(true);
     expect(result.publishVersionDisabledTooltip).toBeUndefined();
   });
 
-  it.each([true, false])(
-    "disables publish/propose when the latest draft matches live (change management %s)",
-    (isChangeManagementDisabled) => {
-      const result = getVersionActionAvailability({
-        isChangeManagementDisabled,
-        hasEditableVersion: true,
-        createChangeRequestPending: false,
-        publishPending: false,
-        canvasDeletedRemotely: false,
-        isPreparingVersionAction: false,
-        hasDraftDiffVersusLive: false,
-      });
+  it("disables publish when the latest draft matches live", () => {
+    const result = getVersionActionAvailability({
+      hasEditableVersion: true,
+      publishPending: false,
+      canvasDeletedRemotely: false,
+      isPreparingVersionAction: false,
+      hasDraftDiffVersusLive: false,
+    });
 
-      expect(result.publishVersionDisabled).toBe(true);
-      expect(result.publishVersionDisabledTooltip).toBeUndefined();
-    },
-  );
+    expect(result.publishVersionDisabled).toBe(true);
+    expect(result.publishVersionDisabledTooltip).toBeUndefined();
+  });
 
   // Regression: committing a repository file (e.g. README.md) to the draft is a
   // publishable change even when the canvas graph and console specs are unchanged.
   // The Publish button must stay enabled.
   it("keeps publish enabled when only repository files differ from live", () => {
     const result = getVersionActionAvailability({
-      isChangeManagementDisabled: true,
       hasEditableVersion: true,
-      createChangeRequestPending: false,
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,

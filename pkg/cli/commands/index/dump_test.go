@@ -231,7 +231,7 @@ func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 	var integration openapi_client.IntegrationsIntegrationDefinition
 	require.IsType(t, integration, dump.Integrations[0])
 
-	var action openapi_client.SuperplaneActionsAction
+	var action openapi_client.ActionsAction
 	require.IsType(t, action, dump.Actions[0])
 
 	var trigger openapi_client.TriggersTrigger

@@ -90,7 +90,6 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 
 - Top-level tenant boundary providing complete data isolation
 - All resources (canvases, integrations, secrets) are scoped to an organization
-- Organization metadata `change_management_enabled` (API field `changeManagementEnabled`) acts as a global override for canvas change management when enabled
 
 **Canvas:**
 
@@ -102,19 +101,7 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Edit paths:
   - **Web UI and agent tools** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** before **Publish**. Agent reads serve the effective staged content and agent `update_draft` writes go through the same staging layer, so agent edits appear as the user's pending staged changes
   - **CLI** commits directly to the draft version row via `CommitCanvasRepositoryFiles`, discarding any pending staging in the same transaction; it never reads or writes `workflow_staged_files`
-- Change management (change requests with approvals) is controlled by: organization metadata `change_management_enabled` OR canvas metadata `change_management_enabled` (API field `changeManagementEnabled`)
-- Effective behavior:
-  - Organization change management enabled: all canvases require change requests
-  - Organization change management disabled: each canvas uses its own `change_management_enabled` value
-- When change management is enabled, users must submit change requests for approval before publishing; when disabled, users can publish committed draft versions directly (uncommitted staging must be committed first)
-- Change request lifecycle:
-  - `STATUS_OPEN`: active change request
-  - `STATUS_REJECTED`: closed without publish
-  - `STATUS_PUBLISHED`: approved and merged into live version
-- Conflicts are represented by metadata flag `is_conflicted` (not by status). A change request can be `STATUS_OPEN` and conflicted at the same time.
-- Conflict detection marks nodes as conflicted only when there is a structural difference between the change request version and live canvas for overlapping changes.
-- Only non-conflicted open change requests can be approved. Conflicted open change requests can be rejected or resolved. Only rejected change requests can be reopened.
-- See [Canvas Change Requests](./canvas-change-requests.md) for CLI workflow details.
+- Users can publish committed draft versions directly. Uncommitted staging must be committed first.
 
 **Integration:**
 

@@ -58,14 +58,6 @@ func PublishCanvasVersion(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
-	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
-	}
-	if changeManagementEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
-	}
-
 	publishedVersion, err := publishDraftVersionInTransaction(
 		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
@@ -173,22 +165,20 @@ func publishDraftVersionInTransaction(
 		// later reuses this row (matched by commit SHA) and promotes it.
 		now := time.Now()
 		publishedVersion = &models.CanvasVersion{
-			WorkflowID:              canvasUUID,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    version.Name,
-			Description:             version.Description,
-			ChangeManagementEnabled: version.ChangeManagementEnabled,
-			ChangeRequestApprovers:  version.ChangeRequestApprovers,
-			Nodes:                   version.Nodes,
-			Edges:                   version.Edges,
-			ConsolePanels:           version.ConsolePanels,
-			ConsoleLayout:           version.ConsoleLayout,
-			CommitSHA:               mergeSHA,
-			GitBranch:               models.CanvasGitBranchMain,
-			MaterializationStatus:   models.MaterializationStatusPending,
-			PublishedAt:             &now,
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			WorkflowID:            canvasUUID,
+			State:                 models.CanvasVersionStatePublished,
+			Name:                  version.Name,
+			Description:           version.Description,
+			Nodes:                 version.Nodes,
+			Edges:                 version.Edges,
+			ConsolePanels:         version.ConsolePanels,
+			ConsoleLayout:         version.ConsoleLayout,
+			CommitSHA:             mergeSHA,
+			GitBranch:             models.CanvasGitBranchMain,
+			MaterializationStatus: models.MaterializationStatusPending,
+			PublishedAt:           &now,
+			CreatedAt:             &now,
+			UpdatedAt:             &now,
 		}
 		if upsertErr := models.UpsertMaterializedVersionInTransaction(tx, publishedVersion); upsertErr != nil {
 			return upsertErr

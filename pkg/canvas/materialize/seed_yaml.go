@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"gopkg.in/yaml.v3"
 )
@@ -29,10 +28,8 @@ type CanvasYAMLMetadata struct {
 }
 
 type CanvasYAMLSpec struct {
-	Nodes                   []models.Node
-	Edges                   []models.Edge
-	ChangeManagementEnabled bool
-	ChangeRequestApprovers  []models.CanvasChangeRequestApprover
+	Nodes []models.Node
+	Edges []models.Edge
 }
 
 type canvasYAMLResource struct {
@@ -43,9 +40,8 @@ type canvasYAMLResource struct {
 }
 
 type canvasYAMLSpec struct {
-	Nodes            []*componentpb.Node         `json:"nodes" yaml:"nodes"`
-	Edges            []*componentpb.Edge         `json:"edges" yaml:"edges"`
-	ChangeManagement *pb.Canvas_ChangeManagement `json:"changeManagement,omitempty" yaml:"changeManagement,omitempty"`
+	Nodes []*componentpb.Node `json:"nodes" yaml:"nodes"`
+	Edges []*componentpb.Edge `json:"edges" yaml:"edges"`
 }
 
 func CanvasYAMLFromVersion(version *models.CanvasVersion) *CanvasYAML {
@@ -61,10 +57,8 @@ func CanvasYAMLFromVersion(version *models.CanvasVersion) *CanvasYAML {
 			Description: version.Description,
 		},
 		Spec: CanvasYAMLSpec{
-			Nodes:                   version.Nodes,
-			Edges:                   version.Edges,
-			ChangeManagementEnabled: version.ChangeManagementEnabled,
-			ChangeRequestApprovers:  version.EffectiveChangeRequestApprovers(),
+			Nodes: version.Nodes,
+			Edges: version.Edges,
 		},
 	}
 }
@@ -92,13 +86,6 @@ func BuildCanvasYAMLFromCanvas(canvas *CanvasYAML) ([]byte, error) {
 			Nodes: actions.NodesToProto(canvas.Spec.Nodes),
 			Edges: actions.EdgesToProto(canvas.Spec.Edges),
 		},
-	}
-
-	if canvas.Spec.ChangeManagementEnabled || len(canvas.Spec.ChangeRequestApprovers) > 0 {
-		resource.Spec.ChangeManagement = serializeChangeManagement(
-			canvas.Spec.ChangeManagementEnabled,
-			canvas.Spec.ChangeRequestApprovers,
-		)
 	}
 
 	jsonBytes, err := json.Marshal(resource)
@@ -174,34 +161,4 @@ func BuildConsoleYAMLFromVersion(version *models.CanvasVersion) ([]byte, error) 
 	}
 
 	return models.CanvasVersionToConsoleYML(version)
-}
-
-func serializeChangeManagement(
-	enabled bool,
-	approvers []models.CanvasChangeRequestApprover,
-) *pb.Canvas_ChangeManagement {
-	if !enabled && len(approvers) == 0 {
-		return nil
-	}
-
-	protoApprovers := make([]*pb.Canvas_ChangeManagement_Approver, 0, len(approvers))
-	for _, approver := range approvers {
-		item := &pb.Canvas_ChangeManagement_Approver{}
-		switch approver.Type {
-		case models.CanvasChangeRequestApproverTypeAnyone:
-			item.Type = pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE
-		case models.CanvasChangeRequestApproverTypeUser:
-			item.Type = pb.Canvas_ChangeManagement_Approver_TYPE_USER
-			item.UserId = approver.User
-		case models.CanvasChangeRequestApproverTypeRole:
-			item.Type = pb.Canvas_ChangeManagement_Approver_TYPE_ROLE
-			item.RoleName = approver.Role
-		}
-		protoApprovers = append(protoApprovers, item)
-	}
-
-	return &pb.Canvas_ChangeManagement{
-		Enabled:   enabled,
-		Approvals: protoApprovers,
-	}
 }

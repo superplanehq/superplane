@@ -1,6 +1,4 @@
 import type {
-  CanvasChangeManagement,
-  CanvasesCanvasChangeRequest,
   CanvasesCanvasVersion,
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
@@ -42,16 +40,7 @@ export interface CanvasVersionsSidebarPanelConfig {
   liveCanvasVersionId?: string;
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  pendingApprovalVersions?: Array<{
-    version: CanvasesCanvasVersion;
-    changeRequest: CanvasesCanvasChangeRequest;
-  }>;
-  rejectedVersions?: Array<{
-    version: CanvasesCanvasVersion;
-    changeRequest: CanvasesCanvasChangeRequest;
-  }>;
   liveVersions: CanvasesCanvasVersion[];
-  liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
@@ -59,7 +48,6 @@ export interface CanvasVersionsSidebarPanelConfig {
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
-  changeRequestApprovalConfig?: CanvasChangeManagement;
   draftBranches?: CanvasesCanvasVersion[];
   activeDraftBranch?: string | null;
   draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;

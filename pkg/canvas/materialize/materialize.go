@@ -58,8 +58,7 @@ func (m *Materializer) MaterializeFromGit(
 	switch mode {
 	case ModeLive:
 		return SyncLiveFromGit(ctx, tx, m.GitProvider, m.Registry, m.Encryptor, m.AuthService, m.WebhookBaseURL, orgID, canvasID, SyncLiveFromGitOptions{
-			HeadSHA:                   commitSHA,
-			SkipChangeManagementCheck: true,
+			HeadSHA: commitSHA,
 		})
 	default:
 		draft := &DraftMaterializer{

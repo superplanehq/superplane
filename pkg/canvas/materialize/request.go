@@ -126,7 +126,7 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 				// has already passed change-management gating at the write path
 				// (publish/change-request handlers), so the materializer always
 				// projects what main points at.
-				SyncLiveFromGitOptions{HeadSHA: headSHA, SkipChangeManagementCheck: true},
+				SyncLiveFromGitOptions{HeadSHA: headSHA},
 			)
 			return syncErr
 		})

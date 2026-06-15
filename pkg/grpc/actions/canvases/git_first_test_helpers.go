@@ -109,19 +109,6 @@ func createGitCanvas(
 	return createCanvasResponse.Canvas.Metadata.Id
 }
 
-func createCanvasWithChangeManagement(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasName string) string {
-	t.Helper()
-	require.NoError(
-		t,
-		database.Conn().
-			Model(&models.Organization{}).
-			Where("id = ?", r.Organization.ID).
-			Update("change_management_enabled", true).
-			Error,
-	)
-	return createCanvasWithNoopNode(ctx, t, r, canvasName)
-}
-
 func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRegistry, canvasID string, nodeName string) string {
 	t.Helper()
 

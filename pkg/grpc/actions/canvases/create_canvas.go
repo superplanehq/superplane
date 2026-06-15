@@ -72,29 +72,6 @@ func CreateCanvas(
 	}
 
 	createdBy := uuid.MustParse(userID)
-	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
-	}
-
-	changeManagementEnabled := organizationChangeManagementEnabled
-	changeRequestApprovers := models.DefaultCanvasChangeRequestApprovers()
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		changeManagementEnabled = changeManagement.Enabled
-
-		approvers, approversErr := parseAndValidateCanvasChangeRequestApprovers(
-			authService,
-			organizationID.String(),
-			changeManagement,
-		)
-		if approversErr != nil {
-			return nil, approversErr
-		}
-		if approvers != nil {
-			changeRequestApprovers = approvers
-		}
-	}
-
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
@@ -161,10 +138,8 @@ func CreateCanvas(
 				Description: pbCanvas.Metadata.Description,
 			},
 			Spec: materialize.CanvasYAMLSpec{
-				Nodes:                   nodes,
-				Edges:                   edges,
-				ChangeManagementEnabled: changeManagementEnabled,
-				ChangeRequestApprovers:  changeRequestApprovers,
+				Nodes: nodes,
+				Edges: edges,
 			},
 		},
 		Author: git.CommitAuthor{
@@ -189,21 +164,19 @@ func CreateCanvas(
 		// It must stay empty for the worker, so the optimistic response below is
 		// built from the parsed spec rather than from this row.
 		placeholderVersion := models.CanvasVersion{
-			ID:                      liveVersionID,
-			WorkflowID:              canvasID,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    name,
-			Description:             pbCanvas.Metadata.Description,
-			ChangeManagementEnabled: changeManagementEnabled,
-			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
-			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
-			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
-			CommitSHA:               commitSHA,
-			GitBranch:               models.CanvasGitBranchMain,
-			MaterializationStatus:   models.MaterializationStatusPending,
-			PublishedAt:             &now,
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			ID:                    liveVersionID,
+			WorkflowID:            canvasID,
+			State:                 models.CanvasVersionStatePublished,
+			Name:                  name,
+			Description:           pbCanvas.Metadata.Description,
+			Nodes:                 datatypes.NewJSONSlice([]models.Node{}),
+			Edges:                 datatypes.NewJSONSlice([]models.Edge{}),
+			CommitSHA:             commitSHA,
+			GitBranch:             models.CanvasGitBranchMain,
+			MaterializationStatus: models.MaterializationStatusPending,
+			PublishedAt:           &now,
+			CreatedAt:             &now,
+			UpdatedAt:             &now,
 		}
 		if versionErr := tx.Create(&placeholderVersion).Error; versionErr != nil {
 			return versionErr
@@ -231,8 +204,6 @@ func CreateCanvas(
 		return nil, status.Errorf(codes.Internal, "failed to request canvas materialization: %v", err)
 	}
 
-	canvas.ChangeManagementEnabled = changeManagementEnabled
-	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
 	canvas.Description = pbCanvas.Metadata.Description
 
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
@@ -273,9 +244,8 @@ func CreateCanvas(
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes:            actions.NodesToProto(nodes),
-				Edges:            actions.EdgesToProto(edges),
-				ChangeManagement: serializeChangeManagement(changeManagementEnabled, changeRequestApprovers),
+				Nodes: actions.NodesToProto(nodes),
+				Edges: actions.EdgesToProto(edges),
 			},
 		},
 	}, nil
