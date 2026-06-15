@@ -4,11 +4,41 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func commitCanvasYAMLForTest(
+	ctx context.Context,
+	t *testing.T,
+	r *support.ResourceRegistry,
+	canvasID string,
+	draftVersionID string,
+	yamlText string,
+) {
+	t.Helper()
+
+	version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+	require.NoError(t, err)
+
+	_, err = commitCanvasRepositoryFilesForTest(
+		ctx,
+		r,
+		r.Organization.ID.String(),
+		canvasID,
+		draftVersionID,
+		version.CommitSHA,
+		"Update canvas.yaml",
+		[]*pb.CanvasRepositoryFileOperation{
+			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
+		},
+	)
+	require.NoError(t, err)
+}
 
 func TestCommitCanvasYAMLWithFilterExpressionDollar(t *testing.T) {
 	r := support.Setup(t)
@@ -36,24 +66,7 @@ spec:
       targetId: f
 `
 
-	err := ApplyRepositorySpecFileOperations(
-		ctx,
-		r.GitProvider,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersionID,
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 
 	exported, err := ReadRepositorySpecFile(ctx, r.Organization.ID.String(), canvas.ID.String(), draftVersionID, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
@@ -99,43 +112,8 @@ spec:
 `
 	}
 
-	err := ApplyRepositorySpecFileOperations(
-		ctx,
-		r.GitProvider,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersionID,
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("true"))},
-		},
-	)
-	require.NoError(t, err)
-
-	err = ApplyRepositorySpecFileOperations(
-		ctx,
-		r.GitProvider,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersionID,
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("$"))},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, baseYAML("true"))
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, baseYAML("$"))
 }
 
 func TestCommitCanvasYAMLWithoutEdgeChannel(t *testing.T) {
@@ -164,24 +142,7 @@ spec:
       targetId: filter-filter-xyz
 `
 
-	err := ApplyRepositorySpecFileOperations(
-		ctx,
-		r.GitProvider,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersionID,
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 }
 
 func TestCommitCanvasYAMLWithMetadataID(t *testing.T) {
@@ -218,22 +179,5 @@ spec:
       channel: default
 `
 
-	err := ApplyRepositorySpecFileOperations(
-		ctx,
-		r.GitProvider,
-		nil,
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		draftVersionID,
-		"",
-		r.AuthService,
-		nil,
-		false,
-		[]*pb.CanvasRepositoryFileOperation{
-			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
-		},
-	)
-	require.NoError(t, err)
+	commitCanvasYAMLForTest(ctx, t, r, canvas.ID.String(), draftVersionID, yamlText)
 }
