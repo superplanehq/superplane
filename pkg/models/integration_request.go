@@ -14,8 +14,9 @@ const (
 	IntegrationRequestTypeSync         = "sync"
 	IntegrationRequestTypeInvokeAction = "invoke-action"
 
-	IntegrationRequestStatePending   = "pending"
-	IntegrationRequestStateCompleted = "completed"
+	IntegrationRequestStatePending    = "pending"
+	IntegrationRequestStateProcessing = "processing"
+	IntegrationRequestStateCompleted  = "completed"
 )
 
 type IntegrationRequest struct {
@@ -42,19 +43,53 @@ type IntegrationInvokeAction struct {
 	Parameters any    `json:"parameters"`
 }
 
-func LockIntegrationRequest(tx *gorm.DB, id uuid.UUID) (*IntegrationRequest, error) {
+// ClaimIntegrationRequest atomically claims a pending request for processing.
+// It locks the row with SKIP LOCKED, gated on the pending state, and flips it to
+// processing so the poll loop (which only lists pending requests) will not pick
+// it up again while the external work runs outside this transaction.
+func ClaimIntegrationRequest(tx *gorm.DB, id uuid.UUID) (*IntegrationRequest, error) {
 	var request IntegrationRequest
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
+		Where("state = ?", IntegrationRequestStatePending).
 		First(&request).
 		Error
 	if err != nil {
 		return nil, err
 	}
 
+	now := time.Now()
+	err = tx.Model(&request).
+		Update("state", IntegrationRequestStateProcessing).
+		Update("updated_at", now).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	request.State = IntegrationRequestStateProcessing
+	request.UpdatedAt = now
 	return &request, nil
+}
+
+// ResetStuckProcessingIntegrationRequests returns requests stuck in the
+// processing state (e.g. after a crash) back to pending so they get retried.
+// The age cutoff avoids resetting requests still in flight on another replica
+// during a rolling deploy.
+func ResetStuckProcessingIntegrationRequests(olderThan time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-olderThan)
+	result := database.Conn().
+		Model(&IntegrationRequest{}).
+		Where("state = ?", IntegrationRequestStateProcessing).
+		Where("updated_at < ?", cutoff).
+		Updates(map[string]any{
+			"state":      IntegrationRequestStatePending,
+			"updated_at": time.Now(),
+		})
+
+	return result.RowsAffected, result.Error
 }
 
 func ListIntegrationRequests() ([]IntegrationRequest, error) {
