@@ -287,7 +287,7 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:                 "commandFile",
 			Label:                "Command file",
 			Type:                 configuration.FieldTypeRepositoryFile,
-			Description:          "Path to a file in the app's repository whose contents are run as the SSH command (e.g. scripts/deploy.sh). The file is run verbatim through bash -lc on the remote host, so multi-line scripts, shebangs, comments, and bash features (pipefail, declare -A, process substitution) all work. {{ ... }} syntax inside the script (Docker inspect, Helm, Go templates) is preserved. Use Environment variables below to inject values from upstream nodes.",
+			Description:          "Path to a file in the app's repository whose contents are run as the SSH command (e.g. scripts/deploy.sh). The file is piped to bash on the remote host (bash -s), so the whole script is always interpreted by bash regardless of any #! shebang line — write bash, not another language. Multi-line scripts, comments, and bash features (pipefail, declare -A, process substitution) all work. {{ ... }} syntax inside the script (Docker inspect, Helm, Go templates) is preserved. Use Environment variables below to inject values from upstream nodes.",
 			Required:             false,
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
 			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
@@ -864,8 +864,10 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 // File mode pipes the (already-loaded) script body to `bash -s` over stdin.
 // This avoids embedding the whole script in the command line — argv has size
 // limits and nested quoting is fragile — while preserving multi-line
-// constructs, shebangs, comments, and bash-only features (pipefail,
-// declare -A, here-docs, process substitution) exactly as written.
+// constructs, comments, and bash-only features (pipefail, declare -A,
+// here-docs, process substitution) exactly as written. The stream is always
+// interpreted by bash, so any leading `#!` line is just a comment: non-bash
+// shebangs are not honored.
 func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
 	if metadata.CommandSource == CommandSourceFile {
 		if scriptBody == "" {
