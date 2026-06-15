@@ -30,8 +30,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Cloud SQL • Create Database" href="#cloud-sql-•-create-database" description="Create a logical database inside a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Create Instance" href="#cloud-sql-•-create-instance" description="Provision a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Delete Database" href="#cloud-sql-•-delete-database" description="Delete a logical database from a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Delete Instance" href="#cloud-sql-•-delete-instance" description="Delete a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Get Database" href="#cloud-sql-•-get-database" description="Fetch a logical database from a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Get Instance" href="#cloud-sql-•-get-instance" description="Fetch a Cloud SQL instance's configuration and status" />
   <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
@@ -79,7 +82,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
@@ -861,6 +864,70 @@ Emits a `gcp.cloudsql.database` payload with the created database's `name`, `ins
 }
 ```
 
+<a id="cloud-sql-•-create-instance"></a>
+
+## Cloud SQL • Create Instance
+
+**Component key:** `gcp.cloudsql.createInstance`
+
+The Create Instance component provisions a new Cloud SQL instance.
+
+### Use Cases
+
+- **Environment setup**: Stand up a database server as part of provisioning an environment
+- **Ephemeral environments**: Create a dedicated instance for a preview or test run
+- **Infrastructure automation**: Provision databases as part of a broader workflow
+
+### Configuration
+
+- **Name**: The instance ID (required)
+- **Database Version**: The database engine and version (required)
+- **Region**: The region to create the instance in, chosen from the regions where Cloud SQL is available
+- **Tier**: The machine tier (size), chosen from the predefined tiers available in the selected region. Custom machine types (`db-custom-*`) are not listed.
+- **Disk Size (GB)**: The data disk size (minimum 10)
+- **Disk Type**: SSD (default) or HDD
+- **Edition**: Enterprise or Enterprise Plus
+- **Availability**: Zonal (single zone, default) or Regional (adds a standby in another zone for high availability)
+- **Root Password**: Initial password for the default admin user (optional, stored as a secret)
+- **Assign Public IP**: Whether to give the instance a public IPv4 address (default yes)
+- **SSL Mode**: How the instance enforces SSL/TLS on incoming connections (optional)
+- **Authorized Networks**: CIDR ranges allowed to connect over the public IP (optional)
+- **Automated Backups**: Enable daily automated backups (optional)
+- **Deletion Protection**: Prevent the instance from being deleted until protection is removed (optional)
+- **Labels**: Key-value labels applied to the instance (optional)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the ready instance's `name`, `state`, `databaseVersion`, `region`, `tier`, `connectionName`, `ipAddress`, and `selfLink`.
+
+### Important Notes
+
+- **Instance creation is asynchronous and takes several minutes.** This component polls the instance until it reaches `RUNNABLE` (or times out) before emitting, so downstream steps run only once the instance is ready.
+- A public IP with no **Authorized Networks** is reachable only through the Cloud SQL Auth Proxy or private access; add CIDR ranges to allow direct external clients.
+- With **Deletion Protection** enabled, the Delete Instance component will fail until protection is removed.
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connectionName": "my-project:us-central1:my-instance",
+    "databaseVersion": "POSTGRES_16",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "ipAddress": "34.41.10.20",
+    "name": "my-instance",
+    "region": "us-central1",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance",
+    "state": "RUNNABLE",
+    "tier": "db-f1-micro"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}
+```
+
 <a id="cloud-sql-•-delete-database"></a>
 
 ## Cloud SQL • Delete Database
@@ -901,6 +968,46 @@ Emits a `gcp.cloudsql.database` payload with the deleted database's `name` and `
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-delete-instance"></a>
+
+## Cloud SQL • Delete Instance
+
+**Component key:** `gcp.cloudsql.deleteInstance`
+
+The Delete Instance component permanently deletes a Cloud SQL instance.
+
+### Use Cases
+
+- **Teardown**: Remove an instance when decommissioning an environment
+- **Ephemeral cleanup**: Delete a preview/test instance when it is no longer needed
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance to delete (required)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the instance `name` and `deleted: true`.
+
+### Important Notes
+
+- **This permanently deletes the instance and all its databases and data — it is irreversible.**
+- Instance deletion is asynchronous and takes several minutes; this component polls until the instance is fully deleted (or times out) before emitting.
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "my-instance"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
 }
 ```
 
@@ -945,6 +1052,53 @@ Emits a `gcp.cloudsql.database` payload with the database's `name`, `instance`, 
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-get-instance"></a>
+
+## Cloud SQL • Get Instance
+
+**Component key:** `gcp.cloudsql.getInstance`
+
+The Get Instance component retrieves a Cloud SQL instance's configuration and current status.
+
+### Use Cases
+
+- **Readiness polling**: After Create Instance, poll until the instance reaches `RUNNABLE`
+- **Enrichment**: Read the connection name or IP address to feed a downstream step
+- **Auditing**: Capture instance details as part of a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance to fetch (required)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the instance `name`, `state`, `databaseVersion`, `region`, `tier`, `connectionName`, `ipAddress`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.viewer` (or `roles/cloudsql.admin`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connectionName": "my-project:us-central1:my-instance",
+    "databaseVersion": "POSTGRES_16",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "ipAddress": "34.41.10.20",
+    "name": "my-instance",
+    "region": "us-central1",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance",
+    "state": "RUNNABLE",
+    "tier": "db-f1-micro"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
 }
 ```
 

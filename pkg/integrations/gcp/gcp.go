@@ -114,7 +114,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -206,6 +206,9 @@ func (g *GCP) Actions() []core.Action {
 		&cloudsql.CreateDatabase{},
 		&cloudsql.GetDatabase{},
 		&cloudsql.DeleteDatabase{},
+		&cloudsql.CreateInstance{},
+		&cloudsql.GetInstance{},
+		&cloudsql.DeleteInstance{},
 		&gcpprometheus.Query{},
 		&gcpprometheus.QueryRange{},
 	}
@@ -1012,6 +1015,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudsql.ListInstanceResources(reqCtx, client)
 	case cloudsql.ResourceTypeDatabase:
 		return cloudsql.ListDatabaseResources(reqCtx, client, p["instance"])
+	case cloudsql.ResourceTypeRegion:
+		return cloudsql.ListRegionResources(reqCtx, client)
+	case cloudsql.ResourceTypeTier:
+		return cloudsql.ListTierResources(reqCtx, client, p["region"])
 	default:
 		return nil, nil
 	}
