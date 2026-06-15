@@ -105,7 +105,6 @@ import {
   isPublishedVersion,
   sortDraftVersionsDesc,
   sortPublishedVersionsDesc,
-  versionSortValue,
 } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
