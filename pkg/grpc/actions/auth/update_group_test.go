@@ -30,7 +30,7 @@ func TestUpdateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
 
-		role, err := r.AuthService.GetGroupRole(orgID, models.DomainTypeOrganization, "test-group")
+		role, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgAdmin, role)
 	})
@@ -88,7 +88,7 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err := r.AuthService.GetGroupUsers(orgID, models.DomainTypeOrganization, "membership-group")
+		users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "membership-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID1)
 		assert.Contains(t, users, userID2)

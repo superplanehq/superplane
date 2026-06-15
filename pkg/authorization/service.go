@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -80,8 +81,8 @@ func NewAuthService() (*AuthService, error) {
 	return service, nil
 }
 
-func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, orgID, models.DomainTypeOrganization, resource, action)
+func (a *AuthService) CheckOrganizationPermission(ctx context.Context, userID, orgID, resource, action string) (bool, error) {
+	return a.checkPermission(ctx, userID, orgID, models.DomainTypeOrganization, resource, action)
 }
 
 func (a *AuthService) IsValidPermission(domainType string, permission *Permission) bool {
@@ -124,8 +125,8 @@ func policyFiltersForDomain(domainType, domainID string) []gormadapter.Filter {
 	}
 }
 
-func (a *AuthService) newReadEnforcer(filters []gormadapter.Filter) (casbin.IEnforcer, error) {
-	adapter, err := gormadapter.NewAdapterByDB(database.Conn())
+func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter.Filter) (casbin.IEnforcer, error) {
+	adapter, err := gormadapter.NewAdapterByDB(database.DB(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
@@ -149,8 +150,8 @@ func (a *AuthService) newReadEnforcer(filters []gormadapter.Filter) (casbin.IEnf
 	return enforcer, nil
 }
 
-func (a *AuthService) withReadEnforcer(domainType, domainID string, fn func(casbin.IEnforcer) error) error {
-	enforcer, err := a.newReadEnforcer(policyFiltersForDomain(domainType, domainID))
+func (a *AuthService) withReadEnforcer(ctx context.Context, domainType, domainID string, fn func(casbin.IEnforcer) error) error {
+	enforcer, err := a.newReadEnforcer(ctx, policyFiltersForDomain(domainType, domainID))
 	if err != nil {
 		return err
 	}
@@ -158,11 +159,11 @@ func (a *AuthService) withReadEnforcer(domainType, domainID string, fn func(casb
 	return fn(enforcer)
 }
 
-func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
+func (a *AuthService) checkPermission(ctx context.Context, userID, domainID, domainType, resource, action string) (bool, error) {
 	domain := prefixDomain(domainType, domainID)
 	filters := policyFiltersForDomain(domainType, domainID)
 
-	enforcer, err := a.newReadEnforcer(filters)
+	enforcer, err := a.newReadEnforcer(ctx, filters)
 	if err != nil {
 		return false, err
 	}
@@ -254,7 +255,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 
 	prefixedGroupName := prefixGroupName(groupName)
 
-	currentRole, err := a.GetGroupRole(domainID, domainType, groupName)
+	currentRole, err := a.GetGroupRole(context.Background(), domainID, domainType, groupName)
 	if err != nil {
 		return fmt.Errorf("failed to get current group role: %w", err)
 	}
@@ -353,12 +354,12 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 	return nil
 }
 
-func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
+func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedGroupName := prefixGroupName(group)
 
 	var users []string
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		exists, err := a.groupExistsWithEnforcer(enforcer, group, domain)
 		if err != nil {
 			return fmt.Errorf("failed to check group existence: %w", err)
@@ -406,12 +407,12 @@ func (a *AuthService) groupExistsWithEnforcer(enforcer casbin.IEnforcer, group, 
 	return false, nil
 }
 
-func (a *AuthService) GetUserGroups(domainID string, domainType string, userID string) ([]string, error) {
+func (a *AuthService) GetUserGroups(ctx context.Context, domainID string, domainType string, userID string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedUserID := prefixUserID(userID)
 
 	var userGroups []string
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		groups, err := enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
 		if err != nil {
 			return fmt.Errorf("failed to get user groups: %w", err)
@@ -432,11 +433,11 @@ func (a *AuthService) GetUserGroups(domainID string, domainType string, userID s
 	return userGroups, nil
 }
 
-func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
+func (a *AuthService) GetGroups(ctx context.Context, domainID string, domainType string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 
 	var groups []string
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		policies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
 		if err != nil {
 			return fmt.Errorf("failed to get groups: %w", err)
@@ -464,12 +465,12 @@ func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, e
 	return groups, nil
 }
 
-func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
+func (a *AuthService) GetGroupRole(ctx context.Context, domainID string, domainType string, group string) (string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedGroupName := prefixGroupName(group)
 
 	var role string
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		roles := enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
 		unprefixedRoles := []string{}
 		for _, r := range roles {
@@ -563,12 +564,12 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	return nil
 }
 
-func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
+func (a *AuthService) GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error) {
 	prefixedRole := prefixRoleName(role)
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
 
 	var unprefixedUsers []string
-	err := a.withReadEnforcer(models.DomainTypeOrganization, orgID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, models.DomainTypeOrganization, orgID, func(enforcer casbin.IEnforcer) error {
 		users, err := enforcer.GetUsersForRole(prefixedRole, orgDomain)
 		if err != nil {
 			return err
@@ -662,11 +663,11 @@ func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 	return nil
 }
 
-func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
+func (a *AuthService) GetUserRolesForOrg(ctx context.Context, userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
 	filters := policyFiltersForDomain(models.DomainTypeOrganization, orgID)
 
-	enforcer, err := a.newReadEnforcer(filters)
+	enforcer, err := a.newReadEnforcer(ctx, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -696,9 +697,9 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 	return roles, nil
 }
 
-func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
+func (a *AuthService) GetRoleDefinition(ctx context.Context, roleName string, domainType string, domainID string) (*RoleDefinition, error) {
 	var roleDefinition *RoleDefinition
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		var err error
 		roleDefinition, err = a.getRoleDefinition(enforcer, roleName, domainType, domainID)
 		return err
@@ -753,11 +754,11 @@ func (a *AuthService) getRoleDefinition(enforcer casbin.IEnforcer, roleName stri
 	return roleDefinition, nil
 }
 
-func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
+func (a *AuthService) GetAllRoleDefinitions(ctx context.Context, domainType string, domainID string) ([]*RoleDefinition, error) {
 	domain := prefixDomain(domainType, domainID)
 
 	var roleDefinitions []*RoleDefinition
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		roles, err := a.getRolesFromPoliciesWithEnforcer(enforcer, domain)
 		if err != nil {
 			return fmt.Errorf("failed to get roles for domain %s: %w", domain, err)
@@ -780,7 +781,7 @@ func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) 
 	return roleDefinitions, nil
 }
 
-func (a *AuthService) GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error) {
+func (a *AuthService) GetRolePermissions(ctx context.Context, roleName string, domainType string, domainID string) ([]*Permission, error) {
 	if err := models.ValidateDomainType(domainType); err != nil {
 		return nil, err
 	}
@@ -789,7 +790,7 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 	prefixedRoleName := prefixRoleName(roleName)
 
 	var permissions []*Permission
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		if !a.IsDefaultRole(roleName, domainType) {
 			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
@@ -808,7 +809,7 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 	return permissions, nil
 }
 
-func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
+func (a *AuthService) GetRoleHierarchy(ctx context.Context, roleName string, domainType string, domainID string) ([]string, error) {
 	if err := models.ValidateDomainType(domainType); err != nil {
 		return nil, err
 	}
@@ -817,7 +818,7 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 	prefixedRoleName := prefixRoleName(roleName)
 
 	var hierarchy []string
-	err := a.withReadEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		if !a.IsDefaultRole(roleName, domainType) {
 			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)

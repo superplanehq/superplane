@@ -457,7 +457,7 @@ func resolveActingApprover(
 	actorUserID uuid.UUID,
 	allowAlreadyApproved bool,
 ) (int, models.CanvasChangeRequestApprover, error) {
-	roles, err := authService.GetUserRolesForOrg(actorUserID.String(), organizationID)
+	roles, err := authService.GetUserRolesForOrg(context.Background(), actorUserID.String(), organizationID)
 	if err != nil {
 		return -1, models.CanvasChangeRequestApprover{}, status.Errorf(codes.Internal, "failed to resolve user roles: %v", err)
 	}

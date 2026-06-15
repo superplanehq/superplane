@@ -223,7 +223,7 @@ func TestReadRuntimeAction_RejectsUnknownResource(t *testing.T) {
 
 type allowingPermissionChecker struct{}
 
-func (allowingPermissionChecker) CheckOrganizationPermission(_, _, _, _ string) (bool, error) {
+func (allowingPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, _, _ string) (bool, error) {
 	return true, nil
 }
 

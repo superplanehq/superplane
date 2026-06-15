@@ -35,7 +35,7 @@ func Test_CreateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if group was created
-		groups, err := r.AuthService.GetGroups(orgID, models.DomainTypeOrganization)
+		groups, err := r.AuthService.GetGroups(context.Background(), orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)

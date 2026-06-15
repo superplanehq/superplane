@@ -11,7 +11,7 @@ import (
 )
 
 func ListRoles(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListRolesResponse, error) {
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+	roleDefinitions, err := authService.GetAllRoleDefinitions(ctx, domainType, domainID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to retrieve role definitions")
 	}
