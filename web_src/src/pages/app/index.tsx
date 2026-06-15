@@ -59,6 +59,7 @@ import { useCanvasDraftBranchActions } from "./useCanvasDraftBranchActions";
 import { useCanvasDraftBranchQueries, useResolvedActiveDraftBranch } from "./useCanvasDraftBranchData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
 import { appPath } from "@/lib/appPaths";
@@ -4406,6 +4407,10 @@ export function AppPage() {
     !!activeCanvasVersionId &&
     !draftSpecToRender &&
     (loadedCanvasVersionLoading || loadedCanvasVersionFetching || !loadedCanvasVersion?.spec);
+
+  useReportPageReady(!isInitialCanvasBootstrapLoading && !!canvas, {
+    failed: !canvas && !canvasLoading && !isDraftCanvasLoading,
+  });
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
