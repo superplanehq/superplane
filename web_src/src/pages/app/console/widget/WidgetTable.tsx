@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { applyTableWhere } from "./evalTableWhere";
@@ -55,6 +54,9 @@ const ACTION_ICONS = {
   "external-link": ExternalLink,
 } as const;
 
+/** Distance from the bottom (px) at which scrolling auto-requests more rows. */
+const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
+
 export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
@@ -81,16 +83,28 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
     return Array.from(ids);
   }, [render.rowActions, ctx]);
 
-  const handleScrollLoadMore = useAutoLoadMoreOnScroll({
-    hasMore,
-    isLoading: isFetchingMore,
-    onLoadMore,
-  });
+  // Auto-load more rows as the user scrolls near the bottom. The table's
+  // `loadMore()` is dual-mode: it usually just widens the display window over
+  // rows already in the infinite-query cache (no network fetch), and only
+  // sometimes triggers an actual page fetch. So we can't rely on a fetching
+  // flag flipping to re-arm the guard (it would stay armed forever after a
+  // cache-only reveal). Instead we re-arm whenever the rendered row set grows
+  // or a fetch settles, which covers both modes.
+  const loadMoreRequestedRef = useRef(false);
+  useEffect(() => {
+    loadMoreRequestedRef.current = false;
+  }, [rows.length, isFetchingMore]);
+
   const onScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
-      handleScrollLoadMore(event.currentTarget);
+      const el = event.currentTarget;
+      if (!hasMore || !onLoadMore || isFetchingMore || loadMoreRequestedRef.current) return;
+      const remainingScroll = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remainingScroll > AUTO_LOAD_SCROLL_THRESHOLD_PX) return;
+      loadMoreRequestedRef.current = true;
+      onLoadMore();
     },
-    [handleScrollLoadMore],
+    [hasMore, onLoadMore, isFetchingMore],
   );
 
   if (isLoading) return <WidgetSpinner />;
@@ -110,9 +124,17 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
     );
   }
   if (filtered.length === 0) {
+    // The current pages produced no matching rows, but later server pages
+    // might — so keep the "Load more" affordance available instead of
+    // dead-ending on the empty message.
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
-        {render.emptyMessage ?? "No data to display."}
+      <div data-testid="widget-table-empty-wrap">
+        <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
+          {render.emptyMessage ?? "No data to display."}
+        </div>
+        {hasMore && onLoadMore ? (
+          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
       </div>
     );
   }

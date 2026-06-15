@@ -184,11 +184,18 @@ export function renderNeedsRunNodeOutputs(render: WidgetRender | undefined): boo
  * resets it on a meaningful "widget identity" change (data source kind or
  * `progressive` toggle), and exposes a `loadMore()` that bumps the count
  * up to the configured limit. Limit edits intentionally do not reset the
- * window — the slice clamps via `computeDisplaySlice` and we'd rather not
- * yank the user back to the first page just because they bumped the limit
- * input.
+ * progressive window — the slice clamps via `computeDisplaySlice` and we'd
+ * rather not yank the user back to the first page just because they bumped
+ * the limit input.
+ *
+ * Non-progressive callers (chart, number) have no "Load more" UX, so they
+ * always render against the full `effectiveLimit`. We deliberately bypass
+ * the `displayCount` state for them: the state only resets on an identity
+ * change, so reusing it would clamp the slice to a stale (smaller) value
+ * when the author raises the limit live — making the panel silently ignore
+ * the increase until it remounts.
  */
-function useDisplayWindow({
+export function useDisplayWindow({
   dataSourceKind,
   progressive,
   effectiveLimit,
@@ -216,6 +223,10 @@ function useDisplayWindow({
       return Number.isFinite(effectiveLimit) ? Math.min(next, effectiveLimit) : next;
     });
   }, [progressive, effectiveLimit]);
+
+  if (!progressive) {
+    return { displayCount: effectiveLimit, displaySlice: effectiveLimit, loadMore };
+  }
 
   return {
     displayCount,
@@ -262,16 +273,28 @@ function useExecutionsDataSourceResult({
   const pages = useMemo(() => query.data?.pages ?? [], [query.data]);
   const pageCount = pages.length;
 
+  const targetNodeId = useMemo(() => {
+    if (dataSource.kind !== "executions" || !dataSource.node) return undefined;
+    return resolveConsoleNode(ctx, dataSource.node)?.node.id;
+  }, [dataSource, ctx]);
+
+  // Count only the executions that survive the node filter so the eager
+  // fill target and the "Load more" affordance track the *visible* rows.
+  // Counting every loaded execution would otherwise show a "Load more"
+  // button that reveals nothing for a node with sparse executions.
   const loadedRowCount = useMemo(() => {
     if (!enabled) return 0;
     let count = 0;
     for (const page of pages) {
       for (const event of page?.events ?? []) {
-        count += event.executions?.length ?? 0;
+        for (const exec of event.executions ?? []) {
+          if (targetNodeId && exec.nodeId !== targetNodeId) continue;
+          count++;
+        }
       }
     }
     return count;
-  }, [enabled, pages]);
+  }, [enabled, pages, targetNodeId]);
 
   useEagerInfinitePagination({
     enabled,
@@ -286,11 +309,9 @@ function useExecutionsDataSourceResult({
 
   const rows = useMemo(() => {
     if (dataSource.kind !== "executions") return [];
-    const targetNode = dataSource.node ? resolveConsoleNode(ctx, dataSource.node) : undefined;
-    const targetNodeId = targetNode?.node.id;
     const nodeNameById = buildNodeNameMap(ctx?.nodes);
     return collectExecutionRows(pages, targetNodeId, nodeNameById, displaySlice);
-  }, [dataSource, pages, ctx, displaySlice]);
+  }, [dataSource, pages, ctx, targetNodeId, displaySlice]);
 
   const isLoading = isWidgetQueryLoading({
     queryIsLoading: query.isLoading,

@@ -90,7 +90,7 @@ function LimitField({
   defaultPlaceholder: string;
   onChange: (limit: number | undefined) => void;
 }) {
-  const placeholder = loadAllWhenBlank ? "Load all" : defaultPlaceholder;
+  const placeholder = loadAllWhenBlank ? "On demand" : defaultPlaceholder;
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-slate-600">Limit</Label>
@@ -104,7 +104,8 @@ function LimitField({
       />
       {loadAllWhenBlank ? (
         <p className="text-[11px] text-slate-500">
-          Leave blank to load all rows. Use the "Load more" button or scroll to reveal additional rows.
+          Leave blank to load rows on demand — scroll or use the "Load more" button to reveal more. Very long histories
+          are capped for performance; set a number to fix how many rows are fetched.
         </p>
       ) : null}
     </div>
