@@ -15,6 +15,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
+	t.Run("memory id returns feature and true", func(t *testing.T) {
+		f, ok := Get(FeatureClaudeManagedAgentMemory)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureClaudeManagedAgentMemory, f.ID)
+		assert.Equal(t, "Claude Managed Agent Memory", f.Label)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -29,6 +37,7 @@ func Test__Get(t *testing.T) {
 
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
+	assert.True(t, Exists(FeatureClaudeManagedAgentMemory))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

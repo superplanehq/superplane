@@ -7,22 +7,26 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
 
 type Service struct {
-	provider Provider
-	auth     authorization.Authorization
+	provider         Provider
+	auth             authorization.Authorization
+	memoryStoreLocks sync.Map
 }
 
 func NewService(provider Provider, auth authorization.Authorization) *Service {
@@ -46,14 +50,42 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 	if existing != nil {
+		s.prepareMemoryStoreForExistingSession(ctx, organizationID, userID, canvasID)
 		return existing, nil
 	}
 	return s.provisionSession(ctx, organizationID, userID, canvasID)
 }
 
+func (s *Service) prepareMemoryStoreForExistingSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) {
+	// Anthropic memory stores attach only when a provider session is created.
+	// For existing sessions, prepare the mapping for the next recovery without
+	// replacing the provider session and losing its current conversation state.
+	if _, err := s.memoryStoresForScope(ctx, organizationID, userID, canvasID); err != nil {
+		log.WithError(err).
+			WithField("provider", s.provider.Name()).
+			WithField("organization_id", organizationID).
+			WithField("user_id", userID).
+			WithField("canvas_id", canvasID).
+			Warn("failed to prepare agent memory store for existing session")
+	}
+}
+
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	var session *models.AgentSession
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	session, err := s.existingSessionForProvision(organizationID, userID, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("ensure session: %w", err)
+	}
+	if session != nil {
+		s.prepareMemoryStoreForExistingSession(ctx, organizationID, userID, canvasID)
+		return session, nil
+	}
+
+	memoryStores, err := s.memoryStoresForScope(ctx, organizationID, userID, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("ensure session: %w", err)
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
 			return err
 		}
@@ -68,7 +100,10 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 		}
 
 		title := sessionTitle(organizationID, canvasID)
-		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: title})
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
+			Title:        title,
+			MemoryStores: memoryStores,
+		})
 		if err != nil {
 			return fmt.Errorf("create provider session: %w", err)
 		}
@@ -85,6 +120,26 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ensure session: %w", err)
+	}
+	return session, nil
+}
+
+func (s *Service) existingSessionForProvision(organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	var session *models.AgentSession
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+			return err
+		}
+
+		found, err := findCanvasSession(tx, organizationID, userID, canvasID)
+		if err != nil {
+			return err
+		}
+		session = found
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return session, nil
 }
@@ -314,8 +369,14 @@ func (s *Service) recoverProviderSession(ctx context.Context, stale *models.Agen
 		return target.recovered, nil
 	}
 
+	memoryStores, err := s.memoryStoresForScope(ctx, target.organizationID, target.userID, target.canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("recover provider session: load memory store: %w", err)
+	}
+
 	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
-		Title: sessionTitle(target.organizationID, target.canvasID),
+		Title:        sessionTitle(target.organizationID, target.canvasID),
+		MemoryStores: memoryStores,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("recover provider session: create provider session: %w", err)
@@ -334,6 +395,7 @@ func (s *Service) recoverProviderSession(ctx context.Context, stale *models.Agen
 
 type providerSessionRecoveryTarget struct {
 	organizationID uuid.UUID
+	userID         uuid.UUID
 	canvasID       uuid.UUID
 	recovered      *models.AgentSession
 }
@@ -354,6 +416,7 @@ func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession) (*pr
 		}
 
 		target.organizationID = locked.OrganizationID
+		target.userID = locked.UserID
 		target.canvasID = locked.CanvasID
 		return nil
 	})
@@ -395,6 +458,228 @@ func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, pr
 		return nil, err
 	}
 	return recovered, nil
+}
+
+const (
+	agentMemoryStoreDescription  = "Durable SuperPlane agent memory for one user and one canvas. Store user preferences, project conventions, useful lessons, and prior mistakes. Do not store secrets, credentials, raw prompts, or large canvas YAML snapshots."
+	agentMemoryStoreInstructions = "Use this memory only for durable lessons, user preferences, app-specific conventions, and prior mistakes that will help future SuperPlane agent sessions for this same user and canvas. Do not store secrets, credentials, raw user prompts, API tokens, or large canvas YAML snapshots."
+)
+
+func (s *Service) memoryStoresForScope(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+	canvasID uuid.UUID,
+) ([]MemoryStoreResource, error) {
+	lock := s.memoryStoreLock(organizationID, userID, canvasID)
+	lock.Lock()
+	defer lock.Unlock()
+
+	plan, err := s.memoryStorePlanForScope(organizationID, userID, canvasID)
+	if err != nil {
+		return nil, err
+	}
+	if plan.store != nil {
+		return []MemoryStoreResource{memoryStoreResource(plan.store)}, nil
+	}
+	if !plan.shouldCreate {
+		return nil, nil
+	}
+
+	created, ok := s.createProviderMemoryStore(ctx, organizationID, userID, canvasID)
+	if !ok {
+		return nil, nil
+	}
+
+	store, err := s.saveMemoryStoreMapping(organizationID, userID, canvasID, created.ProviderMemoryStoreID)
+	if err != nil {
+		s.cleanupProviderMemoryStore(ctx, created.ProviderMemoryStoreID)
+		log.WithError(err).
+			WithField("provider", s.provider.Name()).
+			WithField("organization_id", organizationID).
+			WithField("user_id", userID).
+			WithField("canvas_id", canvasID).
+			WithField("provider_memory_store_id", created.ProviderMemoryStoreID).
+			Warn("failed to save agent memory store mapping; continuing without memory")
+		return nil, nil
+	}
+	if store == nil {
+		return nil, nil
+	}
+
+	return []MemoryStoreResource{memoryStoreResource(store)}, nil
+}
+
+type memoryStorePlan struct {
+	store        *models.AgentMemoryStore
+	shouldCreate bool
+}
+
+func (s *Service) memoryStorePlanForScope(organizationID, userID, canvasID uuid.UUID) (*memoryStorePlan, error) {
+	plan := &memoryStorePlan{}
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		enabled := s.agentMemoryEnabledInTransaction(tx, organizationID)
+		if !enabled {
+			return nil
+		}
+
+		if _, ok := s.provider.(MemoryStoreCreator); !ok {
+			log.WithField("provider", s.provider.Name()).Warn("agent memory enabled but provider does not support memory stores")
+			return nil
+		}
+
+		store, err := models.FindAgentMemoryStoreByScopeInTransaction(tx, organizationID, userID, canvasID, s.provider.Name())
+		if err == nil {
+			plan.store = store
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find agent memory store: %w", err)
+		}
+
+		plan.shouldCreate = true
+		return nil
+	})
+	return plan, err
+}
+
+func (s *Service) createProviderMemoryStore(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+	canvasID uuid.UUID,
+) (*CreateMemoryStoreResult, bool) {
+	creator, ok := s.provider.(MemoryStoreCreator)
+	if !ok {
+		return nil, false
+	}
+	created, err := creator.CreateMemoryStore(ctx, CreateMemoryStoreOptions{
+		Name:        agentMemoryStoreName(userID, canvasID),
+		Description: agentMemoryStoreDescription,
+	})
+	if err != nil {
+		log.WithError(err).
+			WithField("provider", s.provider.Name()).
+			WithField("organization_id", organizationID).
+			WithField("user_id", userID).
+			WithField("canvas_id", canvasID).
+			Warn("failed to create agent memory store; continuing without memory")
+		return nil, false
+	}
+	if created.ProviderMemoryStoreID == "" {
+		log.WithField("provider", s.provider.Name()).Warn("provider returned empty agent memory store id; continuing without memory")
+		return nil, false
+	}
+
+	return created, true
+}
+
+func (s *Service) saveMemoryStoreMapping(
+	organizationID uuid.UUID,
+	userID uuid.UUID,
+	canvasID uuid.UUID,
+	providerMemoryStoreID string,
+) (*models.AgentMemoryStore, error) {
+	var saved *models.AgentMemoryStore
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		store, err := models.FindAgentMemoryStoreByScopeInTransaction(tx, organizationID, userID, canvasID, s.provider.Name())
+		if err == nil {
+			saved = store
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find agent memory store: %w", err)
+		}
+
+		store = &models.AgentMemoryStore{
+			OrganizationID:        organizationID,
+			UserID:                userID,
+			CanvasID:              canvasID,
+			Provider:              s.provider.Name(),
+			ProviderMemoryStoreID: providerMemoryStoreID,
+			Name:                  agentMemoryStoreName(userID, canvasID),
+			Description:           agentMemoryStoreDescription,
+		}
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "organization_id"},
+				{Name: "user_id"},
+				{Name: "canvas_id"},
+				{Name: "provider"},
+			},
+			DoNothing: true,
+		}).Create(store).Error; err != nil {
+			return fmt.Errorf("create agent memory store mapping: %w", err)
+		}
+
+		saved, err = models.FindAgentMemoryStoreByScopeInTransaction(tx, organizationID, userID, canvasID, s.provider.Name())
+		if err != nil {
+			return fmt.Errorf("find saved agent memory store mapping: %w", err)
+		}
+		log.WithField("provider", s.provider.Name()).
+			WithField("organization_id", organizationID).
+			WithField("user_id", userID).
+			WithField("canvas_id", canvasID).
+			WithField("provider_memory_store_id", providerMemoryStoreID).
+			Info("created agent memory store")
+		return nil
+	})
+	return saved, err
+}
+
+func (s *Service) cleanupProviderMemoryStore(ctx context.Context, providerMemoryStoreID string) {
+	cleaner, ok := s.provider.(MemoryStoreCleaner)
+	if !ok {
+		log.WithField("provider", s.provider.Name()).
+			WithField("provider_memory_store_id", providerMemoryStoreID).
+			Warn("provider memory store was created but cannot be cleaned up after mapping failure")
+		return
+	}
+	if err := cleaner.DeleteMemoryStore(ctx, providerMemoryStoreID); err != nil {
+		log.WithError(err).
+			WithField("provider", s.provider.Name()).
+			WithField("provider_memory_store_id", providerMemoryStoreID).
+			Warn("failed to clean up provider memory store after mapping failure")
+	}
+}
+
+func (s *Service) agentMemoryEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) bool {
+	if features.IsReleased(features.FeatureClaudeManagedAgentMemory) {
+		return true
+	}
+
+	organization, err := models.FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if err != nil {
+		log.WithError(err).WithField("organization_id", organizationID).Warn("failed to check agent memory feature; continuing without memory")
+		return false
+	}
+	return organization.HasExperimentalFeature(features.FeatureClaudeManagedAgentMemory)
+}
+
+func (s *Service) memoryStoreLock(organizationID, userID, canvasID uuid.UUID) *sync.Mutex {
+	key := agentMemoryStoreLockKey(organizationID, userID, canvasID, s.provider.Name())
+	lock, _ := s.memoryStoreLocks.LoadOrStore(key, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
+func agentMemoryStoreName(userID uuid.UUID, canvasID uuid.UUID) string {
+	return fmt.Sprintf("SuperPlane canvas memory %s user %s", shortUUID(canvasID), shortUUID(userID))
+}
+
+func shortUUID(id uuid.UUID) string {
+	value := id.String()
+	if len(value) <= 8 {
+		return value
+	}
+	return value[:8]
+}
+
+func memoryStoreResource(store *models.AgentMemoryStore) MemoryStoreResource {
+	return MemoryStoreResource{
+		MemoryStoreID: store.ProviderMemoryStoreID,
+		Access:        MemoryStoreAccessReadWrite,
+		Instructions:  agentMemoryStoreInstructions,
+	}
 }
 
 func (s *Service) cleanupProviderSession(ctx context.Context, providerSessionID string) {
@@ -490,6 +775,16 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(organizationID[:])
 	h.Write(userID[:])
 	h.Write(canvasID[:])
+	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
+}
+
+func agentMemoryStoreLockKey(organizationID, userID, canvasID uuid.UUID, provider string) int64 {
+	h := fnv.New64a()
+	h.Write([]byte("agent-memory-store"))
+	h.Write(organizationID[:])
+	h.Write(userID[:])
+	h.Write(canvasID[:])
+	h.Write([]byte(provider))
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
 
