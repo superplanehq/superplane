@@ -84,9 +84,9 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasEventCreatedRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasEventCreatedRoutingKey,
+		RemoteExchange: messages.EventsExchange,
+		Service:        messages.EventsExchange + "." + messages.EventCreatedRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.EventCreatedRoutingKey,
 	}
 
 	consumer := tackle.NewConsumer()
@@ -94,16 +94,16 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasEventCreatedRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.EventCreatedRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasEventCreatedRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.EventCreatedRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasEventCreatedRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.EventCreatedRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -157,14 +157,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	// - outcome: success, failed, skipped
 	// - reason: none, locked, deadlock, not_found, internal
 	//
-	metricOutcome := executorOutcomeSuccess
-	metricReason := executorReasonNone
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
 	defer func() {
 		telemetry.RecordEventWorkerEventProcessing(
 			context.Background(),
 			time.Since(attemptStart),
-			metricOutcome,
-			metricReason,
+			outcome,
+			reason,
 		)
 	}()
 
@@ -174,15 +174,15 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
-			metricOutcome = executorOutcomeSkipped
-			metricReason = executorReasonLocked
+			outcome = executorOutcomeSkipped
+			reason = executorReasonLocked
 			return nil
 		}
 
-		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
+		createdQueueItems, err = w.processEvent(tx, logger, lockedEvent)
 		if err != nil {
-			metricOutcome = executorOutcomeFailed
-			metricReason = classifyProcessError(err)
+			outcome = executorOutcomeFailed
+			reason = classifyProcessError(err)
 			return err
 		}
 
@@ -191,6 +191,10 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if err != nil {
 		return err
+	}
+
+	if outcome == executorOutcomeSkipped {
+		return nil
 	}
 
 	if len(createdQueueItems) > 0 {
@@ -203,11 +207,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		}
 	}
 
-	if runID != uuid.Nil {
-		err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
-		if err != nil {
+	//
+	// If no queue items were created, this is a terminal node.
+	// We publish a RabbitMQ message so the run finalizer can finalize the run, if needed.
+	//
+	if len(createdQueueItems) == 0 {
+		if err := messages.PublishEventTerminal(event.WorkflowID, event.RunID, event.ID); err != nil {
 			logger.WithError(err).Warnf(
-				"Failed to publish run state message for run %s in workflow %s",
+				"Failed to publish terminal event message for run %s in workflow %s",
 				runID,
 				event.WorkflowID,
 			)
@@ -217,15 +224,15 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
 	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
 	if event.ExecutionID == nil {
@@ -234,11 +241,10 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	queueItems, runID, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
-	return queueItems, runID, err
+	return w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
 }
 
 func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []models.Edge {
@@ -252,22 +258,26 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
-	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
-	if err != nil {
-		return nil, uuid.Nil, err
+	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
+	if len(outgoingEdges) == 0 {
+		return nil, event.RoutedInTransaction(tx)
 	}
 
-	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
+	if err != nil {
+		return nil, err
+	}
+
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
@@ -284,7 +294,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		queueItems = append(queueItems, queueItem)
@@ -292,23 +302,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	err = event.RoutedInTransaction(tx)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	//
-	// If we created any queue items, we know for sure that the run is not finished yet,
-	// so there is no need to lock the run record to check it.
-	//
-	if len(queueItems) > 0 {
-		return queueItems, run.ID, nil
-	}
-
-	_, err = models.MaybeFinalizeRunInTransaction(tx, run.ID)
-	if err != nil {
-		return nil, uuid.Nil, err
-	}
-
-	return queueItems, run.ID, nil
+	return queueItems, nil
 }
 
 func (w *EventRouter) processExecutionEvent(
@@ -318,7 +315,7 @@ func (w *EventRouter) processExecutionEvent(
 	edges []models.Edge,
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
-) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution)
@@ -329,7 +326,7 @@ func (w *EventRouter) processExecutionEvent(
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
@@ -346,24 +343,15 @@ func (w *EventRouter) processExecutionEvent(
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
 	if err := event.RoutedInTransaction(tx); err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	finalized, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
-	if err != nil {
-		return nil, uuid.Nil, err
-	}
-
-	if finalized {
-		return createdQueueItems, execution.RunID, nil
-	}
-
-	return createdQueueItems, uuid.Nil, nil
+	return createdQueueItems, nil
 }
