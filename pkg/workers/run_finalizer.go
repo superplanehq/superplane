@@ -53,7 +53,7 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 			}
 
 			for _, run := range runs {
-				if err := w.finalizeRun(run.WorkflowID, run.ID); err != nil {
+				if err := w.finalizeRun(run.WorkflowID, run.ID, true); err != nil {
 					w.logger.WithFields(log.Fields{
 						"workflow_id": run.WorkflowID,
 						"run_id":      run.ID,
@@ -155,7 +155,7 @@ func (w *RunFinalizer) consumeExecutionFinished(delivery tackle.Delivery) error 
 		return err
 	}
 
-	return w.finalizeRun(workflowID, execution.RunID)
+	return w.finalizeRun(workflowID, execution.RunID, false)
 }
 
 func (w *RunFinalizer) consumeEventTerminal(delivery tackle.Delivery) error {
@@ -177,16 +177,17 @@ func (w *RunFinalizer) consumeEventTerminal(delivery tackle.Delivery) error {
 		return err
 	}
 
-	return w.finalizeRun(workflowID, runID)
+	return w.finalizeRun(workflowID, runID, false)
 }
 
-func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID) error {
+func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, fromSweep bool) error {
 	var finalized bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		finalized, err = models.MaybeFinalizeRunInTransaction(tx, runID)
+		finalized, err = w.maybeFinalizeRun(tx, runID, fromSweep)
 		return err
 	})
+
 	if err != nil {
 		return err
 	}
@@ -205,4 +206,53 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, fromSweep bool) (bool, error) {
+	run, err := models.LockCanvasRunInTransaction(tx, runID)
+	if err != nil {
+		return false, err
+	}
+
+	if run.State == models.CanvasRunStateFinished {
+		return false, nil
+	}
+
+	openWork, err := models.FindOpenCanvasRunWorkInTransaction(tx, runID)
+	if err != nil {
+		return false, err
+	}
+
+	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
+		if fromSweep {
+			// The started-run sweep loads candidates with ORDER BY updated_at ASC
+			// LIMIT N. Bump updated_at here so a run that is still open is pushed to
+			// the back of the queue instead of being retried on every tick.
+			now := time.Now()
+			return false, tx.Model(run).Update("updated_at", &now).Error
+		}
+
+		return false, nil
+	}
+
+	result, err := models.CalculateCanvasRunResultInTransaction(tx, runID)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+	err = tx.Model(run).
+		Updates(map[string]any{
+			"state":       models.CanvasRunStateFinished,
+			"result":      result,
+			"updated_at":  &now,
+			"finished_at": &now,
+		}).
+		Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }

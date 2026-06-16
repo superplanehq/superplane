@@ -224,47 +224,7 @@ func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID,
 	return executions, nil
 }
 
-func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {
-	run, err := lockCanvasRunInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	if run.State == CanvasRunStateFinished {
-		return false, nil
-	}
-
-	openWork, err := findOpenCanvasRunWorkInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		return false, touchCanvasRunInTransaction(tx, run)
-	}
-
-	result, err := calculateCanvasRunResultInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	now := time.Now()
-	err = tx.Model(run).
-		Updates(map[string]any{
-			"state":       CanvasRunStateFinished,
-			"result":      result,
-			"updated_at":  &now,
-			"finished_at": &now,
-		}).
-		Error
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
+func LockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
 	err := tx.
 		// Run finalization checks for open child work before marking the run
@@ -282,19 +242,14 @@ func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error
 	return &run, nil
 }
 
-func touchCanvasRunInTransaction(tx *gorm.DB, run *CanvasRun) error {
-	now := time.Now()
-	return tx.Model(run).Update("updated_at", &now).Error
-}
-
-type openCanvasRunWork struct {
+type OpenCanvasRunWork struct {
 	HasActiveExecutions bool
 	HasQueueItems       bool
 	HasPendingEvents    bool
 }
 
-func findOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*openCanvasRunWork, error) {
-	var result openCanvasRunWork
+func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanvasRunWork, error) {
+	var result OpenCanvasRunWork
 	err := tx.Raw(`
 		SELECT
 			EXISTS (
@@ -329,7 +284,7 @@ func findOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*openCanv
 	return &result, nil
 }
 
-func calculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
+func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
 	var result struct {
 		HasFailed    bool
 		HasCancelled bool

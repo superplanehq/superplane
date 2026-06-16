@@ -58,7 +58,7 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
 
 	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
@@ -103,9 +103,62 @@ func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&queueItem).Error)
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+}
+
+func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	finalizer := NewRunFinalizer(amqpURL)
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: node, Channel: "default"},
+		},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+
+	staleUpdatedAt := time.Now().Add(-time.Hour)
+	require.NoError(t, database.Conn().Model(run).Update("updated_at", &staleUpdatedAt).Error)
+
+	now := time.Now()
+	queueItem := models.CanvasNodeQueueItem{
+		WorkflowID:  canvas.ID,
+		NodeID:      node,
+		RootEventID: event.ID,
+		RunID:       run.ID,
+		EventID:     event.ID,
+		CreatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Create(&queueItem).Error)
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
+
+	unchangedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, staleUpdatedAt.Unix(), unchangedRun.UpdatedAt.Unix())
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, true))
+
+	touchedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.True(t, touchedRun.UpdatedAt.After(staleUpdatedAt))
+	assert.Equal(t, models.CanvasRunStateStarted, touchedRun.State)
 }
