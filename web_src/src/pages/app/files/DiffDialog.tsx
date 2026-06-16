@@ -3,36 +3,22 @@ import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { useMemo } from "react";
 import type { FileContents } from "@pierre/diffs/react";
 
-import type { PendingFileChange, StagedFileDiff } from "./types";
+import type { FileDiffVersusLive } from "./types";
 
 interface DiffDialogProps {
-  changes: PendingFileChange[];
-  committedContentByPath: Record<string, string>;
-  loadedContentByPath: Record<string, string>;
-  stagedFileDiffs: StagedFileDiff[];
+  fileDiffs: FileDiffVersusLive[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DiffDialog({
-  changes,
-  committedContentByPath,
-  loadedContentByPath,
-  stagedFileDiffs,
-  open,
-  onOpenChange,
-}: DiffDialogProps) {
-  const diffFiles = useMemo(() => {
-    const pendingDiffs = changes.map((change) => ({
-      path: change.path,
-      ...buildDiffFile(change, committedContentByPath, loadedContentByPath),
-    }));
-    const stagedDiffs = stagedFileDiffs.map((diff) => ({
-      path: diff.path,
-      ...buildStagedDiffFile(diff),
-    }));
-    return [...stagedDiffs, ...pendingDiffs].sort((left, right) => left.path.localeCompare(right.path));
-  }, [changes, committedContentByPath, loadedContentByPath, stagedFileDiffs]);
+export function DiffDialog({ fileDiffs, open, onOpenChange }: DiffDialogProps) {
+  const diffFiles = useMemo(
+    () =>
+      [...fileDiffs]
+        .sort((left, right) => left.path.localeCompare(right.path))
+        .map((diff) => ({ path: diff.path, ...buildDiffFile(diff) })),
+    [fileDiffs],
+  );
   const diffOptions = useMemo(
     () => ({
       theme: "pierre-light" as const,
@@ -73,43 +59,20 @@ export function DiffDialog({
   );
 }
 
-function buildDiffFile(
-  change: PendingFileChange,
-  committedContentByPath: Record<string, string>,
-  loadedContentByPath: Record<string, string>,
-): { oldFile: FileContents; newFile: FileContents } {
-  // Use committed (stage=false) content as the diff baseline. loadedContentByPath
-  // reflects staged content for draft reads, so after autosave to staging it would
-  // match the edited content and the diff would appear empty.
-  const baselineContents = committedContentByPath[change.path] ?? loadedContentByPath[change.path] ?? "";
-  const previousContents = change.type === "added" ? "" : baselineContents;
-  const nextContents = change.type === "deleted" ? "" : change.content;
-
-  return {
-    oldFile: {
-      name: change.path,
-      contents: previousContents,
-      cacheKey: `${change.path}:old:${previousContents}`,
-    },
-    newFile: {
-      name: change.path,
-      contents: nextContents,
-      cacheKey: `${change.path}:new:${nextContents}`,
-    },
-  };
-}
-
-function buildStagedDiffFile(diff: StagedFileDiff): { oldFile: FileContents; newFile: FileContents } {
+// Diff the live (main) content against the effective draft content. The Files diff
+// always uses live as the baseline so it matches the canvas tab's "draft vs live"
+// comparison, regardless of whether the change is committed or still staged.
+function buildDiffFile(diff: FileDiffVersusLive): { oldFile: FileContents; newFile: FileContents } {
   return {
     oldFile: {
       name: diff.path,
-      contents: diff.committedContent,
-      cacheKey: `${diff.path}:old:${diff.committedContent}`,
+      contents: diff.liveContent,
+      cacheKey: `${diff.path}:old:${diff.liveContent}`,
     },
     newFile: {
       name: diff.path,
-      contents: diff.effectiveContent,
-      cacheKey: `${diff.path}:new:${diff.effectiveContent}`,
+      contents: diff.draftContent,
+      cacheKey: `${diff.path}:new:${diff.draftContent}`,
     },
   };
 }

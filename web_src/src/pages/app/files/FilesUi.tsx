@@ -3,14 +3,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { GitCompareArrows } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function DiffHeaderAction({
-  hasPendingChanges,
-  onDiffOpen,
-}: {
-  hasPendingChanges: boolean;
-  onDiffOpen: () => void;
-}) {
-  if (!hasPendingChanges) {
+export function DiffHeaderAction({ hasChanges, onDiffOpen }: { hasChanges: boolean; onDiffOpen: () => void }) {
+  if (!hasChanges) {
     return null;
   }
 

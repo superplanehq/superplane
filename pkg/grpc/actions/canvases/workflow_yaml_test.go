@@ -8,39 +8,35 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/models"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
 )
 
 func TestCanvasYAMLFromVersionIncludesActionNodeType(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+	canvasID := createGitCanvas(ctx, t, r, "action-node-type", []*componentpb.Node{
 		{
-			NodeID: "wait-1",
-			Name:   "Wait",
-			Type:   models.NodeTypeComponent,
-			Ref: datatypes.NewJSONType(models.NodeRef{
-				Component: &models.ComponentRef{Name: "wait"},
-			}),
-			Configuration: datatypes.NewJSONType(map[string]any{
+			Id:        "wait-1",
+			Name:      "Wait",
+			Component: "wait",
+			Configuration: structFromAnyMap(t, map[string]any{
 				"mode":    "interval",
 				"waitFor": "10",
 				"unit":    "seconds",
 			}),
 		},
-	}, nil)
+	})
 
-	response, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), "")
+	response, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "")
 	require.NoError(t, err)
 
 	versionID := response.GetVersion().GetMetadata().GetId()
 	yamlText, err := ReadRepositorySpecFile(
 		ctx,
 		r.Organization.ID.String(),
-		canvas.ID.String(),
+		canvasID,
 		versionID,
 		CanvasYAMLRepositoryPath,
 	)

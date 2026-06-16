@@ -56,9 +56,9 @@ func TestListDraftCanvasVersions(t *testing.T) {
 	t.Run("lists created draft branches newest first", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-list")
 
-		first, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "First draft")
+		first, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "First draft")
 		require.NoError(t, err)
-		second, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "Second draft")
+		second, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "Second draft")
 		require.NoError(t, err)
 
 		response, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), canvasID, 0, nil, pb.CanvasVersion_STATE_DRAFT)
@@ -73,9 +73,9 @@ func TestListDraftCanvasVersions(t *testing.T) {
 		otherUser := support.CreateUser(t, r, r.Organization.ID)
 		otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-		_, err := CreateCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID, "Other user draft")
+		_, err := CreateCanvasVersion(otherCtx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "Other user draft")
 		require.NoError(t, err)
-		ownDraft, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "My draft")
+		ownDraft, err := CreateCanvasVersion(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "My draft")
 		require.NoError(t, err)
 
 		response, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), canvasID, 0, nil, pb.CanvasVersion_STATE_DRAFT)
