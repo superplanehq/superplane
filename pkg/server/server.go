@@ -247,6 +247,7 @@ func startWorkers(
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
 			Encryptor:         encryptor,
 			ComponentRegistry: registry,
+			GitProvider:       gitProvider,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),
