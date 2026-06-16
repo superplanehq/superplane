@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -33,6 +34,7 @@ func CommitCanvasStaging(
 	versionID string,
 	webhookBaseURL string,
 	authService authorization.Authorization,
+	commitMessages ...string,
 ) (*pb.CommitCanvasStagingResponse, error) {
 	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
 	if err != nil {
@@ -54,7 +56,7 @@ func CommitCanvasStaging(
 			return nil, snapshotErr
 		}
 
-		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitOps); err != nil {
+		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), resolvedStagingCommitMessage(commitMessages...), gitOps); err != nil {
 			return nil, err
 		}
 	}
@@ -153,6 +155,7 @@ func commitStagedGitFiles(
 	canvas *models.Canvas,
 	organizationID string,
 	userID string,
+	message string,
 	gitOps []*pb.CanvasRepositoryFileOperation,
 ) error {
 	if gitProvider == nil {
@@ -196,7 +199,7 @@ func commitStagedGitFiles(
 		Branch:          "main",
 		BaseBranch:      "main",
 		ExpectedHeadSHA: headSHA,
-		Message:         "Update files",
+		Message:         message,
 		Operations:      operations,
 		Author: gitprovider.CommitAuthor{
 			Name:  user.Name,
@@ -301,5 +304,14 @@ func revertGitFileCommit(
 		pbOps = append(pbOps, pbOp)
 	}
 
-	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, pbOps)
+	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, "Revert staged file commit", pbOps)
+}
+
+func resolvedStagingCommitMessage(messages ...string) string {
+	for _, message := range messages {
+		if trimmed := strings.TrimSpace(message); trimmed != "" {
+			return trimmed
+		}
+	}
+	return "Update files"
 }
