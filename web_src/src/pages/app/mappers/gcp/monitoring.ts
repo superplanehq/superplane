@@ -103,7 +103,15 @@ function getPolicyOutput(context: ExecutionDetailsContext): AlertingPolicyOutput
   return outputs?.default?.[0]?.data as AlertingPolicyOutputData | undefined;
 }
 
-function policyDetails(context: ExecutionDetailsContext): Record<string, string> {
+interface PolicyDetailsOptions {
+  includeId?: boolean;
+  includeFirstCondition?: boolean;
+}
+
+function policyDetails(
+  context: ExecutionDetailsContext,
+  { includeId = true, includeFirstCondition = true }: PolicyDetailsOptions = {},
+): Record<string, string> {
   const details: Record<string, string> = {};
   if (context.execution.createdAt) {
     details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
@@ -112,11 +120,11 @@ function policyDetails(context: ExecutionDetailsContext): Record<string, string>
   if (!result) return details;
 
   if (result.displayName) details["Display Name"] = result.displayName;
-  if (result.id) details["Policy ID"] = result.id;
+  if (includeId && result.id) details["Policy ID"] = result.id;
   if (result.enabled !== undefined) details["Enabled"] = result.enabled ? "Yes" : "No";
   if (result.severity) details["Severity"] = result.severity;
   if (result.conditionsCount !== undefined) details["Conditions"] = String(result.conditionsCount);
-  if (result.comparison && result.thresholdValue !== undefined) {
+  if (includeFirstCondition && result.comparison && result.thresholdValue !== undefined) {
     details["First Condition"] = `${comparisonLabels[result.comparison] || result.comparison} ${result.thresholdValue}`;
   }
   if (result.duration) details["Duration"] = result.duration;
@@ -127,7 +135,7 @@ export const createAlertingPolicyMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context, "bell", "Create Alerting Policy", createMetadata(context.node));
   },
-  getExecutionDetails: policyDetails,
+  getExecutionDetails: (context) => policyDetails(context, { includeId: false }),
   subtitle,
 };
 
@@ -151,7 +159,7 @@ export const updateAlertingPolicyMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context, "bell", "Update Alerting Policy", selectorMetadata(context.node));
   },
-  getExecutionDetails: policyDetails,
+  getExecutionDetails: (context) => policyDetails(context, { includeId: false, includeFirstCondition: false }),
   subtitle,
 };
 
@@ -229,7 +237,6 @@ export function snoozeDetails(context: ExecutionDetailsContext): Record<string, 
   if (!out) return details;
 
   if (out.displayName) details["Display Name"] = out.displayName;
-  if (out.id) details["Snooze ID"] = out.id;
   if (out.policiesCount !== undefined) details["Policies"] = String(out.policiesCount);
   if (out.startTime) details["Start"] = new Date(out.startTime).toLocaleString();
   if (out.endTime) details["End"] = new Date(out.endTime).toLocaleString();

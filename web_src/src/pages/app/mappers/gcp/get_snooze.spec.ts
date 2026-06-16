@@ -45,7 +45,7 @@ describe("getSnoozeMapper.getExecutionDetails", () => {
       buildDetailsCtx({ execution: { createdAt: EXECUTED_AT, outputs: { default: [buildOutput(out)] } } }),
     );
     expect(details["Display Name"]).toBe("Deploy window");
-    expect(details["Snooze ID"]).toBe("55");
+    expect(details["Snooze ID"]).toBeUndefined();
     expect(details["Policies"]).toBe("2");
   });
 });

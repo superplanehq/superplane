@@ -40,11 +40,11 @@ describe("createSnoozeMapper.getExecutionDetails", () => {
     expect(details).toEqual({
       "Executed At": new Date(EXECUTED_AT).toLocaleString(),
       "Display Name": "Deploy window",
-      "Snooze ID": "55",
       Policies: "2",
       Start: new Date(out.startTime).toLocaleString(),
       End: new Date(out.endTime).toLocaleString(),
     });
+    expect(details["Snooze ID"]).toBeUndefined();
   });
 });
 
