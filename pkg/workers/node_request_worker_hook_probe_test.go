@@ -72,7 +72,7 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
