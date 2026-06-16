@@ -157,6 +157,7 @@ func (w *IntegrationRequestWorker) syncIntegration(request *models.IntegrationRe
 	// go through a non-transactional context (database.Conn()).
 	//
 	integrationCtx := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
+	integrationCtx.SetCurrentRequest(request)
 	logging.ForIntegration(*instance).WithField("source", "sync").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
@@ -207,6 +208,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(request *models.Integ
 	//
 	logger := logging.ForIntegration(*integration)
 	integrationCtx := contexts.NewIntegrationContext(db, nil, integration, w.encryptor, w.registry, nil)
+	integrationCtx.SetCurrentRequest(request)
 	logger.WithField("source", "integration_action").Info("Integration operation may write secrets")
 	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
