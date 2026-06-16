@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef } from "@/api-client";
+import type { CanvasesCanvasNodeExecutionRef, CanvasesCanvasRun } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
-import { filterRunEvents, getAggregateStatus } from "./canvas-runs";
+import { filterRuns, getAggregateStatus } from "./canvas-runs";
 
 function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {}): CanvasesCanvasNodeExecutionRef {
   return {
@@ -13,18 +13,23 @@ function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {
   } as CanvasesCanvasNodeExecutionRef;
 }
 
-function makeEvent(overrides: Partial<CanvasesCanvasEventWithExecutions> = {}): CanvasesCanvasEventWithExecutions {
+function makeRun(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun {
   return {
-    id: "event-1",
-    nodeId: "trigger-1",
+    id: "run-1",
+    canvasId: "canvas-1",
     createdAt: "2026-04-01T12:00:00.000Z",
-    data: {
-      data: {},
-      type: "event",
+    rootEvent: {
+      id: "event-1",
+      nodeId: "trigger-1",
+      createdAt: "2026-04-01T12:00:00.000Z",
+      data: {
+        data: {},
+        type: "event",
+      },
     },
     executions: [makeExecutionRef()],
     ...overrides,
-  } as CanvasesCanvasEventWithExecutions;
+  } as CanvasesCanvasRun;
 }
 
 describe("getAggregateStatus", () => {
@@ -89,7 +94,7 @@ describe("getAggregateStatus", () => {
   });
 });
 
-describe("filterRunEvents", () => {
+describe("filterRuns", () => {
   const nodes = [
     makeComponentsNode({
       id: "trigger-1",
@@ -111,67 +116,77 @@ describe("filterRunEvents", () => {
     }),
   ];
 
-  it("returns all events when the status filter is all", () => {
-    const events = [
-      makeEvent({
-        id: "event-success",
+  it("returns all runs when the status filter is all", () => {
+    const runs = [
+      makeRun({
+        id: "run-success",
+        rootEvent: { id: "event-success", nodeId: "trigger-1" },
         executions: [makeExecutionRef({ nodeId: "node-success" })],
       }),
-      makeEvent({
-        id: "event-failed",
+      makeRun({
+        id: "run-failed",
+        rootEvent: { id: "event-failed", nodeId: "trigger-1" },
         executions: [makeExecutionRef({ nodeId: "node-failed", result: "RESULT_FAILED" })],
       }),
-      makeEvent({
-        id: "event-queued",
+      makeRun({
+        id: "run-queued",
+        rootEvent: { id: "event-queued", nodeId: "trigger-1" },
         executions: [],
       }),
     ];
 
-    expect(filterRunEvents(events, nodes, "all", "")).toEqual(events);
+    expect(filterRuns(runs, nodes, "all", "")).toEqual(runs);
   });
 
   it("matches completed filter for both completed and cancelled runs", () => {
-    const completedEvent = makeEvent({
-      id: "event-completed",
+    const completedRun = makeRun({
+      id: "run-completed",
+      rootEvent: { id: "event-completed", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-success", result: "RESULT_PASSED" })],
     });
-    const cancelledEvent = makeEvent({
-      id: "event-cancelled",
+    const cancelledRun = makeRun({
+      id: "run-cancelled",
+      rootEvent: { id: "event-cancelled", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-success", result: "RESULT_CANCELLED" })],
     });
-    const failedEvent = makeEvent({
-      id: "event-failed",
+    const failedRun = makeRun({
+      id: "run-failed",
+      rootEvent: { id: "event-failed", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-failed", result: "RESULT_FAILED" })],
     });
 
-    expect(filterRunEvents([completedEvent, cancelledEvent, failedEvent], nodes, "completed", "")).toEqual([
-      completedEvent,
-      cancelledEvent,
+    expect(filterRuns([completedRun, cancelledRun, failedRun], nodes, "completed", "")).toEqual([
+      completedRun,
+      cancelledRun,
     ]);
   });
 
   it("matches error, running, and queued filters from aggregate statuses", () => {
-    const failedEvent = makeEvent({
-      id: "event-failed",
+    const failedRun = makeRun({
+      id: "run-failed",
+      rootEvent: { id: "event-failed", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-failed", result: "RESULT_FAILED" })],
     });
-    const runningEvent = makeEvent({
-      id: "event-running",
+    const runningRun = makeRun({
+      id: "run-running",
+      rootEvent: { id: "event-running", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-running", state: "STATE_STARTED", result: undefined })],
     });
-    const queuedEvent = makeEvent({
-      id: "event-queued",
+    const queuedRun = makeRun({
+      id: "run-queued",
+      rootEvent: { id: "event-queued", nodeId: "trigger-1" },
       executions: [],
     });
 
-    expect(filterRunEvents([failedEvent, runningEvent, queuedEvent], nodes, "errors", "")).toEqual([failedEvent]);
-    expect(filterRunEvents([failedEvent, runningEvent, queuedEvent], nodes, "running", "")).toEqual([runningEvent]);
-    expect(filterRunEvents([failedEvent, runningEvent, queuedEvent], nodes, "queued", "")).toEqual([queuedEvent]);
+    expect(filterRuns([failedRun, runningRun, queuedRun], nodes, "errors", "")).toEqual([failedRun]);
+    expect(filterRuns([failedRun, runningRun, queuedRun], nodes, "running", "")).toEqual([runningRun]);
+    expect(filterRuns([failedRun, runningRun, queuedRun], nodes, "queued", "")).toEqual([queuedRun]);
   });
 
   it("matches search queries against event ids, node names, and execution messages", () => {
-    const searchableEvent = makeEvent({
-      id: "event-searchable",
+    const searchableRun = makeRun({
+      id: "run-searchable",
+      rootEvent: { id: "event-searchable", nodeId: "trigger-1" },
       executions: [
         makeExecutionRef({
           nodeId: "node-failed",
@@ -180,26 +195,29 @@ describe("filterRunEvents", () => {
         }),
       ],
     });
-    const otherEvent = makeEvent({
-      id: "event-other",
+    const otherRun = makeRun({
+      id: "run-other",
+      rootEvent: { id: "event-other", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-success", resultMessage: "Everything passed" })],
     });
 
-    expect(filterRunEvents([searchableEvent, otherEvent], nodes, "all", "searchABLE")).toEqual([searchableEvent]);
-    expect(filterRunEvents([searchableEvent, otherEvent], nodes, "all", "run checks")).toEqual([searchableEvent]);
-    expect(filterRunEvents([searchableEvent, otherEvent], nodes, "all", "TIMED OUT")).toEqual([searchableEvent]);
+    expect(filterRuns([searchableRun, otherRun], nodes, "all", "searchABLE")).toEqual([searchableRun]);
+    expect(filterRuns([searchableRun, otherRun], nodes, "all", "run checks")).toEqual([searchableRun]);
+    expect(filterRuns([searchableRun, otherRun], nodes, "all", "TIMED OUT")).toEqual([searchableRun]);
   });
 
   it("applies status filtering before search matching", () => {
-    const failedEvent = makeEvent({
-      id: "event-failed",
+    const failedRun = makeRun({
+      id: "run-failed",
+      rootEvent: { id: "event-failed", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-failed", result: "RESULT_FAILED" })],
     });
-    const completedEvent = makeEvent({
-      id: "event-completed",
+    const completedRun = makeRun({
+      id: "run-completed",
+      rootEvent: { id: "event-completed", nodeId: "trigger-1" },
       executions: [makeExecutionRef({ nodeId: "node-success", resultMessage: "Run checks finished" })],
     });
 
-    expect(filterRunEvents([failedEvent, completedEvent], nodes, "errors", "run checks")).toEqual([failedEvent]);
+    expect(filterRuns([failedRun, completedRun], nodes, "errors", "run checks")).toEqual([failedRun]);
   });
 });

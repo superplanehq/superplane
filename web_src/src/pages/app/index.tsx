@@ -41,7 +41,6 @@ import {
   useUpdateCanvasMemoryNamespace,
   usePublishCanvasVersion,
   useEventExecutions,
-  useInfiniteCanvasEvents,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
   useTriggers,
@@ -218,7 +217,7 @@ function refreshLiveCanvasAfterVersionSelection({
       refetchType: "all",
     }),
     queryClient.invalidateQueries({
-      queryKey: canvasKeys.eventList(canvasId, 50),
+      queryKey: canvasKeys.infiniteRuns(canvasId),
       refetchType: "all",
     }),
   ]).then(() => {
@@ -489,21 +488,7 @@ export function AppPage() {
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
     [isRunInspectionMode, selectedRunId, runStatusFilters],
   );
-  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
-  const runsEventsData = useMemo(() => {
-    const pages = infiniteEventsQuery.data?.pages || [];
-    const seen = new Set<string>();
-    const events = pages
-      .flatMap((page) => page?.events || [])
-      .filter((e) => {
-        if (!e.id || seen.has(e.id)) return false;
-        seen.add(e.id);
-        return true;
-      });
-    const totalCount = pages[0]?.totalCount || 0;
-    return { events, totalCount };
-  }, [infiniteEventsQuery.data]);
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -4373,7 +4358,7 @@ export function AppPage() {
       setIsResolvingErrors(true);
       try {
         await resolveExecutionErrors(canvasId, executionIds);
-        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Errors acknowledged");
       } catch {
@@ -4939,7 +4924,7 @@ export function AppPage() {
           components={allComponents}
           triggers={allTriggers}
           logEntries={logEntries}
-          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          logRuns={isViewingLiveVersion ? runsData.runs : []}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}
