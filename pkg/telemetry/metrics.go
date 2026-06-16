@@ -39,6 +39,11 @@ var (
 	workflowCleanupWorkerTickHistogram          metric.Float64Histogram
 	workflowCleanupWorkerCanvasesCountHistogram metric.Int64Histogram
 
+	runFinalizerTickHistogram        metric.Float64Histogram
+	runFinalizerRunsCountHistogram   metric.Int64Histogram
+	runFinalizerRunsCounter          metric.Int64Counter
+	runFinalizerRunDurationHistogram metric.Float64Histogram
+
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 
@@ -246,6 +251,42 @@ func InitMetrics(ctx context.Context) error {
 		"workflow_cleanup_worker.tick.canvases.deleted",
 		metric.WithDescription("Number of deleted canvases processed each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerTickHistogram, err = meter.Float64Histogram(
+		"run_finalizer.tick.duration.seconds",
+		metric.WithDescription("Duration of each RunFinalizer sweep tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunsCountHistogram, err = meter.Int64Histogram(
+		"run_finalizer.tick.runs.started",
+		metric.WithDescription("Number of started workflow runs processed each sweep tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunsCounter, err = meter.Int64Counter(
+		"run_finalizer.runs.total",
+		metric.WithDescription("RunFinalizer run processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunDurationHistogram, err = meter.Float64Histogram(
+		"run_finalizer.run.duration.seconds",
+		metric.WithDescription("Duration of RunFinalizer run processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -525,6 +566,44 @@ func RecordWorkflowCleanupWorkerCanvasesCount(ctx context.Context, count int) {
 	}
 
 	workflowCleanupWorkerCanvasesCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordRunFinalizerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	runFinalizerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordRunFinalizerRunsCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	runFinalizerRunsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigger, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("trigger", trigger),
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	runFinalizerRunsCounter.Add(ctx, 1, attrs)
+	runFinalizerRunDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("trigger", trigger),
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordDBLocksCount(ctx context.Context, count int64) {
