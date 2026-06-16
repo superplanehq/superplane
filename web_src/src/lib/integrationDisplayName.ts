@@ -15,6 +15,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   discord: "Discord",
   datadog: "DataDog",
   cloudflare: "Cloudflare",
+  cloudsmith: "Cloudsmith",
   semaphore: "Semaphore",
   rootly: "Rootly",
   incident: "Incident",

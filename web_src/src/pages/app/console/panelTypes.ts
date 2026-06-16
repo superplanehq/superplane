@@ -20,8 +20,9 @@ import type {
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
-import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
+import { normalizeRowAction, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
+import type { WidgetSort, WidgetSortOrder } from "./widget/types";
+import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 import { validateNumberDataSource } from "./numberDataSourceValidation";
@@ -536,51 +537,7 @@ function validateChartContent(content: unknown): string | null {
   return validateChartRender(render);
 }
 
-const ALLOWED_CHART_TYPES = ["bar", "stacked-bar", "line", "area", "donut"];
-
-function validateChartRender(render: Record<string, unknown>): string | null {
-  if (render.kind !== "chart") return 'render.kind must be "chart".';
-  if (typeof render.type !== "string" || !ALLOWED_CHART_TYPES.includes(render.type)) {
-    return `render.type must be one of ${ALLOWED_CHART_TYPES.join(", ")}.`;
-  }
-  if (typeof render.xField !== "string" || render.xField.trim() === "") {
-    return "render.xField must be a non-empty string.";
-  }
-  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
-    return "render.seriesField must be a string.";
-  }
-  if (!Array.isArray(render.series) || render.series.length === 0) {
-    return "render.series must be a non-empty array.";
-  }
-  for (let i = 0; i < render.series.length; i += 1) {
-    const seriesError = validateChartSeries(render.series[i], i);
-    if (seriesError) return seriesError;
-  }
-  const legendError = validateChartLegend(render.legend);
-  if (legendError) return legendError;
-  return validateSort(render.sort);
-}
-
-function validateChartLegend(legend: unknown): string | null {
-  if (legend === undefined) return null;
-  if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
-    return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
-  }
-  return null;
-}
-
-function validateChartSeries(raw: unknown, index: number): string | null {
-  const series = asObject(raw);
-  if (!series) return `render.series[${index}] must be an object.`;
-  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
-    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
-      return `render.series[${index}].${key} must be a string.`;
-    }
-  }
-  return null;
-}
-
-function validateSort(sort: unknown): string | null {
+export function validateSort(sort: unknown): string | null {
   if (sort === undefined || sort === null) return null;
   const obj = asObject(sort);
   if (!obj) return "render.sort must be an object.";

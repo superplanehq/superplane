@@ -65,6 +65,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		return nil, status.Error(codes.Internal, "failed to get setup provider")
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "setup_step_revert").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
 		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)

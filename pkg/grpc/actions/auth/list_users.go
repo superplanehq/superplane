@@ -44,7 +44,7 @@ func ListUsers(
 	//
 	// Get all role definitions
 	//
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+	roleDefinitions, err := authService.GetAllRoleDefinitions(ctx, domainType, domainID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func ListUsers(
 	// For each role, get all users for it
 	//
 	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(roleDef.Name, domainID)
+		userIDs, err := authService.GetOrgUsersForRole(ctx, roleDef.Name, domainID)
 		if err != nil {
 			continue
 		}

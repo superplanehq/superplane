@@ -12,6 +12,7 @@ const STICKY_USER_MESSAGE_MAX_LINES = 4;
 
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
+  notice,
   canvasId,
   organizationId,
   messageGroups,
@@ -23,6 +24,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   showThinking,
 }: {
   error: string | null;
+  notice?: string | null;
   canvasId: string;
   organizationId: string;
   messageGroups: MessageGroup[];
@@ -64,6 +66,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
+        {notice ? <p className="px-3 py-2 text-sm text-amber-600">{notice}</p> : null}
         {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
     </div>
@@ -279,13 +282,31 @@ function truncateQuestion(question: string): string {
   return question.length > 200 ? `${question.slice(0, 200)}…` : question;
 }
 
+// The `superplane_app` tool's `update_draft` action edits the canvas — label it
+// "Editing canvas" rather than a generic "Running command".
+function isCanvasEditMessage(message: AgentMessage): boolean {
+  if (message.toolName !== "superplane_app") return false;
+  try {
+    return (JSON.parse(message.content) as { action?: string })?.action === "update_draft";
+  } catch {
+    return message.content.includes("update_draft");
+  }
+}
+
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const editRunning = messages.some((message) => message.toolStatus === "started" && isCanvasEditMessage(message));
+  const editedAny = messages.some(isCanvasEditMessage);
   const [expanded, setExpanded] = useState(hasRunning);
   const count = messages.length;
-  const label = hasRunning
-    ? `Running command${count > 1 ? ` (${count})` : ""}...`
-    : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+  let label: string;
+  if (hasRunning) {
+    // Only call it "Editing canvas" when an edit is the tool actually running,
+    // so a finished edit next to another running tool isn't mislabeled.
+    label = editRunning ? "Editing canvas…" : `Running command${count > 1 ? ` (${count})` : ""}...`;
+  } else {
+    label = editedAny ? "Edited canvas" : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+  }
 
   useEffect(() => {
     setExpanded(hasRunning);

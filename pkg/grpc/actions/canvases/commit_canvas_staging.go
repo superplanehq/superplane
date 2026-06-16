@@ -103,7 +103,7 @@ func CommitCanvasStaging(
 	}
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(committed, organizationID),
+		Version:        SerializeCanvasVersionMetadata(committed, organizationID, nil),
 		StagingSummary: state,
 	}, nil
 }

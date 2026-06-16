@@ -37,10 +37,7 @@ configured with "superplane apps active" is used.`,
 		Long: `Replace the console panels and layout in the current user's draft
 version. The YAML must use apiVersion: v1 and kind: Console.
 
-When change management is enabled for the app, an open change request
-for the updated draft is created automatically so it shows up in the UI
-for review. Pass --draft-id to target a specific draft and skip
-change-request creation, leaving the edit as a draft only.
+Pass --draft-id to target a specific draft and leave the edit as a draft only.
 
 The app argument is optional. When omitted, the active app
 configured with "superplane apps active" is used.

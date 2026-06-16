@@ -55,6 +55,7 @@ func UpdateIntegrationSecret(
 		return nil, err
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "user_update").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		setupStep, err := setupProvider.OnSecretUpdate(core.SecretUpdateContext{
 			SecretName:   secretName,

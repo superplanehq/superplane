@@ -139,7 +139,7 @@ func (d *DeleteDatabase) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if err := deleteDatabase(context.Background(), client, client.ProjectID(), instance, database); err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete database", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete database", err, roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gcp.cloudsql.database", []any{

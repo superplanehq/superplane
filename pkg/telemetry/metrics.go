@@ -17,17 +17,21 @@ var (
 	meter        = otel.Meter("superplane")
 	metricsReady atomic.Bool
 
-	queueWorkerTickHistogram       metric.Float64Histogram
-	queueWorkerNodesCountHistogram metric.Int64Histogram
-	queueWorkerStuckItems          metric.Int64Histogram
+	queueWorkerTickHistogram         metric.Float64Histogram
+	queueWorkerNodesCountHistogram   metric.Int64Histogram
+	queueWorkerNodesCounter          metric.Int64Counter
+	queueWorkerNodeDurationHistogram metric.Float64Histogram
+	queueWorkerStuckItems            metric.Int64Histogram
 
 	executorWorkerTickHistogram              metric.Float64Histogram
 	executorWorkerNodesCountHistogram        metric.Int64Histogram
 	executorWorkerExecutionsCounter          metric.Int64Counter
 	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
-	eventWorkerTickHistogram        metric.Float64Histogram
-	eventWorkerEventsCountHistogram metric.Int64Histogram
+	eventWorkerTickHistogram          metric.Float64Histogram
+	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsCounter          metric.Int64Counter
+	eventWorkerEventDurationHistogram metric.Float64Histogram
 
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
@@ -47,9 +51,51 @@ var (
 
 	dbRowsAffectedCounter metric.Int64Counter
 
+	integrationSecretWritesCounter metric.Int64Counter
+
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
+
+	organizationsTotalGauge          metric.Int64Gauge
+	usersTotalGauge                  metric.Int64Gauge
+	workflowsTotalGauge              metric.Int64Gauge
+	workflowNodesTotalGauge          metric.Int64Gauge
+	draftsTotalGauge                 metric.Int64Gauge
+	integrationsTotalGauge           metric.Int64Gauge
+	integrationSecretsTotalGauge     metric.Int64Gauge
+	workflowsActiveGauge             metric.Int64Gauge
+	workflowRunsDailyGauge           metric.Int64Gauge
+	workflowEventsDailyGauge         metric.Int64Gauge
+	workflowNodeExecutionsDailyGauge metric.Int64Gauge
 )
+
+// Operation values for integration secret writes.
+const (
+	IntegrationSecretOperationCreate = "create"
+	IntegrationSecretOperationUpdate = "update"
+)
+
+// durationSecondsHistogramBoundaries matches Prometheus DefBuckets and is
+// appropriate for latency histograms recorded in seconds. The OTel SDK default
+// boundaries assume milliseconds, which collapses sub-second values into the
+// (0, 5] bucket and makes histogram_quantile estimates misleading.
+var durationSecondsHistogramBoundaries = []float64{
+	0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+}
+
+func durationSecondsHistogramView() sdkmetric.Option {
+	return sdkmetric.WithView(sdkmetric.NewView(
+		sdkmetric.Instrument{
+			Name: "*duration.seconds",
+			Unit: "s",
+		},
+		sdkmetric.Stream{
+			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: durationSecondsHistogramBoundaries,
+			},
+		},
+	))
+}
 
 func InitMetrics(ctx context.Context) error {
 	exporter, err := otlpmetricgrpc.New(ctx)
@@ -67,6 +113,7 @@ func InitMetrics(ctx context.Context) error {
 		sdkmetric.WithReader(
 			sdkmetric.NewPeriodicReader(exporter),
 		),
+		durationSecondsHistogramView(),
 	)
 
 	otel.SetMeterProvider(provider)
@@ -85,6 +132,24 @@ func InitMetrics(ctx context.Context) error {
 		"queue_worker.tick.nodes.ready",
 		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodesCounter, err = meter.Int64Counter(
+		"queue_worker.nodes.total",
+		metric.WithDescription("WorkflowNodeQueueWorker node processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodeDurationHistogram, err = meter.Float64Histogram(
+		"queue_worker.node.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeQueueWorker node processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -139,6 +204,24 @@ func InitMetrics(ctx context.Context) error {
 		"event_worker.tick.events.pending",
 		metric.WithDescription("Number of pending workflow events each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventsCounter, err = meter.Int64Counter(
+		"event_worker.events.total",
+		metric.WithDescription("WorkflowEventRouter event processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventDurationHistogram, err = meter.Float64Histogram(
+		"event_worker.event.duration.seconds",
+		metric.WithDescription("Duration of WorkflowEventRouter event processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -270,6 +353,15 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	integrationSecretWritesCounter, err = meter.Int64Counter(
+		"integration.secret.writes.total",
+		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration type and operation"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	pendingEventsGauge, err = meter.Int64Gauge(
 		"workflow_events.pending.count",
 		metric.WithDescription("Current number of pending workflow events"),
@@ -282,6 +374,105 @@ func InitMetrics(ctx context.Context) error {
 	pendingExecutionsGauge, err = meter.Int64Gauge(
 		"workflow_node_executions.pending.count",
 		metric.WithDescription("Current number of pending workflow node executions"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	organizationsTotalGauge, err = meter.Int64Gauge(
+		"organizations.total",
+		metric.WithDescription("Current number of organizations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	usersTotalGauge, err = meter.Int64Gauge(
+		"users.total",
+		metric.WithDescription("Current number of organization users"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowsTotalGauge, err = meter.Int64Gauge(
+		"workflows.total",
+		metric.WithDescription("Current number of workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowNodesTotalGauge, err = meter.Int64Gauge(
+		"workflow_nodes.total",
+		metric.WithDescription("Current number of workflow nodes on active workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	draftsTotalGauge, err = meter.Int64Gauge(
+		"drafts.total",
+		metric.WithDescription("Current number of workflow draft versions on active workflows"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	integrationsTotalGauge, err = meter.Int64Gauge(
+		"integrations.total",
+		metric.WithDescription("Current number of app integrations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	integrationSecretsTotalGauge, err = meter.Int64Gauge(
+		"integration_secrets.total",
+		metric.WithDescription("Current number of integration secrets on active integrations"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowsActiveGauge, err = meter.Int64Gauge(
+		"workflows.active.count",
+		metric.WithDescription("Number of workflows with at least one run in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowRunsDailyGauge, err = meter.Int64Gauge(
+		"workflow_runs.daily.count",
+		metric.WithDescription("Number of workflow runs created in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowEventsDailyGauge, err = meter.Int64Gauge(
+		"workflow_events.daily.count",
+		metric.WithDescription("Number of workflow events created in the last 24 hours"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	workflowNodeExecutionsDailyGauge, err = meter.Int64Gauge(
+		"workflow_node_executions.daily.count",
+		metric.WithDescription("Number of workflow node executions created in the last 24 hours"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -319,6 +510,26 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 	}
 
 	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordQueueWorkerNodeProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	queueWorkerNodesCounter.Add(ctx, 1, attrs)
+	queueWorkerNodeDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
@@ -373,6 +584,26 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 	}
 
 	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordEventWorkerEventProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	eventWorkerEventsCounter.Add(ctx, 1, attrs)
+	eventWorkerEventDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {
@@ -473,6 +704,21 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 	)
 }
 
+func RecordIntegrationSecretWrite(ctx context.Context, appName, operation string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretWritesCounter.Add(
+		ctx,
+		1,
+		metric.WithAttributes(
+			attribute.String("app_name", appName),
+			attribute.String("operation", operation),
+		),
+	)
+}
+
 func RecordPendingEventsCount(ctx context.Context, count int64) {
 	if !metricsReady.Load() {
 		return
@@ -487,4 +733,92 @@ func RecordPendingExecutionsCount(ctx context.Context, count int64) {
 	}
 
 	pendingExecutionsGauge.Record(ctx, count)
+}
+
+func RecordOrganizationsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	organizationsTotalGauge.Record(ctx, count)
+}
+
+func RecordUsersTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	usersTotalGauge.Record(ctx, count)
+}
+
+func RecordWorkflowsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowsTotalGauge.Record(ctx, count)
+}
+
+func RecordWorkflowNodesTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowNodesTotalGauge.Record(ctx, count)
+}
+
+func RecordDraftsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	draftsTotalGauge.Record(ctx, count)
+}
+
+func RecordIntegrationsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationsTotalGauge.Record(ctx, count)
+}
+
+func RecordIntegrationSecretsTotal(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretsTotalGauge.Record(ctx, count)
+}
+
+func RecordWorkflowsActiveCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowsActiveGauge.Record(ctx, count)
+}
+
+func RecordWorkflowRunsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowRunsDailyGauge.Record(ctx, count)
+}
+
+func RecordWorkflowEventsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowEventsDailyGauge.Record(ctx, count)
+}
+
+func RecordWorkflowNodeExecutionsDailyCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	workflowNodeExecutionsDailyGauge.Record(ctx, count)
 }

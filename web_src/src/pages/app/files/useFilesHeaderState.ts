@@ -7,9 +7,7 @@ export function useFilesHeaderState(canvasId?: string) {
 }
 
 type ResolveFilesHeaderVersionActionsArgs = {
-  isChangeManagementDisabled: boolean;
   handlePublishVersion: () => void;
-  handleCreateChangeRequest: () => void;
   handleResetDraftChanges: () => void;
   publishVersionDisabled: boolean;
   publishVersionDisabledTooltip?: string;
@@ -19,9 +17,7 @@ type ResolveFilesHeaderVersionActionsArgs = {
 };
 
 export function resolveFilesHeaderVersionActions({
-  isChangeManagementDisabled,
   handlePublishVersion,
-  handleCreateChangeRequest,
   handleResetDraftChanges,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
@@ -30,13 +26,13 @@ export function resolveFilesHeaderVersionActions({
   hasUnpublishedDraftChanges,
 }: ResolveFilesHeaderVersionActionsArgs) {
   return {
-    onPublishVersion: isChangeManagementDisabled ? handlePublishVersion : handleCreateChangeRequest,
+    onPublishVersion: handlePublishVersion,
     onDiscardVersion: handleResetDraftChanges,
     publishVersionDisabled,
     publishVersionDisabledTooltip,
     hasUnpublishedDraftChanges,
     discardVersionDisabled: resetDraftDisabled,
     discardVersionDisabledTooltip: resetDraftDisabledTooltip,
-    publishVersionLabel: isChangeManagementDisabled ? "Publish" : "Propose Change",
+    publishVersionLabel: "Publish",
   };
 }

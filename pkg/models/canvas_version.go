@@ -22,55 +22,25 @@ const (
 )
 
 type CanvasVersion struct {
-	ID                      uuid.UUID
-	WorkflowID              uuid.UUID
-	OwnerID                 *uuid.UUID
-	State                   string
-	Name                    string
-	Description             string
-	ChangeManagementEnabled bool
-	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover]
-	PublishedAt             *time.Time
-	Nodes                   datatypes.JSONSlice[Node]
-	Edges                   datatypes.JSONSlice[Edge]
-	ConsolePanels           datatypes.JSONType[[]ConsolePanel]
-	ConsoleLayout           datatypes.JSONType[[]ConsoleLayoutItem]
-	BranchName              *string
-	DisplayName             string
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
+	ID            uuid.UUID
+	WorkflowID    uuid.UUID
+	OwnerID       *uuid.UUID
+	State         string
+	Name          string
+	Description   string
+	PublishedAt   *time.Time
+	Nodes         datatypes.JSONSlice[Node]
+	Edges         datatypes.JSONSlice[Edge]
+	ConsolePanels datatypes.JSONType[[]ConsolePanel]
+	ConsoleLayout datatypes.JSONType[[]ConsoleLayoutItem]
+	BranchName    *string
+	DisplayName   string
+	CreatedAt     *time.Time
+	UpdatedAt     *time.Time
 }
 
 func (c *CanvasVersion) TableName() string {
 	return "workflow_versions"
-}
-
-func (c *CanvasVersion) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
-	if c == nil || len(c.ChangeRequestApprovers) == 0 {
-		return DefaultCanvasChangeRequestApprovers()
-	}
-
-	approvers := make([]CanvasChangeRequestApprover, len(c.ChangeRequestApprovers))
-	copy(approvers, c.ChangeRequestApprovers)
-	return approvers
-}
-
-func (c *CanvasVersion) BeforeCreate(_ *gorm.DB) error {
-	c.ensureDefaultChangeRequestApprovers()
-	return nil
-}
-
-func (c *CanvasVersion) BeforeSave(_ *gorm.DB) error {
-	c.ensureDefaultChangeRequestApprovers()
-	return nil
-}
-
-func (c *CanvasVersion) ensureDefaultChangeRequestApprovers() {
-	if len(c.ChangeRequestApprovers) > 0 {
-		return
-	}
-
-	c.ChangeRequestApprovers = datatypes.NewJSONSlice(DefaultCanvasChangeRequestApprovers())
 }
 
 func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
@@ -90,6 +60,37 @@ func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID
 
 func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
 	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
+}
+
+func FindCanvasVersionsByIDs(workflowID uuid.UUID, versionIDs []uuid.UUID) (map[uuid.UUID]*CanvasVersion, error) {
+	return FindCanvasVersionsByIDsInTransaction(database.Conn(), workflowID, versionIDs)
+}
+
+func FindCanvasVersionsByIDsInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	versionIDs []uuid.UUID,
+) (map[uuid.UUID]*CanvasVersion, error) {
+	result := make(map[uuid.UUID]*CanvasVersion)
+	if len(versionIDs) == 0 {
+		return result, nil
+	}
+
+	var versions []CanvasVersion
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", versionIDs).
+		Find(&versions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range versions {
+		result[versions[i].ID] = &versions[i]
+	}
+
+	return result, nil
 }
 
 func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
@@ -422,20 +423,18 @@ func CreateDraftBranchFromLiveInTransaction(
 
 	branchName := newDraftBranchName()
 	version := CanvasVersion{
-		ID:                      uuid.New(),
-		WorkflowID:              canvasID,
-		OwnerID:                 &userID,
-		State:                   CanvasVersionStateDraft,
-		Name:                    liveVersion.Name,
-		Description:             liveVersion.Description,
-		ChangeManagementEnabled: liveVersion.ChangeManagementEnabled,
-		ChangeRequestApprovers:  datatypes.NewJSONSlice(liveVersion.EffectiveChangeRequestApprovers()),
-		Nodes:                   datatypes.NewJSONSlice(nodes),
-		Edges:                   datatypes.NewJSONSlice(edges),
-		BranchName:              &branchName,
-		DisplayName:             displayName,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:          uuid.New(),
+		WorkflowID:  canvasID,
+		OwnerID:     &userID,
+		State:       CanvasVersionStateDraft,
+		Name:        liveVersion.Name,
+		Description: liveVersion.Description,
+		Nodes:       datatypes.NewJSONSlice(nodes),
+		Edges:       datatypes.NewJSONSlice(edges),
+		BranchName:  &branchName,
+		DisplayName: displayName,
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
 	}
 	copyVersionConsoleFields(liveVersion, &version)
 
@@ -460,18 +459,16 @@ func CreateCanvasSnapshotVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:                      uuid.New(),
-		WorkflowID:              workflowID,
-		OwnerID:                 &ownerID,
-		State:                   CanvasVersionStateSnapshot,
-		Name:                    sourceVersion.Name,
-		Description:             sourceVersion.Description,
-		ChangeManagementEnabled: sourceVersion.ChangeManagementEnabled,
-		ChangeRequestApprovers:  datatypes.NewJSONSlice(sourceVersion.EffectiveChangeRequestApprovers()),
-		Nodes:                   datatypes.NewJSONSlice(nodes),
-		Edges:                   datatypes.NewJSONSlice(edges),
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:          uuid.New(),
+		WorkflowID:  workflowID,
+		OwnerID:     &ownerID,
+		State:       CanvasVersionStateSnapshot,
+		Name:        sourceVersion.Name,
+		Description: sourceVersion.Description,
+		Nodes:       datatypes.NewJSONSlice(nodes),
+		Edges:       datatypes.NewJSONSlice(edges),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
 	}
 	copyVersionConsoleFields(sourceVersion, &version)
 

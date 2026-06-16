@@ -95,7 +95,9 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
-						messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+						if publishErr := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); publishErr != nil {
+							w.logger.Errorf("Error publishing execution state: %v", publishErr)
+						}
 						return
 					}
 
@@ -116,9 +118,9 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasExecutionRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasExecutionRoutingKey,
+		RemoteExchange: messages.ExecutionsExchange,
+		Service:        messages.ExecutionsExchange + "." + messages.ExecutionPendingRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.ExecutionPendingRoutingKey,
 	}
 
 	consumer := tackle.NewConsumer()
@@ -126,16 +128,16 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasExecutionRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.ExecutionPendingRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasExecutionRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.ExecutionPendingRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasExecutionRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.ExecutionPendingRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -156,7 +158,17 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 
 	err = w.LockAndProcessNodeExecution(executionID)
 	if err == nil {
-		messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		workflowID, parseErr := uuid.Parse(data.CanvasId)
+		if parseErr != nil {
+			w.logger.Errorf("Error parsing canvas id: %v", parseErr)
+			return parseErr
+		}
+
+		if publishErr := messages.PublishCanvasExecutionByID(workflowID, executionID); publishErr != nil {
+			w.logger.Errorf("Error publishing execution state: %v", publishErr)
+			return publishErr
+		}
+
 		return nil
 	}
 
@@ -198,6 +210,15 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		newEvents = append(newEvents, events...)
 	}
 
+	//
+	// We also track whether memory was modified during the execution so we can
+	// broadcast a memory_updated event after the transaction commits.
+	//
+	var memoryChangedCanvasID uuid.UUID
+	onMemoryChanged := func(canvasID uuid.UUID) {
+		memoryChangedCanvasID = canvasID
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -234,7 +255,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -257,10 +278,16 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	if memoryChangedCanvasID != uuid.Nil {
+		if err := messages.NewCanvasMemoryUpdatedMessage(memoryChangedCanvasID.String()).PublishMemoryUpdated(); err != nil {
+			w.logger.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
+		}
+	}
+
 	return nil
 }
 
-func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent), onMemoryChanged func(uuid.UUID)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -321,10 +348,11 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
-		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		Files:          contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
-		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-		Expressions:    contexts.NewExpressionContext(builder),
+		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
+			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
+		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
+		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Expressions: contexts.NewExpressionContext(builder),
 	}
 
 	if node.AppInstallationID != nil {
