@@ -10,11 +10,8 @@ import type {
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import {
   parseRunsFiltersFromQueryKey,
-  upsertExecutionIntoInfiniteEventsData,
   upsertExecutionIntoInfiniteRunsData,
-  upsertRootEventIntoInfiniteData,
   upsertRunIntoInfiniteData,
-  type InfiniteEventsPage,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
 import { canvasKeys } from "./useCanvasData";
@@ -101,22 +98,8 @@ export function useCanvasWebsocket(
     [queryClient, canvasId],
   );
 
-  const patchRootEventInCache = useCallback(
-    (event: CanvasesCanvasEvent) => {
-      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
-        { queryKey: canvasKeys.infiniteEvents(canvasId) },
-        (old) => upsertRootEventIntoInfiniteData(old, event),
-      );
-    },
-    [queryClient, canvasId],
-  );
-
   const patchExecutionInCache = useCallback(
     (execution: CanvasesCanvasNodeExecution) => {
-      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
-        { queryKey: canvasKeys.infiniteEvents(canvasId) },
-        (old) => upsertExecutionIntoInfiniteEventsData(old, execution),
-      );
       queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
         { queryKey: canvasKeys.infiniteRuns(canvasId) },
         (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
@@ -152,14 +135,6 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
-
-            /*
-             * Root canvas events are upserted into the infinite events cache
-             * instead of triggering a refetch.
-             */
-            if (workflowEvent.root) {
-              patchRootEventInCache(workflowEvent);
-            }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
@@ -297,7 +272,6 @@ export function useCanvasWebsocket(
       processRuntimeEvents,
       organizationId,
       patchRunInCache,
-      patchRootEventInCache,
       patchExecutionInCache,
       invalidateMemoryEntries,
     ],
@@ -385,9 +359,6 @@ export function useCanvasWebsocket(
       return;
     }
 
-    queryClient.invalidateQueries({
-      queryKey: canvasKeys.infiniteEvents(canvasId),
-    });
     queryClient.invalidateQueries({
       queryKey: canvasKeys.infiniteRuns(canvasId),
     });
