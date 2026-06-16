@@ -21,7 +21,7 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -90,7 +90,7 @@ func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testin
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -136,7 +136,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -232,7 +232,7 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -289,7 +289,7 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -346,7 +346,7 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -402,7 +402,7 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -463,7 +463,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -538,7 +538,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -613,7 +613,7 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 

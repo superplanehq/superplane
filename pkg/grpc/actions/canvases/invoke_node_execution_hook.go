@@ -110,11 +110,9 @@ func InvokeNodeExecutionHook(
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
 
-	messages.NewCanvasExecutionMessage(
-		execution.WorkflowID.String(),
-		execution.ID.String(),
-		execution.NodeID,
-	).Publish()
+	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to publish execution state: %v", err)
+	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
