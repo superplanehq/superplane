@@ -60,7 +60,9 @@ function addRepositoryDetails(details: Record<string, string>, repository: Repos
   details["Namespace"] = repository.namespace || "-";
   details["Size"] = repository.size_str || (repository.size != null ? `${repository.size} bytes` : "-");
   details["Packages"] = repository.package_count != null ? String(repository.package_count) : "-";
-  details["Downloads"] = repository.num_downloads != null ? String(repository.num_downloads) : "-";
+  if (repository.self_webapp_url) {
+    details["URL"] = repository.self_webapp_url;
+  }
 
   if (repository.num_quarantined_packages) {
     details["Quarantined Packages"] = String(repository.num_quarantined_packages);
