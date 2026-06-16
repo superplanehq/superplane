@@ -84,9 +84,9 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasEventCreatedRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasEventCreatedRoutingKey,
+		RemoteExchange: messages.EventsExchange,
+		Service:        messages.EventsExchange + "." + messages.EventCreatedRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.EventCreatedRoutingKey,
 	}
 
 	consumer := tackle.NewConsumer()
@@ -94,16 +94,16 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasEventCreatedRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.EventCreatedRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasEventCreatedRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.EventCreatedRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasEventCreatedRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.EventCreatedRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -204,13 +204,24 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	}
 
 	if runID != uuid.Nil {
-		err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
-		if err != nil {
-			logger.WithError(err).Warnf(
-				"Failed to publish run state message for run %s in workflow %s",
-				runID,
-				event.WorkflowID,
-			)
+		if len(createdQueueItems) == 0 {
+			if err := messages.PublishEventTerminal(event.WorkflowID, runID, event.ID); err != nil {
+				logger.WithError(err).Warnf(
+					"Failed to publish terminal event message for run %s in workflow %s",
+					runID,
+					event.WorkflowID,
+				)
+			}
+		}
+
+		if event.ExecutionID == nil {
+			if err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish(); err != nil {
+				logger.WithError(err).Warnf(
+					"Failed to publish run state message for run %s in workflow %s",
+					runID,
+					event.WorkflowID,
+				)
+			}
 		}
 	}
 
@@ -257,12 +268,25 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
+	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
+	if len(outgoingEdges) == 0 {
+		run, err := models.FindOrCreateFinishedCanvasRunForRootEventInTransaction(tx, event, models.CanvasRunResultPassed)
+		if err != nil {
+			return nil, uuid.Nil, err
+		}
+
+		if err := event.RoutedInTransaction(tx); err != nil {
+			return nil, uuid.Nil, err
+		}
+
+		return nil, run.ID, nil
+	}
+
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
 	if err != nil {
 		return nil, uuid.Nil, err
 	}
 
-	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
@@ -301,11 +325,6 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 	//
 	if len(queueItems) > 0 {
 		return queueItems, run.ID, nil
-	}
-
-	_, err = models.MaybeFinalizeRunInTransaction(tx, run.ID)
-	if err != nil {
-		return nil, uuid.Nil, err
 	}
 
 	return queueItems, run.ID, nil
@@ -356,14 +375,9 @@ func (w *EventRouter) processExecutionEvent(
 		return nil, uuid.Nil, err
 	}
 
-	finalized, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
-	if err != nil {
-		return nil, uuid.Nil, err
+	if len(createdQueueItems) > 0 {
+		return createdQueueItems, uuid.Nil, nil
 	}
 
-	if finalized {
-		return createdQueueItems, execution.RunID, nil
-	}
-
-	return createdQueueItems, uuid.Nil, nil
+	return nil, execution.RunID, nil
 }
