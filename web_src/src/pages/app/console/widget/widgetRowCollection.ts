@@ -10,25 +10,23 @@ import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode } from "@/ap
 import { DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 
 /**
- * Walk the loaded event pages and synthesize the row objects the dashboard's
- * table / chart / number renderers consume. Each row carries the raw
- * execution fields plus four derived conveniences:
+ * Walk the loaded run pages and synthesize execution row objects for the
+ * dashboard's table / chart / number renderers. Each row carries the raw
+ * execution fields plus derived conveniences:
  *
  * - `status`: lowercase canonical status string (see {@link deriveExecutionStatus}).
- * - `nodeName`: friendly node label resolved per-row via `nodeNameById`,
- *   falling back to the raw `nodeId` when the canvas no longer contains
- *   that node (e.g. it was deleted after the execution ran).
+ * - `nodeName`: friendly node label resolved per-row via `nodeNameById`.
  * - `durationMs`: created-to-updated elapsed time in milliseconds.
- * - `payload`: the data carried by the parent (root) event — i.e. the
- *   payload the node received. Shared by every execution under that event.
+ * - `payload`: the data carried by the run's root event — i.e. the payload
+ *   the node received.
  *
  * Iteration stops as soon as `rows.length >= limit`.
  */
 export function collectExecutionRows(
   pages: Array<
     | {
-        events?: Array<{
-          data?: Record<string, unknown>;
+        runs?: Array<{
+          rootEvent?: { data?: Record<string, unknown> };
           executions?: Array<
             Record<string, unknown> & {
               nodeId?: string;
@@ -48,8 +46,8 @@ export function collectExecutionRows(
 ): unknown[] {
   const rows: unknown[] = [];
   for (const page of pages) {
-    for (const event of page?.events ?? []) {
-      for (const exec of event.executions ?? []) {
+    for (const run of page?.runs ?? []) {
+      for (const exec of run.executions ?? []) {
         if (targetNodeId && exec.nodeId !== targetNodeId) continue;
         rows.push({
           ...exec,
@@ -57,7 +55,7 @@ export function collectExecutionRows(
           nodeName: (exec.nodeId && nodeNameById.get(exec.nodeId)) || exec.nodeId,
           durationMs:
             exec.updatedAt && exec.createdAt ? Date.parse(exec.updatedAt) - Date.parse(exec.createdAt) : undefined,
-          payload: event.data,
+          payload: run.rootEvent?.data,
         });
         if (rows.length >= limit) return rows;
       }
