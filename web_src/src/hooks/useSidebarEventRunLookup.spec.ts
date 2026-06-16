@@ -75,4 +75,66 @@ describe("useSidebarEventRunLookup", () => {
 
     expect(canvasesListRuns).toHaveBeenCalledTimes(1);
   });
+
+  it("paginates beyond the first three pages until a matching run is found", async () => {
+    const queryClient = new QueryClient();
+    const fillerRuns = Array.from({ length: 25 }, (_, index) => ({
+      id: `run-filler-${index}`,
+      rootEvent: { id: `root-filler-${index}` },
+    }));
+
+    canvasesListRuns
+      .mockResolvedValueOnce({
+        data: {
+          runs: fillerRuns,
+          totalCount: 100,
+          hasNextPage: true,
+          lastTimestamp: "2026-02-06T14:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          runs: fillerRuns,
+          totalCount: 100,
+          hasNextPage: true,
+          lastTimestamp: "2026-02-06T13:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          runs: fillerRuns,
+          totalCount: 100,
+          hasNextPage: true,
+          lastTimestamp: "2026-02-06T12:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          runs: [{ id: "run-1", rootEvent: { id: "root-1" } }],
+          totalCount: 100,
+          hasNextPage: false,
+          lastTimestamp: "2026-02-06T11:00:00.000Z",
+        },
+      });
+
+    const { result } = renderHook(
+      () =>
+        useSidebarEventRunLookup({
+          enabled: true,
+          canvasId: "canvas-1",
+          organizationId: "org-1",
+          queryClient,
+          runs: [],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(triggerEvent)).toBe("run-1");
+    });
+
+    expect(canvasesListRuns).toHaveBeenCalledTimes(4);
+  });
 });
