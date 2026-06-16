@@ -110,14 +110,14 @@ func InvokeNodeExecutionHook(
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
 
-	messages.NewCanvasExecutionMessage(
-		execution.WorkflowID.String(),
-		execution.ID.String(),
-		execution.NodeID,
-	).Publish()
+	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
+		logger.Errorf("failed to publish execution state RabbitMQ message: %v", err)
+	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			logger.Errorf("failed to publish canvas event created RabbitMQ message: %v", err)
+		}
 	}
 
 	return &pb.InvokeNodeExecutionHookResponse{}, nil

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { Activity, Cpu, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { isUsagePageForced } from "@/lib/env";
@@ -35,6 +36,10 @@ export function Usage({ organizationId }: UsageProps) {
   const forceUsagePage = isUsagePageForced();
   const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
   const anyError = [error, usersError, integrationsError].find(Boolean);
+
+  useReportPageReady(!anyLoading, {
+    failed: !!anyError,
+  });
 
   if (anyLoading) {
     return (

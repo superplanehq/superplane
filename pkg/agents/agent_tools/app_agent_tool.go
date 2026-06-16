@@ -59,7 +59,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read, and update the current SuperPlane app canvas. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft only creates or updates the caller's private draft and returns the draft version ID plus validation issues."
+	return "Inspect access, read, create drafts, and update the current SuperPlane app canvas. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, create_draft when read returns live/no version_id or when intentionally creating another draft branch, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft requires version_id and updates that selected draft branch."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -69,7 +69,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, update_draft to save canvas_yaml and/or console_yaml to a draft, and list_integrations for connected integration IDs.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, create_draft when read returns live/no version_id or when intentionally creating another draft branch, update_draft to save canvas_yaml and/or console_yaml to a selected draft, and list_integrations for connected integration IDs.",
 			},
 			"canvas_id": {
 				Type:        "string",
@@ -77,7 +77,19 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"use_draft": {
 				Type:        "boolean",
-				Description: "For read. Defaults to true: return the current user's draft when one exists, otherwise live.",
+				Description: "For read. Defaults to true: return the current user's draft when exactly one exists, otherwise live. If multiple owned drafts exist, pass version_id or set use_draft=false.",
+			},
+			"version_id": {
+				Type:        "string",
+				Description: "For read and update_draft. Draft version ID returned by read, create_draft, or a previous update_draft. Required for update_draft. If read returns source live with no version_id, call create_draft before update_draft. For read, use it to select a specific draft when multiple owned drafts exist. The backend validates that it belongs to the current user and canvas and is still a registered draft branch.",
+			},
+			"draft_version_id": {
+				Type:        "string",
+				Description: "Alias for version_id for read and update_draft. Use only one of version_id or draft_version_id.",
+			},
+			"display_name": {
+				Type:        "string",
+				Description: "For create_draft. Optional user-facing draft display name. If omitted, the backend assigns the next Draft #N name.",
 			},
 			"include_console": {
 				Type:        "boolean",
@@ -89,7 +101,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"canvas_yaml": {
 				Type:        "string",
-				Description: "For update_draft. Complete canonical canvas.yaml content to save.",
+				Description: "For update_draft. Complete canonical live canvas.yaml content to save. Unknown fields are rejected; do not include template-only or UI-only fields such as metadata.isTemplate.",
 			},
 			"console_yaml": {
 				Type:        "string",

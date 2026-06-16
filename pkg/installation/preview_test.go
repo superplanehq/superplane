@@ -27,7 +27,7 @@ spec:
 		},
 	})
 
-	preview, err := BuildPreview(repo.String())
+	preview, err := BuildPreview(repo.String(), nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Preview Environments", preview.CanvasName)

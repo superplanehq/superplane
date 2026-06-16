@@ -137,7 +137,7 @@ func Test__CreateInvitation(t *testing.T) {
 		assert.Equal(t, account.Name, user.Name)
 		assert.Equal(t, r.Organization.ID, user.OrganizationID)
 
-		roles, err := r.AuthService.GetUserRolesForOrg(user.ID.String(), r.Organization.ID.String())
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), user.ID.String(), r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, roles)
 

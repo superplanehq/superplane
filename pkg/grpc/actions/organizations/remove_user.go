@@ -18,7 +18,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
-	ownerIDs, err := authService.GetOrgUsersForRole(models.RoleOrgOwner, orgID)
+	ownerIDs, err := authService.GetOrgUsersForRole(ctx, models.RoleOrgOwner, orgID)
 	if err != nil {
 		log.Errorf("Error determining owners for org %s: %v", orgID, err)
 		return nil, status.Error(codes.Internal, "error determining organization owners")
@@ -32,7 +32,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	// TODO: this should all be inside of a transaction
 	// Remove organization roles
 	//
-	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
+	roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
 	if err != nil {
 		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
 		return nil, status.Error(codes.Internal, "error determing user roles")

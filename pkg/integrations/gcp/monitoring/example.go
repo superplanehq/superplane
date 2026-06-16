@@ -19,6 +19,15 @@ var exampleOutputDeleteAlertingPolicyBytes []byte
 //go:embed example_output_update_alerting_policy.json
 var exampleOutputUpdateAlertingPolicyBytes []byte
 
+//go:embed example_output_create_snooze.json
+var exampleOutputCreateSnoozeBytes []byte
+
+//go:embed example_output_get_snooze.json
+var exampleOutputGetSnoozeBytes []byte
+
+//go:embed example_output_expire_snooze.json
+var exampleOutputExpireSnoozeBytes []byte
+
 //go:embed example_data_on_alert.json
 var exampleDataOnAlertBytes []byte
 
@@ -35,9 +44,30 @@ var (
 	exampleOutputUpdateAlertingPolicyOnce sync.Once
 	exampleOutputUpdateAlertingPolicy     map[string]any
 
+	exampleOutputCreateSnoozeOnce sync.Once
+	exampleOutputCreateSnooze     map[string]any
+
+	exampleOutputGetSnoozeOnce sync.Once
+	exampleOutputGetSnooze     map[string]any
+
+	exampleOutputExpireSnoozeOnce sync.Once
+	exampleOutputExpireSnooze     map[string]any
+
 	exampleDataOnAlertOnce sync.Once
 	exampleDataOnAlert     map[string]any
 )
+
+func (c *CreateSnooze) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSnoozeOnce, exampleOutputCreateSnoozeBytes, &exampleOutputCreateSnooze)
+}
+
+func (g *GetSnooze) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSnoozeOnce, exampleOutputGetSnoozeBytes, &exampleOutputGetSnooze)
+}
+
+func (e *ExpireSnooze) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputExpireSnoozeOnce, exampleOutputExpireSnoozeBytes, &exampleOutputExpireSnooze)
+}
 
 func onAlertExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)

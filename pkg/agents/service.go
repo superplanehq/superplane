@@ -37,7 +37,7 @@ func (s *Service) ProviderName() string { return s.provider.Name() }
 // EnsureSession returns the user's single chat session for the given canvas,
 // provisioning it on the upstream provider on first call.
 func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	if err := s.checkAgentPermission(userID.String(), organizationID.String()); err != nil {
+	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
 		return nil, err
 	}
 
@@ -442,13 +442,13 @@ func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) err
 
 // checkAgentPermission enforces the org-level baseline. Per-canvas access is
 // gated by the gRPC handler's models.FindCanvas(orgID, canvasID).
-func (s *Service) checkAgentPermission(userID, organizationID string) error {
+func (s *Service) checkAgentPermission(ctx context.Context, userID, organizationID string) error {
 	checks := []struct{ resource, action string }{
 		{"agents", "create"},
 		{"canvases", "read"},
 	}
 	for _, c := range checks {
-		allowed, err := s.auth.CheckOrganizationPermission(userID, organizationID, c.resource, c.action)
+		allowed, err := s.auth.CheckOrganizationPermission(ctx, userID, organizationID, c.resource, c.action)
 		if err != nil {
 			return fmt.Errorf("resolve %s:%s permission: %w", c.resource, c.action, err)
 		}
@@ -509,7 +509,7 @@ func getDraftStatus(canvasID uuid.UUID) string {
 				draftCreatedAt(draft),
 			)
 		}
-		result += "These drafts may belong to other sessions or users. To make changes, use 'superplane_app' action 'update_draft'; it automatically targets your own private draft, creating one from the live version if needed. Do not assume an unrelated draft is yours.\n"
+		result += "These drafts may belong to other sessions or users. To continue a known draft branch, pass its version_id to 'superplane_app' actions 'read' and 'update_draft'. update_draft always requires version_id. Use 'create_draft' when read returned live/no version_id, or when the user explicitly wants another draft branch. Do not assume an unrelated draft is yours.\n"
 		return result
 	}
 
@@ -620,7 +620,7 @@ func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVer
 	return "draft", true
 }
 
-const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you need to edit the app, call 'superplane_app' action 'create_draft' first, then pass the returned version_id to 'update_draft'. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
 
 func draftCreatedAt(draft models.CanvasVersion) string {
 	if draft.CreatedAt == nil {

@@ -4,6 +4,9 @@ package actions
 type Input struct {
 	Action              string           `json:"action"`
 	CanvasID            string           `json:"canvas_id,omitempty"`
+	VersionID           string           `json:"version_id,omitempty"`
+	DraftVersionID      string           `json:"draft_version_id,omitempty"`
+	DisplayName         string           `json:"display_name,omitempty"`
 	UseDraft            *bool            `json:"use_draft,omitempty"`
 	IncludeConsole      bool             `json:"include_console,omitempty"`
 	IncludeIntegrations bool             `json:"include_integrations,omitempty"`

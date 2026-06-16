@@ -131,7 +131,7 @@ func (c *CreateDatabase) Execute(ctx core.ExecutionContext) error {
 
 	db, err := createDatabase(context.Background(), client, client.ProjectID(), instance, name)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create database", err))
+		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create database", err, roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gcp.cloudsql.database", []any{databasePayload(db)})

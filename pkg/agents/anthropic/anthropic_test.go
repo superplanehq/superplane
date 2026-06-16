@@ -387,10 +387,37 @@ func TestSendMessage_MapsArchivedSessionToUnavailableSession(t *testing.T) {
 	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
 }
 
+func TestSendMessage_MapsDeletedSessionBadRequestToUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Session sesn_deleted does not exist"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_deleted", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
 func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"tool target not found"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
+func TestSendMessage_DoesNotTreatUnrelatedSessionNotFoundMessageAsUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"validation failed: session variable not found"}}`))
 	}))
 	defer server.Close()
 
@@ -825,10 +852,14 @@ func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
 		return nil
 	}))
 
-	require.Len(t, received, 2)
-	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
-	assert.Equal(t, "Recovered", received[0].Text)
-	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
+	// session.error surfaces as a non-terminal notice; the stream keeps going
+	// and the recovered assistant message + turn completion still arrive.
+	require.Len(t, received, 3)
+	assert.Equal(t, agents.ProviderEventSessionNotice, received[0].Type)
+	assert.Equal(t, "An internal service error occurred", received[0].ErrorMessage)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[1].Type)
+	assert.Equal(t, "Recovered", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
 }
 
 func TestStreamEvents_SkipsMalformed(t *testing.T) {
