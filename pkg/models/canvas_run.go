@@ -94,9 +94,6 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 }
 
 func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
-	//
-	// TODO: why the fuck does the canvas run needs a version ID?
-	//
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err

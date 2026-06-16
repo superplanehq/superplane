@@ -157,14 +157,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	// - outcome: success, failed, skipped
 	// - reason: none, locked, deadlock, not_found, internal
 	//
-	metricOutcome := executorOutcomeSuccess
-	metricReason := executorReasonNone
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
 	defer func() {
 		telemetry.RecordEventWorkerEventProcessing(
 			context.Background(),
 			time.Since(attemptStart),
-			metricOutcome,
-			metricReason,
+			outcome,
+			reason,
 		)
 	}()
 
@@ -174,15 +174,15 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
-			metricOutcome = executorOutcomeSkipped
-			metricReason = executorReasonLocked
+			outcome = executorOutcomeSkipped
+			reason = executorReasonLocked
 			return nil
 		}
 
 		createdQueueItems, err = w.processEvent(tx, logger, lockedEvent)
 		if err != nil {
-			metricOutcome = executorOutcomeFailed
-			metricReason = classifyProcessError(err)
+			outcome = executorOutcomeFailed
+			reason = classifyProcessError(err)
 			return err
 		}
 
@@ -191,6 +191,10 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if err != nil {
 		return err
+	}
+
+	if outcome == executorOutcomeSkipped {
+		return nil
 	}
 
 	if len(createdQueueItems) > 0 {
@@ -208,7 +212,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	// We publish a RabbitMQ message so the run finalizer can finalize the run, if needed.
 	//
 	if len(createdQueueItems) == 0 {
-		if err := messages.PublishEventTerminal(event.WorkflowID, runID, event.ID); err != nil {
+		if err := messages.PublishEventTerminal(event.WorkflowID, event.RunID, event.ID); err != nil {
 			logger.WithError(err).Warnf(
 				"Failed to publish terminal event message for run %s in workflow %s",
 				runID,
@@ -261,11 +265,6 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	if len(outgoingEdges) == 0 {
-		_, err := models.CreateCanvasRunInTransaction(tx, event.WorkflowID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
-		if err != nil {
-			return nil, err
-		}
-
 		return nil, event.RoutedInTransaction(tx)
 	}
 
