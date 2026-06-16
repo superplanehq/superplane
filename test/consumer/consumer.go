@@ -20,13 +20,21 @@ type TestConsumer struct {
 }
 
 func New(amqpURL string, routingKey string) TestConsumer {
+	return NewForExchange(amqpURL, messages.CanvasExchange, routingKey)
+}
+
+func NewForExchange(amqpURL, exchangeName, routingKey string) TestConsumer {
 	return TestConsumer{
 		amqpURL:        amqpURL,
-		exchangeName:   messages.CanvasExchange,
+		exchangeName:   exchangeName,
 		routingKey:     routingKey,
 		messageChannel: make(chan bool),
 		consumer:       tackle.NewConsumer(),
 	}
+}
+
+func NewExecutions(amqpURL, routingKey string) TestConsumer {
+	return NewForExchange(amqpURL, messages.ExecutionsExchange, routingKey)
 }
 
 func (c *TestConsumer) Start() {
