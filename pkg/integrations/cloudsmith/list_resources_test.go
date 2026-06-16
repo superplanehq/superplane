@@ -1,6 +1,7 @@
 package cloudsmith
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -11,6 +12,22 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// repoPage builds a JSON array of n repositories with sequential slugs (repo-1, repo-2, …).
+func repoPage(n int) string {
+	items := make([]string, n)
+	for i := range items {
+		items[i] = fmt.Sprintf(`{"name":"Repo %d","slug":"repo-%d","namespace":"acme"}`, i+1, i+1)
+	}
+	return "[" + strings.Join(items, ",") + "]"
+}
+
+func okResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+}
 
 func Test__Cloudsmith__ListResources(t *testing.T) {
 	integration := &Cloudsmith{}
@@ -28,13 +45,10 @@ func Test__Cloudsmith__ListResources(t *testing.T) {
 	t.Run("repository lists namespace-scoped resources", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`[
-						{"name": "Production", "slug": "production", "namespace": "acme"},
-						{"name": "Staging", "slug": "staging", "namespace": "acme"}
-					]`)),
-				},
+				okResponse(`[
+					{"name": "Production", "slug": "production", "namespace": "acme"},
+					{"name": "Staging", "slug": "staging", "namespace": "acme"}
+				]`),
 			},
 		}
 
@@ -58,12 +72,7 @@ func Test__Cloudsmith__ListResources(t *testing.T) {
 	t.Run("falls back to slug when name is empty", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`[
-						{"name": "", "slug": "production", "namespace": "acme"}
-					]`)),
-				},
+				okResponse(`[{"name": "", "slug": "production", "namespace": "acme"}]`),
 			},
 		}
 
@@ -79,6 +88,28 @@ func Test__Cloudsmith__ListResources(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
 		assert.Equal(t, "acme/production", resources[0].Name)
+	})
+
+	t.Run("fetches all pages until partial page is returned", func(t *testing.T) {
+		// First page is full (repositoryPageSize items); second page is partial.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(repoPage(repositoryPageSize)),
+				okResponse(repoPage(3)),
+			},
+		}
+
+		resources, err := integration.ListResources("repository", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey": "test-key",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, repositoryPageSize+3)
 	})
 
 	t.Run("API error is propagated", func(t *testing.T) {
