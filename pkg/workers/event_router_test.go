@@ -31,6 +31,10 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	runConsumer.Start()
 	defer runConsumer.Stop()
 
+	terminalEventConsumer := testconsumer.New(amqpURL, messages.EventTerminalRoutingKey)
+	terminalEventConsumer.Start()
+	defer terminalEventConsumer.Stop()
+
 	//
 	// Create a simple canvas with just a trigger and a component nodes.
 	//
@@ -78,6 +82,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
+	assert.False(t, terminalEventConsumer.HasReceivedMessage())
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
@@ -240,6 +245,13 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, err)
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	finalizer := NewRunFinalizer(amqpURL)
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
+
+	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
