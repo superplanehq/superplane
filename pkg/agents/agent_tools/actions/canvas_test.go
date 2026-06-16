@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -81,6 +82,8 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
 		context.Background(),
 		r.Organization.ID.String(),
@@ -106,6 +109,7 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 		CanvasID:       canvas.ID.String(),
 	}, Input{
 		Action:     "update_draft",
+		VersionID:  draft.ID.String(),
 		CanvasYAML: canvasYAML,
 	})
 
@@ -139,6 +143,341 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.NotEmpty(t, staged)
+}
+
+func TestAppAgentTool_CreateDraftCreatesAnotherDraftBranch(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	existingDraft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:      "create_draft",
+		DisplayName: "Experiment",
+	})
+
+	require.NoError(t, err)
+	created, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Equal(t, "create_draft", created.Action)
+	assert.NotEqual(t, existingDraft.ID.String(), created.VersionID)
+	assert.Equal(t, "Experiment", created.Draft.DisplayName)
+
+	drafts, err := models.ListDraftBranchesForCanvasInTransaction(database.Conn(), canvas.ID, r.User, 0, nil)
+	require.NoError(t, err)
+	assert.Len(t, drafts, 2)
+}
+
+func TestAppAgentTool_UpdateDraftUsesProvidedDraftVersionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	firstDraft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+	secondDraft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
+		context.Background(),
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		"",
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:         "update_draft",
+		DraftVersionID: firstDraft.ID.String(),
+		CanvasYAML:     canvasYAML,
+	})
+
+	require.NoError(t, err)
+	update, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Equal(t, firstDraft.ID.String(), update.VersionID)
+
+	firstHasStaging, err := models.HasWorkflowStaging(firstDraft.ID)
+	require.NoError(t, err)
+	assert.True(t, firstHasStaging)
+
+	secondHasStaging, err := models.HasWorkflowStaging(secondDraft.ID)
+	require.NoError(t, err)
+	assert.False(t, secondHasStaging)
+}
+
+func TestAppAgentTool_UpdateDraftRequiresDraftVersionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
+		context.Background(),
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		"",
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	_, err = registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:     "update_draft",
+		CanvasYAML: canvasYAML,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version_id")
+	assert.Contains(t, err.Error(), "returned by read")
+}
+
+func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	firstDraft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+	secondDraft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	updatedBy := r.User
+	_, err = models.UpsertWorkflowStagingPath(
+		firstDraft.ID,
+		r.Organization.ID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+		"draft: first\n",
+		&updatedBy,
+	)
+	require.NoError(t, err)
+	_, err = models.UpsertWorkflowStagingPath(
+		secondDraft.ID,
+		r.Organization.ID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+		"draft: second\n",
+		&updatedBy,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "read",
+		VersionID: firstDraft.ID.String(),
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(readResult)
+	require.True(t, ok)
+	assert.Equal(t, "draft", read.Source)
+	assert.Equal(t, firstDraft.ID.String(), read.VersionID)
+	require.NotNil(t, read.Draft)
+	assert.Equal(t, firstDraft.ID.String(), read.Draft.VersionID)
+	assert.Equal(t, "draft: first\n", read.CanvasYAML)
+}
+
+func TestAppAgentTool_ReadUseDraftFalseIgnoresDraftVersionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	updatedBy := r.User
+	_, err = models.UpsertWorkflowStagingPath(
+		draft.ID,
+		r.Organization.ID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+		"draft: selected\n",
+		&updatedBy,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	useDraft := false
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "read",
+		UseDraft:  &useDraft,
+		VersionID: draft.ID.String(),
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(readResult)
+	require.True(t, ok)
+	assert.Equal(t, "live", read.Source)
+	assert.Empty(t, read.VersionID)
+	assert.Nil(t, read.Draft)
+	assert.NotEqual(t, "draft: selected\n", read.CanvasYAML)
+}
+
+func TestAppAgentTool_ReadRequiresDraftVersionIDWhenMultipleOwnedDraftsExist(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	_, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+	_, err = models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	_, err = registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{Action: "read"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple owned drafts exist")
+	assert.Contains(t, err.Error(), "version_id")
+}
+
+func TestAppAgentTool_UpdateDraftRejectsDraftVersionForAnotherUser(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	otherDraft, err := models.CreateDraftBranchFromLive(canvas.ID, otherUser.ID, "", nil, nil)
+	require.NoError(t, err)
+
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
+		context.Background(),
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		"",
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	_, err = registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:         "update_draft",
+		DraftVersionID: otherDraft.ID.String(),
+		CanvasYAML:     canvasYAML,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not belong to the current user")
+}
+
+func TestAppAgentTool_UpdateDraftRejectsNonDraftVersionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	require.NotNil(t, canvas.LiveVersionID)
+
+	canvasYAML, err := canvasRepository.ReadRepositorySpecFile(
+		context.Background(),
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		"",
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	_, err = registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:         "update_draft",
+		DraftVersionID: canvas.LiveVersionID.String(),
+		CanvasYAML:     canvasYAML,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is not a draft")
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
@@ -177,6 +516,8 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.Contains(t, unavailable, pb.Canvases_PublishCanvasVersion_FullMethodName)
 
 	toolActions := toolAccessByAction(result.ToolActions)
+	require.Contains(t, toolActions, "create_draft")
+	assert.True(t, toolActions["create_draft"].Allowed)
 	require.Contains(t, toolActions, "update_draft")
 	assert.True(t, toolActions["update_draft"].Allowed)
 	require.Contains(t, toolActions, "read_runtime")
