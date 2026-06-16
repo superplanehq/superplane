@@ -265,3 +265,21 @@ func Test__CreateAlertingPolicy__Execute(t *testing.T) {
 		assert.Contains(t, state.FailureMessage, "failed to create alerting policy")
 	})
 }
+
+func Test__CombinerVisibleWhenConditionKindUnset(t *testing.T) {
+	found := false
+	for _, f := range policyOptionFields() {
+		if f.Name != "combiner" {
+			continue
+		}
+		found = true
+		require.Len(t, f.VisibilityConditions, 1)
+		vals := f.VisibilityConditions[0].Values
+		// Visible for threshold and when conditionKind is unset (Update's default,
+		// where conditionKind is togglable and usually omitted); hidden for PromQL.
+		assert.Contains(t, vals, conditionKindThreshold)
+		assert.Contains(t, vals, "")
+		assert.NotContains(t, vals, conditionKindPromQL)
+	}
+	require.True(t, found, "combiner field not found in policyOptionFields")
+}

@@ -148,9 +148,11 @@ func policyOptionFields() []configuration.Field {
 			Description: "How multiple conditions combine to fire the policy.",
 			Default:     "OR",
 			// A PromQL policy has exactly one condition, so the combiner has no
-			// effect there; only show it for threshold policies (which can have
-			// several conditions).
-			VisibilityConditions: []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold}}},
+			// effect there; hide it only for PromQL. The empty value keeps the
+			// combiner visible when conditionKind is unset — e.g. on Update, where
+			// conditionKind is togglable and usually omitted when conditions are
+			// unchanged — so threshold combiners stay editable.
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold, ""}}},
 			TypeOptions:          &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: combinerOptions}},
 		},
 		{
