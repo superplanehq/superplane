@@ -47,6 +47,7 @@ func (s *TestContext) Start() {
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_EVENT_ROUTER", "yes")
+	os.Setenv("START_RUN_FINALIZER", "yes")
 	os.Setenv("START_NODE_EXECUTOR", "yes")
 	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
