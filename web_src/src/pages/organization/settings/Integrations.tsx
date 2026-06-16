@@ -132,7 +132,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       });
     });
 
-    return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
+    return [...catalogByProvider.values()].sort((a, b) => {
+      const aHasInstances = a.instances.length > 0;
+      const bHasInstances = b.instances.length > 0;
+      if (aHasInstances !== bHasInstances) {
+        return aHasInstances ? -1 : 1;
+      }
+      return a.providerLabel.localeCompare(b.providerLabel);
+    });
   }, [availableIntegrations, connectedInstancesByProvider]);
   const filteredIntegrationCatalog = useMemo(() => {
     const normalizedQuery = filterQuery.trim().toLowerCase();
