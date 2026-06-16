@@ -250,7 +250,7 @@ export function AppPage() {
     setIsConsoleYamlOpen,
     selectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
-  const { handleSelectVersionsMode, handleExitVersionsMode } = useVersionsModeActions({
+  const { handleExitVersionsMode } = useVersionsModeActions({
     setIsConsoleAddPanelOpen,
     setIsConsoleYamlOpen,
     setSearchParams,
@@ -271,6 +271,15 @@ export function AppPage() {
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
+  // True while the user is in an edit session. The session keeps the versions
+  // sidebar visible even when previewing the current/old version (not editing a
+  // draft), and ends only when the user explicitly exits.
+  const [editSessionActive, setEditSessionActive] = useState(false);
+  // Distinguishes "user deliberately selected Current version from the sidebar"
+  // (session stays open) from "landed back on live because the draft was
+  // published/discarded" (session must close). Both states look identical in
+  // terms of active-version state (no selected version), so we can't derive it.
+  const previewingCurrentVersionRef = useRef(false);
   const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -387,6 +396,11 @@ export function AppPage() {
     (!!effectiveLiveCanvasVersionId && selectedCanvasVersion.metadata?.id === effectiveLiveCanvasVersionId) ||
     selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
+  // Events/runs are only surfaced in the normal live workflow context. While an
+  // edit session shows the versions sidebar (including when previewing the
+  // current version), live activity is hidden so the canvas reads as a pure
+  // visual snapshot. `isViewingLiveVersion` stays for permission/eligibility.
+  const showLiveActivity = isViewingLiveVersion && !(editSessionActive && !isRunInspectionMode && !isMemoryMode);
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
   useEffect(() => {
@@ -470,6 +484,28 @@ export function AppPage() {
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
+  // Editing a draft always implies an active edit session; previewing the
+  // current/old version from the sidebar keeps the session open until the user
+  // explicitly exits.
+  useEffect(() => {
+    if (isEditing) {
+      previewingCurrentVersionRef.current = false;
+      setEditSessionActive(true);
+    }
+  }, [isEditing]);
+  // Close the edit session once we return to the live canvas for a reason other
+  // than deliberately previewing the current version (e.g. after publishing or
+  // discarding a draft). Previewing an older published version keeps the session
+  // open because that is not the live version.
+  useEffect(() => {
+    if (!editSessionActive || isEditing || isCreatingDraftBranch) {
+      return;
+    }
+    if (!isViewingLiveVersion || previewingCurrentVersionRef.current) {
+      return;
+    }
+    setEditSessionActive(false);
+  }, [editSessionActive, isEditing, isCreatingDraftBranch, isViewingLiveVersion]);
   const { resolvedActiveBranchMeta, resolvedActiveBranch } = useResolvedActiveDraftBranch({
     canvasId,
     activeBranch,
@@ -489,8 +525,8 @@ export function AppPage() {
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
     [isRunInspectionMode, selectedRunId, runStatusFilters],
   );
-  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
-  const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
+  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, showLiveActivity);
+  const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const runsEventsData = useMemo(() => {
     const pages = infiniteEventsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -950,8 +986,8 @@ export function AppPage() {
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
   const visibleNodeExecutionsMap = useMemo(
-    () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
-    [isViewingLiveVersion, nodeExecutionsMap],
+    () => (showLiveActivity ? nodeExecutionsMap : {}),
+    [showLiveActivity, nodeExecutionsMap],
   );
   const consoleNodeStatuses = useMemo(
     () => deriveConsoleNodeStatuses(visibleNodeExecutionsMap),
@@ -959,12 +995,12 @@ export function AppPage() {
   );
   const handleConsoleTriggerNode = useConsoleTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
   const visibleNodeQueueItemsMap = useMemo(
-    () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
-    [isViewingLiveVersion, nodeQueueItemsMap],
+    () => (showLiveActivity ? nodeQueueItemsMap : {}),
+    [showLiveActivity, nodeQueueItemsMap],
   );
   const visibleNodeEventsMap = useMemo(
-    () => (isViewingLiveVersion ? nodeEventsMap : {}),
-    [isViewingLiveVersion, nodeEventsMap],
+    () => (showLiveActivity ? nodeEventsMap : {}),
+    [showLiveActivity, nodeEventsMap],
   );
 
   // Execution chain data utilities for lazy loading
@@ -1702,17 +1738,17 @@ export function AppPage() {
 
       // Build maps with current node data for sidebar
       const executionsMap =
-        !isViewingLiveVersion || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
+        !showLiveActivity || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
       const queueItemsMap =
-        !isViewingLiveVersion || nodeData.queueItems.length === 0
+        !showLiveActivity || nodeData.queueItems.length === 0
           ? {}
           : { [nodeId]: nodeData.queueItems.slice().reverse() };
       const eventsMapForSidebar =
-        !isViewingLiveVersion || nodeData.events.length === 0
+        !showLiveActivity || nodeData.events.length === 0
           ? {}
           : { [nodeId]: nodeData.events.length > 0 ? nodeData.events : visibleNodeEventsMap[nodeId] || [] };
-      const totalHistoryCount = !isViewingLiveVersion ? 0 : nodeData.totalInHistoryCount;
-      const totalQueueCount = !isViewingLiveVersion ? 0 : nodeData.totalInQueueCount;
+      const totalHistoryCount = !showLiveActivity ? 0 : nodeData.totalInHistoryCount;
+      const totalQueueCount = !showLiveActivity ? 0 : nodeData.totalInQueueCount;
 
       const sidebarData = prepareSidebarData(
         node,
@@ -1732,7 +1768,7 @@ export function AppPage() {
         isLoading: nodeData.isLoading,
       };
     },
-    [canvasNodes, canvasNodesById, allComponents, allTriggers, visibleNodeEventsMap, isViewingLiveVersion, getNodeData],
+    [canvasNodes, canvasNodesById, allComponents, allTriggers, visibleNodeEventsMap, showLiveActivity, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -3997,6 +4033,8 @@ export function AppPage() {
       showErrorToast("No live version available");
       return;
     }
+    // Deliberate preview of the current version keeps the edit session open.
+    previewingCurrentVersionRef.current = true;
     handleUseVersion(effectiveLiveCanvasVersionId);
   }, [effectiveLiveCanvasVersionId, handleUseVersion]);
 
@@ -4011,9 +4049,22 @@ export function AppPage() {
         }
       }
 
+      // Track when the user deliberately selects the current/live version from
+      // the sidebar so the edit session stays open (vs. internal navigation back
+      // to live after publish/discard, which must close it).
+      previewingCurrentVersionRef.current =
+        (!!effectiveLiveCanvasVersionId && versionID === effectiveLiveCanvasVersionId) ||
+        (!!liveCanvasVersionId && versionID === liveCanvasVersionId);
+
       handleUseVersion(versionID);
     },
-    [handleUseVersion, hasEditableVersion, hasPendingLocalCanvasState],
+    [
+      handleUseVersion,
+      hasEditableVersion,
+      hasPendingLocalCanvasState,
+      effectiveLiveCanvasVersionId,
+      liveCanvasVersionId,
+    ],
   );
 
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
@@ -4041,14 +4092,11 @@ export function AppPage() {
     draftVersionToDelete,
     setDraftVersionToDelete,
     draftVersionToDeleteName,
-    startEditingMenuOpen,
-    setStartEditingMenuOpen,
     handleContinueDraftBranch,
     handleCreateDraftBranch,
     handleDeleteDraftBranch,
     confirmDeleteDraftVersion,
     requestDeleteActiveDraft,
-    discardDraftAndCreateNew,
   } = useCanvasDraftBranchActions({
     canUpdateCanvas,
     draftBranches,
@@ -4136,6 +4184,7 @@ export function AppPage() {
         showErrorToast("No live version available");
         return;
       }
+      setEditSessionActive(false);
       exitToLive();
       handleUseVersion(effectiveLiveCanvasVersionId);
       return;
@@ -4275,32 +4324,35 @@ export function AppPage() {
     setIsConsoleYamlOpen,
   });
 
-  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit } =
-    useWorkflowHeaderEditActions({
-      isRunInspectionMode,
-      isVersionsMode: urlViewFlags.isVersionsMode,
-      handleClearRunInspection,
-      handleExitVersionsMode,
-      handleToggleEditMode,
-      setRunDetailNodeId,
-      setSearchParams,
-      startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
-    });
+  const { handleEnterEditModeFromHeader, clearRunInspectionForEdit } = useWorkflowHeaderEditActions({
+    isRunInspectionMode,
+    isVersionsMode: urlViewFlags.isVersionsMode,
+    handleClearRunInspection,
+    handleExitVersionsMode,
+    handleToggleEditMode,
+    setRunDetailNodeId,
+    setSearchParams,
+    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
+  });
 
-  const handleCreateDraftBranchFromHeader = useCallback(async () => {
+  // Ends the edit session: closes the versions sidebar and returns to the live
+  // canvas (which restores events/runs). Works whether editing a draft or
+  // previewing a version from the sidebar.
+  const handleExitEditSession = useCallback(() => {
+    setEditSessionActive(false);
+    clearRunInspectionForEdit();
+    if (effectiveLiveCanvasVersionId) {
+      handleUseVersion(effectiveLiveCanvasVersionId);
+    } else {
+      exitToLive();
+    }
+  }, [clearRunInspectionForEdit, effectiveLiveCanvasVersionId, handleUseVersion, exitToLive]);
+
+  const handleCreateDraftBranchFromSidebar = useCallback(async () => {
     clearRunInspectionForEdit();
     await Promise.resolve();
     await handleCreateDraftBranch();
   }, [clearRunInspectionForEdit, handleCreateDraftBranch]);
-
-  const handleContinueDraftBranchFromHeader = useCallback(
-    async (branchName: string) => {
-      clearRunInspectionForEdit();
-      await Promise.resolve();
-      handleContinueDraftBranch(branchName);
-    },
-    [clearRunInspectionForEdit, handleContinueDraftBranch],
-  );
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -4318,15 +4370,6 @@ export function AppPage() {
     if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId) return;
     handleUseVersion(liveCanvasVersionId);
   }, [handleUseVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
-
-  const handleDiscardDraftAndStartEdit = useCallback(async () => {
-    if (!canUpdateCanvas) {
-      showErrorToast("You don't have permission to edit this canvas");
-      return;
-    }
-    clearRunInspectionForEdit();
-    await discardDraftAndCreateNew();
-  }, [canUpdateCanvas, clearRunInspectionForEdit, discardDraftAndCreateNew]);
 
   const handleResetDraftChanges = useCallback(() => {
     if (!organizationId || !canvasId) {
@@ -4675,13 +4718,15 @@ export function AppPage() {
 
   const showRunsSidebar =
     isCanvasWorkflowTab(headerMode) &&
-    !isEditing &&
+    !editSessionActive &&
     !urlViewFlags.isConsoleMode &&
     !urlViewFlags.isMemoryMode &&
     !urlViewFlags.isFilesMode &&
     !urlViewFlags.isVersionsMode;
 
-  const showVersionsSidebar = urlViewFlags.isVersionsMode;
+  // The versions sidebar is permanent during an edit session while on the
+  // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
+  const showVersionsSidebar = editSessionActive && !isRunInspectionMode && !urlViewFlags.isMemoryMode;
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4724,6 +4769,8 @@ export function AppPage() {
     activeDraftBranch: resolvedActiveBranch,
     draftBranchEditStatusByVersionId,
     onOpenDraftBranch: handleContinueDraftBranch,
+    onCreateDraftBranch: handleCreateDraftBranchFromSidebar,
+    createDraftBranchPending: isCreatingDraftBranch,
     onDeleteDraftBranch: handleDeleteDraftBranch,
     deleteDraftBranchPending: deleteDraftBranchMutation.isPending,
   });
@@ -4879,23 +4926,14 @@ export function AppPage() {
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
-          onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
-          unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
-          startEditingDrafts={draftBranches}
-          startEditingDefaultDraft={startEditingDefaultDraft}
-          startEditingMenuOpen={startEditingMenuOpen}
-          onStartEditingMenuOpenChange={setStartEditingMenuOpen}
-          onContinueDraftBranch={handleContinueDraftBranchFromHeader}
-          onCreateDraftBranch={handleCreateDraftBranchFromHeader}
-          createDraftBranchPending={isCreatingDraftBranch}
           headerMode={headerMode}
+          isEditSessionActive={editSessionActive}
           onSelectCanvasView={handleSelectCanvasView}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          onExitEditMode={handleExitEditModeFromHeader}
+          onExitEditMode={handleExitEditSession}
           onSelectConsole={handleSelectConsoleMode}
-          onSelectVersions={handleSelectVersionsMode}
           onSelectFiles={handleSelectFilesMode}
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
@@ -4939,7 +4977,7 @@ export function AppPage() {
           components={allComponents}
           triggers={allTriggers}
           logEntries={logEntries}
-          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          runsEvents={showLiveActivity ? runsEventsData.events : []}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}

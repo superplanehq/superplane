@@ -52,6 +52,8 @@ export interface CanvasVersionsSidebarPanelConfig {
   activeDraftBranch?: string | null;
   draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   onOpenDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
   onDeleteDraftBranch?: (versionId: string) => void;
   deleteDraftBranchPending?: boolean;
 }
