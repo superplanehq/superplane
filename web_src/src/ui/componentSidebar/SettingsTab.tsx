@@ -475,6 +475,17 @@ export function SettingsTab({
       <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
         <div className="space-y-6">
           <ConfigurationView model={configurationDisplayModel} />
+          {customField && shouldShowConfiguration && (
+            <div
+              className={
+                configurationFields && configurationFields.length > 0
+                  ? ""
+                  : "border-t border-gray-200 dark:border-gray-700 pt-6"
+              }
+            >
+              {customField(nodeConfiguration)}
+            </div>
+          )}
         </div>
       </div>
     );
