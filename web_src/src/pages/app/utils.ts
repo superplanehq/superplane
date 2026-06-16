@@ -4,6 +4,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasRun,
   SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
@@ -268,6 +269,59 @@ export function mapQueueItemsToSidebarEvents(
       triggerEventId: item.rootEvent?.id,
     };
   });
+}
+
+export function getSidebarEventRootEventId(event: SidebarEvent): string | undefined {
+  return (
+    event.triggerEventId || event.originalExecution?.rootEvent?.id || (event.kind === "trigger" ? event.id : undefined)
+  );
+}
+
+export function getSidebarEventExecutionId(event: SidebarEvent): string | undefined {
+  if (event.executionId) {
+    return event.executionId;
+  }
+
+  if (event.kind === "execution") {
+    return event.id;
+  }
+
+  return undefined;
+}
+
+export function getSidebarEventRunLookupBefore(event: SidebarEvent): string | undefined {
+  const timestamp =
+    event.originalExecution?.rootEvent?.createdAt || event.originalEvent?.createdAt || event.receivedAt?.toISOString();
+
+  if (!timestamp) {
+    return undefined;
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  // The API returns runs before this cursor. Move just past the event so the
+  // matching run is included even when run and event timestamps are equal.
+  return new Date(date.getTime() + 5 * 60 * 1000).toISOString();
+}
+
+export function findRunIdForSidebarEvent(runs: CanvasesCanvasRun[], event: SidebarEvent): string | null {
+  const executionId = getSidebarEventExecutionId(event);
+  if (executionId) {
+    const run = runs.find((candidate) => candidate.executions?.some((execution) => execution.id === executionId));
+    if (run?.id) {
+      return run.id;
+    }
+  }
+
+  const rootEventId = getSidebarEventRootEventId(event);
+  if (!rootEventId) {
+    return null;
+  }
+
+  return runs.find((run) => run.rootEvent?.id === rootEventId)?.id ?? null;
 }
 
 export function mapCanvasNodesToLogEntries(options: {

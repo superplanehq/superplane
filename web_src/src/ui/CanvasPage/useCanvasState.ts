@@ -47,6 +47,7 @@ export interface CanvasPageState {
     selectedNodeId: string | null;
     close: () => void;
     open: (nodeId: string) => void;
+    clearSelection: () => void;
   };
 }
 
@@ -297,6 +298,11 @@ function useComponentSidebarState(
     onChangeRef.current?.(true, nodeId);
   }, []);
 
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null);
+    onChangeRef.current?.(true, null);
+  }, []);
+
   // Keep external listener updated when the selection genuinely changes while
   // open. `open`/`close` already notify `onChange` for user-driven changes, so
   // this effect only needs to cover internal selection changes that bypass them.
@@ -352,5 +358,6 @@ function useComponentSidebarState(
     selectedNodeId,
     close,
     open,
+    clearSelection,
   };
 }
