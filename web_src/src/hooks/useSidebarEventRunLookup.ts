@@ -93,9 +93,9 @@ export function useSidebarEventRunLookup({
         return null;
       }
 
-      const cachedLookup = fetchedRunIdsRef.current.get(lookupKey);
-      if (cachedLookup !== undefined) {
-        return cachedLookup;
+      const cachedRunId = fetchedRunIdsRef.current.get(lookupKey);
+      if (cachedRunId) {
+        return cachedRunId;
       }
 
       const resolvedRunId = findRunIdInLookupIndex(lookupIndex, event);
@@ -141,7 +141,6 @@ export function useSidebarEventRunLookup({
           before = response.data.lastTimestamp;
         }
 
-        fetchedRunIdsRef.current.set(lookupKey, null);
         return null;
       })();
 
