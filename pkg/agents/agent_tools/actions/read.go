@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -35,24 +36,24 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		return readResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	draft, err := ownedDraftVersion(canvasID, uuid.MustParse(session.UserID))
-	if err != nil {
-		return readResult{}, fmt.Errorf("load draft: %w", err)
-	}
-
 	versionID := ""
 	source := "live"
-	if input.UseDraft == nil || *input.UseDraft {
-		if draft != nil {
-			versionID = draft.ID.String()
-			source = "draft"
+	var draft *models.CanvasVersion
+	if shouldReadDraft(input) {
+		draft, err = resolveReadableDraftVersion(canvasID, uuid.MustParse(session.UserID), input)
+		if err != nil {
+			return readResult{}, fmt.Errorf("load draft: %w", err)
 		}
+	}
+	if draft != nil {
+		versionID = draft.ID.String()
+		source = "draft"
 	}
 
 	// Read the effective staged content (staged edits when present, the
 	// materialized version row otherwise) so the agent observes the same draft
 	// state the UI edits and the same edits it stages through update_draft.
-	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.CanvasYAMLRepositoryPath)
+	canvasYAML, err := readRepositorySpecFileForSource(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.CanvasYAMLRepositoryPath, source)
 	if err != nil {
 		return readResult{}, fmt.Errorf("read canvas yaml: %w", err)
 	}
@@ -80,7 +81,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	if input.IncludeConsole {
-		consoleYAML, consoleErr := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.ConsoleYAMLRepositoryPath)
+		consoleYAML, consoleErr := readRepositorySpecFileForSource(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.ConsoleYAMLRepositoryPath, source)
 		if consoleErr != nil {
 			return readResult{}, fmt.Errorf("read console yaml: %w", consoleErr)
 		}
@@ -96,6 +97,13 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	return result, nil
+}
+
+func readRepositorySpecFileForSource(ctx context.Context, organizationID, canvasID, versionID, path, source string) (string, error) {
+	if source == "draft" {
+		return canvasRepository.ReadRepositorySpecFileStaged(ctx, organizationID, canvasID, versionID, path)
+	}
+	return canvasRepository.ReadRepositorySpecFile(ctx, organizationID, canvasID, versionID, path)
 }
 
 // summarize derives the canvas summary from the YAML the read returns. A draft
@@ -135,4 +143,14 @@ func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source 
 		return nil, fmt.Errorf("load live canvas version summary: %w", err)
 	}
 	return version, nil
+}
+
+func shouldReadDraft(input Input) bool {
+	if input.UseDraft != nil && !*input.UseDraft {
+		return false
+	}
+	if strings.TrimSpace(input.VersionID) != "" || strings.TrimSpace(input.DraftVersionID) != "" {
+		return true
+	}
+	return true
 }
