@@ -71,12 +71,12 @@ function lastSegment(value: string | undefined): string | undefined {
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 }
 
-function subtitle(context: SubtitleContext): string | React.ReactNode {
+export function subtitle(context: SubtitleContext): string | React.ReactNode {
   const timestamp = context.execution.updatedAt || context.execution.createdAt;
   return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
-function baseProps(
+export function baseProps(
   context: ComponentBaseContext,
   iconSlug: string,
   fallbackTitle: string,
@@ -188,4 +188,68 @@ function selectorMetadata(node: NodeInfo): MetadataItem[] {
   if (label) metadata.push({ icon: "bell", label });
   if (config?.displayName) metadata.push({ icon: "pencil", label: config.displayName });
   return metadata;
+}
+
+// --- Snooze helpers (mappers live in create_snooze.ts / get_snooze.ts / expire_snooze.ts) ---
+
+interface SnoozeOutputData {
+  name?: string;
+  id?: string;
+  displayName?: string;
+  policiesCount?: number;
+  startTime?: string;
+  endTime?: string;
+}
+
+interface CreateSnoozeConfiguration {
+  displayName?: string;
+  policies?: string[];
+  duration?: string;
+}
+
+interface SnoozeSelectorConfiguration {
+  snooze?: string;
+}
+
+// Resolved at Setup time by the backend so the collapsed node can show the
+// snooze's display name instead of its numeric ID.
+interface SnoozeNodeMetadata {
+  snoozeName?: string;
+  displayName?: string;
+  id?: string;
+}
+
+export function snoozeDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const out = outputs?.default?.[0]?.data as SnoozeOutputData | undefined;
+  if (!out) return details;
+
+  if (out.displayName) details["Display Name"] = out.displayName;
+  if (out.id) details["Snooze ID"] = out.id;
+  if (out.policiesCount !== undefined) details["Policies"] = String(out.policiesCount);
+  if (out.startTime) details["Start"] = new Date(out.startTime).toLocaleString();
+  if (out.endTime) details["End"] = new Date(out.endTime).toLocaleString();
+  return details;
+}
+
+export function snoozeCreateMetadata(node: NodeInfo): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const config = node.configuration as CreateSnoozeConfiguration | undefined;
+  if (config?.displayName) metadata.push({ icon: "bell-off", label: config.displayName });
+  const count = config?.policies?.length ?? 0;
+  if (count > 0) metadata.push({ icon: "bell", label: `${count} ${count > 1 ? "policies" : "policy"}` });
+  if (config?.duration) metadata.push({ icon: "clock", label: config.duration });
+  return metadata;
+}
+
+export function snoozeSelectorMetadata(node: NodeInfo): MetadataItem[] {
+  const config = node.configuration as SnoozeSelectorConfiguration | undefined;
+  const nodeMeta = node.metadata as SnoozeNodeMetadata | undefined;
+  // Prefer the resolved display name; fall back to the snooze ID from the value.
+  const label = nodeMeta?.displayName || nodeMeta?.id || lastSegment(config?.snooze);
+  return label ? [{ icon: "bell-off", label }] : [];
 }
