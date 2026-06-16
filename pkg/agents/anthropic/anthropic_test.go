@@ -387,10 +387,37 @@ func TestSendMessage_MapsArchivedSessionToUnavailableSession(t *testing.T) {
 	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
 }
 
+func TestSendMessage_MapsDeletedSessionBadRequestToUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Session sesn_deleted does not exist"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_deleted", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
 func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"tool target not found"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
+func TestSendMessage_DoesNotTreatUnrelatedSessionNotFoundMessageAsUnavailableSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"validation failed: session variable not found"}}`))
 	}))
 	defer server.Close()
 
