@@ -7,10 +7,11 @@ import { EMPTY_DISPLAY_VALUE } from "./formatConfigurationValue";
 type ConfigurationGroupHeaderProps = {
   header: ConfigurationDisplayRow;
   className?: string;
+  hideSummary?: boolean;
 };
 
-function ConfigurationGroupHeader({ header, className }: ConfigurationGroupHeaderProps) {
-  const hasSummary = header.displayText !== "" && header.displayText !== EMPTY_DISPLAY_VALUE;
+function ConfigurationGroupHeader({ header, className, hideSummary = false }: ConfigurationGroupHeaderProps) {
+  const hasSummary = !hideSummary && header.displayText !== "" && header.displayText !== EMPTY_DISPLAY_VALUE;
 
   return (
     <div className={cn("flex items-baseline justify-between gap-2", className)}>
@@ -25,6 +26,7 @@ type ConfigurationNestedGroupProps = {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
+  hideHeaderSummaries?: boolean;
 };
 
 export function ConfigurationNestedGroup({
@@ -32,12 +34,13 @@ export function ConfigurationNestedGroup({
   children,
   className,
   contentClassName,
+  hideHeaderSummaries = false,
 }: ConfigurationNestedGroupProps) {
   return (
     <div className={cn("min-w-0 mt-1", className)}>
-      <ConfigurationGroupHeader header={header} />
+      <ConfigurationGroupHeader header={header} hideSummary={hideHeaderSummaries} />
       <div className={cn("relative ml-1.5 mt-1.5 min-w-0 border-l border-slate-950/10 pl-3", contentClassName)}>
-        <div className="flex flex-col gap-2">{children}</div>
+        <div className="flex flex-col gap-1.5">{children}</div>
       </div>
     </div>
   );
@@ -46,9 +49,14 @@ export function ConfigurationNestedGroup({
 type ConfigurationDisplayBlockListProps = {
   blocks: ConfigurationDisplayBlock[];
   renderRow: (row: ConfigurationDisplayRow) => ReactNode;
+  hideHeaderSummaries?: boolean;
 };
 
-export function ConfigurationDisplayBlockList({ blocks, renderRow }: ConfigurationDisplayBlockListProps) {
+export function ConfigurationDisplayBlockList({
+  blocks,
+  renderRow,
+  hideHeaderSummaries = false,
+}: ConfigurationDisplayBlockListProps) {
   return (
     <>
       {blocks.map((block) => {
@@ -57,8 +65,16 @@ export function ConfigurationDisplayBlockList({ blocks, renderRow }: Configurati
         }
 
         return (
-          <ConfigurationNestedGroup key={block.header.key} header={block.header}>
-            <ConfigurationDisplayBlockList blocks={block.children} renderRow={renderRow} />
+          <ConfigurationNestedGroup
+            key={block.header.key}
+            header={block.header}
+            hideHeaderSummaries={hideHeaderSummaries}
+          >
+            <ConfigurationDisplayBlockList
+              blocks={block.children}
+              renderRow={renderRow}
+              hideHeaderSummaries={hideHeaderSummaries}
+            />
           </ConfigurationNestedGroup>
         );
       })}
