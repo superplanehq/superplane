@@ -41,6 +41,7 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	actionSchema := schema.Properties["action"]
 	resourceSchema := schema.Properties["resource"]
 
+	assert.Contains(t, actionSchema.Enum, "create_draft")
 	assert.Contains(t, actionSchema.Enum, "read_runtime")
 	assert.ElementsMatch(t, []string{
 		"memory",
@@ -66,6 +67,21 @@ func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) 
 	assert.Contains(t, canvasYAMLSchema.Description, "canonical live canvas.yaml")
 	assert.Contains(t, canvasYAMLSchema.Description, "Unknown fields are rejected")
 	assert.Contains(t, canvasYAMLSchema.Description, "metadata.isTemplate")
+}
+
+func TestAppAgentToolSchemaIncludesDraftVersionIDForUpdates(t *testing.T) {
+	tool := NewAppAgentTool(AppAgentToolOptions{})
+
+	schema := tool.InputSchema()
+
+	assert.Contains(t, schema.Properties, "version_id")
+	assert.Contains(t, schema.Properties, "draft_version_id")
+	assert.Contains(t, schema.Properties, "display_name")
+	assert.Contains(t, schema.Properties["version_id"].Description, "For read and update_draft")
+	assert.Contains(t, schema.Properties["draft_version_id"].Description, "Alias")
+	assert.Contains(t, schema.Properties["version_id"].Description, "read")
+	assert.Contains(t, schema.Properties["version_id"].Description, "read returns source live")
+	assert.Contains(t, schema.Properties["display_name"].Description, "For create_draft")
 }
 
 func TestComponentSchemaAgentTool_ReturnsCoreComponentSchema(t *testing.T) {

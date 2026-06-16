@@ -39,6 +39,7 @@ func NewDefaultRegistry(deps Dependencies) *Registry {
 		newAccessAction(deps),
 		newReadAction(deps),
 		newReadRuntimeAction(deps),
+		createDraftAction{},
 		newUpdateDraftAction(deps),
 		listIntegrationsAction{},
 	)
