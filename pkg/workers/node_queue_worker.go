@@ -223,11 +223,9 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 					continue
 				}
 
-				messages.NewCanvasExecutionMessage(
-					node.WorkflowID.String(),
-					executionID.String(),
-					node.NodeID,
-				).Publish()
+				if err := messages.PublishCanvasExecutionByID(node.WorkflowID, *executionID); err != nil {
+					logger.Errorf("Error publishing execution state: %v", err)
+				}
 			}
 		}
 

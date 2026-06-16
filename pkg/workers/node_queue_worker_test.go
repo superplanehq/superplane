@@ -25,7 +25,7 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
@@ -114,7 +114,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
@@ -172,7 +172,7 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
@@ -277,7 +277,7 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
@@ -333,7 +333,7 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
@@ -422,7 +422,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionFinishedRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
