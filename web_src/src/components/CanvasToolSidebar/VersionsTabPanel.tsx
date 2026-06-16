@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DraftBranchRow } from "./DraftBranchRow";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
@@ -137,16 +138,17 @@ function VersionsFooter() {
         <GitBranch className="size-3.5 text-slate-500" aria-hidden />
         <span>This canvas is git-backed</span>
       </div>
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={handleCopyCloneCommand}
-        className="mt-2 flex w-full items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
+        className="mt-2 flex h-auto w-full items-center justify-between gap-2 rounded border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-xs font-normal text-slate-700 shadow-none hover:bg-slate-100"
         data-testid="versions-sidebar-copy-clone-command"
         title="Copy clone command"
       >
         <code className="min-w-0 flex-1 truncate font-mono text-[11px]">{PLACEHOLDER_CLONE_COMMAND}</code>
         <Copy className="size-3.5 shrink-0 text-slate-500" aria-hidden />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -267,16 +269,17 @@ function DraftsSectionHeader({
       {canCreate ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onCreateDraftBranch?.()}
               disabled={createPending}
-              className="flex size-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="size-5 rounded p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               data-testid="canvas-create-draft-button"
               aria-label="Create draft"
             >
               <Plus className="size-4" aria-hidden />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="top">Create new draft</TooltipContent>
         </Tooltip>
