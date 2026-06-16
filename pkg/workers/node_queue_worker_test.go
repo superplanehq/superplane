@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,8 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 )
 
@@ -507,4 +510,109 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 
 	// Verify execution message was published
 	assert.True(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	oldEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	newEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+
+	oldTime := time.Now().Add(-5 * time.Minute)
+	newTime := time.Now()
+	oldQueueItem := models.CanvasNodeQueueItem{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		RootEventID: oldEvent.ID,
+		EventID:     oldEvent.ID,
+		CreatedAt:   &oldTime,
+	}
+	newQueueItem := models.CanvasNodeQueueItem{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		RootEventID: newEvent.ID,
+		EventID:     newEvent.ID,
+		CreatedAt:   &newTime,
+	}
+	require.NoError(t, database.Conn().Create(&oldQueueItem).Error)
+	require.NoError(t, database.Conn().Create(&newQueueItem).Error)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	//
+	// Process the first queue item while the node is ready.
+	//
+	require.NoError(t, worker.LockAndProcessNode(logger, *node, time.Now()))
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	require.Equal(t, oldEvent.ID, executions[0].EventID)
+	require.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
+
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+	assert.Equal(t, newEvent.ID, queueItems[0].EventID)
+
+	//
+	// Finish the execution so the node becomes ready again.
+	//
+	execution := executions[0]
+	require.NoError(t, execution.Start())
+	_, err = execution.Pass(nil)
+	require.NoError(t, err)
+
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
+
+	//
+	// Simulate the execution.finished RabbitMQ message emitted by the executor.
+	//
+	finishedMessage, err := proto.Marshal(&pb.CanvasNodeExecutionMessage{
+		Id:       execution.ID.String(),
+		CanvasId: canvas.ID.String(),
+		NodeId:   componentNode,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ConsumeExecutionFinished(tackle.NewFakeDelivery(finishedMessage)))
+
+	executions, err = models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 2)
+	assert.Equal(t, newEvent.ID, executions[0].EventID)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
+
+	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
 }
