@@ -76,7 +76,9 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					}
 
 					if request.ExecutionID != nil {
-						messages.NewCanvasExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+						if err := messages.PublishCanvasExecutionByID(request.WorkflowID, *request.ExecutionID); err != nil {
+							w.log("Error publishing execution state: %v", err)
+						}
 					}
 				}(request)
 			}
