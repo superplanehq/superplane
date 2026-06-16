@@ -13,3 +13,14 @@ func TestDefaultAgentPromptWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) 
 	assert.Contains(t, prompt, "metadata.isTemplate")
 	assert.Contains(t, prompt, "unknown field")
 }
+
+func TestDefaultAgentPromptGuidesRepositoryFileContextDiscovery(t *testing.T) {
+	prompt := DefaultAgentPrompt()
+
+	assert.Contains(t, prompt, "list_files")
+	assert.Contains(t, prompt, "AGENTS.md")
+	assert.Contains(t, prompt, "read_file")
+	assert.Contains(t, prompt, "write_file")
+	assert.Contains(t, prompt, "commit_files")
+	assert.Contains(t, prompt, "Use `update_draft`, not `write_file`, for `canvas.yaml` and `console.yaml`")
+}
