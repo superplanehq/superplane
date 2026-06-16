@@ -71,12 +71,12 @@ function lastSegment(value: string | undefined): string | undefined {
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 }
 
-function subtitle(context: SubtitleContext): string | React.ReactNode {
+export function subtitle(context: SubtitleContext): string | React.ReactNode {
   const timestamp = context.execution.updatedAt || context.execution.createdAt;
   return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
-function baseProps(
+export function baseProps(
   context: ComponentBaseContext,
   iconSlug: string,
   fallbackTitle: string,
@@ -190,7 +190,7 @@ function selectorMetadata(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-// --- Snooze components ---
+// --- Snooze helpers (mappers live in create_snooze.ts / get_snooze.ts / expire_snooze.ts) ---
 
 interface SnoozeOutputData {
   name?: string;
@@ -219,7 +219,7 @@ interface SnoozeNodeMetadata {
   id?: string;
 }
 
-function snoozeDetails(context: ExecutionDetailsContext): Record<string, string> {
+export function snoozeDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
   if (context.execution.createdAt) {
     details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
@@ -236,7 +236,7 @@ function snoozeDetails(context: ExecutionDetailsContext): Record<string, string>
   return details;
 }
 
-function snoozeCreateMetadata(node: NodeInfo): MetadataItem[] {
+export function snoozeCreateMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const config = node.configuration as CreateSnoozeConfiguration | undefined;
   if (config?.displayName) metadata.push({ icon: "bell-off", label: config.displayName });
@@ -246,34 +246,10 @@ function snoozeCreateMetadata(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function snoozeSelectorMetadata(node: NodeInfo): MetadataItem[] {
+export function snoozeSelectorMetadata(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as SnoozeSelectorConfiguration | undefined;
   const nodeMeta = node.metadata as SnoozeNodeMetadata | undefined;
   // Prefer the resolved display name; fall back to the snooze ID from the value.
   const label = nodeMeta?.displayName || nodeMeta?.id || lastSegment(config?.snooze);
   return label ? [{ icon: "bell-off", label }] : [];
 }
-
-export const createSnoozeMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context, "bell-off", "Create Snooze", snoozeCreateMetadata(context.node));
-  },
-  getExecutionDetails: snoozeDetails,
-  subtitle,
-};
-
-export const getSnoozeMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context, "bell-off", "Get Snooze", snoozeSelectorMetadata(context.node));
-  },
-  getExecutionDetails: snoozeDetails,
-  subtitle,
-};
-
-export const expireSnoozeMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context, "bell-off", "Expire Snooze", snoozeSelectorMetadata(context.node));
-  },
-  getExecutionDetails: snoozeDetails,
-  subtitle,
-};

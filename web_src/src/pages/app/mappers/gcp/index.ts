@@ -30,10 +30,10 @@ import {
   getAlertingPolicyMapper,
   deleteAlertingPolicyMapper,
   updateAlertingPolicyMapper,
-  createSnoozeMapper,
-  getSnoozeMapper,
-  expireSnoozeMapper,
 } from "./monitoring";
+import { createSnoozeMapper } from "./create_snooze";
+import { getSnoozeMapper } from "./get_snooze";
+import { expireSnoozeMapper } from "./expire_snooze";
 import { queryMapper, queryRangeMapper } from "./prometheus";
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
