@@ -20,6 +20,7 @@ type CreateAlertingPolicy struct{}
 
 type CreateAlertingPolicySpec struct {
 	DisplayName           string          `mapstructure:"displayName"`
+	PromQL                PromQLSpec      `mapstructure:",squash"`
 	Conditions            []ConditionSpec `mapstructure:"conditions"`
 	Combiner              string          `mapstructure:"combiner"`
 	Severity              string          `mapstructure:"severity"`
@@ -41,7 +42,7 @@ func (c *CreateAlertingPolicy) Label() string {
 }
 
 func (c *CreateAlertingPolicy) Description() string {
-	return "Create a Cloud Monitoring alerting policy that triggers when Compute Engine instance metrics cross thresholds"
+	return "Create a Cloud Monitoring alerting policy from an instance-metric threshold or a PromQL query (Managed Prometheus)"
 }
 
 func (c *CreateAlertingPolicy) Documentation() string {
@@ -56,10 +57,12 @@ func (c *CreateAlertingPolicy) Documentation() string {
 ## Configuration
 
 - **Display Name**: Human-readable name for the policy (required)
-- **Conditions**: One or more threshold conditions (required). Each has:
+- **Condition type**: **Metric threshold** (default) or **PromQL query** (Google Managed Prometheus)
+- **Conditions** (threshold type): One or more threshold conditions. Each has:
   - **Metric**, **Comparison** (above ` + "`>`" + ` or below ` + "`<`" + `), **Threshold**, **Duration**
   - Optional **Aligner**, **Rolling window**, **Group reducer** + **Group by fields** (aggregation)
   - Optional **Trigger** by count or percent of time series
+- **PromQL query** (PromQL type): a PromQL expression that fires while it returns results, plus an optional **For** duration and **Evaluation interval** — the Prometheus-style alerting rule
 - **Combiner**: How multiple conditions combine — OR / AND / AND-with-matching-resource (default OR)
 - **Severity**: Critical / Error / Warning (optional)
 - **Notification Channels**: Existing channels to alert (optional)
@@ -92,7 +95,14 @@ func (c *CreateAlertingPolicy) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
-	return append([]configuration.Field{
+	// Threshold conditions are required only for the threshold kind; the PromQL
+	// query is required only for the PromQL kind. Each set is shown for its kind.
+	conditions := conditionsField()
+	conditions.Required = false
+	conditions.RequiredConditions = []configuration.RequiredCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold}}}
+	conditions.VisibilityConditions = []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold}}}
+
+	fields := []configuration.Field{
 		{
 			Name:        "displayName",
 			Label:       "Display Name",
@@ -101,8 +111,11 @@ func (c *CreateAlertingPolicy) Configuration() []configuration.Field {
 			Description: "Human-readable name for the alerting policy.",
 			Placeholder: "e.g. High CPU on production instances",
 		},
-		conditionsField(),
-	}, policyOptionFields()...)
+		conditionKindField(),
+		conditions,
+	}
+	fields = append(fields, promqlConditionFields()...)
+	return append(fields, policyOptionFields()...)
 }
 
 // conditionsField is the repeatable conditions list, shared by Create and Update.
@@ -134,7 +147,13 @@ func policyOptionFields() []configuration.Field {
 			Required:    false,
 			Description: "How multiple conditions combine to fire the policy.",
 			Default:     "OR",
-			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: combinerOptions}},
+			// A PromQL policy has exactly one condition, so the combiner has no
+			// effect there; hide it only for PromQL. The empty value keeps the
+			// combiner visible when conditionKind is unset — e.g. on Update, where
+			// conditionKind is togglable and usually omitted when conditions are
+			// unchanged — so threshold combiners stay editable.
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindThreshold, ""}}},
+			TypeOptions:          &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: combinerOptions}},
 		},
 		{
 			Name:        "severity",
@@ -228,7 +247,7 @@ func validateCreateSpec(spec CreateAlertingPolicySpec) error {
 	if strings.TrimSpace(spec.DisplayName) == "" {
 		return errors.New("displayName is required")
 	}
-	if _, err := buildConditions(spec.Conditions); err != nil {
+	if _, err := buildPolicyConditions(spec.PromQL, spec.Conditions); err != nil {
 		return err
 	}
 	if spec.Combiner != "" && !isValidCombiner(spec.Combiner) {
@@ -258,7 +277,7 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	conditions, err := buildConditions(spec.Conditions)
+	conditions, err := buildPolicyConditions(spec.PromQL, spec.Conditions)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
