@@ -1,7 +1,5 @@
 import type { InfiniteData } from "@tanstack/react-query";
 import type {
-  CanvasesCanvasEvent,
-  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
@@ -12,13 +10,6 @@ import type { CanvasRunsFilters } from "./useCanvasData";
 
 export type InfiniteRunsPage = {
   runs?: CanvasesCanvasRun[];
-  totalCount?: number;
-  hasNextPage?: boolean;
-  lastTimestamp?: string;
-};
-
-export type InfiniteEventsPage = {
-  events?: CanvasesCanvasEventWithExecutions[];
   totalCount?: number;
   hasNextPage?: boolean;
   lastTimestamp?: string;
@@ -186,69 +177,6 @@ export function upsertRunIntoInfiniteData(
   return { ...old, pages };
 }
 
-export function canvasEventToEventWithExecutions(event: CanvasesCanvasEvent): CanvasesCanvasEventWithExecutions {
-  return {
-    id: event.id,
-    canvasId: event.canvasId,
-    nodeId: event.nodeId,
-    channel: event.channel,
-    customName: event.customName,
-    data: event.data,
-    createdAt: event.createdAt,
-    executions: [],
-  };
-}
-
-function findEventLocation(
-  pages: InfiniteEventsPage[],
-  eventId: string,
-): { pageIndex: number; eventIndex: number } | null {
-  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-    const eventIndex = pages[pageIndex].events?.findIndex((event) => event.id === eventId) ?? -1;
-    if (eventIndex !== -1) {
-      return { pageIndex, eventIndex };
-    }
-  }
-
-  return null;
-}
-
-export function upsertRootEventIntoInfiniteData(
-  old: InfiniteData<InfiniteEventsPage> | undefined,
-  event: CanvasesCanvasEvent,
-): InfiniteData<InfiniteEventsPage> | undefined {
-  if (!old || !event.id) {
-    return old;
-  }
-
-  const mappedEvent = canvasEventToEventWithExecutions(event);
-  const pages = old.pages.map((page) => ({
-    ...page,
-    events: page.events ? [...page.events] : [],
-  }));
-  const location = findEventLocation(pages, event.id);
-
-  if (location) {
-    const existing = pages[location.pageIndex].events![location.eventIndex];
-    pages[location.pageIndex].events![location.eventIndex] = {
-      ...mappedEvent,
-      executions: existing.executions ?? [],
-    };
-    return { ...old, pages };
-  }
-
-  if (pages.length === 0) {
-    return {
-      ...old,
-      pages: [{ events: [mappedEvent], totalCount: 1, hasNextPage: false }],
-    };
-  }
-
-  pages[0].events = [mappedEvent, ...(pages[0].events ?? [])];
-  bumpTotalCountOnAllPages(pages, 1);
-  return { ...old, pages };
-}
-
 export function executionToRef(execution: CanvasesCanvasNodeExecution): CanvasesCanvasNodeExecutionRef {
   return {
     id: execution.id,
@@ -302,37 +230,6 @@ export function upsertExecutionRef(
   const next = executions.slice();
   next[index] = incoming;
   return next;
-}
-
-export function upsertExecutionIntoInfiniteEventsData(
-  old: InfiniteData<InfiniteEventsPage> | undefined,
-  execution: CanvasesCanvasNodeExecution,
-): InfiniteData<InfiniteEventsPage> | undefined {
-  const rootEventId = execution.rootEvent?.id;
-  if (!old || !rootEventId) {
-    return old;
-  }
-
-  const executionRef = executionToRef(execution);
-  const pages = old.pages.map((page) => ({
-    ...page,
-    events: page.events ? [...page.events] : [],
-  }));
-
-  for (const page of pages) {
-    const eventIndex = page.events?.findIndex((event) => event.id === rootEventId) ?? -1;
-    if (eventIndex === -1) {
-      continue;
-    }
-
-    page.events![eventIndex] = {
-      ...page.events![eventIndex],
-      executions: upsertExecutionRef(page.events![eventIndex].executions ?? [], executionRef),
-    };
-    return { ...old, pages };
-  }
-
-  return old;
 }
 
 function findRunByRootEventId(

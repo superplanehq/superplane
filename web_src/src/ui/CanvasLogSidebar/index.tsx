@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, CircleAlert, CircleX, Search, X } from "lucide-react";
 
-import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,7 @@ export interface CanvasLogSidebarProps {
   counts: LogCounts;
   activeTab?: ConsoleTab;
   onTabChange?: (tab: ConsoleTab) => void;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -90,7 +90,7 @@ export function CanvasLogSidebar({
   counts,
   activeTab: controlledTab,
   onTabChange,
-  runsEvents = [],
+  logRuns = [],
   runsNodes = [],
   runsComponentIconMap = {},
   onRunNodeSelect,
@@ -231,7 +231,7 @@ export function CanvasLogSidebar({
     [setSidebarHeight, sidebarHeight],
   );
 
-  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(runsEvents), [runsEvents]);
+  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(logRuns), [logRuns]);
 
   if (!isOpen) {
     return null;
@@ -354,7 +354,7 @@ export function CanvasLogSidebar({
 
         {activeTab === "errors" ? (
           <ErrorsConsoleContent
-            events={runsEvents}
+            runs={logRuns}
             nodes={runsNodes}
             componentIconMap={runsComponentIconMap}
             searchQuery={searchValue}

@@ -17,7 +17,6 @@ import {
   canvasesDeleteCanvas,
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
-  canvasesListCanvasEvents,
   canvasesListRuns,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
@@ -202,9 +201,6 @@ export const canvasKeys = {
       ...(states || []),
       ...(limit === undefined ? [] : [limit]),
     ] as const,
-  events: () => [...canvasKeys.all, "events"] as const,
-  eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
-  infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
   runs: () => [...canvasKeys.all, "runs"] as const,
   infiniteRuns: (canvasId: string, filters?: CanvasRunsFilters) =>
     [
@@ -1123,43 +1119,6 @@ export const useDeleteCanvas = (organizationId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       analytics.canvasDelete(canvasId, organizationId, nodeCount);
     },
-  });
-};
-
-export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 25;
-
-  return useInfiniteQuery({
-    queryKey: canvasKeys.infiniteEvents(canvasId),
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      const response = await canvasesListCanvasEvents(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: {
-            limit,
-            ...(pageParam ? { before: pageParam } : {}),
-          },
-        }),
-      );
-      return response.data;
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
-      const totalCount = lastPage?.totalCount || 0;
-
-      if (currentLoadedCount >= totalCount) return undefined;
-
-      if (lastPage?.events && lastPage.events.length > 0) {
-        const lastEvent = lastPage.events[lastPage.events.length - 1];
-        return lastEvent.createdAt;
-      }
-      return undefined;
-    },
-    initialPageParam: undefined as string | undefined,
-    staleTime: 0,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && enabled,
   });
 };
 
