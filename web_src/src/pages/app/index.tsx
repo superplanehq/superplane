@@ -489,6 +489,7 @@ export function AppPage() {
     [isRunInspectionMode, selectedRunId, runStatusFilters],
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
+  const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -502,6 +503,18 @@ export function AppPage() {
     const totalCount = pages[0]?.totalCount || 0;
     return { runs, totalCount };
   }, [infiniteRunsQuery.data]);
+  const logRunsData = useMemo(() => {
+    const pages = infiniteLogRunsQuery.data?.pages || [];
+    const seen = new Set<string>();
+    const runs = pages
+      .flatMap((page) => page?.runs || [])
+      .filter((run): run is CanvasesCanvasRun => {
+        if (!run.id || seen.has(run.id)) return false;
+        seen.add(run.id);
+        return true;
+      });
+    return { runs };
+  }, [infiniteLogRunsQuery.data]);
   const selectedRun = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
@@ -4924,7 +4937,7 @@ export function AppPage() {
           components={allComponents}
           triggers={allTriggers}
           logEntries={logEntries}
-          logRuns={isViewingLiveVersion ? runsData.runs : []}
+          logRuns={isViewingLiveVersion ? logRunsData.runs : []}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}
