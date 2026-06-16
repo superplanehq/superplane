@@ -157,6 +157,49 @@ func Test__IntegrationRequestWorker_SyncRewritesSecret(t *testing.T) {
 	}
 }
 
+// Test__IntegrationRequestWorker_NoDuplicateChainOnRetry validates the worker
+// hardening behind issue #5386: completing the in-flight request and creating
+// its successor are atomic, so a lease-retry of an already-processed request
+// (e.g. after a worker crash or phase-3 failure) cannot spawn a duplicate chain.
+func Test__IntegrationRequestWorker_NoDuplicateChainOnRetry(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			return ctx.Integration.ScheduleResync(time.Second)
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+
+	runAt := time.Now().Add(-time.Second)
+	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	request := requests[0]
+
+	//
+	// First pass: completes the request and atomically schedules its successor.
+	//
+	require.NoError(t, worker.LockAndProcessRequest(request))
+	require.Len(t, pendingRequestsForIntegration(t, integration.ID), 1,
+		"exactly one successor should be pending after processing")
+
+	//
+	// Reprocess the very same leased request, simulating a lease-retry after a
+	// worker crash / phase-3 failure. The already-completed parent must not
+	// spawn a second chain.
+	//
+	require.NoError(t, worker.LockAndProcessRequest(request))
+	require.Len(t, pendingRequestsForIntegration(t, integration.ID), 1,
+		"a retried (already completed) request must not create a duplicate chain (#5386)")
+}
+
 // Test__IntegrationRequestWorker_LeasesBeforeProcessing covers the lease: the
 // request's run_at is pushed past the work window in a short transaction before the
 // external work runs, so the work happens outside any DB transaction and the

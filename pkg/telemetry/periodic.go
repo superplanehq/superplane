@@ -41,6 +41,7 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+	p.reportPendingIntegrationRequests()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -121,6 +122,27 @@ func (p *Periodic) reportPendingExecutions() {
 	RecordPendingExecutionsCount(p.ctx, count)
 }
 
+func (p *Periodic) reportPendingIntegrationRequests() {
+	count, err := countPendingIntegrationRequests()
+	if err != nil {
+		return
+	}
+
+	RecordPendingIntegrationRequestsCount(p.ctx, count)
+
+	//
+	// The max-per-installation count is the real early warning for a runaway
+	// refresh loop: a single installation holding hundreds of pending requests
+	// is invisible in the global total (#5386).
+	//
+	max, err := maxPendingIntegrationRequestsPerInstallation()
+	if err != nil {
+		return
+	}
+
+	RecordPendingIntegrationRequestsMaxPerInstallation(p.ctx, max)
+}
+
 func countStuckQueueNodes() (int64, error) {
 	db := database.Conn()
 
@@ -183,4 +205,41 @@ func countPendingExecutions() (int64, error) {
 	}
 
 	return count, nil
+}
+
+func countPendingIntegrationRequests() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Table("app_installation_requests").
+		Where("state = ?", "pending").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func maxPendingIntegrationRequestsPerInstallation() (int64, error) {
+	var max int64
+
+	err := database.Conn().
+		Raw(`
+			SELECT COALESCE(MAX(per_installation), 0)
+			FROM (
+				SELECT COUNT(*) AS per_installation
+				FROM app_installation_requests
+				WHERE state = 'pending'
+				GROUP BY app_installation_id
+			) counts
+		`).
+		Scan(&max).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return max, nil
 }

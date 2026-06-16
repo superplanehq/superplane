@@ -102,8 +102,14 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to validate credentials: %w", err)
 	}
 
-	err = ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, *refreshIn)
-	if err != nil {
+	//
+	// Schedule the next refresh through ScheduleResync, which completes the
+	// current pending request before creating the next one. This keeps a single
+	// pending request per installation. Using ScheduleActionCall here instead
+	// would never complete the prior request, so every sync would leak another
+	// self-perpetuating refresh chain (issue #5386).
+	//
+	if err := ctx.Integration.ScheduleResync(*refreshIn); err != nil {
 		return fmt.Errorf("failed to schedule token refresh: %w", err)
 	}
 
@@ -131,12 +137,20 @@ func (d *DockerHub) Hooks() []core.Hook {
 func (d *DockerHub) HandleHook(ctx core.IntegrationHookContext) error {
 	switch ctx.Name {
 	case "refreshAccessToken":
+		//
+		// Backwards-compatibility bridge for issue #5386: the refresh loop used
+		// to be driven by self-rescheduling "refreshAccessToken" action calls,
+		// which accumulated into many orphaned chains. Any such in-flight action
+		// request is converted here onto the deduplicated resync loop (ScheduleResync
+		// completes the current request before scheduling the next), so the extra
+		// chains collapse to a single pending request over the following cycles.
+		//
 		refreshIn, err := refreshAccessToken(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return fmt.Errorf("failed to refresh access token: %w", err)
 		}
 
-		return ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, *refreshIn)
+		return ctx.Integration.ScheduleResync(*refreshIn)
 
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
