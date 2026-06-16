@@ -80,7 +80,7 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
-	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID)
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,10 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 	return run, nil
 }
 
-func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun, error) {
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+	//
+	// TODO: why the fuck does the canvas run needs a version ID?
+	//
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
@@ -103,9 +106,14 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun
 	run := &CanvasRun{
 		WorkflowID: workflowID,
 		VersionID:  liveVersion.ID,
-		State:      CanvasRunStateStarted,
+		State:      state,
+		Result:     result,
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
+	}
+
+	if state == CanvasRunStateFinished {
+		run.FinishedAt = &now
 	}
 
 	if err := tx.Create(run).Error; err != nil {
@@ -113,6 +121,25 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun
 	}
 
 	return run, nil
+}
+
+func ListStartedCanvasRuns(limit int) ([]CanvasRun, error) {
+	return ListStartedCanvasRunsInTransaction(database.Conn(), limit)
+}
+
+func ListStartedCanvasRunsInTransaction(tx *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := tx.
+		Where("state = ?", CanvasRunStateStarted).
+		Order("updated_at ASC").
+		Limit(limit).
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
 }
 
 type CanvasRunFilters struct {
