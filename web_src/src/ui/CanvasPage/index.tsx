@@ -39,9 +39,8 @@ import {
 
 import type {
   CanvasChangesetChange,
-  CanvasesCanvasEventWithExecutions,
-  CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
+  CanvasesCanvasNodeExecution,
   ActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -293,7 +292,7 @@ export interface CanvasPageProps {
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   toolSidebarRunsContent?: React.ReactNode;
@@ -1634,7 +1633,7 @@ function CanvasPage(props: CanvasPageProps) {
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
                   runNodeDetailPaneOpen={bottomDetailPaneOpen}
-                  runsEvents={props.runsEvents}
+                  logRuns={props.logRuns}
                   runsNodes={props.runsNodes}
                   runsComponentIconMap={props.runsComponentIconMap}
                   onRunNodeSelect={props.onRunNodeSelect}
@@ -2270,7 +2269,7 @@ function CanvasContent({
   runParticipantNodeIds,
   runSelectedNodeId,
   runNodeDetailPaneOpen,
-  runsEvents,
+  logRuns,
   runsNodes,
   runsComponentIconMap,
   onRunNodeSelect,
@@ -2329,7 +2328,7 @@ function CanvasContent({
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
   runNodeDetailPaneOpen?: boolean;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -2426,7 +2425,7 @@ function CanvasContent({
     localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));
   }, [logSidebarHeight]);
 
-  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
+  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(logRuns || []), [logRuns]);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -3553,7 +3552,7 @@ function CanvasContent({
           counts={logCounts}
           activeTab={consoleTab}
           onTabChange={setConsoleTab}
-          runsEvents={runsEvents}
+          logRuns={logRuns}
           runsNodes={runsNodes}
           runsComponentIconMap={runsComponentIconMap}
           onRunNodeSelect={onRunNodeSelect}
