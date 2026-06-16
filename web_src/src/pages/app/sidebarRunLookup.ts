@@ -153,3 +153,26 @@ export function findRunInListRunsResponse(
 
   return { runId, run };
 }
+
+export function shouldContinueRunLookupPagination(options: {
+  pageRuns: CanvasesCanvasRun[];
+  loadedCount: number;
+  response: CanvasesListRunsResponse | undefined;
+}): boolean {
+  const { pageRuns, loadedCount, response } = options;
+
+  if (pageRuns.length === 0 || !response?.lastTimestamp) {
+    return false;
+  }
+
+  const totalCount = response.totalCount;
+  if (typeof totalCount === "number" && totalCount > 0 && loadedCount >= totalCount) {
+    return false;
+  }
+
+  if (response.hasNextPage === false) {
+    return false;
+  }
+
+  return true;
+}

@@ -15,10 +15,12 @@ import {
   findRunInListRunsResponse,
   getSidebarEventLookupKey,
   seedRunInInfiniteRunsCache,
+  shouldContinueRunLookupPagination,
 } from "@/pages/app/sidebarRunLookup";
 
 const RUN_LOOKUP_PAGE_LIMIT = 25;
-const RUN_LOOKUP_MAX_PAGES = 3;
+/** Safety cap so a broken pagination cursor cannot loop forever. */
+const RUN_LOOKUP_MAX_PAGES = 100;
 
 type UseSidebarEventRunLookupOptions = {
   enabled?: boolean;
@@ -111,6 +113,7 @@ export function useSidebarEventRunLookup({
 
       const fetchPromise = (async () => {
         let before: string | undefined = getSidebarEventRunLookupBefore(event);
+        let loadedCount = 0;
 
         for (let page = 0; page < RUN_LOOKUP_MAX_PAGES; page += 1) {
           const response = await canvasesListRuns(
@@ -124,7 +127,8 @@ export function useSidebarEventRunLookup({
             }),
           );
 
-          const pageRuns = response.data?.runs ?? [];
+          const data = response.data;
+          const pageRuns = data?.runs ?? [];
           const match = findRunInListRunsResponse(pageRuns, event);
           if (match) {
             if (match.run.id) {
@@ -134,11 +138,13 @@ export function useSidebarEventRunLookup({
             return match.runId;
           }
 
-          if (!response.data?.lastTimestamp || pageRuns.length === 0) {
+          loadedCount += pageRuns.length;
+
+          if (!shouldContinueRunLookupPagination({ pageRuns, loadedCount, response: data })) {
             break;
           }
 
-          before = response.data.lastTimestamp;
+          before = data!.lastTimestamp;
         }
 
         return null;

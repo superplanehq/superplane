@@ -8,6 +8,7 @@ import {
   findRunIdInLookupIndex,
   getSidebarEventLookupKey,
   resolveRunIdsForSidebarEvents,
+  shouldContinueRunLookupPagination,
 } from "./sidebarRunLookup";
 
 const executionEvent = {
@@ -73,5 +74,47 @@ describe("sidebarRunLookup", () => {
     ] satisfies CanvasesCanvasRun[];
 
     expect(buildRunLookupFingerprint(started)).toBe(buildRunLookupFingerprint(finished));
+  });
+
+  it("continues pagination while the API reports more pages", () => {
+    expect(
+      shouldContinueRunLookupPagination({
+        pageRuns: [{ id: "run-1" }],
+        loadedCount: 25,
+        response: {
+          totalCount: 100,
+          hasNextPage: true,
+          lastTimestamp: "2026-02-06T15:00:00.000Z",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("stops pagination when all runs are loaded", () => {
+    expect(
+      shouldContinueRunLookupPagination({
+        pageRuns: [{ id: "run-1" }],
+        loadedCount: 100,
+        response: {
+          totalCount: 100,
+          hasNextPage: true,
+          lastTimestamp: "2026-02-06T15:00:00.000Z",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("stops pagination when the API reports no next page", () => {
+    expect(
+      shouldContinueRunLookupPagination({
+        pageRuns: [{ id: "run-1" }],
+        loadedCount: 25,
+        response: {
+          totalCount: 100,
+          hasNextPage: false,
+          lastTimestamp: "2026-02-06T15:00:00.000Z",
+        },
+      }),
+    ).toBe(false);
   });
 });
