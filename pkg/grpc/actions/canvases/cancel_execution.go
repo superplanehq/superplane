@@ -63,7 +63,9 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		return nil, err
 	}
 
-	messages.NewCanvasExecutionMessage(workflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+	if err := messages.PublishCanvasExecutionByID(workflowID, execution.ID); err != nil {
+		log.Errorf("failed to publish execution state RabbitMQ message: %v", err)
+	}
 
 	if memoryChanged {
 		if err := messages.NewCanvasMemoryUpdatedMessage(workflowID.String()).PublishMemoryUpdated(); err != nil {
