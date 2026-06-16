@@ -702,6 +702,11 @@ func validateChartPanelContent(panel ConsolePanel) error {
 	if err := validateOptionalString(panel.ID, "render.seriesField", render["seriesField"]); err != nil {
 		return err
 	}
+	for _, key := range []string{"xFormat", "yLabel", "yFormat"} {
+		if err := validateOptionalString(panel.ID, "render."+key, render[key]); err != nil {
+			return err
+		}
+	}
 	series, ok := render["series"].([]any)
 	if !ok || len(series) == 0 {
 		return fmt.Errorf("panel %q render.series must be a non-empty array", panel.ID)
