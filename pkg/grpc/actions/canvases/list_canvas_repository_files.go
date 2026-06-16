@@ -35,7 +35,7 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 	repositoryPaths := []string{}
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err == nil {
-		files, listErr := gitProvider.ListFiles(ctx, repository.RepoID)
+		files, listErr := gitProvider.ListFiles(ctx, repository.RepoID, "")
 		if listErr != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", listErr)
 		}

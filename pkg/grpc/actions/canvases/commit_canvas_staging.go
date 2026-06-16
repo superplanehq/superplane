@@ -171,7 +171,7 @@ func commitStagedGitFiles(
 
 	// Commit on top of the current branch head. Staging does not track a head
 	// SHA per file, so resolve it just before committing.
-	headSHA, err := gitProvider.Head(ctx, repository.RepoID)
+	headSHA, err := gitProvider.Head(ctx, repository.RepoID, "")
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to resolve repository head: %v", err)
 	}
@@ -229,7 +229,7 @@ func snapshotGitFilesBeforeCommit(
 	for _, operation := range gitOps {
 		path := operation.GetPath()
 		if operation.GetDelete() {
-			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path)
+			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
 			if readErr != nil {
 				return nil, status.Errorf(codes.FailedPrecondition, "cannot snapshot %q before staged delete: %v", path, readErr)
 			}
@@ -248,7 +248,7 @@ func snapshotGitFilesBeforeCommit(
 			continue
 		}
 
-		reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path)
+		reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
 		if readErr != nil {
 			revertOps = append(revertOps, gitprovider.FileOperation{
 				Path:   path,

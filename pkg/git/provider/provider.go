@@ -28,6 +28,7 @@ const ReservedSuperPlanePath = ".superplane"
 var (
 	ErrInvalidPath          = errors.New("invalid file path")
 	ErrInvalidRepositoryID  = errors.New("invalid repository path")
+	ErrInvalidRef           = errors.New("invalid git ref")
 	ErrReservedPath         = errors.New("path is reserved for SuperPlane")
 	ErrInvalidCommit        = errors.New("invalid commit")
 	ErrExpectedHeadMismatch = errors.New("expected head sha does not match current branch head")
@@ -56,10 +57,10 @@ type Provider interface {
 	//
 	// File management methods
 	//
-	ListFiles(ctx context.Context, repoID string) ([]string, error)
-	GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error)
+	ListFiles(ctx context.Context, repoID, ref string) ([]string, error)
+	GetFile(ctx context.Context, repoID, path, ref string) (io.ReadCloser, error)
 	Commit(ctx context.Context, repoID string, options CommitOptions) (string, error)
-	Head(ctx context.Context, repoID string) (string, error)
+	Head(ctx context.Context, repoID, ref string) (string, error)
 }
 
 type RepositoryOptions struct {
