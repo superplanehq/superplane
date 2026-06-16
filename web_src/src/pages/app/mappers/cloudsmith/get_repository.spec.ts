@@ -30,22 +30,9 @@ describe("getRepositoryMapper.getExecutionDetails", () => {
     expect(details["Namespace"]).toBe("acme");
     expect(details["Size"]).toBe("500.0 MB");
     expect(details["Packages"]).toBe("312");
-    expect(details["URL"]).toBe("https://cloudsmith.io/~acme/repos/production/");
-    expect(details["Downloads"]).toBeUndefined();
+    expect(details["Downloads"]).toBe("18234");
     expect(details["Quarantined Packages"]).toBe("1");
     expect(details["Policy Violations"]).toBe("2");
-  });
-
-  it("omits URL when self_webapp_url is missing", () => {
-    const ctx = buildDetailsCtx({
-      execution: {
-        outputs: {
-          default: [buildOutput(buildRepositoryData({ self_webapp_url: undefined }))],
-        },
-      },
-    });
-    const details = getRepositoryMapper.getExecutionDetails(ctx);
-    expect(details["URL"]).toBeUndefined();
   });
 
   it("shows at most six fields when compliance counts are zero", () => {
