@@ -1150,6 +1150,13 @@ message CanvasRunMessage {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+message CanvasEventTerminalMessage {
+  string event_id = 1;
+  string canvas_id = 2;
+  string run_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
 message CanvasMessage {
   string id = 1;
   string canvas_id = 2;
