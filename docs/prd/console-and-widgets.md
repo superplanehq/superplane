@@ -384,6 +384,31 @@ Tooltips show the category in the header and one row per series with `label — 
 - `show` — always visible (useful when you want consistent labels even for a single-series chart).
 - `hide` — never rendered.
 
+### Axis formatting
+
+Cartesian charts (`bar`, `stacked-bar`, `line`, `area`) expose three optional axis fields:
+
+- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`.
+- `yLabel` — Y-axis title rendered alongside the ticks (for example `USD`, `Errors / day`). Omitted by default.
+- `yFormat` — display format applied to Y-axis tick labels (`number`, `percent`, `duration`). Falls back to a locale-aware numeric default with thousands separators above 1k. The `format` declared on a series only affects tooltip values; configure `yFormat` to match it on the axis itself.
+
+```yaml
+render:
+  kind: chart
+  type: bar
+  xField: createdAt
+  xFormat: date
+  yLabel: USD
+  yFormat: number
+  series:
+    - field: cost
+      label: Cost
+      format: number
+      prefix: "$"
+```
+
+Donut charts ignore `xFormat`, `yLabel`, and `yFormat` (no axes are rendered).
+
 `WidgetChart` is implemented with Recharts via the shared shadcn `ChartContainer`. Category labels live in the tooltip rather than on the chart surface so densely-packed x-axes don't overlap.
 
 ## Number Panels
