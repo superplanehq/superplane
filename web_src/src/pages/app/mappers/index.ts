@@ -61,6 +61,11 @@ import {
   eventStateRegistry as cloudflareEventStateRegistry,
 } from "./cloudflare/index";
 import {
+  componentMappers as cloudsmithComponentMappers,
+  triggerRenderers as cloudsmithTriggerRenderers,
+  eventStateRegistry as cloudsmithEventStateRegistry,
+} from "./cloudsmith/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -300,6 +305,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
@@ -348,6 +354,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
+  cloudsmith: cloudsmithTriggerRenderers,
   digitalocean: digitaloceanTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
@@ -395,6 +402,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
