@@ -48,6 +48,7 @@ services:
       VITE_DEV_PORT: ${VITE_DEV_PORT:-5173}
       START_EVENT_DISTRIBUTER: "yes"
       START_EVENT_ROUTER: "yes"
+      START_RUN_FINALIZER: "yes"
       START_NODE_EXECUTOR: "yes"
       START_NODE_QUEUE_WORKER: "yes"
       START_NODE_REQUEST_WORKER: "yes"

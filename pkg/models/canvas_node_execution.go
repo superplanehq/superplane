@@ -454,11 +454,6 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		return events, nil
 	}
 
-	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
-	if err != nil {
-		return nil, err
-	}
-
 	return events, nil
 }
 
@@ -556,11 +551,6 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		}
 	}
 
-	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -600,11 +590,6 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 				return err
 			}
 		}
-	}
-
-	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
-	if err != nil {
-		return err
 	}
 
 	return nil
