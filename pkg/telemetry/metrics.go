@@ -56,6 +56,9 @@ var (
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
 
+	pendingIntegrationRequestsGauge                   metric.Int64Gauge
+	pendingIntegrationRequestsMaxPerInstallationGauge metric.Int64Gauge
+
 	organizationsTotalGauge          metric.Int64Gauge
 	usersTotalGauge                  metric.Int64Gauge
 	workflowsTotalGauge              metric.Int64Gauge
@@ -374,6 +377,24 @@ func InitMetrics(ctx context.Context) error {
 	pendingExecutionsGauge, err = meter.Int64Gauge(
 		"workflow_node_executions.pending.count",
 		metric.WithDescription("Current number of pending workflow node executions"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	pendingIntegrationRequestsGauge, err = meter.Int64Gauge(
+		"app_installation_requests.pending.count",
+		metric.WithDescription("Current number of pending integration requests"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	pendingIntegrationRequestsMaxPerInstallationGauge, err = meter.Int64Gauge(
+		"app_installation_requests.pending.max_per_installation",
+		metric.WithDescription("Largest number of pending integration requests held by a single installation"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -733,6 +754,22 @@ func RecordPendingExecutionsCount(ctx context.Context, count int64) {
 	}
 
 	pendingExecutionsGauge.Record(ctx, count)
+}
+
+func RecordPendingIntegrationRequestsCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingIntegrationRequestsGauge.Record(ctx, count)
+}
+
+func RecordPendingIntegrationRequestsMaxPerInstallation(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingIntegrationRequestsMaxPerInstallationGauge.Record(ctx, count)
 }
 
 func RecordOrganizationsTotal(ctx context.Context, count int64) {
