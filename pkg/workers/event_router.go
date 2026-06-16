@@ -179,7 +179,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
-		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
+		createdQueueItems, err = w.processEvent(tx, logger, lockedEvent)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
@@ -203,40 +203,32 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		}
 	}
 
-	if runID != uuid.Nil {
-		if len(createdQueueItems) == 0 {
-			if err := messages.PublishEventTerminal(event.WorkflowID, runID, event.ID); err != nil {
-				logger.WithError(err).Warnf(
-					"Failed to publish terminal event message for run %s in workflow %s",
-					runID,
-					event.WorkflowID,
-				)
-			}
-		}
-
-		if event.ExecutionID == nil {
-			if err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish(); err != nil {
-				logger.WithError(err).Warnf(
-					"Failed to publish run state message for run %s in workflow %s",
-					runID,
-					event.WorkflowID,
-				)
-			}
+	//
+	// If no queue items were created, this is a terminal node.
+	// We publish a RabbitMQ message so the run finalizer can finalize the run, if needed.
+	//
+	if len(createdQueueItems) == 0 {
+		if err := messages.PublishEventTerminal(event.WorkflowID, runID, event.ID); err != nil {
+			logger.WithError(err).Warnf(
+				"Failed to publish terminal event message for run %s in workflow %s",
+				runID,
+				event.WorkflowID,
+			)
 		}
 	}
 
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
 	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
 	if event.ExecutionID == nil {
@@ -245,11 +237,10 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	queueItems, runID, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
-	return queueItems, runID, err
+	return w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
 }
 
 func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []models.Edge {
@@ -263,35 +254,31 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
 	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	if len(outgoingEdges) == 0 {
-		run, err := models.FindOrCreateFinishedCanvasRunForRootEventInTransaction(tx, event, models.CanvasRunResultPassed)
+		_, err := models.CreateCanvasRunInTransaction(tx, event.WorkflowID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
 		if err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
-		if err := event.RoutedInTransaction(tx); err != nil {
-			return nil, uuid.Nil, err
-		}
-
-		return nil, run.ID, nil
+		return nil, event.RoutedInTransaction(tx)
 	}
 
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
@@ -308,7 +295,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		queueItems = append(queueItems, queueItem)
@@ -316,18 +303,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	err = event.RoutedInTransaction(tx)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	//
-	// If we created any queue items, we know for sure that the run is not finished yet,
-	// so there is no need to lock the run record to check it.
-	//
-	if len(queueItems) > 0 {
-		return queueItems, run.ID, nil
-	}
-
-	return queueItems, run.ID, nil
+	return queueItems, nil
 }
 
 func (w *EventRouter) processExecutionEvent(
@@ -337,7 +316,7 @@ func (w *EventRouter) processExecutionEvent(
 	edges []models.Edge,
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
-) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution)
@@ -348,7 +327,7 @@ func (w *EventRouter) processExecutionEvent(
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
@@ -365,19 +344,15 @@ func (w *EventRouter) processExecutionEvent(
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, uuid.Nil, err
+			return nil, err
 		}
 
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
 	if err := event.RoutedInTransaction(tx); err != nil {
-		return nil, uuid.Nil, err
+		return nil, err
 	}
 
-	if len(createdQueueItems) > 0 {
-		return createdQueueItems, uuid.Nil, nil
-	}
-
-	return nil, execution.RunID, nil
+	return createdQueueItems, nil
 }

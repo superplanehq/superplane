@@ -80,7 +80,7 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
-	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID)
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return nil, err
 	}
@@ -93,15 +93,10 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 	return run, nil
 }
 
-func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun, error) {
-	return createCanvasRunInTransaction(tx, workflowID, CanvasRunStateStarted, "")
-}
-
-func CreateFinishedCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, result string) (*CanvasRun, error) {
-	return createCanvasRunInTransaction(tx, workflowID, CanvasRunStateFinished, result)
-}
-
-func createCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+	//
+	// TODO: why the fuck does the canvas run needs a version ID?
+	//
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
@@ -122,59 +117,6 @@ func createCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	}
 
 	if err := tx.Create(run).Error; err != nil {
-		return nil, err
-	}
-
-	return run, nil
-}
-
-func FindOrCreateFinishedCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent, result string) (*CanvasRun, error) {
-	if rootEvent.RunID != uuid.Nil {
-		run, err := FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
-		if err != nil {
-			return nil, err
-		}
-
-		if run.State == CanvasRunStateFinished {
-			return run, nil
-		}
-
-		now := time.Now()
-		err = tx.Model(run).
-			Updates(map[string]any{
-				"state":       CanvasRunStateFinished,
-				"result":      result,
-				"updated_at":  &now,
-				"finished_at": &now,
-			}).
-			Error
-		if err != nil {
-			return nil, err
-		}
-
-		run.State = CanvasRunStateFinished
-		run.Result = result
-		run.UpdatedAt = &now
-		run.FinishedAt = &now
-		return run, nil
-	}
-
-	run, err := FindCanvasRunByRootEventInTransaction(tx, rootEvent.ID)
-	if err == nil {
-		return run, nil
-	}
-
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	run, err = CreateFinishedCanvasRunInTransaction(tx, rootEvent.WorkflowID, result)
-	if err != nil {
-		return nil, err
-	}
-
-	rootEvent.RunID = run.ID
-	if err := tx.Model(rootEvent).Update("run_id", run.ID).Error; err != nil {
 		return nil, err
 	}
 
