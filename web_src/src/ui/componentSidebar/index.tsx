@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { resolveIcon } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { cn, resolveIcon } from "@/lib/utils";
 import { Check, Copy, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -28,6 +29,7 @@ import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 import { analytics } from "@/lib/analytics";
+import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -38,6 +40,35 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
     webhookStepDescription?: ReactNode;
   }
 > = {};
+
+function BottomInspectorTabButton({
+  active,
+  icon,
+  label,
+  onClick,
+  trailing,
+}: {
+  active: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+  trailing?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "mb-[-1px] flex items-center gap-1 self-stretch border-b px-2.5 text-[13px] font-medium",
+        active ? "border-gray-800 text-gray-800" : "border-transparent text-gray-500 hover:text-gray-800",
+      )}
+    >
+      {React.createElement(resolveIcon(icon), { size: RUN_NODE_ICON_SIZE, className: "h-3.5 w-3.5 shrink-0" })}
+      {label}
+      {trailing}
+    </button>
+  );
+}
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -145,9 +176,10 @@ interface ComponentSidebarProps {
   executionChainRequestId?: number;
   onExecutionChainHandled?: () => void;
   readOnly?: boolean;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
+  layout?: "sidebar" | "bottom";
+  resolveRunId?: (event: SidebarEvent) => string | null;
+  fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
+  onSelectRun?: (runId: string) => void;
 }
 
 export const ComponentSidebar = ({
@@ -218,15 +250,17 @@ export const ComponentSidebar = ({
   executionChainRequestId,
   onExecutionChainHandled,
   readOnly = false,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
+  layout = "sidebar",
+  resolveRunId,
+  fetchRunId,
+  onSelectRun,
 }: ComponentSidebarProps) => {
+  const isBottomLayout = layout === "bottom";
   const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
   const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
   const setRightResizing = useSidebarLayoutStore((state) => state.setRightResizing);
   const resizeRight = useSidebarLayoutStore((state) => state.resizeRight);
-  useSidebarMount("right", Boolean(isOpen));
+  useSidebarMount("right", Boolean(isOpen) && !isBottomLayout);
   useSidebarLayoutViewport();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeResizePointerIdRef = useRef<number | null>(null);
@@ -331,7 +365,7 @@ export const ComponentSidebar = ({
   );
 
   useEffect(() => {
-    if (!isResizing) {
+    if (isBottomLayout || !isResizing) {
       return;
     }
 
@@ -363,7 +397,7 @@ export const ComponentSidebar = ({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing, updateSidebarWidthFromPointer, setRightResizing]);
+  }, [isBottomLayout, isResizing, updateSidebarWidthFromPointer, setRightResizing]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -528,68 +562,115 @@ export const ComponentSidebar = ({
   const isDetailView = page !== "overview";
   const appIconSrc = getHeaderIconSrc(blockName);
   const headerIconSrc = iconSrc ?? appIconSrc;
+  const selectedWorkflowNode = useMemo(
+    () => (nodeId ? workflowNodes.find((node) => node.id === nodeId) : undefined),
+    [nodeId, workflowNodes],
+  );
+  const configurationHasError = Boolean(selectedWorkflowNode?.errorMessage);
 
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="ph-no-capture absolute right-0 top-0 h-full z-20"
-      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+      className={
+        isBottomLayout
+          ? "ph-no-capture flex min-h-0 flex-1 flex-col"
+          : "ph-no-capture absolute right-0 top-0 h-full z-20"
+      }
+      style={
+        isBottomLayout
+          ? undefined
+          : { width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }
+      }
     >
-      {/* Resize handle */}
+      {!isBottomLayout ? (
+        <div
+          onPointerDown={handlePointerDown}
+          data-testid="component-sidebar-resize-handle"
+          className="group absolute left-0 top-0 bottom-0 z-40 w-4 cursor-col-resize touch-none bg-transparent"
+          style={{ marginLeft: "-8px" }}
+        >
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 ${
+              isResizing ? "bg-slate-950/50" : ""
+            }`}
+          />
+        </div>
+      ) : null}
       <div
-        onPointerDown={handlePointerDown}
-        data-testid="component-sidebar-resize-handle"
-        className="group absolute left-0 top-0 bottom-0 z-40 w-4 cursor-col-resize touch-none bg-transparent"
-        style={{ marginLeft: "-8px" }}
+        className={
+          isBottomLayout
+            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white"
+            : "border-l-1 border-border h-full overflow-hidden bg-white flex flex-col"
+        }
       >
         <div
-          aria-hidden
-          className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 ${
-            isResizing ? "bg-slate-950/50" : ""
-          }`}
-        />
-      </div>
-      <div className="border-l-1 border-border h-full overflow-hidden bg-white flex flex-col">
-        <div
-          className={"flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")}
+          className={
+            isBottomLayout
+              ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3"
+              : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
+          }
         >
-          <div className="flex flex-col items-start gap-3 w-full">
-            <div className="flex justify-between gap-3 w-full">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
-                    {headerIconSrc ? (
-                      <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
-                    ) : (
-                      <Icon size={16} />
-                    )}
-                  </div>
-                  <h2 className="text-base font-semibold">{nodeName}</h2>
-                </div>
-                {nodeId && !hideNodeId && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
-                    <button
-                      onClick={handleCopyNodeId}
-                      className={"text-gray-500 hover:text-gray-800"}
-                      title={justCopied ? "Copied!" : "Copy Node ID"}
-                    >
-                      {justCopied ? <Check size={14} /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                )}
+          {isBottomLayout ? (
+            <>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <RunNodeIcon
+                  componentName={selectedWorkflowNode?.component}
+                  iconSrc={headerIconSrc}
+                  iconSlug={iconSlug}
+                  alt={nodeName}
+                  size={RUN_NODE_ICON_SIZE}
+                  className="h-3.5 w-3.5 shrink-0 text-gray-800"
+                />
+                <h3 className="truncate text-[13px] font-medium text-gray-900">{nodeName}</h3>
               </div>
-              {null}
+              <div className="flex shrink-0 items-stretch">
+                <div className="flex items-center px-1">
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onClose?.()}>
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-start gap-3 w-full">
+              <div className="flex justify-between gap-3 w-full">
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
+                      {headerIconSrc ? (
+                        <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
+                      ) : (
+                        <Icon size={16} />
+                      )}
+                    </div>
+                    <h2 className="text-base font-semibold">{nodeName}</h2>
+                  </div>
+                  {nodeId && !hideNodeId && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
+                      <button
+                        onClick={handleCopyNodeId}
+                        className={"text-gray-500 hover:text-gray-800"}
+                        title={justCopied ? "Copied!" : "Copy Node ID"}
+                      >
+                        {justCopied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {null}
+              </div>
+              <div
+                onClick={() => onClose?.()}
+                className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              >
+                <X size={16} />
+              </div>
             </div>
-            <div
-              onClick={() => onClose?.()}
-              className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
-            >
-              <X size={16} />
-            </div>
-          </div>
+          )}
         </div>
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <div
@@ -600,57 +681,90 @@ export const ComponentSidebar = ({
             <Tabs
               value={activeTab}
               onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
-              className="flex-1"
+              className={isBottomLayout ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex-1"}
             >
-              {showSettingsTab && (
-                <div className="border-b border-slate-950/15">
-                  <div className="flex px-4">
-                    {shouldShowRunsTab && (
-                      <button
+              {showSettingsTab &&
+                (isBottomLayout ? (
+                  <div className="relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b border-slate-200 px-2">
+                    {shouldShowRunsTab ? (
+                      <BottomInspectorTabButton
+                        active={activeTab === "latest"}
+                        icon="rabbit"
+                        label="Runs"
                         onClick={() => onTabChange?.("latest")}
-                        className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                          activeTab === "latest"
-                            ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                        }`}
-                      >
-                        Runs
-                      </button>
-                    )}
-                    <button
+                      />
+                    ) : null}
+                    <BottomInspectorTabButton
+                      active={activeTab === "settings"}
+                      icon="settings"
+                      label="Configuration"
                       onClick={() => onTabChange?.("settings")}
-                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
-                        activeTab === "settings"
-                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                      }`}
-                    >
-                      Configuration
-                      {nodeId && workflowNodes.find((n) => n.id === nodeId)?.errorMessage && (
-                        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                      )}
-                    </button>
-                    {!hideDocsTab && (
-                      <button
+                      trailing={
+                        configurationHasError ? <span className="h-1.5 w-1.5 rounded-full bg-orange-500" /> : undefined
+                      }
+                    />
+                    {!hideDocsTab ? (
+                      <BottomInspectorTabButton
+                        active={activeTab === "docs"}
+                        icon="info"
+                        label="Info"
                         onClick={() => onTabChange?.("docs")}
-                        className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                          activeTab === "docs"
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="border-b border-slate-950/15">
+                    <div className="flex px-4">
+                      {shouldShowRunsTab && (
+                        <button
+                          onClick={() => onTabChange?.("latest")}
+                          className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                            activeTab === "latest"
+                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                          }`}
+                        >
+                          Runs
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onTabChange?.("settings")}
+                        className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
+                          activeTab === "settings"
                             ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
                             : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         }`}
                       >
-                        Info
+                        Configuration
+                        {configurationHasError ? <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" /> : null}
                       </button>
-                    )}
+                      {!hideDocsTab && (
+                        <button
+                          onClick={() => onTabChange?.("docs")}
+                          className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                            activeTab === "docs"
+                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                          }`}
+                        >
+                          Info
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                ))}
 
               {shouldShowRunsTab && (
                 <TabsContent
                   value="latest"
-                  className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
-                  style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+                  className={cn(
+                    isBottomLayout
+                      ? "mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                      : !showSettingsTab
+                        ? "overflow-y-auto"
+                        : "mt-0",
+                  )}
+                  style={!isBottomLayout && !showSettingsTab ? { maxHeight: "40vh" } : undefined}
                 >
                   <LatestTab
                     latestEvents={latestEvents}
@@ -671,12 +785,19 @@ export const ComponentSidebar = ({
                     getExecutionState={getExecutionState}
                     workflowNodes={workflowNodes}
                     actions={actions}
+                    compact={isBottomLayout}
+                    resolveRunId={resolveRunId}
+                    fetchRunId={fetchRunId}
+                    onSelectRun={onSelectRun}
                   />
                 </TabsContent>
               )}
 
               {showSettingsTab && (
-                <TabsContent value="settings" className="mt-0">
+                <TabsContent
+                  value="settings"
+                  className={cn("mt-0", isBottomLayout && "min-h-0 flex-1 overflow-y-auto")}
+                >
                   <SettingsTab
                     mode={nodeConfigMode}
                     nodeId={nodeId}
@@ -693,9 +814,6 @@ export const ComponentSidebar = ({
                     integrationRef={integrationRef}
                     integrations={integrations}
                     readOnly={readOnly}
-                    onEnterEditMode={onEnterEditMode}
-                    enterEditModeDisabled={enterEditModeDisabled}
-                    enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
                     canReadIntegrations={canReadIntegrations}
                     canCreateIntegrations={canCreateIntegrations}
                     canUpdateIntegrations={canUpdateIntegrations}
@@ -709,7 +827,11 @@ export const ComponentSidebar = ({
               )}
 
               {showSettingsTab && !hideDocsTab && (
-                <TabsContent value="docs" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+                <TabsContent
+                  value="docs"
+                  className={cn("mt-0", isBottomLayout ? "min-h-0 flex-1 overflow-y-auto" : "overflow-y-auto")}
+                  style={!isBottomLayout ? { maxHeight: "calc(100vh - 160px)" } : undefined}
+                >
                   <DocsTab
                     description={componentDescription}
                     examplePayload={componentExamplePayload}
@@ -733,6 +855,7 @@ export const ComponentSidebar = ({
                   page={page as "history" | "queue" | "execution-chain"}
                   onBackToOverview={handleBackToOverview}
                   previousPage={previousPage}
+                  compact={isBottomLayout}
                 />
 
                 <div className="relative flex-1 min-h-0 overflow-hidden">
@@ -751,6 +874,11 @@ export const ComponentSidebar = ({
                         openEventIds={openEventIds}
                         onToggleOpen={handleToggleOpen}
                         onEventClick={onEventClick}
+                        compact={isBottomLayout}
+                        resolveRunId={resolveRunId}
+                        fetchRunId={fetchRunId}
+                        onSelectRun={onSelectRun}
+                        onCancelQueueItem={onCancelQueueItem}
                         onTriggerNavigate={(event) => {
                           if (event.kind === "trigger") {
                             const eventId = event.triggerEventId || event.id;

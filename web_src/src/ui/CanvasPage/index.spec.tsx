@@ -417,4 +417,181 @@ describe("CanvasPage connection drop", () => {
 
     await waitFor(() => expect(loadSidebarData).toHaveBeenCalledWith("node-1"));
   });
+
+  it("renders live inspector in bottom pane instead of right sidebar", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    const bottomPane = screen.getByTestId("live-node-detail-pane");
+    const componentSidebar = screen.getByTestId("component-sidebar");
+    expect(bottomPane).toBeInTheDocument();
+    expect(bottomPane).toContainElement(componentSidebar);
+  });
+
+  it("renders edit inspector in right sidebar, not bottom pane", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-edit"
+          canvasStateMode="editing"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+  });
+
+  it("clears live bottom inspector selection from canvas pane click without closing the pane", async () => {
+    const onSidebarChange = vi.fn();
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          onSidebarChange={onSidebarChange}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+
+    act(() => {
+      reactFlowPropsRef.current?.onPaneClick?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("live-bottom-inspector-empty")).toBeInTheDocument();
+    });
+
+    expect(onSidebarChange).toHaveBeenCalledWith(true, null);
+    expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("renders empty live bottom inspector when open without a selected node", async () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          initialSidebar={{ isOpen: true, nodeId: null }}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    expect(screen.getByTestId("live-node-detail-pane")).toBeInTheDocument();
+    expect(screen.getByTestId("live-bottom-inspector-empty")).toBeInTheDocument();
+    expect(screen.getByText("Select component to inspect")).toBeInTheDocument();
+  });
 });

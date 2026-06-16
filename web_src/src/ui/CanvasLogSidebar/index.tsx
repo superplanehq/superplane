@@ -258,7 +258,7 @@ export function CanvasLogSidebar({
             )}
           />
         </div>
-        <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
+        <div className="flex items-center justify-between pl-4 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
@@ -327,15 +327,12 @@ export function CanvasLogSidebar({
               </span>
             </button>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClose}
-              className="size-5 shrink-0 rounded hover:bg-gray-100"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+          <div className="flex shrink-0 items-stretch">
+            <div className="flex items-center px-1">
+              <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+                <X className="size-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
         <div className="px-2 border-b border-slate-200 h-8">
