@@ -6,7 +6,7 @@ import { CompactSidebarEventRow } from "./CompactSidebarEventRow";
 import { SidebarEventItem } from "./SidebarEventItem";
 import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
-import type { SuperplaneActionsAction, SuperplaneComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { ActionsAction, SuperplaneComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 
@@ -35,8 +35,8 @@ interface LatestTabProps {
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
-  workflowNodes?: SuperplaneComponentsNode[];
-  actions?: SuperplaneActionsAction[];
+  workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
+  actions?: ActionsAction[]; // Component metadata
   compact?: boolean;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;

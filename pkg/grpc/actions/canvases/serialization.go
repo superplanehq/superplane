@@ -27,11 +27,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	changeManagementEnabled, err := isChangeManagementEnabledForCanvas(canvas)
-	if err != nil {
-		return nil, err
-	}
-
 	serializedNodes, err := serializeCanvasNodes(canvas.ID, liveVersion.Nodes)
 	if err != nil {
 		return nil, err
@@ -60,9 +55,8 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes:            serializedNodes,
-				Edges:            actions.EdgesToProto(liveVersion.Edges),
-				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+				Nodes: serializedNodes,
+				Edges: actions.EdgesToProto(liveVersion.Edges),
 			},
 			Status: nil,
 		}, nil
@@ -102,48 +96,14 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes:            serializedNodes,
-			Edges:            actions.EdgesToProto(liveVersion.Edges),
-			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+			Nodes: serializedNodes,
+			Edges: actions.EdgesToProto(liveVersion.Edges),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
 			LastEvents:     serializedEvents,
 		},
 	}, nil
-}
-
-func serializeChangeManagement(
-	enabled bool,
-	approvers []models.CanvasChangeRequestApprover,
-) *pb.Canvas_ChangeManagement {
-	cm := &pb.Canvas_ChangeManagement{
-		Enabled:   enabled,
-		Approvals: make([]*pb.Canvas_ChangeManagement_Approver, 0, len(approvers)),
-	}
-
-	for _, approver := range approvers {
-		cm.Approvals = append(cm.Approvals, &pb.Canvas_ChangeManagement_Approver{
-			Type:     canvasChangeRequestApproverTypeToProto(approver.Type),
-			UserId:   approver.User,
-			RoleName: approver.Role,
-		})
-	}
-
-	return cm
-}
-
-func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManagement_Approver_Type {
-	switch value {
-	case models.CanvasChangeRequestApproverTypeAnyone:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE
-	case models.CanvasChangeRequestApproverTypeUser:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_USER
-	case models.CanvasChangeRequestApproverTypeRole:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_ROLE
-	default:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_UNSPECIFIED
-	}
 }
 
 func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*componentpb.Node, error) {

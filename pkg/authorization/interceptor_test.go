@@ -11,10 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 )
 
 func TestDefaultResourceResolver(t *testing.T) {
@@ -63,7 +60,6 @@ func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
 		{pbCanvases.Canvases_CommitCanvasStaging_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_ApplyCanvasAutoLayout_FullMethodName, "update_version"},
 		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
-		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
 		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
 		{pbCanvases.Canvases_DeleteCanvas_FullMethodName, "delete"},
 	}
@@ -247,24 +243,6 @@ func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
 	}
-}
-
-func TestCheckRequiredExperimentalFeatures(t *testing.T) {
-	const unreleasedFeature = "test_unreleased_feature"
-	t.Cleanup(features.WithRegistryForTest([]features.Feature{{ID: unreleasedFeature, Label: unreleasedFeature}}))
-
-	rule := AuthorizationRule{
-		RequiredExperimentalFeatures: []string{unreleasedFeature},
-	}
-
-	err := checkRequiredExperimentalFeatures(&models.Organization{}, rule)
-	require.Error(t, err)
-	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-
-	err = checkRequiredExperimentalFeatures(&models.Organization{
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{unreleasedFeature},
-	}, rule)
-	require.NoError(t, err)
 }
 
 func marshalScopes(t *testing.T, scopes []string) string {

@@ -6,7 +6,7 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
-  SuperplaneActionsAction,
+  ActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
@@ -70,7 +70,7 @@ export function hydrateRunExecution(
 export function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
+  components: ActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -118,7 +118,7 @@ export function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
+  components: ActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -168,7 +168,7 @@ export function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 export function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
-  components: SuperplaneActionsAction[],
+  components: ActionsAction[],
   triggers: TriggersTrigger[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -225,8 +225,12 @@ function readErrorField(error: unknown, key: string): unknown {
   return (error as Record<string, unknown>)[key];
 }
 
-/** True when a canvas fetch failed because the canvas does not exist. */
-export function isCanvasLoadNotFoundError(error: unknown): boolean {
+/**
+ * True when an API call failed because the targeted resource does not exist
+ * (HTTP 404 / gRPC NOT_FOUND / "not found" message). Used to turn a stale
+ * draft-version id into a graceful recovery instead of an opaque error.
+ */
+export function isNotFoundError(error: unknown): boolean {
   if (readErrorField(error, "status") === 404) {
     return true;
   }
@@ -246,4 +250,9 @@ export function isCanvasLoadNotFoundError(error: unknown): boolean {
   }
 
   return message.includes("not found") || message.includes("404");
+}
+
+/** True when a canvas fetch failed because the canvas does not exist. */
+export function isCanvasLoadNotFoundError(error: unknown): boolean {
+  return isNotFoundError(error);
 }

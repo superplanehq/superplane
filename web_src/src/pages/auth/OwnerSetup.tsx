@@ -5,6 +5,7 @@ import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { PrivateNetworkStep } from "./ownerSetup/PrivateNetworkStep";
 import { SmtpPromptStep } from "./ownerSetup/SmtpPromptStep";
 import { SmtpConfigStep } from "./ownerSetup/SmtpConfigStep";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -28,6 +29,8 @@ const OwnerSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useReportPageReady(true);
 
   const isEmailValid = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

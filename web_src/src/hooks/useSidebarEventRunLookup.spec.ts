@@ -59,7 +59,7 @@ describe("useSidebarEventRunLookup", () => {
         }),
       {
         wrapper: createWrapper(queryClient),
-        initialProps: { runs: [] },
+        initialProps: { runs: [] as CanvasesCanvasRun[] },
       },
     );
 

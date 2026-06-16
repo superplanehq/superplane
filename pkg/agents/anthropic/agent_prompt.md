@@ -290,9 +290,14 @@ Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` section 6
 | Using integration without ID | Add `integration: {id: "..."}` | Check `superplane_app` list_integrations |
 | `start` with `configuration: {}` | `templates: [{name, payload, parameters?}]` | Manual Run needs templates for the UI Run button and hook execution |
 
+### Strict Canvas YAML
+
+`canvas_yaml` passed to `superplane_app` action `update_draft` must be canonical live Canvas YAML. The parser rejects unknown fields; never include template-only or UI-only fields such as `metadata.isTemplate`. If `update_draft` returns an `unknown field` error, remove the non-canonical field and retry with canonical YAML.
+
 ## Error Handling
 
 - If update returns "configuration errors" → app was saved but broken. Fix nodes and re-submit.
+- If update returns "unknown field" → app was not saved. Remove non-canonical canvas YAML fields such as `metadata.isTemplate` and retry once.
 - If "integration is required" → node needs a connected integration. Show the integration button and ask the user.
 - If a native component isn't available → offer alternatives: core components, different vendor, or placeholder with `noop`.
 

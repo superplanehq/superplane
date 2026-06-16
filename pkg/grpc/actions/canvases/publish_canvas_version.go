@@ -56,14 +56,6 @@ func PublishCanvasVersion(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
-	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
-	}
-	if changeManagementEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
-	}
-
 	publishedVersion, err := publishDraftVersionInTransaction(
 		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
@@ -82,7 +74,7 @@ func PublishCanvasVersion(
 	}
 
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(publishedVersion, organizationID),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
 	}, nil
 }
 
@@ -148,12 +140,6 @@ func publishDraftVersionInTransaction(
 		if err != nil {
 			log.Errorf("failed to publish canvas version: %v", err)
 			return err
-		}
-
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
-		if refreshErr != nil {
-			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
-			return refreshErr
 		}
 
 		publishedVersion = version

@@ -30,6 +30,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
+	_ "github.com/superplanehq/superplane/pkg/integrations/cloudsmith"
 	_ "github.com/superplanehq/superplane/pkg/integrations/coolify"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"

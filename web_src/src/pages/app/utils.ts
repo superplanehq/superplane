@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
-  SuperplaneActionsAction,
+  ActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
@@ -1114,7 +1114,7 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
   };
 }
 
-export function buildComponentDefinition(component?: Partial<SuperplaneActionsAction>): ComponentDefinition {
+export function buildComponentDefinition(component?: Partial<ActionsAction>): ComponentDefinition {
   return {
     name: component?.name || "unknown",
     label: component?.label || "Unknown",

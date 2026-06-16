@@ -31,6 +31,9 @@ import {
   deleteAlertingPolicyMapper,
   updateAlertingPolicyMapper,
 } from "./monitoring";
+import { createSnoozeMapper } from "./create_snooze";
+import { getSnoozeMapper } from "./get_snooze";
+import { expireSnoozeMapper } from "./expire_snooze";
 import { queryMapper, queryRangeMapper } from "./prometheus";
 import { createImageMapper } from "./create_image";
 import { updateImageMapper } from "./update_image";
@@ -40,6 +43,9 @@ import {
   createDatabaseMapper,
   getDatabaseMapper,
   deleteDatabaseMapper,
+  createInstanceMapper,
+  getInstanceMapper,
+  deleteInstanceMapper,
   CLOUDSQL_CREATED_STATE_REGISTRY,
   CLOUDSQL_FETCHED_STATE_REGISTRY,
   CLOUDSQL_DELETED_STATE_REGISTRY,
@@ -73,6 +79,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "monitoring.getAlertingPolicy": getAlertingPolicyMapper,
   "monitoring.deleteAlertingPolicy": deleteAlertingPolicyMapper,
   "monitoring.updateAlertingPolicy": updateAlertingPolicyMapper,
+  "monitoring.createSnooze": createSnoozeMapper,
+  "monitoring.getSnooze": getSnoozeMapper,
+  "monitoring.expireSnooze": expireSnoozeMapper,
   "prometheus.query": queryMapper,
   "prometheus.queryRange": queryRangeMapper,
   "compute.createStaticIP": createStaticIPMapper,
@@ -81,6 +90,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "cloudsql.createDatabase": createDatabaseMapper,
   "cloudsql.getDatabase": getDatabaseMapper,
   "cloudsql.deleteDatabase": deleteDatabaseMapper,
+  "cloudsql.createInstance": createInstanceMapper,
+  "cloudsql.getInstance": getInstanceMapper,
+  "cloudsql.deleteInstance": deleteInstanceMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -120,6 +132,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "monitoring.getAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.deleteAlertingPolicy": buildActionStateRegistry("completed"),
   "monitoring.updateAlertingPolicy": buildActionStateRegistry("completed"),
+  "monitoring.createSnooze": buildActionStateRegistry("created"),
+  "monitoring.getSnooze": buildActionStateRegistry("fetched"),
+  "monitoring.expireSnooze": buildActionStateRegistry("expired"),
   "prometheus.query": buildActionStateRegistry("completed"),
   "prometheus.queryRange": buildActionStateRegistry("completed"),
   "compute.createStaticIP": buildActionStateRegistry("completed"),
@@ -128,6 +143,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudsql.createDatabase": CLOUDSQL_CREATED_STATE_REGISTRY,
   "cloudsql.getDatabase": CLOUDSQL_FETCHED_STATE_REGISTRY,
   "cloudsql.deleteDatabase": CLOUDSQL_DELETED_STATE_REGISTRY,
+  "cloudsql.createInstance": CLOUDSQL_CREATED_STATE_REGISTRY,
+  "cloudsql.getInstance": CLOUDSQL_FETCHED_STATE_REGISTRY,
+  "cloudsql.deleteInstance": CLOUDSQL_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

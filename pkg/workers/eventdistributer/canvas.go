@@ -15,6 +15,7 @@ const (
 	CanvasVersionUpdatedEvent = "canvas_version_updated"
 	CanvasStagingUpdatedEvent = "staging_updated"
 	CanvasDeletedEvent        = "canvas_deleted"
+	CanvasMemoryUpdatedEvent  = "memory_updated"
 )
 
 type CanvasStatePayload struct {
@@ -34,6 +35,10 @@ func HandleCanvasUpdated(messageBody []byte, wsHub *ws.Hub) error {
 
 func HandleCanvasDeleted(messageBody []byte, wsHub *ws.Hub) error {
 	return handleCanvasState(messageBody, wsHub, CanvasDeletedEvent)
+}
+
+func HandleCanvasMemoryUpdated(messageBody []byte, wsHub *ws.Hub) error {
+	return handleCanvasState(messageBody, wsHub, CanvasMemoryUpdatedEvent)
 }
 
 func HandleCanvasVersionUpdated(messageBody []byte, wsHub *ws.Hub) error {
