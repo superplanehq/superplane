@@ -60,6 +60,7 @@ export function buildRepositoryData(overrides?: Partial<RepositoryData>): Reposi
     num_quarantined_packages: 1,
     num_policy_violated_packages: 2,
     self_html_url: "https://cloudsmith.io/~acme/repos/production/",
+    self_webapp_url: "https://cloudsmith.io/~acme/repos/production/",
     ...overrides,
   };
 }
