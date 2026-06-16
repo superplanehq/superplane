@@ -141,33 +141,20 @@ func (c *Client) GetRepository(owner, identifier string) (*Repository, error) {
 	return &repository, nil
 }
 
-const repositoryPageSize = 100
-
-// ListRepositories returns every repository the authenticated user can access,
-// following all pages until the API returns a page smaller than repositoryPageSize.
+// ListRepositories returns every repository the authenticated user can access.
 func (c *Client) ListRepositories() ([]Repository, error) {
-	var all []Repository
-
-	for page := 1; ; page++ {
-		requestURL := fmt.Sprintf("%s/repos/?page=%d&page_size=%d", c.BaseURL, page, repositoryPageSize)
-		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		var repositories []Repository
-		if err := json.Unmarshal(responseBody, &repositories); err != nil {
-			return nil, fmt.Errorf("error parsing response: %v", err)
-		}
-
-		all = append(all, repositories...)
-
-		if len(repositories) < repositoryPageSize {
-			break
-		}
+	requestURL := fmt.Sprintf("%s/repos/?page_size=1000", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	return all, nil
+	var repositories []Repository
+	if err := json.Unmarshal(responseBody, &repositories); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return repositories, nil
 }
 
 // Package represents a Cloudsmith package with its metadata.
