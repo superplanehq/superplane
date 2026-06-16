@@ -241,6 +241,13 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	finalizer := NewRunFinalizer(amqpURL)
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID))
+
+	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
+	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
 	assert.NotNil(t, updatedRun.FinishedAt)

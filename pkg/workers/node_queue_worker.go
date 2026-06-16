@@ -381,9 +381,5 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *c
 	//
 	contexts.DispatchOnError(tx, &execution, onNewEvents)
 
-	if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
-		return nil, err
-	}
-
 	return []*uuid.UUID{&execution.ID}, nil
 }
