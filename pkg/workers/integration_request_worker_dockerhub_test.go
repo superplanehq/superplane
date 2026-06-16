@@ -101,6 +101,104 @@ func Test__DockerHubRefreshLoopDoesNotAccumulate(t *testing.T) {
 	}
 }
 
+// Test__DockerHubSyncSchedulesResyncRequest verifies the refresh loop is driven
+// by a deduplicated sync request rather than a self-perpetuating action call,
+// which is the fix for issue #5386.
+func Test__DockerHubSyncSchedulesResyncRequest(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	r.Registry.Integrations["dockerhub"] = &dockerhub.DockerHub{}
+	integration := createDockerHubIntegration(t, r)
+
+	ctx := workercontexts.NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+	httpCtx := &supportcontexts.HTTPContext{
+		Responses: []*http.Response{dockerHubTokenResponse(t), dockerHubRepositoriesResponse()},
+	}
+
+	require.NoError(t, (&dockerhub.DockerHub{}).Sync(core.SyncContext{
+		HTTP:          httpCtx,
+		Integration:   ctx,
+		Configuration: integration.Configuration.Data(),
+	}))
+
+	pending := pendingRequestsForIntegration(t, integration.ID)
+	require.Len(t, pending, 1, "DockerHub sync should schedule exactly one refresh (#5386)")
+	require.Equal(t, models.IntegrationRequestTypeSync, pending[0].Type,
+		"DockerHub must reschedule its refresh as a deduplicated sync request, not an action call (#5386)")
+}
+
+// Test__DockerHubRefreshHookBridgesToResync verifies the backwards-compatibility
+// bridge: a leftover self-perpetuating "refreshAccessToken" action request (one
+// of the 202 orphaned chains in #5386) collapses onto the single deduplicated
+// sync loop when it runs.
+func Test__DockerHubRefreshHookBridgesToResync(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	r.Registry.Integrations["dockerhub"] = &dockerhub.DockerHub{}
+	integration := createDockerHubIntegration(t, r)
+
+	//
+	// Simulate one of the orphaned action chains that drove the runaway loop.
+	//
+	runAt := time.Now()
+	require.NoError(t, integration.CreateActionRequest(database.Conn(), "refreshAccessToken", map[string]any{}, &runAt))
+
+	ctx := workercontexts.NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+	httpCtx := &supportcontexts.HTTPContext{
+		Responses: []*http.Response{dockerHubTokenResponse(t)},
+	}
+
+	require.NoError(t, (&dockerhub.DockerHub{}).HandleHook(core.IntegrationHookContext{
+		Name:          "refreshAccessToken",
+		HTTP:          httpCtx,
+		Integration:   ctx,
+		Configuration: integration.Configuration.Data(),
+	}))
+
+	pending := pendingRequestsForIntegration(t, integration.ID)
+	require.Len(t, pending, 1, "the orphaned action chain must collapse onto a single request (#5386)")
+	require.Equal(t, models.IntegrationRequestTypeSync, pending[0].Type,
+		"the refresh hook must bridge the orphaned chain onto the sync resync loop (#5386)")
+}
+
+func createDockerHubIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {
+	t.Helper()
+
+	//
+	// accessToken is a Sensitive config field, so it is stored as
+	// base64(encrypt(value, associatedData=installationID)).
+	//
+	integrationID := uuid.New()
+	encryptedToken, err := r.Encryptor.Encrypt(context.Background(), []byte("pat"), []byte(integrationID.String()))
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(
+		integrationID,
+		r.Organization.ID,
+		"dockerhub",
+		support.RandomName("integration"),
+		map[string]any{
+			"username":    "superplane",
+			"accessToken": base64.StdEncoding.EncodeToString(encryptedToken),
+		},
+	)
+	require.NoError(t, err)
+
+	return integration
+}
+
+func pendingRequestsForIntegration(t *testing.T, integrationID uuid.UUID) []models.IntegrationRequest {
+	t.Helper()
+
+	var requests []models.IntegrationRequest
+	require.NoError(t, database.Conn().
+		Where("app_installation_id = ? AND state = ?", integrationID, models.IntegrationRequestStatePending).
+		Find(&requests).Error)
+	return requests
+}
+
 func dockerHubTokenResponse(t *testing.T) *http.Response {
 	t.Helper()
 

@@ -55,6 +55,9 @@ var (
 
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
+
+	pendingIntegrationRequestsGauge                   metric.Int64Gauge
+	pendingIntegrationRequestsMaxPerInstallationGauge metric.Int64Gauge
 )
 
 // Operation values for integration secret writes.
@@ -368,6 +371,24 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	pendingIntegrationRequestsGauge, err = meter.Int64Gauge(
+		"app_installation_requests.pending.count",
+		metric.WithDescription("Current number of pending integration requests"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	pendingIntegrationRequestsMaxPerInstallationGauge, err = meter.Int64Gauge(
+		"app_installation_requests.pending.max_per_installation",
+		metric.WithDescription("Largest number of pending integration requests held by a single installation"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
 	err = registerDBOperationMetricsCallbacks()
 	if err != nil {
 		return err
@@ -622,4 +643,20 @@ func RecordPendingExecutionsCount(ctx context.Context, count int64) {
 	}
 
 	pendingExecutionsGauge.Record(ctx, count)
+}
+
+func RecordPendingIntegrationRequestsCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingIntegrationRequestsGauge.Record(ctx, count)
+}
+
+func RecordPendingIntegrationRequestsMaxPerInstallation(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingIntegrationRequestsMaxPerInstallationGauge.Record(ctx, count)
 }

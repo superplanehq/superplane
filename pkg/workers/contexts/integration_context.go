@@ -29,6 +29,13 @@ type IntegrationContext struct {
 	onNewEvents func([]models.CanvasEvent)
 
 	//
+	// Request currently being processed by the worker, if any. When set,
+	// ScheduleResync/ScheduleActionCall complete it in the same transaction
+	// that creates the successor, so a crash can never duplicate the chain (#5386).
+	//
+	currentRequest *models.IntegrationRequest
+
+	//
 	// Lazily create a secret storage, when Secrets() used.
 	//
 	secretStorage *IntegrationSecretStorage
@@ -50,6 +57,12 @@ func NewIntegrationContext(
 		registry:    registry,
 		onNewEvents: onNewEvents,
 	}
+}
+
+// SetCurrentRequest records the request the worker is currently processing so
+// that scheduling its successor can complete it atomically (#5386).
+func (c *IntegrationContext) SetCurrentRequest(request *models.IntegrationRequest) {
+	c.currentRequest = request
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
@@ -184,13 +197,21 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
-	err := c.completeCurrentRequestForInstallation()
-	if err != nil {
-		return err
-	}
-
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateSyncRequest(c.tx, &runAt)
+
+	//
+	// Complete the in-flight request and create its successor atomically. If
+	// this were split across transactions, a crash (or a later failure) between
+	// the two could leave the leased request pending while its successor already
+	// exists; the lease retry would then spawn a duplicate chain (#5386).
+	//
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := c.completeCurrentOrPendingRequest(tx); err != nil {
+			return err
+		}
+
+		return c.integration.CreateSyncRequest(tx, &runAt)
+	})
 }
 
 func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
@@ -199,13 +220,36 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
+
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		//
+		// While the worker processes a request, complete it in the same
+		// transaction that schedules the follow-up so a crash cannot duplicate
+		// the chain (#5386). Outside the worker (no current request) this stays
+		// a plain insert, preserving the existing behavior.
+		//
+		if c.currentRequest != nil {
+			if err := c.currentRequest.Complete(tx); err != nil {
+				return err
+			}
+		}
+
+		return c.integration.CreateActionRequest(tx, actionName, parameters, &runAt)
+	})
 }
 
-func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
-	request, err := models.FindPendingRequestForIntegration(c.tx, c.integration.ID)
+// completeCurrentOrPendingRequest completes the request the worker is currently
+// processing when one is set. Otherwise it falls back to completing the single
+// pending request for the installation, preserving the historical
+// de-duplication behavior for callers outside the worker (e.g. OAuth callbacks).
+func (c *IntegrationContext) completeCurrentOrPendingRequest(tx *gorm.DB) error {
+	if c.currentRequest != nil {
+		return c.currentRequest.Complete(tx)
+	}
+
+	request, err := models.FindPendingRequestForIntegration(tx, c.integration.ID)
 	if err == nil {
-		return request.Complete(c.tx)
+		return request.Complete(tx)
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
