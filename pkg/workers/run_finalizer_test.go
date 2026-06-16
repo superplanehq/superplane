@@ -58,7 +58,7 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
 
 	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&queueItem).Error)
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
@@ -149,13 +149,13 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&queueItem).Error)
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, false))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
 
 	unchangedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
 	assert.Equal(t, staleUpdatedAt.Unix(), unchangedRun.UpdatedAt.Unix())
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, true))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerSweep))
 
 	touchedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)

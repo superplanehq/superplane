@@ -12,11 +12,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
-const startedRunsSweepLimit = 100
+const (
+	startedRunsSweepLimit = 100
+
+	runFinalizerTriggerSweep             = "sweep"
+	runFinalizerTriggerExecutionFinished = "execution_finished"
+	runFinalizerTriggerEventTerminal     = "event_terminal"
+
+	runFinalizerReasonAlreadyFinished = "already_finished"
+	runFinalizerReasonOpenWork        = "open_work"
+)
 
 type RunFinalizer struct {
 	logger      *log.Entry
@@ -46,20 +56,26 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			runs, err := models.ListStartedCanvasRuns(startedRunsSweepLimit)
 			if err != nil {
 				w.logger.Errorf("Error listing started runs: %v", err)
 				continue
 			}
 
+			telemetry.RecordRunFinalizerRunsCount(context.Background(), len(runs))
+
 			for _, run := range runs {
-				if err := w.finalizeRun(run.WorkflowID, run.ID, true); err != nil {
+				if err := w.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep); err != nil {
 					w.logger.WithFields(log.Fields{
 						"workflow_id": run.WorkflowID,
 						"run_id":      run.ID,
 					}).Errorf("Error finalizing run from sweep: %v", err)
 				}
 			}
+
+			telemetry.RecordRunFinalizerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
@@ -155,7 +171,7 @@ func (w *RunFinalizer) consumeExecutionFinished(delivery tackle.Delivery) error 
 		return err
 	}
 
-	return w.finalizeRun(workflowID, execution.RunID, false)
+	return w.finalizeRun(workflowID, execution.RunID, runFinalizerTriggerExecutionFinished)
 }
 
 func (w *RunFinalizer) consumeEventTerminal(delivery tackle.Delivery) error {
@@ -177,18 +193,44 @@ func (w *RunFinalizer) consumeEventTerminal(delivery tackle.Delivery) error {
 		return err
 	}
 
-	return w.finalizeRun(workflowID, runID, false)
+	return w.finalizeRun(workflowID, runID, runFinalizerTriggerEventTerminal)
 }
 
-func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, fromSweep bool) error {
+func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) error {
+	//
+	// For every run we process, we track the following metrics:
+	// - trigger: sweep, execution_finished, event_terminal
+	// - outcome: success, failed, skipped
+	// - reason: none, already_finished, open_work, locked, deadlock, not_found, internal
+	//
+	start := time.Now()
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
+	defer func() {
+		telemetry.RecordRunFinalizerRunProcessing(
+			context.Background(),
+			time.Since(start),
+			trigger,
+			outcome,
+			reason,
+		)
+	}()
+
 	var finalized bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var skipReason string
 		var err error
-		finalized, err = w.maybeFinalizeRun(tx, runID, fromSweep)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger)
+		if skipReason != "" {
+			outcome = executorOutcomeSkipped
+			reason = skipReason
+		}
 		return err
 	})
 
 	if err != nil {
+		outcome = executorOutcomeFailed
+		reason = classifyProcessError(err)
 		return err
 	}
 
@@ -208,36 +250,36 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, fromSweep bool) 
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, fromSweep bool) (bool, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	if run.State == models.CanvasRunStateFinished {
-		return false, nil
+		return false, runFinalizerReasonAlreadyFinished, nil
 	}
 
 	openWork, err := models.FindOpenCanvasRunWorkInTransaction(tx, runID)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		if fromSweep {
+		if trigger == runFinalizerTriggerSweep {
 			// The started-run sweep loads candidates with ORDER BY updated_at ASC
 			// LIMIT N. Bump updated_at here so a run that is still open is pushed to
 			// the back of the queue instead of being retried on every tick.
 			now := time.Now()
-			return false, tx.Model(run).Update("updated_at", &now).Error
+			return false, runFinalizerReasonOpenWork, tx.Model(run).Update("updated_at", &now).Error
 		}
 
-		return false, nil
+		return false, runFinalizerReasonOpenWork, nil
 	}
 
 	result, err := models.CalculateCanvasRunResultInTransaction(tx, runID)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	now := time.Now()
@@ -251,8 +293,8 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, fromSweep 
 		Error
 
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
-	return true, nil
+	return true, "", nil
 }
