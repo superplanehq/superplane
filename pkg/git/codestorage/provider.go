@@ -130,14 +130,14 @@ func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
 	return nil
 }
 
-func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, error) {
+func (p *Provider) ListFiles(ctx context.Context, repoID, ref string) ([]string, error) {
 	repo, err := p.repo(repoID)
 	if err != nil {
 		return nil, err
 	}
 
 	result, err := repo.ListFiles(ctx, codestorage.ListFilesOptions{
-		Ref: p.defaultBranch,
+		Ref: provider.RefOrDefault(ref, p.defaultBranch),
 	})
 
 	if err != nil {
@@ -147,7 +147,7 @@ func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, erro
 	return result.Paths, nil
 }
 
-func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error) {
+func (p *Provider) GetFile(ctx context.Context, repoID, path, ref string) (io.ReadCloser, error) {
 	filePath, err := provider.NormalizePath(path)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.
 
 	resp, err := repo.FileStream(ctx, codestorage.GetFileOptions{
 		Path: filePath,
-		Ref:  p.defaultBranch,
+		Ref:  provider.RefOrDefault(ref, p.defaultBranch),
 	})
 
 	if err != nil {
@@ -220,14 +220,14 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	return result.CommitSHA, nil
 }
 
-func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
+func (p *Provider) Head(ctx context.Context, repoID, ref string) (string, error) {
 	repo, err := p.repo(repoID)
 	if err != nil {
 		return "", err
 	}
 
 	commit, err := repo.GetCommit(ctx, codestorage.GetCommitOptions{
-		SHA: p.defaultBranch,
+		SHA: provider.RefOrDefault(ref, p.defaultBranch),
 	})
 
 	if err != nil {

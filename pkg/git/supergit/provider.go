@@ -64,17 +64,17 @@ func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
 	return p.client.deleteRepo(ctx, repoID)
 }
 
-func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, error) {
-	return p.client.listFiles(ctx, repoID, p.defaultBranch)
+func (p *Provider) ListFiles(ctx context.Context, repoID, ref string) ([]string, error) {
+	return p.client.listFiles(ctx, repoID, provider.RefOrDefault(ref, p.defaultBranch))
 }
 
-func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error) {
+func (p *Provider) GetFile(ctx context.Context, repoID, path, ref string) (io.ReadCloser, error) {
 	filePath, err := provider.NormalizePath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	return p.client.getFile(ctx, repoID, filePath, p.defaultBranch)
+	return p.client.getFile(ctx, repoID, filePath, provider.RefOrDefault(ref, p.defaultBranch))
 }
 
 func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (string, error) {
@@ -107,8 +107,8 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	return result.Commit.CommitSHA, nil
 }
 
-func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
-	commit, err := p.client.getCommit(ctx, repoID, p.defaultBranch)
+func (p *Provider) Head(ctx context.Context, repoID, ref string) (string, error) {
+	commit, err := p.client.getCommit(ctx, repoID, provider.RefOrDefault(ref, p.defaultBranch))
 	if err != nil {
 		return "", err
 	}
