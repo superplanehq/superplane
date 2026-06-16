@@ -342,15 +342,19 @@ export const ComponentSidebar = ({
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
-    const seeded = new Set(openEventIds);
-    latestEvents.forEach((e) => {
-      if (e.isOpen) seeded.add(e.id);
+    setOpenEventIds((current) => {
+      const seeded = new Set(current);
+      let changed = false;
+
+      for (const event of [...latestEvents, ...nextInQueueEvents]) {
+        if (event.isOpen && !seeded.has(event.id)) {
+          seeded.add(event.id);
+          changed = true;
+        }
+      }
+
+      return changed ? seeded : current;
     });
-    nextInQueueEvents.forEach((e) => {
-      if (e.isOpen) seeded.add(e.id);
-    });
-    if (seeded.size !== openEventIds.size) setOpenEventIds(seeded);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestEvents, nextInQueueEvents]);
 
   const Icon = React.useMemo(() => {
