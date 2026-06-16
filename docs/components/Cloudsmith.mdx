@@ -1,0 +1,94 @@
+---
+title: "Cloudsmith"
+---
+
+Automate repository, package, and artifact management on Cloudsmith
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
+</CardGrid>
+
+## Instructions
+
+## Cloudsmith Service Account API Key
+
+SuperPlane authenticates to Cloudsmith using a service account API key, which is not tied to an individual user.
+
+1. In the Cloudsmith web dashboard, go to the **Accounts** tab and click on **Services**
+2. Click on **New Service**. Give the servie a name like **Superplane** and optional description. Assign the **Manager** role to the service.
+3. Click on **Create Service** and copy the generated API key.
+4. Paste the API key below.
+5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+
+<a id="get-repository"></a>
+
+## Get Repository
+
+**Component key:** `cloudsmith.getRepository`
+
+The Get Repository component retrieves detailed information about a specific Cloudsmith repository.
+
+### Use Cases
+
+- **Status checks**: Verify a repository exists and is reachable before publishing or promoting packages
+- **Information retrieval**: Read repository visibility, namespace, and configuration
+- **Storage monitoring**: Track storage usage, package counts, and download metrics
+- **Compliance checks**: Inspect quarantined or policy-violating package counts before downstream actions
+
+### Configuration
+
+- **Repository**: The repository to retrieve (required, supports expressions). The value is the repository identifier in the form `owner/repository`.
+
+### Output
+
+Returns the repository object including:
+- **name**: A descriptive name for the repository
+- **slug**: The slug that identifies the repository in URIs
+- **namespace**: The namespace (owner) the repository belongs to
+- **repository_type_str**: The visibility of the repository (Public, Private, Open-Source)
+- **storage_region**: The Cloudsmith region in which package files are stored
+- **size** / **size_str**: The calculated storage size of the repository
+- **package_count**: The number of packages in the repository
+- **num_downloads**: The number of downloads for packages in the repository
+- **num_quarantined_packages**: The number of quarantined packages
+- **num_policy_violated_packages**: The number of packages with policy violations
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/public/acme/production",
+    "content_kind": "Standard",
+    "created_at": "2026-01-15T09:42:11.123456Z",
+    "description": "Production packages for the ACME platform",
+    "is_open_source": false,
+    "is_private": true,
+    "is_public": false,
+    "name": "Production",
+    "namespace": "acme",
+    "namespace_url": "https://api.cloudsmith.io/v1/namespaces/acme/",
+    "num_downloads": 18234,
+    "num_policy_violated_packages": 2,
+    "num_quarantined_packages": 1,
+    "package_count": 312,
+    "package_group_count": 47,
+    "repository_type_str": "Private",
+    "self_html_url": "https://cloudsmith.io/~acme/repos/production/",
+    "self_url": "https://api.cloudsmith.io/v1/repos/acme/production/",
+    "self_webapp_url": "https://cloudsmith.io/~acme/repos/production/",
+    "size": 524288000,
+    "size_str": "500.0 MB",
+    "slug": "production",
+    "slug_perm": "abcdef123456",
+    "storage_region": "us-ohio"
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "cloudsmith.repository.fetched"
+}
+```
+
