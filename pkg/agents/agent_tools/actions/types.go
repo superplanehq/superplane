@@ -22,6 +22,11 @@ type Input struct {
 	Before              string           `json:"before,omitempty"`
 	States              []string         `json:"states,omitempty"`
 	Results             []string         `json:"results,omitempty"`
+	Path                string           `json:"path,omitempty"`
+	Paths               []string         `json:"paths,omitempty"`
+	Content             string           `json:"content,omitempty"`
+	Message             string           `json:"message,omitempty"`
+	Query               string           `json:"query,omitempty"`
 }
 
 // AutoLayoutInput configures optional backend auto-layout for draft updates.
@@ -62,6 +67,54 @@ type runtimeReadResult struct {
 	CanvasID string `json:"canvas_id"`
 	Resource string `json:"resource"`
 	Payload  any    `json:"payload"`
+}
+
+type fileListResult struct {
+	Action       string   `json:"action"`
+	CanvasID     string   `json:"canvas_id"`
+	Files        []string `json:"files"`
+	ContextFiles []string `json:"context_files,omitempty"`
+}
+
+type fileReadResult struct {
+	Action   string          `json:"action"`
+	CanvasID string          `json:"canvas_id"`
+	Files    []fileReadEntry `json:"files"`
+	Errors   []fileReadError `json:"errors,omitempty"`
+}
+
+type fileReadEntry struct {
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Source    string `json:"source"`
+	VersionID string `json:"version_id,omitempty"`
+}
+
+type fileReadError struct {
+	Path  string `json:"path"`
+	Error string `json:"error"`
+}
+
+type fileStageResult struct {
+	Action         string         `json:"action"`
+	CanvasID       string         `json:"canvas_id"`
+	VersionID      string         `json:"version_id"`
+	Path           string         `json:"path"`
+	Deleted        bool           `json:"deleted,omitempty"`
+	StagingSummary stagingSummary `json:"staging_summary"`
+}
+
+type fileCommitResult struct {
+	Action         string         `json:"action"`
+	CanvasID       string         `json:"canvas_id"`
+	VersionID      string         `json:"version_id"`
+	Draft          draftResult    `json:"draft"`
+	StagingSummary stagingSummary `json:"staging_summary"`
+}
+
+type stagingSummary struct {
+	HasStaging  bool     `json:"has_staging"`
+	StagedPaths []string `json:"staged_paths,omitempty"`
 }
 
 type accessResult struct {
