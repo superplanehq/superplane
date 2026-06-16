@@ -459,8 +459,7 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid,
-    last_active_at timestamp with time zone
+    created_by uuid
 );
 
 
@@ -1312,13 +1311,6 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
--- Name: idx_users_last_active_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_users_last_active_at ON public.users USING btree (last_active_at) WHERE (deleted_at IS NULL);
-
-
---
 -- Name: idx_webhooks_app_installation_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2005,7 +1997,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260615193928	f
+20260615161605	f
 \.
 
 

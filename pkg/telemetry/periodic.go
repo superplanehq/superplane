@@ -51,7 +51,6 @@ func (p *Periodic) report() {
 	p.reportDraftsTotal()
 	p.reportIntegrationsTotal()
 	p.reportIntegrationSecretsTotal()
-	p.reportUsersActive()
 	p.reportWorkflowsActive()
 	p.reportWorkflowRunsDaily()
 	p.reportWorkflowEventsDaily()
@@ -197,15 +196,6 @@ func (p *Periodic) reportIntegrationSecretsTotal() {
 	}
 
 	RecordIntegrationSecretsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportUsersActive() {
-	count, err := countActiveUsers(activeWindow)
-	if err != nil {
-		return
-	}
-
-	RecordUsersActiveCount(p.ctx, count)
 }
 
 func (p *Periodic) reportWorkflowsActive() {
@@ -378,22 +368,6 @@ func countIntegrations() (int64, error) {
 	var count int64
 
 	err := database.Conn().Model(&models.Integration{}).Count(&count).Error
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
-func countActiveUsers(window time.Duration) (int64, error) {
-	var count int64
-
-	since := time.Now().Add(-window)
-	err := database.Conn().
-		Model(&models.User{}).
-		Where("last_active_at >= ?", since).
-		Count(&count).
-		Error
 	if err != nil {
 		return 0, err
 	}
