@@ -32,36 +32,31 @@ describe("pickDefaultDraftBranch", () => {
     clearLastDraftBranch(canvasId);
   });
 
-  it("prefers the branch stored in localStorage when it still exists", () => {
-    writeLastDraftBranch(canvasId, "drafts/stored");
-    const branches = [draft("drafts/other"), draft("drafts/stored")];
-
-    expect(pickDefaultDraftBranch(branches, canvasId)?.metadata?.branchName).toBe("drafts/stored");
+  it("returns null when there are no drafts", () => {
+    expect(pickDefaultDraftBranch([])).toBeNull();
   });
 
-  it("falls back to the current user's most recently updated draft", () => {
+  it("always selects the most recently updated draft regardless of owner", () => {
     const branches = [
       draft("drafts/old", {
         metadata: { owner: { id: "user-1", name: "Ada" }, updatedAt: "2026-06-01T12:00:00.000Z" },
       }),
       draft("drafts/new", {
-        metadata: { owner: { id: "user-1", name: "Ada" }, updatedAt: "2026-06-03T12:00:00.000Z" },
-      }),
-      draft("drafts/other-user", {
         metadata: { owner: { id: "user-2", name: "Grace" }, updatedAt: "2026-06-04T12:00:00.000Z" },
       }),
     ];
 
-    expect(pickDefaultDraftBranch(branches, canvasId, "user-1")?.metadata?.branchName).toBe("drafts/new");
+    expect(pickDefaultDraftBranch(branches)?.metadata?.branchName).toBe("drafts/new");
   });
 
-  it("falls back to the most recently updated org draft", () => {
+  it("ignores the branch stored in localStorage", () => {
+    writeLastDraftBranch(canvasId, "drafts/stored");
     const branches = [
-      draft("drafts/old", { metadata: { updatedAt: "2026-06-01T12:00:00.000Z" } }),
+      draft("drafts/stored", { metadata: { updatedAt: "2026-06-01T12:00:00.000Z" } }),
       draft("drafts/new", { metadata: { updatedAt: "2026-06-03T12:00:00.000Z" } }),
     ];
 
-    expect(pickDefaultDraftBranch(branches, canvasId)?.metadata?.branchName).toBe("drafts/new");
+    expect(pickDefaultDraftBranch(branches)?.metadata?.branchName).toBe("drafts/new");
   });
 });
 
