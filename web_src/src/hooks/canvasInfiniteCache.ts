@@ -272,3 +272,22 @@ export function upsertExecutionIntoInfiniteRunsData(
   };
   return { ...old, pages };
 }
+
+export function upsertRunIntoDescribeRunData(
+  current: { run?: CanvasesCanvasRun } | undefined,
+  incoming: CanvasesCanvasRun,
+): { run?: CanvasesCanvasRun } | undefined {
+  if (!current) {
+    return current;
+  }
+
+  if (!current.run) {
+    return { ...current, run: incoming };
+  }
+
+  if (!shouldAcceptRunUpdate(current.run, incoming)) {
+    return current;
+  }
+
+  return { ...current, run: incoming };
+}

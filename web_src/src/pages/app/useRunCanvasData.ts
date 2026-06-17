@@ -36,6 +36,7 @@ type UseRunCanvasPresentationParams = {
   runCanvasData: RunCanvasData | null;
   liveNodes: CanvasNode[];
   liveEdges: CanvasEdge[];
+  isSelectedRunLoading: boolean;
   isSelectedRunVersionLoading: boolean;
   isSelectedRunExecutionsLoading: boolean;
 };
@@ -140,6 +141,7 @@ export function useRunCanvasPresentation({
   runCanvasData,
   liveNodes,
   liveEdges,
+  isSelectedRunLoading,
   isSelectedRunVersionLoading,
   isSelectedRunExecutionsLoading,
 }: UseRunCanvasPresentationParams) {
@@ -154,6 +156,7 @@ export function useRunCanvasPresentation({
   return {
     nodes: runCanvasData?.nodes ?? [],
     edges: runCanvasData?.edges ?? [],
-    runCanvasLoading: !!selectedRun && (isSelectedRunVersionLoading || isSelectedRunExecutionsLoading),
+    runCanvasLoading:
+      isSelectedRunLoading || (!!selectedRun && (isSelectedRunVersionLoading || isSelectedRunExecutionsLoading)),
   };
 }

@@ -41,6 +41,7 @@ import {
   useUpdateCanvasMemoryNamespace,
   usePublishCanvasVersion,
   useEventExecutions,
+  useDescribeRun,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
   useTriggers,
@@ -94,7 +95,6 @@ import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
-import { clearRunDetailNodeSearchParams, shouldClearRunDetailNode } from "./runInspectionSync";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -152,11 +152,15 @@ import {
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { runPositionAutoSave } from "./runPositionAutoSave";
 import {
+  clearRunDetailNodeSearchParams,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
+  isUnresolvableRunError,
+  isValidRunId,
   prepareData,
   prepareSidebarData,
+  shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 import { useDraftRecovery } from "./useDraftRecovery";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
@@ -552,6 +556,12 @@ export function AppPage() {
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
+  const selectedRunIdIsValid = selectedRunId ? isValidRunId(selectedRunId) : false;
+  const describedRunQuery = useDescribeRun(
+    canvasId!,
+    selectedRunId,
+    isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid,
+  );
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -577,10 +587,26 @@ export function AppPage() {
       });
     return { runs };
   }, [infiniteLogRunsQuery.data]);
-  const selectedRun = useMemo(
+  const selectedRunFromList = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
   );
+  const selectedRun = useMemo(() => {
+    if (!selectedRunId) return null;
+    if (selectedRunFromList?.id === selectedRunId) {
+      return selectedRunFromList;
+    }
+    if (isRunInspectionMode) {
+      return describedRunQuery.data?.run ?? null;
+    }
+    return selectedRunFromList;
+  }, [describedRunQuery.data?.run, isRunInspectionMode, selectedRunFromList, selectedRunId]);
+  const isSelectedRunLoading =
+    isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid && !selectedRun && describedRunQuery.isLoading;
+  const isRunUnresolvable =
+    isRunInspectionMode &&
+    !!selectedRunId &&
+    (!selectedRunIdIsValid || (describedRunQuery.isError && isUnresolvableRunError(describedRunQuery.error)));
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const { selectedRunCanvas, isSelectedRunVersionLoading } = useSelectedRunCanvas({
@@ -1710,6 +1736,7 @@ export function AppPage() {
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
     liveEdges: draftVisualDiff.edges,
+    isSelectedRunLoading,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
@@ -4343,7 +4370,8 @@ export function AppPage() {
     selectedRunId,
     isRunInspectionMode,
     selectedRun,
-    infiniteRunsQuery,
+    isRunResolveLoading: isSelectedRunLoading,
+    isRunUnresolvable,
     onClear: handleClearRunInspection,
   });
 
@@ -4817,6 +4845,8 @@ export function AppPage() {
     canvasId: canvasId!,
     runs: runsData.runs,
     selectedRunId,
+    selectedRun,
+    isSelectedRunLoading,
     onSelectRun: handleSelectRun,
     onNavigateRun: handleNavigateRun,
     onSelectLiveCanvas: handleSelectLiveCanvas,

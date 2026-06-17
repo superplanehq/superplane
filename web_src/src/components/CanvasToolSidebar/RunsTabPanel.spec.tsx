@@ -186,6 +186,24 @@ describe("RunsTabPanel", () => {
     expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
   });
 
+  it("opens run detail when the selected run is provided outside the runs list", () => {
+    render(<RunsTabPanel runs={[]} selectedRunId="run-1" selectedRun={makeRun()} initialOpenDetail {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
+
+    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+    expect(screen.getByText("Deploy main")).toBeInTheDocument();
+  });
+
+  it("shows loading state in run detail while the selected run is resolving", () => {
+    render(<RunsTabPanel runs={[]} selectedRunId="run-1" initialOpenDetail isSelectedRunLoading {...baseProps} />, {
+      wrapper: routerWrapper,
+    });
+
+    expect(screen.getByText("Loading run…")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+  });
+
   it("returns to the run list when back is clicked", async () => {
     const user = userEvent.setup();
     const onBackToRunList = vi.fn();
