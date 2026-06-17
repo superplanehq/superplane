@@ -36,12 +36,23 @@ export function shouldClearRunDetailNode({
   runDetailNodeId,
   participantNodeIds,
   runCanvasLoading,
+  runCanvasReady,
 }: {
   runDetailNodeId: string | null;
   participantNodeIds: string[];
   runCanvasLoading: boolean;
+  runCanvasReady: boolean;
 }): boolean {
-  if (!runDetailNodeId || runCanvasLoading) return false;
+  if (!runDetailNodeId || runCanvasLoading || !runCanvasReady) return false;
   if (participantNodeIds.length === 0) return true;
   return !participantNodeIds.includes(runDetailNodeId);
+}
+
+export function clearRunDetailNodeSearchParams(searchParams: URLSearchParams, nodeId: string): URLSearchParams {
+  const next = new URLSearchParams(searchParams);
+  if (next.get("sidebar") === "1" && next.get("node") === nodeId) {
+    next.delete("sidebar");
+    next.delete("node");
+  }
+  return next;
 }

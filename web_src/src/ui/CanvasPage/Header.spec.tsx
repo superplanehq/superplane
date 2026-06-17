@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { Header } from "./Header";
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -14,6 +15,10 @@ vi.mock("./components/CanvasProjectSwitcher", () => ({
 
 vi.mock("./components/CanvasToolSidebarTrigger", () => ({
   CanvasToolSidebarTrigger: () => null,
+}));
+
+vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
+  CanvasRunsSidebarTrigger: () => null,
 }));
 
 vi.mock("./components/CanvasModeToggle", () => ({
@@ -34,6 +39,14 @@ const toolSidebarState = {
   agentMode: "operator" as const,
   switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
+
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: true,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
 
 function renderHeader(
   mode: "version-live" | "version-edit" | "versions",
@@ -58,6 +71,7 @@ function renderHeader(
               onEnterEditMode={vi.fn()}
               onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
+              runsSidebarState={runsSidebarState}
             />
           }
         />

@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,8 +57,15 @@ vi.mock("../BuildingBlocksSidebar", () => ({
   BuildingBlocksSidebar: () => null,
 }));
 
+vi.mock("@/hooks/useCanvasData", () => ({
+  useEventExecutions: () => ({
+    data: { executions: [] },
+    isLoading: false,
+  }),
+}));
+
 vi.mock("../componentSidebar", () => ({
-  ComponentSidebar: () => null,
+  ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
 }));
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
@@ -311,5 +318,44 @@ describe("CanvasPage run inspection", () => {
 
     expect(onRunNodeDetailClose).not.toHaveBeenCalled();
     expect(selectedRunNode()?.selected).toBe(true);
+  });
+
+  it("shows the run node detail pane during run inspection even when the live node inspector would be open", async () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          initialSidebar={{ isOpen: true, nodeId: "run-node-1" }}
+          runNodeDetailNodeId="run-node-1"
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+          }}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-node-detail-pane")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
   });
 });
