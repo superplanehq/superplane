@@ -185,6 +185,8 @@ func (g *GCP) Actions() []core.Action {
 		&compute.CreateStaticIP{},
 		&compute.DeleteStaticIP{},
 		&compute.ManageStaticIP{},
+		&compute.CreateLoadBalancer{},
+		&compute.DeleteLoadBalancer{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -978,6 +980,10 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeStaticIP:
 		return compute.ListStaticIPResources(reqCtx, client, p["project"], p["instance"])
+	case compute.ResourceTypeInstanceGroup:
+		return compute.ListInstanceGroupResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeForwardingRule:
+		return compute.ListForwardingRuleResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:
