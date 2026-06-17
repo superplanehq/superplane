@@ -1,0 +1,27 @@
+{
+  "data": {
+    "slug": "my-package-1-0-0",
+    "slug_perm": "perm123abc456",
+    "name": "my-package",
+    "version": "1.0.0",
+    "format": "python",
+    "status": 2,
+    "status_str": "Available",
+    "repository": "production",
+    "namespace": "acme",
+    "description": "A sample Python package for demonstration purposes",
+    "summary": "Sample package",
+    "uploaded_at": "2026-01-15T10:00:00.000Z",
+    "checksum_md5": "d41d8cd98f00b204e9800998ecf8427e",
+    "checksum_sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+    "checksum_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "checksum_sha512": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+    "size": 524288,
+    "size_str": "512.0 KB",
+    "cdn_url": "https://dl.cloudsmith.io/public/acme/production/python/my-package-1.0.0.tar.gz",
+    "self_url": "https://api.cloudsmith.io/v1/packages/acme/production/perm123abc456/",
+    "self_html_url": "https://cloudsmith.io/~acme/repos/production/packages/detail/python/my-package/1.0.0/"
+  },
+  "timestamp": "2026-01-15T10:01:00.000000000Z",
+  "type": "cloudsmith.package.fetched"
+}
