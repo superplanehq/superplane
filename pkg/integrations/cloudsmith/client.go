@@ -170,6 +170,111 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 	return all, nil
 }
 
+// Package represents a Cloudsmith package with its metadata.
+type Package struct {
+	Slug           string `json:"slug"`
+	SlugPerm       string `json:"slug_perm"`
+	Name           string `json:"name"`
+	Version        string `json:"version"`
+	Format         string `json:"format"`
+	Status         int    `json:"status"`
+	StatusStr      string `json:"status_str"`
+	Repository     string `json:"repository"`
+	Namespace      string `json:"namespace"`
+	UploadedAt     string `json:"uploaded_at"`
+	ChecksumMD5    string `json:"checksum_md5"`
+	ChecksumSHA1   string `json:"checksum_sha1"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+	ChecksumSHA512 string `json:"checksum_sha512"`
+	SelfURL        string `json:"self_url"`
+	SelfHTMLURL    string `json:"self_html_url"`
+	CDNURL         string `json:"cdn_url"`
+	Size           int64  `json:"size"`
+	SizeStr        string `json:"size_str"`
+	Description    string `json:"description"`
+	Summary        string `json:"summary"`
+}
+
+// GetPackage fetches a single package identified by namespace, repository slug, and package identifier.
+func (c *Client) GetPackage(owner, repo, identifier string) (*Package, error) {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+// PackageStatusInfo holds the sync and quarantine status from the /status/ endpoint.
+type PackageStatusInfo struct {
+	SelfURL          string `json:"self_url"`
+	Stage            int    `json:"stage"`
+	StageStr         string `json:"stage_str"`
+	StageUpdatedAt   string `json:"stage_updated_at"`
+	Status           int    `json:"status"`
+	StatusReason     string `json:"status_reason"`
+	StatusStr        string `json:"status_str"`
+	StatusUpdatedAt  string `json:"status_updated_at"`
+	IsSyncAwaiting   bool   `json:"is_sync_awaiting"`
+	IsSyncCompleted  bool   `json:"is_sync_completed"`
+	IsSyncFailed     bool   `json:"is_sync_failed"`
+	IsSyncInFlight   bool   `json:"is_sync_in_flight"`
+	IsSyncInProgress bool   `json:"is_sync_in_progress"`
+	IsQuarantined    bool   `json:"is_quarantined"`
+	SyncFinishedAt   string `json:"sync_finished_at"`
+	SyncProgress     int    `json:"sync_progress"`
+}
+
+// GetPackageStatusInfo fetches the sync/quarantine status for a package from the /status/ endpoint.
+func (c *Client) GetPackageStatusInfo(owner, repo, identifier string) (*PackageStatusInfo, error) {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/status/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var info PackageStatusInfo
+	if err := json.Unmarshal(responseBody, &info); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &info, nil
+}
+
+const packagePageSize = 100
+
+// ListPackages returns all packages in the given repository, following pagination.
+func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
+	var all []Package
+
+	for page := 1; ; page++ {
+		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), page, packagePageSize)
+		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var packages []Package
+		if err := json.Unmarshal(responseBody, &packages); err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		all = append(all, packages...)
+
+		if len(packages) < packagePageSize {
+			break
+		}
+	}
+
+	return all, nil
+}
+
 var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")
 
 // parseRepositoryID splits a Cloudsmith repository identifier of the form
@@ -201,6 +306,17 @@ type RepositoryNodeMetadata struct {
 	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
 	RepositoryNamespace string `json:"repositoryNamespace" mapstructure:"repositoryNamespace"`
 	RepositorySlug      string `json:"repositorySlug" mapstructure:"repositorySlug"`
+}
+
+// PackageNodeMetadata caches both the repository and package display names so the
+// UI can show human-readable labels without extra API calls.
+type PackageNodeMetadata struct {
+	RepositoryID        string `json:"repositoryId" mapstructure:"repositoryId"`
+	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
+	RepositoryNamespace string `json:"repositoryNamespace" mapstructure:"repositoryNamespace"`
+	RepositorySlug      string `json:"repositorySlug" mapstructure:"repositorySlug"`
+	PackageID           string `json:"packageId" mapstructure:"packageId"`
+	PackageName         string `json:"packageName" mapstructure:"packageName"`
 }
 
 // resolveRepositoryMetadata stores display metadata for the selected repository.
@@ -244,5 +360,82 @@ func resolveRepositoryMetadata(ctx core.SetupContext, repositoryID string) error
 		RepositoryName:      name,
 		RepositoryNamespace: owner,
 		RepositorySlug:      identifier,
+	})
+}
+
+// resolvePackageMetadata fetches and caches both the repository and package names
+// for display in the canvas node. Expressions are stored verbatim.
+func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm string) error {
+	repoIsExpr := strings.Contains(repositoryID, "{{")
+	pkgIsExpr := strings.Contains(packageSlugPerm, "{{")
+
+	// If the repository itself is an expression we cannot resolve either field at setup time.
+	if repoIsExpr {
+		return ctx.Metadata.Set(PackageNodeMetadata{
+			RepositoryID:   repositoryID,
+			RepositoryName: repositoryID,
+			PackageID:      packageSlugPerm,
+			PackageName:    packageSlugPerm,
+		})
+	}
+
+	owner, identifier, err := parseRepositoryID(repositoryID)
+	if err != nil {
+		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
+	}
+
+	var existing PackageNodeMetadata
+	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
+		existing.RepositoryID == repositoryID &&
+		existing.PackageID == packageSlugPerm &&
+		existing.PackageName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repository, err := client.GetRepository(owner, identifier)
+	if err != nil {
+		return fmt.Errorf("failed to fetch repository %q: %w", repositoryID, err)
+	}
+
+	repoName := repository.Name
+	if repoName == "" {
+		repoName = identifier
+	}
+
+	// Package is an expression — store the resolved repository name but leave
+	// the package fields verbatim until the expression is evaluated at runtime.
+	if pkgIsExpr {
+		return ctx.Metadata.Set(PackageNodeMetadata{
+			RepositoryID:        repositoryID,
+			RepositoryName:      repoName,
+			RepositoryNamespace: owner,
+			RepositorySlug:      identifier,
+			PackageID:           packageSlugPerm,
+			PackageName:         packageSlugPerm,
+		})
+	}
+
+	pkg, err := client.GetPackage(owner, identifier, packageSlugPerm)
+	if err != nil {
+		return fmt.Errorf("failed to fetch package %q: %w", packageSlugPerm, err)
+	}
+
+	packageName := pkg.Slug
+	if packageName == "" {
+		packageName = packageSlugPerm
+	}
+
+	return ctx.Metadata.Set(PackageNodeMetadata{
+		RepositoryID:        repositoryID,
+		RepositoryName:      repoName,
+		RepositoryNamespace: owner,
+		RepositorySlug:      identifier,
+		PackageID:           packageSlugPerm,
+		PackageName:         packageName,
 	})
 }
