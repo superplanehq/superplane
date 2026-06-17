@@ -146,13 +146,23 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
 		}
 		besName, besRegion = name, br
-		if bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName)); berr == nil {
-			var bes backendServiceGetResp
-			if json.Unmarshal(bbody, &bes) == nil && len(bes.HealthChecks) > 0 {
-				if _, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks"); herr == nil {
-					hcName, hcRegion = hn, hr
-				}
+		// Resolve the health check from the backend service before deleting
+		// anything. Treat a failed lookup as fatal so we never delete the backend
+		// service and orphan its health check.
+		bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName))
+		if berr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read backend service %q: %v", besName, berr))
+		}
+		var bes backendServiceGetResp
+		if err := json.Unmarshal(bbody, &bes); err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service %q: %v", besName, err))
+		}
+		if len(bes.HealthChecks) > 0 {
+			_, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks")
+			if herr != nil {
+				return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse health check reference %q: %v", bes.HealthChecks[0], herr))
 			}
+			hcName, hcRegion = hn, hr
 		}
 	}
 

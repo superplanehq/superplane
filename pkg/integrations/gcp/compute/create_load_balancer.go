@@ -318,28 +318,40 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	if ipLiteral != "" {
 		frBody["IPAddress"] = ipLiteral
 	}
-	if _, err := createAndWait(callCtx, client, project, region, "forwardingRules", frBody); err != nil {
+	frSelfLink, err := createAndWait(callCtx, client, project, region, "forwardingRules", frBody)
+	if err != nil {
 		return fail("failed to create forwarding rule: %v", err)
 	}
 	created.forwardingRule = frName
 
-	// Read the forwarding rule back for the assigned IP address.
-	var fr forwardingRuleGetResp
-	if body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName)); err == nil {
-		_ = json.Unmarshal(body, &fr)
+	// Determine the load balancer's IP. A reserved IP is already known; for an
+	// ephemeral IP, read the forwarding rule back to learn the assigned address.
+	// Treat a failed read-back as fatal so we never report success with an empty
+	// IP — roll back to a clean state instead.
+	assignedIP := ipLiteral
+	if assignedIP == "" {
+		body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName))
+		if err != nil {
+			return fail("forwarding rule %q was created but could not be read back for its IP address: %v", frName, err)
+		}
+		var fr forwardingRuleGetResp
+		if err := json.Unmarshal(body, &fr); err != nil {
+			return fail("forwarding rule %q was created but its response could not be parsed: %v", frName, err)
+		}
+		assignedIP = fr.IPAddress
 	}
 
 	payload := map[string]any{
 		"name":           name,
 		"region":         region,
-		"ipAddress":      fr.IPAddress,
+		"ipAddress":      assignedIP,
 		"protocol":       protocol,
 		"ports":          ports,
 		"forwardingRule": frName,
 		"backendService": besName,
 		"healthCheck":    hcName,
 		"instanceGroup":  lastSegment(spec.InstanceGroup),
-		"resources":      []string{hcSelfLink, besSelfLink, fr.SelfLink},
+		"resources":      []string{hcSelfLink, besSelfLink, frSelfLink},
 	}
 
 	return ctx.ExecutionState.Emit(
