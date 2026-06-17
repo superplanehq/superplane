@@ -4,8 +4,6 @@ import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
-import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
-import { StartEditingDropdown } from "./components/StartEditingDropdown";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
@@ -240,67 +238,15 @@ export function LiveModeTopHeaderActions({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  hasUnpublishedDraftChanges,
-  onDiscardDraftAndStartEdit,
-  unpublishedDraftUpdatedAt,
-  startEditingDrafts,
-  startEditingDefaultDraft,
-  startEditingMenuOpen,
-  onStartEditingMenuOpenChange,
-  onContinueDraftBranch,
-  onCreateDraftBranch,
-  createDraftBranchPending,
-}: Pick<
-  HeaderProps,
-  | "onEnterEditMode"
-  | "enterEditModeDisabled"
-  | "enterEditModeDisabledTooltip"
-  | "hasUnpublishedDraftChanges"
-  | "onDiscardDraftAndStartEdit"
-  | "unpublishedDraftUpdatedAt"
-  | "startEditingDrafts"
-  | "startEditingDefaultDraft"
-  | "startEditingMenuOpen"
-  | "onStartEditingMenuOpenChange"
-  | "onContinueDraftBranch"
-  | "onCreateDraftBranch"
-  | "createDraftBranchPending"
->) {
-  if (startEditingDrafts !== undefined && onContinueDraftBranch && onCreateDraftBranch) {
-    return (
-      <StartEditingDropdown
-        open={startEditingMenuOpen}
-        onOpenChange={onStartEditingMenuOpenChange}
-        drafts={startEditingDrafts}
-        defaultDraft={startEditingDefaultDraft ?? null}
-        disabled={!!enterEditModeDisabled}
-        isSubmitting={createDraftBranchPending}
-        onContinueDraft={onContinueDraftBranch}
-        onCreateDraft={onCreateDraftBranch}
-      />
-    );
-  }
-
+}: Pick<HeaderProps, "onEnterEditMode" | "enterEditModeDisabled" | "enterEditModeDisabledTooltip">) {
   if (!onEnterEditMode) {
     return null;
-  }
-
-  const showDraftDropdown = !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
-
-  if (showDraftDropdown && onDiscardDraftAndStartEdit) {
-    return (
-      <EnterEditDraftDropdown
-        onContinueEditing={onEnterEditMode}
-        onDiscardAndStartEdit={onDiscardDraftAndStartEdit}
-        updatedAt={unpublishedDraftUpdatedAt}
-      />
-    );
   }
 
   return (
     <EnterEditButton
       onClick={onEnterEditMode}
-      label={hasUnpublishedDraftChanges ? "Continue Editing" : "Edit"}
+      label="Edit"
       disabled={!!enterEditModeDisabled}
       disabledTooltip={enterEditModeDisabledTooltip}
     />
