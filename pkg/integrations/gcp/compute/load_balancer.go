@@ -98,6 +98,7 @@ type forwardingRuleGetResp struct {
 	IPAddress      string `json:"IPAddress"`
 	IPProtocol     string `json:"IPProtocol"`
 	BackendService string `json:"backendService"`
+	Target         string `json:"target"`
 }
 
 type backendServiceGetResp struct {
@@ -177,6 +178,7 @@ type forwardingRuleItem struct {
 	Region              string `json:"region"`
 	IPAddress           string `json:"IPAddress"`
 	LoadBalancingScheme string `json:"loadBalancingScheme"`
+	BackendService      string `json:"backendService"`
 }
 
 type forwardingRulesScopedList struct {
@@ -214,9 +216,11 @@ func ListForwardingRuleResources(ctx context.Context, c Client, project string) 
 				continue
 			}
 			for _, f := range scoped.ForwardingRules {
-				// Regional (has a region) external rules only — global rules belong
-				// to HTTP(S) load balancers this component does not manage.
-				if f == nil || f.SelfLink == "" || f.Region == "" || f.LoadBalancingScheme != loadBalancingSchemeExternal {
+				// Regional external rules backed by a backend service only. This
+				// excludes global rules (HTTP(S) load balancers) and legacy
+				// target-pool NLBs — neither of which this component manages, and
+				// which Delete cannot fully tear down.
+				if f == nil || f.SelfLink == "" || f.Region == "" || f.LoadBalancingScheme != loadBalancingSchemeExternal || f.BackendService == "" {
 					continue
 				}
 				region := lastSegment(f.Region)

@@ -140,30 +140,41 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	if err := json.Unmarshal(body, &fr); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse forwarding rule %q: %v", frName, err))
 	}
-	if fr.BackendService != "" {
-		_, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices")
-		if perr != nil {
-			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
+	if fr.BackendService == "" {
+		// This component only manages passthrough Network Load Balancers backed by
+		// a backend service (as built by Create Load Balancer). A rule with no
+		// backend service is a different type — e.g. a legacy target-pool NLB —
+		// and deleting only the rule would leave its other pieces orphaned, so
+		// refuse rather than report a misleading success.
+		if target := lastSegment(fr.Target); target != "" {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+				"forwarding rule %q targets %q rather than a backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName, target))
 		}
-		besName, besRegion = name, br
-		// Resolve the health check from the backend service before deleting
-		// anything. Treat a failed lookup as fatal so we never delete the backend
-		// service and orphan its health check.
-		bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName))
-		if berr != nil {
-			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read backend service %q: %v", besName, berr))
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+			"forwarding rule %q has no backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName))
+	}
+	_, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices")
+	if perr != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
+	}
+	besName, besRegion = name, br
+	// Resolve the health check from the backend service before deleting anything.
+	// Treat a failed lookup as fatal so we never delete the backend service and
+	// orphan its health check.
+	bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName))
+	if berr != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read backend service %q: %v", besName, berr))
+	}
+	var bes backendServiceGetResp
+	if err := json.Unmarshal(bbody, &bes); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service %q: %v", besName, err))
+	}
+	if len(bes.HealthChecks) > 0 {
+		_, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks")
+		if herr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse health check reference %q: %v", bes.HealthChecks[0], herr))
 		}
-		var bes backendServiceGetResp
-		if err := json.Unmarshal(bbody, &bes); err != nil {
-			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service %q: %v", besName, err))
-		}
-		if len(bes.HealthChecks) > 0 {
-			_, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks")
-			if herr != nil {
-				return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse health check reference %q: %v", bes.HealthChecks[0], herr))
-			}
-			hcName, hcRegion = hn, hr
-		}
+		hcName, hcRegion = hn, hr
 	}
 
 	// 1. Forwarding rule (required).

@@ -294,6 +294,38 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 		assert.Empty(t, deleted)
 	})
 
+	t.Run("rejects a forwarding rule with no backend service", func(t *testing.T) {
+		var deleted []string
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/operations/"):
+					return opDone("op"), nil
+				case strings.Contains(path, "/forwardingRules/"):
+					// A legacy target-pool NLB: a target, no backend service.
+					return []byte(`{"name":"web-lb-fr","target":"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/targetPools/legacy-pool"}`), nil
+				}
+				return nil, assert.AnError
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				deleted = append(deleted, "x")
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, d.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"loadBalancer": fr},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "backend service")
+		// Nothing is deleted, so the target pool is not left orphaned.
+		assert.Empty(t, deleted)
+	})
+
 	t.Run("rejects a cross-project load balancer", func(t *testing.T) {
 		mc := &mockStaticIPClient{projectID: "my-project"}
 		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
