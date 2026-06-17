@@ -84,6 +84,68 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
+func Test__NodeRequestWorker_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"type":         "days",
+					"daysInterval": 1,
+					"hour":         12,
+					"minute":       0,
+					"customName":   "Minute {{ root().data.calendar.minute }}",
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     triggerNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var event models.CanvasEvent
+	err = database.Conn().
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", triggerNode).
+		First(&event).Error
+	require.NoError(t, err)
+	require.NotNil(t, event.CustomName)
+	assert.Regexp(t, `^Minute \d{2}$`, *event.CustomName)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
 func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
