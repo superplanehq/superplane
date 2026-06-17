@@ -4483,9 +4483,24 @@ export function AppPage() {
   );
 
   useEffect(() => {
-    if (!isRunInspectionMode || isViewingLiveVersion || !liveCanvasVersionId) return;
+    if (!isRunInspectionMode || isViewingLiveVersion) return;
+    // Entering an edit session on a draft exits run inspection rather than
+    // snapping back to the live version (which would bounce the user out of edit
+    // mode). For non-editable previews, keep pinning run inspection to live.
+    if (hasEditableVersion) {
+      handleClearRunInspection();
+      return;
+    }
+    if (!liveCanvasVersionId) return;
     handleUseVersion(liveCanvasVersionId);
-  }, [handleUseVersion, isRunInspectionMode, isViewingLiveVersion, liveCanvasVersionId]);
+  }, [
+    hasEditableVersion,
+    handleClearRunInspection,
+    handleUseVersion,
+    isRunInspectionMode,
+    isViewingLiveVersion,
+    liveCanvasVersionId,
+  ]);
 
   const handleResetDraftChanges = useCallback(() => {
     if (!organizationId || !canvasId) {
