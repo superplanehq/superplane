@@ -280,10 +280,12 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Track created resources so we can roll back if a later step fails. Each
-	// name is recorded *before* the insert: createAndWait may fail after GCP has
-	// already created the resource (e.g. the post-wait GET or operation poll
-	// fails), and rollback (best-effort, ignores not-found) must still tear it
-	// down so a retry does not collide with a half-created load balancer.
+	// name is recorded the moment its insert is *accepted* by GCP (see the
+	// onAccepted callback), not before: an insert that is rejected because a
+	// resource of that derived name already exists belongs to another load
+	// balancer and must never be rolled back. Recording on acceptance still
+	// covers the case where the insert completes but the follow-up read or
+	// operation poll fails, since rollback is best-effort and ignores not-found.
 	created := &lbResources{client: client, project: project, region: region}
 	fail := func(format string, args ...any) error {
 		created.rollback(callCtx)
@@ -291,14 +293,12 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// 1. Health check
-	created.healthCheck = hcName
-	hcSelfLink, err := createAndWait(callCtx, client, project, region, "healthChecks", healthCheckBody(hcName, spec.HealthCheckProtocol, hcPort))
+	hcSelfLink, err := createAndWait(callCtx, client, project, region, "healthChecks", healthCheckBody(hcName, spec.HealthCheckProtocol, hcPort), func() { created.healthCheck = hcName })
 	if err != nil {
 		return fail("failed to create health check: %v", err)
 	}
 
 	// 2. Backend service
-	created.backendService = besName
 	besBody := map[string]any{
 		"name":                besName,
 		"loadBalancingScheme": loadBalancingSchemeExternal,
@@ -306,13 +306,12 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		"healthChecks":        []string{hcSelfLink},
 		"backends":            []any{map[string]any{"group": strings.TrimSpace(spec.InstanceGroup)}},
 	}
-	besSelfLink, err := createAndWait(callCtx, client, project, region, "backendServices", besBody)
+	besSelfLink, err := createAndWait(callCtx, client, project, region, "backendServices", besBody, func() { created.backendService = besName })
 	if err != nil {
 		return fail("failed to create backend service: %v", err)
 	}
 
 	// 3. Forwarding rule
-	created.forwardingRule = frName
 	frBody := map[string]any{
 		"name":                frName,
 		"loadBalancingScheme": loadBalancingSchemeExternal,
@@ -323,7 +322,7 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	if ipLiteral != "" {
 		frBody["IPAddress"] = ipLiteral
 	}
-	frSelfLink, err := createAndWait(callCtx, client, project, region, "forwardingRules", frBody)
+	frSelfLink, err := createAndWait(callCtx, client, project, region, "forwardingRules", frBody, func() { created.forwardingRule = frName })
 	if err != nil {
 		return fail("failed to create forwarding rule: %v", err)
 	}
@@ -398,8 +397,12 @@ func (r *lbResources) rollback(ctx context.Context) {
 }
 
 // createAndWait POSTs a regional resource, waits for the operation, and returns
-// the new resource's selfLink.
-func createAndWait(ctx context.Context, client Client, project, region, kind string, body map[string]any) (string, error) {
+// the new resource's selfLink. onAccepted (if non-nil) is invoked once the
+// insert has been accepted by GCP — i.e. the POST succeeded and returned an
+// operation — so the caller can mark the resource for rollback. It is NOT called
+// when the POST itself is rejected (e.g. the resource already exists), so a
+// caller never rolls back a resource it did not create.
+func createAndWait(ctx context.Context, client Client, project, region, kind string, body map[string]any, onAccepted func()) (string, error) {
 	respBody, err := client.Post(ctx, fmt.Sprintf("projects/%s/regions/%s/%s", project, region, kind), body)
 	if err != nil {
 		return "", err
@@ -412,6 +415,9 @@ func createAndWait(ctx context.Context, client Client, project, region, kind str
 	}
 	if op.Name == "" {
 		return "", fmt.Errorf("create operation response missing operation name")
+	}
+	if onAccepted != nil {
+		onAccepted()
 	}
 	if err := WaitForRegionOperation(ctx, client, project, region, lastSegment(op.Name)); err != nil {
 		return "", err

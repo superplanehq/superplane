@@ -191,6 +191,49 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		assert.ElementsMatch(t, []string{"bes", "hc"}, deleted)
 	})
 
+	t.Run("does not roll back a resource it did not create", func(t *testing.T) {
+		var deleted []string
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				if strings.HasSuffix(path, "/backendServices") {
+					// Insert rejected (e.g. a backend service of this name already
+					// exists for another load balancer) — we did not create it.
+					return nil, assert.AnError
+				}
+				return opDone("op"), nil
+			},
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				if strings.Contains(path, "/operations/") {
+					return opDone("op"), nil
+				}
+				return []byte(`{"selfLink":"link"}`), nil
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/forwardingRules/"):
+					deleted = append(deleted, "fr")
+				case strings.Contains(path, "/backendServices/"):
+					deleted = append(deleted, "bes")
+				case strings.Contains(path, "/healthChecks/"):
+					deleted = append(deleted, "hc")
+				}
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"name": "web-lb", "region": "us-central1", "ports": []any{"80"}, "instanceGroup": ig},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		// Only the health check (which we did create) is rolled back; the
+		// pre-existing backend service is left untouched.
+		assert.Equal(t, []string{"hc"}, deleted)
+	})
+
 	t.Run("rolls back a resource whose insert completed but read-back failed", func(t *testing.T) {
 		var deleted []string
 		mc := &mockStaticIPClient{
