@@ -22,11 +22,13 @@ type SyncLiveFromGitOptions struct {
 	HeadSHA string
 }
 
-// SyncLiveFromGit materializes the main branch tip from git into the live DB projection.
-// Safe to call repeatedly; git main must already point at the target commit.
+// SyncLiveFromGit materializes the main branch tip from git into the live DB
+// projection. It reads the head and loads the repo snapshot from git before
+// opening the database transaction, so no git RPC is held across a pooled DB
+// connection. Safe to call repeatedly; git main must already point at the target
+// commit.
 func SyncLiveFromGit(
 	ctx context.Context,
-	tx *gorm.DB,
 	gitProvider git.Provider,
 	reg *registry.Registry,
 	encryptor crypto.Encryptor,
@@ -40,11 +42,7 @@ func SyncLiveFromGit(
 		return nil, fmt.Errorf("git provider is not configured")
 	}
 
-	if err := lockBranchMaterialization(tx, canvasID, models.CanvasGitBranchMain); err != nil {
-		return nil, err
-	}
-
-	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
+	repository, err := models.FindRepositoryUnscoped(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
@@ -57,32 +55,11 @@ func SyncLiveFromGit(
 		}
 	}
 
-	canvas, err := models.FindCanvasInTransaction(tx, orgID, canvasID)
-	if err != nil {
-		return nil, err
-	}
-
-	if version, done, idempotentErr := syncLiveAlreadyMaterialized(tx, canvasID, canvas, headSHA); idempotentErr != nil {
-		return nil, idempotentErr
-	} else if done {
-		return version, nil
-	}
-
 	snapshot, loadErr := LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
 	if loadErr != nil {
-		if markErr := markMaterializationError(tx, canvasID, models.CanvasGitBranchMain, headSHA, nil, loadErr); markErr != nil {
-			return nil, markErr
-		}
+		persistLiveMaterializationError(canvasID, headSHA, loadErr)
 		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, loadErr.Error())
 		return nil, loadErr
-	}
-
-	if nameErr := ensureCanvasNameAvailableInTransaction(tx, orgID, canvasID, snapshot.Name); nameErr != nil {
-		if markErr := markMaterializationError(tx, canvasID, models.CanvasGitBranchMain, headSHA, nil, nameErr); markErr != nil {
-			return nil, markErr
-		}
-		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, nameErr.Error())
-		return nil, nameErr
 	}
 
 	live := &LiveMaterializer{
@@ -92,10 +69,46 @@ func SyncLiveFromGit(
 		AuthService:    authService,
 		WebhookBaseURL: webhookBaseURL,
 	}
-	version, matErr := live.MaterializeLive(ctx, tx, orgID, canvasID, headSHA)
-	if matErr != nil {
-		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, matErr.Error())
-		return nil, matErr
+
+	var version *models.CanvasVersion
+	idempotent := false
+	txErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := lockBranchMaterialization(tx, canvasID, models.CanvasGitBranchMain); err != nil {
+			return err
+		}
+
+		canvas, err := models.FindCanvasInTransaction(tx, orgID, canvasID)
+		if err != nil {
+			return err
+		}
+
+		if existing, done, idempotentErr := syncLiveAlreadyMaterialized(tx, canvasID, canvas, headSHA); idempotentErr != nil {
+			return idempotentErr
+		} else if done {
+			version = existing
+			idempotent = true
+			return nil
+		}
+
+		if nameErr := ensureCanvasNameAvailableInTransaction(tx, orgID, canvasID, snapshot.Name); nameErr != nil {
+			return nameErr
+		}
+
+		v, matErr := live.MaterializeLive(ctx, tx, orgID, canvasID, snapshot, headSHA)
+		if matErr != nil {
+			return matErr
+		}
+		version = v
+		return nil
+	})
+	if txErr != nil {
+		persistLiveMaterializationError(canvasID, headSHA, txErr)
+		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, txErr.Error())
+		return nil, txErr
+	}
+
+	if idempotent {
+		return version, nil
 	}
 
 	publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusReady, "")

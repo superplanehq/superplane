@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,10 +19,11 @@ type ReconcileDraftBranchDeletionsOptions struct {
 }
 
 // ReconcileDraftBranchDeletionsFromGit removes draft workflow_versions rows whose git
-// refs no longer exist. Safe to call repeatedly.
+// refs no longer exist. The git branch listing happens before the database
+// transaction so no git RPC is held across a pooled DB connection. Safe to call
+// repeatedly.
 func ReconcileDraftBranchDeletionsFromGit(
 	ctx context.Context,
-	tx *gorm.DB,
 	gitProvider git.Provider,
 	canvasID uuid.UUID,
 	opts ReconcileDraftBranchDeletionsOptions,
@@ -30,7 +32,7 @@ func ReconcileDraftBranchDeletionsFromGit(
 		return nil, fmt.Errorf("git provider is not configured")
 	}
 
-	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
+	repository, err := models.FindRepositoryUnscoped(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
@@ -45,6 +47,24 @@ func ReconcileDraftBranchDeletionsFromGit(
 		gitBranchSet[branch] = struct{}{}
 	}
 
+	var removed []string
+	if txErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var reconcileErr error
+		removed, reconcileErr = reconcileDraftBranchDeletionsInTransaction(tx, canvasID, gitBranchSet, opts)
+		return reconcileErr
+	}); txErr != nil {
+		return nil, txErr
+	}
+
+	return removed, nil
+}
+
+func reconcileDraftBranchDeletionsInTransaction(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	gitBranchSet map[string]struct{},
+	opts ReconcileDraftBranchDeletionsOptions,
+) ([]string, error) {
 	dbBranches, err := models.ListAllDraftBranchVersionsForCanvasInTransaction(tx, canvasID)
 	if err != nil {
 		return nil, err

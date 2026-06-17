@@ -7,12 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/gorm"
 )
 
 // BranchMaterializer projects the tip of a git branch into the database: the live
@@ -85,12 +83,8 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 		return err
 	}
 
-	var removed []string
-	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		var reconcileErr error
-		removed, reconcileErr = ReconcileDraftBranchDeletionsFromGit(ctx, tx, m.GitProvider, canvasID, ReconcileDraftBranchDeletionsOptions{})
-		return reconcileErr
-	}); err != nil {
+	removed, err := ReconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, ReconcileDraftBranchDeletionsOptions{})
+	if err != nil {
 		return err
 	}
 	PublishDraftBranchDeletionEvents(canvasID.String(), removed)
@@ -111,44 +105,51 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 			return nil
 		}
 
-		return database.Conn().Transaction(func(tx *gorm.DB) error {
-			_, syncErr := SyncLiveFromGit(
-				ctx,
-				tx,
-				m.GitProvider,
-				m.Registry,
-				m.Encryptor,
-				m.AuthService,
-				m.WebhookBaseURL,
-				canvas.OrganizationID,
-				canvasID,
-				// Git main is authoritative: by the time a commit lands on main it
-				// has already passed change-management gating at the write path
-				// (publish/change-request handlers), so the materializer always
-				// projects what main points at.
-				SyncLiveFromGitOptions{HeadSHA: headSHA},
-			)
-			return syncErr
-		})
+		_, syncErr := SyncLiveFromGit(
+			ctx,
+			m.GitProvider,
+			m.Registry,
+			m.Encryptor,
+			m.AuthService,
+			m.WebhookBaseURL,
+			canvas.OrganizationID,
+			canvasID,
+			// Git main is authoritative: by the time a commit lands on main it
+			// has already passed change-management gating at the write path
+			// (publish/change-request handlers), so the materializer always
+			// projects what main points at.
+			SyncLiveFromGitOptions{HeadSHA: headSHA},
+		)
+		return syncErr
 	}
 
 	if m.draftAlreadyMaterialized(canvasID, branch, headSHA) {
 		return nil
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, syncErr := SyncDraftBranchFromGit(
-			ctx,
-			tx,
-			m.GitProvider,
-			m.Registry,
-			canvas.OrganizationID,
-			canvasID,
-			branch,
-			SyncDraftBranchOptions{HeadSHA: headSHA, CreatedBy: pushedBy},
-		)
-		return syncErr
-	})
+	_, syncErr := SyncDraftBranchFromGit(
+		ctx,
+		m.GitProvider,
+		m.Registry,
+		canvas.OrganizationID,
+		canvasID,
+		branch,
+		SyncDraftBranchOptions{HeadSHA: headSHA, CreatedBy: pushedBy},
+	)
+	return syncErr
+}
+
+// ReconcileBranchDeletion removes the database projection of a draft branch that
+// has been deleted from git. It is the worker entry point for "deleted" branch
+// notifications: the handler deletes the branch in git and publishes the event,
+// then the worker drops the corresponding workflow_versions row and its staging.
+// Reconciliation is keyed off git (the source of truth), so it is idempotent and
+// only removes rows whose branch no longer exists. The triggering notification is
+// already fanned out to clients by the event distributer, so nothing is
+// republished here.
+func (m *BranchMaterializer) ReconcileBranchDeletion(ctx context.Context, canvasID uuid.UUID, branch string) error {
+	_, err := ReconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, ReconcileDraftBranchDeletionsOptions{BranchName: branch})
+	return err
 }
 
 func (m *BranchMaterializer) liveAlreadyMaterialized(canvasID uuid.UUID, headSHA string) bool {

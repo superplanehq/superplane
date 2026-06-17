@@ -126,9 +126,21 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		return nil
 	}
 
-	// Deletion notifications carry no branch tip to materialize; draft-branch
-	// deletions are reconciled as a side effect of any other branch update.
+	materializer := &materialize.BranchMaterializer{
+		GitProvider:    w.GitProvider,
+		Registry:       w.Registry,
+		Encryptor:      w.Encryptor,
+		AuthService:    w.AuthService,
+		WebhookBaseURL: w.WebhookBaseURL,
+	}
+
+	// Deletion notifications carry no branch tip to materialize: the handler has
+	// already removed the branch from git, so drop the database projection.
 	if message.GetMaterializationStatus() == pb.MaterializationStatus_MATERIALIZATION_STATUS_DELETED {
+		if err := materializer.ReconcileBranchDeletion(context.Background(), canvasID, message.GetBranch()); err != nil {
+			w.log("Error reconciling deletion for canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
+			return err
+		}
 		return nil
 	}
 
@@ -144,13 +156,6 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		}
 	}
 
-	materializer := &materialize.BranchMaterializer{
-		GitProvider:    w.GitProvider,
-		Registry:       w.Registry,
-		Encryptor:      w.Encryptor,
-		AuthService:    w.AuthService,
-		WebhookBaseURL: w.WebhookBaseURL,
-	}
 	if err := materializer.MaterializeBranch(context.Background(), canvasID, message.GetBranch(), message.GetHeadSha(), pushedBy); err != nil {
 		w.log("Error materializing canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
 		return err

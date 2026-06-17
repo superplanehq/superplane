@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,6 +22,9 @@ type DraftMaterializer struct {
 	Registry    *registry.Registry
 }
 
+// MaterializeDraft writes the draft projection from a snapshot that the caller
+// has already loaded from git outside of any transaction, so no git RPC is held
+// across the DB connection.
 func (m *DraftMaterializer) MaterializeDraft(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -29,6 +33,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 	branch string,
 	commitSHA string,
 	ownerID *uuid.UUID,
+	snapshot *RepoSnapshot,
 ) (*models.CanvasVersion, error) {
 	if m == nil || m.GitProvider == nil {
 		return nil, fmt.Errorf("draft materializer is not configured")
@@ -56,19 +61,6 @@ func (m *DraftMaterializer) MaterializeDraft(
 		if err != nil && err != gorm.ErrRecordNotFound {
 			return nil, err
 		}
-	}
-
-	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
-	if err != nil {
-		return nil, fmt.Errorf("repository not found: %w", err)
-	}
-
-	snapshot, loadErr := LoadRepoSnapshot(ctx, m.GitProvider, m.Registry, orgID, repository.RepoID, commitSHA)
-	if loadErr != nil {
-		if markErr := markMaterializationError(tx, canvasID, branch, commitSHA, ownerID, loadErr); markErr != nil {
-			return nil, markErr
-		}
-		return nil, loadErr
 	}
 
 	now := time.Now()
@@ -145,4 +137,15 @@ func markMaterializationError(tx *gorm.DB, canvasID uuid.UUID, branch, commitSHA
 		version.BranchName = &branchName
 	}
 	return models.UpsertMaterializedVersionInTransaction(tx, version)
+}
+
+// persistDraftMaterializationError records a draft branch materialization failure
+// in its own transaction. It is used when the snapshot load fails before the main
+// materialization transaction is opened.
+func persistDraftMaterializationError(canvasID uuid.UUID, branch string, ownerID *uuid.UUID, headSHA string, cause error) {
+	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		return markMaterializationError(tx, canvasID, branch, headSHA, ownerID, cause)
+	}); err != nil {
+		log.Errorf("failed to persist draft materialization error for canvas %s branch %s: %v", canvasID, branch, err)
+	}
 }

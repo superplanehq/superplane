@@ -26,11 +26,17 @@ type LiveMaterializer struct {
 	WebhookBaseURL string
 }
 
+// MaterializeLive writes the live projection from a snapshot that the caller has
+// already loaded from git outside of any transaction, so no git RPC is held
+// across the DB connection. The publisher it invokes still runs inside the
+// transaction because node Setup() (webhooks, secrets) must commit atomically
+// with the node rows.
 func (m *LiveMaterializer) MaterializeLive(
 	ctx context.Context,
 	tx *gorm.DB,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
+	snapshot *RepoSnapshot,
 	commitSHA string,
 ) (*models.CanvasVersion, error) {
 	if m == nil || m.GitProvider == nil {
@@ -51,19 +57,6 @@ func (m *LiveMaterializer) MaterializeLive(
 	}
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
-	}
-
-	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
-	if err != nil {
-		return nil, fmt.Errorf("repository not found: %w", err)
-	}
-
-	snapshot, loadErr := LoadRepoSnapshot(ctx, m.GitProvider, m.Registry, orgID, repository.RepoID, commitSHA)
-	if loadErr != nil {
-		if markErr := markMaterializationError(tx, canvasID, models.CanvasGitBranchMain, commitSHA, nil, loadErr); markErr != nil {
-			return nil, markErr
-		}
-		return nil, loadErr
 	}
 
 	canvas, err := models.FindCanvasInTransaction(tx, orgID, canvasID)

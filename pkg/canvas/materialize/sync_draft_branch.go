@@ -22,11 +22,12 @@ type SyncDraftBranchOptions struct {
 	DisplayNameOverride string
 }
 
-// SyncDraftBranchFromGit registers draft workflow_versions metadata when missing and
-// materializes the branch tip from git. Safe to call repeatedly.
+// SyncDraftBranchFromGit registers draft workflow_versions metadata when missing
+// and materializes the branch tip from git. It reads the head and loads the repo
+// snapshot from git before opening the database transaction, so no git RPC is held
+// across a pooled DB connection. Safe to call repeatedly.
 func SyncDraftBranchFromGit(
 	ctx context.Context,
-	tx *gorm.DB,
 	gitProvider git.Provider,
 	reg *registry.Registry,
 	orgID uuid.UUID,
@@ -38,11 +39,11 @@ func SyncDraftBranchFromGit(
 		return nil, fmt.Errorf("branch %q is not a draft branch", branchName)
 	}
 
-	if err := lockBranchMaterialization(tx, canvasID, branchName); err != nil {
-		return nil, err
+	if gitProvider == nil {
+		return nil, fmt.Errorf("git provider is not configured")
 	}
 
-	repository, err := models.FindRepositoryInTransaction(tx, canvasID)
+	repository, err := models.FindRepositoryUnscoped(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
@@ -55,140 +56,77 @@ func SyncDraftBranchFromGit(
 		}
 	}
 
-	draftVersion, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branchName)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	if draftVersion == nil {
-		label := strings.TrimSpace(opts.DisplayNameOverride)
-		if label == "" {
-			label, err = nextDraftDisplayNameInTransaction(tx, canvasID)
-			if err != nil {
-				return nil, err
-			}
-		}
-
+	snapshot, loadErr := LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
+	if loadErr != nil {
 		ownerID := OwnerFromDraftBranchName(branchName)
 		if ownerID == nil {
 			ownerID = opts.CreatedBy
 		}
+		persistDraftMaterializationError(canvasID, branchName, ownerID, headSHA, loadErr)
+		return nil, loadErr
+	}
 
-		now := time.Now()
-		branch := branchName
-		draftVersion = &models.CanvasVersion{
-			ID:          uuid.New(),
-			WorkflowID:  canvasID,
-			OwnerID:     ownerID,
-			State:       models.CanvasVersionStateDraft,
-			BranchName:  &branch,
-			DisplayName: label,
-			GitBranch:   branchName,
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+	var version *models.CanvasVersion
+	txErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := lockBranchMaterialization(tx, canvasID, branchName); err != nil {
+			return err
 		}
-		if createErr := tx.Create(draftVersion).Error; createErr != nil {
-			return nil, createErr
+
+		draftVersion, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branchName)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
 		}
-	}
 
-	mat := &DraftMaterializer{GitProvider: gitProvider, Registry: reg}
-	ownerID := draftVersion.OwnerID
-	version, matErr := mat.MaterializeDraft(ctx, tx, orgID, canvasID, branchName, headSHA, ownerID)
-	if matErr != nil {
-		return nil, matErr
-	}
+		if draftVersion == nil {
+			label := strings.TrimSpace(opts.DisplayNameOverride)
+			if label == "" {
+				label, err = nextDraftDisplayNameInTransaction(tx, canvasID)
+				if err != nil {
+					return err
+				}
+			}
 
-	if version.DisplayName == "" && draftVersion.DisplayName != "" {
-		version.DisplayName = draftVersion.DisplayName
-		if saveErr := tx.Save(version).Error; saveErr != nil {
-			return nil, saveErr
+			ownerID := OwnerFromDraftBranchName(branchName)
+			if ownerID == nil {
+				ownerID = opts.CreatedBy
+			}
+
+			now := time.Now()
+			branch := branchName
+			draftVersion = &models.CanvasVersion{
+				ID:          uuid.New(),
+				WorkflowID:  canvasID,
+				OwnerID:     ownerID,
+				State:       models.CanvasVersionStateDraft,
+				BranchName:  &branch,
+				DisplayName: label,
+				GitBranch:   branchName,
+				CreatedAt:   &now,
+				UpdatedAt:   &now,
+			}
+			if createErr := tx.Create(draftVersion).Error; createErr != nil {
+				return createErr
+			}
 		}
-	}
 
-	return version, nil
-}
-
-// RegisterPendingDraftOptions configures RegisterPendingDraftVersion.
-type RegisterPendingDraftOptions struct {
-	CreatedBy           *uuid.UUID
-	DisplayNameOverride string
-}
-
-// RegisterPendingDraftVersion records (or updates) the draft workflow_versions
-// row for branchName in the "pending" materialization state, without loading the
-// git snapshot. Handlers call it after committing to git so the response carries
-// a stable version ID and an existing row, then ask the materializer worker to
-// fill in nodes/edges/console asynchronously (see RequestBranchMaterialization).
-//
-// The transaction-scoped advisory lock serializes this against the worker
-// materializing the same branch, so the worker reuses this row instead of
-// inserting a duplicate that would violate idx_workflow_versions_draft_branch.
-func RegisterPendingDraftVersion(
-	tx *gorm.DB,
-	canvasID uuid.UUID,
-	branchName string,
-	headSHA string,
-	opts RegisterPendingDraftOptions,
-) (*models.CanvasVersion, error) {
-	if !isDraftBranch(branchName) {
-		return nil, fmt.Errorf("branch %q is not a draft branch", branchName)
-	}
-
-	if err := lockBranchMaterialization(tx, canvasID, branchName); err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branchName)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
-	if existing != nil {
-		existing.CommitSHA = headSHA
-		existing.GitBranch = branchName
-		existing.MaterializationStatus = models.MaterializationStatusPending
-		existing.MaterializationError = ""
-		existing.UpdatedAt = &now
-		if label := strings.TrimSpace(opts.DisplayNameOverride); label != "" {
-			existing.DisplayName = label
+		mat := &DraftMaterializer{GitProvider: gitProvider, Registry: reg}
+		v, matErr := mat.MaterializeDraft(ctx, tx, orgID, canvasID, branchName, headSHA, draftVersion.OwnerID, snapshot)
+		if matErr != nil {
+			return matErr
 		}
-		if saveErr := tx.Save(existing).Error; saveErr != nil {
-			return nil, saveErr
+
+		if v.DisplayName == "" && draftVersion.DisplayName != "" {
+			v.DisplayName = draftVersion.DisplayName
+			if saveErr := tx.Save(v).Error; saveErr != nil {
+				return saveErr
+			}
 		}
-		return existing, nil
-	}
 
-	label := strings.TrimSpace(opts.DisplayNameOverride)
-	if label == "" {
-		label, err = nextDraftDisplayNameInTransaction(tx, canvasID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	ownerID := OwnerFromDraftBranchName(branchName)
-	if ownerID == nil {
-		ownerID = opts.CreatedBy
-	}
-
-	branch := branchName
-	version := &models.CanvasVersion{
-		ID:                    uuid.New(),
-		WorkflowID:            canvasID,
-		OwnerID:               ownerID,
-		State:                 models.CanvasVersionStateDraft,
-		BranchName:            &branch,
-		GitBranch:             branchName,
-		DisplayName:           label,
-		CommitSHA:             headSHA,
-		MaterializationStatus: models.MaterializationStatusPending,
-		CreatedAt:             &now,
-		UpdatedAt:             &now,
-	}
-	if createErr := tx.Create(version).Error; createErr != nil {
-		return nil, createErr
+		version = v
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
 	}
 
 	return version, nil

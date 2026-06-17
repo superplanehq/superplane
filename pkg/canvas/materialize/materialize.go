@@ -10,7 +10,6 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/gorm"
 )
 
 type Mode int
@@ -28,9 +27,12 @@ type Materializer struct {
 	WebhookBaseURL string
 }
 
+// MaterializeFromGit projects a branch tip into the database. The underlying sync
+// functions load git state before opening their own short transaction, so no git
+// RPC is held across a pooled DB connection. It is idempotent: the sync functions
+// skip work when the branch is already materialized at commitSHA.
 func (m *Materializer) MaterializeFromGit(
 	ctx context.Context,
-	tx *gorm.DB,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	branch string,
@@ -42,26 +44,15 @@ func (m *Materializer) MaterializeFromGit(
 		return nil, fmt.Errorf("materializer is not configured")
 	}
 
-	version, err := models.FindVersionByCommitSHAInTransaction(tx, canvasID, commitSHA)
-	if err == nil &&
-		version.GitBranch == branch &&
-		version.MaterializationStatus == models.MaterializationStatusReady {
-		return version, nil
-	}
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	}
-
 	switch mode {
 	case ModeLive:
-		return SyncLiveFromGit(ctx, tx, m.GitProvider, m.Registry, m.Encryptor, m.AuthService, m.WebhookBaseURL, orgID, canvasID, SyncLiveFromGitOptions{
+		return SyncLiveFromGit(ctx, m.GitProvider, m.Registry, m.Encryptor, m.AuthService, m.WebhookBaseURL, orgID, canvasID, SyncLiveFromGitOptions{
 			HeadSHA: commitSHA,
 		})
 	default:
-		draft := &DraftMaterializer{
-			GitProvider: m.GitProvider,
-			Registry:    m.Registry,
-		}
-		return draft.MaterializeDraft(ctx, tx, orgID, canvasID, branch, commitSHA, ownerID)
+		return SyncDraftBranchFromGit(ctx, m.GitProvider, m.Registry, orgID, canvasID, branch, SyncDraftBranchOptions{
+			HeadSHA:   commitSHA,
+			CreatedBy: ownerID,
+		})
 	}
 }
