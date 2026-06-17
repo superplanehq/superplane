@@ -1,13 +1,6 @@
 package workers
 
 import (
-	"bytes"
-	"context"
-	"encoding/base64"
-	"encoding/json"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,60 +9,57 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations/dockerhub"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
-	supportcontexts "github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/impl"
 )
 
-// Test__DockerHubRefreshLoopDoesNotAccumulate reproduces issue #5386.
+// Test__IntegrationRequestWorker_SelfReschedulingSyncDoesNotAccumulate reproduces
+// issue #5386 with a generic, integration-agnostic loop: an integration whose Sync
+// reschedules a recurring action via ScheduleActionCall (e.g. a token refresh).
 //
-// DockerHub drives its token refresh through ScheduleActionCall("refreshAccessToken").
-// Re-running Sync (which happens on every integration sync/edit/capability update,
-// and on the recurring refresh) must not leave behind an extra scheduled refresh -
-// the loop must keep at most one pending request per installation.
-//
-// Before the ScheduleActionCall de-duplication fix this FAILS (the pending count
-// climbs past 1, as it did in production with 202 orphaned chains). After the fix
-// it PASSES, with the single pending request being the refreshAccessToken hook.
-func Test__DockerHubRefreshLoopDoesNotAccumulate(t *testing.T) {
+// Sync re-runs on create and on every integration edit/capability update, so each
+// run must reuse the single scheduled action rather than stacking a new
+// self-perpetuating chain. Before the ScheduleActionCall de-duplication fix this
+// FAILS (the pending count climbs, as it did in production with hundreds of
+// orphaned chains); after the fix it stays at one.
+func Test__IntegrationRequestWorker_SelfReschedulingSyncDoesNotAccumulate(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dockerhub"] = &dockerhub.DockerHub{}
-	integration := createDockerHubIntegration(t, r)
+	dummy := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			return ctx.Integration.ScheduleActionCall("refresh", map[string]any{}, time.Second)
+		},
+	})
+	r.Registry.Integrations["dummy"] = dummy
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
 
 	syncOnce := func() {
 		ctx := workercontexts.NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
-		httpCtx := &supportcontexts.HTTPContext{
-			Responses: []*http.Response{dockerHubTokenResponse(t), dockerHubRepositoriesResponse()},
-		}
-
-		require.NoError(t, (&dockerhub.DockerHub{}).Sync(core.SyncContext{
-			HTTP:          httpCtx,
+		require.NoError(t, dummy.Sync(core.SyncContext{
 			Integration:   ctx,
 			Configuration: integration.Configuration.Data(),
 		}))
 	}
 
 	//
-	// The initial sync seeds a single scheduled refresh.
+	// The initial sync seeds a single scheduled action.
 	//
 	syncOnce()
-	pending := pendingActionRequests(t, integration.ID, "refreshAccessToken")
-	require.Len(t, pending, 1, "initial sync should schedule exactly one refresh")
-	require.Equal(t, models.IntegrationRequestTypeInvokeAction, pending[0].Type)
+	require.Len(t, pendingActionRequests(t, integration.ID, "refresh"), 1, "initial sync should schedule exactly one action")
 
 	//
-	// Subsequent syncs must reuse that single scheduled refresh, not stack up new
+	// Subsequent syncs must reuse that single scheduled action, not stack up new
 	// self-perpetuating chains (issue #5386).
 	//
 	for i := 0; i < 4; i++ {
 		syncOnce()
-		require.Len(t, pendingActionRequests(t, integration.ID, "refreshAccessToken"), 1,
-			"DockerHub refresh loop must keep a single pending request after re-sync %d (issue #5386)", i+1)
+		require.Len(t, pendingActionRequests(t, integration.ID, "refresh"), 1,
+			"a self-rescheduling sync loop must keep a single pending request after re-sync %d (#5386)", i+1)
 	}
 }
 
@@ -117,32 +107,6 @@ func Test__IntegrationRequestWorker_ActionCallNoDuplicateOnRetry(t *testing.T) {
 		"a retried (already completed) request must not create a duplicate chain (#5386)")
 }
 
-func createDockerHubIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {
-	t.Helper()
-
-	//
-	// accessToken is a Sensitive config field, so it is stored as
-	// base64(encrypt(value, associatedData=installationID)).
-	//
-	integrationID := uuid.New()
-	encryptedToken, err := r.Encryptor.Encrypt(context.Background(), []byte("pat"), []byte(integrationID.String()))
-	require.NoError(t, err)
-
-	integration, err := models.CreateIntegration(
-		integrationID,
-		r.Organization.ID,
-		"dockerhub",
-		support.RandomName("integration"),
-		map[string]any{
-			"username":    "superplane",
-			"accessToken": base64.StdEncoding.EncodeToString(encryptedToken),
-		},
-	)
-	require.NoError(t, err)
-
-	return integration
-}
-
 func pendingActionRequests(t *testing.T, integrationID uuid.UUID, actionName string) []models.IntegrationRequest {
 	t.Helper()
 
@@ -153,36 +117,4 @@ func pendingActionRequests(t *testing.T, integrationID uuid.UUID, actionName str
 		Where("spec->'invoke_action'->>'action_name' = ?", actionName).
 		Find(&requests).Error)
 	return requests
-}
-
-func dockerHubTokenResponse(t *testing.T) *http.Response {
-	t.Helper()
-
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
-	payloadBytes, err := json.Marshal(map[string]any{"exp": time.Now().Add(10 * time.Minute).Unix()})
-	require.NoError(t, err)
-	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
-	jwt := header + "." + payload + ".signature"
-
-	body, err := json.Marshal(map[string]any{"access_token": jwt})
-	require.NoError(t, err)
-
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(bytes.NewReader(body)),
-	}
-}
-
-func dockerHubRepositoriesResponse() *http.Response {
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body: io.NopCloser(strings.NewReader(`
-			{
-				"next": null,
-				"results": [
-					{"name": "demo", "namespace": "superplane"}
-				]
-			}
-		`)),
-	}
 }
