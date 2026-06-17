@@ -199,7 +199,23 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
+
+	//
+	// Enforce at-most-one pending request per (installation, action, parameters).
+	// Completing the matching pending rows in the same transaction that creates
+	// the successor also completes the in-flight request when the worker is
+	// driving a self-rescheduling loop, and collapses any accumulated chains of
+	// the same action (#5386). Distinct parameters are preserved, so legitimately
+	// different calls (e.g. AWS provisionRule for different detail types) are not
+	// affected.
+	//
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := models.CompletePendingActionRequestsInTransaction(tx, c.integration.ID, actionName, parameters); err != nil {
+			return err
+		}
+
+		return c.integration.CreateActionRequest(tx, actionName, parameters, &runAt)
+	})
 }
 
 func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
