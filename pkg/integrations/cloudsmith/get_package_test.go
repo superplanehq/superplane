@@ -55,6 +55,33 @@ func Test__GetPackage__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("static repository with expression package resolves repository name", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"repository": "acme/production",
+				"package":    "{{ $.trigger.data.package }}",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					okResponse(`{"name":"Production","slug":"production","namespace":"acme"}`),
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-key"},
+			},
+			Metadata: metadataCtx,
+		})
+
+		require.NoError(t, err)
+		metadata, ok := metadataCtx.Metadata.(PackageNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "Production", metadata.RepositoryName)
+		assert.Equal(t, "acme", metadata.RepositoryNamespace)
+		assert.Equal(t, "{{ $.trigger.data.package }}", metadata.PackageName)
+	})
+
 	t.Run("valid configuration resolves package metadata", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 
