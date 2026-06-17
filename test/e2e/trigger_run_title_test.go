@@ -13,25 +13,50 @@ import (
 )
 
 func TestTriggerRunTitle(t *testing.T) {
-	t.Run("resolves run title expression when event is emitted", func(t *testing.T) {
-		steps := &triggerRunTitleSteps{t: t}
-		steps.start()
-		steps.givenACanvasWithManualTrigger("RunTitle Resolve", "Start")
+	testCases := []struct {
+		name          string
+		titleTemplate string
+		expectedTitle string
+	}{
+		{
+			name:          "static title",
+			titleTemplate: "Manual run title",
+			expectedTitle: "Manual run title",
+		},
+		{
+			name:          "root function",
+			titleTemplate: "Run: {{ root().data.message }}",
+			expectedTitle: "Run: Hello, World!",
+		},
+		{
+			name:          "previous function",
+			titleTemplate: "Run: {{ previous().data.message }}",
+			expectedTitle: "Run: Hello, World!",
+		},
+		{
+			name:          "node reference",
+			titleTemplate: `Run: {{ $["Start"].data.message }}`,
+			expectedTitle: "Run: Hello, World!",
+		},
+	}
 
-		// Set a run title that references the trigger payload.
-		// The manual trigger emits a structured event: {"type": "manual.run", "data": {"message": "Hello, World!"}, "timestamp": "..."}
-		steps.whenRunTitleToggleIsEnabled()
-		steps.whenRunTitleIsSetTo("Run: {{ root().data.message }}")
-		steps.waitForAutoSave()
-		steps.thenRunTitleInDBEquals("Run: {{ root().data.message }}")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			steps := &triggerRunTitleSteps{t: t}
+			steps.start()
+			steps.givenACanvasWithManualTrigger("RunTitle "+testCase.name, "Start")
 
-		// Publish and trigger an event
-		steps.saveAndPublish()
-		steps.runManualTrigger()
+			steps.whenRunTitleToggleIsEnabled()
+			steps.whenRunTitleIsSetTo(testCase.titleTemplate)
+			steps.waitForAutoSave()
+			steps.thenRunTitleInDBEquals(testCase.titleTemplate)
 
-		// The emitted event should have the resolved custom name
-		steps.thenEventCustomNameEquals("Run: Hello, World!")
-	})
+			steps.saveAndPublish()
+			steps.runManualTrigger()
+
+			steps.thenEventCustomNameEquals(testCase.expectedTitle)
+		})
+	}
 }
 
 type triggerRunTitleSteps struct {
@@ -39,6 +64,7 @@ type triggerRunTitleSteps struct {
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 	nodeID  string
+	trigger string
 }
 
 func (s *triggerRunTitleSteps) start() {
@@ -52,6 +78,7 @@ func (s *triggerRunTitleSteps) givenACanvasWithManualTrigger(canvasName, trigger
 	s.canvas.Create()
 	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger(triggerName, models.Position{X: 500, Y: 250})
+	s.trigger = triggerName
 	s.nodeID = s.waitForNodeID()
 }
 
@@ -75,7 +102,7 @@ func (s *triggerRunTitleSteps) saveAndPublish() {
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
-	s.canvas.EmitManualTrigger("Start")
+	s.canvas.RunParameterizedManualTrigger(s.trigger, nil)
 	s.session.Sleep(2000)
 }
 
@@ -128,13 +155,13 @@ func (s *triggerRunTitleSteps) findLatestRootEvent() *models.CanvasEvent {
 func (s *triggerRunTitleSteps) waitForNodeID() string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		if node, ok := s.canvas.DraftNodeByName("Start"); ok {
+		if node, ok := s.canvas.DraftNodeByName(s.trigger); ok {
 			return node.ID
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	require.FailNow(s.t, "expected Start node in draft")
+	require.FailNow(s.t, "expected trigger node in draft")
 	return ""
 }
 

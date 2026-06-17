@@ -171,7 +171,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 			"parameters": spec.InvokeAction.Parameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
-		Build(node.Configuration.Data())
+		Build(triggerHookConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return fmt.Errorf("failed to resolve trigger configuration: %w", err)
 	}
@@ -216,6 +216,22 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 	}
 
 	return request.Complete(tx)
+}
+
+func triggerHookConfiguration(configuration map[string]any) map[string]any {
+	if _, ok := configuration["customName"]; !ok {
+		return configuration
+	}
+
+	result := make(map[string]any, len(configuration)-1)
+	for key, value := range configuration {
+		if key == "customName" {
+			continue
+		}
+		result[key] = value
+	}
+
+	return result
 }
 
 func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
