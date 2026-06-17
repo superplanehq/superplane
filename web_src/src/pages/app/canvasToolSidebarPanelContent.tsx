@@ -5,7 +5,6 @@ import type {
 } from "@/api-client";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
-import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import type { ReactNode } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
@@ -44,7 +43,6 @@ export interface CanvasVersionsSidebarPanelConfig {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;

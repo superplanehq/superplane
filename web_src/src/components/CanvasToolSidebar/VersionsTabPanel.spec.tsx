@@ -23,7 +23,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -39,7 +38,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
         onCreateDraftBranch={onCreateDraftBranch}
       />,
     );
@@ -56,7 +54,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
         onCreateDraftBranch={vi.fn()}
       />,
     );
@@ -71,7 +68,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -89,7 +85,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -112,7 +107,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -127,7 +121,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -146,7 +139,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { unmount } = render(<VersionsTabPanel {...props} />);
@@ -171,7 +163,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { rerender } = render(<VersionsTabPanel {...props} />);

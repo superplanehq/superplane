@@ -99,7 +99,6 @@ import { clearRunDetailNodeSearchParams, shouldClearRunDetailNode } from "./runI
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion } from "./lib/draft-spec-cache";
 import {
@@ -285,6 +284,15 @@ export function AppPage() {
     clearRunDetailNodeSearch,
   );
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
+  // `view=versions` is a legacy URL state: the Versions tab was removed in favor
+  // of the in-edit-session sidebar, so such links would otherwise render a
+  // read-only canvas with no sidebar and no way back. Normalize the param away so
+  // the canvas loads normally with the Edit entry point available.
+  useEffect(() => {
+    if (urlViewFlags.isVersionsMode) {
+      handleExitVersionsMode();
+    }
+  }, [urlViewFlags.isVersionsMode, handleExitVersionsMode]);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -614,8 +622,6 @@ export function AppPage() {
   /** Hide draft Discard after a publish flow until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
-  const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
-
   /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
@@ -4895,7 +4901,6 @@ export function AppPage() {
     canUpdateCanvas,
     canvasDeletedRemotely,
     onUseVersion: handleUseVersionFromVersionPanel,
-    onVersionNodeDiffContextChange: setVersionNodeDiffContext,
     onLoadMoreLiveVersions: hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined,
     loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
     loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
@@ -5138,14 +5143,6 @@ export function AppPage() {
       <CanvasYamlModal {...canvasYamlModalProps} />
       {yamlDiffModal}
       {canvasConsoleVersionDiff.consoleYamlDiffModal}
-      <CanvasVersionNodeDiffDialog
-        context={versionNodeDiffContext}
-        onOpenChange={(open) => {
-          if (!open) {
-            setVersionNodeDiffContext(null);
-          }
-        }}
-      />
       <CanvasPageModals
         canvasDeletedRemotely={canvasDeletedRemotely}
         onGoToCanvases={() => {

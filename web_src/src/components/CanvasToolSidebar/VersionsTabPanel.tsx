@@ -2,7 +2,6 @@ import type { CanvasesCanvasVersion } from "@/api-client";
 import { useCallback } from "react";
 import { Copy, GitBranch, Plus } from "lucide-react";
 import { toast } from "sonner";
-import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { cn } from "@/lib/utils";
@@ -23,7 +22,6 @@ export interface VersionsTabPanelProps {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
