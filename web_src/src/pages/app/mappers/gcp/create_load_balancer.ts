@@ -80,11 +80,7 @@ export const createLoadBalancerMapper: ComponentBaseMapper = {
     if (result.name) details["Name"] = result.name;
     if (result.region) details["Region"] = result.region;
     if (result.ipAddress) details["IP Address"] = result.ipAddress;
-    if (result.protocol) details["Protocol"] = result.protocol;
-    if (result.ports?.length) details["Ports"] = result.ports.join(", ");
-    if (result.forwardingRule) details["Forwarding Rule"] = result.forwardingRule;
     if (result.backendService) details["Backend Service"] = result.backendService;
-    if (result.healthCheck) details["Health Check"] = result.healthCheck;
     return details;
   },
 

@@ -48,10 +48,15 @@ describe("createLoadBalancerMapper.getExecutionDetails", () => {
       }),
     );
     expect(details["Name"]).toBe("web-lb");
+    expect(details["Region"]).toBe("us-central1");
     expect(details["IP Address"]).toBe("34.1.2.3");
-    expect(details["Ports"]).toBe("80, 443");
-    expect(details["Forwarding Rule"]).toBe("web-lb-fr");
     expect(details["Backend Service"]).toBe("web-lb-backend");
+    // Trimmed to a max of 5 rows (incl. Executed At).
+    expect(details["Protocol"]).toBeUndefined();
+    expect(details["Ports"]).toBeUndefined();
+    expect(details["Forwarding Rule"]).toBeUndefined();
+    expect(details["Health Check"]).toBeUndefined();
+    expect(Object.keys(details).length).toBeLessThanOrEqual(5);
   });
 
   it("does not throw when outputs are missing", () => {
