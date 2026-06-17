@@ -273,7 +273,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
           emptyStateProps,
           error: node.errorMessage,
           warning: node.warningMessage,
-          paused: !!node.paused,
         },
       },
     };

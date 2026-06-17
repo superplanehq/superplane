@@ -18,7 +18,6 @@ const (
 	CanvasNodeStateReady      = "ready"
 	CanvasNodeStateProcessing = "processing"
 	CanvasNodeStateError      = "error"
-	CanvasNodeStatePaused     = "paused"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
@@ -308,19 +307,6 @@ func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (
 	}
 
 	return &node, nil
-}
-
-func ResumeStateForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (string, error) {
-	runningCount, err := CountRunningExecutionsForNodeInTransaction(tx, workflowID, nodeID)
-	if err != nil {
-		return "", err
-	}
-
-	if runningCount > 0 {
-		return CanvasNodeStateProcessing, nil
-	}
-
-	return CanvasNodeStateReady, nil
 }
 
 func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
