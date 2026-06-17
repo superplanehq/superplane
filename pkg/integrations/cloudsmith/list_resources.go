@@ -2,6 +2,7 @@ package cloudsmith
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -47,7 +48,7 @@ func listRepositories(ctx core.ListResourcesContext) ([]core.IntegrationResource
 
 func listPackages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	repositoryID := ctx.Parameters["repository"]
-	if repositoryID == "" {
+	if repositoryID == "" || strings.Contains(repositoryID, "{{") {
 		return []core.IntegrationResource{}, nil
 	}
 
