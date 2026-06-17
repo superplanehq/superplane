@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -151,6 +152,62 @@ func Test__IntegrationContext_ScheduleActionCall(t *testing.T) {
 		require.Equal(t, int64(1), pendingActions("drain"),
 			"a new schedule must collapse all accumulated chains of the same action to one (#5386)")
 	})
+}
+
+// Test__IntegrationContext_ScheduleActionCall_ConcurrentSchedulingDoesNotDuplicate
+// guards the concurrency case behind #5386: the worker processes due requests in
+// parallel, so the primitive must still converge to a single pending request when
+// many goroutines reschedule the same (action, params) at once. Without the
+// per-installation lock, the concurrent complete+create transactions each insert a
+// successor the others cannot see and the count stays above one.
+func Test__IntegrationContext_ScheduleActionCall_ConcurrentSchedulingDoesNotDuplicate(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	//
+	// Seed several accumulated chains, then reschedule them from many goroutines
+	// at once, mirroring the parallel worker processing that caused the bug.
+	//
+	now := time.Now()
+	for i := 0; i < 8; i++ {
+		require.NoError(t, integration.CreateActionRequest(database.Conn(), "refreshAccessToken", map[string]any{}, &now))
+	}
+
+	const concurrency = 8
+	var wg sync.WaitGroup
+	errs := make(chan error, concurrency)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ctx.ScheduleActionCall("refreshAccessToken", map[string]any{}, time.Second)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+
+	var count int64
+	require.NoError(t, database.Conn().
+		Model(&models.IntegrationRequest{}).
+		Where("app_installation_id = ? AND state = ? AND type = ?",
+			integration.ID, models.IntegrationRequestStatePending, models.IntegrationRequestTypeInvokeAction).
+		Where("spec->'invoke_action'->>'action_name' = ?", "refreshAccessToken").
+		Count(&count).Error)
+	require.Equal(t, int64(1), count, "concurrent scheduling must converge to a single pending request (#5386)")
 }
 
 func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *testing.T) {
