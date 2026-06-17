@@ -19,7 +19,6 @@ type UseCanvasDraftBranchQueriesOptions = {
 export function useCanvasDraftBranchQueries({
   organizationId,
   canvasId,
-  currentUserId,
   searchParams,
   setSearchParams,
 }: UseCanvasDraftBranchQueriesOptions) {
@@ -52,10 +51,7 @@ export function useCanvasDraftBranchQueries({
     setSearchParams,
     draftBranches,
   });
-  const startEditingDefaultDraft = useMemo(
-    () => pickDefaultDraftBranchForCanvas(currentUserId),
-    [pickDefaultDraftBranchForCanvas, currentUserId],
-  );
+  const startEditingDefaultDraft = useMemo(() => pickDefaultDraftBranchForCanvas(), [pickDefaultDraftBranchForCanvas]);
 
   return {
     draftBranches,
