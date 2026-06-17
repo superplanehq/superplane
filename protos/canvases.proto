@@ -372,6 +372,17 @@ service Canvases {
     };
   }
 
+  rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs/{run_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe a run";
+      description: "Returns a description of a run";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -924,6 +935,15 @@ message ListRunsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message DescribeRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message DescribeRunResponse {
+  CanvasRun run = 1;
 }
 
 message CanvasMemory {
