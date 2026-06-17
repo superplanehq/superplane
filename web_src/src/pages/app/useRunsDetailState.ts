@@ -1,4 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+
+function getRunDetailNodeIdFromSearchParams(
+  searchParams: URLSearchParams,
+  isRunInspectionMode: boolean,
+  selectedRunId: string | null,
+): string | null {
+  const runId = searchParams.get("run");
+  if (!isRunInspectionMode || !runId || runId !== selectedRunId || searchParams.get("sidebar") !== "1") {
+    return null;
+  }
+
+  return searchParams.get("node") || null;
+}
 
 export function useRunsDetailState(
   searchParams: URLSearchParams,
@@ -7,11 +20,18 @@ export function useRunsDetailState(
   preserveRunDetailNodeOnNextRunChangeRef?: RefObject<boolean>,
 ) {
   const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
-  const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const urlRunDetailNodeId = useMemo(
+    () => getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
+    [isRunInspectionMode, searchParams, selectedRunId],
+  );
+  const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(() =>
+    getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
+  );
   const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
+  const previousUrlRunDetailNodeIdRef = useRef<string | null>(urlRunDetailNodeId);
 
   useEffect(() => {
     if (!searchParams.get("run")) {
@@ -38,8 +58,18 @@ export function useRunsDetailState(
       preserveRunDetailNodeOnNextRunChangeRef.current = false;
       return;
     }
-    setRunDetailNodeId(null);
-  }, [preserveRunDetailNodeOnNextRunChangeRef, selectedRunId]);
+    setRunDetailNodeId(urlRunDetailNodeId);
+  }, [preserveRunDetailNodeOnNextRunChangeRef, selectedRunId, urlRunDetailNodeId]);
+
+  useEffect(() => {
+    if (previousUrlRunDetailNodeIdRef.current === urlRunDetailNodeId) {
+      return;
+    }
+    previousUrlRunDetailNodeIdRef.current = urlRunDetailNodeId;
+    if (urlRunDetailNodeId) {
+      setRunDetailNodeId(urlRunDetailNodeId);
+    }
+  }, [urlRunDetailNodeId]);
 
   const clearDismissedRunDetail = useCallback(() => {
     setDetailDismissedForRunId(null);
