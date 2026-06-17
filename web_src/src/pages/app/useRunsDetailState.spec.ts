@@ -13,6 +13,22 @@ describe("useRunsDetailState", () => {
     expect(result.current.openRunDetailOnMount).toBe(true);
   });
 
+  it("restores the selected run node on mount when the URL points at the detail pane", () => {
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1", sidebar: "1", node: "node-1" }), true, "run-1"),
+    );
+
+    expect(result.current.runDetailNodeId).toBe("node-1");
+  });
+
+  it("does not restore the selected run node without the detail pane flag", () => {
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1", node: "node-1" }), true, "run-1"),
+    );
+
+    expect(result.current.runDetailNodeId).toBeNull();
+  });
+
   it("clears openRunDetailOnMount when leaving run inspection", () => {
     const { result, rerender } = renderHook(
       ({ isRunInspectionMode, searchParams, selectedRunId }) =>

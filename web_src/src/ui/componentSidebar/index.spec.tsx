@@ -50,7 +50,13 @@ vi.mock("@/lib/integrationDisplayName", () => ({
 }));
 
 vi.mock("@/lib/utils", () => ({
+  cn: (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" "),
   resolveIcon: () => () => <div data-testid="resolved-icon" />,
+}));
+
+vi.mock("@/ui/Runs/RunNodeIcon", () => ({
+  RUN_NODE_ICON_SIZE: 14,
+  RunNodeIcon: () => <div data-testid="run-node-icon" />,
 }));
 
 vi.mock("@/ui/componentSidebar/integrationIconMaps", () => ({
@@ -200,6 +206,20 @@ describe("ComponentSidebar", () => {
       const width = Number.parseFloat(sidebar?.style.width || "");
       expect(width).toBeGreaterThanOrEqual(300);
       expect(width).toBeLessThanOrEqual(800);
+    });
+  });
+
+  it("does not render horizontal resize handle in bottom layout", () => {
+    renderSidebar({ layout: "bottom" });
+
+    expect(screen.queryByTestId("component-sidebar-resize-handle")).not.toBeInTheDocument();
+  });
+
+  it("does not reserve right sidebar layout width in bottom layout", async () => {
+    renderSidebar({ layout: "bottom", isOpen: true });
+
+    await waitFor(() => {
+      expect(useSidebarLayoutStore.getState().rightMountCount).toBe(0);
     });
   });
 

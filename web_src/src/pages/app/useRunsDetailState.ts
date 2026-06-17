@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
+function getInitialRunDetailNodeId(searchParams: URLSearchParams, isRunInspectionMode: boolean): string | null {
+  if (!isRunInspectionMode || !searchParams.get("run") || searchParams.get("sidebar") !== "1") {
+    return null;
+  }
+
+  return searchParams.get("node") || null;
+}
+
 export function useRunsDetailState(
   searchParams: URLSearchParams,
   isRunInspectionMode: boolean,
@@ -7,7 +15,9 @@ export function useRunsDetailState(
   preserveRunDetailNodeOnNextRunChangeRef?: RefObject<boolean>,
 ) {
   const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
-  const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(() =>
+    getInitialRunDetailNodeId(searchParams, isRunInspectionMode),
+  );
   const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
