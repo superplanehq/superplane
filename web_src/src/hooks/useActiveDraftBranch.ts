@@ -29,37 +29,22 @@ export function clearLastDraftBranch(canvasId: string): void {
   window.localStorage.removeItem(lastDraftBranchStorageKey(canvasId));
 }
 
-export function pickDefaultDraftBranch(
-  branches: CanvasesCanvasVersion[],
-  canvasId: string,
-  currentUserId?: string,
-): CanvasesCanvasVersion | null {
+/**
+ * Selects the draft to open when entering edit mode: always the most recently
+ * updated draft (the "latest", first on the list). Stored-branch and owner
+ * preferences were intentionally dropped so the Edit button is predictable.
+ */
+export function pickDefaultDraftBranch(branches: CanvasesCanvasVersion[]): CanvasesCanvasVersion | null {
   if (branches.length === 0) {
     return null;
   }
 
-  const storedBranch = readLastDraftBranch(canvasId);
-  if (storedBranch) {
-    const storedMatch = branches.find((branch) => draftBranchName(branch) === storedBranch);
-    if (storedMatch) {
-      return storedMatch;
-    }
-  }
-
-  const sortByUpdated = (items: CanvasesCanvasVersion[]) =>
-    items
+  return (
+    branches
       .slice()
-      .sort((left, right) => Date.parse(draftUpdatedAt(right) || "") - Date.parse(draftUpdatedAt(left) || ""));
-
-  if (currentUserId) {
-    const owned = branches.filter((branch) => branch.metadata?.owner?.id === currentUserId);
-    const ownedDefault = sortByUpdated(owned)[0];
-    if (ownedDefault) {
-      return ownedDefault;
-    }
-  }
-
-  return sortByUpdated(branches)[0] ?? null;
+      .sort((left, right) => Date.parse(draftUpdatedAt(right) || "") - Date.parse(draftUpdatedAt(left) || ""))[0] ??
+    null
+  );
 }
 
 type UseActiveDraftBranchOptions = {
@@ -144,10 +129,7 @@ export function useActiveDraftBranch({
     activeBranchMeta,
     activateBranch,
     exitToLive,
-    pickDefaultDraftBranch: useCallback(
-      (currentUserId?: string) => (canvasId ? pickDefaultDraftBranch(draftBranches, canvasId, currentUserId) : null),
-      [canvasId, draftBranches],
-    ),
+    pickDefaultDraftBranch: useCallback(() => pickDefaultDraftBranch(draftBranches), [draftBranches]),
   };
 }
 
