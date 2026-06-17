@@ -198,6 +198,7 @@ func Test__CommitCanvasRepositoryFiles_DiscardsStaging(t *testing.T) {
 		r.Organization.ID,
 		ConsoleYAMLRepositoryPath,
 		"stale staged content",
+		"",
 		&r.User,
 	)
 	require.NoError(t, err)

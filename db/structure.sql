@@ -401,6 +401,22 @@ CREATE TABLE public.repositories (
 
 
 --
+-- Name: repository_materialization_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repository_materialization_state (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    branch text NOT NULL,
+    head_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    materialized_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    error text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -624,7 +640,8 @@ CREATE TABLE public.workflow_staged_files (
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
     updated_by uuid,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    base_head_sha character varying(40) NOT NULL
 );
 
 
@@ -648,6 +665,10 @@ CREATE TABLE public.workflow_versions (
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     branch_name text,
     display_name text DEFAULT ''::text NOT NULL,
+    commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    git_branch text NOT NULL,
+    materialization_status character varying(32) NOT NULL,
+    materialization_error text NOT NULL,
     CONSTRAINT workflow_versions_draft_branch_check CHECK (((((state)::text = 'draft'::text) AND (branch_name IS NOT NULL)) OR (((state)::text <> 'draft'::text) AND (branch_name IS NULL))))
 );
 
@@ -931,6 +952,22 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_canvas_id_branch_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_canvas_id_branch_key UNIQUE (canvas_id, branch);
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -1304,6 +1341,13 @@ CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canv
 
 
 --
+-- Name: idx_repository_materialization_state_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repository_materialization_state_canvas_id ON public.repository_materialization_state USING btree (canvas_id);
+
+
+--
 -- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1479,10 +1523,24 @@ CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_file
 
 
 --
+-- Name: idx_workflow_versions_commit_sha; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_commit_sha ON public.workflow_versions USING btree (workflow_id, commit_sha) WHERE ((commit_sha)::text <> ''::text);
+
+
+--
 -- Name: idx_workflow_versions_draft_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_workflow_versions_draft_branch ON public.workflow_versions USING btree (workflow_id, branch_name) WHERE (((state)::text = 'draft'::text) AND (branch_name IS NOT NULL));
+
+
+--
+-- Name: idx_workflow_versions_git_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch);
 
 
 --
@@ -1715,6 +1773,14 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -1997,7 +2063,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260615161605	f
+20260617001600	f
 \.
 
 
