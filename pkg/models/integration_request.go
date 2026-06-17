@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -114,5 +115,45 @@ func (r *IntegrationRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", IntegrationRequestStateCompleted).
 		Update("updated_at", time.Now()).
+		Error
+}
+
+// CompletePendingActionRequestsInTransaction completes every pending invoke-action
+// request for the installation that matches both the action name and the exact
+// parameters. Matching on parameters keeps legitimately distinct calls (e.g. AWS
+// provisionRule for different detail types) separate, while collapsing duplicate
+// or self-rescheduling chains of the same action (#5386). Parameters are compared
+// as jsonb, which is canonical and key-order-independent, against the same
+// json.Marshal representation used when the request was created.
+func CompletePendingActionRequestsInTransaction(tx *gorm.DB, installationID uuid.UUID, actionName string, parameters any) error {
+	params, err := json.Marshal(parameters)
+	if err != nil {
+		return err
+	}
+
+	return tx.Model(&IntegrationRequest{}).
+		Where("app_installation_id = ? AND state = ? AND type = ?",
+			installationID, IntegrationRequestStatePending, IntegrationRequestTypeInvokeAction).
+		Where("spec->'invoke_action'->>'action_name' = ?", actionName).
+		Where("spec->'invoke_action'->'parameters' = ?::jsonb", string(params)).
+		Updates(map[string]any{
+			"state":      IntegrationRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).
+		Error
+}
+
+// CompletePendingSyncRequestsInTransaction completes every pending sync request for
+// the installation. ScheduleResync uses it to keep at most one pending sync, scoped
+// to the sync type so a resync never collapses an unrelated pending action request
+// (e.g. a token-refresh loop) on an installation that uses both.
+func CompletePendingSyncRequestsInTransaction(tx *gorm.DB, installationID uuid.UUID) error {
+	return tx.Model(&IntegrationRequest{}).
+		Where("app_installation_id = ? AND state = ? AND type = ?",
+			installationID, IntegrationRequestStatePending, IntegrationRequestTypeSync).
+		Updates(map[string]any{
+			"state":      IntegrationRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).
 		Error
 }

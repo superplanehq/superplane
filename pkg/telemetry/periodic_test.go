@@ -218,6 +218,48 @@ func TestCountPendingExecutions_DeletedWorkflowIsNotCounted(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountPendingIntegrationRequests(t *testing.T) {
+	database.TruncateTables()
+
+	org, err := models.CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+
+	busy, err := models.CreateIntegration(uuid.New(), org.ID, "dummy", "busy-"+uuid.NewString(), map[string]any{})
+	require.NoError(t, err)
+	quiet, err := models.CreateIntegration(uuid.New(), org.ID, "dummy", "quiet-"+uuid.NewString(), map[string]any{})
+	require.NoError(t, err)
+	deleted, err := models.CreateIntegration(uuid.New(), org.ID, "dummy", "deleted-"+uuid.NewString(), map[string]any{})
+	require.NoError(t, err)
+
+	now := time.Now()
+	for i := 0; i < 3; i++ {
+		require.NoError(t, busy.CreateActionRequest(database.Conn(), "refresh", map[string]any{}, &now))
+	}
+	require.NoError(t, quiet.CreateSyncRequest(database.Conn(), &now))
+
+	//
+	// Requests held by a soft-deleted installation must not be counted.
+	//
+	for i := 0; i < 5; i++ {
+		require.NoError(t, deleted.CreateActionRequest(database.Conn(), "refresh", map[string]any{}, &now))
+	}
+	require.NoError(t, deleted.SoftDelete())
+
+	total, maxPerInstallation, err := countPendingIntegrationRequests()
+	require.NoError(t, err)
+	require.Equal(t, int64(4), total, "total counts pending requests across non-deleted installations")
+	require.Equal(t, int64(3), maxPerInstallation, "max-per-installation flags the busiest installation (#5386 early warning)")
+}
+
+func TestCountPendingIntegrationRequests_NoneReturnsZero(t *testing.T) {
+	database.TruncateTables()
+
+	total, maxPerInstallation, err := countPendingIntegrationRequests()
+	require.NoError(t, err)
+	require.Equal(t, int64(0), total)
+	require.Equal(t, int64(0), maxPerInstallation)
+}
+
 type stuckQueueItemsTestSteps struct {
 	t         *testing.T
 	workflow  *models.Canvas
