@@ -1,6 +1,7 @@
 package cloudsmith
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -242,6 +243,59 @@ func (c *Client) ListPackages(owner, repository string) ([]Package, error) {
 	}
 
 	return all, nil
+}
+
+// Webhook is the subset of a Cloudsmith webhook this integration manages.
+type Webhook struct {
+	SlugPerm  string   `json:"slug_perm"`
+	TargetURL string   `json:"target_url"`
+	Events    []string `json:"events"`
+	IsActive  bool     `json:"is_active"`
+}
+
+// requestBodyFormatJSONObject is the Cloudsmith webhook payload format that
+// delivers the package as a JSON object body (application/json).
+const requestBodyFormatJSONObject = 0
+
+// CreateWebhook registers a webhook on a repository (owner/repository) that
+// posts the given events to targetURL as a JSON object.
+func (c *Client) CreateWebhook(owner, repository, targetURL string, events []string) (*Webhook, error) {
+	templates := make([]map[string]string, 0, len(events))
+	for _, event := range events {
+		templates = append(templates, map[string]string{"event": event, "template": ""})
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"target_url":          targetURL,
+		"events":              events,
+		"request_body_format": requestBodyFormatJSONObject,
+		"templates":           templates,
+		"is_active":           true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding webhook: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repository))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
+// DeleteWebhook removes a webhook from a repository by its permanent slug.
+func (c *Client) DeleteWebhook(owner, repository, slugPerm string) error {
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	_, err := c.execRequest(http.MethodDelete, requestURL, nil)
+	return err
 }
 
 var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")

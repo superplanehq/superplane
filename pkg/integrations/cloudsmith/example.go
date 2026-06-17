@@ -26,3 +26,13 @@ var exampleOutputGetPackageCompliance map[string]any
 func (g *GetPackageCompliance) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPackageComplianceOnce, exampleOutputGetPackageComplianceBytes, &exampleOutputGetPackageCompliance)
 }
+
+//go:embed example_data_on_compliance_check_completed.json
+var exampleDataOnComplianceCheckCompletedBytes []byte
+
+var exampleDataOnComplianceCheckCompletedOnce sync.Once
+var exampleDataOnComplianceCheckCompleted map[string]any
+
+func onComplianceCheckCompletedExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnComplianceCheckCompletedOnce, exampleDataOnComplianceCheckCompletedBytes, &exampleDataOnComplianceCheckCompleted)
+}

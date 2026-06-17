@@ -1,0 +1,14 @@
+{
+  "event": "package.synced",
+  "namespace": "weskk",
+  "repository": "superplane-compliance",
+  "name": "sp-compliance-gpl",
+  "version": "1.0.0",
+  "slug_perm": "f3XvJCI9ufJa",
+  "license": "GPL-3.0-only",
+  "spdx_license": "GPL-3.0-only",
+  "osi_approved": true,
+  "policy_violated": false,
+  "is_quarantined": true,
+  "status": "Quarantined"
+}

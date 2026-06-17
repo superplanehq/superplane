@@ -6,9 +6,16 @@ Automate repository, package, and artifact management on Cloudsmith
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Compliance Check Completed" href="#on-compliance-check-completed" description="Trigger a workflow when a Cloudsmith package finishes processing and its compliance is evaluated" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Package Compliance" href="#get-package-compliance" description="Fetch license, policy, and governance compliance details for a Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
 </CardGrid>
 
@@ -23,6 +30,115 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+
+<a id="on-compliance-check-completed"></a>
+
+## On Compliance Check Completed
+
+**Trigger key:** `cloudsmith.onComplianceCheckCompleted`
+
+The On Compliance Check Completed trigger starts a workflow whenever a package in the selected repository finishes processing — the point at which Cloudsmith has evaluated its license, policy, and governance compliance.
+
+> Vulnerability and security-scan events are handled by a separate component.
+
+### Use Cases
+
+- **Governance gates**: React when a package is processed — block, notify, or audit based on its license / quarantine / policy state
+- **License monitoring**: Record the detected license of every newly processed package
+- **Quarantine response**: Kick off remediation when a processed package is quarantined
+
+### Configuration
+
+- **Repository**: The repository to watch, in the form `owner/repository` (required)
+
+### Webhook Setup
+
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.synced` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository.
+
+### Output
+
+Emits the processed package's compliance fields: **namespace**, **repository**, **name**, **version**, **slug_perm**, **license**, **spdx_license**, **osi_approved**, **policy_violated**, **is_quarantined**, and **status**. Use these to filter downstream (for example, only act when `is_quarantined` is true).
+
+### Example Data
+
+```json
+{
+  "event": "package.synced",
+  "is_quarantined": true,
+  "license": "GPL-3.0-only",
+  "name": "sp-compliance-gpl",
+  "namespace": "weskk",
+  "osi_approved": true,
+  "policy_violated": false,
+  "repository": "superplane-compliance",
+  "slug_perm": "f3XvJCI9ufJa",
+  "spdx_license": "GPL-3.0-only",
+  "status": "Quarantined",
+  "version": "1.0.0"
+}
+```
+
+<a id="get-package-compliance"></a>
+
+## Get Package Compliance
+
+**Component key:** `cloudsmith.getPackageCompliance`
+
+The Get Package Compliance component retrieves the license, policy, and governance metadata for a specific Cloudsmith package — useful for gating promotions or downstream actions on a package's compliance state.
+
+> Vulnerability and security-scan data are handled by a separate component and are not included here.
+
+### Use Cases
+
+- **Promotion gates**: Block promotion of packages that are quarantined or violate a policy
+- **License governance**: Check a package's detected license (and whether it is OSI-approved) before consuming it
+- **Audit**: Record the compliance state of a package as part of a workflow
+
+### Configuration
+
+- **Repository**: The repository the package belongs to, in the form `owner/repository` (required, supports expressions)
+- **Package**: The package to inspect, identified by its permanent slug (required, supports expressions). The picker lists packages in the selected repository.
+
+### Output
+
+Returns the package's compliance details including:
+- **name** / **version** / **slug_perm** / **format**: Package identity
+- **license** / **spdx_license**: The detected license
+- **osi_approved**: Whether the detected license is OSI-approved
+- **policy_violated**: Whether the package violates a configured policy
+- **is_quarantined**: Whether the package is currently quarantined
+- **status** / **status_reason** / **stage**: Processing and compliance status
+- **tags**: Package tags
+- **url**: Link to the package in the Cloudsmith web app
+
+### Example Output
+
+```json
+{
+  "data": {
+    "format": "npm",
+    "is_quarantined": true,
+    "license": "GPL-3.0-only",
+    "name": "sp-compliance-gpl",
+    "osi_approved": true,
+    "policy_violated": false,
+    "slug_perm": "f3XvJCI9ufJa",
+    "spdx_license": "GPL-3.0-only",
+    "stage": "Fully Synchronised",
+    "status": "Quarantined",
+    "status_reason": null,
+    "tags": {
+      "version": [
+        "latest"
+      ]
+    },
+    "url": "https://cloudsmith.io/~weskk/repos/superplane-compliance/packages/detail/npm/sp-compliance-gpl/1.0.0/",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-06-17T14:50:29Z",
+  "type": "cloudsmith.package.complianceFetched"
+}
+```
 
 <a id="get-repository"></a>
 

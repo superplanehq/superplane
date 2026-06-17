@@ -9,6 +9,15 @@ export interface GetRepositoryConfiguration {
   repository: string;
 }
 
+export interface OnComplianceCheckCompletedMetadata {
+  repository?: {
+    namespace?: string;
+    slug?: string;
+  };
+  webhookUrl?: string;
+  webhookId?: string;
+}
+
 export interface PackageComplianceNodeMetadata {
   repository?: string;
   packageId?: string;
