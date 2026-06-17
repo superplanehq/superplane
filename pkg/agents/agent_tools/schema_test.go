@@ -51,7 +51,6 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"memory",
 		"runs",
-		"canvas_events",
 		"event_executions",
 		"node_executions",
 		"node_queue_items",
