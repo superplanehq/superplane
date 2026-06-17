@@ -57,6 +57,29 @@ type GetCommitResponse struct {
 	CommitSHA string `json:"commit_sha"`
 }
 
+type ListBranchesResponse struct {
+	Branches []string `json:"branches"`
+}
+
+type CreateBranchRequest struct {
+	Branch  string `json:"branch"`
+	FromRef string `json:"from_ref"`
+}
+
+type MergeBranchRequest struct {
+	SourceBranch string `json:"source_branch"`
+	TargetBranch string `json:"target_branch"`
+	Message      string `json:"message"`
+	Author       struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	} `json:"author"`
+}
+
+type MergeBranchResponse struct {
+	CommitSHA string `json:"commit_sha"`
+}
+
 func (c *Client) createRepo(ctx context.Context, req RepoRequest) (*RepoResponse, error) {
 	var resp RepoResponse
 	if err := c.doJSON(ctx, http.MethodPost, "/repos", req, &resp); err != nil {
@@ -143,6 +166,42 @@ func (c *Client) getCommit(ctx context.Context, repoID, sha string) (*GetCommitR
 	}
 
 	return &resp, nil
+}
+
+func (c *Client) listBranches(ctx context.Context, repoID, prefix string) ([]string, error) {
+	query := url.Values{}
+	if prefix != "" {
+		query.Set("prefix", prefix)
+	}
+
+	var resp ListBranchesResponse
+	endpoint := repoPath(repoID) + "/branches"
+	if encoded := query.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+
+	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &resp); err != nil {
+		return nil, err
+	}
+
+	return resp.Branches, nil
+}
+
+func (c *Client) createBranch(ctx context.Context, repoID string, req CreateBranchRequest) error {
+	return c.doJSON(ctx, http.MethodPost, repoPath(repoID)+"/branches", req, nil)
+}
+
+func (c *Client) mergeBranch(ctx context.Context, repoID string, req MergeBranchRequest) (string, error) {
+	var resp MergeBranchResponse
+	if err := c.doJSON(ctx, http.MethodPost, repoPath(repoID)+"/merge", req, &resp); err != nil {
+		return "", err
+	}
+
+	return resp.CommitSHA, nil
+}
+
+func (c *Client) deleteBranch(ctx context.Context, repoID, branch string) error {
+	return c.doJSON(ctx, http.MethodDelete, repoPath(repoID)+"/branches/"+url.PathEscape(branch), nil, nil)
 }
 
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload any, out any) error {
