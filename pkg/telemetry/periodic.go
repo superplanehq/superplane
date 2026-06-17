@@ -5,11 +5,14 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 //
 // Reports metrics at periodic intervals.
 //
+
+const activeWindow = 24 * time.Hour
 
 type Periodic struct {
 	ctx                  context.Context
@@ -176,6 +179,172 @@ func countPendingExecutions() (int64, error) {
 		Joins("JOIN workflows AS w ON wne.workflow_id = w.id").
 		Where("wne.state = ?", "pending").
 		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countOrganizations() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Organization{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countUsers() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.User{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflows() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Canvas{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowNodes() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.CanvasNode{}).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflows.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countDrafts() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.CanvasVersion{}).
+		Joins("JOIN workflows ON workflows.id = workflow_versions.workflow_id").
+		Where("workflow_versions.state = ?", models.CanvasVersionStateDraft).
+		Where("workflows.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countIntegrations() (int64, error) {
+	var count int64
+
+	err := database.Conn().Model(&models.Integration{}).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countActiveWorkflows(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_runs AS wr").
+		Joins("JOIN workflows AS w ON w.id = wr.workflow_id").
+		Where("wr.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Distinct("wr.workflow_id").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowRunsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_runs AS wr").
+		Joins("JOIN workflows AS w ON w.id = wr.workflow_id").
+		Where("wr.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowEventsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_events AS we").
+		Joins("JOIN workflows AS w ON w.id = we.workflow_id").
+		Where("we.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countWorkflowNodeExecutionsCreated(window time.Duration) (int64, error) {
+	var count int64
+
+	since := time.Now().Add(-window)
+	err := database.Conn().
+		Table("workflow_node_executions AS wne").
+		Joins("JOIN workflows AS w ON w.id = wne.workflow_id").
+		Where("wne.created_at >= ?", since).
+		Where("w.deleted_at IS NULL").
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countIntegrationSecrets() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Model(&models.IntegrationSecret{}).
+		Joins("JOIN app_installations ON app_installations.id = app_installation_secrets.installation_id").
+		Where("app_installations.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {

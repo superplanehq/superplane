@@ -68,6 +68,11 @@ const (
 	IntegrationSecretOperationUpdate = "update"
 )
 
+// dailyMetricsInterval is how often the daily-usage gauges are collected and
+// exported. Their backing DB queries run on this cadence via observable
+// callbacks, so both the query execution and the OTLP export happen hourly.
+const dailyMetricsInterval = time.Hour
+
 // durationSecondsHistogramBoundaries matches Prometheus DefBuckets and is
 // appropriate for latency histograms recorded in seconds. The OTel SDK default
 // boundaries assume milliseconds, which collapses sub-second values into the
@@ -409,6 +414,30 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	hourlyExporter, err := otlpmetricgrpc.New(ctx)
+	if err != nil {
+		return err
+	}
+
+	// The scale-total and daily-usage gauges live on a dedicated provider that
+	// collects and exports once per hour (see dailyMetricsInterval).
+	hourlyMetricsProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
+		sdkmetric.WithReader(
+			sdkmetric.NewPeriodicReader(hourlyExporter, sdkmetric.WithInterval(dailyMetricsInterval)),
+		),
+	)
+
+	hourlyMeter := hourlyMetricsProvider.Meter("superplane")
+
+	if err = registerScaleMetrics(hourlyMeter); err != nil {
+		return err
+	}
+
+	if err = registerDailyUsageMetrics(hourlyMeter); err != nil {
+		return err
+	}
+
 	err = registerDBOperationMetricsCallbacks()
 	if err != nil {
 		return err
@@ -424,6 +453,143 @@ func InitMetrics(ctx context.Context) error {
 func StartPeriodicMetricsReporter() {
 	p := NewPeriodic(context.Background())
 	p.Start()
+}
+
+// registerScaleMetrics registers the installation scale-total gauges as
+// observable instruments on the hourly meter. The OTel reader invokes each
+// callback only when it collects, so the DB queries run on the hourly export
+// cadence rather than every minute.
+func registerScaleMetrics(m metric.Meter) error {
+	gauges := []struct {
+		name        string
+		description string
+		count       func() (int64, error)
+	}{
+		{
+			name:        "organizations.total",
+			description: "Current number of organizations",
+			count:       countOrganizations,
+		},
+		{
+			name:        "users.total",
+			description: "Current number of organization users",
+			count:       countUsers,
+		},
+		{
+			name:        "workflows.total",
+			description: "Current number of workflows",
+			count:       countWorkflows,
+		},
+		{
+			name:        "workflow_nodes.total",
+			description: "Current number of workflow nodes on active workflows",
+			count:       countWorkflowNodes,
+		},
+		{
+			name:        "drafts.total",
+			description: "Current number of workflow draft versions on active workflows",
+			count:       countDrafts,
+		},
+		{
+			name:        "integrations.total",
+			description: "Current number of app integrations",
+			count:       countIntegrations,
+		},
+		{
+			name:        "integration_secrets.total",
+			description: "Current number of integration secrets on active integrations",
+			count:       countIntegrationSecrets,
+		},
+	}
+
+	for _, gauge := range gauges {
+		_, err := m.Int64ObservableGauge(
+			gauge.name,
+			metric.WithDescription(gauge.description),
+			metric.WithUnit("1"),
+			metric.WithInt64Callback(observeCount(gauge.count)),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// observeCount adapts a point-in-time count query into an observable-gauge
+// callback that runs on each hourly collection.
+func observeCount(count func() (int64, error)) metric.Int64Callback {
+	return func(_ context.Context, observer metric.Int64Observer) error {
+		value, err := count()
+		if err != nil {
+			return err
+		}
+
+		observer.Observe(value)
+		return nil
+	}
+}
+
+// registerDailyUsageMetrics registers the daily-usage gauges as observable
+// instruments on the hourly meter. The OTel reader invokes each callback only
+// when it collects, so the DB queries run on the hourly export cadence rather
+// than every minute.
+func registerDailyUsageMetrics(m metric.Meter) error {
+	gauges := []struct {
+		name        string
+		description string
+		count       func(window time.Duration) (int64, error)
+	}{
+		{
+			name:        "workflows.active.count",
+			description: "Number of workflows with at least one run in the last 24 hours",
+			count:       countActiveWorkflows,
+		},
+		{
+			name:        "workflow_runs.daily.count",
+			description: "Number of workflow runs created in the last 24 hours",
+			count:       countWorkflowRunsCreated,
+		},
+		{
+			name:        "workflow_events.daily.count",
+			description: "Number of workflow events created in the last 24 hours",
+			count:       countWorkflowEventsCreated,
+		},
+		{
+			name:        "workflow_node_executions.daily.count",
+			description: "Number of workflow node executions created in the last 24 hours",
+			count:       countWorkflowNodeExecutionsCreated,
+		},
+	}
+
+	for _, gauge := range gauges {
+		_, err := m.Int64ObservableGauge(
+			gauge.name,
+			metric.WithDescription(gauge.description),
+			metric.WithUnit("1"),
+			metric.WithInt64Callback(observeDailyCount(gauge.count)),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// observeDailyCount adapts a 24-hour count query into an observable-gauge
+// callback that runs on each hourly collection.
+func observeDailyCount(count func(window time.Duration) (int64, error)) metric.Int64Callback {
+	return func(_ context.Context, observer metric.Int64Observer) error {
+		value, err := count(activeWindow)
+		if err != nil {
+			return err
+		}
+
+		observer.Observe(value)
+		return nil
+	}
 }
 
 func RecordQueueWorkerTickDuration(ctx context.Context, d time.Duration) {
@@ -702,3 +868,7 @@ func RecordPendingExecutionsCount(ctx context.Context, count int64) {
 
 	pendingExecutionsGauge.Record(ctx, count)
 }
+
+// Scale-total and daily-usage gauges are observable instruments collected
+// hourly; see registerScaleMetrics and registerDailyUsageMetrics. They have no
+// synchronous Record entrypoints.
