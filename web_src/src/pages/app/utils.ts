@@ -289,24 +289,6 @@ export function getSidebarEventExecutionId(event: SidebarEvent): string | undefi
   return undefined;
 }
 
-export function getSidebarEventRunLookupBefore(event: SidebarEvent): string | undefined {
-  const timestamp =
-    event.originalExecution?.rootEvent?.createdAt || event.originalEvent?.createdAt || event.receivedAt?.toISOString();
-
-  if (!timestamp) {
-    return undefined;
-  }
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-
-  // The API returns runs before this cursor. Move just past the event so the
-  // matching run is included even when run and event timestamps are equal.
-  return new Date(date.getTime() + 5 * 60 * 1000).toISOString();
-}
-
 export function findRunIdForSidebarEvent(runs: CanvasesCanvasRun[], event: SidebarEvent): string | null {
   const executionId = getSidebarEventExecutionId(event);
   if (executionId) {

@@ -5,7 +5,6 @@ import { canvasesListRuns } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { getSidebarEventRunLookupBefore } from "@/pages/app/utils";
 import {
   buildRunLookupIndex,
   buildRunLookupFingerprintFromSources,
@@ -107,7 +106,7 @@ export function useSidebarEventRunLookup({
       }
 
       const fetchPromise = (async () => {
-        let before: string | undefined = getSidebarEventRunLookupBefore(event);
+        let before: string | undefined;
         let loadedCount = 0;
 
         for (let page = 0; page < RUN_LOOKUP_MAX_PAGES; page += 1) {
