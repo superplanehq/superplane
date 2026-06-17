@@ -341,13 +341,22 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		assignedIP = fr.IPAddress
 	}
 
+	// Emit the forwarding rule as a Delete-consumable reference (its canonical,
+	// project-qualified selfLink) rather than a bare name, so the documented
+	// create -> delete cleanup flow can chain on data.forwardingRule. Fall back
+	// to a relative path if the selfLink is somehow unavailable.
+	frRef := strings.TrimSpace(frSelfLink)
+	if frRef == "" {
+		frRef = fmt.Sprintf("regions/%s/forwardingRules/%s", region, frName)
+	}
+
 	payload := map[string]any{
 		"name":           name,
 		"region":         region,
 		"ipAddress":      assignedIP,
 		"protocol":       protocol,
 		"ports":          ports,
-		"forwardingRule": frName,
+		"forwardingRule": frRef,
 		"backendService": besName,
 		"healthCheck":    hcName,
 		"instanceGroup":  lastSegment(spec.InstanceGroup),

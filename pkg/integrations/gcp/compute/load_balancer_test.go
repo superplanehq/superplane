@@ -77,7 +77,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				case strings.Contains(path, "/backendServices/"):
 					return []byte(`{"selfLink":"bes-link"}`), nil
 				case strings.Contains(path, "/forwardingRules/"):
-					return []byte(`{"selfLink":"fr-link","IPAddress":"34.1.2.3"}`), nil
+					return []byte(`{"selfLink":"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/forwardingRules/web-lb-fr","IPAddress":"34.1.2.3"}`), nil
 				}
 				return nil, assert.AnError
 			},
@@ -104,7 +104,10 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		data := state.Payloads[0].(map[string]any)["data"].(map[string]any)
 		assert.Equal(t, "web-lb", data["name"])
 		assert.Equal(t, "34.1.2.3", data["ipAddress"])
-		assert.Equal(t, "web-lb-fr", data["forwardingRule"])
+		// The emitted forwarding rule must be a reference Delete can consume.
+		_, _, frParsed, perr := parseRegionalResource(data["forwardingRule"].(string), "forwardingRules")
+		require.NoError(t, perr)
+		assert.Equal(t, "web-lb-fr", frParsed)
 	})
 
 	t.Run("resolves a reserved IP selfLink to its literal address", func(t *testing.T) {
