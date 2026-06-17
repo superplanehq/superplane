@@ -18,6 +18,7 @@ import {
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListRuns,
+  canvasesDescribeRun,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesCreateCanvasMemoryNamespace,
@@ -210,6 +211,7 @@ export const canvasKeys = {
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
     ] as const,
+  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -1125,6 +1127,25 @@ export const useDeleteCanvas = (organizationId: string) => {
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+};
+
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, runId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId: runId!,
+          },
+        }),
+      );
+      return response.data;
+    },
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && !!runId && enabled,
+  });
 };
 
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {

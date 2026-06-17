@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   canvasFoldersUpdateCanvasFolder,
   canvasesListRuns,
+  canvasesDescribeRun,
   canvasesStageCanvasRepositoryFile,
   canvasesCommitCanvasStaging,
   canvasesDiscardCanvasStaging,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
+  canvasesDescribeRun: vi.fn(),
   canvasesStageCanvasRepositoryFile: vi.fn(),
   canvasesCommitCanvasStaging: vi.fn(),
   canvasesDiscardCanvasStaging: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
+    canvasesDescribeRun,
     canvasesStageCanvasRepositoryFile,
     canvasesCommitCanvasStaging,
     canvasesDiscardCanvasStaging,
@@ -39,6 +42,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
 import {
   canvasKeys,
   ensureDraftVersionExists,
+  useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
   useUpdateCanvasFolderMembership,
@@ -161,6 +165,35 @@ describe("useInfiniteCanvasRuns", () => {
         }),
       );
     });
+  });
+});
+
+describe("useDescribeRun", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches a run by id", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeRun.mockResolvedValueOnce({
+      data: {
+        run: { id: "run-42", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      },
+    });
+
+    const { result } = renderHook(() => useDescribeRun("canvas-1", "run-42"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.run?.id).toBe("run-42");
+    });
+
+    expect(canvasesDescribeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1", runId: "run-42" },
+      }),
+    );
   });
 });
 

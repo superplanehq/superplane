@@ -15,16 +15,14 @@ describe("runInspectionSync", () => {
     expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }] }], false)).toBe(true);
   });
 
-  it("clears stale run URLs only after the run list finishes loading", () => {
+  it("clears stale run URLs only after describe run resolves as not found", () => {
     expect(
       shouldClearStaleRunUrl({
         selectedRunId: "missing-run",
         isRunInspectionMode: true,
         selectedRun: null,
-        isRunsQueryLoading: true,
-        isFetchingNextPage: false,
-        pages: [],
-        hasNextPage: true,
+        isRunResolveLoading: true,
+        isRunNotFound: false,
       }),
     ).toBe(false);
 
@@ -33,10 +31,8 @@ describe("runInspectionSync", () => {
         selectedRunId: "missing-run",
         isRunInspectionMode: true,
         selectedRun: null,
-        isRunsQueryLoading: false,
-        isFetchingNextPage: false,
-        pages: [{ runs: [], totalCount: 0 }],
-        hasNextPage: false,
+        isRunResolveLoading: false,
+        isRunNotFound: true,
       }),
     ).toBe(true);
   });
