@@ -137,4 +137,52 @@ describe("useSidebarEventRunLookup", () => {
 
     expect(canvasesListRuns).toHaveBeenCalledTimes(4);
   });
+
+  it("does not reuse fetched run ids after cached lookup sources are invalidated", async () => {
+    const queryClient = new QueryClient();
+
+    canvasesListRuns
+      .mockResolvedValueOnce({
+        data: {
+          runs: [{ id: "run-1", rootEvent: { id: "root-1" } }],
+          totalCount: 1,
+          hasNextPage: false,
+          lastTimestamp: "2026-02-06T14:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          runs: [],
+          totalCount: 0,
+          hasNextPage: false,
+        },
+      });
+
+    const { result, rerender } = renderHook(
+      () =>
+        useSidebarEventRunLookup({
+          enabled: true,
+          canvasId: "canvas-1",
+          organizationId: "org-1",
+          queryClient,
+          runs: [],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(triggerEvent)).toBe("run-1");
+    });
+
+    queryClient.clear();
+    rerender();
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(triggerEvent)).toBeNull();
+    });
+
+    expect(canvasesListRuns).toHaveBeenCalledTimes(2);
+  });
 });
