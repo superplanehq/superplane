@@ -94,30 +94,40 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
   // the committed/staged caches and clear the staging indicators so the UI does
   // not keep showing stale "uncommitted changes" for content that no longer has
   // any staging on the server.
+  //
+  // Errors here are best-effort: the websocket handler fires this fire-and-forget
+  // and a stale-id 404 (e.g. the version was just deleted by another tab) would
+  // otherwise leak as an unhandled "Not Found" rejection. Swallow and log — the
+  // next websocket event or query refetch will resync, and missing-draft recovery
+  // is owned elsewhere.
   const resyncDraftToCommitted = useCallback(
     async (versionId: string) => {
       if (!organizationId || !canvasId) {
         return;
       }
 
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+      try {
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
 
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
+        if (activeCanvasVersionIdRef.current !== versionId) {
+          draftCanvasSpecsRef.current.delete(versionId);
+          return;
+        }
+
+        consoleMutationGenerationRef.current += 1;
+        const committedVersion = await syncCommittedCanvasDraftState({
+          queryClient,
+          organizationId,
+          canvasId,
+          versionId,
+        });
+        applyResyncedSpec(versionId, committedVersion?.spec ?? null);
+
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
+        setStagingResetNonce((nonce) => nonce + 1);
+      } catch (error) {
+        console.warn("[useCanvasDraftResync] resyncDraftToCommitted failed", error);
       }
-
-      consoleMutationGenerationRef.current += 1;
-      const committedVersion = await syncCommittedCanvasDraftState({
-        queryClient,
-        organizationId,
-        canvasId,
-        versionId,
-      });
-      applyResyncedSpec(versionId, committedVersion?.spec ?? null);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
     },
     [
       organizationId,
@@ -136,35 +146,44 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
   // badge refresh through the websocket hook's invalidations, but the rendered
   // graph reads React state, so the active draft needs its effective staged
   // spec re-applied here.
+  //
+  // Errors here are best-effort: same rationale as `resyncDraftToCommitted`. The
+  // hook is invoked fire-and-forget from the websocket handler, so a stale-id
+  // 404 must not surface as an unhandled rejection.
   const resyncDraftToStaged = useCallback(
     async (versionId: string) => {
       if (!organizationId || !canvasId) {
         return;
       }
 
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+      try {
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
 
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
+        if (activeCanvasVersionIdRef.current !== versionId) {
+          draftCanvasSpecsRef.current.delete(versionId);
+          return;
+        }
+
+        consoleMutationGenerationRef.current += 1;
+        const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
+        const stagedSpec = stagedVersion?.spec ?? null;
+
+        if (stagedVersion) {
+          queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
+        }
+        if (stagedSpec) {
+          queryClient.setQueryData<CanvasesCanvas | undefined>(
+            canvasKeys.detail(organizationId, canvasId),
+            (current) => (current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current),
+          );
+        }
+        applyResyncedSpec(versionId, stagedSpec);
+
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
+        setStagingResetNonce((nonce) => nonce + 1);
+      } catch (error) {
+        console.warn("[useCanvasDraftResync] resyncDraftToStaged failed", error);
       }
-
-      consoleMutationGenerationRef.current += 1;
-      const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
-      const stagedSpec = stagedVersion?.spec ?? null;
-
-      if (stagedVersion) {
-        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
-      }
-      if (stagedSpec) {
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
-          current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current,
-        );
-      }
-      applyResyncedSpec(versionId, stagedSpec);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
     },
     [
       organizationId,
