@@ -42,7 +42,6 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
-  CanvasesCanvasVersion,
   ActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -214,8 +213,6 @@ export interface CanvasPageProps {
   onSelectCanvasView?: () => void;
   isRunInspectionMode?: boolean;
   onSelectConsole?: () => void;
-  /** Switches the canvas surface to the Versions tab. Omitted on templates. */
-  onSelectVersions?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
@@ -241,15 +238,6 @@ export interface CanvasPageProps {
   hasUncommittedDraftChanges?: boolean;
   readyToPublishDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  unpublishedDraftUpdatedAt?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -329,6 +317,8 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   /** When true, the canvas draft is active across Canvas, Console, and Memory tabs. */
   isEditing: boolean;
+  /** True while an edit session is active (editing a draft or previewing a version from the versions sidebar). Drives the permanent versions sidebar and the Edit/Exit header affordance. */
+  isEditSessionActive?: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
@@ -1299,6 +1289,7 @@ function CanvasPage(props: CanvasPageProps) {
           onResetStaging={props.onResetStaging}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
+          isEditSessionActive={props.isEditSessionActive}
           onSelectCanvasView={props.onSelectCanvasView}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
@@ -1307,7 +1298,6 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectConsole={props.onSelectConsole}
-          onSelectVersions={props.onSelectVersions}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
           filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
@@ -1325,15 +1315,6 @@ function CanvasPage(props: CanvasPageProps) {
           hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
           readyToPublishDraftChanges={props.readyToPublishDraftChanges}
           editTabTone={props.editTabTone}
-          unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
-          onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
-          startEditingDrafts={props.startEditingDrafts}
-          startEditingDefaultDraft={props.startEditingDefaultDraft}
-          startEditingMenuOpen={props.startEditingMenuOpen}
-          onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
-          onContinueDraftBranch={props.onContinueDraftBranch}
-          onCreateDraftBranch={props.onCreateDraftBranch}
-          createDraftBranchPending={props.createDraftBranchPending}
           activeDraftBranchLabel={props.activeDraftBranchLabel}
           activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1350,7 +1331,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarRunsContent ?? null}
         </CanvasRunsSidebar>
 
-        <CanvasVersionsSidebar isOpen={props.headerMode === "versions" && props.toolSidebarVersionsContent != null}>
+        <CanvasVersionsSidebar isOpen={!!props.isEditSessionActive && props.toolSidebarVersionsContent != null}>
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
@@ -1880,6 +1861,7 @@ function CanvasContentHeader({
   onResetStaging,
   headerMode,
   isEditing,
+  isEditSessionActive,
   onSelectCanvasView,
   onEnterEditMode,
   enterEditModeDisabled,
@@ -1888,7 +1870,6 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectConsole,
-  onSelectVersions,
   onSelectMemory,
   onSelectFiles,
   filesHeaderActionsSlotId,
@@ -1906,15 +1887,6 @@ function CanvasContentHeader({
   hasUncommittedDraftChanges,
   readyToPublishDraftChanges,
   editTabTone,
-  unpublishedDraftUpdatedAt,
-  onDiscardDraftAndStartEdit,
-  startEditingDrafts,
-  startEditingDefaultDraft,
-  startEditingMenuOpen,
-  onStartEditingMenuOpenChange,
-  onContinueDraftBranch,
-  onCreateDraftBranch,
-  createDraftBranchPending,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
@@ -1956,6 +1928,7 @@ function CanvasContentHeader({
   onResetStaging?: () => void;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
+  isEditSessionActive?: boolean;
   onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -1964,7 +1937,6 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
-  onSelectVersions?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   filesHeaderActionsSlotId?: string;
@@ -1982,15 +1954,6 @@ function CanvasContentHeader({
   hasUncommittedDraftChanges?: boolean;
   readyToPublishDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  unpublishedDraftUpdatedAt?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
@@ -2032,6 +1995,7 @@ function CanvasContentHeader({
       onResetStaging={onResetStaging}
       mode={headerMode}
       isEditing={isEditing}
+      isEditSessionActive={isEditSessionActive}
       onSelectCanvasView={onSelectCanvasView}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
@@ -2040,7 +2004,6 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectConsole={onSelectConsole}
-      onSelectVersions={onSelectVersions}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
       filesHeaderActionsSlotId={filesHeaderActionsSlotId}
@@ -2058,15 +2021,6 @@ function CanvasContentHeader({
       hasUncommittedDraftChanges={hasUncommittedDraftChanges}
       readyToPublishDraftChanges={readyToPublishDraftChanges}
       editTabTone={editTabTone}
-      unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-      onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
-      startEditingDrafts={startEditingDrafts}
-      startEditingDefaultDraft={startEditingDefaultDraft}
-      startEditingMenuOpen={startEditingMenuOpen}
-      onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
-      onContinueDraftBranch={onContinueDraftBranch}
-      onCreateDraftBranch={onCreateDraftBranch}
-      createDraftBranchPending={createDraftBranchPending}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
