@@ -45,9 +45,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Compute • Get VM Instance" href="#compute-•-get-vm-instance" description="Fetch the current state of a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
-  <LinkCard title="Monitoring • Create Alerting Policy" href="#monitoring-•-create-alerting-policy" description="Create a Cloud Monitoring alerting policy that triggers when Compute Engine instance metrics cross thresholds" />
+  <LinkCard title="Monitoring • Create Alerting Policy" href="#monitoring-•-create-alerting-policy" description="Create a Cloud Monitoring alerting policy from an instance-metric threshold or a PromQL query (Managed Prometheus)" />
+  <LinkCard title="Monitoring • Create Snooze" href="#monitoring-•-create-snooze" description="Create a Cloud Monitoring snooze that suppresses alert notifications for selected policies over a time window" />
   <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Expire Snooze" href="#monitoring-•-expire-snooze" description="End an active Cloud Monitoring snooze now so the snoozed policies can notify again" />
   <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Get Snooze" href="#monitoring-•-get-snooze" description="Read a Cloud Monitoring snooze, including the policies it covers and its time window" />
   <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications" />
   <LinkCard title="Managed Prometheus • Query" href="#managed-prometheus-•-query" description="Run an instant PromQL query against Google Cloud Managed Service for Prometheus" />
   <LinkCard title="Managed Prometheus • Query Range" href="#managed-prometheus-•-query-range" description="Run a PromQL range query against Google Cloud Managed Service for Prometheus" />
@@ -1626,10 +1629,12 @@ The Create Alerting Policy component creates a Cloud Monitoring alerting policy 
 ### Configuration
 
 - **Display Name**: Human-readable name for the policy (required)
-- **Conditions**: One or more threshold conditions (required). Each has:
+- **Condition type**: **Metric threshold** (default) or **PromQL query** (Google Managed Prometheus)
+- **Conditions** (threshold type): One or more threshold conditions. Each has:
   - **Metric**, **Comparison** (above `>` or below `<`), **Threshold**, **Duration**
   - Optional **Aligner**, **Rolling window**, **Group reducer** + **Group by fields** (aggregation)
   - Optional **Trigger** by count or percent of time series
+- **PromQL query** (PromQL type): a PromQL expression that fires while it returns results, plus an optional **For** duration and **Evaluation interval** — the Prometheus-style alerting rule
 - **Combiner**: How multiple conditions combine — OR / AND / AND-with-matching-resource (default OR)
 - **Severity**: Critical / Error / Warning (optional)
 - **Notification Channels**: Existing channels to alert (optional)
@@ -1672,6 +1677,56 @@ Returns the created policy: **name**, **id**, **displayName**, **enabled**, **co
 }
 ```
 
+<a id="monitoring-•-create-snooze"></a>
+
+## Monitoring • Create Snooze
+
+**Component key:** `gcp.monitoring.createSnooze`
+
+The Create Snooze component creates a Cloud Monitoring **snooze** that prevents the selected alerting policies from sending notifications for a window of time, starting now. It is the GCP equivalent of an Alertmanager silence.
+
+### Use Cases
+
+- **Maintenance windows**: Mute alerts on policies while you deploy or patch
+- **Noise control**: Temporarily quiet a flapping policy while you fix the root cause
+- **Planned work**: Suppress notifications for a known, expected disruption
+
+### Configuration
+
+- **Display Name**: Human-readable name for the snooze (required)
+- **Alerting Policies**: One or more policies to snooze (required, up to 16)
+- **Duration**: How long to snooze, starting now (required)
+
+### Output
+
+Returns the created snooze: **name**, **id**, **displayName**, **policies**, **policiesCount**, **startTime**, **endTime**.
+
+### Important Notes
+
+- The snooze starts immediately and ends after the chosen duration
+- A snooze suppresses notifications but does not stop incidents from opening
+- Requires the `roles/monitoring.editor` (or `roles/monitoring.snoozeEditor`) IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T13:00:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.snooze.created"
+}
+```
+
 <a id="monitoring-•-delete-alerting-policy"></a>
 
 ## Monitoring • Delete Alerting Policy
@@ -1711,6 +1766,54 @@ Returns the deleted policy reference:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.monitoring.alertingPolicy.deleted"
+}
+```
+
+<a id="monitoring-•-expire-snooze"></a>
+
+## Monitoring • Expire Snooze
+
+**Component key:** `gcp.monitoring.expireSnooze`
+
+The Expire Snooze component ends an active snooze immediately, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+
+It moves the snooze's end time to now. Cloud Monitoring requires a snooze window to be at least a minute long, so a snooze that started less than a minute ago is instead cancelled outright (collapsed to a zero-length window) — either way alerting resumes right away.
+
+### Use Cases
+
+- **Early exit**: Maintenance finished ahead of schedule — re-enable alerting now
+- **Cleanup**: End a snooze created upstream once a workflow completes
+
+### Configuration
+
+- **Snooze**: Pick from the snoozes in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createSnooze`).
+
+### Output
+
+Returns the updated snooze: **name**, **id**, **displayName**, **policies**, **startTime**, **endTime** (now).
+
+### Important Notes
+
+- Cloud Monitoring has no delete-snooze operation; ending a snooze means setting its end time to the current time
+- Requires the `roles/monitoring.editor` (or `roles/monitoring.snoozeEditor`) IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T12:30:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:30:00Z",
+  "type": "gcp.monitoring.snooze.expired"
 }
 ```
 
@@ -1768,6 +1871,51 @@ Returns the policy:
 }
 ```
 
+<a id="monitoring-•-get-snooze"></a>
+
+## Monitoring • Get Snooze
+
+**Component key:** `gcp.monitoring.getSnooze`
+
+The Get Snooze component reads a Cloud Monitoring snooze.
+
+### Use Cases
+
+- **Auditing**: Inspect which policies are snoozed and until when
+- **Chaining**: Read a snooze created upstream before expiring it
+
+### Configuration
+
+- **Snooze**: Pick from the snoozes in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createSnooze`).
+
+### Output
+
+Returns the snooze: **name**, **id**, **displayName**, **policies**, **policiesCount**, **startTime**, **endTime**.
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T13:00:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:30:00Z",
+  "type": "gcp.monitoring.snooze.fetched"
+}
+```
+
 <a id="monitoring-•-update-alerting-policy"></a>
 
 ## Monitoring • Update Alerting Policy
@@ -1785,7 +1933,9 @@ The Update Alerting Policy component modifies an existing Cloud Monitoring alert
 ### Configuration
 
 - **Alerting Policy**: The policy to update (required, supports expressions)
-- **Conditions**: Provide to **replace** the policy's conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **Condition type**: Toggle to **replace** the policy's conditions with a metric threshold or a PromQL query (leave off to keep current conditions)
+- **Conditions** (threshold type): Provide to replace with threshold conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **PromQL query** (PromQL type): Provide to replace with a single PromQL condition (with optional For duration and evaluation interval)
 - **Combiner**: OR / AND / AND-with-matching-resource
 - **Severity**: Critical / Error / Warning
 - **Enabled**: Enable, disable, or leave unchanged

@@ -1,8 +1,26 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
+
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: false,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
+
+const versionsSidebarState = {
+  isVersionsSidebarOpen: false,
+  showVersionsSidebarToggle: false,
+  handleVersionsSidebarToggle: vi.fn(),
+  openVersionsSidebar: vi.fn(),
+  closeVersionsSidebar: vi.fn(),
+} satisfies CanvasVersionsSidebarState;
 
 describe("SecondaryHeaderActions", () => {
   it("shows the console diff badge while editing console changes", () => {
@@ -16,6 +34,8 @@ describe("SecondaryHeaderActions", () => {
         draftConsoleDiff={{ diffCounts: { added: 1, updated: 0, removed: 0 } }}
         onShowConsoleDiff={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
       />,
     );
 
@@ -40,6 +60,8 @@ describe("SecondaryHeaderActions", () => {
         }}
         onShowDiff={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
       />,
     );
 
@@ -58,6 +80,8 @@ describe("SecondaryHeaderActions", () => {
         onResetStaging={vi.fn()}
         onPublishVersion={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
       />,
     );
 

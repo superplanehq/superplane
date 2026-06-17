@@ -55,9 +55,6 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
   /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
   configurationSaveMode?: "manual" | "auto";
 }
@@ -101,9 +98,6 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
   configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
@@ -480,13 +474,8 @@ export function SettingsTab({
     return (
       <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
         <div className="space-y-6">
-          <ConfigurationView
-            model={configurationDisplayModel}
-            onEdit={onEnterEditMode}
-            editDisabled={enterEditModeDisabled}
-            editDisabledTooltip={enterEditModeDisabledTooltip}
-          />
-          {customField && shouldShowConfiguration ? (
+          <ConfigurationView model={configurationDisplayModel} />
+          {customField && shouldShowConfiguration && (
             <div
               className={
                 configurationFields && configurationFields.length > 0
@@ -496,7 +485,7 @@ export function SettingsTab({
             >
               {customField(nodeConfiguration)}
             </div>
-          ) : null}
+          )}
         </div>
       </div>
     );

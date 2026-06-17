@@ -53,7 +53,7 @@ func (e *EventDistributer) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.CanvasExchange, messages.CanvasEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
+		{messages.EventsExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
 		{messages.CanvasExchange, messages.CanvasRunRoutingKey, e.createHandler(eventdistributer.HandleCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
 		{messages.CanvasExchange, messages.CanvasQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},

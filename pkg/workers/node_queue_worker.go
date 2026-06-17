@@ -32,17 +32,28 @@ type NodeQueueWorker struct {
 	semaphore   *semaphore.Weighted
 	logger      *log.Entry
 
-	rabbitMQURL string
-	consumer    *tackle.Consumer
+	rabbitMQURL               string
+	queueItemConsumer         *tackle.Consumer
+	executionFinishedConsumer *tackle.Consumer
 }
 
 func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
+	logger := log.WithFields(log.Fields{"worker": "NodeQueueWorker"})
+
+	queueItemConsumer := tackle.NewConsumer()
+	queueItemConsumer.SetLogger(logging.NewTackleLogger(logger))
+
+	executionFinishedConsumer := tackle.NewConsumer()
+	executionFinishedConsumer.SetLogger(logging.NewTackleLogger(logger))
+
 	return &NodeQueueWorker{
-		registry:    registry,
-		gitProvider: gitProvider,
-		rabbitMQURL: rabbitMQURL,
-		semaphore:   semaphore.NewWeighted(25),
-		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
+		registry:                  registry,
+		gitProvider:               gitProvider,
+		rabbitMQURL:               rabbitMQURL,
+		semaphore:                 semaphore.NewWeighted(25),
+		logger:                    logger,
+		queueItemConsumer:         queueItemConsumer,
+		executionFinishedConsumer: executionFinishedConsumer,
 	}
 }
 
@@ -51,19 +62,28 @@ func (w *NodeQueueWorker) Name() string {
 }
 
 func (w *NodeQueueWorker) Start(ctx context.Context) {
-	go w.StartRabbitMQConsumer(ctx)
+	go w.startConsumerLoop(
+		ctx,
+		w.queueItemConsumer,
+		messages.CanvasExchange+"."+messages.CanvasQueueItemCreatedRoutingKey+"."+w.Name(),
+		messages.CanvasExchange,
+		messages.CanvasQueueItemCreatedRoutingKey,
+		w.ConsumeQueueItemCreated,
+	)
+
+	go w.startConsumerLoop(
+		ctx,
+		w.executionFinishedConsumer,
+		messages.ExecutionsExchange+"."+messages.ExecutionFinishedRoutingKey+"."+w.Name(),
+		messages.ExecutionsExchange,
+		messages.ExecutionFinishedRoutingKey,
+		w.ConsumeExecutionFinished,
+	)
 
 	//
-	// Differently from the other workers, the NodeQueueWorker needs to be
-	// aware of two things: queue items being created and nodes becoming ready.
+	// Slow safety-net poll in case RabbitMQ is not working.
 	//
-	// Since we don't have events for nodes becoming ready, we need to poll still,
-	// so we cannot decrease this interval yet.
-	//
-	// Once we have events for nodes becoming ready,
-	// we can make this worker react to both events.
-	//
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -101,35 +121,54 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *NodeQueueWorker) StartRabbitMQConsumer(ctx context.Context) {
+func (w *NodeQueueWorker) startConsumerLoop(
+	ctx context.Context,
+	consumer *tackle.Consumer,
+	serviceName string,
+	exchangeName string,
+	routingKey string,
+	handler func(tackle.Delivery) error,
+) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasQueueItemCreatedRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasQueueItemCreatedRoutingKey,
+		RemoteExchange: exchangeName,
+		Service:        serviceName,
+		RoutingKey:     routingKey,
 	}
 
-	consumer := tackle.NewConsumer()
-	consumer.SetLogger(logging.NewTackleLogger(w.logger))
-	w.consumer = consumer
-
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasQueueItemCreatedRoutingKey)
+		if ctx.Err() != nil {
+			return
+		}
 
-		err := w.consumer.Start(&options, w.Consume)
+		log.Infof("Connecting to RabbitMQ queue for %s events", routingKey)
+
+		err := consumer.Start(&options, handler)
+		if ctx.Err() != nil {
+			return
+		}
+
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasQueueItemCreatedRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			w.logger.Errorf("Error consuming messages from %s: %v", routingKey, err)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasQueueItemCreatedRoutingKey)
-		time.Sleep(5 * time.Second)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", routingKey)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
 	}
 }
 
-func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
+func (w *NodeQueueWorker) ConsumeQueueItemCreated(delivery tackle.Delivery) error {
 	start := time.Now()
 
 	data := &pb.CanvasNodeQueueItemMessage{}
@@ -145,31 +184,53 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 		return err
 	}
 
-	node, err := models.FindCanvasNode(database.Conn(), canvasID, data.NodeId)
+	return w.tryProcessReadyNode(canvasID, data.NodeId, start)
+}
+
+func (w *NodeQueueWorker) ConsumeExecutionFinished(delivery tackle.Delivery) error {
+	start := time.Now()
+
+	data := &pb.CanvasNodeExecutionMessage{}
+	err := proto.Unmarshal(delivery.Body(), data)
+	if err != nil {
+		w.logger.Errorf("Error unmarshaling canvas execution finished message: %v", err)
+		return err
+	}
+
+	canvasID, err := uuid.Parse(data.CanvasId)
+	if err != nil {
+		w.logger.Errorf("Error parsing canvas id: %v", err)
+		return err
+	}
+
+	return w.tryProcessReadyNode(canvasID, data.NodeId, start)
+}
+
+func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string, attemptStart time.Time) error {
+	node, err := models.FindCanvasNode(database.Conn(), canvasID, nodeID)
 	if err != nil {
 		w.logger.Errorf("Error finding canvas node: %v", err)
 		return err
 	}
 
 	//
-	// New queue item created for a node that is not ready, we should skip it.
+	// Node is not ready yet, skip it. For queue-item-created messages this happens
+	// when a new item arrives while the node is still executing. For
+	// execution-finished messages this can happen when the node is paused.
 	//
 	if node.State != models.CanvasNodeStateReady {
 		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
 		telemetry.RecordQueueWorkerNodeProcessing(
 			context.Background(),
-			time.Since(start),
+			time.Since(attemptStart),
 			executorOutcomeSkipped,
 			executorReasonNone,
 		)
 		return nil
 	}
 
-	//
-	// Node is ready for processing, let's lock it and process it.
-	//
 	logger := logging.WithNode(w.logger, *node)
-	return w.LockAndProcessNode(logger, *node, start)
+	return w.LockAndProcessNode(logger, *node, attemptStart)
 }
 
 func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode, attemptStart time.Time) error {
@@ -380,10 +441,6 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *c
 	// The errored node could not execute, so notify the canvas' On Error nodes.
 	//
 	contexts.DispatchOnError(tx, &execution, onNewEvents)
-
-	if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
-		return nil, err
-	}
 
 	return []*uuid.UUID{&execution.ID}, nil
 }
