@@ -370,6 +370,21 @@ func (a *Integration) ListRequests(reqType string) ([]IntegrationRequest, error)
 	return requests, nil
 }
 
+// LockInTransaction takes a row-level FOR UPDATE lock on the installation,
+// serializing concurrent request scheduling for it. ScheduleActionCall relies on
+// this so its complete+create always observes successors created by other workers
+// processing the same installation in parallel (#5386); without it, READ COMMITTED
+// snapshots let each transaction insert a successor the others cannot see, leaving
+// multiple chains that never drain.
+func (a *Integration) LockInTransaction(tx *gorm.DB) error {
+	var locked Integration
+	return tx.Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", a.ID).
+		First(&locked).
+		Error
+}
+
 func (a *Integration) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error {
 	now := time.Now()
 	return tx.Create(&IntegrationRequest{
