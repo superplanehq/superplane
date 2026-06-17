@@ -286,6 +286,7 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: first\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -294,6 +295,7 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: second\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -340,6 +342,7 @@ func TestAppAgentTool_ReadUseDraftFalseIgnoresDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: selected\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)

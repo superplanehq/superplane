@@ -174,7 +174,7 @@ func StageRepositorySpecFileOperations(
 		}
 
 		if operation.GetDelete() {
-			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, &userUUID); err != nil {
+			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, "", &userUUID); err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to stage deletion of %q: %v", normalized, err)
 			}
 			continue
@@ -185,6 +185,7 @@ func StageRepositorySpecFileOperations(
 			organizationUUID,
 			normalized,
 			string(operation.GetContent()),
+			"",
 			&userUUID,
 		); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to stage %q: %v", normalized, err)
