@@ -61,6 +61,14 @@ type Provider interface {
 	GetFile(ctx context.Context, repoID, path, ref string) (io.ReadCloser, error)
 	Commit(ctx context.Context, repoID string, options CommitOptions) (string, error)
 	Head(ctx context.Context, repoID, ref string) (string, error)
+
+	//
+	// Branch management methods
+	//
+	ListBranches(ctx context.Context, repoID, prefix string) ([]string, error)
+	CreateBranch(ctx context.Context, repoID, branch, fromRef string) error
+	MergeBranch(ctx context.Context, repoID, sourceBranch, targetBranch, message string, author CommitAuthor) (string, error)
+	DeleteBranch(ctx context.Context, repoID, branch string) error
 }
 
 type RepositoryOptions struct {
