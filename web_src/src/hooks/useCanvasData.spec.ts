@@ -195,6 +195,37 @@ describe("useDescribeRun", () => {
       }),
     );
   });
+
+  it("does not overwrite fresher websocket run state in the describe cache", async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(canvasKeys.run("canvas-1", "run-42"), {
+      run: {
+        id: "run-42",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: "2026-06-01T12:01:00.000Z",
+      },
+    });
+    canvasesDescribeRun.mockResolvedValueOnce({
+      data: {
+        run: {
+          id: "run-42",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          updatedAt: "2026-06-01T12:00:00.000Z",
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useDescribeRun("canvas-1", "run-42"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.run?.state).toBe("STATE_FINISHED");
+    });
+    expect(result.current.data?.run?.result).toBe("RESULT_PASSED");
+  });
 });
 
 function createQueryClient() {

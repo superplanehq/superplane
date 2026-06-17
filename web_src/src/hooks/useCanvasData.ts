@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -41,6 +42,7 @@ import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
   CanvasesCanvasSummary,
+  CanvasesCanvasRun,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -1130,6 +1132,8 @@ export type CanvasRunsFilters = {
 };
 
 export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: canvasKeys.run(canvasId, runId!),
     queryFn: async () => {
@@ -1141,7 +1145,13 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
           },
         }),
       );
-      return response.data;
+      const described = response.data;
+      if (!described?.run) {
+        return described;
+      }
+
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      return upsertRunIntoDescribeRunData(current, described.run);
     },
     refetchOnWindowFocus: false,
     enabled: !!canvasId && !!runId && enabled,

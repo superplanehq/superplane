@@ -173,6 +173,17 @@ describe("upsertRunIntoDescribeRunData", () => {
     expect(next).toBe(current);
     expect(next?.run?.state).toBe("STATE_FINISHED");
   });
+
+  it("seeds describe-run cache when no entry exists yet", () => {
+    const incoming = makeRun({
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+    });
+
+    const next = upsertRunIntoDescribeRunData(undefined, incoming);
+
+    expect(next).toEqual({ run: incoming });
+  });
 });
 
 describe("execution cache patching", () => {

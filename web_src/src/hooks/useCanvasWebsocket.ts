@@ -174,7 +174,7 @@ export function useCanvasWebsocket(
       }
 
       if (run.id) {
-        queryClient.setQueryData(canvasKeys.run(canvasId, run.id), (current) =>
+        queryClient.setQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, run.id), (current) =>
           upsertRunIntoDescribeRunData(current, run),
         );
       }

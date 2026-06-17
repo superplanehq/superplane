@@ -276,13 +276,9 @@ export function upsertExecutionIntoInfiniteRunsData(
 export function upsertRunIntoDescribeRunData(
   current: { run?: CanvasesCanvasRun } | undefined,
   incoming: CanvasesCanvasRun,
-): { run?: CanvasesCanvasRun } | undefined {
-  if (!current) {
-    return current;
-  }
-
-  if (!current.run) {
-    return { ...current, run: incoming };
+): { run?: CanvasesCanvasRun } {
+  if (!current?.run) {
+    return { run: incoming };
   }
 
   if (!shouldAcceptRunUpdate(current.run, incoming)) {

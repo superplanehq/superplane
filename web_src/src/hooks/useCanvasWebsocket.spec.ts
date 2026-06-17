@@ -243,6 +243,23 @@ describe("useCanvasWebsocket", () => {
     expect(describedRun?.run?.result).toBe("RESULT_PASSED");
   });
 
+  it("seeds describe-run cache when websocket events arrive before describe loads", () => {
+    const queryClient = new QueryClient();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("run_finished", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const describedRun = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(testCanvasId, "run-1"));
+    expect(describedRun?.run?.state).toBe("STATE_FINISHED");
+    expect(describedRun?.run?.result).toBe("RESULT_PASSED");
+  });
+
   it("does not invalidate runs on initial websocket connect", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
