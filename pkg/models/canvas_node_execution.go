@@ -420,11 +420,9 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -489,11 +487,9 @@ func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutpu
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -543,11 +539,9 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
+		err := node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -584,11 +578,9 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
+		err := node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return err
 		}
 	}
 

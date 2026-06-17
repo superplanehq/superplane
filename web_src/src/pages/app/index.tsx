@@ -20,7 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   renderCanvasRunsSidebarPanel,
@@ -41,7 +41,6 @@ import {
   useUpdateCanvasMemoryNamespace,
   usePublishCanvasVersion,
   useEventExecutions,
-  useInfiniteCanvasEvents,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
   useTriggers,
@@ -218,7 +217,7 @@ function refreshLiveCanvasAfterVersionSelection({
       refetchType: "all",
     }),
     queryClient.invalidateQueries({
-      queryKey: canvasKeys.eventList(canvasId, 50),
+      queryKey: canvasKeys.infiniteRuns(canvasId),
       refetchType: "all",
     }),
   ]).then(() => {
@@ -551,21 +550,8 @@ export function AppPage() {
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
     [isRunInspectionMode, selectedRunId, runStatusFilters],
   );
-  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, showLiveActivity);
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
-  const runsEventsData = useMemo(() => {
-    const pages = infiniteEventsQuery.data?.pages || [];
-    const seen = new Set<string>();
-    const events = pages
-      .flatMap((page) => page?.events || [])
-      .filter((e) => {
-        if (!e.id || seen.has(e.id)) return false;
-        seen.add(e.id);
-        return true;
-      });
-    const totalCount = pages[0]?.totalCount || 0;
-    return { events, totalCount };
-  }, [infiniteEventsQuery.data]);
+  const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -579,6 +565,18 @@ export function AppPage() {
     const totalCount = pages[0]?.totalCount || 0;
     return { runs, totalCount };
   }, [infiniteRunsQuery.data]);
+  const logRunsData = useMemo(() => {
+    const pages = infiniteLogRunsQuery.data?.pages || [];
+    const seen = new Set<string>();
+    const runs = pages
+      .flatMap((page) => page?.runs || [])
+      .filter((run): run is CanvasesCanvasRun => {
+        if (!run.id || seen.has(run.id)) return false;
+        seen.add(run.id);
+        return true;
+      });
+    return { runs };
+  }, [infiniteLogRunsQuery.data]);
   const selectedRun = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
@@ -3628,60 +3626,6 @@ export function AppPage() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
-  const handleTogglePause = useCallback(
-    async (nodeId: string) => {
-      if (!canvasId || !organizationId || !canvas) return;
-
-      const node = canvas.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      if (node.type === "TYPE_TRIGGER") {
-        showErrorToast("Triggers cannot be paused");
-        return;
-      }
-
-      const nextPaused = !node.paused;
-
-      try {
-        const result = await canvasesUpdateNodePause(
-          withOrganizationHeader({
-            path: {
-              canvasId: canvasId,
-              nodeId: nodeId,
-            },
-            body: {
-              paused: nextPaused,
-            },
-          }),
-        );
-
-        const updatedPaused = result.data?.node?.paused ?? nextPaused;
-        const updatedNodes = (canvas.spec?.nodes || []).map((item) =>
-          item.id === nodeId ? { ...item, paused: updatedPaused } : item,
-        );
-
-        const updatedWorkflow = {
-          ...canvas,
-          spec: {
-            ...canvas.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        applyLocalWorkflowUpdate(updatedWorkflow);
-        showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
-      } catch (error) {
-        const parsedError = error as { message: string };
-        if (parsedError?.message) {
-          showErrorToast(parsedError.message);
-        } else {
-          console.error("Failed to update node pause state:", error);
-        }
-      }
-    },
-    [canvasId, organizationId, canvas, applyLocalWorkflowUpdate],
-  );
-
   const handleReEmit = useCallback(
     async (nodeId: string, eventOrExecutionId: string) => {
       if (!canvasId) return;
@@ -4553,7 +4497,7 @@ export function AppPage() {
       setIsResolvingErrors(true);
       try {
         await resolveExecutionErrors(canvasId, executionIds);
-        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Errors acknowledged");
       } catch {
@@ -5014,7 +4958,6 @@ export function AppPage() {
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-          onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
@@ -5119,7 +5062,7 @@ export function AppPage() {
           components={allComponents}
           triggers={allTriggers}
           logEntries={logEntries}
-          runsEvents={showLiveActivity ? runsEventsData.events : []}
+          logRuns={isViewingLiveVersion ? logRunsData.runs : []}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}

@@ -175,10 +175,6 @@ func (s *CanvasService) DeleteNodeQueueItem(ctx context.Context, req *pb.DeleteN
 	return canvases.DeleteNodeQueueItem(ctx, s.registry, req.CanvasId, req.NodeId, req.ItemId)
 }
 
-func (s *CanvasService) UpdateNodePause(ctx context.Context, req *pb.UpdateNodePauseRequest) (*pb.UpdateNodePauseResponse, error) {
-	return canvases.UpdateNodePause(ctx, s.registry, req.CanvasId, req.NodeId, req.Paused)
-}
-
 func (s *CanvasService) ListNodeExecutions(ctx context.Context, req *pb.ListNodeExecutionsRequest) (*pb.ListNodeExecutionsResponse, error) {
 	return canvases.ListNodeExecutions(ctx, s.registry, req.CanvasId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }

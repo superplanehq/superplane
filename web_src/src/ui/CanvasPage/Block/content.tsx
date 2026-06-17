@@ -29,11 +29,10 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
+function getActionProps(compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
     runDisabled: props.runDisabled,
     runDisabledTooltip: props.runDisabledTooltip,
-    onTogglePause: data.type === "trigger" ? undefined : props.onTogglePause,
     onEdit: props.onEdit,
     onDuplicate: props.onDuplicate,
     onDeactivate: props.onDeactivate,
@@ -183,7 +182,6 @@ function renderBlockByType(args: {
         <ComponentBase
           {...safeComponentProps}
           canvasMode={canvasMode}
-          paused={safeComponentProps.paused}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -237,7 +235,6 @@ export function BlockContent({
   selected = false,
   runDisabled,
   runDisabledTooltip,
-  onTogglePause,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -251,10 +248,9 @@ export function BlockContent({
   dimBodyBelowHeader,
 }: BlockProps) {
   const compactView = getCompactView(data, isCompactView);
-  const actionProps = getActionProps(data, compactView, {
+  const actionProps = getActionProps(compactView, {
     runDisabled,
     runDisabledTooltip,
-    onTogglePause,
     onEdit,
     onDuplicate,
     onDeactivate,
