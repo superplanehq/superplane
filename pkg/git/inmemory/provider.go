@@ -157,6 +157,111 @@ func (p *Provider) Head(_ context.Context, repoID, ref string) (string, error) {
 	return repository.resolveRef(ref)
 }
 
+func (p *Provider) ListBranches(_ context.Context, repoID, prefix string) ([]string, error) {
+	repository, err := p.repository(repoID)
+	if err != nil {
+		return nil, err
+	}
+
+	branches := slices.Collect(maps.Keys(repository.branches))
+	sort.Strings(branches)
+	if prefix == "" {
+		return branches, nil
+	}
+
+	filtered := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		if strings.HasPrefix(branch, prefix) {
+			filtered = append(filtered, branch)
+		}
+	}
+
+	return filtered, nil
+}
+
+func (p *Provider) CreateBranch(_ context.Context, repoID, branch, fromRef string) error {
+	repository, err := p.repository(repoID)
+	if err != nil {
+		return err
+	}
+
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return provider.ErrInvalidRef
+	}
+
+	if _, ok := repository.branches[branch]; ok {
+		return fmt.Errorf("%w: branch %q already exists", provider.ErrInvalidRef, branch)
+	}
+
+	fromSHA, err := repository.resolveRef(fromRef)
+	if err != nil {
+		return err
+	}
+
+	repository.branches[branch] = fromSHA
+	return nil
+}
+
+func (p *Provider) MergeBranch(_ context.Context, repoID, sourceBranch, targetBranch, message string, _ provider.CommitAuthor) (string, error) {
+	repository, err := p.repository(repoID)
+	if err != nil {
+		return "", err
+	}
+
+	sourceSHA, err := repository.resolveRef(sourceBranch)
+	if err != nil {
+		return "", err
+	}
+
+	targetSHA, err := repository.resolveRef(targetBranch)
+	if err != nil {
+		return "", err
+	}
+
+	targetFiles, err := repository.filesAtRef(targetSHA)
+	if err != nil {
+		return "", err
+	}
+
+	sourceFiles, err := repository.filesAtRef(sourceSHA)
+	if err != nil {
+		return "", err
+	}
+
+	for path, content := range sourceFiles {
+		targetFiles[path] = append([]byte(nil), content...)
+	}
+
+	newSHA := nextHeadSHA(targetSHA, message)
+	repository.snapshots[newSHA] = targetFiles
+	repository.branches[targetBranch] = newSHA
+	return newSHA, nil
+}
+
+func (p *Provider) DeleteBranch(_ context.Context, repoID, branch string) error {
+	repository, err := p.repository(repoID)
+	if err != nil {
+		return err
+	}
+
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return provider.ErrInvalidRef
+	}
+
+	if branch == repository.defaultBranch {
+		return fmt.Errorf("%w: cannot delete default branch", provider.ErrInvalidRef)
+	}
+
+	if _, ok := repository.branches[branch]; !ok {
+		return provider.ErrInvalidRef
+	}
+
+	delete(repository.branches, branch)
+	return nil
+}
+
 func (p *Provider) repository(repoID string) (*repositoryState, error) {
 	repository, ok := p.repositories[repoID]
 	if !ok {

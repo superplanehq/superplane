@@ -115,3 +115,34 @@ func (p *Provider) Head(ctx context.Context, repoID, ref string) (string, error)
 
 	return commit.CommitSHA, nil
 }
+
+func (p *Provider) ListBranches(ctx context.Context, repoID, prefix string) ([]string, error) {
+	return p.client.listBranches(ctx, repoID, prefix)
+}
+
+func (p *Provider) CreateBranch(ctx context.Context, repoID, branch, fromRef string) error {
+	return p.client.createBranch(ctx, repoID, CreateBranchRequest{
+		Branch:  strings.TrimSpace(branch),
+		FromRef: provider.RefOrDefault(fromRef, p.defaultBranch),
+	})
+}
+
+func (p *Provider) MergeBranch(ctx context.Context, repoID, sourceBranch, targetBranch, message string, author provider.CommitAuthor) (string, error) {
+	if err := provider.ValidateCommitMetadata(message, author); err != nil {
+		return "", err
+	}
+
+	req := MergeBranchRequest{
+		SourceBranch: strings.TrimSpace(sourceBranch),
+		TargetBranch: provider.RefOrDefault(targetBranch, p.defaultBranch),
+		Message:      strings.TrimSpace(message),
+	}
+	req.Author.Name = strings.TrimSpace(author.Name)
+	req.Author.Email = strings.TrimSpace(author.Email)
+
+	return p.client.mergeBranch(ctx, repoID, req)
+}
+
+func (p *Provider) DeleteBranch(ctx context.Context, repoID, branch string) error {
+	return p.client.deleteBranch(ctx, repoID, strings.TrimSpace(branch))
+}
