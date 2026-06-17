@@ -366,7 +366,11 @@ func resolveRepositoryMetadata(ctx core.SetupContext, repositoryID string) error
 // resolvePackageMetadata fetches and caches both the repository and package names
 // for display in the canvas node. Expressions are stored verbatim.
 func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm string) error {
-	if strings.Contains(repositoryID, "{{") || strings.Contains(packageSlugPerm, "{{") {
+	repoIsExpr := strings.Contains(repositoryID, "{{")
+	pkgIsExpr := strings.Contains(packageSlugPerm, "{{")
+
+	// If the repository itself is an expression we cannot resolve either field at setup time.
+	if repoIsExpr {
 		return ctx.Metadata.Set(PackageNodeMetadata{
 			RepositoryID:   repositoryID,
 			RepositoryName: repositoryID,
@@ -401,6 +405,19 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 	repoName := repository.Name
 	if repoName == "" {
 		repoName = identifier
+	}
+
+	// Package is an expression — store the resolved repository name but leave
+	// the package fields verbatim until the expression is evaluated at runtime.
+	if pkgIsExpr {
+		return ctx.Metadata.Set(PackageNodeMetadata{
+			RepositoryID:        repositoryID,
+			RepositoryName:      repoName,
+			RepositoryNamespace: owner,
+			RepositorySlug:      identifier,
+			PackageID:           packageSlugPerm,
+			PackageName:         packageSlugPerm,
+		})
 	}
 
 	pkg, err := client.GetPackage(owner, identifier, packageSlugPerm)
