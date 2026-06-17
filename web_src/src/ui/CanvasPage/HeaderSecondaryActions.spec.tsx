@@ -1,8 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
+
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: false,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
 
 describe("SecondaryHeaderActions", () => {
   it("shows the console diff badge while editing console changes", () => {
@@ -16,6 +25,7 @@ describe("SecondaryHeaderActions", () => {
         draftConsoleDiff={{ diffCounts: { added: 1, updated: 0, removed: 0 } }}
         onShowConsoleDiff={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
       />,
     );
 
@@ -40,6 +50,7 @@ describe("SecondaryHeaderActions", () => {
         }}
         onShowDiff={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
       />,
     );
 
@@ -58,6 +69,7 @@ describe("SecondaryHeaderActions", () => {
         onResetStaging={vi.fn()}
         onPublishVersion={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
       />,
     );
 

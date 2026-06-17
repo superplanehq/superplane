@@ -45,16 +45,34 @@ interface QueuedMessage {
   timestamp: number;
 }
 
-// Refreshes the staged caches for a draft version. versionStagedDetail,
-// consoleStaged and staged repositoryFileContent keys all end with "staged" and
-// include the version id, so a single predicate refreshes the editor's
-// effective draft reads without touching the committed caches.
+function queryKeyStartsWith(queryKey: readonly unknown[], prefix: readonly unknown[]): boolean {
+  return prefix.every((part, index) => queryKey[index] === part);
+}
+
+function isDraftRepositoryFileQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
+  const repositoryPrefix = canvasKeys.repository(canvasId);
+  return (
+    queryKeyStartsWith(queryKey, repositoryPrefix) &&
+    queryKey.length === repositoryPrefix.length + 3 &&
+    queryKey[repositoryPrefix.length] === "file" &&
+    queryKey[repositoryPrefix.length + 2] === versionId
+  );
+}
+
+// Refreshes caches that read a draft version's staging layer. versionStagedDetail,
+// consoleStaged and staged repositoryFileContent keys all end with "staged";
+// repositoryFile keys feed the visible Files tab editor and include the draft id.
 function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
   queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
   queryClient.invalidateQueries({
     predicate: (query) => {
       const key = query.queryKey;
-      return Array.isArray(key) && key[key.length - 1] === "staged" && (key as readonly unknown[]).includes(versionId);
+      if (!Array.isArray(key) || !key.includes(versionId)) {
+        return false;
+      }
+
+      return key[key.length - 1] === "staged" || isDraftRepositoryFileQuery(key, canvasId, versionId);
     },
   });
 }

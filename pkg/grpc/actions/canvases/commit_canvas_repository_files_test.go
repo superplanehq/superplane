@@ -152,7 +152,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID, "")
 		require.NoError(t, err)
 
 		response, err := commitCanvasRepositoryFilesForTest(
@@ -171,14 +171,14 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, response.CommitSha)
 
-		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
 		require.NoError(t, err)
 		content, err := io.ReadAll(reader)
 		require.NoError(t, err)
 		require.NoError(t, reader.Close())
 		assert.Equal(t, "hello world", string(content))
 
-		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID)
+		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID, "")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"README.md"}, files)
 	})
