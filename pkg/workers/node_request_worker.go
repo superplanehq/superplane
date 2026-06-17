@@ -171,7 +171,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 			"parameters": spec.InvokeAction.Parameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
-		Build(node.Configuration.Data())
+		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return fmt.Errorf("failed to resolve trigger configuration: %w", err)
 	}
