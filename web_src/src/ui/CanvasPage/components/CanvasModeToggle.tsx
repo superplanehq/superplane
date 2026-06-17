@@ -12,7 +12,6 @@ export type CanvasMode = "version-live" | "version-edit" | "console" | "memory" 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
-  onSelectVersions?: () => void;
   onSelectConsole?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
@@ -28,7 +27,6 @@ interface CanvasModeToggleProps {
 }
 
 const CANVAS_TAB = "canvas";
-const VERSIONS_TAB = "versions";
 const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
@@ -41,7 +39,6 @@ const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
 const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
 
 const MODE_TO_TAB: Record<string, string> = {
-  versions: VERSIONS_TAB,
   console: CONSOLE_TAB,
   memory: MEMORY_TAB,
   files: FILES_TAB,
@@ -88,7 +85,6 @@ function tabClasses(selected: string, value: string, editing: boolean, tone: Dra
 export function CanvasModeToggle({
   mode,
   onSelectLive,
-  onSelectVersions,
   onSelectConsole,
   onSelectMemory,
   onSelectFiles,
@@ -102,7 +98,6 @@ export function CanvasModeToggle({
   editTabTone = "neutral",
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
-  const showVersions = Boolean(onSelectVersions);
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -135,18 +130,6 @@ export function CanvasModeToggle({
           />
         </span>
       </Link>
-      {showVersions ? (
-        <Link
-          to={tabHref("versions")}
-          onClick={(e) => handleTabClick(e, selected === VERSIONS_TAB, () => void onSelectVersions?.())}
-          className={tabClasses(selected, VERSIONS_TAB, editing, editTabTone)}
-          data-testid="canvas-view-mode-versions"
-          aria-label="Versions"
-          aria-current={selected === VERSIONS_TAB ? "page" : undefined}
-        >
-          Versions
-        </Link>
-      ) : null}
       {showConsole ? (
         <Link
           to={tabHref("console")}
