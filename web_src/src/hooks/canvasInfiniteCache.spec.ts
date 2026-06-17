@@ -7,6 +7,7 @@ import {
   parseRunsFiltersFromQueryKey,
   runMatchesFilters,
   upsertExecutionIntoInfiniteRunsData,
+  upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
@@ -130,6 +131,58 @@ describe("upsertRunIntoInfiniteData", () => {
 
     expect(next.pages[0]?.runs).toEqual([]);
     expect(next.pages[0]?.totalCount).toBe(0);
+  });
+});
+
+describe("upsertRunIntoDescribeRunData", () => {
+  it("updates describe-run cache when the incoming payload is newer", () => {
+    const current = {
+      run: makeRun({
+        state: "STATE_STARTED",
+        updatedAt: "2026-06-01T12:00:00.000Z",
+      }),
+    };
+    const incoming = makeRun({
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const next = upsertRunIntoDescribeRunData(current, incoming);
+
+    expect(next?.run?.state).toBe("STATE_FINISHED");
+    expect(next?.run?.result).toBe("RESULT_PASSED");
+  });
+
+  it("rejects stale run_started updates after run_finished", () => {
+    const current = {
+      run: makeRun({
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: "2026-06-01T12:01:00.000Z",
+      }),
+    };
+    const incoming = makeRun({
+      state: "STATE_STARTED",
+      result: "RESULT_UNKNOWN",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const next = upsertRunIntoDescribeRunData(current, incoming);
+
+    expect(next).toBe(current);
+    expect(next?.run?.state).toBe("STATE_FINISHED");
+  });
+
+  it("seeds describe-run cache when no entry exists yet", () => {
+    const incoming = makeRun({
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+    });
+
+    const next = upsertRunIntoDescribeRunData(undefined, incoming);
+
+    expect(next).toEqual({ run: incoming });
   });
 });
 
