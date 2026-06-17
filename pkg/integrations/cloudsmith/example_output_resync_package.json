@@ -1,0 +1,12 @@
+{
+  "repository": "acme/production",
+  "packageIdentifier": "pkg_123",
+  "package": {
+    "name": "billing-api",
+    "display_name": "billing-api",
+    "slug_perm": "pkg_123",
+    "version": "1.2.3",
+    "format": "docker",
+    "status": "Completed"
+  }
+}

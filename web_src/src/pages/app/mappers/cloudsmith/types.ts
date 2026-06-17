@@ -27,6 +27,18 @@ export interface WebhookTriggerNodeMetadata {
   webhookId?: string;
 }
 
+export interface GetPackageConfiguration {
+  repository?: string;
+  package?: string;
+}
+
+export interface PackageOperationConfiguration {
+  repository?: string;
+  package?: string;
+  action?: string;
+  tags?: string[];
+}
+
 export interface RepositoryData {
   name?: string;
   slug?: string;
@@ -121,9 +133,8 @@ export interface PackageData {
   tags_immutable?: Record<string, unknown>;
 }
 
-// Get Package
-
-export interface GetPackageConfiguration {
+export interface PackageOperationResult {
   repository?: string;
   package?: string;
+  data?: PackageData;
 }
