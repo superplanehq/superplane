@@ -1325,6 +1325,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_events_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_created_at ON public.workflow_events USING btree (created_at);
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1364,6 +1371,13 @@ CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_executi
 --
 
 CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
+
+
+--
+-- Name: idx_workflow_node_executions_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_created_at ON public.workflow_node_executions USING btree (created_at);
 
 
 --
@@ -1448,6 +1462,13 @@ CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree 
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
+
+
+--
+-- Name: idx_workflow_runs_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_created_at ON public.workflow_runs USING btree (created_at);
 
 
 --
@@ -1997,7 +2018,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260617131220	f
+20260617133535	f
 \.
 
 
