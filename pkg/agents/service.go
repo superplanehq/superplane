@@ -46,7 +46,11 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 	if existing != nil {
-		return existing, nil
+		refreshed, err := s.refreshStaleProviderSession(ctx, existing)
+		if errors.Is(err, ErrSessionBusy) {
+			return existing, nil
+		}
+		return refreshed, err
 	}
 	return s.provisionSession(ctx, organizationID, userID, canvasID)
 }
@@ -73,13 +77,16 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 			return fmt.Errorf("create provider session: %w", err)
 		}
 
+		now := time.Now()
 		session = &models.AgentSession{
-			OrganizationID:    organizationID,
-			UserID:            userID,
-			CanvasID:          canvasID,
-			Provider:          s.provider.Name(),
-			ProviderSessionID: upstream.ProviderSessionID,
-			Status:            models.AgentSessionStatusIdle,
+			OrganizationID:          organizationID,
+			UserID:                  userID,
+			CanvasID:                canvasID,
+			Provider:                s.provider.Name(),
+			ProviderSessionID:       upstream.ProviderSessionID,
+			AgentToolSchemaRevision: s.currentToolSchemaRevision(),
+			Status:                  models.AgentSessionStatusIdle,
+			ContextReplayedAt:       &now,
 		}
 		return models.CreateAgentSessionInTransaction(tx, session)
 	})
@@ -182,14 +189,16 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
 
-	preamble := s.buildPreamble(session, ModeBuilder)
+	session, err = s.refreshStaleProviderSession(ctx, session)
+	if err != nil {
+		if errors.Is(err, ErrSessionBusy) {
+			return s.handleBusySession(sessionID, organizationID, userID)
+		}
+		return err
+	}
 
-	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
-		Description:     description,
-		Rubric:          rubric,
-		MaxIterations:   maxIterations,
-		ContextPreamble: preamble,
-	}); err != nil {
+	contextReplayed, err := s.defineOutcomeOnProvider(ctx, session, description, rubric, maxIterations)
+	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return s.handleBusySession(sessionID, organizationID, userID)
 		}
@@ -201,12 +210,8 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 				}
 				return recoverErr
 			}
-			if err := s.provider.DefineOutcome(ctx, recovered.ProviderSessionID, DefineOutcomeOptions{
-				Description:     description,
-				Rubric:          rubric,
-				MaxIterations:   maxIterations,
-				ContextPreamble: preamble,
-			}); err != nil {
+			contextReplayed, err = s.defineOutcomeOnProvider(ctx, recovered, description, rubric, maxIterations)
+			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return s.handleBusySession(sessionID, organizationID, userID)
 				}
@@ -214,6 +219,12 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 			}
 		} else {
 			return fmt.Errorf("define outcome: %w", err)
+		}
+	}
+
+	if contextReplayed {
+		if err := models.MarkAgentSessionContextReplayed(sessionID); err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("failed to mark recovered agent context replayed")
 		}
 	}
 
@@ -225,6 +236,21 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		log.WithError(err).Warn("failed to enqueue stream after define outcome")
 	}
 	return nil
+}
+
+func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.AgentSession, description, rubric string, maxIterations int) (bool, error) {
+	description, contextReplayed, err := s.messageWithRewind(session, description)
+	if err != nil {
+		return false, err
+	}
+
+	err = s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
+		Description:     description,
+		Rubric:          rubric,
+		MaxIterations:   maxIterations,
+		ContextPreamble: s.buildPreamble(session, ModeBuilder),
+	})
+	return contextReplayed, err
 }
 
 func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
@@ -242,9 +268,16 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		agentMode = NormalizeMode(mode[0])
 	}
 
-	preamble := s.buildPreamble(session, agentMode)
+	session, err = s.refreshStaleProviderSession(ctx, session)
+	if err != nil {
+		if errors.Is(err, ErrSessionBusy) {
+			return nil, s.handleBusySession(sessionID, organizationID, userID)
+		}
+		return nil, err
+	}
 
-	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, agentMode)
+	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
 		}
@@ -256,7 +289,8 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 				}
 				return nil, recoverErr
 			}
-			if err := s.provider.SendMessage(ctx, recovered.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, agentMode)
+			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return nil, s.handleBusySession(sessionID, organizationID, userID)
 				}
@@ -281,6 +315,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("persist user message: %w", err)
 	}
 
+	if contextReplayed {
+		if err := models.MarkAgentSessionContextReplayed(sessionID); err != nil {
+			log.WithError(err).WithField("session_id", sessionID).Warn("failed to mark recovered agent context replayed")
+		}
+	}
+
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
 	}
@@ -289,6 +329,123 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 	return persisted, nil
+}
+
+func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, mode Mode) (bool, error) {
+	message, contextReplayed, err := s.messageWithRewind(session, content)
+	if err != nil {
+		return false, err
+	}
+
+	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
+		ContextPreamble: s.buildPreamble(session, mode),
+	})
+	return contextReplayed, err
+}
+
+const (
+	rewindMessageLimit  = 30
+	rewindMaxChars      = 20_000
+	rewindEntryMaxChars = 2_000
+	rewindToolMaxChars  = 800
+)
+
+func (s *Service) messageWithRewind(session *models.AgentSession, content string) (string, bool, error) {
+	if session.ContextReplayedAt != nil {
+		return content, false, nil
+	}
+
+	rewind, err := buildConversationRewind(session.ID)
+	if err != nil {
+		return "", false, fmt.Errorf("build conversation rewind: %w", err)
+	}
+	if rewind == "" {
+		return content, true, nil
+	}
+
+	return rewind + "\n\n[Current user request]\n" + content, true, nil
+}
+
+func buildConversationRewind(sessionID uuid.UUID) (string, error) {
+	rows, err := models.ListAgentSessionMessagesPage(sessionID, nil, rewindMessageLimit)
+	if err != nil {
+		return "", err
+	}
+
+	entries := make([]string, 0, len(rows))
+	remaining := rewindMaxChars
+	for i := len(rows) - 1; i >= 0; i-- {
+		entry := formatRewindEntry(rows[i])
+		if entry == "" {
+			continue
+		}
+		if len(entry) > remaining && len(entries) > 0 {
+			break
+		}
+		if len(entry) > remaining {
+			entry = truncateText(entry, remaining)
+		}
+		entries = append(entries, entry)
+		remaining -= len(entry)
+	}
+	if len(entries) == 0 {
+		return "", nil
+	}
+
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+
+	return "[SuperPlane conversation rewind]\n" +
+		"The provider session was recreated. Treat this as prior conversation context, not as a new request. Do not answer or summarize the rewind; answer only the current user request that follows.\n\n" +
+		"Recent conversation:\n" +
+		strings.Join(entries, "\n\n"), nil
+}
+
+func formatRewindEntry(message models.AgentSessionMessage) string {
+	content := strings.TrimSpace(message.Content)
+	switch message.Role {
+	case models.AgentMessageRoleUser:
+		return "User: " + truncateText(content, rewindEntryMaxChars)
+	case models.AgentMessageRoleAssistant:
+		return "Assistant: " + truncateText(content, rewindEntryMaxChars)
+	case models.AgentMessageRoleSystem:
+		return "System note: " + truncateText(strings.TrimPrefix(content, "@@system: "), rewindEntryMaxChars)
+	case models.AgentMessageRoleTool:
+		return formatToolRewindEntry(message, content)
+	default:
+		return ""
+	}
+}
+
+func formatToolRewindEntry(message models.AgentSessionMessage, content string) string {
+	name := strings.TrimSpace(message.ToolName)
+	if name == "" {
+		name = "tool"
+	}
+	status := strings.TrimSpace(message.ToolStatus)
+	if status == "" {
+		status = "finished"
+	}
+	if content == "" {
+		return fmt.Sprintf("Tool %s %s.", name, status)
+	}
+	return fmt.Sprintf("Tool %s %s: %s", name, status, truncateText(content, rewindToolMaxChars))
+}
+
+func truncateText(text string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	if limit <= 3 {
+		return string(runes[:limit])
+	}
+	return strings.TrimSpace(string(runes[:limit-3])) + "..."
 }
 
 func (s *Service) handleBusySession(sessionID, organizationID, userID uuid.UUID) error {
@@ -305,40 +462,68 @@ func (s *Service) enqueueStreamAfterBusySession(sessionID, organizationID, userI
 	return s.enqueueStream(sessionID, organizationID, userID)
 }
 
+func (s *Service) refreshStaleProviderSession(ctx context.Context, session *models.AgentSession) (*models.AgentSession, error) {
+	if !s.needsToolSchemaRefresh(session) {
+		return session, nil
+	}
+	if session.Status == models.AgentSessionStatusStreaming {
+		return session, nil
+	}
+
+	recovered, oldProviderSessionID, replaced, err := s.replaceProviderSession(ctx, session, true)
+	if err != nil {
+		return nil, fmt.Errorf("refresh stale provider session: %w", err)
+	}
+	if replaced {
+		s.archiveProviderSession(ctx, oldProviderSessionID)
+	}
+	return recovered, nil
+}
+
 func (s *Service) recoverProviderSession(ctx context.Context, stale *models.AgentSession) (*models.AgentSession, error) {
-	target, err := s.providerSessionRecoveryTarget(stale)
+	recovered, _, _, err := s.replaceProviderSession(ctx, stale, false)
 	if err != nil {
 		return nil, fmt.Errorf("recover provider session: %w", err)
 	}
+	return recovered, nil
+}
+
+type providerSessionRecoveryTarget struct {
+	organizationID       uuid.UUID
+	canvasID             uuid.UUID
+	oldProviderSessionID string
+	recovered            *models.AgentSession
+}
+
+func (s *Service) replaceProviderSession(ctx context.Context, stale *models.AgentSession, requireStaleToolSchema bool) (*models.AgentSession, string, bool, error) {
+	target, err := s.providerSessionRecoveryTarget(stale, requireStaleToolSchema)
+	if err != nil {
+		return nil, "", false, err
+	}
 	if target.recovered != nil {
-		return target.recovered, nil
+		return target.recovered, "", false, nil
 	}
 
 	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
 		Title: sessionTitle(target.organizationID, target.canvasID),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("recover provider session: create provider session: %w", err)
+		return nil, "", false, fmt.Errorf("create provider session: %w", err)
 	}
 
-	recovered, err := s.installRecoveredProviderSession(stale, upstream.ProviderSessionID)
+	recovered, err := s.installRecoveredProviderSession(stale, upstream.ProviderSessionID, requireStaleToolSchema)
 	if err != nil {
 		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
-		return nil, fmt.Errorf("recover provider session: %w", err)
+		return nil, "", false, err
 	}
 	if recovered.ProviderSessionID != upstream.ProviderSessionID {
 		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
+		return recovered, "", false, nil
 	}
-	return recovered, nil
+	return recovered, target.oldProviderSessionID, true, nil
 }
 
-type providerSessionRecoveryTarget struct {
-	organizationID uuid.UUID
-	canvasID       uuid.UUID
-	recovered      *models.AgentSession
-}
-
-func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession) (*providerSessionRecoveryTarget, error) {
+func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession, requireStaleToolSchema bool) (*providerSessionRecoveryTarget, error) {
 	target := &providerSessionRecoveryTarget{}
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockAgentSessionInTransaction(tx, stale.ID)
@@ -352,9 +537,14 @@ func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession) (*pr
 			target.recovered = locked
 			return nil
 		}
+		if requireStaleToolSchema && !s.needsToolSchemaRefresh(locked) {
+			target.recovered = locked
+			return nil
+		}
 
 		target.organizationID = locked.OrganizationID
 		target.canvasID = locked.CanvasID
+		target.oldProviderSessionID = locked.ProviderSessionID
 		return nil
 	})
 	if err != nil {
@@ -363,7 +553,7 @@ func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession) (*pr
 	return target, nil
 }
 
-func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, providerSessionID string) (*models.AgentSession, error) {
+func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, providerSessionID string, requireStaleToolSchema bool) (*models.AgentSession, error) {
 	var recovered *models.AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockAgentSessionInTransaction(tx, stale.ID)
@@ -377,16 +567,23 @@ func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, pr
 			recovered = locked
 			return nil
 		}
+		if requireStaleToolSchema && !s.needsToolSchemaRefresh(locked) {
+			recovered = locked
+			return nil
+		}
 
 		if err := models.UpdateAgentSessionProviderSessionInTransaction(
 			tx,
 			locked.ID,
 			providerSessionID,
+			s.currentToolSchemaRevision(),
 			models.AgentSessionStatusIdle,
 		); err != nil {
 			return err
 		}
 		locked.ProviderSessionID = providerSessionID
+		locked.AgentToolSchemaRevision = s.currentToolSchemaRevision()
+		locked.ContextReplayedAt = nil
 		locked.Status = models.AgentSessionStatusIdle
 		recovered = locked
 		return nil
@@ -397,6 +594,22 @@ func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, pr
 	return recovered, nil
 }
 
+func (s *Service) needsToolSchemaRefresh(session *models.AgentSession) bool {
+	return session.AgentToolSchemaRevision != s.currentToolSchemaRevision()
+}
+
+func (s *Service) currentToolSchemaRevision() string {
+	revisioner, ok := s.provider.(ProviderToolSchemaRevisioner)
+	if !ok {
+		return s.provider.Name()
+	}
+	revision := strings.TrimSpace(revisioner.ToolSchemaRevision())
+	if revision == "" {
+		return s.provider.Name()
+	}
+	return revision
+}
+
 func (s *Service) cleanupProviderSession(ctx context.Context, providerSessionID string) {
 	cleaner, ok := s.provider.(ProviderSessionCleaner)
 	if !ok {
@@ -404,6 +617,19 @@ func (s *Service) cleanupProviderSession(ctx context.Context, providerSessionID 
 	}
 	if err := cleaner.DeleteSession(ctx, providerSessionID); err != nil {
 		log.WithError(err).WithField("provider_session_id", providerSessionID).Warn("failed to clean up unused recovered provider session")
+	}
+}
+
+func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID string) {
+	if strings.TrimSpace(providerSessionID) == "" {
+		return
+	}
+	archiver, ok := s.provider.(ProviderSessionArchiver)
+	if !ok {
+		return
+	}
+	if err := archiver.ArchiveSession(ctx, providerSessionID); err != nil && !errors.Is(err, ErrProviderSessionUnavailable) {
+		log.WithError(err).WithField("provider_session_id", providerSessionID).Warn("failed to archive stale provider session")
 	}
 }
 
