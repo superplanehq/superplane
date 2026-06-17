@@ -16,7 +16,6 @@ var criticalHTTPRoutes = map[string]struct{}{
 	"/api/v1/canvases/{canvas_id}":                 {},
 	"/api/v1/canvases/{canvas_id}/versions":        {},
 	"/api/v1/canvases/{canvas_id}/runs":            {},
-	"/api/v1/canvases/{canvas_id}/events":          {},
 	"/api/v1/canvases/{canvas_id}/repository/file": {},
 	"/api/v1/canvases/{canvas_id}/memory":          {},
 }
@@ -32,7 +31,7 @@ var criticalGRPCMethods = map[string]struct{}{
 	pbCanvases.Canvases_DescribeCanvas_FullMethodName:                 {},
 	pbCanvases.Canvases_ListCanvasVersions_FullMethodName:             {},
 	pbCanvases.Canvases_ListRuns_FullMethodName:                       {},
-	pbCanvases.Canvases_ListCanvasEvents_FullMethodName:               {},
+	pbCanvases.Canvases_DescribeRun_FullMethodName:                    {},
 	pbCanvases.Canvases_ListCanvasMemories_FullMethodName:             {},
 }
 

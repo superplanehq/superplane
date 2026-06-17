@@ -76,6 +76,7 @@ func ApplyCanvasAutoLayout(
 		canvas.OrganizationID,
 		CanvasYAMLRepositoryPath,
 		positionedYAML,
+		"",
 		&userUUID,
 	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to stage canvas layout: %v", err)

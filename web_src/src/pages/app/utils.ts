@@ -1,7 +1,6 @@
 import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
-  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ActionsAction,
@@ -10,6 +9,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
 } from "@/api-client";
+import type { CanvasEventWithExecutions } from "./lib/canvas-runs";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
 import { flattenObject } from "@/lib/utils";
@@ -134,7 +134,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
 }
 
 export function buildTriggerSidebarEvent(
-  event: CanvasesCanvasEventWithExecutions,
+  event: CanvasEventWithExecutions,
   triggerNode: ComponentsNode | undefined,
 ): SidebarEvent | undefined {
   if (!triggerNode || !event.id) return undefined;
