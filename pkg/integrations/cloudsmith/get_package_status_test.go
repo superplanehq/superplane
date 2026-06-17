@@ -62,7 +62,7 @@ func Test__GetPackageStatus__Setup(t *testing.T) {
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
 					okResponse(`{"name":"Production","slug":"production","namespace":"acme"}`),
-					okResponse(`{"slug_perm":"perm123","name":"my-package","version":"1.0.0"}`),
+					okResponse(`{"slug":"my-package-1-0-0","slug_perm":"perm123","name":"my-package","version":"1.0.0"}`),
 				},
 			},
 			Integration: &contexts.IntegrationContext{
@@ -75,7 +75,7 @@ func Test__GetPackageStatus__Setup(t *testing.T) {
 		metadata, ok := metadataCtx.Metadata.(PackageNodeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "Production", metadata.RepositoryName)
-		assert.Equal(t, "my-package 1.0.0", metadata.PackageName)
+		assert.Equal(t, "my-package-1-0-0", metadata.PackageName)
 		assert.Equal(t, "perm123", metadata.PackageID)
 	})
 }
