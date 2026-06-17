@@ -2,12 +2,14 @@ package compute
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -417,6 +419,46 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 		assert.Contains(t, state.FailureMessage, "backend service")
 		// Nothing is deleted, so neither the backend service nor the health check is orphaned.
 		assert.Empty(t, deleted)
+	})
+
+	t.Run("retries cleanup when the forwarding rule is already gone", func(t *testing.T) {
+		var deleted []string
+		notFound := &gcpcommon.GCPAPIError{StatusCode: http.StatusNotFound, Message: "not found"}
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/operations/"):
+					return opDone("op"), nil
+				case strings.Contains(path, "/forwardingRules/"):
+					return nil, notFound // already deleted by a previous, partially failed run
+				}
+				return nil, assert.AnError
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/forwardingRules/"):
+					deleted = append(deleted, "fr")
+					return nil, notFound // already gone
+				case strings.Contains(path, "/backendServices/"):
+					deleted = append(deleted, "bes")
+				case strings.Contains(path, "/healthChecks/"):
+					deleted = append(deleted, "hc")
+				}
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, d.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"loadBalancer": fr},
+			ExecutionState: state,
+		}))
+		assert.True(t, state.Passed)
+		// The forwarding rule was already gone; the leftover backend service and
+		// health check (recovered from the naming convention) are still cleaned up.
+		assert.ElementsMatch(t, []string{"fr", "bes", "hc"}, deleted)
 	})
 
 	t.Run("rejects a forwarding rule with no backend service", func(t *testing.T) {

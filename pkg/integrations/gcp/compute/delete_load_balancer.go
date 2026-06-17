@@ -12,6 +12,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type DeleteLoadBalancer struct{}
@@ -128,63 +129,79 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	callCtx := context.Background()
 
 	// Resolve the backend service (and its health check) before deleting
-	// anything. If we cannot determine what the forwarding rule points at, fail
-	// rather than delete the rule and orphan the backend service / health check.
+	// anything, so we never delete the forwarding rule and orphan what it points
+	// at. The deletes below tolerate not-found, so a run that previously deleted
+	// the forwarding rule but failed before the backend service can be retried.
 	var besName, hcName, hcRegion string
 	besRegion := region
-	body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName))
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read forwarding rule %q: %v", frName, err))
-	}
-	var fr forwardingRuleGetResp
-	if err := json.Unmarshal(body, &fr); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse forwarding rule %q: %v", frName, err))
-	}
-	if fr.BackendService == "" {
-		// This component only manages passthrough Network Load Balancers backed by
-		// a backend service (as built by Create Load Balancer). A rule with no
-		// backend service is a different type — e.g. a legacy target-pool NLB —
-		// and deleting only the rule would leave its other pieces orphaned, so
-		// refuse rather than report a misleading success.
-		if target := lastSegment(fr.Target); target != "" {
+
+	body, frErr := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName))
+	switch {
+	case frErr == nil:
+		var fr forwardingRuleGetResp
+		if err := json.Unmarshal(body, &fr); err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse forwarding rule %q: %v", frName, err))
+		}
+		if fr.BackendService == "" {
+			// This component only manages passthrough Network Load Balancers backed
+			// by a backend service (as built by Create Load Balancer). A rule with no
+			// backend service is a different type — e.g. a legacy target-pool NLB —
+			// and deleting only the rule would leave its other pieces orphaned, so
+			// refuse rather than report a misleading success.
+			if target := lastSegment(fr.Target); target != "" {
+				return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+					"forwarding rule %q targets %q rather than a backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName, target))
+			}
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf(
-				"forwarding rule %q targets %q rather than a backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName, target))
+				"forwarding rule %q has no backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName))
 		}
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf(
-			"forwarding rule %q has no backend service; this component only deletes passthrough Network Load Balancers created by Create Load Balancer", frName))
-	}
-	_, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices")
-	if perr != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
-	}
-	besName, besRegion = name, br
-	// Resolve the health check from the backend service before deleting anything.
-	// Treat a failed lookup as fatal so we never delete the backend service and
-	// orphan its health check.
-	bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName))
-	if berr != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read backend service %q: %v", besName, berr))
-	}
-	var bes backendServiceGetResp
-	if err := json.Unmarshal(bbody, &bes); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service %q: %v", besName, err))
-	}
-	if len(bes.HealthChecks) > 0 {
-		_, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks")
-		if herr != nil {
-			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse health check reference %q: %v", bes.HealthChecks[0], herr))
+		_, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices")
+		if perr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
 		}
-		hcName, hcRegion = hn, hr
+		besName, besRegion = name, br
+		// Resolve the health check from the backend service. Treat a failed lookup
+		// as fatal so we never delete the backend service and orphan its health check.
+		bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName))
+		if berr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read backend service %q: %v", besName, berr))
+		}
+		var bes backendServiceGetResp
+		if err := json.Unmarshal(bbody, &bes); err != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service %q: %v", besName, err))
+		}
+		if len(bes.HealthChecks) > 0 {
+			_, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks")
+			if herr != nil {
+				return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse health check reference %q: %v", bes.HealthChecks[0], herr))
+			}
+			hcName, hcRegion = hn, hr
+		}
+	case gcpcommon.IsNotFoundError(frErr):
+		// The forwarding rule is already gone — most likely a previous run deleted
+		// it but failed before removing the backend service. Recover the sibling
+		// names from the Create Load Balancer naming convention (<base>-fr,
+		// <base>-backend, <base>-hc) so the retry can finish the teardown. If the
+		// name does not follow the convention there is nothing else we can safely
+		// identify, and the deletes below simply no-op.
+		if base, ok := strings.CutSuffix(frName, "-fr"); ok {
+			besName = base + "-backend"
+			hcName, hcRegion = base+"-hc", region
+		}
+	default:
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read forwarding rule %q: %v", frName, frErr))
 	}
 
-	// 1. Forwarding rule (required).
-	if err := deleteAndWait(callCtx, client, project, region, "forwardingRules", frName); err != nil {
+	// Delete in dependency order. Each step tolerates not-found so a partial
+	// previous teardown can be completed by re-running.
+	// 1. Forwarding rule.
+	if err := deleteIfExists(callCtx, client, project, region, "forwardingRules", frName); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete forwarding rule: %v", err))
 	}
 
-	// 2. Backend service (required once the forwarding rule is gone).
+	// 2. Backend service.
 	if besName != "" {
-		if err := deleteAndWait(callCtx, client, project, besRegion, "backendServices", besName); err != nil {
+		if err := deleteIfExists(callCtx, client, project, besRegion, "backendServices", besName); err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete backend service %q: %v", besName, err))
 		}
 	}
@@ -192,7 +209,7 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	// 3. Health check (best-effort — may be shared with another load balancer).
 	var note string
 	if hcName != "" {
-		if err := deleteAndWait(callCtx, client, project, hcRegion, "healthChecks", hcName); err != nil {
+		if err := deleteIfExists(callCtx, client, project, hcRegion, "healthChecks", hcName); err != nil {
 			note = fmt.Sprintf("health check %q was not deleted (it may be in use by another load balancer): %v", hcName, err)
 		}
 	}
@@ -212,6 +229,15 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		"gcp.compute.loadBalancer.deleted",
 		[]any{payload},
 	)
+}
+
+// deleteIfExists deletes a regional resource, treating a not-found result as
+// success so the teardown can be safely retried after a partial deletion.
+func deleteIfExists(ctx context.Context, client Client, project, region, kind, name string) error {
+	if err := deleteAndWait(ctx, client, project, region, kind, name); err != nil && !gcpcommon.IsNotFoundError(err) {
+		return err
+	}
+	return nil
 }
 
 func (d *DeleteLoadBalancer) Cancel(ctx core.ExecutionContext) error {
