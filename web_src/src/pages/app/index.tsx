@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, startTransition, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   CanvasChangesetChange,
@@ -95,7 +95,7 @@ import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
-import { shouldClearRunDetailNode } from "./runInspectionSync";
+import { clearRunDetailNodeSearchParams, shouldClearRunDetailNode } from "./runInspectionSync";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -130,6 +130,7 @@ import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunsDetailState } from "./useRunsDetailState";
+import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   clearComponentSidebarSearchParams,
@@ -1682,15 +1683,18 @@ export function AppPage() {
 
   useEffect(() => {
     if (
+      runDetailNodeId &&
       shouldClearRunDetailNode({
         runDetailNodeId,
         participantNodeIds: runCanvasData?.participantNodeIds ?? [],
         runCanvasLoading,
+        runCanvasReady: Boolean(runCanvasData),
       })
     ) {
       setRunDetailNodeId(null);
+      setSearchParams((current) => clearRunDetailNodeSearchParams(current, runDetailNodeId), { replace: true });
     }
-  }, [runCanvasData, runCanvasLoading, runDetailNodeId, selectedRunId, setRunDetailNodeId]);
+  }, [runCanvasData, runCanvasLoading, runDetailNodeId, selectedRunId, setRunDetailNodeId, setSearchParams]);
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -4172,24 +4176,69 @@ export function AppPage() {
     handleUseVersion(liveCanvasVersionId);
   }, [hasEditableVersion, liveCanvasVersionId, handleUseVersion]);
 
+  const liveSidebarRunLookupEnabled = isViewingLiveVersion && !isRunInspectionMode && !isEditing;
+
   const handleSelectRun = useCallback(
     (runId: string) => {
       exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
+      startTransition(() => {
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.set("run", runId);
+            next.delete("sidebar");
+            next.delete("node");
+            next.delete("file");
+            return next;
+          },
+          { replace: true },
+        );
+      });
+    },
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
+  );
+
+  const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
+    enabled: liveSidebarRunLookupEnabled,
+    canvasId,
+    organizationId,
+    queryClient,
+    runs: runsData.runs,
+    infiniteRunsPages: infiniteRunsQuery.data?.pages,
+  });
+
+  const handleSelectRunFromSidebarEvent = useCallback(
+    (runId: string) => {
+      exitEditableVersionForRunInspection();
+      clearDismissedRunDetail();
+      const inspectorNodeId = searchParams.get("sidebar") === "1" ? searchParams.get("node") : null;
+      if (inspectorNodeId) {
+        preserveRunDetailNodeOnNextRunChangeRef.current = true;
+        setRunDetailNodeId(inspectorNodeId);
+      } else {
+        setRunDetailNodeId(null);
+      }
+
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
           next.set("run", runId);
-          next.delete("sidebar");
-          next.delete("node");
+          if (inspectorNodeId) {
+            next.set("sidebar", "1");
+            next.set("node", inspectorNodeId);
+          } else {
+            next.delete("sidebar");
+            next.delete("node");
+          }
           next.delete("file");
           return next;
         },
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, searchParams, setRunDetailNodeId, setSearchParams],
   );
 
   const handleNavigateRun = useCallback(
@@ -4214,15 +4263,40 @@ export function AppPage() {
 
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.delete("run");
-        return next;
-      },
-      { replace: true },
-    );
+    startTransition(() => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("run");
+          next.delete("sidebar");
+          next.delete("node");
+          return next;
+        },
+        { replace: true },
+      );
+    });
   }, [setSearchParams, setRunDetailNodeId]);
+
+  const handleRunNodeDetailSelection = useCallback(
+    (nodeId: string | null) => {
+      setRunDetailNodeId(nodeId);
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (nodeId) {
+            next.set("sidebar", "1");
+            next.set("node", nodeId);
+          } else {
+            next.delete("sidebar");
+            next.delete("node");
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setRunDetailNodeId, setSearchParams],
+  );
 
   useStaleRunInspectionUrlCleanup({
     selectedRunId,
@@ -4309,9 +4383,9 @@ export function AppPage() {
       if (participants && participants.length > 0 && !participants.includes(nodeId)) {
         return;
       }
-      setRunDetailNodeId(nodeId);
+      handleRunNodeDetailSelection(nodeId);
     },
-    [isRunInspectionMode, selectedRun, runCanvasData, setRunDetailNodeId],
+    [handleRunNodeDetailSelection, isRunInspectionMode, selectedRun, runCanvasData],
   );
 
   useEffect(() => {
@@ -4695,7 +4769,7 @@ export function AppPage() {
     initialOpenDetail: openRunDetailOnMount,
     detailDismissedForRunId,
     selectedNodeId: runDetailNodeId,
-    onSelectNode: setRunDetailNodeId,
+    onSelectNode: handleRunNodeDetailSelection,
     hasNextPage: !!infiniteRunsQuery.hasNextPage,
     isFetchingNextPage: infiniteRunsQuery.isFetchingNextPage,
     onLoadMore: () => infiniteRunsQuery.fetchNextPage(),
@@ -4865,8 +4939,8 @@ export function AppPage() {
           runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
-          onRunNodeDetailClose={() => setRunDetailNodeId(null)}
-          onRunNodeDetailNavigate={setRunDetailNodeId}
+          onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
+          onRunNodeDetailNavigate={handleRunNodeDetailSelection}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           saveIsPrimary={saveIsPrimary}
@@ -4933,6 +5007,9 @@ export function AppPage() {
           getLoadingMoreQueue={getLoadingMoreQueue}
           onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
           onRunItemOpen={isViewingLiveVersion ? handleRunItemOpen : undefined}
+          resolveRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? resolveRunIdForSidebarEvent : undefined}
+          fetchRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? fetchRunIdForSidebarEvent : undefined}
+          onSelectRunFromSidebarEvent={liveSidebarRunLookupEnabled ? handleSelectRunFromSidebarEvent : undefined}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}

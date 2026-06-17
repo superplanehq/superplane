@@ -19,7 +19,7 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
   }
 
   return (
-    <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center">
+    <div className="relative z-10 flex h-7 shrink-0 items-center">
       <Tooltip delayDuration={350}>
         <TooltipTrigger asChild>
           <UIButton
@@ -47,7 +47,7 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
             </span>
           </UIButton>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>
+        <TooltipContent side="right" sideOffset={2}>
           {label}
         </TooltipContent>
       </Tooltip>
