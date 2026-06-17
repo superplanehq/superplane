@@ -138,6 +138,48 @@ describe("useSidebarEventRunLookup", () => {
     expect(canvasesListRuns).toHaveBeenCalledTimes(4);
   });
 
+  it("starts paginated lookup from the newest runs", async () => {
+    const queryClient = new QueryClient();
+
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: [{ id: "run-1", rootEvent: { id: "root-1" } }],
+        totalCount: 1,
+        hasNextPage: false,
+        lastTimestamp: "2026-02-06T15:00:00.000Z",
+      },
+    });
+
+    const event = {
+      ...triggerEvent,
+      receivedAt: new Date("2026-02-06T14:00:00.000Z"),
+    } satisfies SidebarEvent;
+
+    const { result } = renderHook(
+      () =>
+        useSidebarEventRunLookup({
+          enabled: true,
+          canvasId: "canvas-1",
+          organizationId: "org-1",
+          queryClient,
+          runs: [],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(event)).toBe("run-1");
+    });
+
+    expect(canvasesListRuns).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: { limit: 25 },
+      }),
+    );
+  });
+
   it("does not reuse fetched run ids after cached lookup sources are invalidated", async () => {
     const queryClient = new QueryClient();
 
