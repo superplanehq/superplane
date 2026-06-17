@@ -27,8 +27,12 @@ const (
 var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
-	enforcer           *casbin.SyncedEnforcer
-	casbinModel        model.Model
+	enforcer *casbin.SyncedEnforcer
+	// We keep the casbin model as text rather than a model.Model so each read
+	// enforcer can rebuild a pristine model from it. The text holds only the
+	// model definition (no policies), and rebuilding from it avoids sharing a
+	// live, concurrently-mutated model across enforcers.
+	casbinModelText    string
 	orgPolicyTemplates [][5]string
 }
 
@@ -36,7 +40,13 @@ func NewAuthService() (*AuthService, error) {
 	modelPath := os.Getenv("RBAC_MODEL_PATH")
 	orgPolicyPath := os.Getenv("RBAC_ORG_POLICY_PATH")
 
-	casbinModel, err := model.NewModelFromFile(modelPath)
+	modelBytes, err := os.ReadFile(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read casbin model: %w", err)
+	}
+	casbinModelText := string(modelBytes)
+
+	casbinModel, err := model.NewModelFromString(casbinModelText)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load casbin model: %w", err)
 	}
@@ -70,7 +80,7 @@ func NewAuthService() (*AuthService, error) {
 
 	service := &AuthService{
 		enforcer:           enforcer,
-		casbinModel:        casbinModel,
+		casbinModelText:    casbinModelText,
 		orgPolicyTemplates: orgPolicyTemplates,
 	}
 
@@ -131,7 +141,16 @@ func (a *AuthService) newReadEnforcer(ctx context.Context, filters []gormadapter
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewEnforcer(a.casbinModel.Copy(), adapter)
+	// Each read enforcer gets its own model. casbin mutates the model during
+	// enforcer initialization and policy loading, so sharing a single model
+	// across concurrently created enforcers causes data races (and would
+	// clobber the shared enforcer's in-memory policies).
+	readModel, err := model.NewModelFromString(a.casbinModelText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load casbin model: %w", err)
+	}
+
+	enforcer, err := casbin.NewEnforcer(readModel, adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
