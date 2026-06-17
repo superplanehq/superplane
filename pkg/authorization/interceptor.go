@@ -333,12 +333,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_UpdateNodePause_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_ListCanvasEvents_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
@@ -346,6 +340,12 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_ListRuns_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DescribeRun_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
 			DomainType:       models.DomainTypeOrganization,

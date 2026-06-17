@@ -269,18 +269,6 @@ service Canvases {
     };
   }
 
-  rpc UpdateNodePause(UpdateNodePauseRequest) returns (UpdateNodePauseResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/pause"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Pause or resume node processing";
-      description: "Pauses or resumes processing for a canvas node while continuing to queue incoming items";
-      tags: "CanvasNode";
-    };
-  }
-
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions"
@@ -380,6 +368,17 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas runs";
       description: "Returns a list of runs for a canvas";
+      tags: "CanvasRun";
+    };
+  }
+
+  rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs/{run_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe a run";
+      description: "Returns a description of a run";
       tags: "CanvasRun";
     };
   }
@@ -807,16 +806,6 @@ message DeleteNodeQueueItemRequest {
 
 message DeleteNodeQueueItemResponse {}
 
-message UpdateNodePauseRequest {
-  string canvas_id = 1;
-  string node_id = 2;
-  bool paused = 3;
-}
-
-message UpdateNodePauseResponse {
-  Components.Node node = 1;
-}
-
 message ListNodeExecutionsRequest {
   string canvas_id = 1;
   string node_id = 2;
@@ -946,6 +935,15 @@ message ListRunsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message DescribeRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message DescribeRunResponse {
+  CanvasRun run = 1;
 }
 
 message CanvasMemory {
