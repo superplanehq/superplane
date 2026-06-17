@@ -5,9 +5,12 @@ import { toast } from "sonner";
 import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { ReactNode } from "react";
 import { DraftBranchRow } from "./DraftBranchRow";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 
@@ -40,7 +43,6 @@ type VersionRowItem = {
   isActive: boolean;
   isCurrentLive: boolean;
   isFirstCanvasVersion?: boolean;
-  previousVersion?: CanvasesCanvasVersion;
   rowTestId?: string;
 };
 
@@ -53,7 +55,6 @@ export function VersionsTabPanel({
   canUpdateCanvas,
   canvasDeletedRemotely,
   onUseVersion,
-  onVersionNodeDiffContextChange,
   onLoadMoreLiveVersions,
   loadMoreLiveVersionsDisabled,
   loadMoreLiveVersionsPending,
@@ -66,14 +67,13 @@ export function VersionsTabPanel({
   onDeleteDraftBranch,
   deleteDraftBranchPending,
 }: VersionsTabPanelProps) {
-  const { hasNoVersions, handleViewDiff, liveItems } = useVersionsPanelData({
+  const { hasNoVersions, liveItems } = useVersionsPanelData({
     liveCanvasVersionId,
     liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,
     loadMoreLiveVersionsDisabled,
     onLoadMoreLiveVersions,
-    onVersionNodeDiffContextChange,
   });
   const { scrollRef, handleScroll } = useVersionsTabScroll({
     scrollPersistenceKey,
@@ -106,10 +106,11 @@ export function VersionsTabPanel({
         />
 
         <section>
+          <VersionsSectionHeader label="History" />
           {hasNoVersions ? (
-            <p className="px-4 py-2 text-xs text-slate-600">No published history yet.</p>
+            <p className="px-3 py-2 text-xs text-slate-600">No published history yet.</p>
           ) : (
-            <VersionRowList items={liveItems} onUseVersion={onUseVersion} onViewDiff={handleViewDiff} />
+            <VersionRowList items={liveItems} onUseVersion={onUseVersion} />
           )}
         </section>
       </div>
@@ -160,7 +161,6 @@ function useVersionsPanelData({
   liveVersions,
   loadMoreLiveVersionsDisabled,
   onLoadMoreLiveVersions,
-  onVersionNodeDiffContextChange,
 }: Pick<
   VersionsTabPanelProps,
   | "liveCanvasVersionId"
@@ -169,15 +169,8 @@ function useVersionsPanelData({
   | "liveVersions"
   | "loadMoreLiveVersionsDisabled"
   | "onLoadMoreLiveVersions"
-  | "onVersionNodeDiffContextChange"
 >) {
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
-  const handleViewDiff = useCallback(
-    (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => {
-      onVersionNodeDiffContextChange({ version, previousVersion });
-    },
-    [onVersionNodeDiffContextChange],
-  );
   const liveItems = buildLiveItems({
     liveCanvasVersionId,
     liveVersions,
@@ -189,7 +182,6 @@ function useVersionsPanelData({
 
   return {
     hasNoVersions,
-    handleViewDiff,
     liveItems,
   };
 }
@@ -225,15 +217,15 @@ function DraftBranchesSection({
 
   if (drafts.length === 0) {
     return (
-      <section className="border-b border-slate-200 pb-2">
+      <section>
         {header}
-        <p className="px-4 pb-2 text-xs text-slate-600">No draft branches yet.</p>
+        <p className="px-3 py-2 text-xs text-slate-600">No draft branches yet.</p>
       </section>
     );
   }
 
   return (
-    <section className="border-b border-slate-200 pb-2" data-testid="canvas-drafts-section">
+    <section data-testid="canvas-drafts-section">
       {header}
       {drafts.map((draft) => {
         const branchName = draftBranchName(draft);
@@ -254,6 +246,15 @@ function DraftBranchesSection({
   );
 }
 
+function VersionsSectionHeader({ label, action }: { label: string; action?: ReactNode }) {
+  return (
+    <div className={cn(RUNS_SIDEBAR_ROW_CLASS, "justify-between pr-1.5")}>
+      <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-gray-500">{label}</span>
+      {action}
+    </div>
+  );
+}
+
 function DraftsSectionHeader({
   canCreate,
   createPending,
@@ -264,27 +265,29 @@ function DraftsSectionHeader({
   onCreateDraftBranch?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Drafts</h3>
-      {canCreate ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onCreateDraftBranch?.()}
-              disabled={createPending}
-              className="size-5 rounded p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-              data-testid="canvas-create-draft-button"
-              aria-label="Create draft"
-            >
-              <Plus className="size-4" aria-hidden />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Create new draft</TooltipContent>
-        </Tooltip>
-      ) : null}
-    </div>
+    <VersionsSectionHeader
+      label="Drafts"
+      action={
+        canCreate ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onCreateDraftBranch?.()}
+                disabled={createPending}
+                className="size-6 shrink-0 rounded p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                data-testid="canvas-create-draft-button"
+                aria-label="Create draft"
+              >
+                <Plus className="size-4" aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create new draft</TooltipContent>
+          </Tooltip>
+        ) : null
+      }
+    />
   );
 }
 
@@ -298,10 +301,10 @@ function VersionsNotices({
   return (
     <>
       {!canUpdateCanvas && !canvasDeletedRemotely ? (
-        <p className="px-4 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+        <p className="px-3 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
       ) : null}
       {canvasDeletedRemotely ? (
-        <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
+        <p className="px-3 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
     </>
   );
@@ -310,11 +313,9 @@ function VersionsNotices({
 function VersionRowList({
   items,
   onUseVersion,
-  onViewDiff,
 }: {
   items: VersionRowItem[];
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
 }) {
   return items.map((item) => (
     <VersionRow
@@ -324,9 +325,7 @@ function VersionRowList({
       isActive={item.isActive}
       isCurrentLive={item.isCurrentLive}
       isFirstCanvasVersion={item.isFirstCanvasVersion}
-      previousVersion={item.previousVersion}
       onUseVersion={onUseVersion}
-      onViewDiff={onViewDiff}
     />
   ));
 }
@@ -355,7 +354,6 @@ function buildLiveItems({
       isActive: versionID === selectedVersionId,
       isCurrentLive: liveCanvasVersionId === versionID,
       isFirstCanvasVersion,
-      previousVersion: liveVersions[index + 1],
     };
   });
 }

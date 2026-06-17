@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { Header } from "./Header";
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -48,6 +49,14 @@ const runsSidebarState = {
   closeRunsSidebar: vi.fn(),
 } satisfies CanvasRunsSidebarState;
 
+const versionsSidebarState = {
+  isVersionsSidebarOpen: false,
+  showVersionsSidebarToggle: true,
+  handleVersionsSidebarToggle: vi.fn(),
+  openVersionsSidebar: vi.fn(),
+  closeVersionsSidebar: vi.fn(),
+} satisfies CanvasVersionsSidebarState;
+
 function renderHeader(
   mode: "version-live" | "version-edit" | "versions",
   options?: {
@@ -72,6 +81,7 @@ function renderHeader(
               onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
               runsSidebarState={runsSidebarState}
+              versionsSidebarState={versionsSidebarState}
             />
           }
         />

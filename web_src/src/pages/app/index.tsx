@@ -4842,8 +4842,9 @@ export function AppPage() {
     !urlViewFlags.isFilesMode &&
     !urlViewFlags.isVersionsMode;
 
-  // The versions sidebar is permanent during an edit session while on the
+  // The versions sidebar is available only during an edit session while on the
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
+  // Within the edit session it can be shown/hidden with the header toggle.
   const showVersionsSidebar = editSessionActive && !isRunInspectionMode && !urlViewFlags.isMemoryMode;
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({

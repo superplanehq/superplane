@@ -53,6 +53,8 @@ import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
+import { useCanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
 import {
   useCanvasToolSidebarState,
@@ -856,6 +858,27 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
+  const versionsSidebarBaseState = useCanvasVersionsSidebarState();
+  // Versions content is only produced during an edit session; within that session
+  // the sidebar can be shown/hidden with the header toggle.
+  const versionsContentAvailable = props.toolSidebarVersionsContent != null;
+  const showVersionsSidebarToggle = versionsContentAvailable;
+  const versionsSidebarState = {
+    ...versionsSidebarBaseState,
+    showVersionsSidebarToggle,
+  };
+  const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
+
+  // The collapse state is intentionally not persisted: the versions sidebar always
+  // starts expanded whenever the user (re)enters an edit session.
+  const isEditSessionActive = props.isEditSessionActive;
+  const { openVersionsSidebar } = versionsSidebarBaseState;
+  useEffect(() => {
+    if (isEditSessionActive) {
+      openVersionsSidebar();
+    }
+  }, [isEditSessionActive, openVersionsSidebar]);
+
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [canvasModalRequest, setCanvasModalRequest] = useState<CanvasModalRequest | null>(null);
@@ -1459,6 +1482,7 @@ function CanvasPage(props: CanvasPageProps) {
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
           runsSidebarState={runsSidebarState}
+          versionsSidebarState={versionsSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1469,7 +1493,7 @@ function CanvasPage(props: CanvasPageProps) {
 
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
-        <CanvasVersionsSidebar isOpen={!!props.isEditSessionActive && props.toolSidebarVersionsContent != null}>
+        <CanvasVersionsSidebar isOpen={isVersionsSidebarOpen}>
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
@@ -1996,6 +2020,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu,
   toolSidebarState,
   runsSidebarState,
+  versionsSidebarState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -2064,6 +2089,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
+  versionsSidebarState: CanvasVersionsSidebarState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -2132,6 +2158,7 @@ function CanvasContentHeader({
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
       runsSidebarState={runsSidebarState}
+      versionsSidebarState={versionsSidebarState}
     />
   );
 }
