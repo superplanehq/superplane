@@ -41,6 +41,7 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+	p.reportPendingIntegrationRequests()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -121,6 +122,16 @@ func (p *Periodic) reportPendingExecutions() {
 	RecordPendingExecutionsCount(p.ctx, count)
 }
 
+func (p *Periodic) reportPendingIntegrationRequests() {
+	total, maxPerInstallation, err := countPendingIntegrationRequests()
+	if err != nil {
+		return
+	}
+
+	RecordPendingIntegrationRequestsCount(p.ctx, total)
+	RecordPendingIntegrationRequestsMaxPerInstallation(p.ctx, maxPerInstallation)
+}
+
 func countStuckQueueNodes() (int64, error) {
 	db := database.Conn()
 
@@ -183,4 +194,39 @@ func countPendingExecutions() (int64, error) {
 	}
 
 	return count, nil
+}
+
+// countPendingIntegrationRequests returns the total number of pending integration
+// requests and the largest number held by any single installation. The
+// max-per-installation value is the real early warning for a runaway scheduling
+// loop like #5386, where one installation accumulates many self-rescheduling
+// chains while the global total still looks unremarkable.
+func countPendingIntegrationRequests() (int64, int64, error) {
+	type result struct {
+		Total              int64
+		MaxPerInstallation int64
+	}
+
+	var stats result
+	err := database.Conn().
+		Raw(`
+			SELECT
+				COALESCE(SUM(per_installation.count), 0) AS total,
+				COALESCE(MAX(per_installation.count), 0) AS max_per_installation
+			FROM (
+				SELECT r.app_installation_id, COUNT(*) AS count
+				FROM app_installation_requests AS r
+				JOIN app_installations AS i ON r.app_installation_id = i.id
+				WHERE r.state = 'pending'
+				  AND i.deleted_at IS NULL
+				GROUP BY r.app_installation_id
+			) AS per_installation
+		`).
+		Scan(&stats).
+		Error
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return stats.Total, stats.MaxPerInstallation, nil
 }

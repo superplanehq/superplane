@@ -184,13 +184,22 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
-	err := c.completeCurrentRequestForInstallation()
-	if err != nil {
-		return err
-	}
-
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateSyncRequest(c.tx, &runAt)
+
+	//
+	// Complete the existing pending sync and create the successor atomically, so a
+	// retry after a crash converges to a single pending sync. Completion is scoped
+	// to the sync type, so a resync (including a gRPC-triggered one) never collapses
+	// an unrelated pending action request (e.g. a token-refresh loop) on an
+	// integration that uses both resync and action calls.
+	//
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := models.CompletePendingSyncRequestsInTransaction(tx, c.integration.ID); err != nil {
+			return err
+		}
+
+		return c.integration.CreateSyncRequest(tx, &runAt)
+	})
 }
 
 func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
@@ -199,20 +208,23 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
-}
 
-func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
-	request, err := models.FindPendingRequestForIntegration(c.tx, c.integration.ID)
-	if err == nil {
-		return request.Complete(c.tx)
-	}
+	//
+	// Enforce at-most-one pending request per (installation, action, parameters).
+	// Completing the matching pending rows in the same transaction that creates
+	// the successor also completes the in-flight request when the worker is
+	// driving a self-rescheduling loop, and collapses any accumulated chains of
+	// the same action (#5386). Distinct parameters are preserved, so legitimately
+	// different calls (e.g. AWS provisionRule for different detail types) are not
+	// affected.
+	//
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := models.CompletePendingActionRequestsInTransaction(tx, c.integration.ID, actionName, parameters); err != nil {
+			return err
+		}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-
-	return err
+		return c.integration.CreateActionRequest(tx, actionName, parameters, &runAt)
+	})
 }
 
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
