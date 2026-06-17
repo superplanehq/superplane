@@ -1133,6 +1133,24 @@ message CanvasVersionMessage {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+enum MaterializationStatus {
+  MATERIALIZATION_STATUS_UNSPECIFIED = 0;
+  MATERIALIZATION_STATUS_PENDING = 1;
+  MATERIALIZATION_STATUS_READY = 2;
+  MATERIALIZATION_STATUS_ERROR = 3;
+  MATERIALIZATION_STATUS_DELETED = 4;
+}
+
+message RepositoryBranchUpdatedMessage {
+  string canvas_id = 1;
+  string branch = 2;
+  string head_sha = 3;
+  MaterializationStatus materialization_status = 4;
+  string materialization_error = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  string pushed_by_user_id = 7;
+}
+
 message NotificationEmailRequested {
   string organization_id = 1;
   string title = 2;
