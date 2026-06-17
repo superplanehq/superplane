@@ -15,7 +15,7 @@ func NewRepositoryBranchUpdatedMessage(
 	canvasID string,
 	branch string,
 	headSHA string,
-	materializationStatus string,
+	materializationStatus pb.MaterializationStatus,
 	materializationError string,
 	pushedByUserID string,
 ) RepositoryBranchUpdatedMessage {

@@ -12,6 +12,15 @@ import (
 
 const RepositoryBranchUpdatedEvent = "repository_branch_updated"
 
+// materializationStatusTokens maps the proto enum to the lowercase tokens the UI
+// consumes, keeping the websocket payload independent of the protobuf naming.
+var materializationStatusTokens = map[pb.MaterializationStatus]string{
+	pb.MaterializationStatus_MATERIALIZATION_STATUS_PENDING: "pending",
+	pb.MaterializationStatus_MATERIALIZATION_STATUS_READY:   "ready",
+	pb.MaterializationStatus_MATERIALIZATION_STATUS_ERROR:   "error",
+	pb.MaterializationStatus_MATERIALIZATION_STATUS_DELETED: "deleted",
+}
+
 type RepositoryBranchUpdatedPayload struct {
 	ID                    string `json:"id"`
 	CanvasID              string `json:"canvasId"`
@@ -43,7 +52,7 @@ func HandleRepositoryBranchUpdated(messageBody []byte, wsHub *ws.Hub) error {
 			CanvasID:              pbMsg.CanvasId,
 			Branch:                pbMsg.Branch,
 			HeadSHA:               pbMsg.HeadSha,
-			MaterializationStatus: pbMsg.MaterializationStatus,
+			MaterializationStatus: materializationStatusTokens[pbMsg.MaterializationStatus],
 			MaterializationError:  pbMsg.MaterializationError,
 		},
 	})

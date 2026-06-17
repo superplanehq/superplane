@@ -527,8 +527,6 @@ message GetCanvasRepositoryResponse {
 
 message ListCanvasRepositoryFilesRequest {
   string canvas_id = 1;
-  string branch = 2;
-  string ref = 3;
 }
 
 message CanvasRepositoryFile {
@@ -612,7 +610,6 @@ message StagingSummary {
   bool has_staging = 1;
   repeated string staged_paths = 2;
   optional string base_version_id = 3;
-  optional string base_head_sha = 4;
 }
 
 message ApplyCanvasVersionChangesetRequest {
@@ -758,10 +755,6 @@ message CanvasVersion {
     string description = 9;
     string branch_name = 10;
     string display_name = 11;
-    string commit_sha = 12;
-    string git_branch = 13;
-    string materialization_status = 14;
-    string materialization_error = 15;
   }
 
   Metadata metadata = 1;
@@ -1177,11 +1170,19 @@ message CanvasVersionMessage {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+enum MaterializationStatus {
+  MATERIALIZATION_STATUS_UNSPECIFIED = 0;
+  MATERIALIZATION_STATUS_PENDING = 1;
+  MATERIALIZATION_STATUS_READY = 2;
+  MATERIALIZATION_STATUS_ERROR = 3;
+  MATERIALIZATION_STATUS_DELETED = 4;
+}
+
 message RepositoryBranchUpdatedMessage {
   string canvas_id = 1;
   string branch = 2;
   string head_sha = 3;
-  string materialization_status = 4;
+  MaterializationStatus materialization_status = 4;
   string materialization_error = 5;
   google.protobuf.Timestamp timestamp = 6;
   string pushed_by_user_id = 7;
