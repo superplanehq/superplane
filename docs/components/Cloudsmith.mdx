@@ -9,6 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
+  <LinkCard title="Get Package Status" href="#get-package-status" description="Retrieve the current status of a Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
 </CardGrid>
 
@@ -23,6 +25,126 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+
+<a id="get-package"></a>
+
+## Get Package
+
+**Component key:** `cloudsmith.getPackage`
+
+The Get Package component retrieves complete metadata for a specific Cloudsmith package.
+
+### Use Cases
+
+- **Audit trails**: Record full package metadata (checksums, format, upload time) for compliance
+- **Downstream enrichment**: Pass package details such as format or CDN URL to later workflow steps
+- **Checksum verification**: Retrieve SHA-256 or MD5 checksums to validate package integrity
+- **Package promotion**: Read source package attributes before replicating to another repository
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use `{{ $['On Package Uploaded'].package.slug_perm }}` to reference an upstream trigger.
+
+### Output
+
+Returns the complete package object including:
+- **name** / **version**: Package name and version string
+- **format**: Package format (e.g., `python`, `debian`, `docker`, `maven`)
+- **status** / **status_str**: Processing status
+- **uploaded_at**: ISO 8601 upload timestamp
+- **checksum_md5** / **checksum_sha1** / **checksum_sha256** / **checksum_sha512**: Package checksums
+- **size** / **size_str**: Package size in bytes and human-readable form
+- **cdn_url**: Direct CDN download URL
+- **self_html_url**: Link to the package page in the Cloudsmith web UI
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/public/acme/production/python/my-package-1.0.0.tar.gz",
+    "checksum_md5": "d41d8cd98f00b204e9800998ecf8427e",
+    "checksum_sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+    "checksum_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "checksum_sha512": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+    "description": "A sample Python package for demonstration purposes",
+    "format": "python",
+    "name": "my-package",
+    "namespace": "acme",
+    "repository": "production",
+    "self_html_url": "https://cloudsmith.io/~acme/repos/production/packages/detail/python/my-package/1.0.0/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/acme/production/perm123abc456/",
+    "size": 524288,
+    "size_str": "512.0 KB",
+    "slug": "my-package-1-0-0",
+    "slug_perm": "perm123abc456",
+    "status": 2,
+    "status_str": "Available",
+    "summary": "Sample package",
+    "uploaded_at": "2026-01-15T10:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-01-15T10:01:00.000000000Z",
+  "type": "cloudsmith.package.fetched"
+}
+```
+
+<a id="get-package-status"></a>
+
+## Get Package Status
+
+**Component key:** `cloudsmith.getPackageStatus`
+
+The Get Package Status component retrieves the current processing status of a Cloudsmith package.
+
+### Use Cases
+
+- **Release gating**: Check that a package is Available before triggering downstream deployment steps
+- **Polling workflows**: Repeatedly check status until a package leaves the Processing state
+- **Quarantine detection**: Alert teams when a package enters a Quarantined or Failed state
+- **Compliance checks**: Verify that a package has passed all scans before promotion
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use `{{ $['On Package Uploaded'].package.slug_perm }}` to reference an upstream trigger.
+
+### Output
+
+Returns a status snapshot containing:
+- **slug**: The package identifier
+- **name** / **version**: Human-readable package name and version
+- **status** / **status_str**: Numeric status code and its string representation (Available, Processing, Failed, Quarantined, Awaiting Scanning)
+- **repository** / **namespace**: Repository and namespace the package belongs to
+- **uploaded_at**: When the package was uploaded
+
+### Example Output
+
+```json
+{
+  "data": {
+    "is_quarantined": false,
+    "is_sync_awaiting": false,
+    "is_sync_completed": true,
+    "is_sync_failed": false,
+    "is_sync_in_flight": false,
+    "is_sync_in_progress": false,
+    "self_url": "https://api.cloudsmith.io/v1/packages/acme/production/perm123abc456/status/",
+    "stage": 2,
+    "stage_str": "Available",
+    "stage_updated_at": "2026-01-15T10:00:05.000Z",
+    "status": 2,
+    "status_reason": "",
+    "status_str": "Available",
+    "status_updated_at": "2026-01-15T10:00:05.000Z",
+    "sync_finished_at": "2026-01-15T10:00:05.000Z",
+    "sync_progress": 100
+  },
+  "timestamp": "2026-01-15T10:01:00.000000000Z",
+  "type": "cloudsmith.package.status"
+}
+```
 
 <a id="get-repository"></a>
 
