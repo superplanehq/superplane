@@ -22,6 +22,14 @@ func TestRegistryDefinitions_ReturnsRegisteredToolsInStableOrder(t *testing.T) {
 	assert.NotEmpty(t, definitions[0].InputSchema())
 }
 
+func TestSchemaRevision_IsStableForRegisteredDefinitions(t *testing.T) {
+	first := SchemaRevision()
+	second := SchemaRevision()
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, first, "agent-tools-v1:")
+}
+
 func TestRegistryExecuteCustomTool_DispatchesByToolName(t *testing.T) {
 	registry := NewRegistry(Dependencies{})
 

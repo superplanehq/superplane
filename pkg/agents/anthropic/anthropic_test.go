@@ -510,6 +510,50 @@ func TestDeleteSession_PropagatesAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "409")
 }
 
+func TestArchiveSession_SendsCorrectRequest(t *testing.T) {
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/sessions/sesn_abc/archive", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	require.NoError(t, p.ArchiveSession(context.Background(), "sesn_abc"))
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestArchiveSession_MapsUnavailableProviderSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"message":"session has been archived"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.ArchiveSession(context.Background(), "sesn_abc")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestToolSchemaRevision_ReturnsStableRevision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("schema revision must not call provider API")
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	first := p.ToolSchemaRevision()
+	second := p.ToolSchemaRevision()
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, first, "agent-tools-v1:")
+}
+
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	const sse = "data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}\n\n" +
 		"data: {\"id\":\"e2\",\"type\":\"agent.tool_use\",\"name\":\"bash\",\"input\":{\"command\":\"ls -la\"}}\n\n" +
