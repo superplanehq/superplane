@@ -23,7 +23,6 @@ const readRuntimeActionName = "read_runtime"
 var runtimeResources = []string{
 	"memory",
 	"runs",
-	"canvas_events",
 	"event_executions",
 	"node_executions",
 	"node_queue_items",
@@ -118,8 +117,6 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 			return nil, err
 		}
 		return protoPayload(canvasactions.ListRuns(ctx, a.registry, canvasID, input.Limit, before, states, results))
-	case "canvas_events":
-		return protoPayload(canvasactions.ListCanvasEvents(ctx, a.registry, canvasID, input.Limit, before))
 	case "event_executions":
 		if strings.TrimSpace(input.EventID) == "" {
 			return nil, fmt.Errorf("event_id is required for event_executions")

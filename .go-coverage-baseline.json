@@ -7,7 +7,7 @@
     "pkg/cli/commands/apps/canvas": 35.9,
     "pkg/cli/commands/apps/canvas/models": 100,
     "pkg/cli/commands/apps/console": 39.1,
-    "pkg/cli/commands/events": 39.1,
+    "pkg/cli/commands/runs": 39.1,
     "pkg/cli/commands/executions": 0,
     "pkg/cli/commands/groups": 69.6,
     "pkg/cli/commands/index": 70.4,
