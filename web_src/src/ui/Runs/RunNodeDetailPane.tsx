@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { useEventExecutions } from "@/hooks/useCanvasData";
-import { cn } from "@/lib/utils";
+import { ResizableBottomPane } from "@/ui/CanvasPage/ResizableBottomPane";
 import { RunNodeDetailContent } from "./RunNodeDetailContent";
 
 export interface RunNodeDetailPaneProps {
@@ -33,91 +33,20 @@ export function RunNodeDetailPane({
   maxHeight = 820,
   onHeightChange,
 }: RunNodeDetailPaneProps) {
-  const [internalHeight, setInternalHeight] = useState(defaultHeight);
-  const [isResizing, setIsResizing] = useState(false);
-  const dragStartRef = useRef<{ y: number; height: number } | null>(null);
-
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
   const executions = useMemo(() => executionsQuery.data?.executions || [], [executionsQuery.data?.executions]);
 
-  const paneHeight = height ?? internalHeight;
-  const clampHeight = useCallback(
-    (value: number) => {
-      const overrideMaxHeight = Math.min(document.body.clientHeight - 100, maxHeight);
-      return Math.max(minHeight, Math.min(overrideMaxHeight, value));
-    },
-    [minHeight, maxHeight],
-  );
-
-  const setPaneHeight = useCallback(
-    (value: number) => {
-      const nextHeight = clampHeight(value);
-      if (height === undefined) {
-        setInternalHeight(nextHeight);
-      }
-      onHeightChange?.(nextHeight);
-    },
-    [clampHeight, height, onHeightChange],
-  );
-
-  const handleResizeStart = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      dragStartRef.current = { y: event.clientY, height: paneHeight };
-      setIsResizing(true);
-    },
-    [paneHeight],
-  );
-
-  useEffect(() => {
-    if (!isResizing) {
-      return;
-    }
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!dragStartRef.current) return;
-      const delta = dragStartRef.current.y - moveEvent.clientY;
-      setPaneHeight(dragStartRef.current.height + delta);
-    };
-
-    const handleMouseUp = () => {
-      dragStartRef.current = null;
-      setIsResizing(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "ns-resize";
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-  }, [isResizing, setPaneHeight]);
-
   return (
-    <aside
-      className="relative z-31 flex min-h-0 shrink-0 flex-col overflow-hidden border-t border-border bg-white"
-      data-testid="run-node-detail-pane"
-      style={{ height: paneHeight, minHeight, maxHeight }}
+    <ResizableBottomPane
+      height={height}
+      defaultHeight={defaultHeight}
+      minHeight={minHeight}
+      maxHeight={maxHeight}
+      onHeightChange={onHeightChange}
+      testId="run-node-detail-pane"
+      resizeHandleTestId="run-node-detail-pane-resize-handle"
     >
-      <div
-        onMouseDown={handleResizeStart}
-        className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-row-resize bg-transparent"
-        style={{ marginTop: "-8px" }}
-        data-testid="run-node-detail-pane-resize-handle"
-      >
-        <div
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50",
-            isResizing && "bg-slate-950/50",
-          )}
-        />
-      </div>
       <RunNodeDetailContent
         run={run}
         nodeId={nodeId}
@@ -129,6 +58,6 @@ export function RunNodeDetailPane({
         onNavigateNode={onNavigateNode}
         testId="run-node-detail-modal"
       />
-    </aside>
+    </ResizableBottomPane>
   );
 }
