@@ -127,21 +127,30 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	}
 	callCtx := context.Background()
 
-	// Resolve the backend service (and its health check) before deleting anything.
+	// Resolve the backend service (and its health check) before deleting
+	// anything. If we cannot determine what the forwarding rule points at, fail
+	// rather than delete the rule and orphan the backend service / health check.
 	var besName, hcName, hcRegion string
 	besRegion := region
-	if body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName)); err == nil {
-		var fr forwardingRuleGetResp
-		if json.Unmarshal(body, &fr) == nil && fr.BackendService != "" {
-			if _, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices"); perr == nil {
-				besName, besRegion = name, br
-				if bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName)); berr == nil {
-					var bes backendServiceGetResp
-					if json.Unmarshal(bbody, &bes) == nil && len(bes.HealthChecks) > 0 {
-						if _, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks"); herr == nil {
-							hcName, hcRegion = hn, hr
-						}
-					}
+	body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName))
+	if err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read forwarding rule %q: %v", frName, err))
+	}
+	var fr forwardingRuleGetResp
+	if err := json.Unmarshal(body, &fr); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse forwarding rule %q: %v", frName, err))
+	}
+	if fr.BackendService != "" {
+		_, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices")
+		if perr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse backend service reference %q: %v", fr.BackendService, perr))
+		}
+		besName, besRegion = name, br
+		if bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName)); berr == nil {
+			var bes backendServiceGetResp
+			if json.Unmarshal(bbody, &bes) == nil && len(bes.HealthChecks) > 0 {
+				if _, hr, hn, herr := parseRegionalResource(bes.HealthChecks[0], "healthChecks"); herr == nil {
+					hcName, hcRegion = hn, hr
 				}
 			}
 		}

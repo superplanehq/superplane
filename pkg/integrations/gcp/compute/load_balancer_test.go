@@ -107,6 +107,48 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		assert.Equal(t, "web-lb-fr", data["forwardingRule"])
 	})
 
+	t.Run("resolves a reserved IP selfLink to its literal address", func(t *testing.T) {
+		ipLink := "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/addresses/web-ip"
+		var frIP any
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				if strings.HasSuffix(path, "/forwardingRules") {
+					frIP = body.(map[string]any)["IPAddress"]
+				}
+				return opDone("op"), nil
+			},
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/operations/"):
+					return opDone("op"), nil
+				case strings.Contains(path, "/addresses/"):
+					return []byte(`{"address":"35.1.1.1"}`), nil
+				case strings.Contains(path, "/healthChecks/"):
+					return []byte(`{"selfLink":"hc-link"}`), nil
+				case strings.Contains(path, "/backendServices/"):
+					return []byte(`{"selfLink":"bes-link"}`), nil
+				case strings.Contains(path, "/forwardingRules/"):
+					return []byte(`{"selfLink":"fr-link","IPAddress":"35.1.1.1"}`), nil
+				}
+				return nil, assert.AnError
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name": "web-lb", "region": "us-central1", "ports": []any{"80"},
+				"instanceGroup": ig, "ipAddress": ipLink,
+			},
+			ExecutionState: state,
+		}))
+		assert.True(t, state.Passed)
+		// The forwarding rule receives the literal IP, not the selfLink.
+		assert.Equal(t, "35.1.1.1", frIP)
+	})
+
 	t.Run("rolls back created resources when the forwarding rule fails", func(t *testing.T) {
 		var deleted []string
 		mc := &mockStaticIPClient{
@@ -188,6 +230,34 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 		assert.True(t, state.Passed)
 		assert.Equal(t, "gcp.compute.loadBalancer.deleted", state.Type)
 		assert.Equal(t, []string{"fr", "bes", "hc"}, deleted)
+	})
+
+	t.Run("fails without deleting when the forwarding rule cannot be read", func(t *testing.T) {
+		var deleted []string
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				if strings.Contains(path, "/operations/") {
+					return opDone("op"), nil
+				}
+				return nil, assert.AnError // forwarding rule GET fails
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				deleted = append(deleted, "x")
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, d.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"loadBalancer": fr},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "forwarding rule")
+		// Nothing is deleted, so the backend service is not orphaned.
+		assert.Empty(t, deleted)
 	})
 
 	t.Run("rejects a cross-project load balancer", func(t *testing.T) {

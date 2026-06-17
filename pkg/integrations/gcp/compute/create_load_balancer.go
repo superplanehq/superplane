@@ -249,6 +249,36 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	project := client.ProjectID()
 	callCtx := context.Background()
 
+	// Resolve a reserved static IP (selected as an integration resource, whose
+	// value is the address selfLink) to its literal IP up front, so a bad
+	// reference fails before any resources are created. Compute Engine expects
+	// the literal address on the forwarding rule, not the selfLink. An empty
+	// value means an ephemeral IP.
+	ipLiteral := ""
+	if ipRef := strings.TrimSpace(spec.IPAddress); ipRef != "" {
+		ipProject, ipRegion, ipName, perr := parseAddressPath(ipRef)
+		if perr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("invalid reserved IP: %v", perr))
+		}
+		if ipProject != "" && ipProject != project {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+				"reserved IP belongs to project %q but this GCP integration is bound to project %q", ipProject, project))
+		}
+		if ipRegion != "" && ipRegion != region {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+				"reserved IP is in region %q but the load balancer is being created in region %q", ipRegion, region))
+		}
+		body, gerr := GetAddress(callCtx, client, project, ipRegion, ipName)
+		if gerr != nil {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to read reserved IP %q: %v", ipName, gerr))
+		}
+		var addr addressGetResp
+		if json.Unmarshal(body, &addr) != nil || strings.TrimSpace(addr.Address) == "" {
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("reserved IP %q has no literal address", ipName))
+		}
+		ipLiteral = addr.Address
+	}
+
 	// Track created resources so we can roll back if a later step fails.
 	created := &lbResources{client: client, project: project, region: region}
 	fail := func(format string, args ...any) error {
@@ -285,8 +315,8 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		"ports":               ports,
 		"backendService":      besSelfLink,
 	}
-	if ip := strings.TrimSpace(spec.IPAddress); ip != "" {
-		frBody["IPAddress"] = ip
+	if ipLiteral != "" {
+		frBody["IPAddress"] = ipLiteral
 	}
 	if _, err := createAndWait(callCtx, client, project, region, "forwardingRules", frBody); err != nil {
 		return fail("failed to create forwarding rule: %v", err)
