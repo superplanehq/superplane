@@ -24,7 +24,7 @@ When building or modifying apps:
 
 Use `superplane_app` action `access` when you need to know what the current session can do. It reports the intersection of the session's permissions and the backend authorization interceptor, including which canvas-scoped actions are allowed for the current app. Do this when a permission boundary is unclear before attempting an operation.
 
-Use `superplane_app` action `read_runtime` for memory, runs, canvas events, event executions, node executions, node queue items, node events, and child executions. Use it for all runtime inspection.
+Use `superplane_app` action `read_runtime` for memory, runs, event executions, node executions, node queue items, and node events. Use it for all runtime inspection.
 
 For Console edits, read with `superplane_app` `include_console: true`, then update with `console_yaml`.
 

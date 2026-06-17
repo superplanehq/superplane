@@ -350,17 +350,6 @@ service Canvases {
     };
   }
 
-  rpc ListCanvasEvents(ListCanvasEventsRequest) returns (ListCanvasEventsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/events"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvas events";
-      description: "Returns a list of root events that triggered executions in a canvas";
-      tags: "CanvasEvent";
-    };
-  }
-
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/runs"
@@ -909,19 +898,6 @@ message InvokeNodeTriggerHookResponse {
   google.protobuf.Struct result = 1;
 }
 
-message ListCanvasEventsRequest {
-  string canvas_id = 1;
-  uint32 limit = 2;
-  google.protobuf.Timestamp before = 3;
-}
-
-message ListCanvasEventsResponse {
-  repeated CanvasEventWithExecutions events = 1;
-  uint32 total_count = 2;
-  bool has_next_page = 3;
-  google.protobuf.Timestamp last_timestamp = 4;
-}
-
 message ListRunsRequest {
   string canvas_id = 1;
   uint32 limit = 2;
@@ -1008,17 +984,6 @@ message CanvasEvent {
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
   bool root = 8;
-}
-
-message CanvasEventWithExecutions {
-  string id = 1;
-  string canvas_id = 2;
-  string node_id = 3;
-  string channel = 4;
-  google.protobuf.Struct data = 5;
-  google.protobuf.Timestamp created_at = 6;
-  repeated CanvasNodeExecutionRef executions = 7;
-  string custom_name = 8;
 }
 
 message CanvasRun {

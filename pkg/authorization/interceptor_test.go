@@ -28,11 +28,6 @@ func TestDefaultResourceResolver(t *testing.T) {
 
 func TestCanvasResourceResolver(t *testing.T) {
 	t.Run("returns canvas id when available", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"})
-		require.Equal(t, []string{"canvas-123"}, resourceIDs)
-	})
-
-	t.Run("returns canvas id for list runs", func(t *testing.T) {
 		resourceIDs := canvasResourceResolver(&pbCanvases.ListRunsRequest{CanvasId: "canvas-123"})
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
@@ -172,7 +167,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-123"}),
 				),
 			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListRunsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: true,
 		},
@@ -185,7 +180,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-456"}),
 				),
 			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListRunsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},
@@ -198,7 +193,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:update"}),
 				),
 			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListRunsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},
