@@ -170,6 +170,80 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 	return all, nil
 }
 
+// Package holds the Cloudsmith package fields relevant to license / policy /
+// governance compliance. Vulnerability fields are intentionally omitted — they
+// are covered by a separate component.
+type Package struct {
+	Name            string              `json:"name"`
+	Version         string              `json:"version"`
+	Slug            string              `json:"slug"`
+	SlugPerm        string              `json:"slug_perm"`
+	Namespace       string              `json:"namespace"`
+	Repository      string              `json:"repository"`
+	Format          string              `json:"format"`
+	License         string              `json:"license"`
+	RawLicense      string              `json:"raw_license"`
+	SPDXLicense     string              `json:"spdx_license"`
+	OSIApproved     bool                `json:"osi_approved"`
+	PolicyViolated  bool                `json:"policy_violated"`
+	IsQuarantined   bool                `json:"is_quarantined"`
+	IsQuarantinable bool                `json:"is_quarantinable"`
+	Stage           string              `json:"stage_str"`
+	Status          string              `json:"status_str"`
+	StatusReason    string              `json:"status_reason"`
+	Tags            map[string][]string `json:"tags"`
+	SelfHTMLURL     string              `json:"self_html_url"`
+	SelfWebappURL   string              `json:"self_webapp_url"`
+}
+
+// GetPackage fetches a single package identified by its permanent slug within a
+// repository (owner/repository).
+func (c *Client) GetPackage(owner, repository, slugPerm string) (*Package, error) {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+const packagePageSize = 100
+
+// ListPackages returns every package in a repository (owner/repository),
+// following all pages until the API returns a page smaller than packagePageSize.
+func (c *Client) ListPackages(owner, repository string) ([]Package, error) {
+	var all []Package
+
+	for page := 1; ; page++ {
+		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d",
+			c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), page, packagePageSize)
+		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var packages []Package
+		if err := json.Unmarshal(responseBody, &packages); err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		all = append(all, packages...)
+
+		if len(packages) < packagePageSize {
+			break
+		}
+	}
+
+	return all, nil
+}
+
 var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")
 
 // parseRepositoryID splits a Cloudsmith repository identifier of the form
