@@ -372,6 +372,17 @@ service Canvases {
     };
   }
 
+  rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs/{run_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe a run";
+      description: "Returns a description of a run";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -926,6 +937,15 @@ message ListRunsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
+message DescribeRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message DescribeRunResponse {
+  CanvasRun run = 1;
+}
+
 message CanvasMemory {
   enum Source {
     SOURCE_UNKNOWN = 0;
@@ -1146,6 +1166,24 @@ message CanvasVersionMessage {
   string canvas_id = 1;
   string version_id = 2;
   google.protobuf.Timestamp timestamp = 3;
+}
+
+enum MaterializationStatus {
+  MATERIALIZATION_STATUS_UNSPECIFIED = 0;
+  MATERIALIZATION_STATUS_PENDING = 1;
+  MATERIALIZATION_STATUS_READY = 2;
+  MATERIALIZATION_STATUS_ERROR = 3;
+  MATERIALIZATION_STATUS_DELETED = 4;
+}
+
+message RepositoryBranchUpdatedMessage {
+  string canvas_id = 1;
+  string branch = 2;
+  string head_sha = 3;
+  MaterializationStatus materialization_status = 4;
+  string materialization_error = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  string pushed_by_user_id = 7;
 }
 
 message NotificationEmailRequested {
