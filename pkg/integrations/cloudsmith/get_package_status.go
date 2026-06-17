@@ -47,12 +47,17 @@ func (g *GetPackageStatus) Documentation() string {
 
 ## Output
 
-Returns a status snapshot containing:
-- **slug**: The package identifier
-- **name** / **version**: Human-readable package name and version
-- **status** / **status_str**: Numeric status code and its string representation (Available, Processing, Failed, Quarantined, Awaiting Scanning)
-- **repository** / **namespace**: Repository and namespace the package belongs to
-- **uploaded_at**: When the package was uploaded`
+Returns a status snapshot from the Cloudsmith status endpoint containing:
+- **stage** / **stage_str**: Processing stage code and label (e.g. Uploading, Processing, Completed)
+- **stage_updated_at**: When the stage last changed
+- **status** / **status_str**: Overall status code and label (e.g. Available, Failed, Quarantined)
+- **status_reason**: Human-readable reason for the current status
+- **status_updated_at**: When the status last changed
+- **is_sync_awaiting** / **is_sync_in_flight** / **is_sync_in_progress**: Whether sync is pending or active
+- **is_sync_completed** / **is_sync_failed**: Final sync outcome flags
+- **is_quarantined**: Whether the package has been quarantined
+- **sync_progress**: Sync completion percentage (0–100)
+- **sync_finished_at**: When synchronisation completed`
 }
 
 func (g *GetPackageStatus) Icon() string {
