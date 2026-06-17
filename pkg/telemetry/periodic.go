@@ -44,17 +44,6 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
-	p.reportOrganizationsTotal()
-	p.reportUsersTotal()
-	p.reportWorkflowsTotal()
-	p.reportWorkflowNodesTotal()
-	p.reportDraftsTotal()
-	p.reportIntegrationsTotal()
-	p.reportIntegrationSecretsTotal()
-	p.reportWorkflowsActive()
-	p.reportWorkflowRunsDaily()
-	p.reportWorkflowEventsDaily()
-	p.reportWorkflowNodeExecutionsDaily()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -133,105 +122,6 @@ func (p *Periodic) reportPendingExecutions() {
 	}
 
 	RecordPendingExecutionsCount(p.ctx, count)
-}
-
-func (p *Periodic) reportOrganizationsTotal() {
-	count, err := countOrganizations()
-	if err != nil {
-		return
-	}
-
-	RecordOrganizationsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportUsersTotal() {
-	count, err := countUsers()
-	if err != nil {
-		return
-	}
-
-	RecordUsersTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowsTotal() {
-	count, err := countWorkflows()
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowNodesTotal() {
-	count, err := countWorkflowNodes()
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowNodesTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportDraftsTotal() {
-	count, err := countDrafts()
-	if err != nil {
-		return
-	}
-
-	RecordDraftsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportIntegrationsTotal() {
-	count, err := countIntegrations()
-	if err != nil {
-		return
-	}
-
-	RecordIntegrationsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportIntegrationSecretsTotal() {
-	count, err := countIntegrationSecrets()
-	if err != nil {
-		return
-	}
-
-	RecordIntegrationSecretsTotal(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowsActive() {
-	count, err := countActiveWorkflows(activeWindow)
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowsActiveCount(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowRunsDaily() {
-	count, err := countWorkflowRunsCreated(activeWindow)
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowRunsDailyCount(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowEventsDaily() {
-	count, err := countWorkflowEventsCreated(activeWindow)
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowEventsDailyCount(p.ctx, count)
-}
-
-func (p *Periodic) reportWorkflowNodeExecutionsDaily() {
-	count, err := countWorkflowNodeExecutionsCreated(activeWindow)
-	if err != nil {
-		return
-	}
-
-	RecordWorkflowNodeExecutionsDailyCount(p.ctx, count)
 }
 
 func countStuckQueueNodes() (int64, error) {
