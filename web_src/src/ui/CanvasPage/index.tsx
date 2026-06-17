@@ -314,7 +314,6 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
-  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
@@ -498,7 +497,6 @@ type CanvasNodeRendererCallbacks = {
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
-  onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
@@ -681,7 +679,6 @@ function buildInteractiveNodeBlockProps(
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
-    onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
     onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
@@ -1604,7 +1601,6 @@ function CanvasPage(props: CanvasPageProps) {
                   onDeactivate={props.onDeactivate}
                   onAnnotationUpdate={props.onAnnotationUpdate}
                   onAnnotationBlur={props.onAnnotationBlur}
-                  onTogglePause={props.onTogglePause}
                   runDisabled={props.runDisabled}
                   runDisabledTooltip={props.runDisabledTooltip}
                   onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -2236,7 +2232,6 @@ function CanvasContent({
   onEdgeCreate,
   onDuplicate,
   onDeactivate,
-  onTogglePause,
   onToggleView,
   onShowNodeDiff,
   onAnnotationUpdate,
@@ -2289,7 +2284,6 @@ function CanvasContent({
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onDuplicate?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
-  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
@@ -2539,9 +2533,6 @@ function CanvasContent({
 
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
-
-  const onTogglePauseRef = useRef(onTogglePause);
-  onTogglePauseRef.current = onTogglePause;
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
@@ -2891,7 +2882,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
-    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
@@ -2909,7 +2899,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
-    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,

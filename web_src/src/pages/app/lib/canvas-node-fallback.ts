@@ -78,7 +78,6 @@ export function buildComponentFallbackCanvasNode({
         includeEmptyState: true,
         emptyStateProps: buildMinimalEmptyStateProps(Puzzle),
         warning: node.warningMessage,
-        paused: !!node.paused,
       },
     },
   };

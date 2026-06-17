@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -68,12 +67,6 @@ func Test__DescribeCanvas(t *testing.T) {
 			},
 		)
 
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasNode{}).
-			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
-			Update("state", models.CanvasNodeStatePaused).
-			Error)
-
 		//
 		// Describe the canvas
 		//
@@ -103,16 +96,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Equal(t, "First Node", response.Canvas.Spec.Nodes[0].Name)
 		assert.Equal(t, "node-2", response.Canvas.Spec.Nodes[1].Id)
 		assert.Equal(t, "Second Node", response.Canvas.Spec.Nodes[1].Name)
-
-		var pausedNode *componentpb.Node
-		for _, node := range response.Canvas.Spec.Nodes {
-			if node.Id == "node-1" {
-				pausedNode = node
-				break
-			}
-		}
-		require.NotNil(t, pausedNode)
-		assert.True(t, pausedNode.Paused)
 
 		assert.Len(t, response.Canvas.Spec.Edges, 1)
 		assert.Equal(t, "node-1", response.Canvas.Spec.Edges[0].SourceId)
