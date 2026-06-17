@@ -12,6 +12,13 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func okResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+}
+
 func Test__Cloudsmith__ListResources(t *testing.T) {
 	integration := &Cloudsmith{}
 
