@@ -284,27 +284,24 @@ export function isValidRunId(runId: string): boolean {
   return RUN_ID_PATTERN.test(runId);
 }
 
-export function isUnresolvableRunError(error: unknown): boolean {
-  return isNotFoundError(error) || isInvalidArgumentError(error);
-}
-
 export function shouldClearStaleRunUrl({
   selectedRunId,
   isRunInspectionMode,
   selectedRun,
   isRunResolveLoading,
-  isRunUnresolvable,
+  describeRunSettled,
 }: {
   selectedRunId: string | null;
   isRunInspectionMode: boolean;
   selectedRun: unknown;
   isRunResolveLoading: boolean;
-  isRunUnresolvable: boolean;
+  describeRunSettled: boolean;
 }): boolean {
   if (!selectedRunId || !isRunInspectionMode) return false;
   if (isRunResolveLoading) return false;
   if (selectedRun) return false;
-  return isRunUnresolvable;
+  if (!isValidRunId(selectedRunId)) return true;
+  return describeRunSettled;
 }
 
 export function shouldClearRunDetailNode({

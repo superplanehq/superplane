@@ -6,14 +6,14 @@ export function useStaleRunInspectionUrlCleanup({
   isRunInspectionMode,
   selectedRun,
   isRunResolveLoading,
-  isRunUnresolvable,
+  describeRunSettled,
   onClear,
 }: {
   selectedRunId: string | null;
   isRunInspectionMode: boolean;
   selectedRun: unknown;
   isRunResolveLoading: boolean;
-  isRunUnresolvable: boolean;
+  describeRunSettled: boolean;
   onClear: () => void;
 }) {
   useEffect(() => {
@@ -23,10 +23,10 @@ export function useStaleRunInspectionUrlCleanup({
         isRunInspectionMode,
         selectedRun,
         isRunResolveLoading,
-        isRunUnresolvable,
+        describeRunSettled,
       })
     ) {
       onClear();
     }
-  }, [isRunInspectionMode, isRunUnresolvable, isRunResolveLoading, onClear, selectedRun, selectedRunId]);
+  }, [describeRunSettled, isRunInspectionMode, isRunResolveLoading, onClear, selectedRun, selectedRunId]);
 }

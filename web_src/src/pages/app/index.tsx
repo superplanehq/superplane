@@ -156,7 +156,6 @@ import {
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
-  isUnresolvableRunError,
   isValidRunId,
   prepareData,
   prepareSidebarData,
@@ -603,10 +602,8 @@ export function AppPage() {
   }, [describedRunQuery.data?.run, isRunInspectionMode, selectedRunFromList, selectedRunId]);
   const isSelectedRunLoading =
     isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid && !selectedRun && describedRunQuery.isLoading;
-  const isRunUnresolvable =
-    isRunInspectionMode &&
-    !!selectedRunId &&
-    (!selectedRunIdIsValid || (describedRunQuery.isError && isUnresolvableRunError(describedRunQuery.error)));
+  const describeQueryEnabled = isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid;
+  const describeRunSettled = !describeQueryEnabled || describedRunQuery.isFetched;
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const { selectedRunCanvas, isSelectedRunVersionLoading } = useSelectedRunCanvas({
@@ -4371,7 +4368,7 @@ export function AppPage() {
     isRunInspectionMode,
     selectedRun,
     isRunResolveLoading: isSelectedRunLoading,
-    isRunUnresolvable,
+    describeRunSettled,
     onClear: handleClearRunInspection,
   });
 

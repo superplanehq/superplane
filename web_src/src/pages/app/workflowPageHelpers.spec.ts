@@ -1,36 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
   clearRunDetailNodeSearchParams,
-  isUnresolvableRunError,
   isValidRunId,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
 } from "./workflowPageHelpers";
 
+const validRunId = "550e8400-e29b-41d4-a716-446655440000";
+
 describe("workflowPageHelpers run inspection", () => {
-  it("clears stale run URLs only after describe run resolves as unresolvable", () => {
+  it("clears stale run URLs after describe settles without a run", () => {
     expect(
       shouldClearStaleRunUrl({
-        selectedRunId: "missing-run",
+        selectedRunId: validRunId,
         isRunInspectionMode: true,
         selectedRun: null,
         isRunResolveLoading: true,
-        isRunUnresolvable: false,
+        describeRunSettled: false,
       }),
     ).toBe(false);
 
     expect(
       shouldClearStaleRunUrl({
-        selectedRunId: "missing-run",
+        selectedRunId: validRunId,
         isRunInspectionMode: true,
         selectedRun: null,
         isRunResolveLoading: false,
-        isRunUnresolvable: true,
+        describeRunSettled: true,
       }),
     ).toBe(true);
   });
 
-  it("treats malformed run ids as unresolvable", () => {
+  it("clears malformed run ids immediately", () => {
     expect(isValidRunId("not-a-uuid")).toBe(false);
     expect(
       shouldClearStaleRunUrl({
@@ -38,15 +39,21 @@ describe("workflowPageHelpers run inspection", () => {
         isRunInspectionMode: true,
         selectedRun: null,
         isRunResolveLoading: false,
-        isRunUnresolvable: true,
+        describeRunSettled: false,
       }),
     ).toBe(true);
   });
 
-  it("treats invalid argument describe errors as unresolvable", () => {
-    expect(isUnresolvableRunError({ code: "INVALID_ARGUMENT" })).toBe(true);
-    expect(isUnresolvableRunError({ status: 400 })).toBe(true);
-    expect(isUnresolvableRunError({ status: 500 })).toBe(false);
+  it("does not clear when the run resolved", () => {
+    expect(
+      shouldClearStaleRunUrl({
+        selectedRunId: validRunId,
+        isRunInspectionMode: true,
+        selectedRun: { id: validRunId },
+        isRunResolveLoading: false,
+        describeRunSettled: true,
+      }),
+    ).toBe(false);
   });
 
   it("clears run detail nodes that are not part of the selected run", () => {
