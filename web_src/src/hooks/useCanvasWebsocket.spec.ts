@@ -79,6 +79,15 @@ function getInvalidationCalls(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>,
   });
 }
 
+type QueryPredicate = (query: { queryKey: readonly unknown[] }) => boolean;
+
+function getInvalidationPredicates(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>) {
+  const predicates: unknown[] = invalidateQueriesSpy.mock.calls.map(
+    (call: unknown[]) => (call[0] as { predicate?: unknown }).predicate,
+  );
+  return predicates.filter((predicate: unknown): predicate is QueryPredicate => typeof predicate === "function");
+}
+
 function seedInfiniteEvents(queryClient: QueryClient, events: InfiniteEventsPage["events"] = []) {
   queryClient.setQueryData<InfiniteData<InfiniteEventsPage>>(canvasKeys.infiniteEvents(testCanvasId), {
     pages: [{ events, totalCount: events?.length ?? 0, hasNextPage: false }],
@@ -314,11 +323,23 @@ describe("useCanvasWebsocket", () => {
     expect(
       getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
     ).toHaveLength(1);
-    const stagedPredicateCalls = invalidateQueriesSpy.mock.calls.filter((call: unknown[]) => {
-      const args = call[0] as { predicate?: unknown };
-      return typeof args.predicate === "function";
-    });
-    expect(stagedPredicateCalls).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.repositoryFiles(testCanvasId))).toHaveLength(1);
+
+    const [stagedPredicate] = getInvalidationPredicates(invalidateQueriesSpy);
+    expect(stagedPredicate).toBeDefined();
+    expect(stagedPredicate({ queryKey: canvasKeys.versionStagedDetail(testCanvasId, "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.consoleStaged(testCanvasId, "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1") })).toBe(true);
+    expect(
+      stagedPredicate({ queryKey: canvasKeys.repositoryFileContent(testCanvasId, "README.md", "version-1", true) }),
+    ).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md") })).toBe(false);
+    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-2") })).toBe(
+      false,
+    );
+    expect(
+      stagedPredicate({ queryKey: canvasKeys.repositoryFileContent(testCanvasId, "README.md", "version-1", false) }),
+    ).toBe(false);
   });
 
   it("skips staging invalidation when onCanvasStagingEvent returns false", () => {

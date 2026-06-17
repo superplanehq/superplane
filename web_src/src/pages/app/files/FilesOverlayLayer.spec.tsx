@@ -12,7 +12,9 @@ import { FilesOverlayLayer } from "./FilesOverlayLayer";
 const repositoryFiles = [{ path: "README.md" }];
 const repositoryFileContents: Record<string, string> = {
   "README.md": "# readme",
+  "notes/scratchpad.json": '{ "hello": "agent" }',
 };
+let stagedPaths: string[] = [];
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -51,7 +53,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
     isPending: false,
   }),
   useCanvasVersionStaging: () => ({
-    data: { hasStaging: false, stagedPaths: [] },
+    data: { hasStaging: stagedPaths.length > 0, stagedPaths },
     isLoading: false,
     error: null,
   }),
@@ -65,13 +67,15 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-let selectRepositoryPath: ((path: string) => void) | undefined;
-
 vi.mock("@pierre/trees/react", () => ({
-  FileTree: () => (
-    <button type="button" onClick={() => selectRepositoryPath?.("README.md")}>
-      README.md
-    </button>
+  FileTree: ({ model }: { model: { paths: string[]; selectPath?: (path: string) => void } }) => (
+    <>
+      {model.paths.map((path) => (
+        <button type="button" key={path} onClick={() => model.selectPath?.(path)}>
+          {path}
+        </button>
+      ))}
+    </>
   ),
   useFileTree: ({
     paths,
@@ -80,13 +84,10 @@ vi.mock("@pierre/trees/react", () => ({
     paths: string[];
     onSelectionChange?: (selectedPaths: string[]) => void;
   }) => {
-    selectRepositoryPath = (path: string) => {
-      if (!paths.includes(path)) return;
-      onSelectionChange?.([path]);
-    };
-
     return {
       model: {
+        paths,
+        selectPath: (path: string) => onSelectionChange?.([path]),
         resetPaths: vi.fn(),
         getSelectedPaths: () => [],
         getItem: () => ({
@@ -101,6 +102,8 @@ vi.mock("@pierre/trees/react", () => ({
 
 describe("FilesOverlayLayer", () => {
   beforeEach(() => {
+    stagedPaths = [];
+    queryClient.clear();
     localStorage.clear();
     useSidebarLayoutStore.getState().hydrateFromStorage();
   });
@@ -158,7 +161,7 @@ describe("FilesOverlayLayer", () => {
     await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
     await user.type(screen.getByTestId("monaco-stub"), "!");
 
-    await user.click(screen.getByRole("button", { name: "canvas.yaml" }));
+    await user.click(screen.getAllByRole("button", { name: "canvas.yaml" })[0]!);
     await user.click(screen.getAllByRole("button", { name: "README.md" }).at(-1)!);
 
     expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme!");
@@ -187,11 +190,50 @@ describe("FilesOverlayLayer", () => {
     await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
     expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme");
 
-    await user.click(screen.getByRole("button", { name: "canvas.yaml" }));
+    await user.click(screen.getAllByRole("button", { name: "canvas.yaml" })[0]!);
     expect(screen.getByTestId("monaco-stub")).toHaveValue("canvas: true");
 
     await user.click(screen.getAllByRole("button", { name: "README.md" }).at(-1)!);
     expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme");
+  });
+
+  it("shows and opens files that only exist in draft staging", async () => {
+    const user = userEvent.setup();
+
+    const props = {
+      isFilesMode: true,
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      isEditing: true,
+      canWrite: true,
+      files: [
+        {
+          path: "canvas.yaml",
+          content: "canvas: true",
+          language: "yaml",
+        },
+      ],
+    };
+
+    const { rerender } = render(<FilesOverlayLayer {...props} />, { wrapper: Wrapper });
+
+    expect(screen.queryByRole("button", { name: "notes/scratchpad.json" })).not.toBeInTheDocument();
+
+    stagedPaths = ["notes/scratchpad.json"];
+    rerender(
+      <FilesOverlayLayer
+        isFilesMode={props.isFilesMode}
+        canvasId={props.canvasId}
+        versionId={props.versionId}
+        isEditing={props.isEditing}
+        canWrite={props.canWrite}
+        files={props.files}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "notes/scratchpad.json" }));
+
+    expect(screen.getByTestId("monaco-stub")).toHaveValue('{ "hello": "agent" }');
   });
 
   it("does not create a file when Escape is pressed in the new file input", async () => {
