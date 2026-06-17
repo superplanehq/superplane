@@ -23,11 +23,56 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
     expect(screen.getByText("No published history yet.")).toBeInTheDocument();
+  });
+
+  it("calls onCreateDraftBranch when the create-draft button is clicked", () => {
+    const onCreateDraftBranch = vi.fn();
+
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={onCreateDraftBranch}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("canvas-create-draft-button"));
+
+    expect(onCreateDraftBranch).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the create-draft button when the user cannot update the canvas", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={false}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("canvas-create-draft-button")).not.toBeInTheDocument();
+  });
+
+  it("renders the git-backed footer with a copy clone command action", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("versions-sidebar-footer")).toBeInTheDocument();
+    expect(screen.getByTestId("versions-sidebar-copy-clone-command")).toBeInTheDocument();
   });
 
   it("selects a version when a row is clicked", () => {
@@ -40,7 +85,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -63,7 +107,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -78,7 +121,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -97,7 +139,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { unmount } = render(<VersionsTabPanel {...props} />);
@@ -122,7 +163,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { rerender } = render(<VersionsTabPanel {...props} />);

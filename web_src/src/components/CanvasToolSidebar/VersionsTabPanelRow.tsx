@@ -1,34 +1,27 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
-import { Diff } from "lucide-react";
 import { useCallback } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
   version,
-  previousVersion,
   isActive = false,
   isCurrentLive = false,
   isFirstCanvasVersion = false,
   rowTestId,
   onUseVersion,
-  onViewDiff,
 }: {
   version: CanvasesCanvasVersion;
-  previousVersion?: CanvasesCanvasVersion;
   isActive?: boolean;
   isCurrentLive?: boolean;
   isFirstCanvasVersion?: boolean;
   rowTestId?: string;
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
 }) {
-  const versionID = version.metadata?.id ?? "";
-  const ownerName = version.metadata?.owner?.name || "Unknown owner";
-  const versionLabel = isFirstCanvasVersion ? "v1" : formatVersionTimestamp(version) || formatVersionLabel(version);
+  const { versionID, ownerName, versionLabel, timestamp } = deriveVersionRowFields(version, isFirstCanvasVersion);
 
   const handleRowActivate = useCallback(() => {
     onUseVersion(versionID);
@@ -56,16 +49,36 @@ export function VersionRow({
       onClick={handleRowActivate}
       onKeyDown={handleRowKeyDown}
       aria-label={`Preview ${versionLabel}`}
+      title={`${versionLabel} · ${ownerName}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-slate-900">{versionLabel}</p>
-          <VersionSubtitle isCurrentLive={isCurrentLive} ownerName={ownerName} />
-        </div>
-        <VersionDetailsButton version={version} previousVersion={previousVersion} onViewDiff={onViewDiff} />
-      </div>
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-xs",
+          isActive ? "font-semibold text-sky-900" : "font-medium text-slate-900",
+        )}
+      >
+        {versionLabel}
+      </span>
+      {isCurrentLive ? (
+        <span className="shrink-0 rounded bg-sky-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-800">
+          Current
+        </span>
+      ) : null}
+      <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500">{ownerName}</span>
+      {timestamp ? (
+        <TimeAgo date={timestamp} includeAgo={false} className="shrink-0 text-xs tabular-nums text-slate-500" />
+      ) : null}
     </div>
   );
+}
+
+function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVersion: boolean) {
+  return {
+    versionID: version.metadata?.id ?? "",
+    ownerName: version.metadata?.owner?.name || "Unknown owner",
+    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionTimestamp(version) || formatVersionLabel(version),
+    timestamp: version.metadata?.publishedAt || version.metadata?.updatedAt || version.metadata?.createdAt,
+  };
 }
 
 function isActivationKey(key: string): boolean {
@@ -73,69 +86,9 @@ function isActivationKey(key: string): boolean {
 }
 
 function versionRowClassName(isActive: boolean): string {
-  const baseClassName = "w-full cursor-pointer border-b border-b-slate-950/10 px-4 py-2 text-left transition";
-  if (!isActive) {
-    return `${baseClassName} bg-white hover:bg-slate-100`;
-  }
-  return cn(baseClassName, "bg-sky-100");
-}
-
-function VersionSubtitle({ isCurrentLive, ownerName }: { isCurrentLive: boolean; ownerName: string }) {
-  return (
-    <p className="mt-0.5 truncate text-xs text-slate-600">
-      {isCurrentLive ? <StatusBadge className="font-medium text-sky-700" label="Current Version" /> : null}
-      {ownerName}
-    </p>
-  );
-}
-
-function StatusBadge({ className, label }: { className: string; label: string }) {
-  return (
-    <>
-      <span className={className}>{label}</span> {"·"}{" "}
-    </>
-  );
-}
-
-function VersionDetailsButton({
-  version,
-  previousVersion,
-  onViewDiff,
-}: {
-  version: CanvasesCanvasVersion;
-  previousVersion?: CanvasesCanvasVersion;
-  onViewDiff: (version: CanvasesCanvasVersion, previousVersion: CanvasesCanvasVersion) => void;
-}) {
-  const handleClick = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      if (!previousVersion) return;
-      onViewDiff(version, previousVersion);
-    },
-    [onViewDiff, previousVersion, version],
-  );
-
-  if (!previousVersion) return null;
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
-              onClick={handleClick}
-              aria-label="View Diff"
-            >
-              <Diff className="size-3.5" />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top">View Diff</TooltipContent>
-      </Tooltip>
-    </div>
+  return cn(
+    RUNS_SIDEBAR_ROW_CLASS,
+    "group w-full cursor-pointer text-left transition-colors",
+    isActive ? "bg-sky-100" : "bg-white hover:bg-gray-50",
   );
 }
