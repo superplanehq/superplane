@@ -4685,7 +4685,9 @@ export function AppPage() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftDiffVersusLive,
   });
-  const exitEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
+  // Exit leaves the edit session entirely (including while previewing the current
+  // or an older version), so it must not require an editable draft to be active.
+  const exitEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
   const exitEditModeDisabledTooltip = getExitEditModeDisabledTooltip({
     canUpdateCanvas,
     canvasDeletedRemotely,
@@ -4960,7 +4962,7 @@ export function AppPage() {
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
-          onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
+          onCancelExecution={showLiveActivity ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}
           onLoadMoreHistory={handleLoadMoreHistory}
           getHasMoreHistory={getHasMoreHistory}
@@ -4969,8 +4971,8 @@ export function AppPage() {
           getAllQueueEvents={getAllQueueEvents}
           getHasMoreQueue={getHasMoreQueue}
           getLoadingMoreQueue={getLoadingMoreQueue}
-          onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
-          onRunItemOpen={isViewingLiveVersion ? handleRunItemOpen : undefined}
+          onReEmit={canUpdateCanvas && showLiveActivity ? handleReEmit : undefined}
+          onRunItemOpen={showLiveActivity ? handleRunItemOpen : undefined}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
@@ -4982,7 +4984,7 @@ export function AppPage() {
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
-          onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
+          onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
           onNodeClick={isRunInspectionMode ? handleRunCanvasNodeClick : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
