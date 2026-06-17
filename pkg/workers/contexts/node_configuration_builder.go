@@ -95,6 +95,22 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 	return resolved, nil
 }
 
+func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
+	if _, ok := configuration["customName"]; !ok {
+		return configuration
+	}
+
+	result := make(map[string]any, len(configuration)-1)
+	for key, value := range configuration {
+		if key == "customName" {
+			continue
+		}
+		result[key] = value
+	}
+
+	return result
+}
+
 func (b *NodeConfigurationBuilder) resolve(configuration map[string]any) (map[string]any, error) {
 	result := make(map[string]any, len(configuration))
 
