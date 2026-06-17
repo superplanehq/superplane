@@ -129,11 +129,12 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 
 	// Resolve the backend service (and its health check) before deleting anything.
 	var besName, hcName, hcRegion string
+	besRegion := region
 	if body, err := client.Get(callCtx, regionalPath(project, region, "forwardingRules", frName)); err == nil {
 		var fr forwardingRuleGetResp
 		if json.Unmarshal(body, &fr) == nil && fr.BackendService != "" {
-			if _, besRegion, name, perr := parseRegionalResource(fr.BackendService, "backendServices"); perr == nil {
-				besName = name
+			if _, br, name, perr := parseRegionalResource(fr.BackendService, "backendServices"); perr == nil {
+				besName, besRegion = name, br
 				if bbody, berr := client.Get(callCtx, regionalPath(project, besRegion, "backendServices", besName)); berr == nil {
 					var bes backendServiceGetResp
 					if json.Unmarshal(bbody, &bes) == nil && len(bes.HealthChecks) > 0 {
@@ -153,7 +154,7 @@ func (d *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 
 	// 2. Backend service (required once the forwarding rule is gone).
 	if besName != "" {
-		if err := deleteAndWait(callCtx, client, project, region, "backendServices", besName); err != nil {
+		if err := deleteAndWait(callCtx, client, project, besRegion, "backendServices", besName); err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete backend service %q: %v", besName, err))
 		}
 	}

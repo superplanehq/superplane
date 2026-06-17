@@ -236,8 +236,10 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	hcName := name + "-hc"
 	besName := name + "-backend"
 	frName := name + "-fr"
-	if len(frName) > 63 {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("name %q is too long; the derived forwarding rule name %q exceeds 63 characters", name, frName))
+	// The backend service name (suffix "-backend") is the longest derived name,
+	// so it is the first to exceed GCP's 63-character resource name limit.
+	if len(besName) > 63 {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("name %q is too long; the derived backend service name %q exceeds 63 characters", name, besName))
 	}
 
 	client, err := getClient(ctx)
@@ -320,8 +322,8 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 // lbResources tracks the load balancer pieces created so far so a partial
 // failure can be unwound (delete in reverse creation order, best-effort).
 type lbResources struct {
-	client                                 Client
-	project, region                        string
+	client                                      Client
+	project, region                             string
 	healthCheck, backendService, forwardingRule string
 }
 
