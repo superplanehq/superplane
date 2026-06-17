@@ -279,7 +279,11 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		ipLiteral = addr.Address
 	}
 
-	// Track created resources so we can roll back if a later step fails.
+	// Track created resources so we can roll back if a later step fails. Each
+	// name is recorded *before* the insert: createAndWait may fail after GCP has
+	// already created the resource (e.g. the post-wait GET or operation poll
+	// fails), and rollback (best-effort, ignores not-found) must still tear it
+	// down so a retry does not collide with a half-created load balancer.
 	created := &lbResources{client: client, project: project, region: region}
 	fail := func(format string, args ...any) error {
 		created.rollback(callCtx)
@@ -287,13 +291,14 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// 1. Health check
+	created.healthCheck = hcName
 	hcSelfLink, err := createAndWait(callCtx, client, project, region, "healthChecks", healthCheckBody(hcName, spec.HealthCheckProtocol, hcPort))
 	if err != nil {
 		return fail("failed to create health check: %v", err)
 	}
-	created.healthCheck = hcName
 
 	// 2. Backend service
+	created.backendService = besName
 	besBody := map[string]any{
 		"name":                besName,
 		"loadBalancingScheme": loadBalancingSchemeExternal,
@@ -305,9 +310,9 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fail("failed to create backend service: %v", err)
 	}
-	created.backendService = besName
 
 	// 3. Forwarding rule
+	created.forwardingRule = frName
 	frBody := map[string]any{
 		"name":                frName,
 		"loadBalancingScheme": loadBalancingSchemeExternal,
@@ -322,7 +327,6 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fail("failed to create forwarding rule: %v", err)
 	}
-	created.forwardingRule = frName
 
 	// Determine the load balancer's IP. A reserved IP is already known; for an
 	// ephemeral IP, read the forwarding rule back to learn the assigned address.
@@ -338,7 +342,10 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 		if err := json.Unmarshal(body, &fr); err != nil {
 			return fail("forwarding rule %q was created but its response could not be parsed: %v", frName, err)
 		}
-		assignedIP = fr.IPAddress
+		assignedIP = strings.TrimSpace(fr.IPAddress)
+	}
+	if assignedIP == "" {
+		return fail("forwarding rule %q was created but no IP address was assigned", frName)
 	}
 
 	// Emit the forwarding rule as a Delete-consumable reference (its canonical,

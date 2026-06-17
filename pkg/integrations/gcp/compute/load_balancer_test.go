@@ -190,6 +190,88 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 		// Backend service and health check created before the failure are torn down.
 		assert.ElementsMatch(t, []string{"bes", "hc"}, deleted)
 	})
+
+	t.Run("rolls back a resource whose insert completed but read-back failed", func(t *testing.T) {
+		var deleted []string
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			postFunc:  func(ctx context.Context, path string, body any) ([]byte, error) { return opDone("op"), nil },
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/operations/"):
+					return opDone("op"), nil
+				case strings.Contains(path, "/healthChecks/"):
+					return []byte(`{"selfLink":"hc-link"}`), nil
+				case strings.Contains(path, "/backendServices/"):
+					return nil, assert.AnError // insert finished, but the read-back fails
+				}
+				return nil, assert.AnError
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/backendServices/"):
+					deleted = append(deleted, "bes")
+				case strings.Contains(path, "/healthChecks/"):
+					deleted = append(deleted, "hc")
+				}
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"name": "web-lb", "region": "us-central1", "ports": []any{"80"}, "instanceGroup": ig},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "backend service")
+		// The backend service insert completed but its read-back failed; rollback
+		// must still tear it down (along with the health check).
+		assert.ElementsMatch(t, []string{"bes", "hc"}, deleted)
+	})
+
+	t.Run("rolls back and fails when the forwarding rule has no assigned IP", func(t *testing.T) {
+		var deleted []string
+		mc := &mockStaticIPClient{
+			projectID: "my-project",
+			postFunc:  func(ctx context.Context, path string, body any) ([]byte, error) { return opDone("op"), nil },
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/operations/"):
+					return opDone("op"), nil
+				case strings.Contains(path, "/healthChecks/"):
+					return []byte(`{"selfLink":"hc-link"}`), nil
+				case strings.Contains(path, "/backendServices/"):
+					return []byte(`{"selfLink":"bes-link"}`), nil
+				case strings.Contains(path, "/forwardingRules/"):
+					return []byte(`{"selfLink":"fr-link"}`), nil // no IPAddress assigned
+				}
+				return nil, assert.AnError
+			},
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				switch {
+				case strings.Contains(path, "/forwardingRules/"):
+					deleted = append(deleted, "fr")
+				case strings.Contains(path, "/backendServices/"):
+					deleted = append(deleted, "bes")
+				case strings.Contains(path, "/healthChecks/"):
+					deleted = append(deleted, "hc")
+				}
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		require.NoError(t, c.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"name": "web-lb", "region": "us-central1", "ports": []any{"80"}, "instanceGroup": ig},
+			ExecutionState: state,
+		}))
+		assert.False(t, state.Passed)
+		assert.Contains(t, state.FailureMessage, "no IP address")
+		assert.ElementsMatch(t, []string{"fr", "bes", "hc"}, deleted)
+	})
 }
 
 func Test__DeleteLoadBalancer__Execute(t *testing.T) {
