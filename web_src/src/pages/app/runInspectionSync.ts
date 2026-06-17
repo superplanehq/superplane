@@ -45,3 +45,12 @@ export function shouldClearRunDetailNode({
   if (participantNodeIds.length === 0) return true;
   return !participantNodeIds.includes(runDetailNodeId);
 }
+
+export function clearRunDetailNodeSearchParams(searchParams: URLSearchParams, nodeId: string): URLSearchParams {
+  const next = new URLSearchParams(searchParams);
+  if (next.get("sidebar") === "1" && next.get("node") === nodeId) {
+    next.delete("sidebar");
+    next.delete("node");
+  }
+  return next;
+}

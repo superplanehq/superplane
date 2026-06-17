@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hasLoadedAllRuns, shouldClearRunDetailNode, shouldClearStaleRunUrl } from "./runInspectionSync";
+import {
+  clearRunDetailNodeSearchParams,
+  hasLoadedAllRuns,
+  shouldClearRunDetailNode,
+  shouldClearStaleRunUrl,
+} from "./runInspectionSync";
 
 describe("runInspectionSync", () => {
   it("detects when all runs are loaded", () => {
@@ -68,5 +73,26 @@ describe("runInspectionSync", () => {
         runCanvasLoading: true,
       }),
     ).toBe(false);
+  });
+
+  it("clears matching stale run detail node search params", () => {
+    const cleared = clearRunDetailNodeSearchParams(
+      new URLSearchParams({ run: "run-1", sidebar: "1", node: "node-a" }),
+      "node-a",
+    );
+
+    expect(cleared.get("run")).toBe("run-1");
+    expect(cleared.get("sidebar")).toBeNull();
+    expect(cleared.get("node")).toBeNull();
+  });
+
+  it("keeps run detail node search params for a newer URL selection", () => {
+    const unchanged = clearRunDetailNodeSearchParams(
+      new URLSearchParams({ run: "run-1", sidebar: "1", node: "node-b" }),
+      "node-a",
+    );
+
+    expect(unchanged.get("sidebar")).toBe("1");
+    expect(unchanged.get("node")).toBe("node-b");
   });
 });
