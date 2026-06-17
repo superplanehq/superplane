@@ -432,9 +432,12 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		return fmt.Errorf("failed to fetch package %q: %w", packageSlugPerm, err)
 	}
 
-	packageName := pkg.Slug
+	packageName := pkg.Name
 	if packageName == "" {
 		packageName = packageSlugPerm
+	}
+	if pkg.Version != "" {
+		packageName = fmt.Sprintf("%s %s", packageName, pkg.Version)
 	}
 
 	return ctx.Metadata.Set(PackageNodeMetadata{
