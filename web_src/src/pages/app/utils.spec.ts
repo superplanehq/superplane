@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { makeComponentsNode } from "@/test/factories";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { findRunIdForSidebarEvent, getSidebarEventRunLookupBefore, mapCanvasNodesToLogEntries } from "./utils";
+import { findRunIdForSidebarEvent, mapCanvasNodesToLogEntries } from "./utils";
 
 describe("mapCanvasNodesToLogEntries", () => {
   it("maps node warnings into canvas log entries", () => {
@@ -66,27 +66,5 @@ describe("findRunIdForSidebarEvent", () => {
         event,
       ),
     ).toBe("run-from-execution");
-  });
-});
-
-describe("getSidebarEventRunLookupBefore", () => {
-  it("starts run lookup just after the root event timestamp", () => {
-    const event = {
-      id: "execution-1",
-      title: "Schedule",
-      state: "success",
-      isOpen: false,
-      kind: "execution",
-      receivedAt: new Date("2026-02-06T15:28:05Z"),
-      originalExecution: {
-        id: "execution-1",
-        rootEvent: {
-          id: "root-event-1",
-          createdAt: "2026-02-06T15:00:00Z",
-        },
-      },
-    } satisfies SidebarEvent;
-
-    expect(getSidebarEventRunLookupBefore(event)).toBe("2026-02-06T15:05:00.000Z");
   });
 });
