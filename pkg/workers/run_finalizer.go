@@ -48,7 +48,14 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 	go w.startExecutionFinishedConsumer(ctx)
 	go w.startEventTerminalConsumer(ctx)
 
-	ticker := time.NewTicker(time.Minute)
+	//
+	// The database poller is supposed to catch runs that weren't finalized properly,
+	// due to some issue in the RabbitMQ event processing plumbing.
+	// Also, runs can be open for quite some time - for example,
+	// a run waiting for an approval that never comes.
+	// So, using the database poller every 5 minutes is a good compromise.
+	//
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -216,6 +223,11 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		)
 	}()
 
+	logger := w.logger.WithFields(log.Fields{
+		"workflow_id": workflowID,
+		"run_id":      runID,
+	})
+
 	var finalized bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
@@ -229,6 +241,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	})
 
 	if err != nil {
+		logger.WithError(err).Errorf("Error finalizing run: %v", err)
 		outcome = executorOutcomeFailed
 		reason = classifyProcessError(err)
 		return err
@@ -238,10 +251,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		return nil
 	}
 
-	w.logger.WithFields(log.Fields{
-		"workflow_id": workflowID,
-		"run_id":      runID,
-	}).Info("Run finalized")
+	logger.Info("Run finalized")
 
 	if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
