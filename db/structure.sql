@@ -133,7 +133,9 @@ CREATE TABLE public.agent_sessions (
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    heartbeat_at timestamp with time zone
+    heartbeat_at timestamp with time zone,
+    agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -2016,7 +2018,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260617143500	f
+20260617203101	f
 \.
 
 
