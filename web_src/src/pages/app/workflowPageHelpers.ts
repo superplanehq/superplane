@@ -252,7 +252,82 @@ export function isNotFoundError(error: unknown): boolean {
   return message.includes("not found") || message.includes("404");
 }
 
+/**
+ * True when an API call failed because the request was invalid
+ * (HTTP 400 / gRPC INVALID_ARGUMENT).
+ */
+export function isInvalidArgumentError(error: unknown): boolean {
+  if (readErrorField(error, "status") === 400) {
+    return true;
+  }
+
+  const response = readErrorField(error, "response");
+  if (typeof response === "object" && response !== null && readErrorField(response, "status") === 400) {
+    return true;
+  }
+
+  if (readErrorField(error, "code") === "INVALID_ARGUMENT") {
+    return true;
+  }
+
+  return false;
+}
+
 /** True when a canvas fetch failed because the canvas does not exist. */
 export function isCanvasLoadNotFoundError(error: unknown): boolean {
   return isNotFoundError(error);
+}
+
+const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidRunId(runId: string): boolean {
+  return RUN_ID_PATTERN.test(runId);
+}
+
+export function isUnresolvableRunError(error: unknown): boolean {
+  return isNotFoundError(error) || isInvalidArgumentError(error);
+}
+
+export function shouldClearStaleRunUrl({
+  selectedRunId,
+  isRunInspectionMode,
+  selectedRun,
+  isRunResolveLoading,
+  isRunUnresolvable,
+}: {
+  selectedRunId: string | null;
+  isRunInspectionMode: boolean;
+  selectedRun: unknown;
+  isRunResolveLoading: boolean;
+  isRunUnresolvable: boolean;
+}): boolean {
+  if (!selectedRunId || !isRunInspectionMode) return false;
+  if (isRunResolveLoading) return false;
+  if (selectedRun) return false;
+  return isRunUnresolvable;
+}
+
+export function shouldClearRunDetailNode({
+  runDetailNodeId,
+  participantNodeIds,
+  runCanvasLoading,
+  runCanvasSettled,
+}: {
+  runDetailNodeId: string | null;
+  participantNodeIds: string[];
+  runCanvasLoading: boolean;
+  runCanvasSettled: boolean;
+}): boolean {
+  if (!runDetailNodeId || runCanvasLoading || !runCanvasSettled) return false;
+  if (participantNodeIds.length === 0) return true;
+  return !participantNodeIds.includes(runDetailNodeId);
+}
+
+export function clearRunDetailNodeSearchParams(searchParams: URLSearchParams, nodeId: string): URLSearchParams {
+  const next = new URLSearchParams(searchParams);
+  if (next.get("sidebar") === "1" && next.get("node") === nodeId) {
+    next.delete("sidebar");
+    next.delete("node");
+  }
+  return next;
 }

@@ -1,19 +1,19 @@
 import { useEffect } from "react";
-import { shouldClearStaleRunUrl } from "./runInspectionSync";
+import { shouldClearStaleRunUrl } from "./workflowPageHelpers";
 
 export function useStaleRunInspectionUrlCleanup({
   selectedRunId,
   isRunInspectionMode,
   selectedRun,
   isRunResolveLoading,
-  isRunNotFound,
+  isRunUnresolvable,
   onClear,
 }: {
   selectedRunId: string | null;
   isRunInspectionMode: boolean;
   selectedRun: unknown;
   isRunResolveLoading: boolean;
-  isRunNotFound: boolean;
+  isRunUnresolvable: boolean;
   onClear: () => void;
 }) {
   useEffect(() => {
@@ -23,10 +23,10 @@ export function useStaleRunInspectionUrlCleanup({
         isRunInspectionMode,
         selectedRun,
         isRunResolveLoading,
-        isRunNotFound,
+        isRunUnresolvable,
       })
     ) {
       onClear();
     }
-  }, [isRunInspectionMode, isRunNotFound, isRunResolveLoading, onClear, selectedRun, selectedRunId]);
+  }, [isRunInspectionMode, isRunUnresolvable, isRunResolveLoading, onClear, selectedRun, selectedRunId]);
 }

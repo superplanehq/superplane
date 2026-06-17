@@ -95,7 +95,6 @@ import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
-import { clearRunDetailNodeSearchParams, shouldClearRunDetailNode } from "./runInspectionSync";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -153,12 +152,15 @@ import {
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { runPositionAutoSave } from "./runPositionAutoSave";
 import {
+  clearRunDetailNodeSearchParams,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
-  isNotFoundError,
+  isUnresolvableRunError,
+  isValidRunId,
   prepareData,
   prepareSidebarData,
+  shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 import { useDraftRecovery } from "./useDraftRecovery";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
@@ -554,7 +556,12 @@ export function AppPage() {
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
-  const describedRunQuery = useDescribeRun(canvasId!, selectedRunId, isRunInspectionMode && !!selectedRunId);
+  const selectedRunIdIsValid = selectedRunId ? isValidRunId(selectedRunId) : false;
+  const describedRunQuery = useDescribeRun(
+    canvasId!,
+    selectedRunId,
+    isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid,
+  );
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -594,7 +601,12 @@ export function AppPage() {
     }
     return selectedRunFromList;
   }, [describedRunQuery.data?.run, isRunInspectionMode, selectedRunFromList, selectedRunId]);
-  const isSelectedRunLoading = isRunInspectionMode && !!selectedRunId && !selectedRun && describedRunQuery.isLoading;
+  const isSelectedRunLoading =
+    isRunInspectionMode && !!selectedRunId && selectedRunIdIsValid && !selectedRun && describedRunQuery.isLoading;
+  const isRunUnresolvable =
+    isRunInspectionMode &&
+    !!selectedRunId &&
+    (!selectedRunIdIsValid || (describedRunQuery.isError && isUnresolvableRunError(describedRunQuery.error)));
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const { selectedRunCanvas, isSelectedRunVersionLoading } = useSelectedRunCanvas({
@@ -4359,7 +4371,7 @@ export function AppPage() {
     isRunInspectionMode,
     selectedRun,
     isRunResolveLoading: isSelectedRunLoading,
-    isRunNotFound: describedRunQuery.isError && isNotFoundError(describedRunQuery.error),
+    isRunUnresolvable,
     onClear: handleClearRunInspection,
   });
 
@@ -4833,6 +4845,8 @@ export function AppPage() {
     canvasId: canvasId!,
     runs: runsData.runs,
     selectedRunId,
+    selectedRun,
+    isSelectedRunLoading,
     onSelectRun: handleSelectRun,
     onNavigateRun: handleNavigateRun,
     onSelectLiveCanvas: handleSelectLiveCanvas,

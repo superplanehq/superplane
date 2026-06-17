@@ -11,6 +11,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import {
   parseRunsFiltersFromQueryKey,
   upsertExecutionIntoInfiniteRunsData,
+  upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
@@ -173,12 +174,9 @@ export function useCanvasWebsocket(
       }
 
       if (run.id) {
-        queryClient.setQueryData(canvasKeys.run(canvasId, run.id), (current) => {
-          if (!current) {
-            return current;
-          }
-          return { ...current, run };
-        });
+        queryClient.setQueryData(canvasKeys.run(canvasId, run.id), (current) =>
+          upsertRunIntoDescribeRunData(current, run),
+        );
       }
     },
     [queryClient, canvasId],
