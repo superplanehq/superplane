@@ -31,7 +31,6 @@ spec:
       position:
         x: 120
         y: 500
-      paused: false
       isCollapsed: false
   edges:
     - sourceId: manual-plan-start

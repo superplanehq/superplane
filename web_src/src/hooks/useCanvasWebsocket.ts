@@ -10,11 +10,8 @@ import type {
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import {
   parseRunsFiltersFromQueryKey,
-  upsertExecutionIntoInfiniteEventsData,
   upsertExecutionIntoInfiniteRunsData,
-  upsertRootEventIntoInfiniteData,
   upsertRunIntoInfiniteData,
-  type InfiniteEventsPage,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
 import { canvasKeys } from "./useCanvasData";
@@ -45,16 +42,34 @@ interface QueuedMessage {
   timestamp: number;
 }
 
-// Refreshes the staged caches for a draft version. versionStagedDetail,
-// consoleStaged and staged repositoryFileContent keys all end with "staged" and
-// include the version id, so a single predicate refreshes the editor's
-// effective draft reads without touching the committed caches.
+function queryKeyStartsWith(queryKey: readonly unknown[], prefix: readonly unknown[]): boolean {
+  return prefix.every((part, index) => queryKey[index] === part);
+}
+
+function isDraftRepositoryFileQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
+  const repositoryPrefix = canvasKeys.repository(canvasId);
+  return (
+    queryKeyStartsWith(queryKey, repositoryPrefix) &&
+    queryKey.length === repositoryPrefix.length + 3 &&
+    queryKey[repositoryPrefix.length] === "file" &&
+    queryKey[repositoryPrefix.length + 2] === versionId
+  );
+}
+
+// Refreshes caches that read a draft version's staging layer. versionStagedDetail,
+// consoleStaged and staged repositoryFileContent keys all end with "staged";
+// repositoryFile keys feed the visible Files tab editor and include the draft id.
 function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
   queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
   queryClient.invalidateQueries({
     predicate: (query) => {
       const key = query.queryKey;
-      return Array.isArray(key) && key[key.length - 1] === "staged" && (key as readonly unknown[]).includes(versionId);
+      if (!Array.isArray(key) || !key.includes(versionId)) {
+        return false;
+      }
+
+      return key[key.length - 1] === "staged" || isDraftRepositoryFileQuery(key, canvasId, versionId);
     },
   });
 }
@@ -101,22 +116,8 @@ export function useCanvasWebsocket(
     [queryClient, canvasId],
   );
 
-  const patchRootEventInCache = useCallback(
-    (event: CanvasesCanvasEvent) => {
-      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
-        { queryKey: canvasKeys.infiniteEvents(canvasId) },
-        (old) => upsertRootEventIntoInfiniteData(old, event),
-      );
-    },
-    [queryClient, canvasId],
-  );
-
   const patchExecutionInCache = useCallback(
     (execution: CanvasesCanvasNodeExecution) => {
-      queryClient.setQueriesData<InfiniteData<InfiniteEventsPage>>(
-        { queryKey: canvasKeys.infiniteEvents(canvasId) },
-        (old) => upsertExecutionIntoInfiniteEventsData(old, execution),
-      );
       queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
         { queryKey: canvasKeys.infiniteRuns(canvasId) },
         (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
@@ -152,14 +153,6 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
-
-            /*
-             * Root canvas events are upserted into the infinite events cache
-             * instead of triggering a refetch.
-             */
-            if (workflowEvent.root) {
-              patchRootEventInCache(workflowEvent);
-            }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
@@ -297,7 +290,6 @@ export function useCanvasWebsocket(
       processRuntimeEvents,
       organizationId,
       patchRunInCache,
-      patchRootEventInCache,
       patchExecutionInCache,
       invalidateMemoryEntries,
     ],
@@ -385,9 +377,6 @@ export function useCanvasWebsocket(
       return;
     }
 
-    queryClient.invalidateQueries({
-      queryKey: canvasKeys.infiniteEvents(canvasId),
-    });
     queryClient.invalidateQueries({
       queryKey: canvasKeys.infiniteRuns(canvasId),
     });
