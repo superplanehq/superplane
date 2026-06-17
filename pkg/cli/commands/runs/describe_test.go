@@ -47,21 +47,6 @@ func TestDescribeRunReturnsFullJSON(t *testing.T) {
 	require.NotContains(t, raw, "/events/")
 }
 
-func TestDescribeRunFindsRunByRootEventID(t *testing.T) {
-	server := newDescribeRunServer(t)
-	ctx, stdout := newRunsCommandContext(t, server, "json")
-	ctx.Args = []string{"evt-001"}
-	canvasID := "canvas-001"
-	cmd := &DescribeRunCommand{AppID: &canvasID}
-
-	err := cmd.Execute(ctx)
-	require.NoError(t, err)
-
-	var result map[string]any
-	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
-	require.Equal(t, "run-001", result["id"])
-}
-
 func TestDescribeRunShowsRootEventPayloadInText(t *testing.T) {
 	server := newDescribeRunServer(t)
 	ctx, stdout := newRunsCommandContext(t, server, "text")
@@ -97,7 +82,7 @@ func newDescribeRunServer(t *testing.T) *httptest.Server {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.True(t, strings.HasPrefix(r.URL.Path, "/api/v1/canvases/canvas-001/runs/"))
 		runID := strings.TrimPrefix(r.URL.Path, "/api/v1/canvases/canvas-001/runs/")
-		require.Contains(t, []string{"run-001", "evt-001"}, runID)
+		require.Equal(t, "run-001", runID)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(describeRunResponse))
 	}))

@@ -295,7 +295,7 @@ func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (
 func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas id")
 	}
 
 	return canvases.DescribeRun(ctx, s.registry, canvasID, req.RunId)

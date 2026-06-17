@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -22,13 +23,14 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 
 	db := database.DB(ctx)
 
-	run, err := findCanvasRunForDescribe(db, canvasID, runUUID)
+	run, err := models.FindCanvasRunInTransaction(db, canvasID, runUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "run not found")
 		}
 
-		return nil, err
+		log.WithError(err).Error("failed to find run")
+		return nil, status.Errorf(codes.Internal, "failed to find run")
 	}
 
 	rootEventsByRunID, err := listRootEventsForRuns(ctx, canvasID, []uuid.UUID{run.ID})
@@ -36,7 +38,7 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		return nil, err
 	}
 
-	executions, err := models.ListParentExecutionsForRunsInTransaction(db, canvasID, []uuid.UUID{run.ID})
+	executions, err := models.ListExecutionsForRunsInTransaction(db, canvasID, []uuid.UUID{run.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -49,26 +51,4 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 	return &pb.DescribeRunResponse{
 		Run: serializedRun,
 	}, nil
-}
-
-func findCanvasRunForDescribe(db *gorm.DB, canvasID, runUUID uuid.UUID) (*models.CanvasRun, error) {
-	run, err := models.FindCanvasRunInTransaction(db, canvasID, runUUID)
-	if err == nil {
-		return run, nil
-	}
-
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	run, err = models.FindCanvasRunByRootEventInTransaction(db, runUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	if run.WorkflowID != canvasID {
-		return nil, gorm.ErrRecordNotFound
-	}
-
-	return run, nil
 }
