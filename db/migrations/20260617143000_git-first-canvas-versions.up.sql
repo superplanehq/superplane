@@ -1,6 +1,6 @@
 BEGIN;
 
--- Git-first canvas versions: commit SHA tracking, materialization state, staging base head.
+-- Git-first canvas versions: commit SHA tracking, materialization status, staging base head.
 
 ALTER TABLE workflow_versions
   ADD COLUMN IF NOT EXISTS commit_sha varchar(40) NOT NULL DEFAULT '',
@@ -23,20 +23,5 @@ ALTER TABLE workflow_staged_files
 
 ALTER TABLE workflow_staged_files
   ALTER COLUMN base_head_sha DROP DEFAULT;
-
-CREATE TABLE IF NOT EXISTS repository_materialization_state (
-  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  canvas_id        UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-  branch           TEXT NOT NULL,
-  head_sha         varchar(40) NOT NULL DEFAULT '',
-  materialized_sha varchar(40) NOT NULL DEFAULT '',
-  status           varchar(32) NOT NULL DEFAULT 'pending',
-  error            TEXT NOT NULL DEFAULT '',
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-  UNIQUE (canvas_id, branch)
-);
-
-CREATE INDEX IF NOT EXISTS idx_repository_materialization_state_canvas_id ON repository_materialization_state (canvas_id);
 
 COMMIT;

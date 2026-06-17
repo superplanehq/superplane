@@ -401,22 +401,6 @@ CREATE TABLE public.repositories (
 
 
 --
--- Name: repository_materialization_state; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.repository_materialization_state (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
-    branch text NOT NULL,
-    head_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    materialized_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
-    error text DEFAULT ''::text NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -955,22 +939,6 @@ ALTER TABLE ONLY public.repositories
 
 
 --
--- Name: repository_materialization_state repository_materialization_state_canvas_id_branch_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_materialization_state
-    ADD CONSTRAINT repository_materialization_state_canvas_id_branch_key UNIQUE (canvas_id, branch);
-
-
---
--- Name: repository_materialization_state repository_materialization_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_materialization_state
-    ADD CONSTRAINT repository_materialization_state_pkey PRIMARY KEY (id);
-
-
---
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1338,13 +1306,6 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
-
-
---
--- Name: idx_repository_materialization_state_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_repository_materialization_state_canvas_id ON public.repository_materialization_state USING btree (canvas_id);
 
 
 --
@@ -1776,14 +1737,6 @@ ALTER TABLE ONLY public.repositories
 
 
 --
--- Name: repository_materialization_state repository_materialization_state_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repository_materialization_state
-    ADD CONSTRAINT repository_materialization_state_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2063,7 +2016,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260617001600	f
+20260617143000	f
 \.
 
 
