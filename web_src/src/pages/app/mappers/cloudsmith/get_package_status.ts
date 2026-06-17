@@ -71,9 +71,9 @@ function buildMetadata(node: NodeInfo): MetadataItem[] {
   }
 
   if (nodeMetadata?.packageName) {
-    items.push({ icon: "activity", label: nodeMetadata.packageName });
+    items.push({ icon: "archive", label: nodeMetadata.packageName });
   } else if (configuration?.package) {
-    items.push({ icon: "activity", label: configuration.package });
+    items.push({ icon: "archive", label: configuration.package });
   }
 
   return items;
