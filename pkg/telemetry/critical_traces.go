@@ -32,6 +32,7 @@ var criticalGRPCMethods = map[string]struct{}{
 	pbCanvases.Canvases_DescribeCanvas_FullMethodName:                 {},
 	pbCanvases.Canvases_ListCanvasVersions_FullMethodName:             {},
 	pbCanvases.Canvases_ListRuns_FullMethodName:                       {},
+	pbCanvases.Canvases_DescribeRun_FullMethodName:                    {},
 	pbCanvases.Canvases_ListCanvasEvents_FullMethodName:               {},
 	pbCanvases.Canvases_ListCanvasMemories_FullMethodName:             {},
 }

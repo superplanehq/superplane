@@ -65,7 +65,7 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 	var executions []models.CanvasNodeExecution
 	err = telemetry.RunSpan(ctx, "runs.load_executions", func(ctx context.Context) error {
 		var loadErr error
-		executions, loadErr = models.ListParentExecutionsForRunsInTransaction(db, canvasID, runIDs)
+		executions, loadErr = models.ListExecutionsForRunsInTransaction(db, canvasID, runIDs)
 		return loadErr
 	})
 	if err != nil {
