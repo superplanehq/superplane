@@ -27,10 +27,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	serializedNodes, err := serializeCanvasNodes(canvas.ID, liveVersion.Nodes)
-	if err != nil {
-		return nil, err
-	}
+	serializedNodes := actions.NodesToProto(liveVersion.Nodes)
 
 	var createdBy *pb.UserRef
 	if user != nil {
@@ -104,31 +101,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			LastEvents:     serializedEvents,
 		},
 	}, nil
-}
-
-func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*componentpb.Node, error) {
-	serialized := actions.NodesToProto(nodes)
-	if len(serialized) == 0 {
-		return serialized, nil
-	}
-
-	canvasNodes, err := models.FindCanvasNodes(canvasID)
-	if err != nil {
-		return nil, err
-	}
-
-	pausedByID := make(map[string]bool, len(canvasNodes))
-	for _, node := range canvasNodes {
-		pausedByID[node.NodeID] = node.State == models.CanvasNodeStatePaused
-	}
-
-	for _, node := range serialized {
-		if paused, ok := pausedByID[node.Id]; ok {
-			node.Paused = paused
-		}
-	}
-
-	return serialized, nil
 }
 
 func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {

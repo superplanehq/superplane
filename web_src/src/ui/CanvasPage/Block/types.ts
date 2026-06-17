@@ -56,7 +56,6 @@ export type CanvasBlockData = BlockData & BlockInternalData;
 export type ComponentActionKeys =
   | "runDisabled"
   | "runDisabledTooltip"
-  | "onTogglePause"
   | "onEdit"
   | "onDuplicate"
   | "onDeactivate"

@@ -216,7 +216,8 @@ func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string,
 	//
 	// Node is not ready yet, skip it. For queue-item-created messages this happens
 	// when a new item arrives while the node is still executing. For
-	// execution-finished messages this can happen when the node is paused.
+	// execution-finished messages this can happen if another worker has already
+	// moved the node into a non-ready state.
 	//
 	if node.State != models.CanvasNodeStateReady {
 		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)

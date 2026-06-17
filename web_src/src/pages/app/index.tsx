@@ -20,7 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   renderCanvasRunsSidebarPanel,
@@ -3626,60 +3626,6 @@ export function AppPage() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
-  const handleTogglePause = useCallback(
-    async (nodeId: string) => {
-      if (!canvasId || !organizationId || !canvas) return;
-
-      const node = canvas.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      if (node.type === "TYPE_TRIGGER") {
-        showErrorToast("Triggers cannot be paused");
-        return;
-      }
-
-      const nextPaused = !node.paused;
-
-      try {
-        const result = await canvasesUpdateNodePause(
-          withOrganizationHeader({
-            path: {
-              canvasId: canvasId,
-              nodeId: nodeId,
-            },
-            body: {
-              paused: nextPaused,
-            },
-          }),
-        );
-
-        const updatedPaused = result.data?.node?.paused ?? nextPaused;
-        const updatedNodes = (canvas.spec?.nodes || []).map((item) =>
-          item.id === nodeId ? { ...item, paused: updatedPaused } : item,
-        );
-
-        const updatedWorkflow = {
-          ...canvas,
-          spec: {
-            ...canvas.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        applyLocalWorkflowUpdate(updatedWorkflow);
-        showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
-      } catch (error) {
-        const parsedError = error as { message: string };
-        if (parsedError?.message) {
-          showErrorToast(parsedError.message);
-        } else {
-          console.error("Failed to update node pause state:", error);
-        }
-      }
-    },
-    [canvasId, organizationId, canvas, applyLocalWorkflowUpdate],
-  );
-
   const handleReEmit = useCallback(
     async (nodeId: string, eventOrExecutionId: string) => {
       if (!canvasId) return;
@@ -5012,7 +4958,6 @@ export function AppPage() {
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-          onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
