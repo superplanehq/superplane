@@ -14,6 +14,6 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRepository: buildActionStateRegistry("fetched"),
-  getPackageStatus: buildActionStateRegistry("retrieved"),
+  getPackageStatus: buildActionStateRegistry("fetched"),
   getPackage: buildActionStateRegistry("fetched"),
 };
