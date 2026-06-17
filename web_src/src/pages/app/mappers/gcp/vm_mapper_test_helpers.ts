@@ -46,7 +46,7 @@ export function buildDetailsCtx(overrides?: {
 
 export function buildComponentCtx(
   nodeOverrides?: Partial<NodeInfo>,
-  componentName = "gcp.compute.createLoadBalancer",
+  componentName = "gcp.compute.createVM",
 ): ComponentBaseContext {
   const node = buildNode({ componentName, ...nodeOverrides });
   return {
@@ -54,9 +54,9 @@ export function buildComponentCtx(
     node,
     componentDefinition: {
       name: node.componentName,
-      label: "Compute",
+      label: "GCP",
       description: "",
-      icon: "globe",
+      icon: "gcp",
       color: "gray",
     },
     lastExecutions: [],

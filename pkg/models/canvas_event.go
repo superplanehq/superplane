@@ -51,7 +51,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 		return nil
 	}
 
-	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return err
 	}

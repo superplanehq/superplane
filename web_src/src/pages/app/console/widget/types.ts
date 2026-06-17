@@ -176,6 +176,22 @@ export interface WidgetChartRender {
    * values and ignores additional series entries.
    */
   seriesField?: string;
+  /**
+   * Optional display format applied to X-axis tick labels. Reuses the
+   * shared `WidgetColumnFormat` vocabulary so date / duration / number
+   * X-axes don't require a CEL wrapper around `xField`.
+   */
+  xFormat?: WidgetColumnFormat;
+  /**
+   * Optional Y-axis title rendered alongside the axis ticks (e.g. "USD",
+   * "Errors / day"). When omitted no axis label is drawn.
+   */
+  yLabel?: string;
+  /**
+   * Optional display format applied to Y-axis tick labels. When omitted
+   * the renderer falls back to its locale-aware numeric default.
+   */
+  yFormat?: WidgetColumnFormat;
 }
 
 /** Sort direction. Defaults to `"asc"` when omitted on a `WidgetSort`. */

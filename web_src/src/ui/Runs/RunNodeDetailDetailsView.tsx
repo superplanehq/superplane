@@ -7,7 +7,7 @@ function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; la
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[11px] font-semibold uppercase tracking-wide text-white",
+        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide text-white",
         badgeColor,
       )}
     >

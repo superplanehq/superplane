@@ -137,6 +137,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUN_FINALIZER") == "yes" {
+		log.Println("Starting Run Finalizer")
+
+		w := workers.NewRunFinalizer(rabbitMQURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
@@ -247,6 +254,7 @@ func startWorkers(
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
 			Encryptor:         encryptor,
 			ComponentRegistry: registry,
+			GitProvider:       gitProvider,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),

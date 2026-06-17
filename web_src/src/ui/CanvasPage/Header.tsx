@@ -1,9 +1,11 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { useParams } from "react-router-dom";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
+import { CanvasRunsSidebarTrigger } from "./components/CanvasRunsSidebarTrigger";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
@@ -110,6 +112,7 @@ export interface HeaderProps {
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
+  runsSidebarState: CanvasRunsSidebarState;
 }
 
 export function Header(props: HeaderProps) {
@@ -279,7 +282,10 @@ function SecondaryHeader(props: HeaderProps) {
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
-      <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
+      <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center gap-1">
+        <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
+        <CanvasRunsSidebarTrigger runsSidebarState={props.runsSidebarState} />
+      </div>
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">

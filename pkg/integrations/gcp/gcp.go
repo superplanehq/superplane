@@ -205,6 +205,9 @@ func (g *GCP) Actions() []core.Action {
 		&monitoring.GetAlertingPolicy{},
 		&monitoring.DeleteAlertingPolicy{},
 		&monitoring.UpdateAlertingPolicy{},
+		&monitoring.CreateSnooze{},
+		&monitoring.GetSnooze{},
+		&monitoring.ExpireSnooze{},
 		&cloudsql.CreateDatabase{},
 		&cloudsql.GetDatabase{},
 		&cloudsql.DeleteDatabase{},
@@ -991,6 +994,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return monitoring.ListAlertingPolicyResources(reqCtx, client)
 	case monitoring.ResourceTypeNotificationChannel:
 		return monitoring.ListNotificationChannelResources(reqCtx, client)
+	case monitoring.ResourceTypeSnooze:
+		return monitoring.ListSnoozeResources(reqCtx, client)
 	case cloudbuild.ResourceTypeTrigger:
 		return cloudbuild.ListTriggerResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeBuild:
