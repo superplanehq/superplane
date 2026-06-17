@@ -171,6 +171,15 @@ export function useCanvasWebsocket(
           queryClient.setQueryData(queryKey, next);
         }
       }
+
+      if (run.id) {
+        queryClient.setQueryData(canvasKeys.run(canvasId, run.id), (current) => {
+          if (!current) {
+            return current;
+          }
+          return { ...current, run };
+        });
+      }
     },
     [queryClient, canvasId],
   );

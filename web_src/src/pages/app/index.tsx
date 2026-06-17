@@ -41,6 +41,7 @@ import {
   useUpdateCanvasMemoryNamespace,
   usePublishCanvasVersion,
   useEventExecutions,
+  useDescribeRun,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
   useTriggers,
@@ -155,6 +156,7 @@ import {
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
+  isNotFoundError,
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
@@ -552,6 +554,7 @@ export function AppPage() {
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
+  const describedRunQuery = useDescribeRun(canvasId!, selectedRunId, isRunInspectionMode && !!selectedRunId);
   const runsData = useMemo(() => {
     const pages = infiniteRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -577,10 +580,21 @@ export function AppPage() {
       });
     return { runs };
   }, [infiniteLogRunsQuery.data]);
-  const selectedRun = useMemo(
+  const selectedRunFromList = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
   );
+  const selectedRun = useMemo(() => {
+    if (!selectedRunId) return null;
+    if (selectedRunFromList?.id === selectedRunId) {
+      return selectedRunFromList;
+    }
+    if (isRunInspectionMode) {
+      return describedRunQuery.data?.run ?? null;
+    }
+    return selectedRunFromList;
+  }, [describedRunQuery.data?.run, isRunInspectionMode, selectedRunFromList, selectedRunId]);
+  const isSelectedRunLoading = isRunInspectionMode && !!selectedRunId && !selectedRun && describedRunQuery.isLoading;
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const { selectedRunCanvas, isSelectedRunVersionLoading } = useSelectedRunCanvas({
@@ -1710,6 +1724,7 @@ export function AppPage() {
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
     liveEdges: draftVisualDiff.edges,
+    isSelectedRunLoading,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
@@ -4343,7 +4358,8 @@ export function AppPage() {
     selectedRunId,
     isRunInspectionMode,
     selectedRun,
-    infiniteRunsQuery,
+    isRunResolveLoading: isSelectedRunLoading,
+    isRunNotFound: describedRunQuery.isError && isNotFoundError(describedRunQuery.error),
     onClear: handleClearRunInspection,
   });
 

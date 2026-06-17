@@ -13,23 +13,19 @@ export function shouldClearStaleRunUrl({
   selectedRunId,
   isRunInspectionMode,
   selectedRun,
-  isRunsQueryLoading,
-  isFetchingNextPage,
-  pages,
-  hasNextPage,
+  isRunResolveLoading,
+  isRunNotFound,
 }: {
   selectedRunId: string | null;
   isRunInspectionMode: boolean;
   selectedRun: unknown;
-  isRunsQueryLoading: boolean;
-  isFetchingNextPage: boolean;
-  pages: RunsPage[];
-  hasNextPage: boolean;
+  isRunResolveLoading: boolean;
+  isRunNotFound: boolean;
 }): boolean {
   if (!selectedRunId || !isRunInspectionMode) return false;
-  if (isRunsQueryLoading || isFetchingNextPage) return false;
+  if (isRunResolveLoading) return false;
   if (selectedRun) return false;
-  return hasLoadedAllRuns(pages, hasNextPage);
+  return isRunNotFound;
 }
 
 export function shouldClearRunDetailNode({
