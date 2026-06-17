@@ -34,12 +34,11 @@ describe("CanvasModeToggle", () => {
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
 
-  it("orders tabs as Canvas, Versions, Console, Memory, and Files", () => {
+  it("orders tabs as Canvas, Console, Memory, and Files", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
         onSelectLive={vi.fn()}
-        onSelectVersions={vi.fn()}
         onSelectConsole={vi.fn()}
         onSelectMemory={vi.fn()}
         onSelectFiles={vi.fn()}
@@ -50,30 +49,18 @@ describe("CanvasModeToggle", () => {
     const tabs = screen.getAllByRole("link");
     expect(tabs.map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual([
       "Canvas",
-      "Versions",
       "Console",
       "Memory",
       "Files",
     ]);
   });
 
-  it("invokes onSelectVersions when clicking the Versions tab", async () => {
-    const user = userEvent.setup();
-    const onSelectVersions = vi.fn();
+  it("does not render a Versions tab", () => {
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectConsole={vi.fn()} />, {
+      wrapper: routerWrapper,
+    });
 
-    render(
-      <CanvasModeToggle
-        mode="version-live"
-        onSelectLive={vi.fn()}
-        onSelectVersions={onSelectVersions}
-        onSelectConsole={vi.fn()}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByRole("link", { name: "Versions" }));
-
-    expect(onSelectVersions).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("link", { name: "Versions" })).not.toBeInTheDocument();
   });
 
   it("shows only the Canvas tab when no secondary tabs are provided", () => {
