@@ -70,7 +70,6 @@ export function useSidebarEventRunLookup({
     return buildRunLookupIndex(cachedRuns);
   }, [enabled, infiniteRunsPages, lookupFingerprint, runs, unfilteredRunPages]);
 
-  const fetchedRunIdsRef = useRef(new Map<string, string | null>());
   const inFlightRef = useRef(new Map<string, Promise<string | null>>());
 
   const resolveRunIdForSidebarEvent = useCallback(
@@ -95,18 +94,14 @@ export function useSidebarEventRunLookup({
         return null;
       }
 
-      const cachedRunId = fetchedRunIdsRef.current.get(lookupKey);
-      if (cachedRunId) {
-        return cachedRunId;
-      }
+      const scopedLookupKey = `${canvasId}:${lookupKey}`;
 
       const resolvedRunId = findRunIdInLookupIndex(lookupIndex, event);
       if (resolvedRunId) {
-        fetchedRunIdsRef.current.set(lookupKey, resolvedRunId);
         return resolvedRunId;
       }
 
-      const inFlight = inFlightRef.current.get(lookupKey);
+      const inFlight = inFlightRef.current.get(scopedLookupKey);
       if (inFlight) {
         return inFlight;
       }
@@ -134,7 +129,6 @@ export function useSidebarEventRunLookup({
             if (match.run.id) {
               seedRunInInfiniteRunsCache(queryClient, canvasId, match.run);
             }
-            fetchedRunIdsRef.current.set(lookupKey, match.runId);
             return match.runId;
           }
 
@@ -150,12 +144,12 @@ export function useSidebarEventRunLookup({
         return null;
       })();
 
-      inFlightRef.current.set(lookupKey, fetchPromise);
+      inFlightRef.current.set(scopedLookupKey, fetchPromise);
 
       try {
         return await fetchPromise;
       } finally {
-        inFlightRef.current.delete(lookupKey);
+        inFlightRef.current.delete(scopedLookupKey);
       }
     },
     [canvasId, enabled, lookupIndex, organizationId, queryClient],
