@@ -37,6 +37,11 @@ func TestCanvasResourceResolver(t *testing.T) {
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
+	t.Run("returns canvas id for describe run", func(t *testing.T) {
+		resourceIDs := canvasResourceResolver(&pbCanvases.DescribeRunRequest{CanvasId: "canvas-123"})
+		require.Equal(t, []string{"canvas-123"}, resourceIDs)
+	})
+
 	t.Run("returns nil when request does not expose a canvas id", func(t *testing.T) {
 		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasesRequest{})
 		assert.Nil(t, resourceIDs)

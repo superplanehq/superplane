@@ -205,7 +205,7 @@ func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
 	}
 }
 
-func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+func ListExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	if len(runIDs) == 0 {
 		return []CanvasNodeExecution{}, nil
 	}
