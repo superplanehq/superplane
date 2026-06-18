@@ -47,12 +47,24 @@ func SyncLiveFromGit(
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
 
+	currentHead, err := gitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read main branch head: %w", err)
+	}
+
 	headSHA := strings.TrimSpace(opts.HeadSHA)
 	if headSHA == "" {
-		headSHA, err = gitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read main branch head: %w", err)
-		}
+		headSHA = currentHead
+	} else if headSHA != currentHead {
+		// Stale notification: a newer commit already superseded this SHA on
+		// main, so projecting it would publish an outdated canvas. Skip as a
+		// no-op; the commit that is now main's HEAD carries its own
+		// notification and will materialize the current state.
+		log.Infof(
+			"skipping stale live materialization for canvas %s: notification sha %s is not main head %s",
+			canvasID, headSHA, currentHead,
+		)
+		return nil, nil
 	}
 
 	snapshot, loadErr := LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
