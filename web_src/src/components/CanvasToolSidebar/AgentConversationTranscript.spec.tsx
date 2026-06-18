@@ -102,6 +102,28 @@ describe("ConversationTranscript user messages", () => {
     expect(screen.getByTestId("agent-user-message").parentElement).toHaveClass("sticky");
   });
 
+  it("does not keep user messages with image attachments sticky", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", url: "/img/0" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    expect(screen.getByTestId("agent-user-message").parentElement).not.toHaveClass("sticky");
+  });
+
   it("does not keep long user messages sticky", () => {
     const longPrompt = [
       "My idea is: Create an elixir clusterautoprovisioning app with enough detail to wrap across multiple lines.",

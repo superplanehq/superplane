@@ -176,7 +176,7 @@ const MessageRow = memo(function MessageRow({
   }
 
   const isUser = message.role === "user";
-  const shouldStickUserMessage = isUser && isCompactUserMessage(message.content);
+  const shouldStickUserMessage = isUser && isCompactUserMessage(message);
 
   return (
     <div
@@ -239,7 +239,13 @@ function shouldRenderMessage(message: AgentMessage): boolean {
   return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
 }
 
-function isCompactUserMessage(content: string): boolean {
+function isCompactUserMessage(message: AgentMessage): boolean {
+  // Messages with image attachments render tall thumbnails; pinning them would
+  // cover in-progress agent output, so they never stick regardless of text length.
+  if (message.images && message.images.length > 0) {
+    return false;
+  }
+  const content = message.content;
   return content.length <= STICKY_USER_MESSAGE_MAX_CHARS && content.split("\n").length <= STICKY_USER_MESSAGE_MAX_LINES;
 }
 
