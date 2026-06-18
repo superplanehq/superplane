@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -67,12 +67,8 @@ func SeedMainRepository(
 		Message: "Initial canvas",
 		Author:  input.Author,
 		Operations: []git.FileOperation{
-			{Path: CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))},
-			{Path: ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))},
+			{Path: gitref.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))},
+			{Path: gitref.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))},
 		},
 	})
-}
-
-func DefaultDraftBranchName(userID uuid.UUID) string {
-	return DraftBranchPrefix + userID.String()
 }

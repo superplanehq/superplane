@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
@@ -62,8 +63,8 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 		BaseBranch: models.CanvasGitBranchMain,
 		Message:    "seed",
 		Operations: []provider.FileOperation{
-			{Path: materialize.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))},
-			{Path: materialize.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))},
+			{Path: gitref.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))},
+			{Path: gitref.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))},
 		},
 	})
 	require.NoError(t, err)

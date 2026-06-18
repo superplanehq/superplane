@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -37,7 +38,7 @@ func ReconcileDraftBranchDeletionsFromGit(
 		return nil, fmt.Errorf("repository not found: %w", err)
 	}
 
-	gitBranches, err := gitProvider.ListBranches(ctx, repository.RepoID, DraftBranchPrefix)
+	gitBranches, err := gitProvider.ListBranches(ctx, repository.RepoID, gitref.DraftBranchPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list draft branches in git: %w", err)
 	}

@@ -3,11 +3,11 @@ package materialize
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -43,7 +43,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 		return nil, err
 	}
 
-	if isDraftBranch(branch) {
+	if gitref.IsDraftBranch(branch) {
 		existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branch)
 		if err == nil &&
 			existing.CommitSHA == commitSHA &&
@@ -82,7 +82,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 		CreatedAt:             &now,
 		UpdatedAt:             &now,
 	}
-	if isDraftBranch(branch) {
+	if gitref.IsDraftBranch(branch) {
 		version.BranchName = &branchName
 	}
 
@@ -114,10 +114,6 @@ func draftVersionState(branch string) string {
 	return models.CanvasVersionStateDraft
 }
 
-func isDraftBranch(branch string) bool {
-	return strings.HasPrefix(branch, DraftBranchPrefix)
-}
-
 func markMaterializationError(tx *gorm.DB, canvasID uuid.UUID, branch, commitSHA string, ownerID *uuid.UUID, cause error) error {
 	errMsg := cause.Error()
 	now := time.Now()
@@ -133,7 +129,7 @@ func markMaterializationError(tx *gorm.DB, canvasID uuid.UUID, branch, commitSHA
 		CreatedAt:             &now,
 		UpdatedAt:             &now,
 	}
-	if isDraftBranch(branch) {
+	if gitref.IsDraftBranch(branch) {
 		version.BranchName = &branchName
 	}
 	return models.UpsertMaterializedVersionInTransaction(tx, version)

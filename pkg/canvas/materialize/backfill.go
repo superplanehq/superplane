@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -78,7 +79,7 @@ func backfillMainBranch(
 	repository *models.Repository,
 	liveVersion *models.CanvasVersion,
 ) error {
-	if !GitBranchExists(ctx, gitProvider, repository.RepoID, models.CanvasGitBranchMain) {
+	if !gitref.GitBranchExists(ctx, gitProvider, repository.RepoID, models.CanvasGitBranchMain) {
 		_, err := SeedMainRepository(ctx, gitProvider, repository, SeedRepositoryInput{
 			Canvas: CanvasYAMLFromVersion(liveVersion),
 			Author: backfillCommitAuthor,
@@ -109,7 +110,7 @@ func BackfillDraftBranch(
 	}
 
 	branchName := *version.BranchName
-	if !GitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
+	if !gitref.GitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
 		if err := gitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain); err != nil {
 			return fmt.Errorf("create draft branch %q: %w", branchName, err)
 		}
@@ -142,9 +143,9 @@ func seedMissingSpecFiles(
 	hasConsole := false
 	for _, path := range files {
 		switch path {
-		case CanvasFileName:
+		case gitref.CanvasFileName:
 			hasCanvas = true
-		case ConsoleFileName:
+		case gitref.ConsoleFileName:
 			hasConsole = true
 		}
 	}
@@ -159,14 +160,14 @@ func seedMissingSpecFiles(
 		if buildErr != nil {
 			return buildErr
 		}
-		ops = append(ops, git.FileOperation{Path: CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))})
+		ops = append(ops, git.FileOperation{Path: gitref.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))})
 	}
 	if !hasConsole {
 		consoleYAML, buildErr := BuildConsoleYAMLFromVersion(version)
 		if buildErr != nil {
 			return buildErr
 		}
-		ops = append(ops, git.FileOperation{Path: ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))})
+		ops = append(ops, git.FileOperation{Path: gitref.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))})
 	}
 
 	if len(ops) == 0 {

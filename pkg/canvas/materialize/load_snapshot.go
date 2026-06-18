@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -32,14 +33,14 @@ func LoadRepoSnapshot(
 	repoID string,
 	sha string,
 ) (*RepoSnapshot, error) {
-	canvasYAML, err := readGitFile(ctx, gitProvider, repoID, CanvasFileName, sha)
+	canvasYAML, err := readGitFile(ctx, gitProvider, repoID, gitref.CanvasFileName, sha)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", CanvasFileName, err)
+		return nil, fmt.Errorf("read %s: %w", gitref.CanvasFileName, err)
 	}
 
 	pbCanvas, err := canvasyaml.ParseCanvasResource(canvasYAML)
 	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", CanvasFileName, err)
+		return nil, fmt.Errorf("parse %s: %w", gitref.CanvasFileName, err)
 	}
 
 	nodes, edges, err := snapshotNodesAndEdges(pbCanvas)
@@ -56,17 +57,17 @@ func LoadRepoSnapshot(
 		Edges:       edges,
 	}
 
-	consoleYAML, err := readGitFile(ctx, gitProvider, repoID, ConsoleFileName, sha)
+	consoleYAML, err := readGitFile(ctx, gitProvider, repoID, gitref.ConsoleFileName, sha)
 	if err != nil {
 		if errors.Is(err, errGitFileNotFound) {
 			return snapshot, nil
 		}
-		return nil, fmt.Errorf("read %s: %w", ConsoleFileName, err)
+		return nil, fmt.Errorf("read %s: %w", gitref.ConsoleFileName, err)
 	}
 
 	console, err := models.ConsoleFromYML(consoleYAML)
 	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", ConsoleFileName, err)
+		return nil, fmt.Errorf("parse %s: %w", gitref.ConsoleFileName, err)
 	}
 
 	snapshot.ConsolePanels = console.Spec.Panels
