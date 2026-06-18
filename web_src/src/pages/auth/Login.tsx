@@ -442,6 +442,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showSignupUnavailable = !configLoading && isSignupMode && !canSignup;
   const showSignupWaitlist = showSignupUnavailable && !authConfig.signupsBlockedByEnvironment;
   const showSignupClosedNotice = showSignupUnavailable && authConfig.signupsBlockedByEnvironment;
+  const showSignupEntryPoint = canSignup || !authConfig.signupsBlockedByEnvironment;
   const signupUnavailableReason = showSignupWaitlist ? "waitlist" : showSignupClosedNotice ? "closed" : null;
   const authErrorMessage = getAuthErrorMessage(authError, signupUnavailableReason);
   const showStandaloneProductUpdatesOptIn =
@@ -980,7 +981,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
+          {!configLoading && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
               <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
@@ -998,14 +999,18 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && !isSignupMode && canSignup && (
-            <div className="mt-6 text-center text-sm text-gray-500">
-              {"Don't have an account? "}
-              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
-                Sign up
-              </Link>
-            </div>
-          )}
+          {!configLoading &&
+            useMagicCodePrimary &&
+            magicCodeStep === "email" &&
+            !isSignupMode &&
+            showSignupEntryPoint && (
+              <div className="mt-6 text-center text-sm text-gray-500">
+                {"Don't have an account? "}
+                <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
+                  Sign up
+                </Link>
+              </div>
+            )}
         </div>
       </div>
     </div>
