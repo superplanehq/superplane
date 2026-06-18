@@ -698,8 +698,12 @@ Returns the created droplet object including:
     "networks": {
       "v4": [
         {
-          "ip_address": "104.131.186.241",
+          "ip_address": "167.99.0.10",
           "type": "public"
+        },
+        {
+          "ip_address": "10.108.0.5",
+          "type": "private"
         }
       ]
     },
@@ -710,7 +714,8 @@ Returns the created droplet object including:
     "size_slug": "s-1vcpu-1gb",
     "status": "new",
     "tags": [
-      "web"
+      "web",
+      "production"
     ],
     "vcpus": 1
   },
@@ -778,6 +783,10 @@ Returns the created GPU droplet object including:
         {
           "ip_address": "143.198.100.50",
           "type": "public"
+        },
+        {
+          "ip_address": "10.132.0.5",
+          "type": "private"
         }
       ]
     },
@@ -913,8 +922,7 @@ Returns the created load balancer object including:
     "algorithm": "round_robin",
     "created_at": "2026-03-13T10:00:00Z",
     "droplet_ids": [
-      98765432,
-      98765433
+      31638492
     ],
     "forwarding_rules": [
       {
@@ -2008,7 +2016,10 @@ Returns the droplet object including:
     },
     "size_slug": "s-1vcpu-1gb",
     "status": "active",
-    "tags": [],
+    "tags": [
+      "web",
+      "production"
+    ],
     "vcpus": 1
   },
   "timestamp": "2026-03-12T21:13:32.946693411Z",
@@ -2560,11 +2571,6 @@ Returns the evaluation results including:
             "metricName": "Correctness (general hallucinations)",
             "numberValue": 100,
             "stringValue": ""
-          },
-          {
-            "metricName": "Retrieved context relevance",
-            "numberValue": 0,
-            "stringValue": ""
           }
         ],
         "output": "A Droplet is a type of virtual private server (VPS) provided by a cloud platform."
@@ -2577,11 +2583,6 @@ Returns the evaluation results including:
             "metricName": "Correctness (general hallucinations)",
             "numberValue": 66.67,
             "stringValue": ""
-          },
-          {
-            "metricName": "Retrieved context relevance",
-            "numberValue": 0,
-            "stringValue": ""
           }
         ],
         "output": "The pricing for Droplet starts at $5/month for a basic plan."
@@ -2590,12 +2591,12 @@ Returns the evaluation results including:
     "runLevelMetrics": [
       {
         "metricName": "Retrieved context relevance",
-        "numberValue": 0,
+        "numberValue": 85,
         "stringValue": ""
       },
       {
         "metricName": "Response-context completeness",
-        "numberValue": 0,
+        "numberValue": 90,
         "stringValue": ""
       },
       {

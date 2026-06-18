@@ -17,7 +17,10 @@
           "value": "api"
         }
       ],
-      "probes": [1, 2],
+      "probes": [
+        1,
+        2
+      ],
       "created": 1776248430,
       "modified": 1776248430,
       "settings": {
@@ -30,7 +33,9 @@
           "noFollowRedirects": false,
           "failIfSSL": false,
           "failIfNotSSL": true,
-          "validStatusCodes": [200],
+          "validStatusCodes": [
+            200
+          ],
           "failIfHeaderMatchesRegexp": [
             {
               "header": "X-Canary",

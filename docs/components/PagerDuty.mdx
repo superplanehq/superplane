@@ -133,7 +133,7 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
     }
   },
   "timestamp": "2026-01-19T12:00:00Z",
-  "type": "pagerduty.onIncident"
+  "type": "pagerduty.incident.triggered"
 }
 ```
 
@@ -285,6 +285,13 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
     "status_update": {
       "created_at": "2026-01-19T12:30:00Z",
       "id": "P1234567",
+      "incident": {
+        "html_url": "https://acme.pagerduty.com/incidents/PGR0VU2",
+        "id": "PGR0VU2",
+        "self": "https://api.pagerduty.com/incidents/PGR0VU2",
+        "summary": "A little bump in the road",
+        "type": "incident_reference"
+      },
       "message": "We have identified the issue and are working on a fix.",
       "sender": {
         "html_url": "https://acme.pagerduty.com/users/PLH1HKV",

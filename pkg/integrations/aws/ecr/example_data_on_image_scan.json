@@ -14,7 +14,10 @@
       "scan-status": "COMPLETE",
       "repository-name": "my-repo",
       "image-digest": "sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
-      "image-tags": [],
+      "image-tags": [
+        "v1.5.0",
+        "latest"
+      ],
       "finding-severity-counts": {
         "CRITICAL": 10,
         "MEDIUM": 9
