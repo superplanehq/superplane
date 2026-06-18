@@ -81,10 +81,13 @@ func TestForEachExecute(t *testing.T) {
 	})
 
 	t.Run("returns error when array exceeds item limit", func(t *testing.T) {
+		core.ResetMaxForEachItemsForTests()
+		t.Setenv("SUPERPLANE_FOREACH_MAX_ITEMS", "100")
+
 		component := &ForEach{}
 		execState := &contexts.ExecutionStateContext{}
 		execMetadata := &contexts.MetadataContext{}
-		items := make([]any, maxItemsPerExecution+1)
+		items := make([]any, core.MaxForEachItems()+1)
 		exprCtx := &contexts.ExpressionContext{Output: items}
 
 		err := component.Execute(core.ExecutionContext{
