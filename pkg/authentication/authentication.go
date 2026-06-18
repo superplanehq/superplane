@@ -41,6 +41,8 @@ const (
 	magicCodeMaxVerifyAttempts = 3
 	authSignupStatePrefix      = "signup:"
 	authSignupResultParam      = "auth_signup_result"
+	authErrorParam             = "auth_error"
+	authErrorSignupRequired    = "signup_required"
 	jsonContentType            = "application/json"
 )
 
@@ -182,6 +184,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	account, wasCreated, err := a.findOrCreateAccountForProvider(mockUser, a.allowSignupFromRequest(r))
 
 	if err != nil {
+		if errors.Is(err, errSignupRequired) {
+			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+			return
+		}
+
 		if errorStatusForAccountError(err) == http.StatusForbidden {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
@@ -216,6 +223,11 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
+		if errors.Is(err, errSignupRequired) {
+			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+			return
+		}
+
 		if errorStatusForAccountError(err) == http.StatusForbidden {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
@@ -819,6 +831,18 @@ func addAuthSignupResult(redirectURL string, result string) string {
 	params.Set(authSignupResultParam, result)
 	parsedURL.RawQuery = params.Encode()
 	return parsedURL.String()
+}
+
+func getSignupRequiredRedirectURL(r *http.Request) string {
+	params := url.Values{}
+	params.Set(authErrorParam, authErrorSignupRequired)
+
+	redirectURL := getRedirectURL(r)
+	if redirectURL != "/" {
+		params.Set("redirect", redirectURL)
+	}
+
+	return fmt.Sprintf("/signup?%s", params.Encode())
 }
 
 func generateMagicCode() (string, error) {

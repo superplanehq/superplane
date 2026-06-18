@@ -81,6 +81,14 @@ interface LoginProps {
   mode?: AuthMode;
 }
 
+const getAuthErrorMessage = (authError: string | null) => {
+  if (authError === "signup_required") {
+    return "No account exists for that provider yet. Create an account to continue.";
+  }
+
+  return null;
+};
+
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
   <p className="mt-2 text-center text-xs text-gray-500">You used {label} to log in last time</p>
 );
@@ -259,6 +267,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
   const magicLinkToken = searchParams.get("magic_link_token");
   const redirectTarget = safeRedirect || "";
+  const authErrorMessage = getAuthErrorMessage(searchParams.get("auth_error"));
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response, authRedirectURL?: string) => {
@@ -412,6 +421,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
+  const visibleFormError = formError ?? authErrorMessage;
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -652,9 +662,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             <p className="text-sm text-gray-500">No login methods are configured.</p>
           )}
 
-          {!configLoading && formError && (
+          {!configLoading && visibleFormError && (
             <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
-              {formError}
+              {visibleFormError}
             </div>
           )}
 

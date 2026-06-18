@@ -214,6 +214,24 @@ func TestGetRedirectURL(t *testing.T) {
 	})
 }
 
+func TestGetSignupRequiredRedirectURL(t *testing.T) {
+	t.Run("should redirect to signup with an auth error", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/github/callback", nil)
+
+		redirectURL := getSignupRequiredRedirectURL(req)
+
+		assert.Equal(t, "/signup?auth_error=signup_required", redirectURL)
+	})
+
+	t.Run("should preserve the original OAuth redirect", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/github/callback?state=%2Finvite%2Fabc", nil)
+
+		redirectURL := getSignupRequiredRedirectURL(req)
+
+		assert.Equal(t, "/signup?auth_error=signup_required&redirect=%2Finvite%2Fabc", redirectURL)
+	})
+}
+
 func TestHandler_checkSignupPolicy(t *testing.T) {
 	t.Run("should reject new magic-code account from login flow", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
