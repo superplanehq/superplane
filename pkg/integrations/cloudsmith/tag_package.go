@@ -146,7 +146,7 @@ func (t *TagPackage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to tag package: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageTaggedPayloadType, []any{packageResult(spec.PackageSpec, pkg)})
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageTaggedPayloadType, []any{pkg})
 }
 
 func (t *TagPackage) Cancel(ctx core.ExecutionContext) error {
