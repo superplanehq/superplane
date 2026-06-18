@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
@@ -48,7 +49,7 @@ func (s *Server) handleAgentChatMessageImage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	message, err := models.FindAgentSessionMessage(messageID)
+	message, err := models.FindAgentSessionMessage(database.DB(r.Context()), messageID)
 	if err != nil || message.SessionID != sessionID {
 		http.Error(w, "message not found", http.StatusNotFound)
 		return
