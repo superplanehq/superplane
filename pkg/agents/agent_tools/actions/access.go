@@ -52,8 +52,8 @@ func (a accessAction) Execute(ctx context.Context, session agents.AgentSessionCo
 		Accessible:     accessible,
 		Unavailable:    unavailable,
 		Notes: []string{
-			"Accessible API methods are the intersection of organization RBAC and the scoped agent token permissions enforced by the authorization interceptor.",
-			"Canvas-scoped token permissions only allow API methods whose interceptor rule can resolve this session canvas_id.",
+			"Accessible API routes are the intersection of organization RBAC and the scoped agent token permissions enforced by gateway authorization.",
+			"Canvas-scoped token permissions only allow API routes whose authorization rule can resolve this session canvas_id.",
 			"Draft graph and Console edits are allowed through canvases:update_version on this canvas; publishing and live app operations are not included in the agent token.",
 		},
 	}, nil
@@ -61,20 +61,20 @@ func (a accessAction) Execute(ctx context.Context, session agents.AgentSessionCo
 
 func (a accessAction) apiAccess(ctx context.Context, session agents.AgentSessionContext, permissions []jwt.Permission) ([]apiAccessResult, []apiAccessResult, error) {
 	rules := authorization.DefaultAuthorizationRules()
-	methods := sortedRuleMethods(rules)
+	routes := sortedAuthorizationRoutes(rules)
 	rbac := newRBACCache(ctx, a.auth, session.UserID, session.OrganizationID)
 
 	accessible := []apiAccessResult{}
 	unavailable := []apiAccessResult{}
-	for _, method := range methods {
-		rule := rules[method]
+	for _, route := range routes {
+		rule := rules[route]
 		tokenAllowed, resources, tokenReason := scopedTokenAllowsRule(rule, permissions, session.CanvasID)
 		rbacAllowed, rbacReason, err := rbac.allows(rule.Resource, rule.Action)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		entry := newAPIAccessResult(method, rule, resources)
+		entry := newAPIAccessResult(route, rule, resources)
 		if tokenAllowed && rbacAllowed {
 			accessible = append(accessible, entry)
 			continue
@@ -96,7 +96,7 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		scoped      bool
 		description string
 	}{
-		{name: accessActionName, description: "No API permission required; reports this session's token and interceptor access."},
+		{name: accessActionName, description: "No API permission required; reports this session's token and API route access."},
 		{name: readActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: readRuntimeActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listFilesActionName, resource: "canvases", operation: "read", scoped: true},
@@ -136,13 +136,15 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 	return results
 }
 
-func sortedRuleMethods(rules map[string]authorization.AuthorizationRule) []string {
-	methods := make([]string, 0, len(rules))
-	for method := range rules {
-		methods = append(methods, method)
+func sortedAuthorizationRoutes(rules map[authorization.HTTPRoute]authorization.AuthorizationRule) []authorization.HTTPRoute {
+	routes := make([]authorization.HTTPRoute, 0, len(rules))
+	for route := range rules {
+		routes = append(routes, route)
 	}
-	sort.Strings(methods)
-	return methods
+	sort.Slice(routes, func(i, j int) bool {
+		return routes[i].String() < routes[j].String()
+	})
+	return routes
 }
 
 func scopedTokenAllowsRule(rule authorization.AuthorizationRule, permissions []jwt.Permission, canvasID string) (bool, []string, string) {
@@ -159,8 +161,8 @@ func scopedTokenAllowsRule(rule authorization.AuthorizationRule, permissions []j
 			continue
 		}
 
-		if rule.ResourceResolver == nil {
-			return false, nil, "agent token is resource-scoped, but this API method is not resource-scoped by the interceptor"
+		if len(rule.ResourcePathParams) == 0 {
+			return false, nil, "agent token is resource-scoped, but this API route is not resource-scoped by authorization rules"
 		}
 
 		return true, []string{canvasID}, ""
@@ -182,25 +184,13 @@ func permissionAllows(permissions []jwt.Permission, resource, operation string, 
 	return false
 }
 
-func newAPIAccessResult(method string, rule authorization.AuthorizationRule, resources []string) apiAccessResult {
-	service, rpc := splitFullMethodName(method)
+func newAPIAccessResult(route authorization.HTTPRoute, rule authorization.AuthorizationRule, resources []string) apiAccessResult {
 	return apiAccessResult{
-		Method:    method,
-		Service:   service,
-		RPC:       rpc,
+		Method:    route.String(),
 		Resource:  rule.Resource,
 		Operation: rule.Action,
 		Resources: resources,
 	}
-}
-
-func splitFullMethodName(method string) (string, string) {
-	trimmed := strings.TrimPrefix(method, "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) != 2 {
-		return "", ""
-	}
-	return parts[0], parts[1]
 }
 
 func accessDeniedReason(tokenAllowed bool, tokenReason string, rbacAllowed bool, rbacReason string) string {
