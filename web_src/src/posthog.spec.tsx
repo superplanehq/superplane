@@ -3,15 +3,16 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { init, identify, capture, reset } = vi.hoisted(() => ({
+const { init, identify, capture, reset, setOnce } = vi.hoisted(() => ({
   init: vi.fn(),
   identify: vi.fn(),
   capture: vi.fn(),
   reset: vi.fn(),
+  setOnce: vi.fn(),
 }));
 
 vi.mock("posthog-js", () => ({
-  default: { init, identify, capture, reset },
+  default: { init, identify, capture, reset, people: { set_once: setOnce } },
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -56,7 +57,17 @@ const stubFetch = (data: object, status = 200) => {
 describe("posthog init", () => {
   beforeEach(() => {
     init.mockClear();
+    setOnce.mockClear();
+    localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
     vi.resetModules();
+  });
+
+  afterEach(() => {
+    delete (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY;
+    localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
+    window.history.replaceState({}, "", "/");
   });
 
   it("calls init when SUPERPLANE_POSTHOG_KEY is set", async () => {
@@ -64,7 +75,7 @@ describe("posthog init", () => {
     await import("@/posthog");
     expect(init).toHaveBeenCalledWith(
       "test-key",
-      expect.objectContaining({ autocapture: false, capture_pageview: false }),
+      expect.objectContaining({ autocapture: false, capture_pageview: false, person_profiles: "always" }),
     );
   });
 
@@ -73,6 +84,18 @@ describe("posthog init", () => {
     await import("@/posthog");
     expect(init).not.toHaveBeenCalled();
   });
+
+  it("sets initial UTM person properties when PostHog initializes", async () => {
+    (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY = "test-key";
+    window.history.replaceState({}, "", "/signup?utm_source=youtube&utm_campaign=erictech_beta");
+
+    await import("@/posthog");
+
+    expect(setOnce).toHaveBeenCalledWith({
+      $initial_utm_source: "youtube",
+      $initial_utm_campaign: "erictech_beta",
+    });
+  });
 });
 
 describe("account identification", () => {
@@ -80,12 +103,15 @@ describe("account identification", () => {
     identify.mockClear();
     capture.mockClear();
     localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
     stubFetch(mockAccount);
   });
 
   afterEach(() => {
     localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
     window.history.replaceState({}, "", "/");
+    delete (window as Window & { SUPERPLANE_POSTHOG_KEY?: string }).SUPERPLANE_POSTHOG_KEY;
     vi.unstubAllGlobals();
   });
 
