@@ -101,11 +101,25 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		return fmt.Errorf("anthropic: provider session id is required")
 	}
 
+	content := []map[string]any{
+		{"type": "text", "text": withPreamble(message, opts.ContextPreamble)},
+	}
+	for _, image := range opts.Images {
+		content = append(content, map[string]any{
+			"type": "image",
+			"source": map[string]string{
+				"type":       "base64",
+				"media_type": image.MediaType,
+				"data":       image.Data,
+			},
+		})
+	}
+
 	body := map[string]any{
 		"events": []map[string]any{
 			{
 				"type":    "user.message",
-				"content": []map[string]string{{"type": "text", "text": withPreamble(message, opts.ContextPreamble)}},
+				"content": content,
 			},
 		},
 	}
