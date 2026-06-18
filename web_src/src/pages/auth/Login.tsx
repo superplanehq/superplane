@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,12 @@ import {
   recordLastUsedLoginMethod,
   type LastUsedLoginMethod,
 } from "@/lib/lastUsedLoginMethod";
+import {
+  clearPendingSignupAnalyticsPreference,
+  confirmSignupAnalyticsPreference,
+  savePendingSignupAnalyticsPreference,
+} from "@/lib/signupAnalytics";
+import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 
 type AuthConfig = {
   providers: string[];
@@ -56,13 +63,166 @@ const getProviderLabel = (provider: string) => {
   }
 };
 
+const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode: boolean) => {
+  const params = new URLSearchParams(redirectQuery ? redirectQuery.slice(1) : "");
+  if (isSignupMode) {
+    params.set("signup", "true");
+  }
+
+  const query = params.toString();
+  return query ? `/auth/${provider}?${query}` : `/auth/${provider}`;
+};
+
+const isWelcomeRedirect = (response: Response) => {
+  try {
+    const parsedURL = new URL(response.url || "/", window.location.origin);
+    return parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome";
+  } catch {
+    return false;
+  }
+};
+
 type MagicCodeStep = "email" | "code";
+type AuthMode = "login" | "signup";
+
+interface LoginProps {
+  mode?: AuthMode;
+}
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
   <p className="mt-2 text-center text-xs text-gray-500">You used {label} to log in last time</p>
 );
 
-export const Login: React.FC = () => {
+const ProductUpdatesOptIn: React.FC<{
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}> = ({ checked, onCheckedChange }) => (
+  <label htmlFor="signup-product-updates" className="flex cursor-pointer items-start gap-2 text-sm text-gray-700">
+    <Checkbox
+      id="signup-product-updates"
+      checked={checked}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange(e.target.checked)}
+      className="mt-0.5"
+    />
+    <span>I want to receive product updates</span>
+  </label>
+);
+
+const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
+  if (!enabled) {
+    return;
+  }
+
+  savePendingSignupAnalyticsPreference({
+    email: email?.trim() || undefined,
+    productUpdatesOptIn,
+  });
+};
+
+const clearSignupPreference = (enabled: boolean) => {
+  if (enabled) {
+    clearPendingSignupAnalyticsPreference();
+  }
+};
+
+const buildMagicCodeRequestBody = (email: string, signup: boolean, redirectTarget: string) => {
+  const formData = new URLSearchParams();
+  formData.append("email", email.trim());
+  if (signup) {
+    formData.append("signup", "true");
+  }
+  if (redirectTarget) {
+    formData.append("redirect", redirectTarget);
+  }
+
+  return formData.toString();
+};
+
+const buildMagicCodeVerifyBody = (email: string, code: string, signup: boolean, inviteToken: string) => {
+  const formData = new URLSearchParams();
+  formData.append("email", email.trim());
+  formData.append("code", code.trim());
+  if (signup) {
+    formData.append("signup", "true");
+  }
+  if (inviteToken) {
+    formData.append("invite_token", inviteToken);
+  }
+
+  return formData.toString();
+};
+
+const buildSignupBody = (name: string, email: string, password: string, inviteToken: string) => {
+  const formData = new URLSearchParams();
+  formData.append("name", name);
+  formData.append("email", email.trim());
+  formData.append("password", password);
+  if (inviteToken) {
+    formData.append("invite_token", inviteToken);
+  }
+
+  return formData.toString();
+};
+
+const getMagicCodeVerifyError = async (response: Response) => {
+  if (response.status === 401) {
+    return "Invalid or expired code. Please try again.";
+  }
+
+  if (response.status === 403) {
+    const errorText = await response.text();
+    return errorText || "Sign-up is not allowed.";
+  }
+
+  return "Verification failed. Please try again.";
+};
+
+const getSignupError = async (response: Response) => {
+  if (response.status === 409) {
+    return "Account already exists. Please sign in.";
+  }
+
+  const errorText = await response.text();
+  return errorText || "Signup failed. Please try again.";
+};
+
+type SignupValidationFields = {
+  canSignup: boolean;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
+
+const getSignupValidationError = ({
+  canSignup,
+  firstName,
+  lastName,
+  email,
+  password,
+  confirmPassword,
+}: SignupValidationFields) => {
+  if (!canSignup) {
+    return "Signups are currently disabled.";
+  }
+
+  if (!firstName.trim() || !lastName.trim()) {
+    return "First and last names are required";
+  }
+
+  if (!email.trim() || !password || !confirmPassword) {
+    return "Email and password are required";
+  }
+
+  if (password !== confirmPassword) {
+    return "Passwords do not match";
+  }
+
+  return null;
+};
+
+export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
@@ -73,7 +233,7 @@ export const Login: React.FC = () => {
   const [configError, setConfigError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(mode === "signup");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
@@ -81,6 +241,7 @@ export const Login: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupProductUpdatesOptIn, setSignupProductUpdatesOptIn] = useState(true);
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
@@ -109,6 +270,22 @@ export const Login: React.FC = () => {
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response) => {
+      const finalURL = response.url || "/";
+
+      try {
+        const parsedURL = new URL(finalURL, window.location.origin);
+        if (parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome") {
+          if (!parsedURL.searchParams.has("redirect") && redirectTarget) {
+            parsedURL.searchParams.set("redirect", redirectTarget);
+          }
+
+          window.location.href = `${parsedURL.pathname}${parsedURL.search}`;
+          return;
+        }
+      } catch {
+        // fall through to existing redirect behavior
+      }
+
       if (redirectTarget) {
         window.location.href = redirectTarget;
         return;
@@ -130,7 +307,6 @@ export const Login: React.FC = () => {
         // fall through to default redirect
       }
 
-      const finalURL = response.url || "/";
       window.location.href = finalURL;
     },
     [redirectTarget],
@@ -147,28 +323,41 @@ export const Login: React.FC = () => {
   }, [account, accountLoading, safeRedirect]);
 
   useEffect(() => {
+    setIsSignupMode(mode === "signup");
+    setFormError(null);
+    setMagicCodeStep("email");
+    setMagicCode("");
+    setShowPasswordLogin(false);
+  }, [mode]);
+
+  useEffect(() => {
     if (!magicLinkToken) return;
 
     const verifyMagicLink = async () => {
       setSubmitLoading(true);
       try {
-        const formData = new URLSearchParams();
-        formData.append("token", magicLinkToken);
-        if (inviteToken) {
-          formData.append("invite_token", inviteToken);
-        }
+        const { url, body } = buildMagicLinkVerifyRequest({
+          token: magicLinkToken,
+          inviteToken,
+          redirectTarget,
+          signupIntent: mode === "signup",
+        });
 
-        const response = await fetch("/auth/magic-code/verify", {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           credentials: "include",
-          body: formData.toString(),
+          body,
         });
 
         if (!response.ok) {
           setFormError("Invalid or expired link. Please request a new code.");
           setSubmitLoading(false);
           return;
+        }
+
+        if (mode === "signup" && !isWelcomeRedirect(response)) {
+          clearPendingSignupAnalyticsPreference();
         }
 
         await handleRedirectAfterAuth(response);
@@ -179,7 +368,7 @@ export const Login: React.FC = () => {
     };
 
     verifyMagicLink();
-  }, [magicLinkToken, inviteToken, handleRedirectAfterAuth]);
+  }, [magicLinkToken, inviteToken, redirectTarget, mode, handleRedirectAfterAuth]);
 
   useEffect(() => {
     let canceled = false;
@@ -222,7 +411,7 @@ export const Login: React.FC = () => {
   const allowedProviders = ["google", "github"];
   const activeProviders = allowedProviders.filter((provider) => providers.includes(provider));
   const hasProviders = activeProviders.length > 0;
-  const canSignup = authConfig.signupEnabled || inviteToken;
+  const canSignup = authConfig.signupEnabled || Boolean(inviteToken);
 
   useReportPageReady(!configLoading && !accountLoading, {
     failed: !!configError,
@@ -232,19 +421,10 @@ export const Login: React.FC = () => {
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
-  const useMagicCodePrimary = authConfig.magicCodeEnabled && !showPasswordLogin;
-
-  useEffect(() => {
-    if (!canSignup && isSignupMode) {
-      setIsSignupMode(false);
-      setFormError(null);
-    }
-  }, [canSignup, isSignupMode]);
-
-  const handleToggleMode = (nextMode: "login" | "signup") => {
-    setIsSignupMode(nextMode === "signup");
-    setFormError(null);
-  };
+  const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
+  const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showStandaloneProductUpdatesOptIn =
+    isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,22 +435,19 @@ export const Login: React.FC = () => {
       return;
     }
 
+    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
+
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", magicCodeEmail.trim());
-      if (redirectTarget) {
-        formData.append("redirect", redirectTarget);
-      }
-
       const response = await fetch("/auth/magic-code/request", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
+        body: buildMagicCodeRequestBody(magicCodeEmail, isSignupMode, redirectTarget),
       });
 
       if (!response.ok) {
+        clearSignupPreference(isSignupMode);
         setFormError("Failed to send code. Please try again.");
         setSubmitLoading(false);
         return;
@@ -279,6 +456,7 @@ export const Login: React.FC = () => {
       setMagicCodeStep("code");
       setSubmitLoading(false);
     } catch {
+      clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -296,13 +474,6 @@ export const Login: React.FC = () => {
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", magicCodeEmail.trim());
-      formData.append("code", magicCode.trim());
-      if (inviteToken) {
-        formData.append("invite_token", inviteToken);
-      }
-
       const url = redirectTarget
         ? `/auth/magic-code/verify?redirect=${encodeURIComponent(redirectTarget)}`
         : "/auth/magic-code/verify";
@@ -311,24 +482,30 @@ export const Login: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         credentials: "include",
-        body: formData.toString(),
+        body: buildMagicCodeVerifyBody(magicCodeEmail, magicCode, isSignupMode, inviteToken),
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          setFormError("Invalid or expired code. Please try again.");
-        } else if (response.status === 403) {
-          const errorText = await response.text();
-          setFormError(errorText || "Sign-up is not allowed.");
-        } else {
-          setFormError("Verification failed. Please try again.");
-        }
+        clearSignupPreference(isSignupMode);
+        setFormError(await getMagicCodeVerifyError(response));
         setSubmitLoading(false);
         return;
       }
 
+      if (isSignupMode) {
+        if (isWelcomeRedirect(response)) {
+          confirmSignupAnalyticsPreference({
+            email: magicCodeEmail.trim(),
+            productUpdatesOptIn: signupProductUpdatesOptIn,
+          });
+        } else {
+          clearSignupPreference(true);
+        }
+      }
+
       await handleRedirectAfterAuth(response);
     } catch {
+      clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -388,37 +565,22 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setFormError(null);
 
-    if (!canSignup) {
-      setFormError("Signups are currently disabled.");
-      return;
-    }
-
-    if (!signupFirstName.trim() || !signupLastName.trim()) {
-      setFormError("First and last names are required");
-      return;
-    }
-
-    if (!signupEmail.trim() || !signupPassword || !signupConfirmPassword) {
-      setFormError("Email and password are required");
-      return;
-    }
-
-    if (signupPassword !== signupConfirmPassword) {
-      setFormError("Passwords do not match");
+    const validationError = getSignupValidationError({
+      canSignup,
+      firstName: signupFirstName,
+      lastName: signupLastName,
+      email: signupEmail,
+      password: signupPassword,
+      confirmPassword: signupConfirmPassword,
+    });
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("name", `${signupFirstName.trim()} ${signupLastName.trim()}`);
-      formData.append("email", signupEmail.trim());
-      formData.append("password", signupPassword);
-      if (inviteToken) {
-        formData.append("invite_token", inviteToken);
-      }
-
       const url = redirectTarget ? `/signup?redirect=${encodeURIComponent(redirectTarget)}` : "/signup";
       const response = await fetch(url, {
         method: "POST",
@@ -426,19 +588,24 @@ export const Login: React.FC = () => {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         credentials: "include",
-        body: formData.toString(),
+        body: buildSignupBody(
+          `${signupFirstName.trim()} ${signupLastName.trim()}`,
+          signupEmail,
+          signupPassword,
+          inviteToken,
+        ),
       });
 
       if (!response.ok) {
-        if (response.status === 409) {
-          setFormError("Account already exists. Please sign in.");
-        } else {
-          const errorText = await response.text();
-          setFormError(errorText || "Signup failed. Please try again.");
-        }
+        setFormError(await getSignupError(response));
         setSubmitLoading(false);
         return;
       }
+
+      confirmSignupAnalyticsPreference({
+        email: signupEmail.trim(),
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
 
       await handleRedirectAfterAuth(response);
     } catch {
@@ -447,11 +614,17 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleProviderClick = (provider: string) => {
+    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn);
+
+    recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
+  };
+
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
 
   const getHeading = () => {
-    if (isSignupMode) return "Create your account";
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
@@ -493,7 +666,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "email" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
             <form onSubmit={handleMagicCodeRequest} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -508,13 +681,20 @@ export const Login: React.FC = () => {
                 />
               </div>
 
+              {isSignupMode && (
+                <ProductUpdatesOptIn
+                  checked={signupProductUpdatesOptIn}
+                  onCheckedChange={setSignupProductUpdatesOptIn}
+                />
+              )}
+
               <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
                 Continue with email
               </LoadingButton>
             </form>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "code" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "code" && (
             <form onSubmit={handleMagicCodeVerify} className="space-y-4">
               <div className="space-y-2">
                 <Label>Code</Label>
@@ -532,7 +712,7 @@ export const Login: React.FC = () => {
               </div>
 
               <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
-                Sign in
+                Continue
               </LoadingButton>
 
               <div className="text-center">
@@ -655,6 +835,8 @@ export const Login: React.FC = () => {
                 />
               </div>
 
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+
               <LoadingButton
                 type="submit"
                 disabled={!canSignup}
@@ -719,14 +901,20 @@ export const Login: React.FC = () => {
               </div>
             )}
 
+          {!configLoading && showStandaloneProductUpdatesOptIn && (
+            <div className="mb-4">
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+            </div>
+          )}
+
           {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
             <div className="space-y-3">
               {activeProviders.map((provider) => (
                 <div key={provider}>
                   <Button variant="outline" className="w-full justify-center gap-2" asChild>
                     <a
-                      href={`/auth/${provider}${redirectQuery}`}
-                      onClick={() => recordLastUsedLoginMethod(provider as LastUsedLoginMethod)}
+                      href={providerAuthPath(provider, redirectQuery, isSignupMode)}
+                      onClick={() => handleProviderClick(provider)}
                     >
                       {provider === "github" && (
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -765,26 +953,27 @@ export const Login: React.FC = () => {
           {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("signup")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Create an account
-              </button>
+              </Link>
             </div>
           )}
 
           {!configLoading && isSignupMode && (
             <div className="mt-6 text-sm text-gray-500">
               Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("login")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/login${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Sign in
-              </button>
+              </Link>
+            </div>
+          )}
+
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && !isSignupMode && canSignup && (
+            <div className="mt-6 text-center text-sm text-gray-500">
+              {"Don't have an account? "}
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
+                Sign up
+              </Link>
             </div>
           )}
         </div>
