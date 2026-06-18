@@ -27,6 +27,9 @@ const (
 	MaterializationStatusDeleted = "deleted"
 
 	CanvasGitBranchMain = "main"
+
+	CanvasFileName  = "canvas.yaml"
+	ConsoleFileName = "console.yaml"
 )
 
 type CanvasVersion struct {
@@ -683,6 +686,11 @@ const canvasDraftBranchNamePrefix = "drafts/"
 
 func newDraftBranchName() string {
 	return canvasDraftBranchNamePrefix + uuid.New().String()
+}
+
+// IsDraftBranch reports whether a git branch is a canvas draft branch.
+func IsDraftBranch(branch string) bool {
+	return strings.HasPrefix(branch, canvasDraftBranchNamePrefix)
 }
 
 func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Canvas, error) {
