@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log"
@@ -19,6 +20,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
+
+const seedFilesCommitMessage = "Seed repository with files from app source"
 
 const (
 	canvasRepositoryProvisionerServiceName   = "superplane." + messages.CanvasExchange + "." + messages.CanvasCreatedRoutingKey + ".canvas-repository-provisioner"
@@ -188,9 +191,50 @@ func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, r
 			return repository.MarkError(tx)
 		}
 
+		if err := w.commitSeedFiles(ctx, tx, repository); err != nil {
+			w.log("Error committing seed files for canvas %s: %v", repository.CanvasID, err)
+			return repository.MarkError(tx)
+		}
+
 		w.log("Repository created for canvas %s", repository.CanvasID)
 		return repository.MarkReady(tx)
 	})
+}
+
+// commitSeedFiles applies any persisted seed files as the canvas repository's
+// initial content (after the empty README.md created by CreateRepository) and
+// deletes the seed rows once the commit succeeds. Repositories without seed
+// files are a no-op.
+func (w *RepositoryProvisionerWorker) commitSeedFiles(ctx context.Context, tx *gorm.DB, repository *models.Repository) error {
+	seedFiles, err := models.ListRepositorySeedFilesInTransaction(tx, repository.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(seedFiles) == 0 {
+		return nil
+	}
+
+	operations := make([]git.FileOperation, 0, len(seedFiles))
+	for _, file := range seedFiles {
+		operations = append(operations, git.FileOperation{
+			Path:      file.Path,
+			Content:   bytes.NewReader(file.Content),
+			SizeBytes: int64(len(file.Content)),
+		})
+	}
+
+	if _, err := w.Storage.Commit(ctx, repository.RepoID, git.CommitOptions{
+		Branch:     "main",
+		BaseBranch: "main",
+		Message:    seedFilesCommitMessage,
+		Author:     git.SuperPlaneBotAuthor(),
+		Operations: operations,
+	}); err != nil {
+		return err
+	}
+
+	return models.DeleteRepositorySeedFilesInTransaction(tx, repository.ID)
 }
 
 func (w *RepositoryProvisionerWorker) log(format string, v ...any) {
