@@ -38,29 +38,22 @@ func (m *DraftMaterializer) MaterializeDraft(
 	if m == nil || m.GitProvider == nil {
 		return nil, fmt.Errorf("draft materializer is not configured")
 	}
+	if !gitref.IsDraftBranch(branch) {
+		return nil, fmt.Errorf("branch %q is not a draft branch", branch)
+	}
 
 	if err := lockBranchMaterialization(tx, canvasID, branch); err != nil {
 		return nil, err
 	}
 
-	if gitref.IsDraftBranch(branch) {
-		existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branch)
-		if err == nil &&
-			existing.CommitSHA == commitSHA &&
-			existing.MaterializationStatus == models.MaterializationStatusReady {
-			return existing, nil
-		}
-		if err != nil && err != gorm.ErrRecordNotFound {
-			return nil, err
-		}
-	} else {
-		existing, err := models.FindVersionByCommitSHAInTransaction(tx, canvasID, commitSHA)
-		if err == nil && existing.MaterializationStatus == models.MaterializationStatusReady {
-			return existing, nil
-		}
-		if err != nil && err != gorm.ErrRecordNotFound {
-			return nil, err
-		}
+	existing, err := models.FindDraftVersionByBranchInTransaction(tx, canvasID, branch)
+	if err == nil &&
+		existing.CommitSHA == commitSHA &&
+		existing.MaterializationStatus == models.MaterializationStatusReady {
+		return existing, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -68,7 +61,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 	version := &models.CanvasVersion{
 		WorkflowID:            canvasID,
 		OwnerID:               ownerID,
-		State:                 draftVersionState(branch),
+		State:                 models.CanvasVersionStateDraft,
 		Name:                  snapshot.Name,
 		Description:           snapshot.Description,
 		Nodes:                 datatypes.NewJSONSlice(snapshot.Nodes),
@@ -77,13 +70,11 @@ func (m *DraftMaterializer) MaterializeDraft(
 		ConsoleLayout:         datatypes.NewJSONType(snapshot.ConsoleLayout),
 		CommitSHA:             commitSHA,
 		GitBranch:             branch,
+		BranchName:            &branchName,
 		MaterializationStatus: models.MaterializationStatusReady,
 		MaterializationError:  "",
 		CreatedAt:             &now,
 		UpdatedAt:             &now,
-	}
-	if gitref.IsDraftBranch(branch) {
-		version.BranchName = &branchName
 	}
 
 	if err := models.UpsertMaterializedVersionInTransaction(tx, version); err != nil {
