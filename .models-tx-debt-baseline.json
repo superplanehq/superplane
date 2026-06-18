@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 191,
-  "maxAllowedDatabaseConnCalls": 220,
+  "maxAllowedInTransactionDefinitions": 187,
+  "maxAllowedDatabaseConnCalls": 217,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:40:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:70:CreateAccountInTransaction",
@@ -124,10 +124,6 @@
     "pkg/models/email_settings.go:32:UpsertEmailSettingsInTransaction",
     "pkg/models/email_settings.go:43:FindEmailSettingsInTransaction",
     "pkg/models/email_settings.go:60:DeleteEmailSettingsInTransaction",
-    "pkg/models/installation_metadata.go:31:GetInstallationMetadataInTransaction",
-    "pkg/models/installation_metadata.go:35:GetInstallationIDInTransaction",
-    "pkg/models/installation_metadata.go:48:UpdateInstallationMetadataInTransaction",
-    "pkg/models/installation_metadata.go:62:findOrCreateInstallationMetadataInTransaction",
     "pkg/models/integration.go:86:ListIntegrationSecretsInTransaction",
     "pkg/models/integration.go:136:CountIntegrationsByOrganizationInTransaction",
     "pkg/models/integration.go:220:FindUnscopedIntegrationInTransaction",
@@ -308,9 +304,6 @@
     "pkg/models/email_settings.go:29:database.Conn()",
     "pkg/models/email_settings.go:40:database.Conn()",
     "pkg/models/email_settings.go:57:database.Conn()",
-    "pkg/models/installation_metadata.go:24:database.Conn()",
-    "pkg/models/installation_metadata.go:28:database.Conn()",
-    "pkg/models/installation_metadata.go:45:database.Conn()",
     "pkg/models/integration.go:83:database.Conn()",
     "pkg/models/integration.go:115:database.Conn()",
     "pkg/models/integration.go:125:database.Conn()",
@@ -416,5 +409,5 @@
     "pkg/models/workflow_staging.go:71:database.Conn()",
     "pkg/models/workflow_staging.go:75:database.Conn()"
   ],
-  "updatedAt": "2026-06-18T14:18:06Z"
+  "updatedAt": "2026-06-18T17:32:24Z"
 }
