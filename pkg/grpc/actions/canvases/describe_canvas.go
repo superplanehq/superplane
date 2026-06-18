@@ -21,7 +21,7 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	orgID := uuid.MustParse(organizationID)
-	canvas, err := findCanvas(ctx, orgID, canvasID)
+	canvas, err := loadCanvas(ctx, orgID, canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}

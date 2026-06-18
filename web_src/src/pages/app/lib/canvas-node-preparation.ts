@@ -6,7 +6,7 @@ import {
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
-  type SuperplaneActionsAction,
+  type ActionsAction,
   type SuperplaneComponentsEdge as ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
   type TriggersTrigger,
@@ -41,7 +41,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
   node: ComponentsNode;
-  components: SuperplaneActionsAction[];
+  components: ActionsAction[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
@@ -55,7 +55,7 @@ type PrepareComponentNodeArgs = {
 type PrepareComponentBaseNodeArgs = {
   nodes: ComponentsNode[];
   node: ComponentsNode;
-  components: SuperplaneActionsAction[];
+  components: ActionsAction[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
@@ -273,7 +273,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
           emptyStateProps,
           error: node.errorMessage,
           warning: node.warningMessage,
-          paused: !!node.paused,
         },
       },
     };

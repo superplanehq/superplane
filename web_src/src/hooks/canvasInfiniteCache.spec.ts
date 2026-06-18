@@ -1,21 +1,14 @@
 import type { InfiniteData } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type {
-  CanvasesCanvasEvent,
-  CanvasesCanvasEventWithExecutions,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasRun,
-} from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import {
   executionToRef,
   parseRunsFiltersFromQueryKey,
   runMatchesFilters,
-  upsertExecutionIntoInfiniteEventsData,
   upsertExecutionIntoInfiniteRunsData,
-  upsertRootEventIntoInfiniteData,
+  upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
-  type InfiniteEventsPage,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
 
@@ -36,26 +29,6 @@ function makeRun(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun 
 function makeInfiniteRunsData(runs: CanvasesCanvasRun[], totalCount = runs.length): InfiniteData<InfiniteRunsPage> {
   return {
     pages: [{ runs, totalCount, hasNextPage: false }],
-    pageParams: [undefined],
-  };
-}
-
-function makeEvent(overrides: Partial<CanvasesCanvasEventWithExecutions> = {}): CanvasesCanvasEventWithExecutions {
-  return {
-    id: "event-1",
-    nodeId: "trigger-1",
-    createdAt: "2026-06-01T12:00:00.000Z",
-    executions: [],
-    ...overrides,
-  };
-}
-
-function makeInfiniteEventsData(
-  events: CanvasesCanvasEventWithExecutions[],
-  totalCount = events.length,
-): InfiniteData<InfiniteEventsPage> {
-  return {
-    pages: [{ events, totalCount, hasNextPage: false }],
     pageParams: [undefined],
   };
 }
@@ -161,50 +134,60 @@ describe("upsertRunIntoInfiniteData", () => {
   });
 });
 
-describe("upsertRootEventIntoInfiniteData", () => {
-  it("maps root events and inserts them at the top of page 0", () => {
-    const old = makeInfiniteEventsData([makeEvent({ id: "event-old", createdAt: "2026-06-01T11:00:00.000Z" })], 1);
-    const incoming: CanvasesCanvasEvent = {
-      id: "event-new",
-      nodeId: "trigger-1",
-      root: true,
-      createdAt: "2026-06-01T12:00:00.000Z",
-      customName: "Deploy",
+describe("upsertRunIntoDescribeRunData", () => {
+  it("updates describe-run cache when the incoming payload is newer", () => {
+    const current = {
+      run: makeRun({
+        state: "STATE_STARTED",
+        updatedAt: "2026-06-01T12:00:00.000Z",
+      }),
     };
-
-    const next = upsertRootEventIntoInfiniteData(old, incoming)!;
-
-    expect(next.pages[0]?.events?.[0]).toMatchObject({
-      id: "event-new",
-      customName: "Deploy",
-      executions: [],
+    const incoming = makeRun({
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
     });
-    expect(next.pages[0]?.totalCount).toBe(2);
+
+    const next = upsertRunIntoDescribeRunData(current, incoming);
+
+    expect(next?.run?.state).toBe("STATE_FINISHED");
+    expect(next?.run?.result).toBe("RESULT_PASSED");
   });
 
-  it("preserves existing executions when the same root event is upserted again", () => {
-    const old = makeInfiniteEventsData([
-      makeEvent({
-        executions: [{ id: "execution-1", nodeId: "node-1", state: "STATE_STARTED" }],
+  it("rejects stale run_started updates after run_finished", () => {
+    const current = {
+      run: makeRun({
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: "2026-06-01T12:01:00.000Z",
       }),
-    ]);
-    const incoming: CanvasesCanvasEvent = {
-      id: "event-1",
-      nodeId: "trigger-1",
-      root: true,
-      createdAt: "2026-06-01T12:00:00.000Z",
     };
+    const incoming = makeRun({
+      state: "STATE_STARTED",
+      result: "RESULT_UNKNOWN",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
 
-    const next = upsertRootEventIntoInfiniteData(old, incoming)!;
+    const next = upsertRunIntoDescribeRunData(current, incoming);
 
-    expect(next.pages[0]?.events?.[0]?.executions).toEqual([
-      { id: "execution-1", nodeId: "node-1", state: "STATE_STARTED" },
-    ]);
+    expect(next).toBe(current);
+    expect(next?.run?.state).toBe("STATE_FINISHED");
+  });
+
+  it("seeds describe-run cache when no entry exists yet", () => {
+    const incoming = makeRun({
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+    });
+
+    const next = upsertRunIntoDescribeRunData(undefined, incoming);
+
+    expect(next).toEqual({ run: incoming });
   });
 });
 
 describe("execution cache patching", () => {
-  it("maps executions to refs and upserts them into matching events and runs", () => {
+  it("maps executions to refs and upserts them into matching runs", () => {
     const execution: CanvasesCanvasNodeExecution = {
       id: "execution-1",
       nodeId: "node-1",
@@ -226,18 +209,15 @@ describe("execution cache patching", () => {
       updatedAt: "2026-06-01T12:01:00.000Z",
     });
 
-    const eventsOld = makeInfiniteEventsData([makeEvent({ id: "event-1" })]);
-    const eventsNext = upsertExecutionIntoInfiniteEventsData(eventsOld, execution)!;
-    expect(eventsNext.pages[0]?.events?.[0]?.executions?.[0]?.state).toBe("STATE_FINISHED");
-
     const runsOld = makeInfiniteRunsData([makeRun({ rootEvent: { id: "event-1", nodeId: "trigger-1" } })]);
     const runsNext = upsertExecutionIntoInfiniteRunsData(runsOld, execution)!;
     expect(runsNext.pages[0]?.runs?.[0]?.executions?.[0]?.state).toBe("STATE_FINISHED");
   });
 
   it("ignores stale execution updates", () => {
-    const old = makeInfiniteEventsData([
-      makeEvent({
+    const old = makeInfiniteRunsData([
+      makeRun({
+        rootEvent: { id: "event-1", nodeId: "trigger-1" },
         executions: [
           {
             id: "execution-1",
@@ -256,8 +236,8 @@ describe("execution cache patching", () => {
       rootEvent: { id: "event-1", nodeId: "trigger-1" },
     };
 
-    const next = upsertExecutionIntoInfiniteEventsData(old, incoming);
+    const next = upsertExecutionIntoInfiniteRunsData(old, incoming);
 
-    expect(next?.pages[0]?.events?.[0]?.executions?.[0]?.state).toBe("STATE_FINISHED");
+    expect(next?.pages[0]?.runs?.[0]?.executions?.[0]?.state).toBe("STATE_FINISHED");
   });
 });

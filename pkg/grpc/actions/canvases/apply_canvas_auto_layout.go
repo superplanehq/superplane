@@ -61,9 +61,8 @@ func ApplyCanvasAutoLayout(
 			Description: pbCanvas.GetMetadata().GetDescription(),
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes:            actions.NodesToProto(laidOutNodes),
-			Edges:            actions.EdgesToProto(laidOutEdges),
-			ChangeManagement: pbCanvas.GetSpec().GetChangeManagement(),
+			Nodes: actions.NodesToProto(laidOutNodes),
+			Edges: actions.EdgesToProto(laidOutEdges),
 		},
 	}
 
@@ -77,6 +76,7 @@ func ApplyCanvasAutoLayout(
 		canvas.OrganizationID,
 		CanvasYAMLRepositoryPath,
 		positionedYAML,
+		"",
 		&userUUID,
 	); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to stage canvas layout: %v", err)

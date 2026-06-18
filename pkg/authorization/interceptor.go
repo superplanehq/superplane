@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -285,36 +284,6 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_CreateCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_DescribeCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "publish",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ResolveCanvasChangeRequest_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_DeleteCanvas_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "delete",
@@ -364,19 +333,13 @@ func DefaultAuthorizationRules() map[string]AuthorizationRule {
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_UpdateNodePause_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ListCanvasEvents_FullMethodName: {
+		pbCanvases.Canvases_ListRuns_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_ListRuns_FullMethodName: {
+		pbCanvases.Canvases_DescribeRun_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
 			DomainType:       models.DomainTypeOrganization,
@@ -489,20 +452,10 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		userID := userMeta[0]
 		organizationID := orgMeta[0]
 
-		var org *models.Organization
-		err := telemetry.RunSpan(ctx, "auth.load_organization", func(ctx context.Context) error {
-			var loadErr error
-			org, loadErr = models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID)
-			return loadErr
-		})
-		if err != nil {
-			return nil, status.Error(codes.NotFound, "organization not found")
-		}
-
 		var allowed bool
-		err = telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
+		err := telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
 			var checkErr error
-			allowed, checkErr = a.authService.CheckOrganizationPermission(ctx, userID, org.ID.String(), rule.Resource, rule.Action)
+			allowed, checkErr = checkOrganizationPermission(ctx, a.authService, userID, organizationID, rule.Resource, rule.Action)
 			return checkErr
 		})
 		if err != nil {
@@ -510,7 +463,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		if !allowed {
-			log.Warnf("User %s tried to %s %s in organization %s", userID, rule.Action, rule.Resource, org.ID.String())
+			log.Warnf("User %s tried to %s %s in organization %s", userID, rule.Action, rule.Resource, organizationID)
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
@@ -528,13 +481,13 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
-		if err := checkRequiredExperimentalFeatures(org, rule); err != nil {
+		if err := checkRequiredExperimentalFeatures(ctx, organizationID, rule); err != nil {
 			log.Warnf(
 				"User %s tried to access %s:%s in organization %s without required experimental feature",
 				userID,
 				rule.Resource,
 				rule.Action,
-				org.ID.String(),
+				organizationID,
 			)
 			return nil, err
 		}
@@ -544,15 +497,6 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		newContext = context.WithValue(newContext, DomainIdContextKey, organizationID)
 		return handler(newContext, req)
 	}
-}
-
-func checkRequiredExperimentalFeatures(org *models.Organization, rule AuthorizationRule) error {
-	for _, featureID := range rule.RequiredExperimentalFeatures {
-		if !org.HasExperimentalFeature(featureID) {
-			return status.Error(codes.PermissionDenied, "required experimental feature is not enabled")
-		}
-	}
-	return nil
 }
 
 func hasRequiredScopedTokenPermission(ctx context.Context, req any, rule AuthorizationRule) bool {

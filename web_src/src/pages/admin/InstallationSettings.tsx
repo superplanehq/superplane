@@ -2,6 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Input, InputGroup } from "@/components/Input/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
@@ -525,6 +526,8 @@ const InstallationSettings: React.FC = () => {
     saveNetworkSettings,
     saveSMTPSettings,
   } = useInstallationSettingsState();
+
+  useReportPageReady(!loading || !!settings);
 
   if (loading && !settings) {
     return (

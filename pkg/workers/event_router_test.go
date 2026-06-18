@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -30,6 +31,10 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	runConsumer.Start()
 	defer runConsumer.Stop()
 
+	terminalEventConsumer := testconsumer.New(amqpURL, messages.EventTerminalRoutingKey)
+	terminalEventConsumer.Start()
+	defer terminalEventConsumer.Stop()
+
 	//
 	// Create a simple canvas with just a trigger and a component nodes.
 	//
@@ -52,7 +57,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	// Create the root event for the trigger node, and process it.
 	//
 	event := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	err := router.LockAndProcessEvent(logger, *event)
+	err := router.LockAndProcessEvent(logger, *event, time.Now())
 	require.NoError(t, err)
 
 	//
@@ -77,6 +82,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
+	assert.False(t, terminalEventConsumer.HasReceivedMessage())
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
@@ -114,7 +120,7 @@ func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T)
 		assert.NotEqual(t, event.ID, pending.ID)
 	}
 
-	require.NoError(t, router.LockAndProcessEvent(logger, *event))
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
 
 	updatedEvent, err := models.FindCanvasEvent(event.ID)
 	require.NoError(t, err)
@@ -181,7 +187,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, outputEvent)
+	err = router.LockAndProcessEvent(logger, outputEvent, time.Now())
 	require.NoError(t, err)
 
 	updatedEvent, err := models.FindCanvasEvent(outputEvent.ID)
@@ -235,10 +241,17 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
-	err = router.LockAndProcessEvent(logger, events[0])
+	err = router.LockAndProcessEvent(logger, events[0], time.Now())
 	require.NoError(t, err)
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	finalizer := NewRunFinalizer(amqpURL)
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)

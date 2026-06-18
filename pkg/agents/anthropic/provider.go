@@ -15,6 +15,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 )
 
 const ProviderName = "anthropic"
@@ -46,6 +47,10 @@ func New(cfg Config) (*Provider, error) {
 }
 
 func (p *Provider) Name() string { return ProviderName }
+
+func (p *Provider) ToolSchemaRevision() string {
+	return agenttools.SchemaRevision()
+}
 
 func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	body := map[string]any{
@@ -209,7 +214,31 @@ func isProviderSessionUnavailable(err error) bool {
 	if !errors.As(err, &apiErr) {
 		return false
 	}
-	return apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusGone
+	if apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusGone {
+		return true
+	}
+	if apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	message := strings.ToLower(apiErr.Message)
+	if !strings.Contains(message, "session") {
+		return false
+	}
+
+	sessionID := sessionIDFromProviderPath(apiErr.Path)
+	if sessionID != "" && strings.Contains(message, strings.ToLower(sessionID)) {
+		return strings.Contains(message, "not found") ||
+			strings.Contains(message, "does not exist") ||
+			strings.Contains(message, "deleted") ||
+			strings.Contains(message, "archived")
+	}
+
+	return strings.Contains(message, "session does not exist") ||
+		strings.Contains(message, "session has been deleted") ||
+		strings.Contains(message, "session was deleted") ||
+		strings.Contains(message, "session has been archived") ||
+		strings.Contains(message, "session was archived")
 }
 
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
@@ -238,6 +267,29 @@ func (p *Provider) DeleteSession(ctx context.Context, providerSessionID string) 
 	}
 
 	return nil
+}
+
+func (p *Provider) ArchiveSession(ctx context.Context, providerSessionID string) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+url.PathEscape(providerSessionID)+"/archive", nil); err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
+		return fmt.Errorf("anthropic: archive session: %w", err)
+	}
+
+	return nil
+}
+
+func sessionIDFromProviderPath(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "sessions" {
+		return ""
+	}
+	return parts[1]
 }
 
 func withPreamble(message, preamble string) string {

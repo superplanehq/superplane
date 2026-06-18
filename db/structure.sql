@@ -133,7 +133,9 @@ CREATE TABLE public.agent_sessions (
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    heartbeat_at timestamp with time zone
+    heartbeat_at timestamp with time zone,
+    agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -380,7 +382,6 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    change_management_enabled boolean DEFAULT false NOT NULL,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
@@ -480,47 +481,6 @@ CREATE TABLE public.webhooks (
     retry_count integer DEFAULT 0 NOT NULL,
     max_retries integer DEFAULT 3 NOT NULL,
     app_installation_id uuid
-);
-
-
---
--- Name: workflow_change_request_approvals; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.workflow_change_request_approvals (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    workflow_id uuid NOT NULL,
-    workflow_change_request_id uuid NOT NULL,
-    approver_index integer NOT NULL,
-    approver_type character varying(32) NOT NULL,
-    approver_user_id uuid,
-    approver_role character varying(255),
-    actor_user_id uuid,
-    state character varying(32) NOT NULL,
-    invalidated_at timestamp without time zone,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.workflow_change_requests (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    workflow_id uuid NOT NULL,
-    version_id uuid NOT NULL,
-    owner_id uuid,
-    status character varying(32) NOT NULL,
-    changed_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    title text DEFAULT ''::text NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
-    published_at timestamp without time zone,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    based_on_version_id uuid,
-    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -666,7 +626,8 @@ CREATE TABLE public.workflow_staged_files (
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
     updated_by uuid,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    base_head_sha character varying(40) NOT NULL
 );
 
 
@@ -686,12 +647,14 @@ CREATE TABLE public.workflow_versions (
     state character varying(32) NOT NULL,
     name character varying(128) DEFAULT ''::character varying NOT NULL,
     description text DEFAULT ''::text NOT NULL,
-    change_management_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     branch_name text,
     display_name text DEFAULT ''::text NOT NULL,
+    commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    git_branch text NOT NULL,
+    materialization_status character varying(32) NOT NULL,
+    materialization_error text NOT NULL,
     CONSTRAINT workflow_versions_draft_branch_check CHECK (((((state)::text = 'draft'::text) AND (branch_name IS NOT NULL)) OR (((state)::text <> 'draft'::text) AND (branch_name IS NULL))))
 );
 
@@ -1042,30 +1005,6 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_request_approvals
-    ADD CONSTRAINT workflow_change_request_approvals_pkey PRIMARY KEY (id);
-
-
---
--- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_pkey PRIMARY KEY (id);
-
-
---
--- Name: workflow_change_requests workflow_change_requests_workflow_version_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_workflow_version_key UNIQUE (workflow_id, version_id);
-
-
---
 -- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1393,48 +1332,6 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
--- Name: idx_workflow_change_request_approvals_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_request_approvals_active ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, invalidated_at, approver_index);
-
-
---
--- Name: idx_workflow_change_request_approvals_change_request; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_request_approvals_change_request ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, created_at DESC);
-
-
---
--- Name: idx_workflow_change_requests_based_on_version; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_requests_based_on_version ON public.workflow_change_requests USING btree (workflow_id, based_on_version_id);
-
-
---
--- Name: idx_workflow_change_requests_owner; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_requests_owner ON public.workflow_change_requests USING btree (owner_id);
-
-
---
--- Name: idx_workflow_change_requests_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_requests_status ON public.workflow_change_requests USING btree (workflow_id, status, created_at DESC);
-
-
---
--- Name: idx_workflow_change_requests_workflow_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_change_requests_workflow_id ON public.workflow_change_requests USING btree (workflow_id);
-
-
---
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1589,10 +1486,24 @@ CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_file
 
 
 --
+-- Name: idx_workflow_versions_commit_sha; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_commit_sha ON public.workflow_versions USING btree (workflow_id, commit_sha) WHERE ((commit_sha)::text <> ''::text);
+
+
+--
 -- Name: idx_workflow_versions_draft_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_workflow_versions_draft_branch ON public.workflow_versions USING btree (workflow_id, branch_name) WHERE (((state)::text = 'draft'::text) AND (branch_name IS NOT NULL));
+
+
+--
+-- Name: idx_workflow_versions_git_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch);
 
 
 --
@@ -1860,70 +1771,6 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_request_approvals
-    ADD CONSTRAINT workflow_change_request_approvals_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
--- Name: workflow_change_request_approvals workflow_change_request_approvals_approver_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_request_approvals
-    ADD CONSTRAINT workflow_change_request_approvals_approver_user_id_fkey FOREIGN KEY (approver_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
--- Name: workflow_change_request_approvals workflow_change_request_approvals_change_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_request_approvals
-    ADD CONSTRAINT workflow_change_request_approvals_change_request_id_fkey FOREIGN KEY (workflow_change_request_id) REFERENCES public.workflow_change_requests(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_change_request_approvals workflow_change_request_approvals_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_request_approvals
-    ADD CONSTRAINT workflow_change_request_approvals_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_based_on_version_id_fkey FOREIGN KEY (based_on_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
-
-
---
--- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
--- Name: workflow_change_requests workflow_change_requests_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_change_requests workflow_change_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_change_requests
-    ADD CONSTRAINT workflow_change_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2171,7 +2018,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260614140634	f
+20260617203101	f
 \.
 
 

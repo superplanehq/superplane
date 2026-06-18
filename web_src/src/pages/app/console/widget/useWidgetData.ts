@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import {
-  useCanvasMemoryEntries,
-  useEventExecutionsBatch,
-  useInfiniteCanvasEvents,
-  useInfiniteCanvasRuns,
-} from "@/hooks/useCanvasData";
+import { useCanvasMemoryEntries, useEventExecutionsBatch, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 
 import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
@@ -267,7 +262,7 @@ function useExecutionsDataSourceResult({
   loadMore: () => void;
 }): WidgetDataResult {
   const enabled = dataSource.kind === "executions";
-  const query = useInfiniteCanvasEvents(canvasId, enabled);
+  const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
   // Memoize `pages` so empty-array fallback identity stays stable across
   // renders — keeps the downstream `useMemo` deps from busting every cycle.
   const pages = useMemo(() => query.data?.pages ?? [], [query.data]);
@@ -286,8 +281,8 @@ function useExecutionsDataSourceResult({
     if (!enabled) return 0;
     let count = 0;
     for (const page of pages) {
-      for (const event of page?.events ?? []) {
-        for (const exec of event.executions ?? []) {
+      for (const run of page?.runs ?? []) {
+        for (const exec of run.executions ?? []) {
           if (targetNodeId && exec.nodeId !== targetNodeId) continue;
           count++;
         }

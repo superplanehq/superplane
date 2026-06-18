@@ -218,7 +218,7 @@ func (s *Server) writeRepositoryGitFile(
 		return errRepositoryNotFound
 	}
 
-	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path)
+	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path, "")
 	if fileErr != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), fileErr)
 		return errRepositoryFileReadFailed

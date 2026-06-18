@@ -3,6 +3,7 @@ package agenttools
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	componentregistry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 )
@@ -20,6 +22,7 @@ import (
 type Dependencies struct {
 	Encryptor         crypto.Encryptor
 	ComponentRegistry *componentregistry.Registry
+	GitProvider       gitprovider.Provider
 	WebhookBaseURL    string
 	AuthService       authorization.Authorization
 	UsageService      usage.Service
@@ -55,6 +58,8 @@ type toolCall struct {
 }
 
 type factory func(Dependencies) tool
+
+const toolContractRevision = "agent-tools-v1"
 
 var registeredTools = struct {
 	sync.RWMutex
@@ -124,6 +129,25 @@ func DefinitionMaps() []map[string]any {
 		})
 	}
 	return tools
+}
+
+// SchemaRevision identifies the provider-facing custom tool contract. The
+// hash changes when tool names, descriptions, or input schemas change; bump
+// toolContractRevision for behavior changes that keep the JSON schema stable.
+func SchemaRevision() string {
+	payload := struct {
+		Contract string           `json:"contract"`
+		Tools    []map[string]any `json:"tools"`
+	}{
+		Contract: toolContractRevision,
+		Tools:    DefinitionMaps(),
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		panic(fmt.Sprintf("agent tool schema revision: %v", err))
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%s:%x", toolContractRevision, sum[:])
 }
 
 // Definitions returns the registered custom tool definitions in stable name

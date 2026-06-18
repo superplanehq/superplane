@@ -31,7 +31,6 @@ spec:
       position:
         x: 120
         y: 500
-      paused: false
       isCollapsed: false
   edges:
     - sourceId: manual-plan-start
@@ -76,8 +75,6 @@ kind: Canvas
 metadata:
   name: unknown-field-test
 spec:
-  changeManagement:
-    enabled: false
   edges: []
   nodes:
     - id: wait-1

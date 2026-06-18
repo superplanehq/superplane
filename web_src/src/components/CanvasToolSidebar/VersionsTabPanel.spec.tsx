@@ -15,17 +15,6 @@ function makePublishedVersion(id: string): CanvasesCanvasVersion {
   };
 }
 
-function makePendingApprovalVersion(id: string): CanvasesCanvasVersion {
-  return {
-    metadata: {
-      id,
-      owner: { name: "Alice" },
-      createdAt: "2026-05-19T12:00:00Z",
-      state: "STATE_DRAFT",
-    },
-  };
-}
-
 describe("VersionsTabPanel", () => {
   it("shows the empty state when there is no published history", () => {
     render(
@@ -34,11 +23,56 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
     expect(screen.getByText("No published history yet.")).toBeInTheDocument();
+  });
+
+  it("calls onCreateDraftBranch when the create-draft button is clicked", () => {
+    const onCreateDraftBranch = vi.fn();
+
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={onCreateDraftBranch}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("canvas-create-draft-button"));
+
+    expect(onCreateDraftBranch).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the create-draft button when the user cannot update the canvas", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={false}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("canvas-create-draft-button")).not.toBeInTheDocument();
+  });
+
+  it("renders the git-backed footer with a copy clone command action", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("versions-sidebar-footer")).toBeInTheDocument();
+    expect(screen.getByTestId("versions-sidebar-copy-clone-command")).toBeInTheDocument();
   });
 
   it("selects a version when a row is clicked", () => {
@@ -51,7 +85,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -74,7 +107,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -89,7 +121,6 @@ describe("VersionsTabPanel", () => {
         canUpdateCanvas={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
@@ -108,7 +139,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { unmount } = render(<VersionsTabPanel {...props} />);
@@ -123,31 +153,6 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
   });
 
-  it("shows View Diff for pending change requests before live history loads", () => {
-    const liveCanvasVersion = makePublishedVersion("live-version");
-    const pendingVersion = makePendingApprovalVersion("pending-version");
-
-    render(
-      <VersionsTabPanel
-        liveCanvasVersionId="live-version"
-        liveCanvasVersion={liveCanvasVersion}
-        liveVersions={[]}
-        pendingApprovalVersions={[
-          {
-            version: pendingVersion,
-            changeRequest: { metadata: { id: "cr-1", title: "Pending change" } },
-          },
-        ]}
-        canUpdateCanvas={true}
-        canvasDeletedRemotely={false}
-        onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByLabelText("View Diff")).toBeInTheDocument();
-  });
-
   it("loads older versions when the sidebar scroll reaches the end", () => {
     const onLoadMoreLiveVersions = vi.fn();
     const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];
@@ -158,7 +163,6 @@ describe("VersionsTabPanel", () => {
       canUpdateCanvas: true,
       canvasDeletedRemotely: false,
       onUseVersion: vi.fn(),
-      onVersionNodeDiffContextChange: vi.fn(),
     };
 
     const { rerender } = render(<VersionsTabPanel {...props} />);

@@ -1003,6 +1003,60 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "render.seriesField must be a string",
 		},
+		{
+			name: "chart xFormat must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":    "chart",
+						"type":    "bar",
+						"xField":  "createdAt",
+						"xFormat": 7,
+						"series":  []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.xFormat must be a string",
+		},
+		{
+			name: "chart yLabel must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"yLabel": false,
+						"series": []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.yLabel must be a string",
+		},
+		{
+			name: "chart yFormat must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":    "chart",
+						"type":    "bar",
+						"xField":  "service",
+						"yFormat": 1.5,
+						"series":  []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.yFormat must be a string",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1029,6 +1083,30 @@ func TestValidateConsoleContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) 
 						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
 					},
 					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "chart",
+			Type: ConsolePanelTypeChart,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":    "chart",
+					"type":    "bar",
+					"xField":  "createdAt",
+					"xFormat": "date",
+					"yLabel":  "USD",
+					"yFormat": "number",
+					"series":  []any{map[string]any{"field": "cost", "label": "Cost", "prefix": "$"}},
 				},
 			},
 		},

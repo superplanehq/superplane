@@ -11,9 +11,7 @@ import (
 func TestIsCriticalHTTPRoute(t *testing.T) {
 	t.Run("critical canvas endpoints", func(t *testing.T) {
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/runs"))
-		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/events"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/versions"))
-		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/change-requests"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/repository/file"))
 		assert.True(t, IsCriticalHTTPRoute("/api/v1/canvases/{canvas_id}/memory"))
 	})

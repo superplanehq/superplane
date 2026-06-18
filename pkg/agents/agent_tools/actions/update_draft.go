@@ -32,7 +32,8 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	draft, err := ensureOwnedDraftVersion(canvasID, uuid.MustParse(session.UserID))
+	userID := uuid.MustParse(session.UserID)
+	draft, err := resolveTargetDraftVersion(canvasID, userID, input)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("ensure draft: %w", err)
 	}
@@ -132,25 +133,91 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 	}, nil
 }
 
-func ownedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error) {
+func ownedDraftVersions(canvasID, userID uuid.UUID) ([]models.CanvasVersion, error) {
 	drafts, err := models.ListDraftCanvasVersions(canvasID)
 	if err != nil {
 		return nil, err
 	}
+	owned := make([]models.CanvasVersion, 0, len(drafts))
 	for i := range drafts {
 		if models.IsUserOwnedDraftVersion(&drafts[i], userID) && models.IsRegisteredDraftVersion(&drafts[i]) {
-			return &drafts[i], nil
+			owned = append(owned, drafts[i])
 		}
 	}
-	return nil, nil
+	return owned, nil
 }
 
-func ensureOwnedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error) {
-	if draft, err := ownedDraftVersion(canvasID, userID); err != nil || draft != nil {
-		return draft, err
+func resolveTargetDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
+	requested, err := requestedDraftVersionID(input)
+	if err != nil {
+		return nil, err
+	}
+	if requested == uuid.Nil {
+		return nil, fmt.Errorf("version_id is required for update_draft; pass the version_id returned by read, create_draft, or the previous update_draft; if read returned live with no version_id, call create_draft first")
+	}
+	return validatedOwnedDraftVersion(canvasID, userID, requested)
+}
+
+func resolveReadableDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
+	requested, err := requestedDraftVersionID(input)
+	if err != nil {
+		return nil, err
+	}
+	if requested != uuid.Nil {
+		return validatedOwnedDraftVersion(canvasID, userID, requested)
 	}
 
-	return models.CreateDraftBranchFromLive(canvasID, userID, "", nil, nil)
+	drafts, err := ownedDraftVersions(canvasID, userID)
+	if err != nil {
+		return nil, err
+	}
+	switch len(drafts) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &drafts[0], nil
+	default:
+		return nil, fmt.Errorf("multiple owned drafts exist for this app; pass version_id to read a specific draft or use use_draft=false to read live")
+	}
+}
+
+func validatedOwnedDraftVersion(canvasID, userID, versionID uuid.UUID) (*models.CanvasVersion, error) {
+	draft, err := models.FindCanvasVersion(canvasID, versionID)
+	if err != nil {
+		return nil, fmt.Errorf("load draft version %s: %w", versionID, err)
+	}
+	if draft.State != models.CanvasVersionStateDraft {
+		return nil, fmt.Errorf("draft version %s is not a draft", versionID)
+	}
+	if !models.IsRegisteredDraftVersion(draft) {
+		return nil, fmt.Errorf("draft version %s is not a registered draft branch", versionID)
+	}
+	if !models.IsUserOwnedDraftVersion(draft, userID) {
+		return nil, fmt.Errorf("draft version %s does not belong to the current user", versionID)
+	}
+	return draft, nil
+}
+
+func requestedDraftVersionID(input Input) (uuid.UUID, error) {
+	versionID := strings.TrimSpace(input.VersionID)
+	draftVersionID := strings.TrimSpace(input.DraftVersionID)
+	if versionID != "" && draftVersionID != "" && versionID != draftVersionID {
+		return uuid.Nil, fmt.Errorf("version_id and draft_version_id must match when both are provided")
+	}
+
+	requested := versionID
+	if requested == "" {
+		requested = draftVersionID
+	}
+	if requested == "" {
+		return uuid.Nil, nil
+	}
+
+	parsed, err := uuid.Parse(requested)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid draft version id: %w", err)
+	}
+	return parsed, nil
 }
 
 func resolveCustomToolAutoLayout(input *AutoLayoutInput, hasCanvasUpdate bool) *pb.CanvasAutoLayout {
