@@ -298,6 +298,24 @@ func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string
 	return &webhook, nil
 }
 
+// GetWebhook fetches a webhook by its permanent slug. The error (including
+// not-found) lets callers detect a webhook that was removed at Cloudsmith.
+func (c *Client) GetWebhook(owner, repository, slugPerm string) (*Webhook, error) {
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
 // DeleteWebhook removes a webhook from a repository by its permanent slug.
 func (c *Client) DeleteWebhook(owner, repository, slugPerm string) error {
 	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",

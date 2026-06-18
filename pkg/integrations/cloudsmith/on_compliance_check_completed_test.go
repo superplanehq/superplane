@@ -64,7 +64,7 @@ func Test__OnComplianceCheckCompleted__Setup(t *testing.T) {
 		assert.NotEmpty(t, stored.WebhookURL)
 	})
 
-	t.Run("already provisioned for the same repository is a no-op", func(t *testing.T) {
+	t.Run("healthy existing webhook is a no-op", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnComplianceCheckCompletedMetadata{
 				Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
@@ -72,15 +72,49 @@ func Test__OnComplianceCheckCompleted__Setup(t *testing.T) {
 				WebhookID:  "wh-existing",
 			},
 		}
-		// No HTTP responses configured: a no-op must not make API calls.
+		// GetWebhook returns a webhook whose target matches: setup must not recreate.
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://superplane.example/hook"}`))},
+			},
+		}
 		err := trigger.Setup(core.TriggerContext{
-			HTTP:          &contexts.HTTPContext{},
+			HTTP:          httpCtx,
 			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
 			Metadata:      metadata,
 			Webhook:       &contexts.NodeWebhookContext{},
 			Configuration: map[string]any{"repository": "weskk/superplane-compliance"},
 		})
 		require.NoError(t, err)
+		stored := metadata.Metadata.(OnComplianceCheckCompletedMetadata)
+		assert.Equal(t, "wh-existing", stored.WebhookID)
+	})
+
+	t.Run("re-provisions when the remote webhook is gone", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: OnComplianceCheckCompletedMetadata{
+				Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
+				WebhookURL: "https://superplane.example/hook",
+				WebhookID:  "wh-deleted",
+			},
+		}
+		// GetWebhook 404 -> recreate.
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"detail":"Not found."}`))},
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-new","events":["package.synced"],"is_active":true}`))},
+			},
+		}
+		err := trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			Metadata:      metadata,
+			Webhook:       &contexts.NodeWebhookContext{},
+			Configuration: map[string]any{"repository": "weskk/superplane-compliance"},
+		})
+		require.NoError(t, err)
+		stored := metadata.Metadata.(OnComplianceCheckCompletedMetadata)
+		assert.Equal(t, "wh-new", stored.WebhookID)
 	})
 }
 

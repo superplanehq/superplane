@@ -143,21 +143,31 @@ func (t *OnComplianceCheckCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
 	}
 
-	// Already provisioned for this repository.
-	if metadata.Repository != nil &&
-		metadata.Repository.Namespace == owner &&
-		metadata.Repository.Slug == slug &&
-		metadata.WebhookID != "" {
-		return nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// The repository changed since the last setup; remove the stale webhook.
-	if metadata.WebhookID != "" && metadata.Repository != nil {
+	sameRepo := metadata.Repository != nil &&
+		metadata.Repository.Namespace == owner &&
+		metadata.Repository.Slug == slug
+
+	if sameRepo && metadata.WebhookID != "" && metadata.WebhookURL != "" {
+		// Already provisioned for this repository: only skip re-provisioning when
+		// the remote webhook still exists and targets our URL. If it was deleted
+		// or reconfigured at Cloudsmith, fall through and recreate it so the
+		// trigger self-heals on the next setup instead of staying silently broken.
+		existing, getErr := client.GetWebhook(owner, slug, metadata.WebhookID)
+		if getErr == nil && existing.TargetURL == metadata.WebhookURL {
+			return nil
+		}
+		if getErr == nil {
+			if delErr := client.DeleteWebhook(owner, slug, metadata.WebhookID); delErr != nil {
+				ctx.Logger.Warnf("failed to remove stale Cloudsmith webhook: %v", delErr)
+			}
+		}
+	} else if metadata.WebhookID != "" && metadata.Repository != nil {
+		// The repository changed since the last setup; remove the old webhook.
 		if delErr := client.DeleteWebhook(metadata.Repository.Namespace, metadata.Repository.Slug, metadata.WebhookID); delErr != nil {
 			ctx.Logger.Warnf("failed to remove previous Cloudsmith webhook: %v", delErr)
 		}
