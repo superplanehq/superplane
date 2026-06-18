@@ -339,13 +339,13 @@ func FindActiveUserByTokenHashInTransaction(tx *gorm.DB, tokenHash string) (*Use
 	return &user, err
 }
 
-func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
+func FindMaybeDeletedUsersByIDs(tx *gorm.DB, ids []uuid.UUID) ([]User, error) {
 	if len(ids) == 0 {
 		return []User{}, nil
 	}
 
 	var users []User
-	err := database.Conn().Unscoped().
+	err := tx.Unscoped().
 		Where("id IN ?", ids).
 		Find(&users).
 		Error

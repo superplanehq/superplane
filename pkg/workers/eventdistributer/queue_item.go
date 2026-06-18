@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -74,7 +75,7 @@ func handleQueueItemState(workflowID string, queueItemID string, nodeID string, 
 			return fmt.Errorf("failed to find queue item: %w", err)
 		}
 
-		serializedQueueItems, err := canvases.SerializeNodeQueueItems([]models.CanvasNodeQueueItem{*queueItem})
+		serializedQueueItems, err := canvases.SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{*queueItem})
 		if err != nil {
 			return fmt.Errorf("failed to serialize queue item: %w", err)
 		}
