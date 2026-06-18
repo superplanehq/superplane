@@ -20,11 +20,13 @@ import {
 } from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
+import { SignupWaitlist } from "./SignupWaitlist";
 
 type AuthConfig = {
   providers: string[];
   passwordLoginEnabled: boolean;
   signupEnabled: boolean;
+  signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
 };
 
@@ -106,6 +108,13 @@ const ProductUpdatesOptIn: React.FC<{
     />
     <span>I want to receive product updates</span>
   </label>
+);
+
+const SignupClosedNotice: React.FC = () => (
+  <p className="text-left text-sm leading-6 text-gray-600">
+    This installation is not accepting new account signups right now. Contact your SuperPlane administrator if you need
+    access.
+  </p>
 );
 
 const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
@@ -227,6 +236,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     providers: [],
     passwordLoginEnabled: false,
     signupEnabled: false,
+    signupsBlockedByEnvironment: false,
     magicCodeEnabled: false,
   });
   const [configLoading, setConfigLoading] = useState(true);
@@ -382,6 +392,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             providers: data.providers || [],
             passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
             signupEnabled: Boolean(data.signupEnabled),
+            signupsBlockedByEnvironment: Boolean(data.signupsBlockedByEnvironment),
             magicCodeEnabled: Boolean(data.magicCodeEnabled),
           });
         }
@@ -419,9 +430,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showSignupWaitlist = isSignupMode && !canSignup && !authConfig.signupsBlockedByEnvironment;
+  const showSignupClosedNotice = isSignupMode && !canSignup && authConfig.signupsBlockedByEnvironment;
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
-  const visibleFormError = formError ?? authErrorMessage;
+  const visibleFormError = showSignupWaitlist || showSignupClosedNotice ? null : (formError ?? authErrorMessage);
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -626,11 +639,15 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
   const getHeading = () => {
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    if (showSignupClosedNotice) return "Signups are closed";
+    if (showSignupWaitlist) return "SuperPlane Cloud";
     if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
   const getSubheading = () => {
+    if (showSignupClosedNotice) return "New accounts are not available.";
+    if (showSignupWaitlist) return "Join the waitlist for access.";
     if (isSignupMode) return "Set up your account.";
     if (useMagicCodePrimary && magicCodeStep === "code") return `We sent a code to ${magicCodeEmail}`;
     return "Log in to continue";
@@ -654,9 +671,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && !canSignup && (
-            <p className="text-sm text-gray-500">Signups are currently disabled.</p>
-          )}
+          {!configLoading && showSignupWaitlist && <SignupWaitlist />}
+          {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
 
           {!configLoading && !isSignupMode && !hasAnyFormMethod && (
             <p className="text-sm text-gray-500">No login methods are configured.</p>

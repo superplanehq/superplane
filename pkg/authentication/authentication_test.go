@@ -1,11 +1,13 @@
 package authentication
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +18,11 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+type authConfigResponse struct {
+	SignupEnabled               bool `json:"signupEnabled"`
+	SignupsBlockedByEnvironment bool `json:"signupsBlockedByEnvironment"`
+}
+
 func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.ResourceRegistry) {
 	r := support.Setup(t)
 	t.Cleanup(func() { r.Close() })
@@ -23,6 +30,38 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	signer := jwt.NewSigner("test-secret")
 	handler := NewHandler(signer, r.Encryptor, r.AuthService, "test", "/templates", blockSignup, false, false)
 	return handler, r
+}
+
+func TestHandler_handleAuthConfig(t *testing.T) {
+	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, true)
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/auth/config", nil)
+
+		handler.handleAuthConfig(recorder, request)
+
+		require.Equal(t, http.StatusOK, recorder.Code)
+
+		var response authConfigResponse
+		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+		assert.False(t, response.SignupEnabled)
+		assert.True(t, response.SignupsBlockedByEnvironment)
+	})
+
+	t.Run("reports admin signup state when environment allows signups", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/auth/config", nil)
+
+		handler.handleAuthConfig(recorder, request)
+
+		require.Equal(t, http.StatusOK, recorder.Code)
+
+		var response authConfigResponse
+		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+		assert.True(t, response.SignupEnabled)
+		assert.False(t, response.SignupsBlockedByEnvironment)
+	})
 }
 
 func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
@@ -260,6 +299,21 @@ func TestHandler_checkSignupPolicy(t *testing.T) {
 		err = handler.checkSignupPolicy(account.Email, req)
 
 		assert.NoError(t, err)
+	})
+
+	t.Run("should reject new account when installation signups are disabled", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		metadata, err := models.GetInstallationMetadata(database.Conn())
+		require.NoError(t, err)
+		metadata.SignupsEnabled = false
+		metadata.UpdatedAt = time.Now()
+		require.NoError(t, models.UpdateInstallationMetadata(database.Conn(), metadata))
+
+		req, _ := http.NewRequest("POST", "/auth/magic-code/verify?signup=true", nil)
+
+		err = handler.checkSignupPolicy("disabled-signup@example.com", req)
+
+		assert.Equal(t, errSignupDisabled, err)
 	})
 }
 
