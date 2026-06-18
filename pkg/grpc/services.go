@@ -60,78 +60,34 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		return nil, fmt.Errorf("usage service is required")
 	}
 
-	chain := NewUnaryChain(cfg.AuthService)
-
 	return &Services{
-		Users: WrapUsersServer(
-			NewUsersService(cfg.AuthService),
-			chain,
+		Users:  NewUsersService(cfg.AuthService),
+		Groups: NewGroupsService(cfg.AuthService),
+		Roles:  NewRoleService(cfg.AuthService),
+		Organizations: NewOrganizationService(
+			cfg.AuthService,
+			cfg.Registry,
+			cfg.OIDCProvider,
+			cfg.BaseURL,
+			cfg.WebhooksBaseURL,
+			cfg.UsageService,
 		),
-		Groups: WrapGroupsServer(
-			NewGroupsService(cfg.AuthService),
-			chain,
+		Integrations: NewIntegrationService(cfg.Encryptor, cfg.Registry),
+		Secrets:      NewSecretService(cfg.Encryptor, cfg.AuthService),
+		Me:           NewMeService(cfg.AuthService),
+		Actions:      NewActionService(cfg.Registry),
+		Triggers:     NewTriggerService(cfg.Registry),
+		Widgets:      NewWidgetService(cfg.Registry),
+		Canvases: NewCanvasService(
+			cfg.AuthService,
+			cfg.Registry,
+			cfg.Encryptor,
+			cfg.GitProvider,
+			cfg.WebhooksBaseURL,
+			cfg.UsageService,
 		),
-		Roles: WrapRolesServer(
-			NewRoleService(cfg.AuthService),
-			chain,
-		),
-		Organizations: WrapOrganizationsServer(
-			NewOrganizationService(
-				cfg.AuthService,
-				cfg.Registry,
-				cfg.OIDCProvider,
-				cfg.BaseURL,
-				cfg.WebhooksBaseURL,
-				cfg.UsageService,
-			),
-			chain,
-		),
-		Integrations: WrapIntegrationsServer(
-			NewIntegrationService(cfg.Encryptor, cfg.Registry),
-			chain,
-		),
-		Secrets: WrapSecretsServer(
-			NewSecretService(cfg.Encryptor, cfg.AuthService),
-			chain,
-		),
-		Me: WrapMeServer(
-			NewMeService(cfg.AuthService),
-			chain,
-		),
-		Actions: WrapActionsServer(
-			NewActionService(cfg.Registry),
-			chain,
-		),
-		Triggers: WrapTriggersServer(
-			NewTriggerService(cfg.Registry),
-			chain,
-		),
-		Widgets: WrapWidgetsServer(
-			NewWidgetService(cfg.Registry),
-			chain,
-		),
-		Canvases: WrapCanvasesServer(
-			NewCanvasService(
-				cfg.AuthService,
-				cfg.Registry,
-				cfg.Encryptor,
-				cfg.GitProvider,
-				cfg.WebhooksBaseURL,
-				cfg.UsageService,
-			),
-			chain,
-		),
-		CanvasFolders: WrapCanvasFoldersServer(
-			NewCanvasFolderService(),
-			chain,
-		),
-		ServiceAccounts: WrapServiceAccountsServer(
-			NewServiceAccountsService(cfg.AuthService),
-			chain,
-		),
-		Agents: WrapAgentsServer(
-			NewAgentsService(cfg.AgentService),
-			chain,
-		),
+		CanvasFolders:   NewCanvasFolderService(),
+		ServiceAccounts: NewServiceAccountsService(cfg.AuthService),
+		Agents:          NewAgentsService(cfg.AgentService),
 	}, nil
 }
