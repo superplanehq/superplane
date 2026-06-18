@@ -70,11 +70,14 @@ func (c *Cloudsmith) Configuration() []configuration.Field {
 func (c *Cloudsmith) Actions() []core.Action {
 	return []core.Action{
 		&GetRepository{},
+		&GetPackageCompliance{},
 	}
 }
 
 func (c *Cloudsmith) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnComplianceCheckCompleted{},
+	}
 }
 
 func (c *Cloudsmith) Sync(ctx core.SyncContext) error {

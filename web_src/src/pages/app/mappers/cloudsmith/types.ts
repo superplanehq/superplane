@@ -9,6 +9,44 @@ export interface GetRepositoryConfiguration {
   repository: string;
 }
 
+export interface OnComplianceCheckCompletedMetadata {
+  repository?: {
+    namespace?: string;
+    slug?: string;
+  };
+  webhookUrl?: string;
+  webhookId?: string;
+}
+
+export interface PackageComplianceNodeMetadata {
+  repository?: string;
+  packageId?: string;
+  packageName?: string;
+  version?: string;
+}
+
+export interface GetPackageComplianceConfiguration {
+  repository: string;
+  package: string;
+}
+
+export interface PackageComplianceData {
+  name?: string;
+  version?: string;
+  slug_perm?: string;
+  format?: string;
+  license?: string;
+  spdx_license?: string;
+  osi_approved?: boolean;
+  policy_violated?: boolean;
+  is_quarantined?: boolean;
+  status?: string;
+  status_reason?: string | null;
+  stage?: string;
+  tags?: Record<string, string[]>;
+  url?: string;
+}
+
 export interface RepositoryData {
   name?: string;
   slug?: string;
