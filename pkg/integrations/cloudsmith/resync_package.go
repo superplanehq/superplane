@@ -76,7 +76,7 @@ func (r *ResyncPackage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to resync package: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageResyncedPayloadType, []any{packageResult(spec, pkg)})
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageResyncedPayloadType, []any{pkg})
 }
 
 func (r *ResyncPackage) Cancel(ctx core.ExecutionContext) error {

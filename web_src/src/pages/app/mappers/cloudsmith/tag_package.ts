@@ -14,7 +14,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { PackageData, PackageNodeMetadata, PackageOperationConfiguration, PackageOperationResult } from "./types";
+import type { PackageData, PackageNodeMetadata, PackageOperationConfiguration } from "./types";
 
 export const tagPackageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -40,12 +40,13 @@ export const tagPackageMapper: ComponentBaseMapper = {
       details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const payload = (context.execution.outputs as { default?: OutputPayload[] } | undefined)?.default?.[0];
-    const result = payload?.data as PackageOperationResult | undefined;
-    if (!result) return details;
+    const pkg = (context.execution.outputs as { default?: OutputPayload[] } | undefined)?.default?.[0]?.data as
+      | PackageData
+      | undefined;
+    if (!pkg) return details;
 
-    details["Repository"] = result.repository || "-";
-    if (result.data) addPackageDetails(details, result.data);
+    if (pkg.repository) details["Repository"] = pkg.repository;
+    addPackageDetails(details, pkg);
 
     return details;
   },
