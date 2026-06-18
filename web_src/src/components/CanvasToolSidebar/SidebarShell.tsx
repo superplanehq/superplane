@@ -15,14 +15,18 @@ export function SidebarShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       <div
         onMouseDown={handleMouseDown}
-        className={cn(
-          "absolute top-0 right-0 bottom-0 z-10 w-1 translate-x-1/2 cursor-col-resize bg-transparent transition-colors duration-150 ease-out delay-0",
-          "hover:delay-300 hover:bg-slate-950/10",
-          isResizing && "bg-slate-950/10 delay-0",
-        )}
-        aria-hidden
+        className="group absolute top-0 right-0 bottom-0 z-30 w-4 cursor-col-resize bg-transparent"
+        style={{ marginRight: "-8px" }}
         data-testid="canvas-tool-sidebar-resize-handle"
-      />
+      >
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50",
+            isResizing && "bg-slate-950/50",
+          )}
+        />
+      </div>
     </aside>
   );
 }

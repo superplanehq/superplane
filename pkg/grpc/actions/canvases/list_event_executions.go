@@ -27,7 +27,6 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 	query := database.Conn().
 		Where("workflow_id = ?", workflowUUID).
 		Where("root_event_id = ?", eventUUID).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC")
 
 	err = query.Find(&executions).Error
@@ -35,12 +34,14 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 		return nil, err
 	}
 
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(executions))
+	db := database.DB(ctx)
+
+	resources, err := LoadNodeExecutionResources(db, executions)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions, childExecutions)
+	serialized, err := SerializeNodeExecutions(executions, resources)
 	if err != nil {
 		return nil, err
 	}

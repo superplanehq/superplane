@@ -36,10 +36,6 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		organization.Description = pbOrganization.Metadata.Description
 	}
 
-	if pbOrganization.Spec != nil && pbOrganization.Spec.ChangeManagementEnabled != nil {
-		organization.ChangeManagementEnabled = *pbOrganization.Spec.ChangeManagementEnabled
-	}
-
 	now := time.Now()
 	organization.UpdatedAt = &now
 	err = database.Conn().Save(organization).Error
@@ -62,7 +58,6 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
 				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
 			},
 		},

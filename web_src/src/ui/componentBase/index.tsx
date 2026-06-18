@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle, Rabbit } from "lucide-react";
+import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
+import { calcRelativeTimeFromDiff, cn, resolveIcon } from "@/lib/utils";
+import { CircleAlert, Rabbit } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
@@ -205,7 +206,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
-  paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -237,6 +237,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
    * Used for contextual dimming (e.g. runs view non-participant nodes).
    */
   dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -252,7 +253,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   selected = false,
   runDisabled: _runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
-  onTogglePause,
   onEdit: _onEdit,
   onDuplicate,
   onDeactivate: _onDeactivate,
@@ -270,9 +270,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   emptyStateProps,
   error,
   warning,
-  paused,
   canvasMode = "live",
   dimBodyBelowHeader = false,
+  draftDiffStatus,
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -314,8 +314,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
       tone: "neutral" as const,
     };
   }, [canvasMode, emptyStateProps, emptyStatePurpose]);
-  const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
-  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -338,27 +336,17 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] ${dimBodyBelowHeader ? "bg-slate-200" : "bg-white"} ${hasError ? "!outline-orange-500" : ""}`}
+        className={cn(
+          "group relative flex flex-col rounded-md w-[23rem]",
+          getDraftDiffOutlineClassName(draftDiffStatus),
+          !draftDiffStatus && hasError && "!outline-orange-500",
+          dimBodyBelowHeader ? "bg-slate-200" : "bg-white",
+        )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onTogglePause && !hasError && (
-              <button
-                type="button"
-                data-testid="node-action-pause"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTogglePause();
-                }}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
-              >
-                {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
-                <span>{paused ? "Resume" : "Pause"}</span>
-              </button>
-            )}
             {onDuplicate && (
               <button
                 type="button"
@@ -425,31 +413,13 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   <TooltipTrigger asChild>
                     <div
                       data-testid="node-warning-badge"
-                      className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
+                      className="absolute -top-8 left-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-orange-500"
                     >
-                      <AlertTriangle size={16} className="text-white" />
+                      <CircleAlert className="h-4 w-4 text-white" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {paused && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      data-testid="node-paused-badge"
-                      className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
-                    >
-                      <PauseIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -483,7 +453,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                             value={spec.value}
                             contentType={spec.contentType || "json"}
                           >
-                            <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                            <span className="text-[13px] bg-gray-500 px-2 py-0.5 rounded-md text-white font-mono font-medium cursor-help">
                               {spec.title}
                             </span>
                           </PayloadTooltip>

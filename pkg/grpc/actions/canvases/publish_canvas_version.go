@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -25,6 +26,7 @@ func PublishCanvasVersion(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	versionID string,
@@ -54,20 +56,8 @@ func PublishCanvasVersion(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
-	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
-	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
-	}
-	if changeManagementEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
-	}
-
 	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
@@ -84,7 +74,7 @@ func PublishCanvasVersion(
 	}
 
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(publishedVersion, organizationID),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
 	}, nil
 }
 
@@ -92,6 +82,7 @@ func publishDraftVersionInTransaction(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
@@ -143,17 +134,12 @@ func publishDraftVersionInTransaction(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				GitProvider:    gitProv,
 			},
 		)
 		if err != nil {
 			log.Errorf("failed to publish canvas version: %v", err)
 			return err
-		}
-
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
-		if refreshErr != nil {
-			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
-			return refreshErr
 		}
 
 		publishedVersion = version

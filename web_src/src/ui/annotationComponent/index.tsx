@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
 import type { ComponentActionsProps } from "../types/componentActions";
@@ -51,6 +52,7 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   noteId?: string;
   selected?: boolean;
   hideActionsButton?: boolean;
+  canvasMode?: "live" | "edit";
   width?: number;
   height?: number;
   onAnnotationUpdate?: (updates: {
@@ -64,6 +66,7 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   /** When true, keep the note header strip and replace body with a neutral block (runs contextual dimming). */
   dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -74,11 +77,13 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   selected = false,
   onDelete,
   hideActionsButton,
+  canvasMode = "live",
   width: propWidth = DEFAULT_WIDTH,
   height: propHeight = DEFAULT_HEIGHT,
   onAnnotationUpdate,
   onAnnotationBlur,
   dimBodyBelowHeader = false,
+  draftDiffStatus,
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -194,11 +199,10 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [onAnnotationUpdate],
   );
 
-  // Enter edit mode on double-click
-  const handleDoubleClick = useCallback(() => {
-    setIsEditing(true);
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }, []);
+  // Shared text styling for both modes
+  const textStyles = "text-sm leading-normal text-gray-800";
+  const showNoteActions = canvasMode === "edit" && !hideActionsButton;
+  const isNoteEditable = canvasMode === "edit";
 
   // Exit edit mode
   const exitEditMode = useCallback(() => {
@@ -219,8 +223,20 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [exitEditMode],
   );
 
-  // Shared text styling for both modes
-  const textStyles = "text-sm leading-normal text-gray-800";
+  useEffect(() => {
+    if (!isNoteEditable && isEditing) {
+      exitEditMode();
+    }
+  }, [exitEditMode, isEditing, isNoteEditable]);
+
+  // Enter edit mode on double-click
+  const handleDoubleClick = useCallback(() => {
+    if (!isNoteEditable) {
+      return;
+    }
+    setIsEditing(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [isNoteEditable]);
 
   return (
     <SelectionWrapper selected={selected}>
@@ -229,7 +245,8 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           ref={containerRef}
           style={{ width: dimensions.width, height: dimensions.height }}
           className={cn(
-            "group relative flex flex-col rounded-md outline outline-slate-950/20",
+            "group relative flex flex-col rounded-md outline",
+            getDraftDiffOutlineClassName(draftDiffStatus),
             dimBodyBelowHeader ? "bg-slate-200" : colorStyles.container,
           )}
         >
@@ -250,7 +267,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
             <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
           ) : (
             <>
-              {!hideActionsButton && (
+              {showNoteActions && (
                 <>
                   <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
                   <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
@@ -346,8 +363,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                   </>
                 ) : (
                   <div
-                    className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
-                    onDoubleClick={handleDoubleClick}
+                    className={cn(
+                      "nodrag h-full w-full overflow-auto text-left",
+                      isNoteEditable ? "cursor-text" : "cursor-default",
+                      textStyles,
+                    )}
+                    onDoubleClick={isNoteEditable ? handleDoubleClick : undefined}
                   >
                     {annotationText ? (
                       <ReactMarkdown
@@ -357,36 +378,16 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
                           li: ({ children }) => <li className="mb-1">{children}</li>,
                           h1: ({ children }) => (
-                            <h1
-                              style={{ fontSize: "2rem" }}
-                              className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight"
-                            >
-                              {children}
-                            </h1>
+                            <h1 className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight">{children}</h1>
                           ),
                           h2: ({ children }) => (
-                            <h2
-                              style={{ fontSize: "1.6rem" }}
-                              className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight"
-                            >
-                              {children}
-                            </h2>
+                            <h2 className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight">{children}</h2>
                           ),
                           h3: ({ children }) => (
-                            <h3
-                              style={{ fontSize: "1.3rem" }}
-                              className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight"
-                            >
-                              {children}
-                            </h3>
+                            <h3 className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight">{children}</h3>
                           ),
                           h4: ({ children }) => (
-                            <h4
-                              style={{ fontSize: "1.1rem" }}
-                              className="mt-2 first:mt-0 mb-1 text-sm font-medium leading-tight"
-                            >
-                              {children}
-                            </h4>
+                            <h4 className="mt-2 first:mt-0 mb-1 text-xs font-medium leading-tight">{children}</h4>
                           ),
                           code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
                           pre: ({ children }) => (
@@ -409,36 +410,40 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         {annotationText}
                       </ReactMarkdown>
                     ) : (
-                      <span className="text-black/50">Double click to add and edit notes...</span>
+                      <span className="text-black/50">
+                        {isNoteEditable ? "Double click to add and edit notes..." : "No notes"}
+                      </span>
                     )}
                   </div>
                 )}
               </div>
 
-              <NodeResizeControl
-                minWidth={MIN_WIDTH}
-                minHeight={MIN_HEIGHT}
-                onResize={handleResize}
-                onResizeEnd={handleResizeEnd}
-                autoScale={false}
-                position="bottom-right"
-                className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
-              >
-                <span className="sr-only">Resize note</span>
-                <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="opacity-30"
-                  >
-                    <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
-                    <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
-                  </svg>
-                </span>
-              </NodeResizeControl>
+              {isNoteEditable && (
+                <NodeResizeControl
+                  minWidth={MIN_WIDTH}
+                  minHeight={MIN_HEIGHT}
+                  onResize={handleResize}
+                  onResizeEnd={handleResizeEnd}
+                  autoScale={false}
+                  position="bottom-right"
+                  className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
+                >
+                  <span className="sr-only">Resize note</span>
+                  <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="opacity-30"
+                    >
+                      <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
+                      <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
+                    </svg>
+                  </span>
+                </NodeResizeControl>
+              )}
             </>
           )}
         </div>
@@ -455,6 +460,7 @@ export const AnnotationComponent = React.memo(
     prev.annotationColor === next.annotationColor &&
     prev.selected === next.selected &&
     prev.hideActionsButton === next.hideActionsButton &&
+    prev.canvasMode === next.canvasMode &&
     prev.width === next.width &&
     prev.height === next.height &&
     prev.dimBodyBelowHeader === next.dimBodyBelowHeader,

@@ -36,7 +36,7 @@ func UpdateCanvasVersion(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+) (*models.CanvasVersion, error) {
 	return UpdateCanvasVersionWithUsage(
 		ctx,
 		nil,
@@ -49,6 +49,7 @@ func UpdateCanvasVersion(
 		autoLayout,
 		webhookBaseURL,
 		authService,
+		false,
 	)
 }
 
@@ -64,7 +65,8 @@ func UpdateCanvasVersionWithUsage(
 	autoLayout *pb.CanvasAutoLayout,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-) (*pb.UpdateCanvasVersionResponse, error) {
+	discardStaging bool,
+) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -81,38 +83,14 @@ func UpdateCanvasVersionWithUsage(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
 	}
 
-	changeManagementEnabled := false
-	var changeRequestApprovers []models.CanvasChangeRequestApprover
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		changeManagementEnabled = changeManagement.Enabled
-
-		changeRequestApprovers, err = parseAndValidateCanvasChangeRequestApprovers(
-			authService,
-			organizationID,
-			changeManagement,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
-	}
-
-	expandedNodes, err := expandNodes(organizationID, nodes)
-	if err != nil {
-		return nil, err
 	}
 
 	err = usage.EnsureOrganizationWithinLimits(
@@ -121,7 +99,7 @@ func UpdateCanvasVersionWithUsage(
 		organizationID,
 		&usagepb.OrganizationState{},
 		&usagepb.CanvasState{
-			Nodes: int32(len(expandedNodes)),
+			Nodes: int32(len(nodes)),
 		},
 	)
 
@@ -153,19 +131,8 @@ func UpdateCanvasVersionWithUsage(
 
 		nodes := injectMetadataIntoNodes(version.Nodes, nodes)
 
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		if version.State == models.CanvasVersionStatePublished {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
-		}
-
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvasUUID, userUUID, version.ID); draftErr != nil {
-			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
-			}
-			return draftErr
+		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+			return err
 		}
 
 		nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
@@ -186,17 +153,19 @@ func UpdateCanvasVersionWithUsage(
 		now := time.Now()
 		version.Name = nextName
 		version.Description = pbCanvas.GetMetadata().GetDescription()
-		if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
-			version.ChangeManagementEnabled = changeManagementEnabled
-			if changeRequestApprovers != nil {
-				version.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
-			}
-		}
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 
-		return tx.Save(version).Error
+		if err := tx.Save(version).Error; err != nil {
+			return err
+		}
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
+		return nil
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
@@ -210,9 +179,27 @@ func UpdateCanvasVersionWithUsage(
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
-	return &pb.UpdateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
-	}, nil
+	return version, nil
+}
+
+func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
+	if version.OwnerID == nil || *version.OwnerID != userID {
+		return status.Error(codes.PermissionDenied, "version owner mismatch")
+	}
+
+	if version.State == models.CanvasVersionStatePublished {
+		return status.Error(codes.FailedPrecondition, "published versions are immutable")
+	}
+
+	if version.State != models.CanvasVersionStateDraft {
+		return status.Error(codes.FailedPrecondition, "version is not your editable draft")
+	}
+
+	if !models.IsRegisteredDraftVersion(version) {
+		return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+	}
+
+	return nil
 }
 
 func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {

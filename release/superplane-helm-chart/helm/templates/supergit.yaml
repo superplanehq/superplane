@@ -1,0 +1,80 @@
+{{- if .Values.supergit.local.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: supergit
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: supergit
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supergit
+  template:
+    metadata:
+      labels:
+        app: supergit
+    spec:
+      containers:
+        - name: supergit
+          image: "{{ .Values.supergit.image.registry }}/{{ .Values.supergit.image.name }}:{{ .Values.supergit.local.version }}"
+          imagePullPolicy: {{ .Values.supergit.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.supergit.port }}
+              name: http
+          env:
+            - name: SUPERGIT_ROOT
+              value: /var/lib/supergit/repos
+            - name: SUPERGIT_PORT
+              value: {{ .Values.supergit.port | toString | quote }}
+            - name: SUPERGIT_DEFAULT_BRANCH
+              value: {{ .Values.supergit.defaultBranch | quote }}
+            - name: SUPERGIT_MAX_FILE_BYTES
+              value: {{ .Values.supergit.maxFileBytes | toString | quote }}
+            - name: SUPERGIT_MAX_COMMIT_BYTES
+              value: {{ .Values.supergit.maxCommitBytes | toString | quote }}
+          volumeMounts:
+            - name: supergit-storage
+              mountPath: /var/lib/supergit/repos
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          {{- with .Values.supergit.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: supergit-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.supergit.local.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supergit
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.supergit.port }}
+      targetPort: {{ .Values.supergit.port }}
+      name: http
+  selector:
+    app: supergit
+{{- end }}

@@ -3,7 +3,7 @@ import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/compon
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 
 // Keep in sync with pkg/features/features.go.
-const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
+export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 /** Key unchanged so existing browser state continues to work. */
 const CANVAS_TOOL_SIDEBAR_OPEN_STORAGE_KEY = "canvasAgentSidebarOpen";
 
@@ -78,6 +78,30 @@ export function useCanvasToolSidebarState({
 
   const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
 
+  useEffect(() => {
+    if (!showToolSidebarToggle) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor')
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleToolSidebarToggle();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showToolSidebarToggle, handleToolSidebarToggle]);
+
   return {
     canvasId,
     organizationId,
@@ -85,6 +109,7 @@ export function useCanvasToolSidebarState({
     readOnly,
     isToolSidebarOpen,
     showToolSidebarToggle,
+    isAgentEnabled: featureEnabled,
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,

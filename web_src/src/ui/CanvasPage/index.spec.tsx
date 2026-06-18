@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +6,7 @@ import type { BlockData } from "./Block";
 
 const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
-  fitViewMock: vi.fn(),
+  fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
@@ -62,6 +62,10 @@ vi.mock("@xyflow/react", () => ({
 vi.mock("../BuildingBlocksSidebar", () => ({
   BuildingBlocksSidebar: ({ isOpen }: { isOpen: boolean }) =>
     isOpen ? <aside data-testid="building-blocks-sidebar" /> : null,
+}));
+
+vi.mock("../componentSidebar", () => ({
+  ComponentSidebar: () => <aside data-testid="component-sidebar" />,
 }));
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
@@ -176,6 +180,7 @@ describe("CanvasPage connection drop", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
     fitViewMock.mockClear();
+    fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
@@ -198,8 +203,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -256,8 +259,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -285,7 +286,7 @@ describe("CanvasPage connection drop", () => {
     });
   });
 
-  it("creates a starter placeholder when the add component button is clicked", async () => {
+  it("opens the building blocks sidebar without creating a placeholder when the add component button is clicked", async () => {
     const onPlaceholderAdd = vi.fn(
       async (_data: { position: { x: number; y: number }; sourceNodeId?: string; sourceHandleId?: string | null }) =>
         "placeholder-starter",
@@ -295,13 +296,12 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
+          headerMode="version-live"
           nodes={[]}
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -309,40 +309,136 @@ describe("CanvasPage connection drop", () => {
     );
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId("open-sidebar-button"));
+      fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
-    expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
-    const payload = onPlaceholderAdd.mock.calls[0]?.[0];
-    expect(payload).toBeDefined();
-    expect(payload).toMatchObject({
-      position: { x: expect.any(Number), y: expect.any(Number) },
-    });
-    expect(payload?.sourceNodeId).toBeUndefined();
-    expect(payload?.sourceHandleId).toBeUndefined();
+    expect(onPlaceholderAdd).not.toHaveBeenCalled();
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
-  it("does not re-run fit all when only run canvas nodes change", () => {
-    vi.useFakeTimers();
-    const hasFitToViewRef = { current: true };
-    getNodesMock.mockReturnValue([
-      {
-        id: "run-node-1",
-        position: { x: 0, y: 0 },
-      },
-    ]);
+  it("opens the canvas YAML modal without switching to the Files tab", async () => {
+    const onYamlOpen = vi.fn();
+    const onSelectFiles = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onYamlOpen={onYamlOpen}
+          onSelectFiles={onSelectFiles}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("canvas-yaml-button"));
+    });
+
+    expect(onYamlOpen).toHaveBeenCalledTimes(1);
+    expect(onSelectFiles).not.toHaveBeenCalled();
+  });
+
+  it("loads node run data only while the component sidebar is open in live mode", async () => {
+    const loadSidebarData = vi.fn();
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
 
     const { rerender } = render(
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-edit"
+          canvasStateMode="editing"
           nodes={[
             {
-              id: "run-node-1",
+              id: "node-1",
               position: { x: 0, y: 0 },
               data: {
-                label: "Run 1",
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          loadSidebarData={loadSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+    expect(loadSidebarData).not.toHaveBeenCalled();
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId=""
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          loadSidebarData={loadSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(loadSidebarData).toHaveBeenCalledWith("node-1"));
+  });
+
+  it("renders live inspector in bottom pane instead of right sidebar", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
                 state: "pending",
                 type: "component",
               },
@@ -352,39 +448,87 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={false}
           activeCanvasVersionId="live-version"
-          hasFitToViewRef={hasFitToViewRef}
-          fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
         />
       </MemoryRouter>,
     );
 
-    act(() => {
-      vi.runAllTimers();
-    });
+    await act(async () => {});
 
-    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    const bottomPane = screen.getByTestId("live-node-detail-pane");
+    const componentSidebar = screen.getByTestId("component-sidebar");
+    expect(bottomPane).toBeInTheDocument();
+    expect(bottomPane).toContainElement(componentSidebar);
+  });
 
-    getNodesMock.mockReturnValue([
-      {
-        id: "run-node-1",
-        position: { x: 10, y: 20 },
-      },
-    ]);
+  it("renders edit inspector in right sidebar, not bottom pane", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
 
-    rerender(
+    render(
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="runs"
+          headerMode="version-edit"
+          canvasStateMode="editing"
           nodes={[
             {
-              id: "run-node-1",
-              position: { x: 10, y: 20 },
+              id: "node-1",
+              position: { x: 0, y: 0 },
               data: {
-                label: "Run 1",
-                state: "success",
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+  });
+
+  it("clears live bottom inspector selection from canvas pane click without closing the pane", async () => {
+    const onSidebarChange = vi.fn();
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
                 type: "component",
               },
             },
@@ -393,19 +537,61 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={false}
           activeCanvasVersionId="live-version"
-          hasFitToViewRef={hasFitToViewRef}
-          fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          onSidebarChange={onSidebarChange}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
         />
       </MemoryRouter>,
     );
 
+    await act(async () => {});
+
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+
     act(() => {
-      vi.runAllTimers();
+      reactFlowPropsRef.current?.onPaneClick?.();
     });
 
-    expect(fitViewMock).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
+    await waitFor(() => {
+      expect(screen.getByTestId("live-bottom-inspector-empty")).toBeInTheDocument();
+    });
+
+    expect(onSidebarChange).toHaveBeenCalledWith(true, null);
+    expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("renders empty live bottom inspector when open without a selected node", async () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="default"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          initialSidebar={{ isOpen: true, nodeId: null }}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {});
+
+    expect(screen.getByTestId("live-node-detail-pane")).toBeInTheDocument();
+    expect(screen.getByTestId("live-bottom-inspector-empty")).toBeInTheDocument();
+    expect(screen.getByText("Select component to inspect")).toBeInTheDocument();
   });
 });

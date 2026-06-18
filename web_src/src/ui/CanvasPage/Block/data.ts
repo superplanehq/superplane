@@ -1,4 +1,4 @@
-import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
+import { isRecord } from "@/pages/app/mappers/safeMappers";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";

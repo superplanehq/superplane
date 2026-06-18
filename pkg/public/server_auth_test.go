@@ -10,6 +10,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,10 +26,10 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 
 	signer := jwt.NewSigner("test-client-secret")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	server.RegisterWebRoutes("")
@@ -152,7 +153,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		signer := jwt.NewSigner("test-client-secret")
 		oidcProvider := support.NewOIDCProvider()
-		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", r.AuthService, nil, true)
+		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, r.GitProvider, "", "localhost", "", "test", "/app/templates", r.AuthService, nil, true)
 		require.NoError(t, err)
 
 		handler := blockedServer.authHandler
@@ -165,7 +166,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		resultAccount, err := handler.FindOrCreateAccountForProvider(gothUser)
 		require.Error(t, err)
-		assert.Equal(t, "signup is currently disabled", err.Error())
+		assert.Equal(t, "signup must be started from the signup page", err.Error())
 		assert.Nil(t, resultAccount)
 	})
 

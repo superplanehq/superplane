@@ -13,9 +13,8 @@ import (
 )
 
 func TestLoginPage(t *testing.T) {
-	steps := &TestLoginPageSteps{t: t}
-
 	t.Run("login page should include redirect URL in auth links", func(t *testing.T) {
+		steps := &TestLoginPageSteps{t: t}
 		steps.Start()
 		steps.VisitProtectedRandomURL()
 		steps.AssertRedirectedToLoginWithRedirectParam()
@@ -23,6 +22,7 @@ func TestLoginPage(t *testing.T) {
 	})
 
 	t.Run("after login user should be redirected back original URL", func(t *testing.T) {
+		steps := &TestLoginPageSteps{t: t}
 		steps.Start()
 		steps.VisitProtectedRandomURL()
 		steps.AssertRedirectedToLoginWithRedirectParam()
@@ -31,12 +31,14 @@ func TestLoginPage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user sees login page", func(t *testing.T) {
+		steps := &TestLoginPageSteps{t: t}
 		steps.Start()
 		steps.VisitLoginPage()
 		steps.AssertLoginPageVisible()
 	})
 
 	t.Run("authenticated user gets redirected from login page", func(t *testing.T) {
+		steps := &TestLoginPageSteps{t: t}
 		steps.Start()
 		steps.session.Login()
 		steps.VisitLoginPage()
@@ -44,6 +46,7 @@ func TestLoginPage(t *testing.T) {
 	})
 
 	t.Run("user with invalid token sees login page", func(t *testing.T) {
+		steps := &TestLoginPageSteps{t: t}
 		steps.Start()
 		steps.SetInvalidAuthCookie()
 		steps.VisitLoginPage()
@@ -69,7 +72,7 @@ func (steps *TestLoginPageSteps) VisitLoginPage() {
 }
 
 func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {
-	steps.protectedURLPath = "/" + steps.session.OrgID.String() + "/canvases/redirect-test"
+	steps.protectedURLPath = "/" + steps.session.OrgID.String() + "/apps/redirect-test"
 	steps.session.Visit(steps.protectedURLPath)
 }
 

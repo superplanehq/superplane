@@ -1,7 +1,6 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { Button } from "@/components/ui/button";
 import type { RunStatusKey } from "@/ui/Runs/runPresentation";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Rabbit } from "lucide-react";
 import { RunRow } from "./RunRow";
 
 type DecoratedRun = {
@@ -22,9 +21,6 @@ interface RunsListProps {
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
-  hasNextPage?: boolean;
-  isFetchingNextPage?: boolean;
-  onLoadMore?: () => void;
   onClearFilters: () => void;
 }
 
@@ -38,9 +34,6 @@ export function RunsList({
   isLoading,
   isError,
   onRetry,
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
   onClearFilters,
 }: RunsListProps) {
   if (isError && runs.length === 0) {
@@ -66,7 +59,12 @@ export function RunsList({
   }
 
   if (runs.length === 0) {
-    return <div className="px-3 py-6 text-center text-xs text-gray-400">No runs yet</div>;
+    return (
+      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-[13px] text-gray-500">
+        <Rabbit className="h-4 w-4" aria-hidden />
+        <span>No Runs</span>
+      </div>
+    );
   }
 
   if (filteredRuns.length === 0) {
@@ -97,25 +95,7 @@ export function RunsList({
   return (
     <>
       {orderedRuns.active.map(renderRow)}
-      {orderedRuns.active.length > 0 && orderedRuns.rest.length > 0 ? (
-        <div className="h-px bg-slate-300" aria-hidden />
-      ) : null}
       {orderedRuns.rest.map(renderRow)}
-      {hasNextPage && onLoadMore ? (
-        <div className="px-3 py-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full text-xs"
-            onClick={onLoadMore}
-            disabled={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-            Load more
-          </Button>
-        </div>
-      ) : null}
       {isError ? (
         <div role="alert" className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-red-600">
           <span className="inline-flex items-center gap-1">

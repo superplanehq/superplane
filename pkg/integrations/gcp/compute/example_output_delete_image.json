@@ -1,0 +1,7 @@
+{
+  "type": "gcp.compute.image.deleted",
+  "data": {
+    "imageName": "my-app-2026-06-02"
+  },
+  "timestamp": "2026-06-02T12:00:00Z"
+}

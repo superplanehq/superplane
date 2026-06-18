@@ -21,14 +21,58 @@ describe("VersionsTabPanel", () => {
       <VersionsTabPanel
         liveVersions={[]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
     expect(screen.getByText("No published history yet.")).toBeInTheDocument();
+  });
+
+  it("calls onCreateDraftBranch when the create-draft button is clicked", () => {
+    const onCreateDraftBranch = vi.fn();
+
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={onCreateDraftBranch}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("canvas-create-draft-button"));
+
+    expect(onCreateDraftBranch).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the create-draft button when the user cannot update the canvas", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={false}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onCreateDraftBranch={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("canvas-create-draft-button")).not.toBeInTheDocument();
+  });
+
+  it("renders the git-backed footer with a copy clone command action", () => {
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        canUpdateCanvas={true}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("versions-sidebar-footer")).toBeInTheDocument();
+    expect(screen.getByTestId("versions-sidebar-copy-clone-command")).toBeInTheDocument();
   });
 
   it("selects a version when a row is clicked", () => {
@@ -39,19 +83,17 @@ describe("VersionsTabPanel", () => {
         liveCanvasVersionId="version-2"
         liveVersions={[makePublishedVersion("version-2"), makePublishedVersion("version-1")]}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("Preview Published version"));
+    fireEvent.click(screen.getAllByTestId("canvas-live-version-row")[0]);
 
     expect(onUseVersion).toHaveBeenCalledWith("version-2");
   });
 
-  it("keeps expanded versions visible when selecting a different version", () => {
+  it("keeps loaded versions visible when selecting a different version", () => {
     const liveVersions = Array.from({ length: 12 }, (_, index) => {
       const number = 12 - index;
       return makePublishedVersion(`version-${number}`);
@@ -63,36 +105,89 @@ describe("VersionsTabPanel", () => {
         selectedCanvasVersion={null}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
-    // Starts collapsed to 5 versions so the first version ("v1") isn't visible.
-    expect(screen.queryByText("v1")).not.toBeInTheDocument();
-
-    // Expand twice (5 -> 10 -> 12) to reveal the first version row.
-    fireEvent.click(screen.getByRole("button", { name: "Load older versions" }));
-    fireEvent.click(screen.getByRole("button", { name: "Load older versions" }));
     expect(screen.getByText("v1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load older versions" })).not.toBeInTheDocument();
 
-    // After selecting another version, the expanded view should remain.
     rerender(
       <VersionsTabPanel
         liveCanvasVersionId="version-12"
         selectedCanvasVersion={makePublishedVersion("version-9")}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
-        isTemplate={false}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
-        onVersionNodeDiffContextChange={vi.fn()}
       />,
     );
 
-    // Version rows beyond the initial 5 should still be visible without clicking again.
     expect(screen.getByText("v1")).toBeInTheDocument();
+  });
+
+  it("restores the sidebar scroll position after remounting for the same canvas", () => {
+    const liveVersions = Array.from({ length: 12 }, (_, index) => {
+      const number = 12 - index;
+      return makePublishedVersion(`version-${number}`);
+    });
+    const props = {
+      scrollPersistenceKey: "canvas-1",
+      liveCanvasVersionId: "version-12",
+      liveVersions,
+      canUpdateCanvas: true,
+      canvasDeletedRemotely: false,
+      onUseVersion: vi.fn(),
+    };
+
+    const { unmount } = render(<VersionsTabPanel {...props} />);
+    const scroller = screen.getByTestId("versions-sidebar-scroll");
+
+    scroller.scrollTop = 420;
+    fireEvent.scroll(scroller);
+    unmount();
+
+    render(<VersionsTabPanel {...props} selectedCanvasVersion={makePublishedVersion("version-9")} />);
+
+    expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
+  });
+
+  it("loads older versions when the sidebar scroll reaches the end", () => {
+    const onLoadMoreLiveVersions = vi.fn();
+    const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];
+    const props = {
+      liveCanvasVersionId: "version-3",
+      selectedCanvasVersion: null,
+      liveVersions,
+      canUpdateCanvas: true,
+      canvasDeletedRemotely: false,
+      onUseVersion: vi.fn(),
+    };
+
+    const { rerender } = render(<VersionsTabPanel {...props} />);
+    const scroller = screen.getByTestId("versions-sidebar-scroll");
+
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+
+    rerender(
+      <VersionsTabPanel
+        {...props}
+        onLoadMoreLiveVersions={onLoadMoreLiveVersions}
+        loadMoreLiveVersionsDisabled={false}
+        loadMoreLiveVersionsPending={false}
+      />,
+    );
+
+    expect(onLoadMoreLiveVersions).not.toHaveBeenCalled();
+
+    scroller.scrollTop = 860;
+    fireEvent.scroll(scroller);
+
+    expect(onLoadMoreLiveVersions).toHaveBeenCalledTimes(1);
   });
 });

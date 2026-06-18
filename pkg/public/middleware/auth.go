@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 type contextKey string
@@ -148,6 +149,8 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
 
+			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
@@ -199,7 +202,13 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// we expect a user API token.
 			//
 			if r.Header.Get("Authorization") != "" {
-				user, scopedClaims, err := authenticateUserByToken(r, jwtSigner)
+				var user *models.User
+				var scopedClaims *jwt.ScopedTokenClaims
+				err := telemetry.RunSpan(r.Context(), "auth.authenticate_by_token", func(ctx context.Context) error {
+					var authErr error
+					user, scopedClaims, authErr = authenticateUserByToken(ctx, r, jwtSigner)
+					return authErr
+				})
 				if err != nil {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
@@ -218,7 +227,13 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, impersonationInfo, err := authenticateUserByCookie(jwtSigner, r)
+			var user *models.User
+			var impersonationInfo *ImpersonationInfo
+			err := telemetry.RunSpan(r.Context(), "auth.authenticate_by_cookie", func(ctx context.Context) error {
+				var authErr error
+				user, impersonationInfo, authErr = authenticateUserByCookie(ctx, jwtSigner, r)
+				return authErr
+			})
 			if err != nil {
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
@@ -233,13 +248,18 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
 			}
+
+			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
+				authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
+			}
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-func authenticateUserByToken(r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
+func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
 	token, err := getBearerToken(r)
 	if err != nil {
 		return nil, nil, err
@@ -248,16 +268,13 @@ func authenticateUserByToken(r *http.Request, jwtSigner *jwt.Signer) (*models.Us
 	//
 	// Try to authenticate the token as if it was a scoped-token first.
 	//
-	user, scopedClaims, err := authenticateUserByScopedToken(token, jwtSigner)
+	user, scopedClaims, err := authenticateUserByScopedToken(ctx, token, jwtSigner)
 	if err == nil {
 		return user, scopedClaims, nil
 	}
 
-	//
-	// If the token is not a scoped-token, try to authenticate it as if it was a API token.
-	//
 	hashedToken := crypto.HashToken(token)
-	user, err = models.FindActiveUserByTokenHash(hashedToken)
+	user, err = models.FindActiveUserByTokenHashInTransaction(database.DB(ctx), hashedToken)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -279,13 +296,13 @@ func getBearerToken(r *http.Request) (string, error) {
 	return strings.TrimSpace(headerParts[1]), nil
 }
 
-func authenticateUserByScopedToken(token string, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
+func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
 	claims, err := jwtSigner.ValidateScopedToken(token)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	user, err := models.FindActiveUserByID(claims.OrgID, claims.Subject)
+	user, err := models.FindActiveUserByIDInTransaction(database.DB(ctx), claims.OrgID, claims.Subject)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,11 +325,11 @@ func authenticateUserByScopedToken(token string, jwtSigner *jwt.Signer) (*models
 	return user, claims, nil
 }
 
-func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
 	// If a valid impersonation session exists, commit to it — never fall
 	// through to the admin's own identity. This prevents silently showing
 	// admin data when the impersonated user isn't in the requested org.
-	user, info, err := resolveImpersonatedUser(jwtSigner, r)
+	user, info, err := resolveImpersonatedUser(ctx, jwtSigner, r)
 	if err == nil {
 		return user, info, nil
 	}
@@ -330,7 +347,7 @@ func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.U
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
-	user, err = models.FindActiveUserByEmail(organizationID, account.Email)
+	user, err = models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, account.Email)
 	if err != nil {
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
@@ -375,7 +392,7 @@ func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
 // resolveImpersonatedUser checks if there's a valid impersonation session.
 // It validates the impersonation token AND the admin's account token, then
 // finds the impersonated user in the organization from the request header.
-func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
 	tokenStr, err := impersonation.ReadCookie(r)
 	if err != nil {
 		return nil, nil, fmt.Errorf("no impersonation cookie")
@@ -420,7 +437,7 @@ func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.Us
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
-	user, err := models.FindActiveUserByEmail(organizationID, impAccount.Email)
+	user, err := models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, impAccount.Email)
 	if err != nil {
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
@@ -485,7 +502,8 @@ func isOwnerSetupAllowedPath(path string) bool {
 
 func isAccountAPIPath(path string) bool {
 	switch path {
-	case "/account", "/account/limits", "/account/password", "/organizations":
+	case "/account", "/account/limits", "/account/password", "/organizations",
+		"/apps/install/preview", "/apps/install":
 		return true
 	default:
 		return strings.HasPrefix(path, "/api/v1/invite-links/")
@@ -501,6 +519,10 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64
 	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
 		return "", 0, fmt.Errorf("invalid account token: %v", err)
+	}
+
+	if !authentication.IsAccountSessionWithinMaxAge(claims) {
+		return "", 0, fmt.Errorf("session exceeded maximum age")
 	}
 
 	accountClaim, exists := claims["sub"]

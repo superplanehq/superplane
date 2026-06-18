@@ -2,6 +2,7 @@ import { formatRelativeTime } from "@/lib/timezone";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
@@ -46,6 +47,10 @@ export function Groups({ organizationId }: GroupsProps) {
   const canDeleteGroups = canAct("groups", "delete");
 
   const error = groupsError || rolesError;
+
+  useReportPageReady(!loadingGroups && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleCreateGroup = () => {
     if (!canCreateGroups) return;

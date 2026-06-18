@@ -12,12 +12,12 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -31,6 +31,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -66,6 +67,7 @@ func RunServer(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	gitProvider git.Provider,
 	agentService agentsActions.AgentsService,
 	port int,
 ) {
@@ -83,7 +85,12 @@ func RunServer(
 		recovery.WithRecoveryHandler(customFunc),
 	}
 
-	grpcServer := grpc.NewServer(
+	var serverOptions []grpc.ServerOption
+	if telemetry.TracingEnabled() {
+		serverOptions = append(serverOptions, grpc.StatsHandler(telemetry.CriticalGRPCServerStatsHandler()))
+	}
+
+	serverOptions = append(serverOptions,
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(opts...),
 			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
@@ -93,6 +100,8 @@ func RunServer(
 			recovery.StreamServerInterceptor(opts...),
 		),
 	)
+
+	grpcServer := grpc.NewServer(serverOptions...)
 
 	//
 	// Initialize health service.
@@ -142,10 +151,7 @@ func RunServer(
 	widgetService := NewWidgetService(registry)
 	widgetPb.RegisterWidgetsServer(grpcServer, widgetService)
 
-	blueprintService := NewBlueprintService(registry)
-	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
-
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
+	canvasService := NewCanvasService(authService, registry, encryptor, gitProvider, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	canvasFolderService := NewCanvasFolderService()

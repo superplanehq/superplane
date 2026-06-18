@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 type TestContext struct {
@@ -22,6 +25,8 @@ type TestContext struct {
 	viteCmd   *exec.Cmd
 
 	baseURL string
+
+	AgentProvider *support.TestAgentProvider
 }
 
 func NewTestContext(t *testing.M) *TestContext {
@@ -42,8 +47,8 @@ func (s *TestContext) Start() {
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_EVENT_ROUTER", "yes")
+	os.Setenv("START_RUN_FINALIZER", "yes")
 	os.Setenv("START_NODE_EXECUTOR", "yes")
-	os.Setenv("START_BLUEPRINT_NODE_EXECUTOR", "yes")
 	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
@@ -62,11 +67,28 @@ func (s *TestContext) Start() {
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
 
+	s.AgentProvider = support.NewAgentProvider()
+	s.ResetAgentProvider()
+	server.SetAgentProviderForTests(s.AgentProvider)
+
 	s.startVite()
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
 	s.setUpNavigationLogger()
+}
+
+func (s *TestContext) ResetAgentProvider() {
+	s.AgentProvider.Reset()
+	s.AgentProvider.SetSendMessageEvents(agentTurnCompletedEvent())
+	s.AgentProvider.SetDefineOutcomeEvents(agentTurnCompletedEvent())
+}
+
+func agentTurnCompletedEvent() agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: "e2e-turn-completed-" + uuid.NewString(),
+		Type:            agents.ProviderEventTurnCompleted,
+	}
 }
 
 func (s *TestContext) startPlaywright() {
@@ -225,6 +247,11 @@ func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())
+			if strings.Contains(resp.URL(), "/repository/commits") {
+				if body, err := resp.Text(); err == nil && body != "" {
+					t.Logf("[Browser Logs] response body: %s", body)
+				}
+			}
 		}
 	})
 

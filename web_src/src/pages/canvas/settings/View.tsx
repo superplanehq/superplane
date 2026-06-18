@@ -1,77 +1,23 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { isChangeManagementSettingsEnabled } from "@/lib/env";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { normalizeApprovers, validateApproverConfig } from "./approverUtils";
-import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
 import { IdentityFields } from "./IdentityFields";
-import type { ChangeRequestApproverType, SettingsApprover, SettingsViewProps } from "./types";
+import type { SettingsViewProps } from "./types";
 
-export function SettingsView({
-  initialValues,
-  canUpdateCanvas,
-  orgChangeManagementEnabled,
-  isSaving,
-  availableUsers,
-  availableRoles,
-  onSave,
-  onBackToCanvas,
-}: SettingsViewProps) {
+export function SettingsView({ initialValues, canUpdateCanvas, isSaving, onSave, onBackToCanvas }: SettingsViewProps) {
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
-  const [changeManagementEnabled, setChangeManagementEnabled] = useState(initialValues.changeManagementEnabled);
-  const [approvers, setApprovers] = useState<SettingsApprover[]>(normalizeApprovers(initialValues.approvers));
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const isChangeManagementEnforcedByOrganization = orgChangeManagementEnabled === true;
-  const effectiveChangeManagementEnabled = isChangeManagementEnforcedByOrganization ? true : changeManagementEnabled;
-  const isChangeManagementToggleDisabled = !canUpdateCanvas || isChangeManagementEnforcedByOrganization;
 
   useEffect(() => {
     setName(initialValues.name);
     setDescription(initialValues.description);
-    setChangeManagementEnabled(isChangeManagementEnforcedByOrganization ? true : initialValues.changeManagementEnabled);
-    setApprovers(normalizeApprovers(initialValues.approvers));
-  }, [initialValues, isChangeManagementEnforcedByOrganization]);
-
-  const normalizedInitialApprovers = useMemo(
-    () => normalizeApprovers(initialValues.approvers),
-    [initialValues.approvers],
-  );
+  }, [initialValues]);
 
   const hasChanges = useMemo(() => {
-    return (
-      name !== initialValues.name ||
-      description !== initialValues.description ||
-      effectiveChangeManagementEnabled !== initialValues.changeManagementEnabled ||
-      JSON.stringify(approvers) !== JSON.stringify(normalizedInitialApprovers)
-    );
-  }, [
-    description,
-    effectiveChangeManagementEnabled,
-    initialValues.changeManagementEnabled,
-    initialValues.description,
-    initialValues.name,
-    name,
-    approvers,
-    normalizedInitialApprovers,
-  ]);
-
-  const approverValidation = useMemo(() => {
-    if (!effectiveChangeManagementEnabled) {
-      return { formErrors: [], itemErrors: [] };
-    }
-    return validateApproverConfig(approvers, availableUsers, availableRoles);
-  }, [approvers, availableRoles, availableUsers, effectiveChangeManagementEnabled]);
-
-  const hasApproverValidationErrors = useMemo(
-    () =>
-      approverValidation.formErrors.length > 0 ||
-      approverValidation.itemErrors.some((item) => !!item.type || !!item.userId || !!item.roleName),
-    [approverValidation.formErrors.length, approverValidation.itemErrors],
-  );
-
-  const hasEveryoneApprover = useMemo(() => approvers.some((a) => a.type === "TYPE_ANYONE"), [approvers]);
+    return name !== initialValues.name || description !== initialValues.description;
+  }, [description, initialValues.description, initialValues.name, name]);
 
   const handleSave = useCallback(async () => {
     if (!canUpdateCanvas) {
@@ -79,18 +25,11 @@ export function SettingsView({
     }
 
     setSaveMessage(null);
-    if (hasApproverValidationErrors) {
-      return;
-    }
 
     try {
       await onSave({
         name,
         description,
-        changeManagement: {
-          enabled: isChangeManagementEnforcedByOrganization ? undefined : changeManagementEnabled,
-          approvals: effectiveChangeManagementEnabled ? normalizeApprovers(approvers) : undefined,
-        },
       });
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -98,59 +37,7 @@ export function SettingsView({
       setSaveMessage(errorMessage);
       setTimeout(() => setSaveMessage(null), 3000);
     }
-  }, [
-    approvers,
-    canUpdateCanvas,
-    description,
-    effectiveChangeManagementEnabled,
-    hasApproverValidationErrors,
-    isChangeManagementEnforcedByOrganization,
-    name,
-    onSave,
-    changeManagementEnabled,
-  ]);
-
-  const addApprover = useCallback(() => {
-    setApprovers((current) => [...current, { type: "TYPE_USER", userId: "" }]);
-  }, []);
-
-  const updateApproverType = useCallback((index: number, type: ChangeRequestApproverType) => {
-    setApprovers((current) =>
-      current.map((item, currentIndex) => {
-        if (currentIndex !== index) {
-          return item;
-        }
-
-        if (type === "TYPE_USER") {
-          return { type, userId: item.userId || "" };
-        }
-        if (type === "TYPE_ROLE") {
-          return { type, roleName: item.roleName || "" };
-        }
-
-        return { type };
-      }),
-    );
-  }, []);
-
-  const updateApproverUser = useCallback((index: number, userId: string) => {
-    setApprovers((current) =>
-      current.map((item, currentIndex) => (currentIndex === index ? { ...item, userId } : item)),
-    );
-  }, []);
-
-  const updateApproverRole = useCallback((index: number, roleName: string) => {
-    setApprovers((current) =>
-      current.map((item, currentIndex) => (currentIndex === index ? { ...item, roleName } : item)),
-    );
-  }, []);
-
-  const removeApprover = useCallback((index: number) => {
-    setApprovers((current) => {
-      const next = current.filter((_, currentIndex) => currentIndex !== index);
-      return next.length > 0 ? next : [{ type: "TYPE_USER", userId: "" }];
-    });
-  }, []);
+  }, [canUpdateCanvas, description, name, onSave]);
 
   return (
     <div className="px-4 py-6">
@@ -160,11 +47,11 @@ export function SettingsView({
             type="button"
             variant="ghost"
             size="sm"
-            className="-ml-2 gap-1 px-2 text-slate-600 hover:text-slate-900"
+            className="-ml-2 gap-1 px-2 text-slate-600 hover:bg-slate-950/5 hover:text-slate-900"
             onClick={onBackToCanvas}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-            Back to canvas
+            Back to app
           </Button>
         ) : null}
         <IdentityFields
@@ -174,32 +61,12 @@ export function SettingsView({
           onDescriptionChange={setDescription}
           canUpdateCanvas={canUpdateCanvas}
         />
-        {isChangeManagementSettingsEnabled() ? (
-          <ChangeManagementFieldset
-            isChangeManagementEnforcedByOrganization={isChangeManagementEnforcedByOrganization}
-            changeManagementEnabled={changeManagementEnabled}
-            onChangeManagementEnabledChange={setChangeManagementEnabled}
-            isChangeManagementToggleDisabled={isChangeManagementToggleDisabled}
-            effectiveChangeManagementEnabled={effectiveChangeManagementEnabled}
-            approvers={approvers}
-            canUpdateCanvas={canUpdateCanvas}
-            availableUsers={availableUsers}
-            availableRoles={availableRoles}
-            approverValidation={approverValidation}
-            hasEveryoneApprover={hasEveryoneApprover}
-            onApproverTypeChange={updateApproverType}
-            onApproverUserChange={updateApproverUser}
-            onApproverRoleChange={updateApproverRole}
-            onRemoveApprover={removeApprover}
-            onAddApprover={addApprover}
-          />
-        ) : null}
         <div className="flex items-center gap-4">
           <LoadingButton
             type="button"
             data-testid="canvas-settings-save-changes"
             onClick={handleSave}
-            disabled={!canUpdateCanvas || !hasChanges || hasApproverValidationErrors}
+            disabled={!canUpdateCanvas || !hasChanges}
             loading={isSaving}
             loadingText="Saving..."
           >

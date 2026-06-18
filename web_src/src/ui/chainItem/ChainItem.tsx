@@ -7,9 +7,10 @@ import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
-import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import { getComponentBaseMapper } from "@/pages/app/mappers";
+import { buildExecutionInfo, buildNodeInfo } from "@/pages/app/utils";
 import { ChainItemIcon } from "./ChainItemIcon";
 import type { ChainItemData } from "./types";
 
@@ -204,43 +205,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   </span>
                 </>
               )}
-            {(item.childExecutions?.length || 0) > 0 && (
-              <>
-                <span className="mx-1">·</span>
-                <span>
-                  {item.childExecutions?.length} execution{item.childExecutions!.length > 1 ? "s" : ""}
-                </span>
-              </>
-            )}
           </span>
         </div>
-
-        {/* Child executions for composite components */}
-        {item.childExecutions && item.childExecutions.length > 0 && (
-          <div className="ml-8 mt-1 space-y-1">
-            {item.childExecutions.map((child, childIndex) => (
-              <div key={`${item.id}-child-${childIndex}`} className="flex items-center justify-between gap-2 text-sm">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="flex-shrink-0">
-                    {React.createElement(resolveIcon("corner-down-right"), {
-                      size: 16,
-                      className: "text-gray-400",
-                    })}
-                  </div>
-                  <ChainItemIcon item={child} size={14} className="text-gray-500" />
-                  <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
-                </div>
-                <div
-                  className={`capitalize text-xs py-[1px] px-[3px] rounded flex items-center justify-center flex-shrink-0 ${
-                    child.badgeColor?.replace("bg", "text") || "bg-gray-400"
-                  }`}
-                >
-                  <span>{child.state}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Expandable content */}
         {isOpen && item.tabData && (
@@ -453,16 +419,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <DialogTitle>Payload</DialogTitle>
               <DialogDescription className="sr-only">Expanded payload viewer.</DialogDescription>
               <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyPayloadToClipboard(modalPayload);
                   }}
-                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
                 >
                   {React.createElement(resolveIcon("copy"), { size: 14 })}
                   Copy
-                </button>
+                </Button>
               </SimpleTooltip>
             </div>
             <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">

@@ -15,7 +15,7 @@ func DescribeRole(ctx context.Context, domainType, domainID, roleName string, au
 		return nil, status.Error(codes.InvalidArgument, "invalid role specified")
 	}
 
-	roleDefinition, err := authService.GetRoleDefinition(roleName, domainType, domainID)
+	roleDefinition, err := authService.GetRoleDefinition(ctx, roleName, domainType, domainID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "role not found")
 	}

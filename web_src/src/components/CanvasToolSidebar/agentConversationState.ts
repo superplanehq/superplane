@@ -28,11 +28,30 @@ export function useConversationMessages(
 }
 
 export function useThinkingIndicator(messages: AgentMessage[], status: string): boolean {
-  const hasRunningTool = useMemo(
-    () => messages.some((message) => message.role === "tool" && message.toolStatus === "started"),
-    [messages],
-  );
-  return status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
+  const hasRunningTool = useMemo(() => hasActiveTool(messages), [messages]);
+  return status === "streaming" && !hasRunningTool;
+}
+
+function hasActiveTool(messages: AgentMessage[]): boolean {
+  const activeToolIds = new Set<string>();
+
+  for (const message of messages) {
+    if (message.role !== "tool") continue;
+
+    const key = message.toolCallId || message.id || message.toolName;
+    if (!key) continue;
+
+    if (message.toolStatus === "started") {
+      activeToolIds.add(key);
+      continue;
+    }
+
+    if (message.toolStatus === "finished") {
+      activeToolIds.delete(key);
+    }
+  }
+
+  return activeToolIds.size > 0;
 }
 
 export function useStoredOutcomeState(
@@ -69,6 +88,7 @@ export function createWebsocketCallbacks(
   setStatus: (value: string) => void,
   setError: (value: string | null) => void,
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void,
+  setNotice?: (value: string | null) => void,
 ) {
   return {
     onPersistedMessage: (message: AgentMessage) => {
@@ -79,6 +99,10 @@ export function createWebsocketCallbacks(
     onStatusChange: (next: string, error?: string) => {
       setStatus(next || "idle");
       setError(error ?? null);
+      setNotice?.(null); // turn boundary clears any stale notice
+    },
+    onNotice: (message: string) => {
+      setNotice?.(message || "The agent hit a recoverable error and is retrying.");
     },
     onOutcomeEvent: (phase: "start" | "end", evaluation: OutcomeEvaluationPayload) => {
       setOutcomeState((prev) => {
@@ -132,7 +156,7 @@ export function statusLabel(status: string): string {
     case "streaming":
       return "Agent is running...";
     case "failed":
-      return "Last turn failed";
+      return "Message failed. Try again.";
     case "terminated":
       return "Session ended";
     default:

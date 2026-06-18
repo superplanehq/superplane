@@ -3,10 +3,13 @@ package jira
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+const opsAlertLabelMaxRunes = 80
 
 func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
@@ -20,138 +23,239 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listAssignees(ctx)
 	case "priority":
 		return listPriorities(ctx)
+	case "resolution":
+		return listResolutions(ctx)
+	case "jsmApproval":
+		return listJSMApprovals(ctx)
 	case "serviceDesk":
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client: %w", err)
-		}
-
-		desks, err := client.ListServiceDesks()
-		if err != nil {
-			return nil, fmt.Errorf("list service desks: %w", err)
-		}
-
-		resources := make([]core.IntegrationResource, 0, len(desks))
-		for _, desk := range desks {
-			name := desk.ProjectName
-			if desk.ProjectKey != "" {
-				name = fmt.Sprintf("%s (%s)", desk.ProjectName, desk.ProjectKey)
-			}
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
-				Name: name,
-				ID:   desk.ID,
-			})
-		}
-		return resources, nil
-
+		return listServiceDesks(ctx)
 	case "serviceDeskRequestType":
-		deskID := strings.TrimSpace(ctx.Parameters["serviceDesk"])
-		if deskID == "" {
-			return []core.IntegrationResource{}, nil
-		}
-
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client: %w", err)
-		}
-
-		requestTypes, err := client.ListRequestTypes(deskID)
-		if err != nil {
-			return nil, fmt.Errorf("list request types: %w", err)
-		}
-
-		resources := make([]core.IntegrationResource, 0, len(requestTypes))
-		for _, rt := range requestTypes {
-			name := rt.Name
-			if rt.ID != "" {
-				name = fmt.Sprintf("%s (%s)", rt.Name, rt.ID)
-			}
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
-				Name: name,
-				ID:   rt.ID,
-			})
-		}
-		return resources, nil
-
+		return listServiceDeskRequestTypes(ctx)
 	case "impact":
-		return j.listRequestTypeFieldResources(resourceType, "impact", ctx)
-
+		return listRequestTypeFieldResources(resourceType, "impact", ctx)
 	case "urgency":
-		return j.listRequestTypeFieldResources(resourceType, "urgency", ctx)
-
+		return listRequestTypeFieldResources(resourceType, "urgency", ctx)
+	case "team":
+		return listTeams(ctx)
+	case "heartbeat":
+		return listHeartbeats(ctx)
 	case "issue":
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client: %w", err)
-		}
-
-		projectKey := strings.TrimSpace(ctx.Parameters["project"])
-
-		if projectKey != "" {
-			desks, derr := client.ListServiceDesks()
-			if derr == nil {
-				for _, desk := range desks {
-					if strings.EqualFold(strings.TrimSpace(desk.ProjectKey), projectKey) {
-						rows, rerr := client.ListCustomerRequestsByServiceDesk(desk.ID, 500)
-						if rerr == nil && len(rows) > 0 {
-							resources := make([]core.IntegrationResource, 0, len(rows))
-							for _, row := range rows {
-								if strings.TrimSpace(row.IssueKey) == "" {
-									continue
-								}
-								name := row.IssueKey
-								if s := strings.TrimSpace(row.Summary); s != "" {
-									name = fmt.Sprintf("%s (%s)", s, row.IssueKey)
-								}
-								resources = append(resources, core.IntegrationResource{
-									Type: resourceType,
-									Name: name,
-									ID:   row.IssueKey,
-								})
-							}
-							return resources, nil
-						}
-						break
-					}
-				}
-			}
-		}
-
-		var jql string
-		if projectKey != "" {
-			jql = fmt.Sprintf(`project = "%s" ORDER BY updated DESC`, jqlQuotedProjectKey(projectKey))
-		} else {
-			jql = "updated >= -90d ORDER BY updated DESC"
-		}
-
-		hits, err := client.SearchIssuesUpTo(jql, 500)
-		if err != nil {
-			return nil, fmt.Errorf("search issues: %w", err)
-		}
-
-		resources := make([]core.IntegrationResource, 0, len(hits))
-		for _, hit := range hits {
-			if strings.TrimSpace(hit.Key) == "" {
-				continue
-			}
-			name := hit.Key
-			if hit.Fields != nil {
-				if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
-					name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
-				}
-			}
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
-				Name: name,
-				ID:   hit.Key,
-			})
-		}
-		return resources, nil
+		return listIssues(ctx)
+	case "alert":
+		return listAlerts(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
+
+func listServiceDesks(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	desks, err := client.ListServiceDesks()
+	if err != nil {
+		return nil, fmt.Errorf("list service desks: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(desks))
+	for _, desk := range desks {
+		name := desk.ProjectName
+		if desk.ProjectKey != "" {
+			name = fmt.Sprintf("%s (%s)", desk.ProjectName, desk.ProjectKey)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "serviceDesk",
+			Name: name,
+			ID:   desk.ID,
+		})
+	}
+	return resources, nil
+}
+
+func listServiceDeskRequestTypes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	deskID := strings.TrimSpace(ctx.Parameters["serviceDesk"])
+	if deskID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	requestTypes, err := client.ListRequestTypes(deskID)
+	if err != nil {
+		return nil, fmt.Errorf("list request types: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(requestTypes))
+	for _, rt := range requestTypes {
+		name := rt.Name
+		if rt.ID != "" {
+			name = fmt.Sprintf("%s (%s)", rt.Name, rt.ID)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "serviceDeskRequestType",
+			Name: name,
+			ID:   rt.ID,
+		})
+	}
+	return resources, nil
+}
+
+func listTeams(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	teams, err := client.ListOpsTeams(cloudID)
+	if err != nil {
+		return nil, fmt.Errorf("list operations teams: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(teams))
+	for _, team := range teams {
+		if strings.TrimSpace(team.TeamID) == "" {
+			continue
+		}
+		name := strings.TrimSpace(team.TeamName)
+		if name == "" {
+			name = team.TeamID
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "team",
+			Name: name,
+			ID:   team.TeamID,
+		})
+	}
+	return resources, nil
+}
+
+func listHeartbeats(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	teamID := strings.TrimSpace(ctx.Parameters["team"])
+	if teamID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("list heartbeats: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(heartbeats))
+	for _, hb := range heartbeats {
+		if strings.TrimSpace(hb.Name) == "" {
+			continue
+		}
+		name := hb.Name
+		if hb.Status != "" {
+			name = fmt.Sprintf("%s (%s)", hb.Name, hb.Status)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "heartbeat",
+			Name: name,
+			ID:   hb.Name,
+		})
+	}
+	return resources, nil
+}
+
+func listIssues(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+
+	if projectKey != "" {
+		if resources, ok := listIssuesFromServiceDesk(client, projectKey); ok {
+			return resources, nil
+		}
+	}
+
+	var jql string
+	if projectKey != "" {
+		jql = fmt.Sprintf(`project = "%s" ORDER BY updated DESC`, jqlQuotedProjectKey(projectKey))
+	} else {
+		jql = "updated >= -90d ORDER BY updated DESC"
+	}
+
+	hits, err := client.SearchIssuesUpTo(jql, 500)
+	if err != nil {
+		return nil, fmt.Errorf("search issues: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(hits))
+	for _, hit := range hits {
+		if strings.TrimSpace(hit.Key) == "" {
+			continue
+		}
+		name := hit.Key
+		if hit.Fields != nil {
+			if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
+				name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
+			}
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "issue",
+			Name: name,
+			ID:   hit.Key,
+		})
+	}
+	return resources, nil
+}
+
+func listIssuesFromServiceDesk(client *Client, projectKey string) ([]core.IntegrationResource, bool) {
+	desks, err := client.ListServiceDesks()
+	if err != nil {
+		return nil, false
+	}
+
+	for _, desk := range desks {
+		if !strings.EqualFold(strings.TrimSpace(desk.ProjectKey), projectKey) {
+			continue
+		}
+		rows, err := client.ListCustomerRequestsByServiceDesk(desk.ID, 500)
+		if err != nil || len(rows) == 0 {
+			break
+		}
+		resources := make([]core.IntegrationResource, 0, len(rows))
+		for _, row := range rows {
+			if strings.TrimSpace(row.IssueKey) == "" {
+				continue
+			}
+			name := row.IssueKey
+			if s := strings.TrimSpace(row.Summary); s != "" {
+				name = fmt.Sprintf("%s (%s)", s, row.IssueKey)
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: "issue",
+				Name: name,
+				ID:   row.IssueKey,
+			})
+		}
+		return resources, true
+	}
+	return nil, false
 }
 
 func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -217,11 +321,6 @@ func listIssueTypes(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 }
 
 func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
-		return []core.IntegrationResource{}, nil
-	}
-
 	if ctx.HTTP == nil {
 		return []core.IntegrationResource{}, nil
 	}
@@ -231,11 +330,23 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	statuses, err := client.GetProjectStatuses(projectKey)
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		statuses, err := client.GetProjectStatuses(projectKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issue statuses: %w", err)
+		}
+		return issueStatusResources(statuses), nil
+	}
+
+	statuses, err := client.ListGlobalStatuses()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list issue statuses: %w", err)
 	}
+	return issueStatusResources(statuses), nil
+}
 
+func issueStatusResources(statuses []Status) []core.IntegrationResource {
 	resources := make([]core.IntegrationResource, 0, len(statuses))
 	for _, s := range statuses {
 		resources = append(resources, core.IntegrationResource{
@@ -244,12 +355,12 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			ID:   s.Name,
 		})
 	}
-	return resources, nil
+	return resources
 }
 
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
+	projectKey := assigneeProjectKey(ctx)
+	if projectKey == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -308,7 +419,79 @@ func listPriorities(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 	return resources, nil
 }
 
-func (j *Jira) listRequestTypeFieldResources(resourceType, fieldLabel string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+// listJSMApprovals returns the pending approvals for a JSM customer request,
+// so the Approve Workflow component can offer a picker instead of asking the
+// user to copy an approval id by hand. Non-pending approvals are filtered out
+// because they are not actionable.
+func listJSMApprovals(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	issueKey := strings.TrimSpace(ctx.Parameters["issueKey"])
+	if issueKey == "" || strings.Contains(issueKey, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	approvals, err := client.ListApprovals(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list approvals: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(approvals))
+	for _, approval := range approvals {
+		if !isPendingApproval(approval) {
+			continue
+		}
+		id := approval.ID.String()
+		if id == "" {
+			continue
+		}
+		name := strings.TrimSpace(approval.Name)
+		if name == "" {
+			name = fmt.Sprintf("Approval %s", id)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "jsmApproval",
+			Name: name,
+			ID:   id,
+		})
+	}
+	return resources, nil
+}
+
+func listResolutions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	resolutions, err := client.ListResolutions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resolutions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(resolutions))
+	for _, r := range resolutions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "resolution",
+			Name: r.Name,
+			ID:   r.Name,
+		})
+	}
+	return resources, nil
+}
+
+func listRequestTypeFieldResources(resourceType, fieldLabel string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	deskID := strings.TrimSpace(ctx.Parameters["serviceDesk"])
 	reqID := strings.TrimSpace(ctx.Parameters["serviceDeskRequestType"])
 	if deskID == "" || reqID == "" {
@@ -337,6 +520,35 @@ func (j *Jira) listRequestTypeFieldResources(resourceType, fieldLabel string, ct
 	}
 
 	return requestTypeFieldResources(client, field, resourceType, projectKey, fieldLabel)
+}
+
+func listAlerts(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	rows, err := client.ListOpsAlerts(cloudID, 100)
+	if err != nil {
+		return nil, fmt.Errorf("list Ops alerts: %w", err)
+	}
+	out := make([]core.IntegrationResource, 0, len(rows))
+	for _, row := range rows {
+		rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
+		if rawID == "" {
+			continue
+		}
+		name := opsAlertIntegrationResourceLabel(row, rawID)
+		out = append(out, core.IntegrationResource{
+			Type: "alert",
+			Name: name,
+			ID:   rawID,
+		})
+	}
+	return out, nil
 }
 
 func findRequestTypeFieldID(fields []RequestTypeField, fieldLabel string) string {
@@ -500,4 +712,53 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 		}
 	}
 	return ""
+}
+
+func assigneeProjectKey(ctx core.ListResourcesContext) string {
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		return projectKey
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return ""
+	}
+	for _, p := range metadata.Projects {
+		if k := strings.TrimSpace(p.Key); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
+func truncateOpsAlertLabelMessage(msg string) string {
+	if utf8.RuneCountInString(msg) <= opsAlertLabelMaxRunes {
+		return msg
+	}
+	runes := []rune(msg)
+	keep := opsAlertLabelMaxRunes - utf8.RuneCountInString("...")
+	if keep < 0 {
+		keep = 0
+	}
+	return string(runes[:keep]) + "..."
+}
+
+func opsAlertIntegrationResourceLabel(row map[string]any, alertID string) string {
+	msg := strings.TrimSpace(opsAlertStringField(row, "message"))
+	if msg != "" {
+		msg = truncateOpsAlertLabelMessage(msg)
+	}
+	tiny := strings.TrimSpace(opsAlertStringField(row, "tinyId"))
+
+	switch {
+	case msg != "" && tiny != "":
+		return fmt.Sprintf("%s #%s", msg, tiny)
+	case msg != "":
+		return msg
+	case tiny != "":
+		return fmt.Sprintf("#%s", tiny)
+	default:
+		return alertID
+	}
 }

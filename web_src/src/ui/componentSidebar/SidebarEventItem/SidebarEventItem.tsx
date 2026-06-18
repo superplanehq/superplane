@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Button } from "@/components/ui/button";
 import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isCancelledError } from "@tanstack/react-query";
@@ -16,7 +17,6 @@ export interface ExecutionChainItem extends EventStateStyle {
   executionId: string;
   state: string;
   payload?: any;
-  children?: Array<{ name: string; state: string } & EventStateStyle>;
 }
 
 export interface TabData {
@@ -151,26 +151,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             executionId: exec.id || "",
             payload,
             state: state,
-            children:
-              exec?.childExecutions && exec.childExecutions.length > 0
-                ? exec.childExecutions
-                    .slice()
-                    .sort((a: any, b: any) => {
-                      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                      return timeA - timeB;
-                    })
-                    .map((childExec: any) => {
-                      const nodeId = childExec?.nodeId?.split(":")?.at(-1);
-                      const { map, state } = getExecutionState(exec.nodeId, childExec);
-
-                      return {
-                        name: nodeId || "Unknown",
-                        state: state,
-                        ...map[state],
-                      };
-                    })
-                : undefined,
           };
 
           return mainItem;
@@ -210,9 +190,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   pollingRef.current.hasInProgress =
     ["waiting", "running", "pending"].includes(event.state || "") ||
     executionChainData?.some((item) => item.state !== "running" && item.state !== "failed") ||
-    executionChainData?.some((execution) =>
-      execution.children?.some((children) => children.state !== "success" && children.state !== "failed"),
-    ) ||
     false;
   pollingRef.current.loadData = () => loadExecutionChainData(true);
 
@@ -609,13 +586,16 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
               <div className="flex items-center gap-2">
                 <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
-                  <button
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
                     onClick={() => copyPayloadToClipboard(modalPayload)}
-                    className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
                   >
                     {React.createElement(resolveIcon("copy"), { size: 14 })}
                     Copy
-                  </button>
+                  </Button>
                 </SimpleTooltip>
                 <button
                   onClick={() => {

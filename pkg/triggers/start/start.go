@@ -1,6 +1,7 @@
 package manual
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,20 +44,23 @@ func (s *Start) Documentation() string {
 ## How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Configure one or more templates, each with a name and a default payload
+2. Configure one or more templates, each with a name, default payload, and optional parameters
 3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. The workflow begins immediately with the configured payload for the selected template
 
 ## Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
-- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
+- ` + "`parameters`" + ` (optional): a list of typed parameters exposed to payload expressions as ` + "`parameters[\"name\"]`" + ` and used by the run form
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` and ` + "`{{ parameters[\"my parameter\"] }}`" + ` in JSON values.
+
+Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, ` + "`boolean`" + `, or ` + "`select`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type. Select parameters also require an ` + "`options`" + ` list of ` + "`label`" + ` / ` + "`value`" + ` pairs; run-time values use the option ` + "`value`" + ` strings.
 
 ## Event Data
 
-Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is the selected template's payload after expression resolution.`
 }
 
 func (s *Start) Icon() string {
@@ -68,6 +72,8 @@ func (s *Start) Color() string {
 }
 
 func (s *Start) Configuration() []configuration.Field {
+	disallowExpressions := false
+
 	return []configuration.Field{
 		{
 			Name:  "templates",
@@ -86,10 +92,160 @@ func (s *Start) Configuration() []configuration.Field {
 								Required: true,
 							},
 							{
-								Name:     "payload",
-								Label:    "Payload",
-								Type:     configuration.FieldTypeObject,
-								Required: true,
+								Name:  "parameters",
+								Label: "Parameters",
+								Type:  configuration.FieldTypeList,
+								TypeOptions: &configuration.TypeOptions{
+									List: &configuration.ListTypeOptions{
+										ItemLabel:   "Parameter",
+										Accordion:   true,
+										Reorderable: true,
+										ItemDefinition: &configuration.ListItemDefinition{
+											Type: configuration.FieldTypeObject,
+											Schema: []configuration.Field{
+												{
+													Name:     "name",
+													Label:    "Name",
+													Type:     configuration.FieldTypeString,
+													Required: true,
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+												{
+													Name:     "type",
+													Label:    "Type",
+													Type:     configuration.FieldTypeSelect,
+													Required: true,
+													Default:  configuration.FieldTypeString,
+													TypeOptions: &configuration.TypeOptions{
+														Select: &configuration.SelectTypeOptions{
+															Options: []configuration.FieldOption{
+																{Label: "String", Value: configuration.FieldTypeString},
+																{Label: "Number", Value: configuration.FieldTypeNumber},
+																{Label: "Boolean", Value: configuration.FieldTypeBool},
+																{Label: "Select", Value: configuration.FieldTypeSelect},
+															},
+														},
+													},
+												},
+												{
+													Name:  "options",
+													Label: "Options",
+													Type:  configuration.FieldTypeList,
+													RequiredConditions: []configuration.RequiredCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeSelect}},
+													},
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeSelect}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														List: &configuration.ListTypeOptions{
+															ItemLabel: "Option",
+															Accordion: true,
+															ItemDefinition: &configuration.ListItemDefinition{
+																Type: configuration.FieldTypeObject,
+																Schema: []configuration.Field{
+																	{
+																		Name:     "label",
+																		Label:    "Label",
+																		Type:     configuration.FieldTypeString,
+																		Required: true,
+																		TypeOptions: &configuration.TypeOptions{
+																			String: &configuration.StringTypeOptions{
+																				AllowExpressions: &disallowExpressions,
+																			},
+																		},
+																	},
+																	{
+																		Name:     "value",
+																		Label:    "Value",
+																		Type:     configuration.FieldTypeString,
+																		Required: true,
+																		TypeOptions: &configuration.TypeOptions{
+																			String: &configuration.StringTypeOptions{
+																				AllowExpressions: &disallowExpressions,
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+												{
+													Name:      "defaultString",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeString,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeSelect}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+												{
+													Name:      "defaultNumber",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeNumber,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeNumber}},
+													},
+												},
+												{
+													Name:      "defaultBoolean",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeBool,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeBool}},
+													},
+												},
+												{
+													Name:      "title",
+													Label:     "Display Title",
+													Togglable: true,
+													Type:      configuration.FieldTypeString,
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+												{
+													Name:      "placeholder",
+													Label:     "Input Placeholder",
+													Togglable: true,
+													Type:      configuration.FieldTypeString,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeNumber}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Name:        "payload",
+								Label:       "Payload",
+								Type:        configuration.FieldTypeObject,
+								Required:    true,
+								Description: "JSON object emitted when the template runs. Supports expressions such as {{ now() }} and {{ parameters[\"my parameter\"] }} in field values.",
+								Placeholder: `{
+  "message": "Hello, World!"
+}`,
 							},
 						},
 					},
@@ -97,8 +253,9 @@ func (s *Start) Configuration() []configuration.Field {
 			},
 			Default: []map[string]any{
 				{
-					"name":    "Hello World",
-					"payload": map[string]any{"message": "Hello, World!"},
+					"name":       "Hello World",
+					"payload":    map[string]any{"message": "Hello, World!"},
+					"parameters": []map[string]any{},
 				},
 			},
 		},
@@ -124,11 +281,6 @@ func (s *Start) Hooks() []core.Hook {
 					Label:    "Template",
 					Type:     configuration.FieldTypeString,
 					Required: true,
-				},
-				{
-					Name:  "payload",
-					Label: "Payload Override",
-					Type:  configuration.FieldTypeObject,
 				},
 			},
 		},
@@ -157,7 +309,7 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 	}
 
 	var names []string
-	var payload map[string]any
+	var payload any
 	found := false
 
 	for _, raw := range rawTemplates {
@@ -168,7 +320,7 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		name, _ := tmpl["name"].(string)
 		names = append(names, name)
 		if name == templateName {
-			payload, _ = tmpl["payload"].(map[string]any)
+			payload = templatePayload(tmpl)
 			found = true
 		}
 	}
@@ -177,15 +329,16 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
 	}
 
-	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
-		payload = override
-	}
-
 	if payload == nil {
-		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
+		return nil, fmt.Errorf("template %q has no payload", templateName)
 	}
 
-	if err := ctx.Events.Emit("manual.run", payload); err != nil {
+	resolvedPayload, err := payloadObject(payload)
+	if err != nil {
+		return nil, fmt.Errorf("template %q payload must be a JSON object: %w", templateName, err)
+	}
+
+	if err := ctx.Events.Emit("manual.run", resolvedPayload); err != nil {
 		return nil, fmt.Errorf("failed to emit event: %w", err)
 	}
 
@@ -194,4 +347,26 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func templatePayload(tmpl map[string]any) any {
+	return tmpl["payload"]
+}
+
+func payloadObject(value any) (map[string]any, error) {
+	switch payload := value.(type) {
+	case map[string]any:
+		return payload, nil
+	case string:
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
+			return nil, err
+		}
+		if parsed == nil {
+			return nil, fmt.Errorf("empty payload")
+		}
+		return parsed, nil
+	default:
+		return nil, fmt.Errorf("unsupported payload type")
+	}
 }

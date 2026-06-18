@@ -68,7 +68,7 @@ function RubricMarkdown({
           code: MarkdownCode,
           pre: ({ children: preChildren }) => <>{preChildren}</>,
           table: ({ children: tableChildren, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
               <table {...props}>{tableChildren}</table>
             </div>
           ),
@@ -144,7 +144,7 @@ export function RubricWidget({
 
   return (
     <>
-      <div className="my-4 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="my-4 rounded-lg border border-slate-200 bg-white overflow-hidden">
         {/* Header */}
         <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
           <ClipboardList size={14} className="text-slate-600 shrink-0" />

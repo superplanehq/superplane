@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -69,7 +70,12 @@ func (c *ReadMemory) Documentation() string {
 ## Output Channels
 
 - **Found**: At least one matching memory row was found
-- **Not Found**: No matching memory rows were found`
+- **Not Found**: No matching memory rows were found
+
+## Limits
+
+- When **Emit Mode** is ` + "`oneByOne`" + `, at most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` events are emitted per execution.
+- Self-hosted deployments can raise this cap with the ` + "`SUPERPLANE_MAX_EMIT_COUNT`" + ` environment variable.`
 
 }
 
@@ -227,6 +233,9 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payloads := buildPayloads(spec, matches, values)
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), config.MaxEmitCount())
+	}
 
 	return ctx.ExecutionState.Emit(
 		channel,

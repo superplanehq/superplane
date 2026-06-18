@@ -14,12 +14,11 @@ import (
 )
 
 func TestTimeGateComponent(t *testing.T) {
-	steps := &TimeGateSteps{t: t}
-
 	weekendDays := []string{"saturday", "sunday"}
 	workweekDays := []string{"monday", "tuesday", "wednesday", "thursday", "friday"}
 
 	t.Run("add a TimeGate that blocks on weekends", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Weekday Work Hours Gate")
 		steps.addTimeGate()
@@ -27,11 +26,12 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
 	t.Run("add a TimeGate that blocks on outside of work hours", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Work Hours Gate")
 		steps.addTimeGate()
@@ -39,11 +39,12 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
 	t.Run("push through the time gate item", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		now := time.Now().UTC()
 		tomorrow := now.Add(24 * time.Hour)
@@ -166,11 +167,11 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas.Connect("timeGate", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *TimeGateSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},

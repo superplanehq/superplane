@@ -1,0 +1,16 @@
+{
+  "data": {
+    "name": "my-instance",
+    "state": "RUNNABLE",
+    "databaseVersion": "POSTGRES_16",
+    "region": "us-central1",
+    "tier": "db-f1-micro",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "connectionName": "my-project:us-central1:my-instance",
+    "ipAddress": "34.41.10.20",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}

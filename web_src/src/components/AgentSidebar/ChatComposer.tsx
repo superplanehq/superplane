@@ -1,109 +1,161 @@
-import { ArrowUp, Loader2, Square } from "lucide-react";
-import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { useCallback, useRef } from "react";
 import type { AgentMode } from "./agentMode";
-import { ModeToggle } from "./ModeToggle";
+import { ComposerToolbar } from "./ComposerToolbar";
+import { useMentions } from "./useMentions";
+import { useMentionCandidates } from "./useMentionCandidates";
+import { MentionDropdown } from "./MentionDropdown";
+import { MentionTextarea } from "./MentionTextarea";
+import type { SuperplaneComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun } from "@/api-client";
 
-export function ChatComposer({
-  onSend,
-  onStop,
-  sending,
-  stopping,
-  statusLabel,
-  agentMode,
-  onModeSwitch,
-  modeDisabled,
-}: {
+type ChatComposerProps = {
   onSend: (content: string) => Promise<void>;
   onStop: () => void;
   sending: boolean;
+  sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   modeDisabled?: boolean;
-}) {
-  const [draft, setDraft] = useState("");
-  const canSend = Boolean(draft.trim()) && !sending;
+  nodes?: SuperplaneComponentsNode[];
+  runs?: CanvasesCanvasRun[];
+};
+
+const modePlaceholder = {
+  builder: "Describe the change to build...",
+  operator: "Ask the agent…",
+} as const;
+
+export function ChatComposer({
+  onSend,
+  onStop,
+  sending,
+  sendPending,
+  stopping,
+  statusLabel,
+  agentMode,
+  onModeSwitch,
+  modeDisabled,
+  nodes,
+  runs,
+}: ChatComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const mentionKeyboardRef = useRef<((e: React.KeyboardEvent) => boolean) | null>(null);
+  const {
+    value,
+    setValue,
+    showDropdown,
+    filter,
+    setCursorPos,
+    insertMention,
+    getMarkdown,
+    mentions,
+    isEmpty,
+    clear,
+    snapshot,
+    restore,
+    dismiss,
+  } = useMentions();
+
+  const candidates = useMentionCandidates(nodes, runs, filter, showDropdown);
+  const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
-    const content = draft.trim();
+    if (isEmpty) return;
+    const content = getMarkdown().trim();
     if (!content) return;
-
-    setDraft("");
-
+    snapshot();
+    clear();
     try {
       await onSend(content);
     } catch {
-      setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : content));
+      restore();
     }
-  }, [draft, onSend]);
+  }, [isEmpty, getMarkdown, clear, onSend, snapshot, restore]);
+
+  const handleMentionSelect = useCallback(
+    (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
+      const pos = insertMention(item);
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(pos, pos);
+        }
+      });
+    },
+    [insertMention],
+  );
+
+  const handleDismiss = useCallback(() => {
+    dismiss();
+    textareaRef.current?.focus();
+  }, [dismiss]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (mentionKeyboardRef.current?.(e)) return;
+      if (e.key !== "Enter") return;
+      if ("isComposing" in e.nativeEvent && e.nativeEvent.isComposing) return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      if (canSend) void handleSend();
+    },
+    [canSend, handleSend],
+  );
+
+  const handleToolbarSend = useStableCallback(() => {
+    void handleSend();
+  });
 
   return (
-    <footer className="border-t border-slate-950/15 px-3 pb-3">
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={1}
-        placeholder="Ask the agent…"
-        data-testid="agent-input"
-        className={cn(
-          "min-h-9 w-full resize-none border-0 bg-transparent px-0 py-2 text-sm shadow-none",
-          "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
-          "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          "text-[rgba(10,10,10,1)] dark:bg-transparent",
-        )}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter") return;
-          const nativeEvent = e.nativeEvent;
-          if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
-          if (e.shiftKey) return;
-          e.preventDefault();
-          if (!canSend) return;
-          void handleSend();
-        }}
-      />
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{statusLabel}</span>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {sending && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="size-7 shrink-0 rounded-full border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-              onClick={onStop}
-              disabled={stopping}
-              aria-label={stopping ? "Stopping" : "Stop"}
-              title={stopping ? "Stopping..." : "Stop"}
-              data-testid="agent-stop-button"
-            >
-              {stopping ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              ) : (
-                <Square className="size-3 fill-current" aria-hidden />
-              )}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="default"
-            size="icon"
-            className="size-7 shrink-0 rounded-full"
-            onClick={() => void handleSend()}
-            disabled={!canSend}
-            aria-label="Send message"
-            data-testid="agent-send-message-button"
-          >
-            <ArrowUp className="size-3.5" aria-hidden />
-          </Button>
-        </div>
+    <footer className="px-3 pb-3 pt-2">
+      <div
+        ref={containerRef}
+        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15"
+      >
+        <MentionTextarea
+          value={value}
+          mentions={mentions}
+          setValue={setValue}
+          setCursorPos={setCursorPos}
+          onKeyDown={handleKeyDown}
+          placeholder={modePlaceholder[agentMode]}
+          textareaRef={textareaRef}
+          backdropRef={backdropRef}
+        />
+        <ComposerToolbar
+          agentMode={agentMode}
+          onModeSwitch={onModeSwitch}
+          modeDisabled={modeDisabled}
+          sending={sending}
+          stopping={stopping}
+          statusLabel={statusLabel}
+          canSend={canSend}
+          onStop={onStop}
+          onSend={handleToolbarSend}
+        />
       </div>
-      <div className="flex items-center pt-1.5">
-        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-      </div>
+      {showDropdown ? (
+        <MentionDropdown
+          items={candidates}
+          visible={showDropdown}
+          anchorEl={containerRef.current}
+          onSelect={handleMentionSelect}
+          onDismiss={handleDismiss}
+          keyboardRef={mentionKeyboardRef}
+        />
+      ) : null}
     </footer>
   );
+}
+
+function useStableCallback(callback: () => void): () => void {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  return useCallback(() => callbackRef.current(), []);
 }

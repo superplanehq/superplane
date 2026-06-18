@@ -9,6 +9,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,12 +25,24 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		return nil, err
 	}
 
-	runs, err := models.ListCanvasRuns(canvasID, int(limit), beforeTime, filters)
+	db := database.DB(ctx)
+
+	var runs []models.CanvasRun
+	err = telemetry.RunSpan(ctx, "runs.list", func(ctx context.Context) error {
+		var listErr error
+		runs, listErr = models.ListCanvasRunsInTransaction(database.DB(ctx), canvasID, int(limit), beforeTime, filters)
+		return listErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountCanvasRuns(canvasID, filters)
+	var count int64
+	err = telemetry.RunSpan(ctx, "runs.count", func(ctx context.Context) error {
+		var countErr error
+		count, countErr = models.CountCanvasRunsInTransaction(database.DB(ctx), canvasID, filters)
+		return countErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -37,12 +52,22 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		runIDs[i] = run.ID
 	}
 
-	rootEventsByRunID, err := listRootEventsForRuns(canvasID, runIDs)
+	var rootEventsByRunID map[string]models.CanvasEvent
+	err = telemetry.RunSpan(ctx, "runs.load_root_events", func(ctx context.Context) error {
+		var loadErr error
+		rootEventsByRunID, loadErr = listRootEventsForRuns(ctx, canvasID, runIDs)
+		return loadErr
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	executions, err := models.ListParentExecutionsForRunsInTransaction(database.Conn(), canvasID, runIDs)
+	var executions []models.CanvasNodeExecution
+	err = telemetry.RunSpan(ctx, "runs.load_executions", func(ctx context.Context) error {
+		var loadErr error
+		executions, loadErr = models.ListExecutionsForRunsInTransaction(db, canvasID, runIDs)
+		return loadErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +77,7 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		executionsByRunID[execution.RunID.String()] = append(executionsByRunID[execution.RunID.String()], execution)
 	}
 
-	serialized, err := SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+	serialized, err := serializeCanvasRuns(ctx, runs, rootEventsByRunID, executionsByRunID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,14 +117,14 @@ func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_R
 	}, nil
 }
 
-func listRootEventsForRuns(canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
+func listRootEventsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
 	eventsByRunID := map[string]models.CanvasEvent{}
 	if len(runIDs) == 0 {
 		return eventsByRunID, nil
 	}
 
 	var events []models.CanvasEvent
-	err := database.Conn().
+	err := database.DB(ctx).
 		Where("workflow_id = ?", canvasID).
 		Where("run_id IN ?", runIDs).
 		Where("execution_id IS NULL").
@@ -219,4 +244,28 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	}
 
 	return nil
+}
+
+func serializeCanvasRuns(
+	ctx context.Context,
+	runs []models.CanvasRun,
+	rootEventsByRunID map[string]models.CanvasEvent,
+	executionsByRunID map[string][]models.CanvasNodeExecution,
+) ([]*pb.CanvasRun, error) {
+	var serialized []*pb.CanvasRun
+	err := telemetry.RunSpan(ctx, "runs.serialize", func(ctx context.Context) error {
+		var serErr error
+		serialized, serErr = SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("runs.count", len(runs)))
+		}
+
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return serialized, nil
 }

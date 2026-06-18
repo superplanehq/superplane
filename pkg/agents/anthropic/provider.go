@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 )
 
 const ProviderName = "anthropic"
@@ -45,6 +47,10 @@ func New(cfg Config) (*Provider, error) {
 }
 
 func (p *Provider) Name() string { return ProviderName }
+
+func (p *Provider) ToolSchemaRevision() string {
+	return agenttools.SchemaRevision()
+}
 
 func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	body := map[string]any{
@@ -104,6 +110,12 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isSessionAwaitingToolResults(err) {
+			return fmt.Errorf("%w: %w", agents.ErrSessionBusy, err)
+		}
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: send message: %w", err)
 	}
 	return nil
@@ -119,6 +131,9 @@ func (p *Provider) InterruptSession(ctx context.Context, providerSessionID strin
 		},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: interrupt session: %w", err)
 	}
 	return nil
@@ -142,9 +157,88 @@ func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, 
 		"events": []map[string]any{event},
 	}
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		if isSessionAwaitingToolResults(err) {
+			return fmt.Errorf("%w: %w", agents.ErrSessionBusy, err)
+		}
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: define outcome: %w", err)
 	}
 	return nil
+}
+
+func (p *Provider) SendCustomToolResults(ctx context.Context, providerSessionID string, results []agents.CustomToolResult) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+	if len(results) == 0 {
+		return nil
+	}
+
+	events := make([]map[string]any, 0, len(results))
+	for _, result := range results {
+		if result.CustomToolUseID == "" {
+			return fmt.Errorf("anthropic: custom tool use id is required")
+		}
+		event := map[string]any{
+			"type":               "user.custom_tool_result",
+			"custom_tool_use_id": result.CustomToolUseID,
+			"content": []map[string]string{
+				{"type": "text", "text": result.Content},
+			},
+		}
+		if result.IsError {
+			event["is_error"] = true
+		}
+		events = append(events, event)
+	}
+
+	body := map[string]any{"events": events}
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		return fmt.Errorf("anthropic: send custom tool results: %w", err)
+	}
+	return nil
+}
+
+func isSessionAwaitingToolResults(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	return strings.Contains(apiErr.Message, "waiting on responses to events")
+}
+
+func isProviderSessionUnavailable(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusGone {
+		return true
+	}
+	if apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	message := strings.ToLower(apiErr.Message)
+	if !strings.Contains(message, "session") {
+		return false
+	}
+
+	sessionID := sessionIDFromProviderPath(apiErr.Path)
+	if sessionID != "" && strings.Contains(message, strings.ToLower(sessionID)) {
+		return strings.Contains(message, "not found") ||
+			strings.Contains(message, "does not exist") ||
+			strings.Contains(message, "deleted") ||
+			strings.Contains(message, "archived")
+	}
+
+	return strings.Contains(message, "session does not exist") ||
+		strings.Contains(message, "session has been deleted") ||
+		strings.Contains(message, "session was deleted") ||
+		strings.Contains(message, "session has been archived") ||
+		strings.Contains(message, "session was archived")
 }
 
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
@@ -154,6 +248,9 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 
 	body, err := p.client.openStream(ctx, "/sessions/"+providerSessionID+"/events/stream")
 	if err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
 		return fmt.Errorf("anthropic: open stream: %w", err)
 	}
 	defer body.Close()
@@ -170,6 +267,29 @@ func (p *Provider) DeleteSession(ctx context.Context, providerSessionID string) 
 	}
 
 	return nil
+}
+
+func (p *Provider) ArchiveSession(ctx context.Context, providerSessionID string) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+url.PathEscape(providerSessionID)+"/archive", nil); err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
+		return fmt.Errorf("anthropic: archive session: %w", err)
+	}
+
+	return nil
+}
+
+func sessionIDFromProviderPath(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "sessions" {
+		return ""
+	}
+	return parts[1]
 }
 
 func withPreamble(message, preamble string) string {
@@ -221,5 +341,6 @@ func parseSSEData(line string) (agents.ProviderEvent, bool) {
 }
 
 func isTerminalEvent(t agents.ProviderEventType) bool {
-	return t == agents.ProviderEventTurnCompleted || t == agents.ProviderEventSessionFailed
+	return t == agents.ProviderEventTurnCompleted ||
+		t == agents.ProviderEventSessionFailed
 }

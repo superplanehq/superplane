@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, CircleX, Search, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleAlert, CircleX, Search, X } from "lucide-react";
 
-import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
+import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
+import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "errors" | "warnings";
@@ -44,7 +44,7 @@ export interface CanvasLogSidebarProps {
   counts: LogCounts;
   activeTab?: ConsoleTab;
   onTabChange?: (tab: ConsoleTab) => void;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -90,7 +90,7 @@ export function CanvasLogSidebar({
   counts,
   activeTab: controlledTab,
   onTabChange,
-  runsEvents = [],
+  logRuns = [],
   runsNodes = [],
   runsComponentIconMap = {},
   onRunNodeSelect,
@@ -231,7 +231,7 @@ export function CanvasLogSidebar({
     [setSidebarHeight, sidebarHeight],
   );
 
-  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(runsEvents), [runsEvents]);
+  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(logRuns), [logRuns]);
 
   if (!isOpen) {
     return null;
@@ -247,7 +247,7 @@ export function CanvasLogSidebar({
       >
         <div
           onMouseDown={handleResizeStart}
-          className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-ns-resize bg-transparent"
+          className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-row-resize bg-transparent"
           style={{ marginTop: "-8px" }}
         >
           <div
@@ -258,7 +258,7 @@ export function CanvasLogSidebar({
             )}
           />
         </div>
-        <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
+        <div className="flex items-center justify-between pl-4 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
@@ -303,7 +303,7 @@ export function CanvasLogSidebar({
                   : "border-transparent text-gray-500 hover:text-gray-800",
               )}
             >
-              <TriangleAlert
+              <CircleAlert
                 className={cn(
                   "h-4 w-4",
                   counts.warning > 0
@@ -327,15 +327,12 @@ export function CanvasLogSidebar({
               </span>
             </button>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClose}
-              className="size-5 shrink-0 rounded hover:bg-gray-100"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+          <div className="flex shrink-0 items-stretch">
+            <div className="flex items-center px-1">
+              <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+                <X className="size-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
         <div className="px-2 border-b border-slate-200 h-8">
@@ -354,7 +351,7 @@ export function CanvasLogSidebar({
 
         {activeTab === "errors" ? (
           <ErrorsConsoleContent
-            events={runsEvents}
+            runs={logRuns}
             nodes={runsNodes}
             componentIconMap={runsComponentIconMap}
             searchQuery={searchValue}
@@ -387,7 +384,7 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
   return (
     <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800">
       <div className="pt-0.5">
-        <TriangleAlert className="h-4 w-4 text-amber-600" />
+        <CircleAlert className="h-4 w-4 text-orange-500" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

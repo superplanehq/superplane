@@ -78,6 +78,10 @@ func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.S
 		pbOpts.MaxLength = &maxLength
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -112,6 +116,10 @@ func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextT
 	if opts.MaxLength != nil {
 		maxLength := int32(*opts.MaxLength)
 		pbOpts.MaxLength = &maxLength
+	}
+
+	if opts.Language != "" {
+		pbOpts.Language = &opts.Language
 	}
 
 	return pbOpts
@@ -177,6 +185,16 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
+	}
+
+	if opts.Accordion {
+		accordion := true
+		pbOpts.Accordion = &accordion
+	}
+
+	if opts.Reorderable {
+		reorderable := true
+		pbOpts.Reorderable = &reorderable
 	}
 
 	if opts.MaxItems != nil {
@@ -360,6 +378,10 @@ func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration
 		opts.MaxLength = &maxLength
 	}
 
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
+	}
+
 	return opts
 }
 
@@ -393,6 +415,10 @@ func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.Tex
 	if pbOpts.MaxLength != nil {
 		maxLength := int(*pbOpts.MaxLength)
 		opts.MaxLength = &maxLength
+	}
+
+	if pbOpts.Language != nil {
+		opts.Language = *pbOpts.Language
 	}
 
 	return opts
@@ -504,7 +530,9 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
-		ItemLabel: pbOpts.ItemLabel,
+		ItemLabel:   pbOpts.GetItemLabel(),
+		Accordion:   pbOpts.GetAccordion(),
+		Reorderable: pbOpts.GetReorderable(),
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
@@ -1021,7 +1049,7 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configFields = AppendGlobalTriggerFields(configFields)
+		configFields = AppendGlobalTriggerFields(trigger.Name(), configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1041,21 +1069,27 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	return out
 }
 
-func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
+func AppendGlobalTriggerFields(triggerName string, fields []configuration.Field) []configuration.Field {
 	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
 		return field.Name == "customName"
 	}) {
 		return fields
 	}
 
-	fields = append(fields, configuration.Field{
+	runTitleField := configuration.Field{
 		Name:        "customName",
 		Label:       "Run title",
 		Type:        configuration.FieldTypeString,
 		Togglable:   true,
 		Description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
 		Placeholder: "{{ root().data.foo }}",
-	})
+	}
+
+	if defaultTitle := defaultRunTitleExpression(triggerName); defaultTitle != "" {
+		runTitleField.Default = defaultTitle
+	}
+
+	fields = append(fields, runTitleField)
 
 	return fields
 }

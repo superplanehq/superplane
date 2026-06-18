@@ -2,7 +2,7 @@ package canvases
 
 import (
 	"context"
-	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,13 +16,22 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID string) (*pb.CreateCanvasVersionResponse, error) {
+func CreateCanvasVersion(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	displayName string,
+) (*pb.CreateCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	orgUUID := uuid.MustParse(organizationID)
+	orgUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+	}
+
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
@@ -33,41 +42,33 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-		if liveVersionErr != nil {
-			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "canvas live version not found")
-			}
-			return liveVersionErr
-		}
-
-		version, err = models.SaveCanvasDraftInTransaction(
+		var createErr error
+		version, createErr = models.CreateDraftBranchFromLiveInTransaction(
 			tx,
-			canvas.ID,
+			canvasUUID,
 			userUUID,
-			liveVersion.Nodes,
-			liveVersion.Edges,
+			strings.TrimSpace(displayName),
+			nil,
+			nil,
 		)
-
-		return err
+		return createErr
 	})
 	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create canvas version: %v", err)
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
 	return &pb.CreateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersion(version, organizationID, nil),
 	}, nil
 }

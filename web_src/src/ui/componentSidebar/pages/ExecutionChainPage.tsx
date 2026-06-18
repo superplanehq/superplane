@@ -9,11 +9,10 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode,
   TriggersTrigger,
-  SuperplaneActionsAction,
+  ActionsAction,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
-import type { ChildExecution } from "@/ui/chainItem";
-import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import { getExecutionDetails } from "@/pages/app/mappers";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { analytics } from "@/lib/analytics";
 
@@ -79,7 +78,7 @@ function buildExecutionTabData(
 function convertSidebarEventToChainItem(
   triggerEvent: SidebarEvent,
   workflowNodes: SuperplaneComponentsNode[] = [],
-  _actions: SuperplaneActionsAction[] = [],
+  _actions: ActionsAction[] = [],
   triggers: TriggersTrigger[] = [],
   getTabData?: (event: SidebarEvent) => any,
 ): ChainItemData {
@@ -112,7 +111,6 @@ function convertSidebarEventToChainItem(
     executionId: undefined, // Trigger events don't have execution IDs
     originalExecution: undefined,
     originalEvent: triggerEvent.originalEvent,
-    childExecutions: undefined,
     workflowNode,
     tabData: getTabData?.(triggerEvent) || {
       current: triggerEvent.values || {},
@@ -140,7 +138,7 @@ interface ExecutionChainPageProps {
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
   workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
-  actions?: SuperplaneActionsAction[]; // Component metadata
+  actions?: ActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   organizationId?: string;
@@ -257,46 +255,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           }
         }
 
-        // Process child executions when present.
-        let childExecutions: ChildExecution[] | undefined = undefined;
-        if (exec.childExecutions && exec.childExecutions.length > 0) {
-          childExecutions = exec.childExecutions
-            .slice()
-            .sort((a: any, b: any) => {
-              const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return timeA - timeB;
-            })
-            .map((childExec: any) => {
-              let badgeColor = "bg-gray-400";
-              const componentName = childExec.nodeName || childExec.nodeId || "Unknown";
-
-              if (getExecutionState) {
-                const { map, state } = getExecutionState(exec.nodeId, childExec);
-                badgeColor = map[state]?.badgeColor || "bg-gray-400";
-
-                return {
-                  name: componentName,
-                  state: state,
-                  nodeId: childExec.nodeId || "",
-                  executionId: childExec.id || "",
-                  badgeColor,
-                  backgroundColor: map[state]?.backgroundColor,
-                  componentIcon: "box",
-                };
-              }
-
-              return {
-                name: componentName,
-                state: childExec.state?.replace("STATE_", "").toLowerCase() || "unknown",
-                nodeId: childExec.nodeId || "",
-                executionId: childExec.id || "",
-                badgeColor,
-                componentIcon: "box",
-              };
-            });
-        }
-
         return {
           id: exec.id || `execution-${index}`,
           nodeId: exec.nodeId || "",
@@ -309,7 +267,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           state: exec.state || "neutral",
           executionId: exec.id,
           originalExecution: exec, // Pass the full execution data
-          childExecutions,
           workflowNode,
           tabData: buildExecutionTabData(exec, workflowNode || ({} as SuperplaneComponentsNode), workflowNodes),
         };
@@ -325,7 +282,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       loadInFlightRef.current = false;
       setLoading(false);
     }
-  }, [eventId, loadExecutionChain, workflowNodes, actions, triggers, getExecutionState]);
+  }, [eventId, loadExecutionChain, workflowNodes, actions, triggers]);
 
   // Load execution chain data
   useEffect(() => {

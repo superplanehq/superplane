@@ -10,8 +10,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
-	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
+	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
+	drafts "github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
@@ -20,6 +20,7 @@ import (
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
+	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -57,9 +58,10 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
-	RootCmd.AddCommand(canvases.NewCommand(options))
+	RootCmd.AddCommand(apps.NewCommand(options))
+	RootCmd.AddCommand(drafts.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
-	RootCmd.AddCommand(events.NewCommand(options))
+	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))

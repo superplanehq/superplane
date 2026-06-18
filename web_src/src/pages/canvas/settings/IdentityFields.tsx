@@ -21,7 +21,7 @@ export function IdentityFields({
     <Fieldset className="space-y-6 rounded-lg border border-slate-950/15 bg-white p-6">
       <Field className="space-y-3">
         <Label htmlFor="canvas-settings-name-input" className="block text-sm font-medium text-gray-700">
-          Canvas Name
+          App name
         </Label>
         <Input
           id="canvas-settings-name-input"
@@ -42,7 +42,7 @@ export function IdentityFields({
           onChange={(event) => onDescriptionChange(event.target.value)}
           disabled={!canUpdateCanvas}
           rows={4}
-          placeholder="Describe canvas…"
+          placeholder="Describe app…"
         />
       </Field>
     </Fieldset>

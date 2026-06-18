@@ -284,6 +284,24 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	return nil
 }
 
+func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	c.Finished = false
+	c.Passed = true
+	c.Channel = channel
+	c.Type = payloadType
+
+	wrappedPayloads := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		wrappedPayloads = append(wrappedPayloads, map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+	c.Payloads = wrappedPayloads
+	return nil
+}
+
 func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Finished = true
 	c.Passed = false
@@ -420,11 +438,25 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 }
 
 type ExpressionContext struct {
-	Output any
-	Error  error
+	Output                any
+	Error                 error
+	WithVariablesOutputs  map[string]any
+	WithVariablesOutputFn func(expression string, variables map[string]any) (any, error)
 }
 
 func (c *ExpressionContext) Run(expression string) (any, error) {
+	return c.Output, c.Error
+}
+
+func (c *ExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	if c.WithVariablesOutputFn != nil {
+		return c.WithVariablesOutputFn(expression, variables)
+	}
+	if c.WithVariablesOutputs != nil {
+		if v, ok := c.WithVariablesOutputs[expression]; ok {
+			return v, nil
+		}
+	}
 	return c.Output, c.Error
 }
 

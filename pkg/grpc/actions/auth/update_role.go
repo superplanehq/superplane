@@ -16,7 +16,7 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
+	_, err := authService.GetRoleDefinition(ctx, roleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", roleName, err)
 		return nil, status.Error(codes.NotFound, "role not found")
@@ -57,7 +57,7 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 	}
 
 	if roleSpec.InheritedRole != nil && roleSpec.InheritedRole.Metadata != nil && roleSpec.InheritedRole.Metadata.Name != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(roleSpec.InheritedRole.Metadata.Name, domainType, domainID)
+		inheritedRoleDef, err := authService.GetRoleDefinition(ctx, roleSpec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", roleSpec.InheritedRole.Metadata.Name, err)
 			return nil, status.Error(codes.InvalidArgument, "inherited role not found")

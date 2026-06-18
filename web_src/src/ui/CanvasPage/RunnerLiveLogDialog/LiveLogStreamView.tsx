@@ -1,19 +1,31 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
-import type { CommandSection } from "./types";
+import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { isExecutionInFlight, type CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 
-export function LiveLogStreamView({ executionId }: { executionId: string }) {
-  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(executionId);
+export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
+  const executionInFlight = isExecutionInFlight(execution);
+  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(execution.id, executionInFlight);
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
+  const lastSectionIndex = sections.length - 1;
+  const waitingForLogs = executionInFlight && !hasAnyLogs && !error;
+  const showError = Boolean(error) && !executionInFlight;
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50">
-      {error ? <ErrorMessage /> : null}
-      {!error && !hasAnyLogs ? <NoLogsMessage /> : null}
+      {showError ? <ErrorMessage /> : null}
+      {waitingForLogs ? <WaitingForLogsMessage /> : null}
+      {!showError && !waitingForLogs && !hasAnyLogs ? <NoLogsMessage /> : null}
 
-      {sections.map((section) => (
-        <CommandSectionView key={`${section.index}-${section.text}`} section={section} onToggle={toggleSection} />
+      {sections.map((section, index) => (
+        <CommandSectionView
+          key={`${section.index}-${section.text}`}
+          section={section}
+          onToggle={toggleSection}
+          isLast={index === lastSectionIndex}
+        />
       ))}
     </div>
   );
@@ -21,6 +33,10 @@ export function LiveLogStreamView({ executionId }: { executionId: string }) {
 
 function NoLogsMessage() {
   return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
+}
+
+function WaitingForLogsMessage() {
+  return <div className="px-4 py-3 text-left text-muted-foreground">Waiting for logs…</div>;
 }
 
 function ErrorMessage() {
@@ -31,16 +47,32 @@ function ErrorMessage() {
   );
 }
 
-function CommandSectionView({ section, onToggle }: { section: CommandSection; onToggle: (index: number) => void }) {
+function CommandSectionView({
+  section,
+  onToggle,
+  isLast,
+}: {
+  section: CommandSection;
+  onToggle: (index: number) => void;
+  isLast: boolean;
+}) {
   return (
     <div className="border-b border-slate-200">
-      <CommandSectionHeader section={section} onToggle={onToggle} />
+      <CommandSectionHeader section={section} onToggle={onToggle} isLast={isLast} />
       <CommandSectionContent section={section} />
     </div>
   );
 }
 
-function CommandSectionHeader({ section, onToggle }: { section: CommandSection; onToggle: (index: number) => void }) {
+function CommandSectionHeader({
+  section,
+  onToggle,
+  isLast,
+}: {
+  section: CommandSection;
+  onToggle: (index: number) => void;
+  isLast: boolean;
+}) {
   const isCollapsed = section.status === "passed" && section.collapsed;
 
   const openChevron = <ChevronRight className="size-4" />;
@@ -49,7 +81,10 @@ function CommandSectionHeader({ section, onToggle }: { section: CommandSection; 
   return (
     <button
       type="button"
-      className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-2 font-mono text-left text-xs"
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-2 font-mono text-left text-xs",
+        isLast && "sticky top-0 z-10 border-b border-slate-200 bg-slate-50",
+      )}
       onClick={() => onToggle(section.index)}
     >
       <div className="flex items-center gap-2">
@@ -58,7 +93,7 @@ function CommandSectionHeader({ section, onToggle }: { section: CommandSection; 
       </div>
 
       <div className="flex items-center gap-2">
-        <Duration duration={section.duration_ms ?? 0} />
+        <Duration status={section.status} durationMs={section.duration_ms} startedAt={section.started_at} />
         <StatusBadge status={section.status} />
       </div>
     </button>
@@ -77,7 +112,29 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
   );
 }
 
-function Duration({ duration }: { duration: number }) {
+function Duration({
+  status,
+  durationMs,
+  startedAt,
+}: {
+  status: CommandSection["status"];
+  durationMs: number | null;
+  startedAt: number | null;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (status !== "running" || startedAt === null) {
+      return;
+    }
+
+    setNow(Date.now());
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [status, startedAt]);
+
+  const duration = status === "running" && startedAt !== null ? Math.max(0, now - startedAt) : (durationMs ?? 0);
+
   return <div className="flex items-center gap-1">{formatDuration(duration)}</div>;
 }
 

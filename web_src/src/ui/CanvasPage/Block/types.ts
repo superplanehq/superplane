@@ -46,6 +46,7 @@ export interface BlockInternalData {
   _isHighlighted?: boolean;
   _hasHighlightedNodes?: boolean;
   _dimBodyBelowHeader?: boolean;
+  _draftDiffStatus?: "added" | "updated" | "removed";
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }
@@ -55,7 +56,6 @@ export type CanvasBlockData = BlockData & BlockInternalData;
 export type ComponentActionKeys =
   | "runDisabled"
   | "runDisabledTooltip"
-  | "onTogglePause"
   | "onEdit"
   | "onDuplicate"
   | "onDeactivate"

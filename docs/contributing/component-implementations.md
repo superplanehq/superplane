@@ -100,11 +100,24 @@ const (
     FieldTypeXML    = "xml"     // Multi-line XML editor with validation
 )
 
-// Component definition
+// Component definition (plain text — e.g. a message or description)
 {
     Name:  "text",
     Type:  configuration.FieldTypeText,
     Label: "Text Payload",
+}
+
+// Component definition (code — e.g. a script or command). Setting a language
+// switches the editor to the rich Monaco editor with syntax highlighting.
+{
+    Name:  "script",
+    Type:  configuration.FieldTypeText,
+    Label: "Script",
+    TypeOptions: &configuration.TypeOptions{
+        Text: &configuration.TextTypeOptions{
+            Language: "shell", // e.g. "shell", "python", "javascript", "json", "graphql"
+        },
+    },
 }
 ```
 
@@ -120,13 +133,20 @@ switch (field.type) {
 }
 ```
 
+> **`text` editor selection:** A `text` field renders a lightweight multi-line editor
+> (with `{{ }}` expression autocomplete) by default — use it for messages, descriptions,
+> prompts, and other plain text. Only when the value is code should you set
+> `TypeOptions.Text.Language`; that switches the field to the full Monaco editor with
+> syntax highlighting. Reserve Monaco for code (scripts, commands, JSON payloads), not
+> for plain text.
+
 ### Renderer Responsibilities
 
 Each field renderer should:
-1. **Determine behavior based on `field.type`**, not `field.name`
+1. **Determine behavior based on `field.type`** (and `typeOptions`), not `field.name`
 2. **Be independent and reusable** across different components
 3. **Handle its own validation** when type-specific (e.g., XML validation)
-4. **Provide appropriate UX** for the data type (Monaco editor for text/xml, simple input for strings)
+4. **Provide appropriate UX** for the data type (Monaco editor for code/xml, lightweight multi-line editor for plain text, simple input for strings)
 
 ## Field Naming Conventions
 
@@ -209,3 +229,4 @@ When implementing a new component:
 - Use appropriate field renderers based on type, not field name
 - Implement validation in `Setup()` method
 - The Setup() and Execute() methods should always have unit tests written for them
+- For triggers, add a thoughtful default run title expression in `pkg/grpc/actions/run_title_defaults.go`

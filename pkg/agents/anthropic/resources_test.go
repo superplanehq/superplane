@@ -25,16 +25,16 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 		byMountPath[source.MountPath] = source
 	}
 
-	assert.Contains(t, byMountPath, "ref/skills/superplane-canvas-builder/SKILL.md")
+	assert.Contains(t, byMountPath, "ref/skills/superplane-app-builder/SKILL.md")
 	assert.Equal(
 		t,
-		"https://example.test/root/skills/superplane-canvas-builder/SKILL.md",
-		byMountPath["ref/skills/superplane-canvas-builder/SKILL.md"].SourceURL,
+		"https://example.test/root/skills/superplane-app-builder/SKILL.md",
+		byMountPath["ref/skills/superplane-app-builder/SKILL.md"].SourceURL,
 	)
 	assert.Equal(
 		t,
-		"skills/superplane-canvas-builder/SKILL.md",
-		byMountPath["ref/skills/superplane-canvas-builder/SKILL.md"].SourceKey,
+		"skills/superplane-app-builder/SKILL.md",
+		byMountPath["ref/skills/superplane-app-builder/SKILL.md"].SourceKey,
 	)
 	assert.Equal(
 		t,
@@ -43,9 +43,26 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 	)
 	assert.Equal(
 		t,
+		"https://example.test/root/skills/superplane-cli/references/console-yaml-spec.md",
+		byMountPath["ref/skills/superplane-cli/references/console-yaml-spec.md"].SourceURL,
+	)
+	assert.Equal(
+		t,
+		"https://raw.githubusercontent.com/superplanehq/superplane/main/docs/prd/console-and-widgets.md",
+		byMountPath["ref/docs/prd/console-and-widgets.md"].SourceURL,
+	)
+	assert.Equal(
+		t,
+		"docs/prd/console-and-widgets.md",
+		byMountPath["ref/docs/prd/console-and-widgets.md"].SourceKey,
+	)
+	assert.Equal(
+		t,
 		"https://example.test/root/skills/superplane-monitor/SKILL.md",
 		byMountPath["ref/skills/superplane-monitor/SKILL.md"].SourceURL,
 	)
+	assert.Contains(t, byMountPath, "ref/components/Index.md")
+	assert.Contains(t, string(byMountPath["ref/components/Index.md"].SourceData), "aws.ec2.createInstance")
 
 	componentSourceCount := 0
 	for _, source := range sources {

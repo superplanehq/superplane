@@ -17,15 +17,21 @@ var (
 	meter        = otel.Meter("superplane")
 	metricsReady atomic.Bool
 
-	queueWorkerTickHistogram       metric.Float64Histogram
-	queueWorkerNodesCountHistogram metric.Int64Histogram
-	queueWorkerStuckItems          metric.Int64Histogram
+	queueWorkerTickHistogram         metric.Float64Histogram
+	queueWorkerNodesCountHistogram   metric.Int64Histogram
+	queueWorkerNodesCounter          metric.Int64Counter
+	queueWorkerNodeDurationHistogram metric.Float64Histogram
+	queueWorkerStuckItems            metric.Int64Histogram
 
-	executorWorkerTickHistogram       metric.Float64Histogram
-	executorWorkerNodesCountHistogram metric.Int64Histogram
+	executorWorkerTickHistogram              metric.Float64Histogram
+	executorWorkerNodesCountHistogram        metric.Int64Histogram
+	executorWorkerExecutionsCounter          metric.Int64Counter
+	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
-	eventWorkerTickHistogram        metric.Float64Histogram
-	eventWorkerEventsCountHistogram metric.Int64Histogram
+	eventWorkerTickHistogram          metric.Float64Histogram
+	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsCounter          metric.Int64Counter
+	eventWorkerEventDurationHistogram metric.Float64Histogram
 
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
@@ -33,14 +39,56 @@ var (
 	workflowCleanupWorkerTickHistogram          metric.Float64Histogram
 	workflowCleanupWorkerCanvasesCountHistogram metric.Int64Histogram
 
+	runFinalizerTickHistogram        metric.Float64Histogram
+	runFinalizerRunsCountHistogram   metric.Int64Histogram
+	runFinalizerRunsCounter          metric.Int64Counter
+	runFinalizerRunDurationHistogram metric.Float64Histogram
+
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 
+	dbPoolConnectionsMaxGauge   metric.Int64Gauge
+	dbPoolConnectionsOpenGauge  metric.Int64Gauge
+	dbPoolConnectionsInUseGauge metric.Int64Gauge
+	dbPoolConnectionsIdleGauge  metric.Int64Gauge
+	dbPoolWaitCountCounter      metric.Int64Counter
+	dbPoolWaitDurationHistogram metric.Float64Histogram
+
 	dbRowsAffectedCounter metric.Int64Counter
+
+	integrationSecretWritesCounter metric.Int64Counter
 
 	pendingEventsGauge     metric.Int64Gauge
 	pendingExecutionsGauge metric.Int64Gauge
 )
+
+// Operation values for integration secret writes.
+const (
+	IntegrationSecretOperationCreate = "create"
+	IntegrationSecretOperationUpdate = "update"
+)
+
+// durationSecondsHistogramBoundaries matches Prometheus DefBuckets and is
+// appropriate for latency histograms recorded in seconds. The OTel SDK default
+// boundaries assume milliseconds, which collapses sub-second values into the
+// (0, 5] bucket and makes histogram_quantile estimates misleading.
+var durationSecondsHistogramBoundaries = []float64{
+	0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+}
+
+func durationSecondsHistogramView() sdkmetric.Option {
+	return sdkmetric.WithView(sdkmetric.NewView(
+		sdkmetric.Instrument{
+			Name: "*duration.seconds",
+			Unit: "s",
+		},
+		sdkmetric.Stream{
+			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: durationSecondsHistogramBoundaries,
+			},
+		},
+	))
+}
 
 func InitMetrics(ctx context.Context) error {
 	exporter, err := otlpmetricgrpc.New(ctx)
@@ -48,10 +96,17 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	res, err := otelResource(ctx)
+	if err != nil {
+		return err
+	}
+
 	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(
 			sdkmetric.NewPeriodicReader(exporter),
 		),
+		durationSecondsHistogramView(),
 	)
 
 	otel.SetMeterProvider(provider)
@@ -75,6 +130,24 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	queueWorkerNodesCounter, err = meter.Int64Counter(
+		"queue_worker.nodes.total",
+		metric.WithDescription("WorkflowNodeQueueWorker node processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	queueWorkerNodeDurationHistogram, err = meter.Float64Histogram(
+		"queue_worker.node.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeQueueWorker node processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
 	executorWorkerTickHistogram, err = meter.Float64Histogram(
 		"executor_worker.tick.duration.seconds",
 		metric.WithDescription("Duration of each WorkflowNodeExecutor tick"),
@@ -93,6 +166,24 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	executorWorkerExecutionsCounter, err = meter.Int64Counter(
+		"executor_worker.executions.total",
+		metric.WithDescription("WorkflowNodeExecutor execution processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	executorWorkerExecutionDurationHistogram, err = meter.Float64Histogram(
+		"executor_worker.execution.duration.seconds",
+		metric.WithDescription("Duration of WorkflowNodeExecutor execution processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
 	eventWorkerTickHistogram, err = meter.Float64Histogram(
 		"event_worker.tick.duration.seconds",
 		metric.WithDescription("Duration of each WorkflowEventRouter tick"),
@@ -106,6 +197,24 @@ func InitMetrics(ctx context.Context) error {
 		"event_worker.tick.events.pending",
 		metric.WithDescription("Number of pending workflow events each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventsCounter, err = meter.Int64Counter(
+		"event_worker.events.total",
+		metric.WithDescription("WorkflowEventRouter event processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	eventWorkerEventDurationHistogram, err = meter.Float64Histogram(
+		"event_worker.event.duration.seconds",
+		metric.WithDescription("Duration of WorkflowEventRouter event processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -147,6 +256,42 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	runFinalizerTickHistogram, err = meter.Float64Histogram(
+		"run_finalizer.tick.duration.seconds",
+		metric.WithDescription("Duration of each RunFinalizer sweep tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunsCountHistogram, err = meter.Int64Histogram(
+		"run_finalizer.tick.runs.started",
+		metric.WithDescription("Number of started workflow runs processed each sweep tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunsCounter, err = meter.Int64Counter(
+		"run_finalizer.runs.total",
+		metric.WithDescription("RunFinalizer run processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	runFinalizerRunDurationHistogram, err = meter.Float64Histogram(
+		"run_finalizer.run.duration.seconds",
+		metric.WithDescription("Duration of RunFinalizer run processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
 	dbLocksCountHistogram, err = meter.Int64Histogram(
 		"db.locks.count",
 		metric.WithDescription("Number of database locks"),
@@ -165,6 +310,60 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	dbPoolConnectionsMaxGauge, err = meter.Int64Gauge(
+		"db.pool.connections.max",
+		metric.WithDescription("Configured maximum open database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsOpenGauge, err = meter.Int64Gauge(
+		"db.pool.connections.open",
+		metric.WithDescription("Number of open database connections"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsInUseGauge, err = meter.Int64Gauge(
+		"db.pool.connections.in_use",
+		metric.WithDescription("Number of database connections currently in use"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolConnectionsIdleGauge, err = meter.Int64Gauge(
+		"db.pool.connections.idle",
+		metric.WithDescription("Number of idle database connections in the pool"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitCountCounter, err = meter.Int64Counter(
+		"db.pool.wait.count",
+		metric.WithDescription("Number of times a request waited for a database connection"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	dbPoolWaitDurationHistogram, err = meter.Float64Histogram(
+		"db.pool.wait.duration.seconds",
+		metric.WithDescription("Time spent waiting for a database connection"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
 	queueWorkerStuckItems, err = meter.Int64Histogram(
 		"queue_items.stuck.count",
 		metric.WithDescription("Number of stuck workflow node queue items"),
@@ -177,6 +376,15 @@ func InitMetrics(ctx context.Context) error {
 	dbRowsAffectedCounter, err = meter.Int64Counter(
 		"db.rows.affected.count",
 		metric.WithDescription("Number of database rows affected by operation"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	integrationSecretWritesCounter, err = meter.Int64Counter(
+		"integration.secret.writes.total",
+		metric.WithDescription("Number of writes to app_installation_secrets, attributed by integration type and operation"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -234,6 +442,26 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordQueueWorkerNodeProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	queueWorkerNodesCounter.Add(ctx, 1, attrs)
+	queueWorkerNodeDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
 func RecordExecutorWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !metricsReady.Load() {
 		return
@@ -250,6 +478,28 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordExecutorWorkerExecution(ctx context.Context, d time.Duration, outcome, reason, component string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+		attribute.String("component", component),
+	)
+
+	executorWorkerExecutionsCounter.Add(ctx, 1, attrs)
+	executorWorkerExecutionDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+			attribute.String("component", component),
+		),
+	)
+}
+
 func RecordEventWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !metricsReady.Load() {
 		return
@@ -264,6 +514,26 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 	}
 
 	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordEventWorkerEventProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	eventWorkerEventsCounter.Add(ctx, 1, attrs)
+	eventWorkerEventDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordNodeRequestWorkerTickDuration(ctx context.Context, d time.Duration) {
@@ -298,6 +568,44 @@ func RecordWorkflowCleanupWorkerCanvasesCount(ctx context.Context, count int) {
 	workflowCleanupWorkerCanvasesCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordRunFinalizerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	runFinalizerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordRunFinalizerRunsCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	runFinalizerRunsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigger, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("trigger", trigger),
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	runFinalizerRunsCounter.Add(ctx, 1, attrs)
+	runFinalizerRunDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("trigger", trigger),
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
 func RecordDBLocksCount(ctx context.Context, count int64) {
 	if !metricsReady.Load() {
 		return
@@ -322,6 +630,33 @@ func RecordDBLongQueriesCount(ctx context.Context, count int64) {
 	dbLongQueriesCountHistogram.Record(ctx, count)
 }
 
+func RecordDBPoolStats(ctx context.Context, maxOpen, open, inUse, idle int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbPoolConnectionsMaxGauge.Record(ctx, maxOpen)
+	dbPoolConnectionsOpenGauge.Record(ctx, open)
+	dbPoolConnectionsInUseGauge.Record(ctx, inUse)
+	dbPoolConnectionsIdleGauge.Record(ctx, idle)
+}
+
+func RecordDBPoolWaitCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() || count <= 0 {
+		return
+	}
+
+	dbPoolWaitCountCounter.Add(ctx, count)
+}
+
+func RecordDBPoolWaitDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() || d <= 0 {
+		return
+	}
+
+	dbPoolWaitDurationHistogram.Record(ctx, d.Seconds())
+}
+
 func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation string) {
 	if !metricsReady.Load() {
 		return
@@ -332,6 +667,21 @@ func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation
 		count,
 		metric.WithAttributes(
 			attribute.String("table", tableName),
+			attribute.String("operation", operation),
+		),
+	)
+}
+
+func RecordIntegrationSecretWrite(ctx context.Context, appName, operation string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	integrationSecretWritesCounter.Add(
+		ctx,
+		1,
+		metric.WithAttributes(
+			attribute.String("app_name", appName),
 			attribute.String("operation", operation),
 		),
 	)

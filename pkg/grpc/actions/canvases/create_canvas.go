@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -32,6 +33,7 @@ func CreateCanvas(
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
+	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
 	pbCanvas *pb.Canvas,
@@ -44,10 +46,6 @@ func CreateCanvas(
 
 	if pbCanvas.GetMetadata() == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
-	}
-
-	if pbCanvas.Metadata.GetIsTemplate() {
-		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
 	}
 
 	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
@@ -72,29 +70,6 @@ func CreateCanvas(
 	}
 
 	createdBy := uuid.MustParse(userID)
-	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
-	}
-
-	changeManagementEnabled := organizationChangeManagementEnabled
-	changeRequestApprovers := models.DefaultCanvasChangeRequestApprovers()
-	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
-		changeManagementEnabled = changeManagement.Enabled
-
-		approvers, approversErr := parseAndValidateCanvasChangeRequestApprovers(
-			authService,
-			organizationID.String(),
-			changeManagement,
-		)
-		if approversErr != nil {
-			return nil, approversErr
-		}
-		if approvers != nil {
-			changeRequestApprovers = approvers
-		}
-	}
-
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
@@ -120,7 +95,6 @@ func CreateCanvas(
 		ID:             canvasID,
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
-		IsTemplate:     false,
 		Name:           name,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
@@ -148,22 +122,29 @@ func CreateCanvas(
 		// Create new empty canvas version record
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:                      versionID,
-			WorkflowID:              canvasID,
-			OwnerID:                 &createdBy,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    name,
-			Description:             pbCanvas.Metadata.Description,
-			ChangeManagementEnabled: changeManagementEnabled,
-			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
-			PublishedAt:             &now,
-			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
-			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			ID:          versionID,
+			WorkflowID:  canvasID,
+			OwnerID:     &createdBy,
+			State:       models.CanvasVersionStatePublished,
+			Name:        name,
+			Description: pbCanvas.Metadata.Description,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
+			return err
+		}
+
+		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+			OrganizationID: organizationID,
+			CanvasID:       canvasID,
+		}))
+
+		if err != nil {
 			return err
 		}
 
@@ -202,6 +183,7 @@ func CreateCanvas(
 			Encryptor:      encryptor,
 			AuthService:    authService,
 			WebhookBaseURL: webhookBaseURL,
+			GitProvider:    gitProvider,
 		})
 
 		if err != nil {
@@ -219,8 +201,6 @@ func CreateCanvas(
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
-	canvas.ChangeManagementEnabled = changeManagementEnabled
-	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
 	canvas.Description = pbCanvas.Metadata.Description
 
 	var user *models.User
@@ -231,7 +211,12 @@ func CreateCanvas(
 		}
 	}
 
-	proto, err := SerializeCanvas(&canvas, false, user)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	proto, err := SerializeCanvas(&canvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, err
 	}

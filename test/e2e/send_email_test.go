@@ -4,14 +4,12 @@ import (
 	"testing"
 	"time"
 
-	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestSendEmailComponent(t *testing.T) {
@@ -20,7 +18,7 @@ func TestSendEmailComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Send Email User")
 		steps.addSendEmailWithUser("Notify User", "Test Subject", "Test Body")
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertSendEmailSavedToDB("Notify User", "Test Subject")
 	})
 
@@ -74,19 +72,9 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 
 	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), subject)
 
-	s.typeIntoMonacoEditor(body)
+	s.session.FillIn(q.Locator("textarea[data-testid='text-field-body']"), body)
 
 	s.session.Sleep(300)
-}
-
-func (s *SendEmailSteps) typeIntoMonacoEditor(text string) {
-	editor := q.Locator(".monaco-editor .view-lines")
-	s.session.Click(editor)
-	s.session.Sleep(200)
-
-	if err := s.session.Page().Keyboard().Type(text, pw.KeyboardTypeOptions{}); err != nil {
-		s.t.Fatalf("typing into monaco editor: %v", err)
-	}
 }
 
 func (s *SendEmailSteps) assertSendEmailSavedToDB(nodeName, expectedSubject string) {
@@ -118,7 +106,7 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 	s.canvas.Connect("Send Email", "Output")
 
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) {
@@ -135,13 +123,13 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 
 	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), "Test notification")
 
-	s.typeIntoMonacoEditor("This is a test email body")
+	s.session.FillIn(q.Locator("textarea[data-testid='text-field-body']"), "This is a test email body")
 
 	s.session.Sleep(300)
 }
 
 func (s *SendEmailSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
@@ -161,13 +149,7 @@ func (s *SendEmailSteps) givenSMTPSettingsExist() {
 }
 
 func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
-	s.canvas.RunManualTrigger("Start")
-	if s.waitForSendEmailFinished(90 * time.Second) {
-		return
-	}
-
-	// Fallback for missed click in overloaded suites: emit trigger directly.
-	s.emitManualTriggerFallback()
+	s.canvas.EmitManualTrigger("Start")
 	_ = s.waitForSendEmailFinished(180 * time.Second)
 }
 
@@ -181,18 +163,6 @@ func (s *SendEmailSteps) waitForSendEmailFinished(timeout time.Duration) bool {
 		s.session.Sleep(500)
 	}
 	return false
-}
-
-func (s *SendEmailSteps) emitManualTriggerFallback() {
-	startNode := s.canvas.GetNodeFromDB("Start")
-	support.EmitCanvasEventForNodeWithData(
-		s.t,
-		s.canvas.WorkflowID,
-		startNode.NodeID,
-		"default",
-		nil,
-		map[string]any{"message": "Hello, World!"},
-	)
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFinished() {

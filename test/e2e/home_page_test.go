@@ -11,16 +11,16 @@ import (
 )
 
 func TestHomePage(t *testing.T) {
-	steps := &TestHomePageSteps{t: t}
-
 	t.Run("creating a new canvas", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
 		steps.Start()
 		steps.VisitHomePage()
-		steps.FillInNewCanvasForm("Example Canvas")
-		steps.AssertCanvasSavedInDB("Example Canvas")
+		steps.ClickNewApp()
+		steps.AssertNavigatedToCanvas()
 	})
 
 	t.Run("showing canvases in folders", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
 		steps.Start()
 		steps.GivenCanvasInFolder("Foldered Canvas", "Deployments")
 		steps.VisitHomePage()
@@ -41,6 +41,11 @@ func (steps *TestHomePageSteps) Start() {
 
 func (steps *TestHomePageSteps) VisitHomePage() {
 	steps.session.Visit("/" + steps.session.OrgID.String() + "/")
+}
+
+func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
+	url := steps.session.Page().URL()
+	assert.Regexp(steps.t, `/apps/[0-9a-f-]{36}`, url)
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
@@ -66,27 +71,12 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 	steps.session.AssertText(canvasName)
 }
 
-func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
-	steps.session.Visit("/" + steps.session.OrgID.String() + "/canvases/new")
-	steps.session.FillIn(q.TestID("canvas-name-input"), canvasName)
-	steps.session.Click(q.TestID("create-canvas-button"))
-	steps.session.Sleep(500)
-}
+func (steps *TestHomePageSteps) ClickNewApp() {
+	newAppButton := q.Locator(`button[aria-label="Create new app"]`).Run(steps.session)
+	if visible, _ := newAppButton.IsVisible(); visible {
+		steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
+	}
 
-func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
-	component, err := models.FindBlueprintByName(s, steps.session.OrgID)
-
-	assert.NoError(steps.t, err)
-	assert.Equal(steps.t, s, component.Name)
-}
-
-func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
-	newComponentButton := q.Text("New Bundle")
-	saveComponentButton := q.Text("Create Bundle")
-	componentNameInput := q.TestID("component-name-input")
-
-	steps.session.Click(newComponentButton)
-	steps.session.FillIn(componentNameInput, name)
-	steps.session.Click(saveComponentButton)
-	steps.session.Sleep(500)
+	steps.session.Click(q.Text("Start from scratch"))
+	steps.session.Sleep(3000)
 }
