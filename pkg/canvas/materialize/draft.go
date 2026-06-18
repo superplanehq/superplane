@@ -17,15 +17,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type DraftMaterializer struct {
+type draftMaterializer struct {
 	GitProvider git.Provider
 	Registry    *registry.Registry
 }
 
-// MaterializeDraft writes the draft projection from a snapshot that the caller
+// materializeDraft writes the draft projection from a snapshot that the caller
 // has already loaded from git outside of any transaction, so no git RPC is held
 // across the DB connection.
-func (m *DraftMaterializer) MaterializeDraft(
+func (m *draftMaterializer) materializeDraft(
 	ctx context.Context,
 	tx *gorm.DB,
 	orgID uuid.UUID,
@@ -33,7 +33,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 	branch string,
 	commitSHA string,
 	ownerID *uuid.UUID,
-	snapshot *RepoSnapshot,
+	snapshot *repoSnapshot,
 ) (*models.CanvasVersion, error) {
 	if m == nil || m.GitProvider == nil {
 		return nil, fmt.Errorf("draft materializer is not configured")

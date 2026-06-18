@@ -17,24 +17,24 @@ import (
 	"gorm.io/gorm"
 )
 
-type SyncDraftBranchOptions struct {
+type syncDraftBranchOptions struct {
 	HeadSHA             string
 	CreatedBy           *uuid.UUID
 	DisplayNameOverride string
 }
 
-// SyncDraftBranchFromGit registers draft workflow_versions metadata when missing
+// syncDraftBranchFromGit registers draft workflow_versions metadata when missing
 // and materializes the branch tip from git. It reads the head and loads the repo
 // snapshot from git before opening the database transaction, so no git RPC is held
 // across a pooled DB connection. Safe to call repeatedly.
-func SyncDraftBranchFromGit(
+func syncDraftBranchFromGit(
 	ctx context.Context,
 	gitProvider git.Provider,
 	reg *registry.Registry,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	branchName string,
-	opts SyncDraftBranchOptions,
+	opts syncDraftBranchOptions,
 ) (*models.CanvasVersion, error) {
 	if !gitref.IsDraftBranch(branchName) {
 		return nil, fmt.Errorf("branch %q is not a draft branch", branchName)
@@ -57,7 +57,7 @@ func SyncDraftBranchFromGit(
 		}
 	}
 
-	snapshot, loadErr := LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
+	snapshot, loadErr := loadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
 	if loadErr != nil {
 		ownerID := gitref.OwnerFromDraftBranchName(branchName)
 		if ownerID == nil {
@@ -110,8 +110,8 @@ func SyncDraftBranchFromGit(
 			}
 		}
 
-		mat := &DraftMaterializer{GitProvider: gitProvider, Registry: reg}
-		v, matErr := mat.MaterializeDraft(ctx, tx, orgID, canvasID, branchName, headSHA, draftVersion.OwnerID, snapshot)
+		mat := &draftMaterializer{GitProvider: gitProvider, Registry: reg}
+		v, matErr := mat.materializeDraft(ctx, tx, orgID, canvasID, branchName, headSHA, draftVersion.OwnerID, snapshot)
 		if matErr != nil {
 			return matErr
 		}

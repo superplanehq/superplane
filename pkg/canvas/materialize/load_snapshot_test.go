@@ -1,4 +1,4 @@
-package materialize_test
+package materialize
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
-	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
 	"github.com/superplanehq/superplane/pkg/git/provider"
@@ -71,7 +70,7 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, commitSHA)
 
-	snapshot, err := materialize.LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repoID, commitSHA)
+	snapshot, err := loadRepoSnapshot(ctx, gitProvider, reg, orgID, repoID, commitSHA)
 	require.NoError(t, err)
 	require.NotNil(t, snapshot)
 

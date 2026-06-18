@@ -18,16 +18,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type SyncLiveFromGitOptions struct {
+type syncLiveFromGitOptions struct {
 	HeadSHA string
 }
 
-// SyncLiveFromGit materializes the main branch tip from git into the live DB
+// syncLiveFromGit materializes the main branch tip from git into the live DB
 // projection. It reads the head and loads the repo snapshot from git before
 // opening the database transaction, so no git RPC is held across a pooled DB
 // connection. Safe to call repeatedly; git main must already point at the target
 // commit.
-func SyncLiveFromGit(
+func syncLiveFromGit(
 	ctx context.Context,
 	gitProvider git.Provider,
 	reg *registry.Registry,
@@ -36,7 +36,7 @@ func SyncLiveFromGit(
 	webhookBaseURL string,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
-	opts SyncLiveFromGitOptions,
+	opts syncLiveFromGitOptions,
 ) (*models.CanvasVersion, error) {
 	if gitProvider == nil {
 		return nil, fmt.Errorf("git provider is not configured")
@@ -67,14 +67,14 @@ func SyncLiveFromGit(
 		return nil, nil
 	}
 
-	snapshot, loadErr := LoadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
+	snapshot, loadErr := loadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
 	if loadErr != nil {
 		persistLiveMaterializationError(canvasID, headSHA, loadErr)
 		publishMainBranchUpdated(canvasID.String(), headSHA, models.MaterializationStatusError, loadErr.Error())
 		return nil, loadErr
 	}
 
-	live := &LiveMaterializer{
+	live := &liveMaterializer{
 		GitProvider:    gitProvider,
 		Registry:       reg,
 		Encryptor:      encryptor,
@@ -106,7 +106,7 @@ func SyncLiveFromGit(
 			return nameErr
 		}
 
-		v, matErr := live.MaterializeLive(ctx, tx, orgID, canvasID, snapshot, headSHA)
+		v, matErr := live.materializeLive(ctx, tx, orgID, canvasID, snapshot, headSHA)
 		if matErr != nil {
 			return matErr
 		}

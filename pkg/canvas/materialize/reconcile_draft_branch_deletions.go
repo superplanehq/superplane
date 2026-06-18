@@ -15,19 +15,19 @@ import (
 	"gorm.io/gorm"
 )
 
-type ReconcileDraftBranchDeletionsOptions struct {
+type reconcileDraftBranchDeletionsOptions struct {
 	BranchName string
 }
 
-// ReconcileDraftBranchDeletionsFromGit removes draft workflow_versions rows whose git
+// reconcileDraftBranchDeletionsFromGit removes draft workflow_versions rows whose git
 // refs no longer exist. The git branch listing happens before the database
 // transaction so no git RPC is held across a pooled DB connection. Safe to call
 // repeatedly.
-func ReconcileDraftBranchDeletionsFromGit(
+func reconcileDraftBranchDeletionsFromGit(
 	ctx context.Context,
 	gitProvider git.Provider,
 	canvasID uuid.UUID,
-	opts ReconcileDraftBranchDeletionsOptions,
+	opts reconcileDraftBranchDeletionsOptions,
 ) ([]string, error) {
 	if gitProvider == nil {
 		return nil, fmt.Errorf("git provider is not configured")
@@ -64,7 +64,7 @@ func reconcileDraftBranchDeletionsInTransaction(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
 	gitBranchSet map[string]struct{},
-	opts ReconcileDraftBranchDeletionsOptions,
+	opts reconcileDraftBranchDeletionsOptions,
 ) ([]string, error) {
 	dbBranches, err := models.ListAllDraftBranchVersionsForCanvasInTransaction(tx, canvasID)
 	if err != nil {
@@ -99,8 +99,8 @@ func reconcileDraftBranchDeletionsInTransaction(
 	return removed, nil
 }
 
-// PublishDraftBranchDeletionEvents notifies clients that draft branches were removed from git.
-func PublishDraftBranchDeletionEvents(canvasID string, removed []string) {
+// publishDraftBranchDeletionEvents notifies clients that draft branches were removed from git.
+func publishDraftBranchDeletionEvents(canvasID string, removed []string) {
 	for _, branch := range removed {
 		if publishErr := messages.NewRepositoryBranchUpdatedMessage(
 			canvasID,

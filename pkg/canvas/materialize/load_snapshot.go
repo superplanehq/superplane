@@ -16,7 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-type RepoSnapshot struct {
+type repoSnapshot struct {
 	Name          string
 	Description   string
 	Nodes         []models.Node
@@ -25,14 +25,14 @@ type RepoSnapshot struct {
 	ConsoleLayout []models.ConsoleLayoutItem
 }
 
-func LoadRepoSnapshot(
+func loadRepoSnapshot(
 	ctx context.Context,
 	gitProvider git.Provider,
 	registry *registry.Registry,
 	orgID uuid.UUID,
 	repoID string,
 	sha string,
-) (*RepoSnapshot, error) {
+) (*repoSnapshot, error) {
 	canvasYAML, err := readGitFile(ctx, gitProvider, repoID, gitref.CanvasFileName, sha)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", gitref.CanvasFileName, err)
@@ -50,7 +50,7 @@ func LoadRepoSnapshot(
 	_ = registry
 	_ = orgID
 
-	snapshot := &RepoSnapshot{
+	snapshot := &repoSnapshot{
 		Name:        pbCanvas.GetMetadata().GetName(),
 		Description: pbCanvas.GetMetadata().GetDescription(),
 		Nodes:       nodes,

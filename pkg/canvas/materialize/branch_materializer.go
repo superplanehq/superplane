@@ -33,11 +33,11 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 		return err
 	}
 
-	removed, err := ReconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, ReconcileDraftBranchDeletionsOptions{})
+	removed, err := reconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, reconcileDraftBranchDeletionsOptions{})
 	if err != nil {
 		return err
 	}
-	PublishDraftBranchDeletionEvents(canvasID.String(), removed)
+	publishDraftBranchDeletionEvents(canvasID.String(), removed)
 
 	if headSHA == "" {
 		repository, repoErr := models.FindRepositoryUnscoped(canvasID)
@@ -55,7 +55,7 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 			return nil
 		}
 
-		_, syncErr := SyncLiveFromGit(
+		_, syncErr := syncLiveFromGit(
 			ctx,
 			m.GitProvider,
 			m.Registry,
@@ -68,7 +68,7 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 			// has already passed change-management gating at the write path
 			// (publish/change-request handlers), so the materializer always
 			// projects what main points at.
-			SyncLiveFromGitOptions{HeadSHA: headSHA},
+			syncLiveFromGitOptions{HeadSHA: headSHA},
 		)
 		return syncErr
 	}
@@ -77,14 +77,14 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 		return nil
 	}
 
-	_, syncErr := SyncDraftBranchFromGit(
+	_, syncErr := syncDraftBranchFromGit(
 		ctx,
 		m.GitProvider,
 		m.Registry,
 		canvas.OrganizationID,
 		canvasID,
 		branch,
-		SyncDraftBranchOptions{HeadSHA: headSHA, CreatedBy: pushedBy},
+		syncDraftBranchOptions{HeadSHA: headSHA, CreatedBy: pushedBy},
 	)
 	return syncErr
 }
@@ -98,7 +98,7 @@ func (m *BranchMaterializer) MaterializeBranch(ctx context.Context, canvasID uui
 // already fanned out to clients by the event distributer, so nothing is
 // republished here.
 func (m *BranchMaterializer) ReconcileBranchDeletion(ctx context.Context, canvasID uuid.UUID, branch string) error {
-	_, err := ReconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, ReconcileDraftBranchDeletionsOptions{BranchName: branch})
+	_, err := reconcileDraftBranchDeletionsFromGit(ctx, m.GitProvider, canvasID, reconcileDraftBranchDeletionsOptions{BranchName: branch})
 	return err
 }
 
