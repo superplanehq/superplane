@@ -184,7 +184,7 @@ func (s *adminSteps) saveInstallationSettings() {
 }
 
 func (s *adminSteps) assertPrivateNetworkAccessEnabled() {
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(s.t, err)
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess)
 }
