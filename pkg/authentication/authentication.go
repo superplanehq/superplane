@@ -41,6 +41,7 @@ const (
 	magicCodeMaxVerifyAttempts = 3
 	authSignupStatePrefix      = "signup:"
 	authSignupResultParam      = "auth_signup_result"
+	jsonContentType            = "application/json"
 )
 
 type Handler struct {
@@ -770,6 +771,20 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
+	writePostAuthRedirect(w, r, redirectURL)
+}
+
+func writePostAuthRedirect(w http.ResponseWriter, r *http.Request, redirectURL string) {
+	if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
+		w.Header().Set("Content-Type", jsonContentType)
+		if err := json.NewEncoder(w).Encode(map[string]string{"redirectUrl": redirectURL}); err != nil {
+			log.Errorf("Error encoding auth redirect response: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+
+		return
+	}
+
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 

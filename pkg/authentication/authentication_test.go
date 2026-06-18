@@ -319,6 +319,30 @@ func TestHandler_getPostAuthRedirectURL(t *testing.T) {
 	})
 }
 
+func TestWritePostAuthRedirect(t *testing.T) {
+	t.Run("should return JSON redirect when requested", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", nil)
+		req.Header.Set("Accept", "application/json")
+		recorder := httptest.NewRecorder()
+
+		writePostAuthRedirect(recorder, req, "/welcome?redirect=%2Fcanvases")
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+		assert.JSONEq(t, `{"redirectUrl":"/welcome?redirect=%2Fcanvases"}`, recorder.Body.String())
+	})
+
+	t.Run("should keep browser redirects by default", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", nil)
+		recorder := httptest.NewRecorder()
+
+		writePostAuthRedirect(recorder, req, "/welcome")
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "/welcome", recorder.Header().Get("Location"))
+	})
+}
+
 func TestHandler_handlePasswordSignup(t *testing.T) {
 	t.Run("should route new cloud users through welcome with original redirect", func(t *testing.T) {
 		r := support.Setup(t)
