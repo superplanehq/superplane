@@ -176,7 +176,7 @@ const MessageRow = memo(function MessageRow({
   }
 
   const isUser = message.role === "user";
-  const shouldStickUserMessage = isUser && isCompactUserMessage(message.content);
+  const shouldStickUserMessage = isUser && isCompactUserMessage(message);
 
   return (
     <div
@@ -199,6 +199,7 @@ const MessageRow = memo(function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
+        <MessageImages images={message.images} />
         <RichMessage
           content={message.content}
           onAction={isUser ? undefined : onAction}
@@ -214,11 +215,37 @@ const MessageRow = memo(function MessageRow({
   );
 });
 
+function MessageImages({ images }: { images: AgentMessage["images"] }) {
+  if (!images || images.length === 0) return null;
+
+  return (
+    <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
+      {images.map((image, index) => (
+        <a
+          key={index}
+          href={image.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-md border border-slate-200"
+        >
+          <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function shouldRenderMessage(message: AgentMessage): boolean {
   return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
 }
 
-function isCompactUserMessage(content: string): boolean {
+function isCompactUserMessage(message: AgentMessage): boolean {
+  // Messages with image attachments render tall thumbnails; pinning them would
+  // cover in-progress agent output, so they never stick regardless of text length.
+  if (message.images && message.images.length > 0) {
+    return false;
+  }
+  const content = message.content;
   return content.length <= STICKY_USER_MESSAGE_MAX_CHARS && content.split("\n").length <= STICKY_USER_MESSAGE_MAX_LINES;
 }
 

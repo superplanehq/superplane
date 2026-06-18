@@ -25,8 +25,8 @@
     "pkg/models/agent_session.go:202:DeleteAgentSessionsForCanvasInTransaction",
     "pkg/models/agent_session.go:210:DeleteAgentSessionsForOrganizationInTransaction",
     "pkg/models/agent_session.go:217:LockAgentSessionInTransaction",
-    "pkg/models/agent_session_message.go:39:AppendAgentSessionMessageInTransaction",
-    "pkg/models/agent_session_message.go:117:CountAgentSessionMessagesInTransaction",
+    "pkg/models/agent_session_message.go:47:AppendAgentSessionMessageInTransaction",
+    "pkg/models/agent_session_message.go:136:CountAgentSessionMessagesInTransaction",
     "pkg/models/canvas.go:98:FindCanvasNodesInTransaction",
     "pkg/models/canvas.go:112:FindCanvasNodesUnscopedInTransaction",
     "pkg/models/canvas.go:131:SoftDeleteInTransaction",
@@ -224,9 +224,9 @@
     "pkg/models/agent_session.go:148:database.Conn()",
     "pkg/models/agent_session.go:157:database.Conn()",
     "pkg/models/agent_session.go:236:database.Conn()",
-    "pkg/models/agent_session_message.go:88:database.Conn()",
-    "pkg/models/agent_session_message.go:98:database.Conn()",
-    "pkg/models/agent_session_message.go:127:database.Conn()",
+    "pkg/models/agent_session_message.go:99:database.Conn()",
+    "pkg/models/agent_session_message.go:117:database.Conn()",
+    "pkg/models/agent_session_message.go:146:database.Conn()",
     "pkg/models/canvas.go:77:database.Conn()",
     "pkg/models/canvas.go:91:database.Conn()",
     "pkg/models/canvas.go:95:database.Conn()",
@@ -421,5 +421,5 @@
     "pkg/models/workflow_staging.go:71:database.Conn()",
     "pkg/models/workflow_staging.go:75:database.Conn()"
   ],
-  "updatedAt": "2026-06-18T09:43:13Z"
+  "updatedAt": "2026-06-18T13:08:41Z"
 }
