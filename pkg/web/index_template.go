@@ -10,16 +10,11 @@ import (
 type indexTemplateData struct {
 	SentryDSN            string
 	SentryEnvironment    string
-	AgentEnabled         bool
 	PostHogKey           string
 	Dash0WebOTLPEndpoint string
 	Dash0WebAuthToken    string
 	Dash0WebServiceName  string
 	Dash0WebEnvironment  string
-}
-
-func agentEnabled() bool {
-	return strings.TrimSpace(os.Getenv("AGENT_ENABLED")) == "yes"
 }
 
 func dash0WebEnvironment() string {
@@ -46,7 +41,6 @@ func newIndexTemplateDataFromEnv() indexTemplateData {
 	return indexTemplateData{
 		SentryDSN:            os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:    os.Getenv("SENTRY_ENVIRONMENT"),
-		AgentEnabled:         agentEnabled(),
 		PostHogKey:           os.Getenv("POSTHOG_KEY"),
 		Dash0WebOTLPEndpoint: os.Getenv("DASH0_WEB_OTLP_ENDPOINT"),
 		Dash0WebAuthToken:    os.Getenv("DASH0_WEB_AUTH_TOKEN"),
