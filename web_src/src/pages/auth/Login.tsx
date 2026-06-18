@@ -712,7 +712,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               </div>
 
               <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
-                Continue
+                {isSignupMode ? "Create account" : "Sign in"}
               </LoadingButton>
 
               <div className="text-center">
