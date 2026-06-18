@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
@@ -260,6 +261,21 @@ func TestHandler_checkSignupPolicy(t *testing.T) {
 		err = handler.checkSignupPolicy(account.Email, req)
 
 		assert.NoError(t, err)
+	})
+
+	t.Run("should reject new account when installation signups are disabled", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		metadata, err := models.GetInstallationMetadata(database.Conn())
+		require.NoError(t, err)
+		metadata.SignupsEnabled = false
+		metadata.UpdatedAt = time.Now()
+		require.NoError(t, models.UpdateInstallationMetadata(database.Conn(), metadata))
+
+		req, _ := http.NewRequest("POST", "/auth/magic-code/verify?signup=true", nil)
+
+		err = handler.checkSignupPolicy("disabled-signup@example.com", req)
+
+		assert.Equal(t, errSignupDisabled, err)
 	})
 }
 
