@@ -165,6 +165,16 @@ type ProviderSessionCleaner interface {
 	DeleteSession(ctx context.Context, providerSessionID string) error
 }
 
+type ProviderSessionArchiver interface {
+	Name() string
+	ArchiveSession(ctx context.Context, providerSessionID string) error
+}
+
+type ProviderToolSchemaRevisioner interface {
+	Name() string
+	ToolSchemaRevision() string
+}
+
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")
 var ErrSessionBusy = errors.New("agent session is still processing")
 var ErrProviderSessionUnavailable = errors.New("provider session is unavailable")
