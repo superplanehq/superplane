@@ -1,5 +1,5 @@
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { RepositoryData } from "./types";
+import type { PackageComplianceData, RepositoryData } from "./types";
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
@@ -43,6 +43,25 @@ export function buildDetailsCtx(overrides?: {
 }): ExecutionDetailsContext {
   const node = buildNode(overrides?.node);
   return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
+}
+
+export function buildPackageComplianceData(overrides?: Partial<PackageComplianceData>): PackageComplianceData {
+  return {
+    name: "sp-compliance-gpl",
+    version: "1.0.0",
+    slug_perm: "f3XvJCI9ufJa",
+    format: "npm",
+    license: "GPL-3.0-only",
+    spdx_license: "GPL-3.0-only",
+    osi_approved: true,
+    policy_violated: false,
+    is_quarantined: true,
+    status: "Quarantined",
+    stage: "Fully Synchronised",
+    tags: { version: ["latest"] },
+    url: "https://cloudsmith.io/~weskk/repos/superplane-compliance/packages/detail/npm/sp-compliance-gpl/1.0.0/",
+    ...overrides,
+  };
 }
 
 export function buildRepositoryData(overrides?: Partial<RepositoryData>): RepositoryData {
