@@ -154,7 +154,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		installationMetadata, err := models.GetInstallationMetadataInTransaction(tx)
+		installationMetadata, err := models.GetInstallationMetadata(tx)
 		if err != nil {
 			return err
 		}
@@ -162,7 +162,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		installationMetadata.AllowPrivateNetworkAccess = req.AllowPrivateNetworkAccess
 		installationMetadata.UpdatedAt = time.Now()
 
-		return models.UpdateInstallationMetadataInTransaction(tx, installationMetadata)
+		return models.UpdateInstallationMetadata(tx, installationMetadata)
 	})
 
 	if err != nil {

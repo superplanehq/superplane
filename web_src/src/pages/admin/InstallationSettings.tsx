@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useState } from "react";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
+  signups_enabled: boolean;
+  signups_blocked_by_environment: boolean;
   effective_blocked_http_hosts: string[];
   effective_private_ip_ranges: string[];
   blocked_http_hosts_overridden: boolean;
@@ -38,7 +40,17 @@ type DerivedState = {
   blockedHosts: string[];
   privateRanges: string[];
   hasNetworkChanges: boolean;
+  hasSignupChanges: boolean;
   hasSMTPChanges: boolean;
+};
+
+type SignupAccessSectionProps = {
+  enabled: boolean;
+  blockedByEnvironment: boolean;
+  hasChanges: boolean;
+  saving: boolean;
+  onChange: (checked: boolean) => void;
+  onSave: () => void;
 };
 
 type NetworkPolicySectionProps = {
@@ -110,6 +122,7 @@ const toSMTPFormState = (data: InstallationSettingsResponse): SMTPFormState => (
 const getDerivedState = (
   settings: InstallationSettingsResponse | null,
   allowPrivateNetworkAccess: boolean,
+  signupsEnabled: boolean,
   form: SMTPFormState,
 ): DerivedState => {
   const hasSMTPSettings = settings?.smtp_enabled ?? false;
@@ -118,6 +131,7 @@ const getDerivedState = (
     blockedHosts: settings?.effective_blocked_http_hosts ?? [],
     privateRanges: settings?.effective_private_ip_ranges ?? [],
     hasNetworkChanges: settings != null && allowPrivateNetworkAccess !== settings.allow_private_network_access,
+    hasSignupChanges: settings != null && signupsEnabled !== settings.signups_enabled,
     hasSMTPChanges:
       settings != null &&
       (form.enabled !== settings.smtp_enabled ||
@@ -152,6 +166,76 @@ const buildSMTPRequestBody = (form: SMTPFormState) => {
   }
 
   return body;
+};
+
+const SignupAccessSection = ({
+  enabled,
+  blockedByEnvironment,
+  hasChanges,
+  saving,
+  onChange,
+  onSave,
+}: SignupAccessSectionProps) => {
+  const effectiveEnabled = enabled && !blockedByEnvironment;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">
+            Signup Access
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-gray-900">Public signups</h2>
+          <Text className="mt-2 text-sm text-gray-600">
+            Control whether visitors can create new accounts from the signup page. Invite links can still create
+            accounts while public signups are closed.
+          </Text>
+        </div>
+
+        <div
+          className={`rounded-2xl border px-4 py-3 shadow-sm ${
+            effectiveEnabled ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900">
+                {effectiveEnabled ? "Signups open" : "Signups closed"}
+              </p>
+              <Text className="text-xs text-gray-600">
+                {effectiveEnabled
+                  ? "New users can create accounts from /signup."
+                  : "The signup page will show the waitlist form."}
+              </Text>
+            </div>
+
+            <Switch
+              data-testid="installation-signups-switch"
+              checked={enabled}
+              disabled={blockedByEnvironment}
+              onCheckedChange={onChange}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
+        <Button
+          type="button"
+          data-testid="installation-signups-save"
+          onClick={onSave}
+          disabled={saving || !hasChanges || blockedByEnvironment}
+        >
+          {saving ? "Saving..." : "Save signup settings"}
+        </Button>
+        <Text className="text-xs text-gray-500">
+          {blockedByEnvironment
+            ? "`BLOCK_SIGNUP` is active, so public signups remain closed until the environment override is removed."
+            : "When closed, /signup collects waitlist emails instead of creating accounts."}
+        </Text>
+      </div>
+    </div>
+  );
 };
 
 const NetworkPolicySection = ({
@@ -416,12 +500,15 @@ const useInstallationSettingsState = () => {
   const [loading, setLoading] = useState(true);
   const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
   const [savingNetwork, setSavingNetwork] = useState(false);
+  const [signupsEnabled, setSignupsEnabled] = useState(true);
+  const [savingSignups, setSavingSignups] = useState(false);
   const [smtpForm, setSMTPForm] = useState<SMTPFormState>(emptySMTPForm);
   const [savingSMTP, setSavingSMTP] = useState(false);
 
   const applySettings = useCallback((data: InstallationSettingsResponse) => {
     setSettings(data);
     setAllowPrivateNetworkAccess(data.allow_private_network_access);
+    setSignupsEnabled(data.signups_enabled);
     setSMTPForm(toSMTPFormState(data));
   }, []);
 
@@ -481,6 +568,21 @@ const useInstallationSettingsState = () => {
     }
   }, [allowPrivateNetworkAccess, patchSettings]);
 
+  const saveSignupSettings = useCallback(async () => {
+    setSavingSignups(true);
+    try {
+      await patchSettings(
+        { signups_enabled: signupsEnabled },
+        "Signup settings updated",
+        "Failed to update signup settings",
+      );
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to update signup settings");
+    } finally {
+      setSavingSignups(false);
+    }
+  }, [patchSettings, signupsEnabled]);
+
   const saveSMTPSettings = useCallback(async () => {
     setSavingSMTP(true);
     try {
@@ -504,11 +606,15 @@ const useInstallationSettingsState = () => {
     loading,
     allowPrivateNetworkAccess,
     savingNetwork,
+    signupsEnabled,
+    savingSignups,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
+    setSignupsEnabled,
     setSMTPField,
     saveNetworkSettings,
+    saveSignupSettings,
     saveSMTPSettings,
   };
 };
@@ -519,11 +625,15 @@ const InstallationSettings: React.FC = () => {
     loading,
     allowPrivateNetworkAccess,
     savingNetwork,
+    signupsEnabled,
+    savingSignups,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
+    setSignupsEnabled,
     setSMTPField,
     saveNetworkSettings,
+    saveSignupSettings,
     saveSMTPSettings,
   } = useInstallationSettingsState();
 
@@ -538,7 +648,7 @@ const InstallationSettings: React.FC = () => {
     );
   }
 
-  const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, smtpForm);
+  const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, signupsEnabled, smtpForm);
 
   return (
     <div className="space-y-6">
@@ -548,6 +658,15 @@ const InstallationSettings: React.FC = () => {
           Configure installation-wide network policy and email delivery for this SuperPlane instance.
         </Text>
       </div>
+
+      <SignupAccessSection
+        enabled={signupsEnabled}
+        blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
+        hasChanges={derivedState.hasSignupChanges}
+        saving={savingSignups}
+        onChange={setSignupsEnabled}
+        onSave={saveSignupSettings}
+      />
 
       <NetworkPolicySection
         allowPrivateNetworkAccess={allowPrivateNetworkAccess}
