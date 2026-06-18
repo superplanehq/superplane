@@ -60,7 +60,6 @@ func persistDraftMaterializationError(canvasID uuid.UUID, branch string, ownerID
 func markMaterializationError(tx *gorm.DB, canvasID uuid.UUID, branch, commitSHA string, ownerID *uuid.UUID, cause error) (uuid.UUID, error) {
 	errMsg := cause.Error()
 	now := time.Now()
-	branchName := branch
 	version := &models.CanvasVersion{
 		WorkflowID:            canvasID,
 		OwnerID:               ownerID,
@@ -71,9 +70,6 @@ func markMaterializationError(tx *gorm.DB, canvasID uuid.UUID, branch, commitSHA
 		MaterializationError:  errMsg,
 		CreatedAt:             &now,
 		UpdatedAt:             &now,
-	}
-	if models.IsDraftBranch(branch) {
-		version.BranchName = &branchName
 	}
 	if err := models.UpsertMaterializedVersionInTransaction(tx, version); err != nil {
 		return uuid.Nil, err

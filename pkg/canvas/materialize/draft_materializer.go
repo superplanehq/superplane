@@ -62,7 +62,6 @@ func (m *draftMaterializer) persist(
 				WorkflowID:  canvasID,
 				OwnerID:     createdBy,
 				State:       models.CanvasVersionStateDraft,
-				BranchName:  &branchName,
 				DisplayName: label,
 				GitBranch:   branchName,
 				CreatedAt:   &now,
@@ -133,7 +132,6 @@ func (m *draftMaterializer) materializeDraftInTransaction(
 	}
 
 	now := time.Now()
-	branchName := branch
 	version := &models.CanvasVersion{
 		WorkflowID:            canvasID,
 		OwnerID:               ownerID,
@@ -146,7 +144,6 @@ func (m *draftMaterializer) materializeDraftInTransaction(
 		ConsoleLayout:         datatypes.NewJSONType(snapshot.ConsoleLayout),
 		CommitSHA:             commitSHA,
 		GitBranch:             branch,
-		BranchName:            &branchName,
 		MaterializationStatus: models.MaterializationStatusReady,
 		MaterializationError:  "",
 		CreatedAt:             &now,
