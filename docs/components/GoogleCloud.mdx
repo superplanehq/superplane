@@ -35,7 +35,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud SQL • Delete Instance" href="#cloud-sql-•-delete-instance" description="Delete a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Get Database" href="#cloud-sql-•-get-database" description="Fetch a logical database from a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Get Instance" href="#cloud-sql-•-get-instance" description="Fetch a Cloud SQL instance's configuration and status" />
+  <LinkCard title="Compute • Create Load Balancer" href="#compute-•-create-load-balancer" description="Create a regional external passthrough Network Load Balancer that forwards TCP/UDP traffic to a group of VM instances" />
   <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
+  <LinkCard title="Compute • Delete Load Balancer" href="#compute-•-delete-load-balancer" description="Delete a regional external passthrough Network Load Balancer and its backend service and health check" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
@@ -1105,6 +1107,76 @@ Emits a `gcp.cloudsql.instance` payload with the instance `name`, `state`, `data
 }
 ```
 
+<a id="compute-•-create-load-balancer"></a>
+
+## Compute • Create Load Balancer
+
+**Component key:** `gcp.compute.createLoadBalancer`
+
+The Create Load Balancer component builds a regional external passthrough Network Load Balancer (Layer 4). It gives you one public IP that spreads incoming TCP/UDP traffic across the VMs in an instance group, and routes around unhealthy VMs using a health check.
+
+Google Cloud has no single "load balancer" resource — a load balancer is a collection of resources. This component creates them for you, in order:
+
+1. **Health check** — how the LB decides a VM is healthy
+2. **Backend service** — references your instance group and the health check
+3. **Forwarding rule** — the public IP + ports that send traffic to the backend service
+
+If any step fails, the resources already created are rolled back.
+
+### Use Cases
+
+- **Distribute traffic**: Spread requests across several VMs running the same service
+- **Resilience**: Stop sending traffic to VMs that fail their health check
+- **Non-HTTP services**: Balance any TCP/UDP protocol (this is an L4 balancer; it does not terminate HTTPS or route by URL — use an Application Load Balancer for that)
+
+### Configuration
+
+- **Name**: Base name for the load balancer; the pieces are named `<name>-hc`, `<name>-backend`, `<name>-fr` (required)
+- **Region**: The region to create it in (required)
+- **Protocol**: `TCP` or `UDP` (default TCP)
+- **Ports**: One or more ports to forward, e.g. 80, 443 (required)
+- **Instance group**: The existing instance group whose VMs receive traffic (required)
+- **Health check protocol / port**: `TCP` (default), `HTTP`, or `HTTPS`; port defaults to the first forwarded port
+- **Reserved IP**: Optionally use a reserved static IP; leave blank for an ephemeral IP
+
+### Output
+
+Returns the assembled load balancer: **name**, **region**, **ipAddress**, **protocol**, **ports**, and the underlying **forwardingRule**, **backendService**, **healthCheck**, plus **resources** (selfLinks of everything created).
+
+### Important Notes
+
+- Targets an **existing** instance group; the group's VMs must be in the chosen region
+- Requires the `roles/compute.loadBalancerAdmin` IAM role
+- This is an L4 passthrough LB: it forwards ports and preserves the client IP; it does not terminate TLS
+
+### Example Output
+
+```json
+{
+  "data": {
+    "backendService": "web-lb-backend",
+    "forwardingRule": "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/forwardingRules/web-lb-fr",
+    "healthCheck": "web-lb-hc",
+    "instanceGroup": "web-servers",
+    "ipAddress": "34.1.2.3",
+    "name": "web-lb",
+    "ports": [
+      "80",
+      "443"
+    ],
+    "protocol": "TCP",
+    "region": "us-central1",
+    "resources": [
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/healthChecks/web-lb-hc",
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/backendServices/web-lb-backend",
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/forwardingRules/web-lb-fr"
+    ]
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.loadBalancer.created"
+}
+```
+
 <a id="compute-•-create-static-ip"></a>
 
 ## Compute • Create Static IP
@@ -1153,6 +1225,52 @@ Returns the reserved address:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.staticIP.created"
+}
+```
+
+<a id="compute-•-delete-load-balancer"></a>
+
+## Compute • Delete Load Balancer
+
+**Component key:** `gcp.compute.deleteLoadBalancer`
+
+The Delete Load Balancer component tears down a regional external passthrough Network Load Balancer. You select its **forwarding rule** (the load balancer's entry point), and the component follows the references and deletes the pieces in reverse order:
+
+1. **Forwarding rule** (the public IP + ports)
+2. **Backend service** it pointed at
+3. **Health check** the backend service used
+
+### Use Cases
+
+- **Cleanup**: Remove a load balancer created by **Create Load Balancer**
+- **Teardown**: Decommission a service's front end as part of a workflow
+
+### Configuration
+
+- **Load Balancer**: The regional external forwarding rule that anchors the load balancer (required)
+
+### Output
+
+Returns what was removed: **forwardingRule**, **backendService**, **healthCheck**, **region**.
+
+### Important Notes
+
+- The instance group the backend service referenced is **not** deleted — only the load balancer's own resources
+- The health check is removed on a best-effort basis; if it is shared by another load balancer the API keeps it and a note is returned
+- Requires the `roles/compute.loadBalancerAdmin` IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "backendService": "web-lb-backend",
+    "forwardingRule": "web-lb-fr",
+    "healthCheck": "web-lb-hc",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.loadBalancer.deleted"
 }
 ```
 
