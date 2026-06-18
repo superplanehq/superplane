@@ -35,6 +35,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
             const signupPreference = consumePendingSignupAnalyticsPreference({
               accountEmail: accountData.email,
               currentPath: window.location.pathname,
+              signupResult: getSignupAnalyticsResult(window.location.search),
             });
 
             const accountProperties = {
@@ -72,4 +73,13 @@ export function AccountProvider({ children }: AccountProviderProps) {
   }, []);
 
   return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
+}
+
+function getSignupAnalyticsResult(search: string) {
+  const value = new URLSearchParams(search).get("auth_signup_result");
+  if (value === "created" || value === "existing") {
+    return value;
+  }
+
+  return null;
 }

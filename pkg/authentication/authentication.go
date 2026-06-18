@@ -40,6 +40,7 @@ const (
 	magicCodeRateWindow        = 10 * time.Minute
 	magicCodeMaxVerifyAttempts = 3
 	authSignupStatePrefix      = "signup:"
+	authSignupResultParam      = "auth_signup_result"
 )
 
 type Handler struct {
@@ -774,8 +775,16 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 
 func (a *Handler) getPostAuthRedirectURL(r *http.Request, wasCreated bool) string {
 	redirectURL := getRedirectURL(r)
-	if !wasCreated || !a.magicCodeEnabled {
+	if !wasCreated {
+		if isSignupIntentFromRequest(r) {
+			return addAuthSignupResult(redirectURL, "existing")
+		}
+
 		return redirectURL
+	}
+
+	if !a.magicCodeEnabled {
+		return addAuthSignupResult(redirectURL, "created")
 	}
 
 	if redirectURL == "/" {
@@ -783,6 +792,18 @@ func (a *Handler) getPostAuthRedirectURL(r *http.Request, wasCreated bool) strin
 	}
 
 	return fmt.Sprintf("/welcome?redirect=%s", url.QueryEscape(redirectURL))
+}
+
+func addAuthSignupResult(redirectURL string, result string) string {
+	parsedURL, err := url.Parse(redirectURL)
+	if err != nil {
+		return redirectURL
+	}
+
+	params := parsedURL.Query()
+	params.Set(authSignupResultParam, result)
+	parsedURL.RawQuery = params.Encode()
+	return parsedURL.String()
 }
 
 func generateMagicCode() (string, error) {

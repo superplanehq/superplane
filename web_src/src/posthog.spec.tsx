@@ -34,7 +34,7 @@ vi.mock("@/lib/env", () => ({
 
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { confirmSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
 
 const mockAccount = {
   id: "user-123",
@@ -85,6 +85,7 @@ describe("account identification", () => {
 
   afterEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
     vi.unstubAllGlobals();
   });
 
@@ -141,6 +142,51 @@ describe("account identification", () => {
         product_updates_opt_in: false,
       },
     });
+  });
+
+  it("captures unconfirmed signup preference when redirect marks account as created", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=created");
+    savePendingSignupAnalyticsPreference({
+      productUpdatesOptIn: true,
+    });
+
+    render(
+      <AccountProvider>
+        <div />
+      </AccountProvider>,
+    );
+
+    await waitFor(() => {
+      expect(capture).toHaveBeenCalledWith("auth:signup", {
+        product_updates_opt_in: true,
+        $set: {
+          product_updates_opt_in: true,
+        },
+      });
+    });
+  });
+
+  it("clears unconfirmed signup preference when redirect marks account as existing", async () => {
+    window.history.replaceState({}, "", "/org-123?auth_signup_result=existing");
+    savePendingSignupAnalyticsPreference({
+      productUpdatesOptIn: true,
+    });
+
+    render(
+      <AccountProvider>
+        <div />
+      </AccountProvider>,
+    );
+
+    await waitFor(() => {
+      expect(identify).toHaveBeenCalledWith("user-123", {
+        email: "john@example.com",
+        name: "John Doe",
+        installation_admin: false,
+      });
+    });
+
+    expect(capture).not.toHaveBeenCalledWith("auth:signup", expect.anything());
   });
 });
 

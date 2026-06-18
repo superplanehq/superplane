@@ -279,7 +279,25 @@ func TestHandler_getPostAuthRedirectURL(t *testing.T) {
 
 		redirectURL := handler.getPostAuthRedirectURL(req, true)
 
-		assert.Equal(t, "/invite/abc", redirectURL)
+		assert.Equal(t, "/invite/abc?auth_signup_result=created", redirectURL)
+	})
+
+	t.Run("should mark existing user when signup intent resolves to login", func(t *testing.T) {
+		handler := NewHandler(nil, nil, nil, "test", "/templates", false, false, true)
+		req, _ := http.NewRequest("GET", "/callback?state=signup%3A%252Fcanvases", nil)
+
+		redirectURL := handler.getPostAuthRedirectURL(req, false)
+
+		assert.Equal(t, "/canvases?auth_signup_result=existing", redirectURL)
+	})
+
+	t.Run("should mark new users when welcome is disabled", func(t *testing.T) {
+		handler := NewHandler(nil, nil, nil, "test", "/templates", false, false, false)
+		req, _ := http.NewRequest("GET", "/callback?state=signup%3A%252Fcanvases%253Fview%253Dlist", nil)
+
+		redirectURL := handler.getPostAuthRedirectURL(req, true)
+
+		assert.Equal(t, "/canvases?auth_signup_result=created&view=list", redirectURL)
 	})
 
 	t.Run("should route new cloud users through welcome with original redirect", func(t *testing.T) {

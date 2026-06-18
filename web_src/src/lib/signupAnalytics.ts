@@ -6,6 +6,8 @@ export type SignupAnalyticsPreference = {
   productUpdatesOptIn: boolean;
 };
 
+export type SignupAnalyticsResult = "created" | "existing" | null;
+
 type StoredSignupAnalyticsPreference = SignupAnalyticsPreference & {
   createdAt: number;
   confirmed: boolean;
@@ -14,6 +16,7 @@ type StoredSignupAnalyticsPreference = SignupAnalyticsPreference & {
 type ConsumeSignupAnalyticsPreferenceOptions = {
   accountEmail?: string;
   currentPath: string;
+  signupResult?: SignupAnalyticsResult;
 };
 
 export function savePendingSignupAnalyticsPreference(preference: SignupAnalyticsPreference) {
@@ -39,9 +42,15 @@ export function clearPendingSignupAnalyticsPreference() {
 export function consumePendingSignupAnalyticsPreference({
   accountEmail,
   currentPath,
+  signupResult = null,
 }: ConsumeSignupAnalyticsPreferenceOptions): SignupAnalyticsPreference | null {
   const preference = readSignupAnalyticsPreference();
   if (!preference) {
+    return null;
+  }
+
+  if (signupResult === "existing") {
+    clearPendingSignupAnalyticsPreference();
     return null;
   }
 
@@ -51,10 +60,14 @@ export function consumePendingSignupAnalyticsPreference({
   }
 
   if (preference.email && accountEmail && preference.email.toLowerCase() !== accountEmail.toLowerCase()) {
+    if (signupResult === "created") {
+      clearPendingSignupAnalyticsPreference();
+    }
+
     return null;
   }
 
-  if (!preference.confirmed && currentPath !== "/welcome") {
+  if (!preference.confirmed && currentPath !== "/welcome" && signupResult !== "created") {
     return null;
   }
 

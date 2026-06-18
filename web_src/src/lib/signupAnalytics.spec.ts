@@ -57,6 +57,26 @@ describe("signup analytics preference", () => {
     expect(consumePendingSignupAnalyticsPreference({ currentPath: "/org-123" })).toBeNull();
   });
 
+  it("consumes an unconfirmed signup preference when signup result is created", () => {
+    savePendingSignupAnalyticsPreference({
+      productUpdatesOptIn: false,
+    });
+
+    expect(consumePendingSignupAnalyticsPreference({ currentPath: "/org-123", signupResult: "created" })).toEqual({
+      email: undefined,
+      productUpdatesOptIn: false,
+    });
+  });
+
+  it("clears an unconfirmed signup preference when signup result is existing", () => {
+    savePendingSignupAnalyticsPreference({
+      productUpdatesOptIn: true,
+    });
+
+    expect(consumePendingSignupAnalyticsPreference({ currentPath: "/org-123", signupResult: "existing" })).toBeNull();
+    expect(consumePendingSignupAnalyticsPreference({ currentPath: "/welcome" })).toBeNull();
+  });
+
   it("does not consume a signup preference for a different account email", () => {
     confirmSignupAnalyticsPreference({
       email: "new-user@example.com",
