@@ -5,7 +5,6 @@ import type {
 } from "@/api-client";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
-import type { CanvasVersionNodeDiffContext } from "@/pages/app/CanvasVersionNodeDiffDialog";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import type { ReactNode } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
@@ -15,6 +14,8 @@ export interface CanvasRunsSidebarPanelConfig {
   canvasId: string;
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
+  selectedRun?: CanvasesCanvasRun | null;
+  isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
   onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
@@ -44,7 +45,6 @@ export interface CanvasVersionsSidebarPanelConfig {
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
@@ -52,6 +52,8 @@ export interface CanvasVersionsSidebarPanelConfig {
   activeDraftBranch?: string | null;
   draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
   onOpenDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
   onDeleteDraftBranch?: (versionId: string) => void;
   deleteDraftBranchPending?: boolean;
 }

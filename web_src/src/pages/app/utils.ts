@@ -1,14 +1,15 @@
 import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
-  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ActionsAction,
+  CanvasesCanvasRun,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
 } from "@/api-client";
+import type { CanvasEventWithExecutions } from "./lib/canvas-runs";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
 import { flattenObject } from "@/lib/utils";
@@ -133,7 +134,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
 }
 
 export function buildTriggerSidebarEvent(
-  event: CanvasesCanvasEventWithExecutions,
+  event: CanvasEventWithExecutions,
   triggerNode: ComponentsNode | undefined,
 ): SidebarEvent | undefined {
   if (!triggerNode || !event.id) return undefined;
@@ -268,6 +269,41 @@ export function mapQueueItemsToSidebarEvents(
       triggerEventId: item.rootEvent?.id,
     };
   });
+}
+
+export function getSidebarEventRootEventId(event: SidebarEvent): string | undefined {
+  return (
+    event.triggerEventId || event.originalExecution?.rootEvent?.id || (event.kind === "trigger" ? event.id : undefined)
+  );
+}
+
+export function getSidebarEventExecutionId(event: SidebarEvent): string | undefined {
+  if (event.executionId) {
+    return event.executionId;
+  }
+
+  if (event.kind === "execution") {
+    return event.id;
+  }
+
+  return undefined;
+}
+
+export function findRunIdForSidebarEvent(runs: CanvasesCanvasRun[], event: SidebarEvent): string | null {
+  const executionId = getSidebarEventExecutionId(event);
+  if (executionId) {
+    const run = runs.find((candidate) => candidate.executions?.some((execution) => execution.id === executionId));
+    if (run?.id) {
+      return run.id;
+    }
+  }
+
+  const rootEventId = getSidebarEventRootEventId(event);
+  if (!rootEventId) {
+    return null;
+  }
+
+  return runs.find((run) => run.rootEvent?.id === rootEventId)?.id ?? null;
 }
 
 export function mapCanvasNodesToLogEntries(options: {

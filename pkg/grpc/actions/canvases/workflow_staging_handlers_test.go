@@ -175,7 +175,7 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 
-	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
 	require.NoError(t, err)
 	committed, err := io.ReadAll(reader)
 	require.NoError(t, err)

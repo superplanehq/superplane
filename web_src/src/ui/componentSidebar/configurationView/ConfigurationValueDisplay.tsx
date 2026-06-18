@@ -72,7 +72,7 @@ export function ConfigurationValueDisplay({ row, className }: ConfigurationValue
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn("min-w-0 break-all text-primary underline underline-offset-2", className)}
+        className={cn("min-w-0 break-all text-blue-600 underline underline-offset-2 hover:text-blue-700", className)}
       >
         {row.displayText}
       </a>

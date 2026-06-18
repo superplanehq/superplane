@@ -43,10 +43,14 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 
 	assert.Contains(t, actionSchema.Enum, "create_draft")
 	assert.Contains(t, actionSchema.Enum, "read_runtime")
+	assert.Contains(t, actionSchema.Enum, "list_files")
+	assert.Contains(t, actionSchema.Enum, "read_file")
+	assert.Contains(t, actionSchema.Enum, "write_file")
+	assert.Contains(t, actionSchema.Enum, "delete_file")
+	assert.Contains(t, actionSchema.Enum, "commit_files")
 	assert.ElementsMatch(t, []string{
 		"memory",
 		"runs",
-		"canvas_events",
 		"event_executions",
 		"node_executions",
 		"node_queue_items",
@@ -56,6 +60,14 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, schema.Properties, "node_id")
 	assert.Contains(t, schema.Properties, "event_id")
 	assert.Contains(t, schema.Properties, "execution_id")
+	assert.Contains(t, schema.Properties, "path")
+	assert.Contains(t, schema.Properties, "paths")
+	assert.Contains(t, schema.Properties, "content")
+	assert.Contains(t, schema.Properties, "message")
+	assert.Contains(t, schema.Properties, "query")
+	assert.Contains(t, schema.Properties["path"].Description, "AGENTS.md")
+	assert.Contains(t, schema.Properties["content"].Description, "write_file")
+	assert.Contains(t, schema.Properties["message"].Description, "commit_files")
 }
 
 func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {
@@ -77,7 +89,7 @@ func TestAppAgentToolSchemaIncludesDraftVersionIDForUpdates(t *testing.T) {
 	assert.Contains(t, schema.Properties, "version_id")
 	assert.Contains(t, schema.Properties, "draft_version_id")
 	assert.Contains(t, schema.Properties, "display_name")
-	assert.Contains(t, schema.Properties["version_id"].Description, "For read and update_draft")
+	assert.Contains(t, schema.Properties["version_id"].Description, "For read, read_file")
 	assert.Contains(t, schema.Properties["draft_version_id"].Description, "Alias")
 	assert.Contains(t, schema.Properties["version_id"].Description, "read")
 	assert.Contains(t, schema.Properties["version_id"].Description, "read returns source live")

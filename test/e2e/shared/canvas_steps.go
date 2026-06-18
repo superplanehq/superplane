@@ -43,29 +43,31 @@ func (s *CanvasSteps) EnterEditMode() {
 	s.waitForEnabledEditButton()
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(400)
-
-	menu := q.TestID("start-editing-menu").Run(s.session)
-	if visible, _ := menu.IsVisible(); visible {
-		continueButton := q.TestID("start-editing-continue").Run(s.session)
-		require.NoError(s.t, continueButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	}
-
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
 }
 
-// CreateNewDraftFromEditMenu opens the Edit menu and creates an additional draft branch.
+// CreateNewDraftFromEditMenu creates an additional draft branch using the
+// "Create new draft" button in the versions sidebar. It waits for the editor to
+// switch to the new draft so subsequent edits are staged onto it rather than the
+// draft that was being edited before.
 func (s *CanvasSteps) CreateNewDraftFromEditMenu() {
-	s.waitForEnabledEditButton()
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("start-editing-menu"))
+	s.OpenVersionsSidebar()
+	before := len(s.ListDraftVersions())
 
-	createButton := q.TestID("start-editing-create").Run(s.session)
+	createButton := q.TestID("canvas-create-draft-button").Run(s.session)
 	require.NoError(s.t, createButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(500)
-	s.waitForEnabledExitEditButton()
+
+	require.Eventually(s.t, func() bool {
+		return len(s.ListDraftVersions()) > before
+	}, 15*time.Second, 200*time.Millisecond, "new draft branch was not created")
+
+	newest := s.FindCurrentDraft()
+	require.NotNil(s.t, newest)
+
+	// Selecting the new draft from the sidebar guarantees the editor is switched
+	// to it before subsequent edits are made.
+	s.OpenDraftBranchInSidebar(newest.DisplayName)
 }
 
 // ExitEditMode leaves the current draft and returns to the live canvas view.
@@ -77,55 +79,19 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar opens the Versions view via the canvas header tab.
+// OpenVersionsSidebar reveals the versions sidebar, which is permanently shown
+// while an edit session is active. If no edit session is active yet, it enters
+// edit mode (selecting the latest draft or creating one) to reveal the sidebar.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	s.ensureNotEditingForVersionsSidebar()
-	deadline := time.Now().Add(20 * time.Second)
-	for time.Now().Before(deadline) {
-		versionsTab := q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`).Run(s.session)
-		sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
-		tabVisible, tabErr := versionsTab.IsVisible()
-		sidebarVisible, sidebarErr := sidebar.IsVisible()
-		if tabErr == nil && sidebarErr == nil && tabVisible && sidebarVisible {
-			s.session.Sleep(300)
-			return
-		}
-		if tabErr == nil {
-			if visible, _ := versionsTab.IsVisible(); !visible {
-				s.session.Click(q.TestID("canvas-view-mode-versions"))
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
+	sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
+	if visible, _ := sidebar.IsVisible(); visible {
+		s.session.Sleep(300)
+		return
 	}
+
+	s.EnterEditMode()
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-versions"][aria-current="page"]`))
 	s.session.Sleep(300)
-}
-
-func (s *CanvasSteps) ensureNotEditingForVersionsSidebar() {
-	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	visible, visibleErr := exitEditButton.IsVisible()
-	if visibleErr != nil || !visible {
-		return
-	}
-
-	disabled, err := exitEditButton.IsDisabled()
-	require.NoError(s.t, err)
-	if disabled {
-		return
-	}
-
-	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
-		visible, visibleErr = exitEditButton.IsVisible()
-		if visibleErr != nil || !visible {
-			s.session.Sleep(300)
-			return
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
 }
 
 // SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
@@ -176,14 +142,11 @@ func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
 	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") > button`, displayName))
 	s.session.Click(selector)
 
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		url := s.session.Page().URL()
-		if strings.Contains(url, "branch=") && !strings.Contains(url, "view=versions") {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+	chip := q.TestID("active-draft-branch-chip").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		text, err := chip.TextContent()
+		return err == nil && strings.Contains(text, displayName)
+	}, 30*time.Second, 200*time.Millisecond, "editor did not switch to draft %q", displayName)
 
 	s.waitForEnabledExitEditButton()
 }
