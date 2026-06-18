@@ -17,14 +17,14 @@ func (g *GetRepository) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetRepositoryOnce, exampleOutputGetRepositoryBytes, &exampleOutputGetRepository)
 }
 
-//go:embed example_data_on_compliance_check_completed.json
-var exampleDataOnComplianceCheckCompletedBytes []byte
+//go:embed example_data_on_security_scan_completed.json
+var exampleDataOnSecurityScanCompletedBytes []byte
 
-var exampleDataOnComplianceCheckCompletedOnce sync.Once
-var exampleDataOnComplianceCheckCompleted map[string]any
+var exampleDataOnSecurityScanCompletedOnce sync.Once
+var exampleDataOnSecurityScanCompleted map[string]any
 
-func onComplianceCheckCompletedExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnComplianceCheckCompletedOnce, exampleDataOnComplianceCheckCompletedBytes, &exampleDataOnComplianceCheckCompleted)
+func onSecurityScanCompletedExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnSecurityScanCompletedOnce, exampleDataOnSecurityScanCompletedBytes, &exampleDataOnSecurityScanCompleted)
 }
 
 //go:embed example_data_on_package_created.json

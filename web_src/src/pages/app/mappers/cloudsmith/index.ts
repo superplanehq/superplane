@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { getRepositoryMapper } from "./get_repository";
-import { onComplianceCheckCompletedTriggerRenderer } from "./on_compliance_check_completed";
+import { onSecurityScanCompletedTriggerRenderer } from "./on_security_scan_completed";
 import { onPackageCreatedTriggerRenderer } from "./on_package_created";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -9,12 +9,12 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
-  onComplianceCheckCompleted: onComplianceCheckCompletedTriggerRenderer,
+  onSecurityScanCompleted: onSecurityScanCompletedTriggerRenderer,
   onPackageCreated: onPackageCreatedTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRepository: buildActionStateRegistry("fetched"),
-  onComplianceCheckCompleted: buildActionStateRegistry("triggered"),
+  onSecurityScanCompleted: buildActionStateRegistry("triggered"),
   onPackageCreated: buildActionStateRegistry("triggered"),
 };

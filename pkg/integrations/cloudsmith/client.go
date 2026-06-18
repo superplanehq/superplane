@@ -204,32 +204,14 @@ type Package struct {
 	VulnerabilityScanResultsURL string `json:"vulnerability_scan_results_url"`
 }
 
-// VulnerabilityScan is one security-scan result for a package, returned by the
-// vulnerabilities API.
+// VulnerabilityScan is a package's security-scan summary, delivered under
+// context.vulnerability_scan_results on a package.security_scanned webhook.
 type VulnerabilityScan struct {
 	Identifier         string `json:"identifier"`
 	CreatedAt          string `json:"created_at"`
 	HasVulnerabilities bool   `json:"has_vulnerabilities"`
 	MaxSeverity        string `json:"max_severity"`
 	NumVulnerabilities int    `json:"num_vulnerabilities"`
-}
-
-// GetPackageVulnerabilities returns the security-scan results for a package
-// (owner/repository, by permanent slug), newest first.
-func (c *Client) GetPackageVulnerabilities(owner, repository, identifier string) ([]VulnerabilityScan, error) {
-	requestURL := fmt.Sprintf("%s/vulnerabilities/%s/%s/%s/",
-		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(identifier))
-	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var scans []VulnerabilityScan
-	if err := json.Unmarshal(responseBody, &scans); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return scans, nil
 }
 
 // Webhook is the subset of a Cloudsmith webhook this integration manages.
