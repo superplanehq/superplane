@@ -91,6 +91,9 @@ func (t *TagPackage) Configuration() []configuration.Field {
 			Label:       "Tags",
 			Type:        configuration.FieldTypeList,
 			Description: "Tags to apply. Not required for Clear.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "action", Values: []string{TagActionAdd, TagActionReplace, TagActionRemove}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Tag",

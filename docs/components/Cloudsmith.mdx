@@ -9,8 +9,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Delete Package" href="#delete-package" description="Delete a package from a Cloudsmith repository" />
   <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
+  <LinkCard title="Resync Package" href="#resync-package" description="Schedule a Cloudsmith package for resynchronization" />
+  <LinkCard title="Tag Package" href="#tag-package" description="Add, replace, clear, or remove tags for a Cloudsmith package" />
 </CardGrid>
 
 ## Instructions
@@ -24,6 +27,32 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+
+<a id="delete-package"></a>
+
+## Delete Package
+
+**Component key:** `cloudsmith.deletePackage`
+
+The Delete Package component deletes a package from a Cloudsmith repository.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+
+### Output
+
+Emits the deleted package identifier on the default channel.
+
+### Example Output
+
+```json
+{
+  "packageIdentifier": "pkg_123",
+  "repository": "acme/production"
+}
+```
 
 <a id="get-package"></a>
 
@@ -193,3 +222,76 @@ Returns the repository object including:
 }
 ```
 
+<a id="resync-package"></a>
+
+## Resync Package
+
+**Component key:** `cloudsmith.resyncPackage`
+
+The Resync Package component schedules a Cloudsmith package for resynchronization.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+
+### Output
+
+Emits the package returned by Cloudsmith on the default channel.
+
+### Example Output
+
+```json
+{
+  "package": {
+    "display_name": "billing-api",
+    "format": "docker",
+    "name": "billing-api",
+    "slug_perm": "pkg_123",
+    "status": "Completed",
+    "version": "1.2.3"
+  },
+  "packageIdentifier": "pkg_123",
+  "repository": "acme/production"
+}
+```
+
+<a id="tag-package"></a>
+
+## Tag Package
+
+**Component key:** `cloudsmith.tagPackage`
+
+The Tag Package component updates tags for a Cloudsmith package.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+- **Action**: `Add`, `Clear`, `Replace`, or `Remove`.
+- **Tags**: Tags to apply. Not required when the action is `Clear`.
+- **Immutable**: Marks newly created tags immutable when supported by Cloudsmith.
+
+### Output
+
+Emits the updated package returned by Cloudsmith on the default channel.
+
+### Example Output
+
+```json
+{
+  "package": {
+    "display_name": "billing-api",
+    "format": "docker",
+    "name": "billing-api",
+    "slug_perm": "pkg_123",
+    "tags": {
+      "latest": true,
+      "production": true
+    },
+    "version": "1.2.3"
+  },
+  "packageIdentifier": "pkg_123",
+  "repository": "acme/production"
+}
+```
