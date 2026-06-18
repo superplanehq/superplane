@@ -5,14 +5,44 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 const canvasNameAlreadyExistsMessage = "Canvas with the same name already exists"
+
+func checkCanvasExistence(ctx context.Context, orgID, canvasID uuid.UUID) error {
+	return telemetry.RunSpan(ctx, "canvases.check_canvas_existence", func(ctx context.Context) error {
+		exists, err := models.CheckCanvasExistence(database.DB(ctx), orgID, canvasID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return gorm.ErrRecordNotFound
+		}
+
+		return nil
+	})
+}
+
+func loadCanvas(ctx context.Context, orgID, canvasID uuid.UUID) (*models.Canvas, error) {
+	var canvas *models.Canvas
+	err := telemetry.RunSpan(ctx, "canvases.find_canvas", func(ctx context.Context) error {
+		var findErr error
+		canvas, findErr = models.FindCanvasInTransaction(database.DB(ctx), orgID, canvasID)
+		return findErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return canvas, nil
+}
 
 func ensureCanvasNameAvailableInTransaction(
 	tx *gorm.DB,
