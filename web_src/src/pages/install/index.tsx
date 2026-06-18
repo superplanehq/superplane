@@ -13,6 +13,13 @@ import type { AppEntry } from "@/pages/home/AppDetailModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
+// Treat a cleared/whitespace-only override as "use the default" so the user
+// still installs under the pre-filled name they saw rather than a randomly
+// generated one on the server.
+function resolveCanvasName(nameOverride: string | null, defaultName: string): string {
+  return nameOverride?.trim() ? nameOverride : defaultName;
+}
+
 export function InstallPage() {
   return (
     <AuthGuard>
@@ -44,7 +51,7 @@ function InstallPageContent() {
   // Set org once loaded
   const effectiveOrgId = organizationId || defaultOrganizationId;
   const showOrgPicker = organizations.length > 1;
-  const canvasName = nameOverride ?? defaultName;
+  const canvasName = resolveCanvasName(nameOverride, defaultName);
 
   useReportPageReady(!isLoading, {
     failed: !!(loadError || !preview || !repoParam),
