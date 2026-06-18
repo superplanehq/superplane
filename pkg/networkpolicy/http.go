@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -52,9 +53,9 @@ func ResolveHTTPPolicyInTransaction(tx *gorm.DB) (*HTTPPolicy, error) {
 	var metadata *models.InstallationMetadata
 	var err error
 	if tx == nil {
-		metadata, err = models.GetInstallationMetadata()
+		metadata, err = models.GetInstallationMetadata(database.Conn())
 	} else {
-		metadata, err = models.GetInstallationMetadataInTransaction(tx)
+		metadata, err = models.GetInstallationMetadata(tx)
 	}
 
 	if err != nil {
