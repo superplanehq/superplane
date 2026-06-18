@@ -104,4 +104,30 @@ func Test__ResolveInstallParams(t *testing.T) {
 		resolved := ResolveInstallParams(schemaWithPlaceholder, map[string]string{})
 		assert.Equal(t, "us-east-1", resolved["region"])
 	})
+
+	t.Run("empty secret_picker resolves to empty string, not placeholder or name", func(t *testing.T) {
+		// An optional secret_picker left empty must not be filled with the
+		// placeholder/param-name fallback, since those are not real secret
+		// names and would inject a bogus credential reference into canvas.yaml.
+		secretSchema := []InstallParam{
+			{Name: "ssh_password_secret", Type: ParamTypeSecretPicker, Placeholder: "my-secret"},
+		}
+
+		resolved := ResolveInstallParams(secretSchema, map[string]string{})
+		assert.Equal(t, "", resolved["ssh_password_secret"])
+
+		resolved = ResolveInstallParams(secretSchema, map[string]string{"ssh_password_secret": "  "})
+		assert.Equal(t, "", resolved["ssh_password_secret"])
+	})
+
+	t.Run("secret_picker uses provided value and explicit default", func(t *testing.T) {
+		secretSchema := []InstallParam{
+			{Name: "picked", Type: ParamTypeSecretPicker, Placeholder: "my-secret"},
+			{Name: "defaulted", Type: ParamTypeSecretPicker, Default: "prod-secret"},
+		}
+
+		resolved := ResolveInstallParams(secretSchema, map[string]string{"picked": "user-secret"})
+		assert.Equal(t, "user-secret", resolved["picked"])
+		assert.Equal(t, "prod-secret", resolved["defaulted"])
+	})
 }
