@@ -50,6 +50,92 @@ describe("DraftActionsWidget", () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it("dismisses without logging an error when discarding a draft that is already gone", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => '{"code":5,"message":"version not found","details":[]}',
+    } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onDismiss = vi.fn();
+
+    render(
+      <DraftActionsWidget
+        versionId="draft-1"
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /discard/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("dismisses without logging an error when publishing a draft that is already gone", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, text: async () => "" } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () => '{"code":5,"message":"version not found","details":[]}',
+      } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onDismiss = vi.fn();
+
+    render(
+      <DraftActionsWidget
+        versionId="draft-1"
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /publish/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/publish");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("logs and does not dismiss when discard fails for non-404 reasons", async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: false, status: 500, text: async () => "boom" } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const onDismiss = vi.fn();
+
+    render(
+      <DraftActionsWidget
+        versionId="draft-1"
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /discard/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("discard failed:", 500, "boom");
+  });
+
   it("does not publish when committing staged edits fails", async () => {
     const user = userEvent.setup();
     vi.spyOn(console, "error").mockImplementation(() => {});

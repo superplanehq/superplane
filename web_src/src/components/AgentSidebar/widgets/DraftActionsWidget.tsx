@@ -42,10 +42,19 @@ export function DraftActionsWidget({
       const response = await run();
       if (response.ok) {
         onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
+        return;
       }
+      // The draft can be deleted or published out-of-band (e.g. another tab,
+      // the agent, or a websocket-driven action) between the widget rendering
+      // and the click. In that case the draft this widget references no longer
+      // exists, so the actions are no longer applicable: dismiss the widget
+      // instead of surfacing a stale-state 404 as an error to Sentry.
+      if (response.status === 404) {
+        onDismiss?.();
+        return;
+      }
+      const text = await response.text();
+      console.error(`${action} failed:`, response.status, text);
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
     } finally {
