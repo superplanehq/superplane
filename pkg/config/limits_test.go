@@ -1,4 +1,4 @@
-package core
+package config
 
 import (
 	"testing"
@@ -20,5 +20,22 @@ func TestMaxEmitCount(t *testing.T) {
 	t.Run("ignores invalid env values", func(t *testing.T) {
 		t.Setenv(maxEmitCountEnvVar, "not-a-number")
 		assert.Equal(t, 100, MaxEmitCount())
+	})
+}
+
+func TestMaxPayloadSize(t *testing.T) {
+	t.Run("defaults to 64 KiB", func(t *testing.T) {
+		t.Setenv(maxPayloadSizeEnvVar, "")
+		assert.Equal(t, 64*1024, MaxPayloadSize())
+	})
+
+	t.Run("reads SUPERPLANE_MAX_PAYLOAD_SIZE", func(t *testing.T) {
+		t.Setenv(maxPayloadSizeEnvVar, "8192")
+		assert.Equal(t, 8192, MaxPayloadSize())
+	})
+
+	t.Run("ignores invalid env values", func(t *testing.T) {
+		t.Setenv(maxPayloadSizeEnvVar, "not-a-number")
+		assert.Equal(t, 64*1024, MaxPayloadSize())
 	})
 }

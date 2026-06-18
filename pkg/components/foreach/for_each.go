@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -55,7 +56,7 @@ func (c *ForEach) Documentation() string {
 
 ## Limits
 
-- At most ` + fmt.Sprintf("%d", core.MaxEmitCount()) + ` items per execution. Larger arrays fail with an error.
+- At most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` items per execution. Larger arrays fail with an error.
 
 ## Output Fields (per item)
 
@@ -137,7 +138,7 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 	if len(items) == 0 {
 		return ctx.ExecutionState.Pass()
 	}
-	maxEmitCount := core.MaxEmitCount()
+	maxEmitCount := config.MaxEmitCount()
 	if len(items) > maxEmitCount {
 		return fmt.Errorf("array has %d items; For Each supports at most %d items per execution", len(items), maxEmitCount)
 	}
