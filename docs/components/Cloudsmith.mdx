@@ -53,7 +53,7 @@ The On Compliance Check Completed trigger starts a workflow whenever a package i
 
 ### Webhook Setup
 
-This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.synced` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository.
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.synced` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
 
 ### Output
 

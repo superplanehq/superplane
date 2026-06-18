@@ -1,6 +1,9 @@
 package cloudsmith
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +17,11 @@ import (
 // complianceWebhookEvent is the Cloudsmith event fired once a package has been
 // processed and its license/policy/governance compliance has been evaluated.
 const complianceWebhookEvent = "package.synced"
+
+// signatureHeader is the header Cloudsmith sets on each delivery, formatted as
+// "sha1=<hex>" where the digest is HMAC-SHA1 of the request body keyed by the
+// webhook's signature_key.
+const signatureHeader = "X-Cloudsmith-Signature"
 
 type OnComplianceCheckCompleted struct{}
 
@@ -78,7 +86,7 @@ func (t *OnComplianceCheckCompleted) Documentation() string {
 
 ## Webhook Setup
 
-This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the ` + "`package.synced`" + ` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository.
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the ` + "`package.synced`" + ` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
 
 ## Output
 
@@ -163,7 +171,14 @@ func (t *OnComplianceCheckCompleted) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	webhook, err := client.CreateWebhook(owner, slug, webhookURL, []string{complianceWebhookEvent})
+	// Use the node's webhook secret as Cloudsmith's signature key so deliveries
+	// are signed (HMAC-SHA1) and can be verified in HandleWebhook.
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return fmt.Errorf("failed to get webhook secret: %w", err)
+	}
+
+	webhook, err := client.CreateWebhook(owner, slug, webhookURL, string(secret), []string{complianceWebhookEvent})
 	if err != nil {
 		return fmt.Errorf("failed to create Cloudsmith webhook: %w", err)
 	}
@@ -184,6 +199,20 @@ func (t *OnComplianceCheckCompleted) HandleHook(ctx core.TriggerHookContext) (ma
 }
 
 func (t *OnComplianceCheckCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	// Verify the delivery is genuinely from Cloudsmith using the node's webhook
+	// secret (set as the webhook's signature key at setup).
+	var secret []byte
+	if ctx.Webhook != nil {
+		s, err := ctx.Webhook.GetSecret()
+		if err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("error getting secret: %w", err)
+		}
+		secret = s
+	}
+	if err := verifyCloudsmithSignature(ctx.Headers.Get(signatureHeader), ctx.Body, secret); err != nil {
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature: %w", err)
+	}
+
 	metadata := OnComplianceCheckCompletedMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
@@ -239,6 +268,27 @@ func (t *OnComplianceCheckCompleted) Cleanup(ctx core.TriggerContext) error {
 
 	if err := client.DeleteWebhook(metadata.Repository.Namespace, metadata.Repository.Slug, metadata.WebhookID); err != nil {
 		ctx.Logger.Warnf("failed to delete Cloudsmith webhook during cleanup: %v", err)
+	}
+	return nil
+}
+
+// verifyCloudsmithSignature checks the X-Cloudsmith-Signature header (formatted
+// "sha1=<hex>") against HMAC-SHA1 of the body keyed by secret. When no secret is
+// configured, verification is skipped (mirrors the other integrations).
+func verifyCloudsmithSignature(signature string, body, secret []byte) error {
+	if len(secret) == 0 {
+		return nil
+	}
+	if signature == "" {
+		return fmt.Errorf("missing signature")
+	}
+
+	mac := hmac.New(sha1.New, secret)
+	mac.Write(body)
+	expected := "sha1=" + hex.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		return fmt.Errorf("signature mismatch")
 	}
 	return nil
 }

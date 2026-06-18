@@ -1,6 +1,9 @@
 package cloudsmith
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"strings"
@@ -12,6 +15,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// cloudsmithSig computes the X-Cloudsmith-Signature value for a body + secret.
+func cloudsmithSig(secret string, body []byte) string {
+	mac := hmac.New(sha1.New, []byte(secret))
+	mac.Write(body)
+	return "sha1=" + hex.EncodeToString(mac.Sum(nil))
+}
 
 func Test__OnComplianceCheckCompleted__Setup(t *testing.T) {
 	trigger := &OnComplianceCheckCompleted{}
@@ -132,6 +142,60 @@ func Test__OnComplianceCheckCompleted__HandleWebhook(t *testing.T) {
 		event := events.Payloads[0].Data.(ComplianceCheckEvent)
 		assert.Equal(t, "MIT", event.License)
 		assert.False(t, event.IsQuarantined)
+	})
+
+	t.Run("rejects an invalid signature when a secret is configured", func(t *testing.T) {
+		body := []byte(`{"data":{"name":"x","slug_perm":"y","namespace":"weskk","repository":"superplane-compliance"}}`)
+		events := &contexts.EventContext{}
+		headers := http.Header{}
+		headers.Set("X-Cloudsmith-Signature", "sha1=deadbeef")
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:     body,
+			Events:   events,
+			Metadata: metadata(),
+			Webhook:  &contexts.NodeWebhookContext{Secret: "topsecret"},
+			Headers:  headers,
+			Logger:   log.NewEntry(log.New()),
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		require.ErrorContains(t, err, "invalid signature")
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("rejects a missing signature when a secret is configured", func(t *testing.T) {
+		body := []byte(`{"data":{"name":"x","slug_perm":"y","namespace":"weskk","repository":"superplane-compliance"}}`)
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:     body,
+			Events:   events,
+			Metadata: metadata(),
+			Webhook:  &contexts.NodeWebhookContext{Secret: "topsecret"},
+			Headers:  http.Header{},
+			Logger:   log.NewEntry(log.New()),
+		})
+		assert.Equal(t, http.StatusForbidden, code)
+		require.ErrorContains(t, err, "missing signature")
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("accepts a valid signature and emits", func(t *testing.T) {
+		body := []byte(`{"data":{"name":"sp-compliance-apache","slug_perm":"z","namespace":"weskk","repository":"superplane-compliance","license":"Apache-2.0","status_str":"Completed"}}`)
+		events := &contexts.EventContext{}
+		headers := http.Header{}
+		headers.Set("X-Cloudsmith-Signature", cloudsmithSig("topsecret", body))
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:     body,
+			Events:   events,
+			Metadata: metadata(),
+			Webhook:  &contexts.NodeWebhookContext{Secret: "topsecret"},
+			Headers:  headers,
+			Logger:   log.NewEntry(log.New()),
+		})
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(ComplianceCheckEvent)
+		assert.Equal(t, "Apache-2.0", event.License)
 	})
 
 	t.Run("ignores events from a different repository", func(t *testing.T) {
