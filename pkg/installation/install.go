@@ -175,18 +175,20 @@ func fetchAndSubstituteParams(repo *Repository, userParams map[string]string, or
 		return canvasBody, nil
 	}
 
-	if userParams != nil {
-		if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-		}
-		if err := ValidateSecretPickerParams(params.InstallParams, userParams, organizationID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-		}
-		resolved := ResolveInstallParams(params.InstallParams, userParams)
-		return SubstituteInstallParams(canvasBody, resolved), nil
+	if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	return SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams)), nil
+	// Validate the resolved values rather than the raw user input: defaults,
+	// placeholders, and param-name fallbacks are what actually get substituted
+	// into the canvas, so every secret_picker value that lands there must
+	// reference a real organization secret.
+	resolved := ResolveInstallParams(params.InstallParams, userParams)
+	if err := ValidateSecretPickerParams(params.InstallParams, resolved, organizationID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	return SubstituteInstallParams(canvasBody, resolved), nil
 }
 
 func (s *Service) createCanvas(
