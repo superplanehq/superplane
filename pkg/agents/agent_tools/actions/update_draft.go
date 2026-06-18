@@ -127,7 +127,7 @@ func (a updateDraftAction) Execute(ctx context.Context, session agents.AgentSess
 		Action:     "update_draft",
 		CanvasID:   session.CanvasID,
 		VersionID:  draft.ID.String(),
-		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: stringValue(draft.BranchName)},
+		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
 		NodeIssues: collectNodeIssues(nodes),
 		Summary:    summarizeParsedCanvas(draft.Name, nodes, edges),
 	}, nil
