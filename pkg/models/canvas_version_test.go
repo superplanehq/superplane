@@ -71,8 +71,8 @@ func TestNextDraftDisplayNameDoesNotReuseNumbersAfterDelete(t *testing.T) {
 			return err
 		}
 		assert.Equal(t, "Draft #3", third.DisplayName)
-		require.NotNil(t, second.BranchName)
-		middleBranchName = *second.BranchName
+		require.NotEmpty(t, second.GitBranch)
+		middleBranchName = second.GitBranch
 
 		return deleteRegisteredDraftBranchInTransaction(tx, canvas.ID, middleBranchName)
 	})
@@ -93,7 +93,7 @@ func TestNextDraftDisplayNameDoesNotReuseNumbersAfterDelete(t *testing.T) {
 func deleteRegisteredDraftBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, branchName string) error {
 	result := tx.
 		Where("workflow_id = ?", canvasID).
-		Where("branch_name = ?", branchName).
+		Where("git_branch = ?", branchName).
 		Where("state = ?", models.CanvasVersionStateDraft).
 		Delete(&models.CanvasVersion{})
 	if result.Error != nil {
