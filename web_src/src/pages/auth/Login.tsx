@@ -20,6 +20,7 @@ import {
 } from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
+import { SignupWaitlist } from "./SignupWaitlist";
 
 type AuthConfig = {
   providers: string[];
@@ -419,9 +420,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showSignupWaitlist = isSignupMode && !canSignup;
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
-  const visibleFormError = formError ?? authErrorMessage;
+  const visibleFormError = showSignupWaitlist ? null : (formError ?? authErrorMessage);
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -654,9 +656,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && !canSignup && (
-            <p className="text-sm text-gray-500">Signups are currently disabled.</p>
-          )}
+          {!configLoading && showSignupWaitlist && <SignupWaitlist />}
 
           {!configLoading && !isSignupMode && !hasAnyFormMethod && (
             <p className="text-sm text-gray-500">No login methods are configured.</p>
