@@ -173,6 +173,12 @@ check.configuration.fields:
 check.configuration.fields.baseline.update:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go --update-baseline"
 
+check.models.tx.debt:
+	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go
+
+check.models.tx.debt.baseline.update:
+	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
+
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 

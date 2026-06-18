@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { analytics } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,9 +23,10 @@ export interface PostHogSurvey {
   questions: SurveyQuestion[];
 }
 
-interface OwnerSetupSurveyProps {
+interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
-  organizationId: string;
+  redirectTo: string;
+  onComplete?: () => void;
 }
 
 type SurveyAnswer = string | string[];
@@ -36,6 +38,7 @@ const parseChoiceLabel = (choice: string): { title: string; subtitle: string | n
   if (!match) {
     return { title: choice, subtitle: null };
   }
+
   return { title: match[1].trim(), subtitle: match[2].trim() };
 };
 
@@ -61,22 +64,27 @@ interface SurveyChoiceButtonsProps {
 }
 
 const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSelect }) => (
-  <div className="space-y-2">
+  <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
     {choices.map((choice) => {
       const { title, subtitle } = parseChoiceLabel(choice);
+
       return (
-        <Button
+        <button
           key={choice}
           type="button"
-          variant="outline"
-          className="w-full justify-start whitespace-normal h-auto py-3 text-left"
+          className="group flex w-full items-start justify-between gap-4 px-2 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:hover:bg-gray-800"
           onClick={() => onSelect(choice)}
         >
-          <span className="flex flex-col items-start">
-            <span className="font-medium">{title}</span>
-            {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+          <span className="min-w-0">
+            <span className="block text-sm font-medium leading-5 text-gray-900 dark:text-white">{title}</span>
+            {subtitle && (
+              <span className="mt-1 block text-sm font-normal leading-5 text-gray-500 dark:text-gray-400">
+                {subtitle}
+              </span>
+            )}
           </span>
-        </Button>
+          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-colors group-hover:text-gray-900 dark:group-hover:text-white" />
+        </button>
       );
     })}
   </div>
@@ -91,23 +99,26 @@ interface SurveyMultiChoiceProps {
 
 const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selectedChoices, onToggle, onSubmit }) => (
   <div className="space-y-4">
-    <div className="space-y-2">
+    <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
       {choices.map((choice) => {
         const isChecked = selectedChoices.includes(choice);
         const { title, subtitle } = parseChoiceLabel(choice);
+
         return (
           <label
             key={choice}
-            className="flex items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left cursor-pointer"
+            className="flex cursor-pointer items-start gap-3 px-2 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             <Checkbox
               checked={isChecked}
               onCheckedChange={(checked) => onToggle(choice, checked === true)}
-              className="mt-0.5"
+              className="mt-0.5 shrink-0"
             />
-            <span className="flex flex-col text-sm text-gray-800 dark:text-gray-200">
-              <span className="font-medium">{title}</span>
-              {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+            <span className="min-w-0 text-sm text-gray-800 dark:text-gray-200">
+              <span className="block font-medium leading-5">{title}</span>
+              {subtitle && (
+                <span className="mt-1 block font-normal leading-5 text-gray-500 dark:text-gray-400">{subtitle}</span>
+              )}
             </span>
           </label>
         );
@@ -132,6 +143,7 @@ const SurveyTextQuestion: React.FC<SurveyTextQuestionProps> = ({ placeholder, te
       placeholder={placeholder ?? "Type your answer"}
       value={textAnswer}
       onChange={(event) => onTextChange(event.target.value)}
+      className="min-h-32 resize-none rounded-md"
     />
     <Button type="button" className="w-full" onClick={onSubmit} disabled={!textAnswer.trim()}>
       Continue
@@ -146,28 +158,63 @@ interface SurveyProgressProps {
 }
 
 const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQuestionIndex, onSkip }) => (
-  <div className="flex flex-col items-center gap-3">
-    <div className="flex gap-1.5">
+  <div className="flex items-center justify-between gap-4">
+    <div className="flex gap-1.5" aria-label={`Question ${currentQuestionIndex + 1} of ${questionCount}`}>
       {Array.from({ length: questionCount }).map((_, i) => (
         <div
           key={i}
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            i === currentQuestionIndex ? "w-4 bg-gray-900 dark:bg-white" : "w-1.5 bg-gray-300 dark:bg-gray-600"
+          className={`h-1 transition-all duration-300 ${
+            i === currentQuestionIndex ? "w-8 bg-gray-900 dark:bg-white" : "w-4 bg-gray-300 dark:bg-gray-600"
           }`}
         />
       ))}
     </div>
     <button
       type="button"
-      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+      className="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
       onClick={onSkip}
     >
-      Skip this question
+      Skip
     </button>
   </div>
 );
 
-const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
+const buildSurveyResponseProps = (survey: PostHogSurvey, responses: SurveyResponses) => {
+  const responseProps: Record<string, string | string[]> = {};
+
+  survey.questions.forEach((question, index) => {
+    const answer = responses[index];
+    if (answer === undefined) {
+      return;
+    }
+
+    const key = question.id
+      ? `$survey_response_${question.id}`
+      : index === 0
+        ? "$survey_response"
+        : `$survey_response_${index}`;
+
+    responseProps[key] = answer;
+  });
+
+  return responseProps;
+};
+
+const SurveyQuestionHeader: React.FC<{ question: string | undefined }> = ({ question }) => (
+  <div className="space-y-5">
+    <img src={superplaneLogo} alt="SuperPlane logo" className="h-8 w-8" />
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Welcome to SuperPlane
+      </p>
+      <h4 className="text-balance text-2xl font-semibold leading-8 text-gray-950 dark:text-white">
+        {question ?? "Question"}
+      </h4>
+    </div>
+  </div>
+);
+
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
@@ -180,25 +227,23 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
   const currentType = currentQuestion ? getQuestionType(currentQuestion, currentChoices.length > 0) : "text";
 
+  const handleComplete = useCallback(() => {
+    if (onComplete) {
+      onComplete();
+      return;
+    }
+
+    window.location.href = redirectTo;
+  }, [onComplete, redirectTo]);
+
   const finishSurvey = (responses: SurveyResponses) => {
     if (Object.keys(responses).length === 0) {
       analytics.surveyDismissed(survey.id);
     } else {
-      const responseProps: Record<string, string | string[]> = {};
-      survey.questions.forEach((question, index) => {
-        const answer = responses[index];
-        if (answer === undefined) return;
-        if (question.id) {
-          responseProps[`$survey_response_${question.id}`] = answer;
-        } else if (index === 0) {
-          responseProps["$survey_response"] = answer;
-        } else {
-          responseProps[`$survey_response_${index}`] = answer;
-        }
-      });
-      analytics.surveySent(survey.id, survey.name, responseProps);
+      analytics.surveySent(survey.id, survey.name, buildSurveyResponseProps(survey, responses));
     }
-    window.location.href = `/${organizationId}`;
+
+    handleComplete();
   };
 
   const advanceOrFinish = (responses: SurveyResponses) => {
@@ -209,6 +254,7 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setMultiAnswer([]);
       return;
     }
+
     finishSurvey(responses);
   };
 
@@ -219,7 +265,10 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
 
   const handleSubmitTextAnswer = () => {
     const answer = textAnswer.trim();
-    if (!answer) return;
+    if (!answer) {
+      return;
+    }
+
     const newResponses = { ...surveyResponses, [currentQuestionIndex]: answer };
     advanceOrFinish(newResponses);
   };
@@ -229,11 +278,15 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setMultiAnswer((previous) => [...previous, choice]);
       return;
     }
+
     setMultiAnswer((previous) => previous.filter((item) => item !== choice));
   };
 
   const handleSubmitMultiChoice = () => {
-    if (multiAnswer.length === 0) return;
+    if (multiAnswer.length === 0) {
+      return;
+    }
+
     const newResponses = { ...surveyResponses, [currentQuestionIndex]: multiAnswer };
     advanceOrFinish(newResponses);
   };
@@ -243,29 +296,28 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setTextAnswer("");
       setMultiAnswer([]);
-    } else {
-      finishSurvey(surveyResponses);
+      return;
     }
+
+    finishSurvey(surveyResponses);
   };
 
   useEffect(() => {
     if (currentQuestion) {
       return;
     }
-    analytics.surveyDismissed(survey.id);
-    window.location.href = `/${organizationId}`;
-  }, [currentQuestion, organizationId, survey.id]);
 
-  if (!currentQuestion) return null;
+    analytics.surveyDismissed(survey.id);
+    handleComplete();
+  }, [currentQuestion, handleComplete, survey.id]);
+
+  if (!currentQuestion) {
+    return null;
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {currentQuestion.question ?? "Question"}
-        </h4>
-      </div>
+    <div className="space-y-7">
+      <SurveyQuestionHeader question={currentQuestion.question} />
 
       {currentType === "single_choice" && (
         <SurveyChoiceButtons choices={currentChoices} onSelect={handleSingleChoice} />
@@ -298,4 +350,4 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
 };
 
-export default OwnerSetupSurvey;
+export default PostHogSurveyForm;

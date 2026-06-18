@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,14 +20,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
-	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedNodes := actions.NodesToProto(liveVersion.Nodes)
-
+func SerializeCanvas(
+	canvas *models.Canvas,
+	liveVersion *models.CanvasVersion,
+	user *models.User,
+	status *pb.Canvas_Status,
+) (*pb.Canvas, error) {
 	var createdBy *pb.UserRef
 	if user != nil {
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
@@ -37,48 +34,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 	canvasFolderID := ""
 	if canvas.CanvasFolderID != nil {
 		canvasFolderID = canvas.CanvasFolderID.String()
-	}
-
-	if !includeStatus {
-		return &pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{
-				Id:             canvas.ID.String(),
-				OrganizationId: canvas.OrganizationID.String(),
-				Name:           canvas.Name,
-				Description:    canvas.Description,
-				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:      createdBy,
-				FolderId:       canvasFolderID,
-			},
-			Spec: &pb.Canvas_Spec{
-				Nodes: serializedNodes,
-				Edges: actions.EdgesToProto(liveVersion.Edges),
-			},
-			Status: nil,
-		}, nil
-	}
-
-	// Fetch last executions per node
-	lastExecutions, err := models.FindLastExecutionPerNode(canvas.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch last events per node
-	lastEvents, err := models.FindLastEventPerNode(canvas.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedEvents, err := SerializeCanvasEvents(lastEvents)
-	if err != nil {
-		return nil, err
 	}
 
 	return &pb.Canvas{
@@ -93,13 +48,10 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: serializedNodes,
+			Nodes: actions.NodesToProto(liveVersion.Nodes),
 			Edges: actions.EdgesToProto(liveVersion.Edges),
 		},
-		Status: &pb.Canvas_Status{
-			LastExecutions: serializedExecutions,
-			LastEvents:     serializedEvents,
-		},
+		Status: status,
 	}, nil
 }
 
@@ -278,11 +230,17 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef,
 	return nil
 }
 
-func serializeCanvas(ctx context.Context, canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
+func serializeCanvas(
+	ctx context.Context,
+	canvas *models.Canvas,
+	liveVersion *models.CanvasVersion,
+	user *models.User,
+	status *pb.Canvas_Status,
+) (*pb.Canvas, error) {
 	var proto *pb.Canvas
 	err := telemetry.RunSpan(ctx, "canvases.serialize", func(ctx context.Context) error {
 		var serErr error
-		proto, serErr = SerializeCanvas(canvas, includeStatus, user)
+		proto, serErr = SerializeCanvas(canvas, liveVersion, user, status)
 		return serErr
 	})
 	if err != nil {

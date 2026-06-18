@@ -193,6 +193,21 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	return &canvas, nil
 }
 
+func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {
+	var count int64
+
+	err := tx.Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
 	return FindCanvasWithoutOrgScopeInTransaction(database.Conn(), id)
 }
