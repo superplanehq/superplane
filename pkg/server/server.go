@@ -3,7 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
+	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
+	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -58,10 +62,10 @@ func getAgentProviderOverride() agents.Provider {
 	return agentProviderOverride.provider
 }
 
-func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
 	if provider := getAgentProviderOverride(); provider != nil {
 		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+		return provider, agents.NewService(provider, authService)
 	}
 
 	cfg := config.LoadAnthropicAgentConfig()
@@ -101,7 +105,7 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		return nil, nil
 	}
 
-	service := agents.NewService(provider, authService, jwtSigner, baseURL)
+	service := agents.NewService(provider, authService)
 	log.Info("Anthropic managed agents enabled")
 	return provider, service
 }
@@ -133,6 +137,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUN_FINALIZER") == "yes" {
+		log.Println("Starting Run Finalizer")
+
+		w := workers.NewRunFinalizer(rabbitMQURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
@@ -145,7 +156,7 @@ func startWorkers(
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -243,6 +254,7 @@ func startWorkers(
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
 			Encryptor:         encryptor,
 			ComponentRegistry: registry,
+			GitProvider:       gitProvider,
 			WebhookBaseURL:    getWebhookBaseURL(baseURL),
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),
@@ -449,7 +461,7 @@ func configureLogging() {
 	}
 }
 
-func setupOtelMetrics() {
+func setupOtel() {
 	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
@@ -462,11 +474,40 @@ func setupOtelMetrics() {
 	} else {
 		log.Info("OpenTelemetry metrics initialized")
 	}
+
+	if err := telemetry.InitTracing(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry tracing: %v", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized for critical API endpoints")
+	}
+}
+
+func startPprofServer() {
+	if os.Getenv("PPROF_ENABLED") != "yes" {
+		return
+	}
+
+	port := os.Getenv("PPROF_PORT")
+	if port == "" {
+		port = "6060"
+	}
+
+	// Sample contention so /debug/pprof/block and /debug/pprof/mutex are useful.
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(5)
+
+	go func() {
+		log.Infof("pprof server listening on :%s", port)
+		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+			log.Warnf("pprof server stopped: %v", err)
+		}
+	}()
 }
 
 func Start() {
 	configureLogging()
-	setupOtelMetrics()
+	setupOtel()
+	startPprofServer()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
@@ -560,7 +601,7 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
-	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
+	agentProvider, agentService := buildAgentService(authService)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(

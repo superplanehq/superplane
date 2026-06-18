@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -53,7 +54,7 @@ func (c *AuthReader) GetUser(id uuid.UUID) (*core.User, error) {
 }
 
 func (c *AuthReader) GetRole(name string) (*core.RoleRef, error) {
-	roleDefinition, err := c.authService.GetRoleDefinition(name, models.DomainTypeOrganization, c.orgID.String())
+	roleDefinition, err := c.authService.GetRoleDefinition(context.Background(), name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting role definition: %v", err)
 	}
@@ -80,7 +81,7 @@ func (c *AuthReader) HasRole(role string) (bool, error) {
 		return false, fmt.Errorf("user not authenticated")
 	}
 
-	roles, err := c.authService.GetUserRolesForOrg(c.authenticatedUser.ID.String(), c.orgID.String())
+	roles, err := c.authService.GetUserRolesForOrg(context.Background(), c.authenticatedUser.ID.String(), c.orgID.String())
 	if err != nil {
 		return false, fmt.Errorf("error finding users for role %s: %v", role, err)
 	}
@@ -99,7 +100,7 @@ func (c *AuthReader) InGroup(group string) (bool, error) {
 		return false, fmt.Errorf("user not authenticated")
 	}
 
-	userIDs, err := c.authService.GetGroupUsers(c.orgID.String(), models.DomainTypeOrganization, group)
+	userIDs, err := c.authService.GetGroupUsers(context.Background(), c.orgID.String(), models.DomainTypeOrganization, group)
 	if err != nil {
 		return false, fmt.Errorf("error finding users in group %s: %v", group, err)
 	}

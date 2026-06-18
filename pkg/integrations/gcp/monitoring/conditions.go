@@ -3,6 +3,7 @@ package monitoring
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
@@ -17,7 +18,30 @@ const (
 
 	triggerCount   = "count"
 	triggerPercent = "percent"
+
+	// conditionKind selects how a policy's condition is expressed: a curated
+	// instance metric threshold, or a PromQL query against Google Managed
+	// Prometheus (the Prometheus-style alerting rule).
+	conditionKindThreshold = "threshold"
+	conditionKindPromQL    = "promql"
 )
+
+var conditionKindOptions = []configuration.FieldOption{
+	{Label: "Metric threshold", Value: conditionKindThreshold},
+	{Label: "PromQL query (Managed Prometheus)", Value: conditionKindPromQL},
+}
+
+// evaluationIntervalOptions are how often Cloud Monitoring evaluates a PromQL
+// condition's query.
+var evaluationIntervalOptions = []configuration.FieldOption{
+	{Label: "30 seconds", Value: "30s"},
+	{Label: "1 minute", Value: "60s"},
+	{Label: "5 minutes", Value: "300s"},
+}
+
+func isValidEvaluationInterval(v string) bool {
+	return optionHasValue(evaluationIntervalOptions, v)
+}
 
 // ConditionSpec is one threshold condition within an alerting policy.
 type ConditionSpec struct {
@@ -160,6 +184,110 @@ func conditionFields() []configuration.Field {
 			Placeholder: "e.g. 1",
 		},
 	}
+}
+
+// PromQLSpec holds the PromQL-condition inputs (used when conditionKind=promql).
+type PromQLSpec struct {
+	ConditionKind      string `mapstructure:"conditionKind"`
+	Query              string `mapstructure:"promqlQuery"`
+	Duration           string `mapstructure:"promqlDuration"`
+	EvaluationInterval string `mapstructure:"promqlEvaluationInterval"`
+}
+
+// conditionKindField is the toggle between threshold and PromQL conditions.
+func conditionKindField() configuration.Field {
+	return configuration.Field{
+		Name:        "conditionKind",
+		Label:       "Condition type",
+		Type:        configuration.FieldTypeSelect,
+		Required:    false,
+		Default:     conditionKindThreshold,
+		Description: "Build the condition from a curated instance-metric threshold, or from a PromQL query (Google Managed Prometheus).",
+		TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: conditionKindOptions}},
+	}
+}
+
+// promqlConditionFields are the PromQL inputs, shown when conditionKind=promql.
+func promqlConditionFields() []configuration.Field {
+	promqlOnly := []configuration.VisibilityCondition{{Field: "conditionKind", Values: []string{conditionKindPromQL}}}
+	return []configuration.Field{
+		{
+			Name:                 "promqlQuery",
+			Label:                "PromQL query",
+			Type:                 configuration.FieldTypeText,
+			Required:             false,
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "conditionKind", Values: []string{conditionKindPromQL}}},
+			VisibilityConditions: promqlOnly,
+			Description:          "The PromQL expression. The policy fires while the query returns one or more time series (e.g. an expression with a comparison).",
+			Placeholder:          `rate(container_cpu_usage_seconds_total[5m]) > 0.8`,
+		},
+		{
+			Name:                 "promqlDuration",
+			Label:                "For (duration)",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "0s",
+			VisibilityConditions: promqlOnly,
+			Description:          "How long the query must keep returning results before firing (the PromQL FOR clause).",
+			TypeOptions:          &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: durationOptions}},
+		},
+		{
+			Name:                 "promqlEvaluationInterval",
+			Label:                "Evaluation interval",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "60s",
+			VisibilityConditions: promqlOnly,
+			Description:          "How often Cloud Monitoring evaluates the query.",
+			TypeOptions:          &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: evaluationIntervalOptions}},
+		},
+	}
+}
+
+// buildPolicyConditions assembles the conditions array for either a threshold or
+// a PromQL policy, based on conditionKind (empty defaults to threshold).
+func buildPolicyConditions(p PromQLSpec, thresholds []ConditionSpec) ([]any, error) {
+	if p.ConditionKind == conditionKindPromQL {
+		return buildPromQLConditions(p)
+	}
+	return buildConditions(thresholds)
+}
+
+func buildPromQLConditions(p PromQLSpec) ([]any, error) {
+	query := strings.TrimSpace(p.Query)
+	if query == "" {
+		return nil, errors.New("promqlQuery is required for a PromQL condition")
+	}
+	if p.Duration != "" && !isValidDuration(p.Duration) {
+		return nil, fmt.Errorf("invalid PromQL duration %q", p.Duration)
+	}
+	if p.EvaluationInterval != "" && !isValidEvaluationInterval(p.EvaluationInterval) {
+		return nil, fmt.Errorf("invalid evaluation interval %q", p.EvaluationInterval)
+	}
+	return []any{buildPromQLCondition(query, p.Duration, p.EvaluationInterval)}, nil
+}
+
+func buildPromQLCondition(query, duration, evalInterval string) map[string]any {
+	pql := map[string]any{"query": query}
+	if duration != "" && duration != "0s" {
+		pql["duration"] = duration
+	}
+	if evalInterval != "" {
+		pql["evaluationInterval"] = evalInterval
+	}
+	return map[string]any{
+		"displayName":                      promqlConditionDisplayName(query),
+		"conditionPrometheusQueryLanguage": pql,
+	}
+}
+
+func promqlConditionDisplayName(query string) string {
+	const max = 60
+	q := strings.Join(strings.Fields(query), " ")
+	if len(q) > max {
+		return q[:max-1] + "…"
+	}
+	return q
 }
 
 func validateCondition(c ConditionSpec) error {

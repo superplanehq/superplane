@@ -18,10 +18,12 @@ const (
 	ProviderEventCustomToolResultsRequired ProviderEventType = "custom_tool_results_required"
 	ProviderEventTurnCompleted             ProviderEventType = "turn_completed"
 	ProviderEventSessionFailed             ProviderEventType = "session_failed"
-	ProviderEventOutcomeEvaluation         ProviderEventType = "outcome_evaluation"
-	ProviderEventOutcomeEvaluationStart    ProviderEventType = "outcome_evaluation_start"
-	ProviderEventThreadMessageSent         ProviderEventType = "thread_message_sent"
-	ProviderEventThreadMessageReceived     ProviderEventType = "thread_message_received"
+	// Recoverable provider error; the session keeps running.
+	ProviderEventSessionNotice          ProviderEventType = "session_notice"
+	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
+	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
+	ProviderEventThreadMessageSent      ProviderEventType = "thread_message_sent"
+	ProviderEventThreadMessageReceived  ProviderEventType = "thread_message_received"
 )
 
 type ProviderEvent struct {
@@ -147,8 +149,8 @@ type MessageImage struct {
 }
 
 // SendMessageOptions.ContextPreamble is prepended to the user's message so
-// providers that need caller context inline (e.g. a CLI token on first turn)
-// receive it without a separate system message.
+// providers that need caller context inline (e.g. the canvas/session
+// identifiers) receive it without a separate system message.
 type SendMessageOptions struct {
 	ContextPreamble string
 	// Images are attachments sent to the agent alongside the text content.
@@ -171,6 +173,16 @@ type Provider interface {
 type ProviderSessionCleaner interface {
 	Name() string
 	DeleteSession(ctx context.Context, providerSessionID string) error
+}
+
+type ProviderSessionArchiver interface {
+	Name() string
+	ArchiveSession(ctx context.Context, providerSessionID string) error
+}
+
+type ProviderToolSchemaRevisioner interface {
+	Name() string
+	ToolSchemaRevision() string
 }
 
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")

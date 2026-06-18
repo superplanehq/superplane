@@ -35,6 +35,15 @@ func Conn() *gorm.DB {
 	return dbInstance.Session(&gorm.Session{})
 }
 
+func PoolStats() (sql.DBStats, error) {
+	sqlDB, err := Conn().DB()
+	if err != nil {
+		return sql.DBStats{}, fmt.Errorf("failed to get sql.DB: %w", err)
+	}
+
+	return sqlDB.Stats(), nil
+}
+
 func dbPoolSize() int {
 	poolSize := os.Getenv("DB_POOL_SIZE")
 
@@ -177,7 +186,6 @@ func TruncateTables() error {
 			role_metadata,
 			group_metadata,
 			installation_metadata,
-			blueprints,
 			workflows,
 			workflow_runs,
 			workflow_nodes,

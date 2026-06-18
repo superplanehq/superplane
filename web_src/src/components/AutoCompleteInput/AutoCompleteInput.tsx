@@ -24,6 +24,8 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   expressionMode?: "wrapped" | "raw";
   /** Labels of suggestions to hide (e.g., ["$", "previous"] to restrict to root() only). */
   excludedSuggestions?: string[];
+  /** Minimum height in pixels. Overrides the default derived from `inputSize` (useful for multi-line fields). */
+  minHeight?: number;
 }
 
 const suggestionSortPriority = {
@@ -103,6 +105,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       quickTip,
       expressionMode = "wrapped",
       excludedSuggestions,
+      minHeight,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -168,10 +171,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       // Use the larger of the two heights
       const textareaHeight = textarea.scrollHeight;
       const backdropHeight = backdrop?.scrollHeight ?? 0;
-      const minHeight = INPUT_SIZE_MIN_HEIGHT[inputSize];
-      const finalHeight = Math.max(textareaHeight, backdropHeight, minHeight);
+      const resolvedMinHeight = minHeight ?? INPUT_SIZE_MIN_HEIGHT[inputSize];
+      const finalHeight = Math.max(textareaHeight, backdropHeight, resolvedMinHeight);
       textarea.style.height = `${finalHeight}px`;
-    }, [inputSize]);
+    }, [inputSize, minHeight]);
 
     // Tokenize expression content for syntax highlighting
     const tokenizeExpression = (expr: string): React.ReactNode[] => {

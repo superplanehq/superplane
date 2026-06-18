@@ -68,7 +68,7 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 	}
 
 	if role.Spec.InheritedRole != nil && role.Spec.InheritedRole.Metadata != nil && role.Spec.InheritedRole.Metadata.Name != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
+		inheritedRoleDef, err := authService.GetRoleDefinition(ctx, role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", role.Spec.InheritedRole.Metadata.Name, err)
 			return nil, status.Error(codes.InvalidArgument, "inherited role not found")

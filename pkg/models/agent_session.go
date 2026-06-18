@@ -18,17 +18,19 @@ const (
 )
 
 type AgentSession struct {
-	ID                uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	OrganizationID    uuid.UUID
-	UserID            uuid.UUID
-	CanvasID          uuid.UUID
-	Provider          string
-	ProviderSessionID string
-	Status            string
-	LastActiveAt      *time.Time
-	HeartbeatAt       *time.Time
-	CreatedAt         *time.Time
-	UpdatedAt         *time.Time
+	ID                      uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	OrganizationID          uuid.UUID
+	UserID                  uuid.UUID
+	CanvasID                uuid.UUID
+	Provider                string
+	ProviderSessionID       string
+	AgentToolSchemaRevision string
+	Status                  string
+	LastActiveAt            *time.Time
+	HeartbeatAt             *time.Time
+	ContextReplayedAt       *time.Time
+	CreatedAt               *time.Time
+	UpdatedAt               *time.Time
 }
 
 func (AgentSession) TableName() string { return "agent_sessions" }
@@ -150,18 +152,30 @@ func TouchAgentSessionHeartbeat(sessionID uuid.UUID) error {
 		Error
 }
 
-func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID, providerSessionID, status string) error {
+func MarkAgentSessionContextReplayed(sessionID uuid.UUID) error {
+	now := time.Now()
+	return database.Conn().Model(&AgentSession{}).
+		Where("id = ?", sessionID).
+		Updates(map[string]any{
+			"context_replayed_at": &now,
+			"updated_at":          &now,
+		}).
+		Error
+}
+
+func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID, providerSessionID, toolSchemaRevision, status string) error {
 	now := time.Now()
 	return tx.Model(&AgentSession{}).
 		Where("id = ?", sessionID).
 		Updates(map[string]any{
-			"provider_session_id": providerSessionID,
-			"status":              status,
-			"last_active_at":      &now,
-			"updated_at":          &now,
-			"heartbeat_at":        gorm.Expr("NULL"),
-		}).
-		Error
+			"provider_session_id":        providerSessionID,
+			"agent_tool_schema_revision": toolSchemaRevision,
+			"status":                     status,
+			"last_active_at":             &now,
+			"updated_at":                 &now,
+			"heartbeat_at":               gorm.Expr("NULL"),
+			"context_replayed_at":        gorm.Expr("NULL"),
+		}).Error
 }
 
 func UpdateAgentSessionStatusIfUnchangedInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string, unchangedSince *time.Time) (bool, error) {

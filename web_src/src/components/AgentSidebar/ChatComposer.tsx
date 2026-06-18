@@ -25,6 +25,11 @@ type ChatComposerProps = {
   runs?: CanvasesCanvasRun[];
 };
 
+const modePlaceholder = {
+  builder: "Describe the change to build...",
+  operator: "Ask the agent…",
+} as const;
+
 export function ChatComposer({
   onSend,
   onStop,
@@ -54,7 +59,7 @@ export function ChatComposer({
           setCursorPos={c.setCursorPos}
           onKeyDown={c.handleKeyDown}
           onPaste={c.handlePaste}
-          placeholder="Ask the agent…"
+          placeholder={modePlaceholder[agentMode]}
           textareaRef={c.textareaRef}
           backdropRef={c.backdropRef}
         />

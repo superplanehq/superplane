@@ -52,6 +52,7 @@ spec:
 		"",
 		r.AuthService,
 		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},
@@ -116,6 +117,7 @@ spec:
 		"",
 		r.AuthService,
 		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("true"))},
 		},
@@ -133,6 +135,7 @@ spec:
 		"",
 		r.AuthService,
 		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseYAML("$"))},
 		},
@@ -180,6 +183,7 @@ spec:
 		"",
 		r.AuthService,
 		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},
@@ -235,6 +239,7 @@ spec:
 		"",
 		r.AuthService,
 		nil,
+		false,
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},

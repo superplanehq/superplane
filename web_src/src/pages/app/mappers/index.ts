@@ -61,6 +61,11 @@ import {
   eventStateRegistry as cloudflareEventStateRegistry,
 } from "./cloudflare/index";
 import {
+  componentMappers as cloudsmithComponentMappers,
+  triggerRenderers as cloudsmithTriggerRenderers,
+  eventStateRegistry as cloudsmithEventStateRegistry,
+} from "./cloudsmith/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -123,6 +128,7 @@ import {
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
 import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
   componentMappers as jfrogArtifactoryComponentMappers,
@@ -299,6 +305,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
@@ -333,6 +340,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  coolify: coolifyComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
@@ -346,6 +354,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
+  cloudsmith: cloudsmithTriggerRenderers,
   digitalocean: digitaloceanTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
@@ -393,6 +402,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,

@@ -1,17 +1,38 @@
-import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion } from "@/api-client";
+import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion, type CanvasesStagingSummary } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+import { isNotFoundError } from "../workflowPageHelpers";
 
+// Confirms whether a canvas version still exists. Used to distinguish a deleted
+// version from an incidental repository-file 404, since fetchCanvasVersionWithSpec
+// loads the version and its canvas.yaml in parallel. A non-404 describe error is
+// treated as "exists" so the original failure is surfaced as transient.
+export async function canvasVersionExists(canvasId: string, versionId: string): Promise<boolean> {
+  try {
+    const response = await canvasesDescribeCanvasVersion(withOrganizationHeader({ path: { canvasId, versionId } }));
+    return Boolean(response.data?.version?.metadata?.id);
+  } catch (error) {
+    return !isNotFoundError(error);
+  }
+}
+
+// fetchRepositorySpecFileContent reads a canvas.yaml/console.yaml file. When
+// `stage` is set (only meaningful for a draft version), the server returns the
+// effective staged content (staged edits overlaid on the committed version).
 export async function fetchRepositorySpecFileContent(
   canvasId: string,
   path: string,
   versionId?: string,
+  stage = false,
 ): Promise<string> {
   const params = new URLSearchParams({ path });
   if (versionId) {
     params.set("version_id", versionId);
+  }
+  if (stage && versionId) {
+    params.set("stage", "true");
   }
 
   const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params}`, {
@@ -25,6 +46,20 @@ export async function fetchRepositorySpecFileContent(
   }
 
   return response.text();
+}
+
+// fetchCanvasVersionStagingSummary returns the uncommitted staging summary for a
+// draft version, used to drive the orange "uncommitted changes" indicators.
+export async function fetchCanvasVersionStagingSummary(
+  canvasId: string,
+  versionId: string,
+): Promise<CanvasesStagingSummary | undefined> {
+  const response = await canvasesDescribeCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId, versionId },
+    }),
+  );
+  return response.data?.stagingSummary;
 }
 
 export function canvasVersionWithSpecFromYaml(
@@ -50,6 +85,7 @@ export function canvasVersionWithSpecFromYaml(
 export async function fetchCanvasVersionWithSpec(
   canvasId: string,
   versionId: string,
+  stage = false,
 ): Promise<CanvasesCanvasVersion | undefined> {
   const [describeResponse, canvasYaml] = await Promise.all([
     canvasesDescribeCanvasVersion(
@@ -57,7 +93,7 @@ export async function fetchCanvasVersionWithSpec(
         path: { canvasId, versionId },
       }),
     ),
-    fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId),
+    fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, stage),
   ]);
 
   return canvasVersionWithSpecFromYaml(describeResponse.data?.version, canvasYaml);
@@ -85,8 +121,9 @@ export function consoleSpecFromYaml(consoleYaml: string): ConsoleSpecData | unde
 export async function fetchConsoleSpecFromRepository(
   canvasId: string,
   versionId?: string,
+  stage = false,
 ): Promise<ConsoleSpecData | undefined> {
-  const consoleYaml = await fetchRepositorySpecFileContent(canvasId, CONSOLE_YAML_PATH, versionId);
+  const consoleYaml = await fetchRepositorySpecFileContent(canvasId, CONSOLE_YAML_PATH, versionId, stage);
   if (!consoleYaml.trim()) {
     return undefined;
   }

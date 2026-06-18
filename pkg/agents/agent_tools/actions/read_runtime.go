@@ -23,12 +23,10 @@ const readRuntimeActionName = "read_runtime"
 var runtimeResources = []string{
 	"memory",
 	"runs",
-	"canvas_events",
 	"event_executions",
 	"node_executions",
 	"node_queue_items",
 	"node_events",
-	"child_executions",
 }
 
 type readRuntimeAction struct {
@@ -51,7 +49,7 @@ func (a readRuntimeAction) Execute(ctx context.Context, session agents.AgentSess
 	if a.registry == nil {
 		return runtimeReadResult{}, fmt.Errorf("component registry is not configured")
 	}
-	if err := a.checkReadPermission(session); err != nil {
+	if err := a.checkReadPermission(ctx, session); err != nil {
 		return runtimeReadResult{}, err
 	}
 
@@ -76,12 +74,12 @@ func (a readRuntimeAction) Execute(ctx context.Context, session agents.AgentSess
 	}, nil
 }
 
-func (a readRuntimeAction) checkReadPermission(session agents.AgentSessionContext) error {
+func (a readRuntimeAction) checkReadPermission(ctx context.Context, session agents.AgentSessionContext) error {
 	if a.auth == nil {
 		return fmt.Errorf("authorization service is unavailable")
 	}
 
-	allowed, err := a.auth.CheckOrganizationPermission(session.UserID, session.OrganizationID, "canvases", "read")
+	allowed, err := a.auth.CheckOrganizationPermission(ctx, session.UserID, session.OrganizationID, "canvases", "read")
 	if err != nil {
 		return fmt.Errorf("check canvases:read permission: %w", err)
 	}
@@ -119,8 +117,6 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 			return nil, err
 		}
 		return protoPayload(canvasactions.ListRuns(ctx, a.registry, canvasID, input.Limit, before, states, results))
-	case "canvas_events":
-		return protoPayload(canvasactions.ListCanvasEvents(ctx, a.registry, canvasID, input.Limit, before))
 	case "event_executions":
 		if strings.TrimSpace(input.EventID) == "" {
 			return nil, fmt.Errorf("event_id is required for event_executions")
@@ -149,15 +145,6 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 			return nil, fmt.Errorf("node_id is required for node_events")
 		}
 		return protoPayload(canvasactions.ListNodeEvents(ctx, a.registry, canvasID, input.NodeID, input.Limit, before))
-	case "child_executions":
-		if strings.TrimSpace(input.ExecutionID) == "" {
-			return nil, fmt.Errorf("execution_id is required for child_executions")
-		}
-		executionID, err := uuid.Parse(input.ExecutionID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid execution_id: %w", err)
-		}
-		return protoPayload(canvasactions.ListChildExecutions(ctx, a.registry, canvasID, executionID))
 	default:
 		return nil, fmt.Errorf("unsupported runtime resource %q", resource)
 	}

@@ -51,7 +51,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 		return nil
 	}
 
-	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return err
 	}
@@ -175,8 +175,12 @@ func CountCanvasEvents(canvasID uuid.UUID, nodeID string) (int64, error) {
 }
 
 func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
+	return ListRootCanvasEventsInTransaction(database.Conn(), canvasID, limit, before)
+}
+
+func ListRootCanvasEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL")
 
@@ -197,9 +201,13 @@ func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]C
 }
 
 func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
+	return CountRootCanvasEventsInTransaction(database.Conn(), canvasID)
+}
+
+func CountRootCanvasEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID) (int64, error) {
 	var count int64
 
-	err := database.Conn().
+	err := tx.
 		Model(&CanvasEvent{}).
 		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL").
@@ -320,7 +328,7 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		Table("workflow_events").
 		Select("workflow_events.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_events"},
 			Options:  "SKIP LOCKED",
 		}).

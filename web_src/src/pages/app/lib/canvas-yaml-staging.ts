@@ -15,11 +15,6 @@ type ParsedCanvasYaml = {
   spec?: {
     nodes?: ComponentsNode[];
     edges?: ComponentsEdge[];
-    changeManagement?: CanvasesCanvas["spec"] extends infer Spec
-      ? Spec extends { changeManagement?: infer ChangeManagement }
-        ? ChangeManagement
-        : never
-      : never;
   };
 };
 
@@ -44,18 +39,23 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
     return null;
   }
 
-  if (!parsed.spec || typeof parsed.spec !== "object") {
+  if (parsed.spec === undefined || (parsed.spec !== null && typeof parsed.spec !== "object")) {
     return null;
   }
 
-  if (parsed.spec.nodes !== undefined && !Array.isArray(parsed.spec.nodes)) {
+  const spec = parsed.spec ?? {};
+
+  if (spec.nodes !== undefined && !Array.isArray(spec.nodes)) {
+    return null;
+  }
+
+  if (spec.edges !== undefined && !Array.isArray(spec.edges)) {
     return null;
   }
 
   return {
-    nodes: (parsed.spec.nodes ?? []).map(normalizeCanvasYamlNode),
-    edges: (parsed.spec.edges ?? []).map(normalizeCanvasYamlEdge),
-    changeManagement: parsed.spec.changeManagement,
+    nodes: (spec.nodes ?? []).map(normalizeCanvasYamlNode),
+    edges: (spec.edges ?? []).map(normalizeCanvasYamlEdge),
   };
 }
 
@@ -130,7 +130,6 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
     spec: {
       nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
       edges: (workflow.spec?.edges ?? []).map(normalizeCanvasYamlEdge),
-      ...(workflow.spec?.changeManagement ? { changeManagement: workflow.spec.changeManagement } : {}),
     },
   };
 

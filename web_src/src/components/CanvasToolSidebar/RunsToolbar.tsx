@@ -1,5 +1,7 @@
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { cn } from "@/lib/utils";
 import { RunFiltersPopover, type TriggerOption } from "./RunFiltersPopover";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunsToolbarProps {
   selectedStatuses: Set<RunStatusFilter>;
@@ -21,7 +23,8 @@ export function RunsToolbar({
   onClearTriggers,
 }: RunsToolbarProps) {
   return (
-    <div className="flex shrink-0 items-center gap-1.5 border-b border-slate-200 px-1 py-1.5">
+    <div className={cn(RUNS_SIDEBAR_ROW_CLASS, "justify-between pr-1.5")}>
+      <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-gray-500">Runs</span>
       <RunFiltersPopover
         selectedStatuses={selectedStatuses}
         selectedTriggerIds={selectedTriggerIds}

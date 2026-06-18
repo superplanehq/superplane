@@ -23,6 +23,18 @@ func summarizeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion
 	return summary
 }
 
+// summarizeParsedCanvas builds a summary from nodes/edges parsed out of staged
+// canvas.yaml. Staging never materializes the version row, so the agent's reads
+// and writes summarize the parsed staged graph instead of a persisted version.
+func summarizeParsedCanvas(canvasName string, nodes []models.Node, edges []models.Edge) summary {
+	return summary{
+		CanvasName: canvasName,
+		NodeCount:  len(nodes),
+		EdgeCount:  len(edges),
+		Nodes:      summarizeNodes(nodes, 20),
+	}
+}
+
 func summarizeNodes(nodes []models.Node, limit int) []nodeSummary {
 	count := len(nodes)
 	if count > limit {
@@ -60,8 +72,6 @@ func nodeRefName(ref models.NodeRef) string {
 		return ref.Component.Name
 	case ref.Trigger != nil:
 		return ref.Trigger.Name
-	case ref.Blueprint != nil:
-		return ref.Blueprint.ID
 	case ref.Widget != nil:
 		return ref.Widget.Name
 	default:

@@ -33,7 +33,7 @@ func init() {
 
 /*
  * Configuration for the component.
- * Filled when the component is added to a blueprint/workflow.
+ * Filled when the component is added to a workflow.
  */
 type Config struct {
 	Items []Item `json:"items" mapstructure:"items"`

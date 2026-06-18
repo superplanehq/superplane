@@ -1,6 +1,7 @@
 package canvases
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,15 +27,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	changeManagementEnabled, err := isChangeManagementEnabledForCanvas(canvas)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedNodes, err := serializeCanvasNodes(canvas.ID, liveVersion.Nodes)
-	if err != nil {
-		return nil, err
-	}
+	serializedNodes := actions.NodesToProto(liveVersion.Nodes)
 
 	var createdBy *pb.UserRef
 	if user != nil {
@@ -58,9 +52,8 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes:            serializedNodes,
-				Edges:            actions.EdgesToProto(liveVersion.Edges),
-				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+				Nodes: serializedNodes,
+				Edges: actions.EdgesToProto(liveVersion.Edges),
 			},
 			Status: nil,
 		}, nil
@@ -72,17 +65,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	executionIDs := make([]string, len(lastExecutions))
-	for i, execution := range lastExecutions {
-		executionIDs[i] = execution.ID.String()
-	}
-
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions)
 	if err != nil {
 		return nil, err
 	}
@@ -110,73 +93,14 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes:            serializedNodes,
-			Edges:            actions.EdgesToProto(liveVersion.Edges),
-			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+			Nodes: serializedNodes,
+			Edges: actions.EdgesToProto(liveVersion.Edges),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
 			LastEvents:     serializedEvents,
 		},
 	}, nil
-}
-
-func serializeChangeManagement(
-	enabled bool,
-	approvers []models.CanvasChangeRequestApprover,
-) *pb.Canvas_ChangeManagement {
-	cm := &pb.Canvas_ChangeManagement{
-		Enabled:   enabled,
-		Approvals: make([]*pb.Canvas_ChangeManagement_Approver, 0, len(approvers)),
-	}
-
-	for _, approver := range approvers {
-		cm.Approvals = append(cm.Approvals, &pb.Canvas_ChangeManagement_Approver{
-			Type:     canvasChangeRequestApproverTypeToProto(approver.Type),
-			UserId:   approver.User,
-			RoleName: approver.Role,
-		})
-	}
-
-	return cm
-}
-
-func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManagement_Approver_Type {
-	switch value {
-	case models.CanvasChangeRequestApproverTypeAnyone:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE
-	case models.CanvasChangeRequestApproverTypeUser:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_USER
-	case models.CanvasChangeRequestApproverTypeRole:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_ROLE
-	default:
-		return pb.Canvas_ChangeManagement_Approver_TYPE_UNSPECIFIED
-	}
-}
-
-func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*componentpb.Node, error) {
-	serialized := actions.NodesToProto(nodes)
-	if len(serialized) == 0 {
-		return serialized, nil
-	}
-
-	canvasNodes, err := models.FindCanvasNodes(canvasID)
-	if err != nil {
-		return nil, err
-	}
-
-	pausedByID := make(map[string]bool, len(canvasNodes))
-	for _, node := range canvasNodes {
-		pausedByID[node.NodeID] = node.State == models.CanvasNodeStatePaused
-	}
-
-	for _, node := range serialized {
-		if paused, ok := pausedByID[node.Id]; ok {
-			node.Paused = paused
-		}
-	}
-
-	return serialized, nil
 }
 
 func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {
@@ -352,4 +276,18 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef,
 	}
 
 	return nil
+}
+
+func serializeCanvas(ctx context.Context, canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
+	var proto *pb.Canvas
+	err := telemetry.RunSpan(ctx, "canvases.serialize", func(ctx context.Context) error {
+		var serErr error
+		proto, serErr = SerializeCanvas(canvas, includeStatus, user)
+		return serErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return proto, nil
 }

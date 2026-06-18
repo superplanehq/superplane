@@ -25,26 +25,14 @@ type Canvas struct {
 	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
-	Description             string                                           `gorm:"column:description;->"`
-	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`
-	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover] `gorm:"column:change_request_approvers;->"`
-	Nodes                   datatypes.JSONSlice[Node]                        `gorm:"column:nodes;->"`
-	Edges                   datatypes.JSONSlice[Edge]                        `gorm:"column:edges;->"`
-	CreatedBy               *uuid.UUID
-	NextDraftDisplayNumber  int `gorm:"column:next_draft_display_number;not null;default:1"`
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
-	DeletedAt               gorm.DeletedAt `gorm:"index"`
-}
-
-func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
-	if c == nil || len(c.ChangeRequestApprovers) == 0 {
-		return DefaultCanvasChangeRequestApprovers()
-	}
-
-	approvers := make([]CanvasChangeRequestApprover, len(c.ChangeRequestApprovers))
-	copy(approvers, c.ChangeRequestApprovers)
-	return approvers
+	Description            string                    `gorm:"column:description;->"`
+	Nodes                  datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
+	Edges                  datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
+	CreatedBy              *uuid.UUID
+	NextDraftDisplayNumber int `gorm:"column:next_draft_display_number;not null;default:1"`
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -71,8 +59,6 @@ func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 		Select(
 			"workflows.*",
 			"live_version.description AS description",
-			"live_version.change_management_enabled AS change_management_enabled",
-			"live_version.change_request_approvers AS change_request_approvers",
 			"live_version.nodes AS nodes",
 			"live_version.edges AS edges",
 		)
@@ -207,6 +193,21 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	return &canvas, nil
 }
 
+func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {
+	var count int64
+
+	err := tx.Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
 	return FindCanvasWithoutOrgScopeInTransaction(database.Conn(), id)
 }
@@ -306,8 +307,6 @@ func ListDeletedCanvases() ([]Canvas, error) {
 			"workflows.updated_at",
 			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
 			"live_version.description AS description",
-			"live_version.change_management_enabled AS change_management_enabled",
-			"live_version.change_request_approvers AS change_request_approvers",
 		).
 		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		Find(&canvases).
@@ -377,8 +376,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 
 		canvas.Name = liveVersion.Name
 		canvas.Description = liveVersion.Description
-		canvas.ChangeManagementEnabled = liveVersion.ChangeManagementEnabled
-		canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(liveVersion.EffectiveChangeRequestApprovers())
 	}
 
 	return &canvas, nil

@@ -4,18 +4,116 @@ import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { coerceMonacoValue } from "@/lib/monaco";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { toTestId } from "@/lib/testID";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-function resolveTextFieldLanguage(field: FieldRendererProps["field"]): string {
+const PLAIN_TEXT_MIN_HEIGHT_PX = 120;
+
+const CODE_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: "on" as const,
+  wordWrap: "on" as const,
+  folding: false,
+  autoIndent: "none" as const,
+  formatOnPaste: false,
+  formatOnType: false,
+  tabSize: 2,
+  insertSpaces: true,
+  scrollBeyondLastLine: false,
+  renderWhitespace: "boundary" as const,
+  smoothScrolling: true,
+  cursorBlinking: "smooth" as const,
+  contextmenu: true,
+  selectOnLineNumbers: true,
+  bracketPairColorization: {
+    enabled: true,
+  },
+  suggestOnTriggerCharacters: true,
+  quickSuggestions: {
+    other: true,
+    strings: true,
+    comments: false,
+  },
+  wordBasedSuggestions: "off" as const,
+};
+
+function resolveTextFieldLanguage(field: FieldRendererProps["field"]): string | undefined {
   const language = field.typeOptions?.text?.language?.trim();
-  return language || "plaintext";
+  return language || undefined;
 }
 
-export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
+export const TextFieldRenderer: React.FC<FieldRendererProps> = (props) => {
+  const language = resolveTextFieldLanguage(props.field);
+
+  // Code fields (those that declare a language, e.g. scripts/commands) keep the
+  // rich Monaco editor. Plain text fields (messages, descriptions, prompts) use a
+  // lightweight multi-line editor instead.
+  if (language) {
+    return <CodeTextFieldRenderer {...props} language={language} />;
+  }
+
+  return <PlainTextFieldRenderer {...props} />;
+};
+
+const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  allowExpressions = false,
+  excludedSuggestions,
+  valuePreviewLabel,
+}) => {
+  const resolvedValue = value ?? field.defaultValue;
+  const currentValue = resolvedValue == null ? "" : String(resolvedValue);
+  const shouldPreserveEmpty = field.togglable === true;
+  const emit = (nextValue: string) => onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined);
+
+  if (!allowExpressions) {
+    return (
+      <Textarea
+        value={currentValue}
+        onChange={(e) => emit(e.target.value)}
+        placeholder={field.placeholder || ""}
+        style={{ minHeight: PLAIN_TEXT_MIN_HEIGHT_PX }}
+        data-testid={toTestId(`text-field-${field.name}`)}
+      />
+    );
+  }
+
+  return (
+    <AutoCompleteInput
+      exampleObj={autocompleteExampleObj ?? null}
+      value={currentValue}
+      onChange={emit}
+      placeholder={field.placeholder || ""}
+      startWord="{{"
+      prefix="{{ "
+      suffix=" }}"
+      inputSize="md"
+      minHeight={PLAIN_TEXT_MIN_HEIGHT_PX}
+      showValuePreview
+      valuePreviewLabel={valuePreviewLabel}
+      quickTip="Tip: type `{{` to start an expression."
+      excludedSuggestions={excludedSuggestions}
+      data-testid={toTestId(`text-field-${field.name}`)}
+    />
+  );
+};
+
+const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  language,
+}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
-  const language = resolveTextFieldLanguage(field);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: language,
@@ -32,35 +130,6 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
   const handleEditorChange = (newValue: string | undefined) => {
     const valueToUse = newValue || "";
     onChange(valueToUse || undefined);
-  };
-
-  const editorOptions = {
-    minimap: { enabled: false },
-    fontSize: 13,
-    lineNumbers: "on" as const,
-    wordWrap: "on" as const,
-    folding: false,
-    autoIndent: "none" as const,
-    formatOnPaste: false,
-    formatOnType: false,
-    tabSize: 2,
-    insertSpaces: true,
-    scrollBeyondLastLine: false,
-    renderWhitespace: "boundary" as const,
-    smoothScrolling: true,
-    cursorBlinking: "smooth" as const,
-    contextmenu: true,
-    selectOnLineNumbers: true,
-    bracketPairColorization: {
-      enabled: language !== "plaintext",
-    },
-    suggestOnTriggerCharacters: true,
-    quickSuggestions: {
-      other: true,
-      strings: true,
-      comments: false,
-    },
-    wordBasedSuggestions: "off" as const,
   };
 
   return (
@@ -86,7 +155,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             theme="vs"
-            options={editorOptions}
+            options={CODE_EDITOR_OPTIONS}
           />
         </div>
       </div>
@@ -125,7 +194,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
               onMount={handleEditorMount}
               theme="vs"
               options={{
-                ...editorOptions,
+                ...CODE_EDITOR_OPTIONS,
                 automaticLayout: true,
               }}
             />

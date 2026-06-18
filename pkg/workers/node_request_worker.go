@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,12 +30,14 @@ type NodeRequestWorker struct {
 	encryptor      crypto.Encryptor
 	webhookBaseURL string
 	authService    authorization.Authorization
+	gitProvider    gitprovider.Provider
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor:      encryptor,
 		registry:       registry,
+		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
 		authService:    authService,
@@ -74,7 +76,9 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					}
 
 					if request.ExecutionID != nil {
-						messages.NewCanvasExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+						if err := messages.PublishCanvasExecutionByID(request.WorkflowID, *request.ExecutionID); err != nil {
+							w.log("Error publishing execution state: %v", err)
+						}
 					}
 				}(request)
 			}
@@ -167,7 +171,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 			"parameters": spec.InvokeAction.Parameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
-		Build(node.Configuration.Data())
+		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return fmt.Errorf("failed to resolve trigger configuration: %w", err)
 	}
@@ -271,19 +275,19 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 }
 
 func (w *NodeRequestWorker) invokeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+	if request.ExecutionID == nil {
+		return fmt.Errorf("execution id is required for component hook")
+	}
+
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
 	if err != nil {
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
-	if execution.ParentExecutionID == nil {
-		return w.invokeParentNodeComponentAction(tx, request, execution, onNewEvents)
-	}
-
-	return w.invokeChildNodeComponentAction(tx, request, execution, onNewEvents)
+	return w.invokeExecutionComponentHook(tx, request, execution, onNewEvents)
 }
 
-func (w *NodeRequestWorker) invokeParentNodeComponentAction(
+func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	tx *gorm.DB,
 	request *models.CanvasNodeRequest,
 	execution *models.CanvasNodeExecution,
@@ -309,7 +313,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
-	logger := logging.ForExecution(execution, nil)
+	logger := logging.ForExecution(execution)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
@@ -321,6 +325,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 	}
 
 	if node.AppInstallationID != nil {
@@ -334,75 +339,6 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 	}
 
 	hookCtx.Logger = logger
-	err = hookProvider.HandleHook(hookCtx)
-	if err != nil {
-		return fmt.Errorf("action execution failed: %w", err)
-	}
-
-	err = tx.Save(&execution).Error
-	if err != nil {
-		return fmt.Errorf("error saving execution after action handler: %v", err)
-	}
-
-	return request.Complete(tx)
-}
-
-func (w *NodeRequestWorker) invokeChildNodeComponentAction(
-	tx *gorm.DB,
-	request *models.CanvasNodeRequest,
-	execution *models.CanvasNodeExecution,
-	onNewEvents func([]models.CanvasEvent),
-) error {
-	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
-	if err != nil {
-		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
-	}
-
-	parentNode, err := models.FindCanvasNode(tx, execution.WorkflowID, parentExecution.NodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNode.Ref.Data().Blueprint.ID)
-	if err != nil {
-		return fmt.Errorf("blueprint not found: %w", err)
-	}
-
-	childNodeID := strings.Split(execution.NodeID, ":")[1]
-	childNode, err := blueprint.FindNode(childNodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	spec := request.Spec.Data()
-	if spec.InvokeAction == nil {
-		return fmt.Errorf("spec is not specified")
-	}
-
-	hookProvider, _, err := w.registry.FindActionHook(childNode.Ref.Component.Name, spec.InvokeAction.ActionName)
-	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
-	}
-
-	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
-	if err != nil {
-		return fmt.Errorf("workflow not found: %w", err)
-	}
-
-	hookCtx := core.ActionHookContext{
-		Name:           spec.InvokeAction.ActionName,
-		Configuration:  execution.Configuration.Data(),
-		Parameters:     spec.InvokeAction.Parameters,
-		Logger:         logging.ForExecution(execution, parentExecution),
-		HTTP:           w.registry.HTTPContextInTransaction(tx),
-		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
-		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, nil, nil),
-		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
-	}
-
 	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)

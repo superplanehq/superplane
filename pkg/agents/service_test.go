@@ -3,6 +3,7 @@ package agents_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -49,26 +49,42 @@ func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.Pro
 const testProviderName = "test"
 
 type fakeProvider struct {
-	mu                  sync.Mutex
-	createCalled        int
-	sendCalled          int
-	interruptCalled     int
-	interruptedSessions []string
-	sentSessions        []string
-	defineSessions      []string
-	lastPreamble        string
-	lastImages          []agents.MessageImage
-	lastOutcomeOpts     agents.DefineOutcomeOptions
-	createSessionErr    error
-	createHook          func() error
-	sendErr             error
-	sendErrs            []error
-	interruptErr        error
-	defineOutcomeErr    error
-	defineErrs          []error
+	mu                   sync.Mutex
+	createCalled         int
+	sendCalled           int
+	interruptCalled      int
+	interruptedSessions  []string
+	sentSessions         []string
+	sentMessages         []string
+	defineSessions       []string
+	defineDescriptions   []string
+	archivedSessions     []string
+	lastPreamble         string
+	lastImages           []agents.MessageImage
+	lastOutcomeOpts      agents.DefineOutcomeOptions
+	toolSchemaRevision   string
+	onToolSchemaRevision func()
+	createSessionErr     error
+	createHook           func() error
+	sendErr              error
+	sendErrs             []error
+	interruptErr         error
+	archiveErr           error
+	defineOutcomeErr     error
+	defineErrs           []error
 }
 
 func (f *fakeProvider) Name() string { return testProviderName }
+
+func (f *fakeProvider) ToolSchemaRevision() string {
+	if f.onToolSchemaRevision != nil {
+		f.onToolSchemaRevision()
+	}
+	if f.toolSchemaRevision == "" {
+		return "test-revision"
+	}
+	return f.toolSchemaRevision
+}
 
 func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	f.mu.Lock()
@@ -85,11 +101,12 @@ func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOp
 	return &agents.CreateSessionResult{ProviderSessionID: "provider-session-" + uuid.NewString()}, nil
 }
 
-func (f *fakeProvider) SendMessage(_ context.Context, providerSessionID string, _ string, opts agents.SendMessageOptions) error {
+func (f *fakeProvider) SendMessage(_ context.Context, providerSessionID string, message string, opts agents.SendMessageOptions) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sendCalled++
 	f.sentSessions = append(f.sentSessions, providerSessionID)
+	f.sentMessages = append(f.sentMessages, message)
 	f.lastPreamble = opts.ContextPreamble
 	f.lastImages = opts.Images
 	if len(f.sendErrs) > 0 {
@@ -112,6 +129,7 @@ func (f *fakeProvider) DefineOutcome(_ context.Context, providerSessionID string
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.defineSessions = append(f.defineSessions, providerSessionID)
+	f.defineDescriptions = append(f.defineDescriptions, opts.Description)
 	if len(f.defineErrs) > 0 {
 		err := f.defineErrs[0]
 		f.defineErrs = f.defineErrs[1:]
@@ -128,10 +146,16 @@ func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.P
 	return nil
 }
 
+func (f *fakeProvider) ArchiveSession(_ context.Context, providerSessionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.archivedSessions = append(f.archivedSessions, providerSessionID)
+	return f.archiveErr
+}
+
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
 	t.Helper()
-	signer := jwt.NewSigner("test-secret")
-	return agents.NewService(provider, r.AuthService, signer, "https://api.test.local")
+	return agents.NewService(provider, r.AuthService)
 }
 
 func setupCanvasForUser(t *testing.T, r *support.ResourceRegistry) *models.Canvas {
@@ -213,6 +237,59 @@ func TestService_EnsureSession_IsIdempotent(t *testing.T) {
 
 	assert.Equal(t, first.ID, second.ID)
 	assert.Equal(t, 1, provider.createCalled, "second call must not provision a new upstream session")
+}
+
+func TestService_EnsureSession_ReplacesIdleSessionWhenToolSchemaRevisionChanges(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	first, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := first.ProviderSessionID
+
+	provider.toolSchemaRevision = "revision-2"
+	refreshed, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, first.ID, refreshed.ID)
+	assert.Equal(t, "revision-2", refreshed.AgentToolSchemaRevision)
+	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Nil(t, refreshed.ContextReplayedAt)
+	assert.Equal(t, []string{originalProviderSessionID}, provider.archivedSessions)
+	assert.Equal(t, 2, provider.createCalled)
+}
+
+func TestService_EnsureSession_ReturnsExistingSessionWhenStaleRefreshRacesWithStreamingTurn(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	var revisionChecks atomic.Int32
+	provider.toolSchemaRevision = "revision-2"
+	provider.onToolSchemaRevision = func() {
+		if revisionChecks.Add(1) != 1 {
+			return
+		}
+		require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusStreaming))
+	}
+
+	refreshed, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, session.ID, refreshed.ID)
+	assert.Equal(t, session.ProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, 1, provider.createCalled, "busy refresh race must not create a replacement provider session")
+	assert.Empty(t, provider.archivedSessions)
 }
 
 func TestService_EnsureSession_FailsWhenProviderErrors(t *testing.T) {
@@ -378,6 +455,97 @@ func TestService_SendMessage_RecreatesUnavailableProviderSession(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestService_SendMessage_RewindsPriorMessagesAfterProviderSessionRecovery(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{
+		sendErrs: []error{agents.ErrProviderSessionUnavailable, nil},
+	}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID: session.ID,
+		Role:      models.AgentMessageRoleUser,
+		Content:   "what changed last time?",
+	}))
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID: session.ID,
+		Role:      models.AgentMessageRoleAssistant,
+		Content:   "We inspected the draft and found a missing approval node.",
+	}))
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID:  session.ID,
+		Role:       models.AgentMessageRoleTool,
+		ToolName:   "superplane_app",
+		ToolStatus: models.AgentToolStatusFinished,
+		Content:    `{"canvas_yaml":"very large details are compacted"}`,
+	}))
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "continue from there", nil)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+
+	require.Len(t, provider.sentMessages, 2)
+	assert.Equal(t, "continue from there", provider.sentMessages[0])
+	retryMessage := provider.sentMessages[1]
+	assert.Contains(t, retryMessage, "[SuperPlane conversation rewind]")
+	assert.Contains(t, retryMessage, "User: what changed last time?")
+	assert.Contains(t, retryMessage, "Assistant: We inspected the draft")
+	assert.Contains(t, retryMessage, "Tool superplane_app finished")
+	assert.Contains(t, retryMessage, "[Current user request]\ncontinue from there")
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, refreshed.ContextReplayedAt)
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 10)
+	require.NoError(t, err)
+	require.Len(t, stored, 4)
+	assert.Equal(t, "continue from there", stored[3].Content)
+	assert.NotContains(t, stored[3].Content, "conversation rewind")
+}
+
+func TestService_SendMessage_RewindsAfterToolSchemaRefreshAndTrimsOldMessages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+	for i := 0; i < 35; i++ {
+		require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+			SessionID: session.ID,
+			Role:      models.AgentMessageRoleUser,
+			Content:   fmt.Sprintf("prior-message-%02d", i),
+		}))
+	}
+
+	provider.toolSchemaRevision = "revision-2"
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "new work", nil)
+	require.NoError(t, err)
+
+	require.Len(t, provider.sentMessages, 1)
+	assert.Contains(t, provider.sentMessages[0], "[SuperPlane conversation rewind]")
+	assert.NotContains(t, provider.sentMessages[0], "prior-message-00")
+	assert.Contains(t, provider.sentMessages[0], "prior-message-34")
+	assert.Contains(t, provider.sentMessages[0], "[Current user request]\nnew work")
+	assert.Equal(t, []string{originalProviderSessionID}, provider.archivedSessions)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "revision-2", refreshed.AgentToolSchemaRevision)
+	assert.NotNil(t, refreshed.ContextReplayedAt)
+	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
+}
+
 func TestService_SendMessage_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -490,23 +658,25 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first", nil)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
-	assert.Contains(t, provider.lastPreamble, "api_token:")
-	assert.Contains(t, provider.lastPreamble, "api_token_expires_at:")
-	assert.Contains(t, provider.lastPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
-	assert.Contains(t, provider.lastPreamble, "Do not run `superplane version` as a preflight.")
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
-	assert.Contains(t, provider.lastPreamble, "GET /api/v1/canvases/{canvas_id}/console")
+	assert.Contains(t, provider.lastPreamble, "All SuperPlane access goes through the agent tools.")
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
+	// The agent must never receive a usable API/CLI credential; everything
+	// goes through the server-side tools.
+	assert.NotContains(t, provider.lastPreamble, "api_token:")
+	assert.NotContains(t, provider.lastPreamble, "api_base_url:")
+	assert.NotContains(t, provider.lastPreamble, "SUPERPLANE_TOKEN")
+	assert.NotContains(t, provider.lastPreamble, "superplane version")
 
 	require.NoError(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle))
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second", nil)
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastPreamble, "api_token:",
-		"a fresh api_token must be re-injected on every turn so the session never expires mid-conversation")
+	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
+		"the session context must be re-injected on every turn")
 }
 
 func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
@@ -527,7 +697,7 @@ func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry", nil)
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastPreamble, "api_token:",
+	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
 		"preamble must still be injected after the previous attempt failed at the provider")
 }
 
@@ -552,12 +722,12 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 		3,
 	)
 	require.NoError(t, err)
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Prefer 'superplane_app' action 'update_draft'")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps console set ... -f console.yaml --draft-id <draft-id>")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'update_draft'")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "create_draft' when 'read' returned live/no version_id")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
+	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
+	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps")
 }
 
 func TestService_SendMessage_PrivateToUser(t *testing.T) {

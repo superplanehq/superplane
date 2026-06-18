@@ -81,14 +81,11 @@ kind: Canvas
 metadata:
   name: Empty
 spec:
-  changeManagement:
-    enabled: true
 `;
 
     expect(parseCanvasYamlToSpec(yamlText)).toEqual({
       nodes: [],
       edges: [],
-      changeManagement: { enabled: true },
     });
   });
 

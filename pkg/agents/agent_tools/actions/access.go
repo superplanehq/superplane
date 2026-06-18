@@ -23,21 +23,21 @@ func newAccessAction(deps Dependencies) accessAction {
 }
 
 type organizationPermissionChecker interface {
-	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)
+	CheckOrganizationPermission(ctx context.Context, userID, orgID, resource, action string) (bool, error)
 }
 
 func (a accessAction) Name() string {
 	return accessActionName
 }
 
-func (a accessAction) Execute(_ context.Context, session agents.AgentSessionContext, _ Input) (any, error) {
+func (a accessAction) Execute(ctx context.Context, session agents.AgentSessionContext, _ Input) (any, error) {
 	if strings.TrimSpace(session.CanvasID) == "" {
 		return accessResult{}, fmt.Errorf("session canvas id is required")
 	}
 
 	permissions := agents.AgentTokenPermissions(session.CanvasID)
 	scopes := agents.AgentTokenScopes(session.CanvasID)
-	accessible, unavailable, err := a.apiAccess(session, permissions)
+	accessible, unavailable, err := a.apiAccess(ctx, session, permissions)
 	if err != nil {
 		return accessResult{}, err
 	}
@@ -48,7 +48,7 @@ func (a accessAction) Execute(_ context.Context, session agents.AgentSessionCont
 		OrganizationID: session.OrganizationID,
 		UserID:         session.UserID,
 		TokenScopes:    scopes,
-		ToolActions:    a.toolActions(session, permissions),
+		ToolActions:    a.toolActions(ctx, session, permissions),
 		Accessible:     accessible,
 		Unavailable:    unavailable,
 		Notes: []string{
@@ -59,10 +59,10 @@ func (a accessAction) Execute(_ context.Context, session agents.AgentSessionCont
 	}, nil
 }
 
-func (a accessAction) apiAccess(session agents.AgentSessionContext, permissions []jwt.Permission) ([]apiAccessResult, []apiAccessResult, error) {
+func (a accessAction) apiAccess(ctx context.Context, session agents.AgentSessionContext, permissions []jwt.Permission) ([]apiAccessResult, []apiAccessResult, error) {
 	rules := authorization.DefaultAuthorizationRules()
 	methods := sortedRuleMethods(rules)
-	rbac := newRBACCache(a.auth, session.UserID, session.OrganizationID)
+	rbac := newRBACCache(ctx, a.auth, session.UserID, session.OrganizationID)
 
 	accessible := []apiAccessResult{}
 	unavailable := []apiAccessResult{}
@@ -87,8 +87,8 @@ func (a accessAction) apiAccess(session agents.AgentSessionContext, permissions 
 	return accessible, unavailable, nil
 }
 
-func (a accessAction) toolActions(session agents.AgentSessionContext, permissions []jwt.Permission) []toolAccessResult {
-	rbac := newRBACCache(a.auth, session.UserID, session.OrganizationID)
+func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessionContext, permissions []jwt.Permission) []toolAccessResult {
+	rbac := newRBACCache(ctx, a.auth, session.UserID, session.OrganizationID)
 	actions := []struct {
 		name        string
 		resource    string
@@ -99,7 +99,13 @@ func (a accessAction) toolActions(session agents.AgentSessionContext, permission
 		{name: accessActionName, description: "No API permission required; reports this session's token and interceptor access."},
 		{name: readActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: readRuntimeActionName, resource: "canvases", operation: "read", scoped: true},
+		{name: listFilesActionName, resource: "canvases", operation: "read", scoped: true},
+		{name: readFileActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listIntegrationsActionName, resource: "integrations", operation: "read"},
+		{name: createDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: writeFileActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: deleteFileActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: commitFilesActionName, resource: "canvases", operation: "update_version", scoped: true},
 		{name: updateDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
 	}
 
@@ -209,6 +215,7 @@ func accessDeniedReason(tokenAllowed bool, tokenReason string, rbacAllowed bool,
 }
 
 type rbacCache struct {
+	ctx            context.Context
 	auth           organizationPermissionChecker
 	userID         string
 	organizationID string
@@ -221,8 +228,9 @@ type rbacDecision struct {
 	err     error
 }
 
-func newRBACCache(auth organizationPermissionChecker, userID, organizationID string) *rbacCache {
+func newRBACCache(ctx context.Context, auth organizationPermissionChecker, userID, organizationID string) *rbacCache {
 	return &rbacCache{
+		ctx:            ctx,
 		auth:           auth,
 		userID:         userID,
 		organizationID: organizationID,
@@ -246,7 +254,7 @@ func (c *rbacCache) check(resource, operation string) rbacDecision {
 		return rbacDecision{allowed: false, reason: "authorization service is unavailable"}
 	}
 
-	allowed, err := c.auth.CheckOrganizationPermission(c.userID, c.organizationID, resource, operation)
+	allowed, err := c.auth.CheckOrganizationPermission(c.ctx, c.userID, c.organizationID, resource, operation)
 	if err != nil {
 		return rbacDecision{err: fmt.Errorf("check RBAC permission %s:%s: %w", resource, operation, err)}
 	}

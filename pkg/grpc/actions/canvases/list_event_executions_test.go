@@ -87,7 +87,7 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
 	require.NoError(t, err)
@@ -98,63 +98,6 @@ func Test__ListEventExecutions__ReturnsParentExecutionsForEvent(t *testing.T) {
 	assert.Equal(t, parentExecution.ID.String(), execution.Id)
 	assert.Equal(t, canvas.ID.String(), execution.CanvasId)
 	assert.Equal(t, "node-1", execution.NodeId)
-	assert.Empty(t, execution.ParentExecutionId)
-	assert.Empty(t, execution.ChildExecutions)
-}
-
-func Test__ListEventExecutions__ReturnsParentExecutionsWithChildExecutions(t *testing.T) {
-	r := support.Setup(t)
-
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-1",
-				Name:   "Node 1",
-				Type:   models.NodeTypeBlueprint,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Blueprint: &models.BlueprintRef{ID: "test-blueprint"},
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
-
-	childEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "child-node-1", "default", nil)
-	childEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "child-node-2", "default", nil)
-
-	childExecution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "child-node-1", rootEvent.ID, childEvent1.ID, &parentExecution.ID)
-	childExecution2 := support.CreateCanvasNodeExecution(t, canvas.ID, "child-node-2", rootEvent.ID, childEvent2.ID, &parentExecution.ID)
-
-	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.Len(t, response.Executions, 1)
-
-	execution := response.Executions[0]
-	assert.Equal(t, parentExecution.ID.String(), execution.Id)
-	assert.Equal(t, canvas.ID.String(), execution.CanvasId)
-	assert.Equal(t, "node-1", execution.NodeId)
-	assert.Empty(t, execution.ParentExecutionId)
-
-	require.Len(t, execution.ChildExecutions, 2)
-
-	childExecutionIDs := []string{execution.ChildExecutions[0].Id, execution.ChildExecutions[1].Id}
-	assert.Contains(t, childExecutionIDs, childExecution1.ID.String())
-	assert.Contains(t, childExecutionIDs, childExecution2.ID.String())
-
-	for _, childExec := range execution.ChildExecutions {
-		assert.Equal(t, canvas.ID.String(), childExec.CanvasId)
-		assert.Equal(t, parentExecution.ID.String(), childExec.ParentExecutionId)
-		assert.Empty(t, childExec.ChildExecutions)
-	}
 }
 
 func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *testing.T) {
@@ -183,8 +126,8 @@ func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *tes
 	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
-	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent2.ID, event2.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent2.ID, event2.ID)
 
 	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent1.ID.String())
 	require.NoError(t, err)

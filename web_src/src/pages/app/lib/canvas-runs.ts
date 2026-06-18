@@ -1,14 +1,19 @@
 import type {
-  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "../mappers";
 import { buildEventInfo, buildExecutionInfo, getNodeComponentName } from "../utils";
+
+export type CanvasEventWithExecutions = CanvasesCanvasEvent & {
+  executions?: CanvasesCanvasNodeExecutionRef[];
+};
 
 export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
@@ -114,17 +119,36 @@ export function getStatusBadgeProps(status: string) {
 
 export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
 
-export function filterRunEvents(
-  events: CanvasesCanvasEventWithExecutions[],
+export function getRunRootEventForDisplay(run: CanvasesCanvasRun): CanvasEventWithExecutions | null {
+  const rootEvent = run.rootEvent;
+  if (!rootEvent?.id) {
+    return null;
+  }
+
+  return {
+    id: rootEvent.id,
+    canvasId: run.canvasId,
+    nodeId: rootEvent.nodeId,
+    channel: rootEvent.channel,
+    customName: rootEvent.customName,
+    data: rootEvent.data,
+    createdAt: rootEvent.createdAt,
+    executions: run.executions,
+  };
+}
+
+export function filterRuns(
+  runs: CanvasesCanvasRun[],
   nodes: ComponentsNode[],
   statusFilter: RunsStatusFilter,
   searchQuery: string,
-) {
+): CanvasesCanvasRun[] {
   const query = searchQuery.trim().toLowerCase();
-  return events.filter((event) => {
-    const executions = event.executions || [];
+  return runs.filter((run) => {
+    const executions = run.executions || [];
     if (statusFilter !== "all" && !matchesStatusFilter(executions, statusFilter)) return false;
-    if (query && !matchesSearchQuery(event, executions, nodes, query)) return false;
+    const rootEvent = getRunRootEventForDisplay(run);
+    if (query && rootEvent && !matchesSearchQuery(rootEvent, executions, nodes, query)) return false;
     return true;
   });
 }
@@ -139,7 +163,7 @@ function matchesStatusFilter(executions: CanvasesCanvasNodeExecutionRef[], statu
 }
 
 function matchesSearchQuery(
-  event: CanvasesCanvasEventWithExecutions,
+  event: CanvasEventWithExecutions,
   executions: CanvasesCanvasNodeExecutionRef[],
   nodes: ComponentsNode[],
   query: string,
@@ -165,10 +189,10 @@ function matchesSearchQuery(
   return searchableText.includes(query);
 }
 
-export function countUnacknowledgedErrors(events: CanvasesCanvasEventWithExecutions[]): number {
+export function countUnacknowledgedErrors(runs: CanvasesCanvasRun[]): number {
   let count = 0;
-  for (const event of events) {
-    for (const exec of event.executions || []) {
+  for (const run of runs) {
+    for (const exec of run.executions || []) {
       if (exec.result === "RESULT_FAILED" && exec.resultReason !== "RESULT_REASON_ERROR_RESOLVED") {
         count++;
       }
@@ -183,25 +207,27 @@ export function findNode(nodes: ComponentsNode[], nodeId: string | undefined): C
   return nodes.find((n) => n.id === nodeId) || nodes.find((n) => n.id === baseNodeId);
 }
 
-export function mergeQueueItemsWithEvents(
-  events: CanvasesCanvasEventWithExecutions[],
+export function mergeQueueItemsWithRuns(
+  runs: CanvasesCanvasRun[],
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
 ): {
   queueItemsByEventId: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  allEvents: CanvasesCanvasEventWithExecutions[];
+  allRuns: CanvasesCanvasRun[];
 } {
   const map: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
   const orphansByEvent: Record<
     string,
     { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }
   > = {};
-  const eventIds = new Set(events.map((e) => e.id));
+  const rootEventIds = new Set(
+    runs.map((run) => run.rootEvent?.id).filter((eventId): eventId is string => Boolean(eventId)),
+  );
 
   for (const items of Object.values(nodeQueueItemsMap)) {
     for (const item of items) {
       const eventId = item.rootEvent?.id;
       if (!eventId) continue;
-      if (eventIds.has(eventId)) {
+      if (rootEventIds.has(eventId)) {
         if (!map[eventId]) map[eventId] = [];
         map[eventId].push(item);
       } else {
@@ -211,29 +237,34 @@ export function mergeQueueItemsWithEvents(
     }
   }
 
-  const orphanEvents: CanvasesCanvasEventWithExecutions[] = Object.entries(orphansByEvent).map(
+  const orphanRuns: CanvasesCanvasRun[] = Object.entries(orphansByEvent).map(
     ([eventId, { event: rootEvent, items }]) => ({
       id: eventId,
       canvasId: items[0]?.canvasId,
-      nodeId: rootEvent?.nodeId,
-      channel: rootEvent?.channel,
-      data: rootEvent?.data as Record<string, unknown> | undefined,
-      createdAt: rootEvent?.createdAt,
+      rootEvent: rootEvent as CanvasesCanvasEvent | undefined,
       executions: [],
     }),
   );
 
-  if (orphanEvents.length === 0) return { queueItemsByEventId: map, allEvents: events };
+  if (orphanRuns.length === 0) return { queueItemsByEventId: map, allRuns: runs };
 
   for (const [eventId, { items }] of Object.entries(orphansByEvent)) {
     map[eventId] = items;
   }
 
-  const merged = [...orphanEvents, ...events];
+  const merged = [...orphanRuns, ...runs];
   merged.sort((a, b) => {
-    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const ta = a.createdAt
+      ? new Date(a.createdAt).getTime()
+      : a.rootEvent?.createdAt
+        ? new Date(a.rootEvent.createdAt).getTime()
+        : 0;
+    const tb = b.createdAt
+      ? new Date(b.createdAt).getTime()
+      : b.rootEvent?.createdAt
+        ? new Date(b.rootEvent.createdAt).getTime()
+        : 0;
     return tb - ta;
   });
-  return { queueItemsByEventId: map, allEvents: merged };
+  return { queueItemsByEventId: map, allRuns: merged };
 }

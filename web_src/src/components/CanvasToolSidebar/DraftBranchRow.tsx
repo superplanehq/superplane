@@ -3,6 +3,12 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { draftBranchName, draftDisplayName, draftOwnerName, draftUpdatedAt, draftVersionId } from "@/lib/draftVersion";
+import {
+  draftBranchRowBackgroundClassName,
+  draftBranchStatusBadge,
+  type DraftBranchEditStatus,
+} from "@/pages/app/lib/draft-branch-edit-status";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 function formatUpdatedAt(value?: string): string {
   if (!value) {
@@ -20,6 +26,7 @@ function formatUpdatedAt(value?: string): string {
 export function DraftBranchRow({
   draft,
   isActive,
+  editStatus = "ready",
   canUpdateCanvas,
   deletePending,
   onOpen,
@@ -27,6 +34,7 @@ export function DraftBranchRow({
 }: {
   draft: CanvasesCanvasVersion;
   isActive: boolean;
+  editStatus?: DraftBranchEditStatus;
   canUpdateCanvas: boolean;
   deletePending?: boolean;
   onOpen: (branchName: string) => void;
@@ -36,37 +44,37 @@ export function DraftBranchRow({
   const displayName = draftDisplayName(draft);
   const ownerName = draftOwnerName(draft);
   const versionId = draftVersionId(draft);
+  const statusBadge = draftBranchStatusBadge(editStatus, isActive);
+  const rowTitle = [displayName, branchName, ownerName, formatUpdatedAt(draftUpdatedAt(draft))]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
-      className={cn("flex items-start gap-2 border-b border-slate-100 px-4 py-3", isActive ? "bg-blue-50" : "bg-white")}
+      className={cn(RUNS_SIDEBAR_ROW_CLASS, draftBranchRowBackgroundClassName(isActive, editStatus))}
       data-testid="canvas-draft-branch-row"
+      title={rowTitle}
     >
       <button
         type="button"
-        className="min-w-0 flex-1 text-left"
+        className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         onClick={() => branchName && onOpen(branchName)}
         disabled={!branchName}
       >
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
-        </div>
-        <p className="mt-0.5 truncate text-xs text-slate-500">{branchName}</p>
-        <p className="mt-1 text-xs text-slate-500">
-          {ownerName} · {formatUpdatedAt(draftUpdatedAt(draft))}
-        </p>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-900">{displayName}</span>
+        <span className={cn(statusBadge.className, "shrink-0")}>{statusBadge.label}</span>
       </button>
       {canUpdateCanvas && onDelete && versionId ? (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-600"
+          className="size-7 shrink-0 text-slate-500 hover:text-red-600"
           aria-label={`Delete ${displayName}`}
           disabled={deletePending}
           onClick={() => onDelete(versionId)}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="size-4" />
         </Button>
       ) : null}
     </div>

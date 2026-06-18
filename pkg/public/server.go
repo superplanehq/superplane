@@ -29,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
@@ -39,7 +40,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -139,6 +139,27 @@ func getOtelMetricRoute(ctx context.Context) string {
 	}
 
 	return route.pattern
+}
+
+func resolveCriticalHTTPRoute(r *http.Request) string {
+	route := getOtelMetricRoute(r.Context())
+	if route != "" {
+		return route
+	}
+
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+
+	currentRoute := mux.CurrentRoute(r)
+	if currentRoute != nil {
+		routeTemplate, err := currentRoute.GetPathTemplate()
+		if err == nil {
+			return routeTemplate
+		}
+	}
+
+	return ""
 }
 
 func NewServer(
@@ -244,6 +265,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
@@ -262,6 +284,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
+	opts = append(opts, telemetry.GRPCGatewayDialOptions()...)
 
 	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
@@ -309,11 +332,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}
 
 	err = pbWidgets.RegisterWidgetsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-	if err != nil {
-		return err
-	}
-
-	err = pbBlueprints.RegisterBlueprintsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -387,7 +405,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/actions").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
@@ -437,7 +454,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -454,7 +471,7 @@ func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) htt
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-account-id", account.ID.String())
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -538,6 +555,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 			next.ServeHTTP(w, withOtelMetricRoute(r))
 		})
 	})
+	r.Use(middleware.CriticalHTTPTraceMiddleware(resolveCriticalHTTPRoute))
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",
 		otelmux.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
@@ -714,6 +732,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		integrationInstance.Capabilities,
 	)
 
+	logging.ForIntegration(*integrationInstance).WithField("source", "oauth_callback").Info("Integration operation may write secrets")
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:           logging.ForIntegration(*integrationInstance),
 		Request:          r,
@@ -1273,7 +1292,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
-				Logger:         logging.ForExecution(execution, nil),
+				Logger:         logging.ForExecution(execution),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),

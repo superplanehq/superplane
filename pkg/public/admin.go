@@ -17,6 +17,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
 
@@ -326,10 +329,17 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
 
-	organizations, total, err := models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+	var organizations []models.OrganizationWithCounts
+	var total int64
+	err := telemetry.RunSpan(ctx, "organizations.list", func(ctx context.Context) error {
+		var listErr error
+		organizations, total, listErr = models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+		return listErr
+	})
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -345,23 +355,32 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		CreatedAt   *string `json:"created_at,omitempty"`
 	}
 
-	items := make([]orgItem, 0, len(organizations))
-	for _, org := range organizations {
-		item := orgItem{
-			ID:          org.ID.String(),
-			Name:        org.Name,
-			Description: org.Description,
-			CanvasCount: org.CanvasCount,
-			MemberCount: org.MemberCount,
+	var items []orgItem
+	_ = telemetry.RunSpan(ctx, "organizations.serialize", func(ctx context.Context) error {
+		items = make([]orgItem, 0, len(organizations))
+		for _, org := range organizations {
+			item := orgItem{
+				ID:          org.ID.String(),
+				Name:        org.Name,
+				Description: org.Description,
+				CanvasCount: org.CanvasCount,
+				MemberCount: org.MemberCount,
+			}
+
+			if org.CreatedAt != nil {
+				formatted := org.CreatedAt.Format(time.RFC3339)
+				item.CreatedAt = &formatted
+			}
+
+			items = append(items, item)
 		}
 
-		if org.CreatedAt != nil {
-			formatted := org.CreatedAt.Format(time.RFC3339)
-			item.CreatedAt = &formatted
+		if span := trace.SpanFromContext(ctx); span.IsRecording() {
+			span.SetAttributes(attribute.Int("organizations.count", len(items)))
 		}
 
-		items = append(items, item)
-	}
+		return nil
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(paginatedResponse{

@@ -61,9 +61,9 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	case "session.status_terminated":
 		return sessionFailedEvent(raw), true
 	case "session.error":
-		// Managed Agents can emit recoverable internal errors and keep the
-		// session running; only status_terminated is terminal for us.
-		return agents.ProviderEvent{}, false
+		// Recoverable error: surface a notice but keep streaming. Only
+		// status_terminated is terminal.
+		return sessionNoticeEvent(raw), true
 	case "span.outcome_evaluation_start":
 		return outcomeEvaluationStartEvent(raw), true
 	case "agent.thread_message_sent":
@@ -135,6 +135,17 @@ func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
 	return agents.ProviderEvent{
 		Type:         agents.ProviderEventSessionFailed,
 		ErrorMessage: msg,
+	}
+}
+
+func sessionNoticeEvent(raw anthropicEvent) agents.ProviderEvent {
+	msg := "the agent hit a recoverable error and is retrying"
+	if raw.Error != nil && raw.Error.Message != "" {
+		msg = raw.Error.Message
+	}
+	return agents.ProviderEvent{
+		Type:         agents.ProviderEventSessionNotice,
+		ErrorMessage: redactSensitive(msg),
 	}
 }
 
@@ -216,8 +227,9 @@ func joinText(blocks []anthropicContentBlock) string {
 	return strings.Join(parts, "")
 }
 
-// JWTs are the only secret shape we inject into the preamble today; the
-// agent shouldn't be echoing them back through bash or assistant text.
+// Defense in depth: the agent is no longer handed any credential, but if a
+// JWT-shaped secret ever surfaces in tool output or assistant text we still
+// redact it rather than relay it to the user.
 var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`)
 
 func redactSensitive(s string) string {

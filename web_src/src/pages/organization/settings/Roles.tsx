@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
@@ -26,6 +27,10 @@ export function Roles({ organizationId }: RolesProps) {
   const canCreateRoles = canAct("roles", "create");
   const canUpdateRoles = canAct("roles", "update");
   const canDeleteRoles = canAct("roles", "delete");
+
+  useReportPageReady(!loadingRoles && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const roleHref = (role: RolesRole) => `/${organizationId}/settings/create-role/${role.metadata?.name}`;
 

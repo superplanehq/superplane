@@ -4,10 +4,24 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesCommitCanvasRepositoryFiles } = vi.hoisted(() => ({
+const {
+  canvasFoldersUpdateCanvasFolder,
+  canvasesListRuns,
+  canvasesDescribeRun,
+  canvasesStageCanvasRepositoryFile,
+  canvasesCommitCanvasStaging,
+  canvasesDiscardCanvasStaging,
+  canvasesDescribeCanvasVersion,
+  canvasesListCanvasVersions,
+} = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
-  canvasesCommitCanvasRepositoryFiles: vi.fn(),
+  canvasesDescribeRun: vi.fn(),
+  canvasesStageCanvasRepositoryFile: vi.fn(),
+  canvasesCommitCanvasStaging: vi.fn(),
+  canvasesDiscardCanvasStaging: vi.fn(),
+  canvasesDescribeCanvasVersion: vi.fn(),
+  canvasesListCanvasVersions: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -16,12 +30,19 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
-    canvasesCommitCanvasRepositoryFiles,
+    canvasesDescribeRun,
+    canvasesStageCanvasRepositoryFile,
+    canvasesCommitCanvasStaging,
+    canvasesDiscardCanvasStaging,
+    canvasesDescribeCanvasVersion,
+    canvasesListCanvasVersions,
   };
 });
 
 import {
   canvasKeys,
+  ensureDraftVersionExists,
+  useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
   useUpdateCanvasFolderMembership,
@@ -144,6 +165,66 @@ describe("useInfiniteCanvasRuns", () => {
         }),
       );
     });
+  });
+});
+
+describe("useDescribeRun", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches a run by id", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeRun.mockResolvedValueOnce({
+      data: {
+        run: { id: "run-42", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      },
+    });
+
+    const { result } = renderHook(() => useDescribeRun("canvas-1", "run-42"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.run?.id).toBe("run-42");
+    });
+
+    expect(canvasesDescribeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1", runId: "run-42" },
+      }),
+    );
+  });
+
+  it("does not overwrite fresher websocket run state in the describe cache", async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(canvasKeys.run("canvas-1", "run-42"), {
+      run: {
+        id: "run-42",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: "2026-06-01T12:01:00.000Z",
+      },
+    });
+    canvasesDescribeRun.mockResolvedValueOnce({
+      data: {
+        run: {
+          id: "run-42",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          updatedAt: "2026-06-01T12:00:00.000Z",
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useDescribeRun("canvas-1", "run-42"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.run?.state).toBe("STATE_FINISHED");
+    });
+    expect(result.current.data?.run?.result).toBe("RESULT_PASSED");
   });
 });
 
@@ -281,13 +362,15 @@ const emptyConsoleYaml =
 const afterConsoleYaml =
   "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n";
 
-function mockConsoleRepositoryFileFetch(yamlBody: string) {
+function mockConsoleRepositoryFileFetch(yamlBody: string, options?: { committedYaml?: string }) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/repository/file") && url.includes("console.yaml")) {
-        return new Response(yamlBody, { status: 200 });
+        const committedYaml = options?.committedYaml ?? yamlBody;
+        const body = url.includes("stage=true") ? yamlBody : committedYaml;
+        return new Response(body, { status: 200 });
       }
       return new Response("not found", { status: 404 });
     }),
@@ -306,7 +389,14 @@ describe("useUpdateCanvasConsole", () => {
   it("registers a canvas version websocket echo before saving dashboard changes", async () => {
     const queryClient = createQueryClient();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
-    canvasesCommitCanvasRepositoryFiles.mockResolvedValue({ data: {} });
+    canvasesStageCanvasRepositoryFile.mockResolvedValue({ data: {} });
+    canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
+    canvasesDiscardCanvasStaging.mockResolvedValue({
+      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+    });
+    canvasesDescribeCanvasVersion.mockResolvedValue({
+      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+    });
     mockConsoleRepositoryFileFetch(emptyConsoleYaml);
 
     const { result } = renderHook(
@@ -320,23 +410,22 @@ describe("useUpdateCanvasConsole", () => {
     await result.current.mutateAsync({ panels: [], layout: [] });
 
     expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
-    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledOnce();
-    expect(canvasesCommitCanvasRepositoryFiles).toHaveBeenCalledWith(
+    expect(canvasesDiscardCanvasStaging).toHaveBeenCalledOnce();
+    expect(canvasesDiscardCanvasStaging).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { canvasId: "canvas-1" },
-        body: expect.objectContaining({
-          versionId: "version-1",
-          operations: [expect.objectContaining({ path: "console.yaml" })],
-        }),
+        path: { canvasId: "canvas-1", versionId: "version-1" },
+        body: { paths: ["console.yaml"] },
       }),
     );
+    // Console edits stage only; committing into the version row is an explicit action.
+    expect(canvasesCommitCanvasStaging).not.toHaveBeenCalled();
   });
 
   it("releases the ignored canvas version echo when dashboard save fails", async () => {
     const queryClient = createQueryClient();
     const releaseCanvasVersionUpdatedEcho = vi.fn();
     const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
-    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
+    canvasesStageCanvasRepositoryFile.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(
       () =>
@@ -354,7 +443,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.consoleStaged("canvas-1", "version-1");
     let resolveSave: (value: unknown) => void = () => {};
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
@@ -366,8 +455,12 @@ describe("useUpdateCanvasConsole", () => {
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
       consoleYaml: emptyConsoleYaml,
     });
-    canvasesCommitCanvasRepositoryFiles.mockReturnValue(savePromise);
-    mockConsoleRepositoryFileFetch(afterConsoleYaml);
+    canvasesStageCanvasRepositoryFile.mockReturnValue(savePromise);
+    canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
+    canvasesDescribeCanvasVersion.mockResolvedValue({
+      data: { stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] } },
+    });
+    mockConsoleRepositoryFileFetch(afterConsoleYaml, { committedYaml: emptyConsoleYaml });
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -393,14 +486,14 @@ describe("useUpdateCanvasConsole", () => {
 
   it("rolls back the dashboard cache when console save fails", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.console("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.consoleStaged("canvas-1", "version-1");
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
     });
-    canvasesCommitCanvasRepositoryFiles.mockRejectedValue(new Error("request failed"));
+    canvasesStageCanvasRepositoryFile.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -416,5 +509,43 @@ describe("useUpdateCanvasConsole", () => {
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
     });
+  });
+});
+
+describe("ensureDraftVersionExists", () => {
+  beforeEach(() => {
+    canvasesListCanvasVersions.mockReset();
+  });
+
+  it("returns true when the draft version is still present", async () => {
+    canvasesListCanvasVersions.mockResolvedValue({
+      data: { versions: [{ metadata: { id: "v-1" } }, { metadata: { id: "v-2" } }] },
+    });
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "v-2");
+
+    expect(exists).toBe(true);
+    expect(canvasesListCanvasVersions).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false when the draft version is gone", async () => {
+    canvasesListCanvasVersions.mockResolvedValue({
+      data: { versions: [{ metadata: { id: "v-1" } }] },
+    });
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "deleted");
+
+    expect(exists).toBe(false);
+  });
+
+  it("short-circuits to false without calling the API when args are missing", async () => {
+    const queryClient = new QueryClient();
+
+    const exists = await ensureDraftVersionExists(queryClient, "org-1", "canvas-1", "");
+
+    expect(exists).toBe(false);
+    expect(canvasesListCanvasVersions).not.toHaveBeenCalled();
   });
 });

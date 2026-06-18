@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { Header } from "./Header";
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -14,6 +16,10 @@ vi.mock("./components/CanvasProjectSwitcher", () => ({
 
 vi.mock("./components/CanvasToolSidebarTrigger", () => ({
   CanvasToolSidebarTrigger: () => null,
+}));
+
+vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
+  CanvasRunsSidebarTrigger: () => null,
 }));
 
 vi.mock("./components/CanvasModeToggle", () => ({
@@ -35,8 +41,24 @@ const toolSidebarState = {
   switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: true,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
+
+const versionsSidebarState = {
+  isVersionsSidebarOpen: false,
+  showVersionsSidebarToggle: true,
+  handleVersionsSidebarToggle: vi.fn(),
+  openVersionsSidebar: vi.fn(),
+  closeVersionsSidebar: vi.fn(),
+} satisfies CanvasVersionsSidebarState;
+
 function renderHeader(
-  mode: "runs" | "version-live" | "version-edit",
+  mode: "version-live" | "version-edit" | "versions",
   options?: {
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
@@ -58,6 +80,8 @@ function renderHeader(
               onEnterEditMode={vi.fn()}
               onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
+              runsSidebarState={runsSidebarState}
+              versionsSidebarState={versionsSidebarState}
             />
           }
         />
@@ -67,16 +91,16 @@ function renderHeader(
 }
 
 describe("Header", () => {
-  it("hides enter edit actions in runs mode", () => {
-    renderHeader("runs");
-
-    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
-  });
-
-  it("shows enter edit actions outside runs mode", () => {
+  it("shows enter edit actions on the live canvas tab", () => {
     renderHeader("version-live");
 
     expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
+  });
+
+  it("hides enter edit actions on the versions tab", () => {
+    renderHeader("versions");
+
+    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 
   it("renders without crashing when canvasName is undefined", () => {

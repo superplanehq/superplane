@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +25,12 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 	}
 
 	readStartedAt := time.Now()
-	limits, err := describeUsageLimits(ctx, usageService, orgID)
+	var limits *usagepb.OrganizationLimits
+	err := telemetry.RunSpan(ctx, "usage.load_limits", func(ctx context.Context) error {
+		var loadErr error
+		limits, loadErr = describeUsageLimits(ctx, usageService, orgID)
+		return loadErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +39,12 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		log.Warnf("Failed to persist usage limits cache for organization %s: %v", orgID, err)
 	}
 
-	orgUsage, err := describeUsageMetrics(ctx, usageService, orgID)
+	var orgUsage *usagepb.OrganizationUsage
+	err = telemetry.RunSpan(ctx, "usage.load_metrics", func(ctx context.Context) error {
+		var loadErr error
+		orgUsage, loadErr = describeUsageMetrics(ctx, usageService, orgID)
+		return loadErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -44,12 +55,22 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 
 	go usage.ReconcileCanvasCount(orgID, orgUsage.GetCanvases())
 
+	var response *pb.DescribeUsageResponse
+	_ = telemetry.RunSpan(ctx, "usage.build_response", func(ctx context.Context) error {
+		response = buildDescribeUsageResponse(limits, orgUsage)
+		return nil
+	})
+
+	return response, nil
+}
+
+func buildDescribeUsageResponse(limits *usagepb.OrganizationLimits, orgUsage *usagepb.OrganizationUsage) *pb.DescribeUsageResponse {
 	return &pb.DescribeUsageResponse{
 		Enabled:       true,
 		StatusMessage: "Usage tracking is active and up to date.",
 		Limits:        serializeUsageLimits(limits),
 		Usage:         serializeUsage(orgUsage),
-	}, nil
+	}
 }
 
 func describeUsageLimits(
