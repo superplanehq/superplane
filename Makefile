@@ -312,6 +312,7 @@ REST_API_MODULES := authorization,organizations,integrations,secrets,users,group
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models
 	$(MAKE) pb.gen.gateway
+	$(MAKE) pb.gen.intercepted
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
@@ -322,6 +323,9 @@ pb.gen.models:
 
 pb.gen.gateway:
 	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+
+pb.gen.intercepted:
+	@go run ./scripts/generate_intercepted_services/main.go
 
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
