@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -26,7 +26,7 @@ func NewExecutionStateContext(
 	return &ExecutionStateContext{
 		tx:             tx,
 		execution:      execution,
-		maxPayloadSize: DefaultMaxPayloadSize,
+		maxPayloadSize: config.MaxPayloadSize(),
 		onNewEvents:    onNewEvents,
 	}
 }
@@ -49,8 +49,8 @@ func (s *ExecutionStateContext) Pass() error {
 }
 
 func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
 	outputs := map[string][]any{
@@ -89,8 +89,8 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 }
 
 func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
 	outputs := map[string][]any{
