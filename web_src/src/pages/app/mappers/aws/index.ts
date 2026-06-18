@@ -57,6 +57,9 @@ import { enableImageMapper } from "./ec2/enable_image";
 import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
+import { createWorkspaceMapper, deleteWorkspaceMapper, getWorkspaceMapper, updateWorkspaceMapper } from "./prometheus";
+import { createLoadBalancerMapper } from "./ec2/create_load_balancer";
+import { deleteLoadBalancerMapper } from "./ec2/delete_load_balancer";
 import {
   createWorkspaceMapper,
   deleteWorkspaceMapper,
@@ -126,6 +129,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.manageInstancePower": manageInstancePowerMapper,
   "ec2.releaseElasticIP": releaseElasticIPMapper,
   "ec2.updateInstance": updateInstanceMapper,
+  "ec2.createLoadBalancer": createLoadBalancerMapper,
+  "ec2.deleteLoadBalancer": deleteLoadBalancerMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -198,4 +203,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.manageInstancePower": MANAGE_INSTANCE_POWER_STATE_REGISTRY,
   "ec2.releaseElasticIP": buildActionStateRegistry("released"),
   "ec2.updateInstance": buildActionStateRegistry("updated"),
+  "ec2.createLoadBalancer": buildActionStateRegistry("created"),
+  "ec2.deleteLoadBalancer": buildActionStateRegistry("deleted"),
 };
