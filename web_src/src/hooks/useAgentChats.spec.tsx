@@ -176,6 +176,64 @@ describe("useAgentChatMessages", () => {
     });
   });
 
+  it("keeps an in-flight image-only optimistic send when an earlier image message is persisted", async () => {
+    type ListAgentChatMessagesResult = Awaited<ReturnType<typeof agentsListAgentChatMessages>>;
+    let resolveList: ((value: ListAgentChatMessagesResult) => void) | undefined;
+    vi.mocked(agentsListAgentChatMessages).mockReturnValue(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }) as ReturnType<typeof agentsListAgentChatMessages>,
+    );
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(() => useAgentChatMessages("chat-1", "org-1", true), {
+      wrapper: wrapper(queryClient),
+    });
+
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"), {
+      pages: [
+        {
+          messages: [
+            {
+              id: "optimistic-message-2",
+              role: "user",
+              content: "",
+              toolName: "",
+              toolCallId: "",
+              toolStatus: "",
+              images: [{ mediaType: "image/png", url: "data:image/png;base64,aGVsbG8=" }],
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [""],
+    });
+
+    if (!resolveList) {
+      throw new Error("list promise was not created");
+    }
+
+    // An earlier image-only message is already persisted (also empty content).
+    resolveList({
+      data: {
+        messages: [{ id: "server-message-1", role: "user", content: "", images: [{ mediaType: "image/png" }] }],
+        hasMore: false,
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as ListAgentChatMessagesResult);
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
+      expect(data?.pages[0]?.messages.map((message) => message.id)).toEqual([
+        "server-message-1",
+        "optimistic-message-2",
+      ]);
+    });
+  });
+
   it("keeps extra optimistic messages when repeated sends share the same content", async () => {
     type ListAgentChatMessagesResult = Awaited<ReturnType<typeof agentsListAgentChatMessages>>;
     let resolveList: ((value: ListAgentChatMessagesResult) => void) | undefined;

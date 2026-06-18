@@ -194,6 +194,14 @@ function mergePendingOptimisticMessages(
       return false;
     }
 
+    // Image-only sends have empty content, which the role+content heuristic
+    // cannot use to tell an in-flight send apart from an already-persisted one.
+    // Keep them and let the mutation's onSuccess/onError remove the optimistic
+    // copy by id, so a later send isn't dropped by an earlier persisted image.
+    if (!message.content.trim()) {
+      return true;
+    }
+
     const key = optimisticMessageMatchKey(message);
     const persistedCount = persistedUserMessageCounts.get(key) ?? 0;
     if (persistedCount === 0) {
