@@ -2,7 +2,9 @@ import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from ".
 import { buildActionStateRegistry } from "../utils";
 import { getRepositoryMapper } from "./get_repository";
 import { getPackageMapper } from "./get_package";
-import { deletePackageMapper, resyncPackageMapper, tagPackageMapper } from "./package_operations";
+import { resyncPackageMapper } from "./resync_package";
+import { tagPackageMapper } from "./tag_package";
+import { deletePackageMapper } from "./delete_package";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getRepository: getRepositoryMapper,
@@ -18,6 +20,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRepository: buildActionStateRegistry("fetched"),
   getPackage: buildActionStateRegistry("fetched"),
   resyncPackage: buildActionStateRegistry("resynced"),
-  tagPackage: buildActionStateRegistry("tagged"),
+  tagPackage: buildActionStateRegistry("completed"),
   deletePackage: buildActionStateRegistry("deleted"),
 };

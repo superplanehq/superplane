@@ -19,9 +19,9 @@ func Test__TagPackage__Setup(t *testing.T) {
 	t.Run("requires tags unless action is Clear", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"repository":        "acme/production",
-				"package": "pkg_123",
-				"action":            TagActionAdd,
+				"repository": "acme/production",
+				"package":    "pkg_123",
+				"action":     TagActionAdd,
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -32,9 +32,9 @@ func Test__TagPackage__Setup(t *testing.T) {
 	t.Run("allows Clear without tags", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"repository":        "{{ $.event.repository }}",
-				"package": "pkg_123",
-				"action":            TagActionClear,
+				"repository": "{{ $.event.repository }}",
+				"package":    "pkg_123",
+				"action":     TagActionClear,
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -45,10 +45,10 @@ func Test__TagPackage__Setup(t *testing.T) {
 	t.Run("rejects unknown action", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"repository":        "acme/production",
-				"package": "pkg_123",
-				"action":            "Append",
-				"tags":              []string{"latest"},
+				"repository": "acme/production",
+				"package":    "pkg_123",
+				"action":     "Append",
+				"tags":       []string{"latest"},
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -78,11 +78,11 @@ func Test__TagPackage__Execute(t *testing.T) {
 		httpContext,
 		executionState,
 		map[string]any{
-			"repository":        "acme/production",
-			"package": "pkg_123",
-			"action":            TagActionReplace,
-			"isImmutable":       true,
-			"tags":              []string{" production ", "stable"},
+			"repository":  "acme/production",
+			"package":     "pkg_123",
+			"action":      TagActionReplace,
+			"isImmutable": true,
+			"tags":        []string{" production ", "stable"},
 		},
 	))
 
