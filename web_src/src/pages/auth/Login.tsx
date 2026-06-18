@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,12 @@ import {
   recordLastUsedLoginMethod,
   type LastUsedLoginMethod,
 } from "@/lib/lastUsedLoginMethod";
+import {
+  clearPendingSignupAnalyticsPreference,
+  confirmSignupAnalyticsPreference,
+  savePendingSignupAnalyticsPreference,
+} from "@/lib/signupAnalytics";
+import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 
 type AuthConfig = {
   providers: string[];
@@ -56,13 +63,52 @@ const getProviderLabel = (provider: string) => {
   }
 };
 
+const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode: boolean) => {
+  const params = new URLSearchParams(redirectQuery ? redirectQuery.slice(1) : "");
+  if (isSignupMode) {
+    params.set("signup", "true");
+  }
+
+  const query = params.toString();
+  return query ? `/auth/${provider}?${query}` : `/auth/${provider}`;
+};
+
+const isWelcomeRedirect = (response: Response) => {
+  try {
+    const parsedURL = new URL(response.url || "/", window.location.origin);
+    return parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome";
+  } catch {
+    return false;
+  }
+};
+
 type MagicCodeStep = "email" | "code";
+type AuthMode = "login" | "signup";
+
+interface LoginProps {
+  mode?: AuthMode;
+}
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
   <p className="mt-2 text-center text-xs text-gray-500">You used {label} to log in last time</p>
 );
 
-export const Login: React.FC = () => {
+const ProductUpdatesOptIn: React.FC<{
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}> = ({ checked, onCheckedChange }) => (
+  <label htmlFor="signup-product-updates" className="flex cursor-pointer items-start gap-2 text-sm text-gray-700">
+    <Checkbox
+      id="signup-product-updates"
+      checked={checked}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange(e.target.checked)}
+      className="mt-0.5"
+    />
+    <span>I want to receive product updates</span>
+  </label>
+);
+
+export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
@@ -73,7 +119,7 @@ export const Login: React.FC = () => {
   const [configError, setConfigError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(mode === "signup");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
@@ -81,6 +127,7 @@ export const Login: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupProductUpdatesOptIn, setSignupProductUpdatesOptIn] = useState(true);
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
@@ -109,6 +156,22 @@ export const Login: React.FC = () => {
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response) => {
+      const finalURL = response.url || "/";
+
+      try {
+        const parsedURL = new URL(finalURL, window.location.origin);
+        if (parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome") {
+          if (!parsedURL.searchParams.has("redirect") && redirectTarget) {
+            parsedURL.searchParams.set("redirect", redirectTarget);
+          }
+
+          window.location.href = `${parsedURL.pathname}${parsedURL.search}`;
+          return;
+        }
+      } catch {
+        // fall through to existing redirect behavior
+      }
+
       if (redirectTarget) {
         window.location.href = redirectTarget;
         return;
@@ -130,7 +193,6 @@ export const Login: React.FC = () => {
         // fall through to default redirect
       }
 
-      const finalURL = response.url || "/";
       window.location.href = finalURL;
     },
     [redirectTarget],
@@ -147,28 +209,41 @@ export const Login: React.FC = () => {
   }, [account, accountLoading, safeRedirect]);
 
   useEffect(() => {
+    setIsSignupMode(mode === "signup");
+    setFormError(null);
+    setMagicCodeStep("email");
+    setMagicCode("");
+    setShowPasswordLogin(false);
+  }, [mode]);
+
+  useEffect(() => {
     if (!magicLinkToken) return;
 
     const verifyMagicLink = async () => {
       setSubmitLoading(true);
       try {
-        const formData = new URLSearchParams();
-        formData.append("token", magicLinkToken);
-        if (inviteToken) {
-          formData.append("invite_token", inviteToken);
-        }
+        const { url, body } = buildMagicLinkVerifyRequest({
+          token: magicLinkToken,
+          inviteToken,
+          redirectTarget,
+          signupIntent: mode === "signup",
+        });
 
-        const response = await fetch("/auth/magic-code/verify", {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           credentials: "include",
-          body: formData.toString(),
+          body,
         });
 
         if (!response.ok) {
           setFormError("Invalid or expired link. Please request a new code.");
           setSubmitLoading(false);
           return;
+        }
+
+        if (mode === "signup" && !isWelcomeRedirect(response)) {
+          clearPendingSignupAnalyticsPreference();
         }
 
         await handleRedirectAfterAuth(response);
@@ -179,7 +254,7 @@ export const Login: React.FC = () => {
     };
 
     verifyMagicLink();
-  }, [magicLinkToken, inviteToken, handleRedirectAfterAuth]);
+  }, [magicLinkToken, inviteToken, redirectTarget, mode, handleRedirectAfterAuth]);
 
   useEffect(() => {
     let canceled = false;
@@ -232,19 +307,10 @@ export const Login: React.FC = () => {
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
-  const useMagicCodePrimary = authConfig.magicCodeEnabled && !showPasswordLogin;
-
-  useEffect(() => {
-    if (!canSignup && isSignupMode) {
-      setIsSignupMode(false);
-      setFormError(null);
-    }
-  }, [canSignup, isSignupMode]);
-
-  const handleToggleMode = (nextMode: "login" | "signup") => {
-    setIsSignupMode(nextMode === "signup");
-    setFormError(null);
-  };
+  const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
+  const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showStandaloneProductUpdatesOptIn =
+    isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,11 +321,21 @@ export const Login: React.FC = () => {
       return;
     }
 
+    if (isSignupMode) {
+      savePendingSignupAnalyticsPreference({
+        email: magicCodeEmail.trim(),
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+    }
+
     setSubmitLoading(true);
 
     try {
       const formData = new URLSearchParams();
       formData.append("email", magicCodeEmail.trim());
+      if (isSignupMode) {
+        formData.append("signup", "true");
+      }
       if (redirectTarget) {
         formData.append("redirect", redirectTarget);
       }
@@ -271,6 +347,9 @@ export const Login: React.FC = () => {
       });
 
       if (!response.ok) {
+        if (isSignupMode) {
+          clearPendingSignupAnalyticsPreference();
+        }
         setFormError("Failed to send code. Please try again.");
         setSubmitLoading(false);
         return;
@@ -279,6 +358,9 @@ export const Login: React.FC = () => {
       setMagicCodeStep("code");
       setSubmitLoading(false);
     } catch {
+      if (isSignupMode) {
+        clearPendingSignupAnalyticsPreference();
+      }
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -299,6 +381,9 @@ export const Login: React.FC = () => {
       const formData = new URLSearchParams();
       formData.append("email", magicCodeEmail.trim());
       formData.append("code", magicCode.trim());
+      if (isSignupMode) {
+        formData.append("signup", "true");
+      }
       if (inviteToken) {
         formData.append("invite_token", inviteToken);
       }
@@ -315,6 +400,9 @@ export const Login: React.FC = () => {
       });
 
       if (!response.ok) {
+        if (isSignupMode) {
+          clearPendingSignupAnalyticsPreference();
+        }
         if (response.status === 401) {
           setFormError("Invalid or expired code. Please try again.");
         } else if (response.status === 403) {
@@ -327,8 +415,22 @@ export const Login: React.FC = () => {
         return;
       }
 
+      if (isSignupMode) {
+        if (isWelcomeRedirect(response)) {
+          confirmSignupAnalyticsPreference({
+            email: magicCodeEmail.trim(),
+            productUpdatesOptIn: signupProductUpdatesOptIn,
+          });
+        } else {
+          clearPendingSignupAnalyticsPreference();
+        }
+      }
+
       await handleRedirectAfterAuth(response);
     } catch {
+      if (isSignupMode) {
+        clearPendingSignupAnalyticsPreference();
+      }
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -440,6 +542,11 @@ export const Login: React.FC = () => {
         return;
       }
 
+      confirmSignupAnalyticsPreference({
+        email: signupEmail.trim(),
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+
       await handleRedirectAfterAuth(response);
     } catch {
       setFormError("Network error occurred");
@@ -447,11 +554,21 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleProviderClick = (provider: string) => {
+    if (isSignupMode) {
+      savePendingSignupAnalyticsPreference({
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+    }
+
+    recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
+  };
+
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
 
   const getHeading = () => {
-    if (isSignupMode) return "Create your account";
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
@@ -493,7 +610,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "email" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
             <form onSubmit={handleMagicCodeRequest} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -508,13 +625,20 @@ export const Login: React.FC = () => {
                 />
               </div>
 
+              {isSignupMode && (
+                <ProductUpdatesOptIn
+                  checked={signupProductUpdatesOptIn}
+                  onCheckedChange={setSignupProductUpdatesOptIn}
+                />
+              )}
+
               <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
                 Continue with email
               </LoadingButton>
             </form>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "code" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "code" && (
             <form onSubmit={handleMagicCodeVerify} className="space-y-4">
               <div className="space-y-2">
                 <Label>Code</Label>
@@ -532,7 +656,7 @@ export const Login: React.FC = () => {
               </div>
 
               <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
-                Sign in
+                Continue
               </LoadingButton>
 
               <div className="text-center">
@@ -655,6 +779,8 @@ export const Login: React.FC = () => {
                 />
               </div>
 
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+
               <LoadingButton
                 type="submit"
                 disabled={!canSignup}
@@ -719,14 +845,20 @@ export const Login: React.FC = () => {
               </div>
             )}
 
+          {!configLoading && showStandaloneProductUpdatesOptIn && (
+            <div className="mb-4">
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+            </div>
+          )}
+
           {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
             <div className="space-y-3">
               {activeProviders.map((provider) => (
                 <div key={provider}>
                   <Button variant="outline" className="w-full justify-center gap-2" asChild>
                     <a
-                      href={`/auth/${provider}${redirectQuery}`}
-                      onClick={() => recordLastUsedLoginMethod(provider as LastUsedLoginMethod)}
+                      href={providerAuthPath(provider, redirectQuery, isSignupMode)}
+                      onClick={() => handleProviderClick(provider)}
                     >
                       {provider === "github" && (
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -765,26 +897,27 @@ export const Login: React.FC = () => {
           {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("signup")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Create an account
-              </button>
+              </Link>
             </div>
           )}
 
           {!configLoading && isSignupMode && (
             <div className="mt-6 text-sm text-gray-500">
               Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("login")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/login${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Sign in
-              </button>
+              </Link>
+            </div>
+          )}
+
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && !isSignupMode && canSignup && (
+            <div className="mt-6 text-center text-sm text-gray-500">
+              {"Don't have an account? "}
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
+                Sign up
+              </Link>
             </div>
           )}
         </div>

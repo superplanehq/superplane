@@ -17,6 +17,7 @@ import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
@@ -83,6 +84,8 @@ function AppRouter() {
             <Routes>
               {/* public routes */}
               <Route path="login" element={<Login />} />
+              <Route path="signup" element={<Login mode="signup" />} />
+              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
 
