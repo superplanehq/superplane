@@ -9,14 +9,16 @@ type MagicCodeRequestedMessage struct {
 	Code           string `json:"code"`
 	MagicLinkToken string `json:"magic_link_token"`
 	RedirectURL    string `json:"redirect_url,omitempty"`
+	SignupIntent   bool   `json:"signup_intent,omitempty"`
 }
 
-func NewMagicCodeRequestedMessage(email, code, magicLinkToken, redirectURL string) MagicCodeRequestedMessage {
+func NewMagicCodeRequestedMessage(email, code, magicLinkToken, redirectURL string, signupIntent bool) MagicCodeRequestedMessage {
 	return MagicCodeRequestedMessage{
 		Email:          email,
 		Code:           code,
 		MagicLinkToken: magicLinkToken,
 		RedirectURL:    redirectURL,
+		SignupIntent:   signupIntent,
 	}
 }
 
