@@ -16,12 +16,41 @@ import { analytics } from "@/lib/analytics";
 describe("analytics", () => {
   beforeEach(() => {
     capture.mockClear();
+    localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    document.cookie = "superplane_initial_utm=; Max-Age=0; Path=/";
   });
 
   it("captures org create", () => {
     analytics.orgCreate("org-123");
     expect(capture).toHaveBeenCalledWith("auth:org_create", {
       organization_id: "org-123",
+    });
+  });
+
+  it("captures org create with stored UTM attribution", () => {
+    localStorage.setItem(
+      "superplane.initial_utm",
+      JSON.stringify({
+        utm_source: "youtube",
+        utm_medium: "influencer",
+        utm_campaign: "erictech_beta",
+        utm_content: "video",
+      }),
+    );
+
+    analytics.orgCreate("org-123");
+
+    expect(capture).toHaveBeenCalledWith("auth:org_create", {
+      organization_id: "org-123",
+      utm_source: "youtube",
+      utm_medium: "influencer",
+      utm_campaign: "erictech_beta",
+      utm_content: "video",
     });
   });
 
