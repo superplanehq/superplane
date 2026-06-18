@@ -70,7 +70,6 @@ func (c *Cloudsmith) Configuration() []configuration.Field {
 func (c *Cloudsmith) Actions() []core.Action {
 	return []core.Action{
 		&GetRepository{},
-		&GetPackageStatus{},
 		&GetPackage{},
 	}
 }

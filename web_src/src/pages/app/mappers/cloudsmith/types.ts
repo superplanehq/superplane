@@ -48,53 +48,68 @@ export interface RepositoryData {
 // Package types
 
 export interface PackageData {
+  // Identity
   slug?: string;
   slug_perm?: string;
   name?: string;
+  display_name?: string;
   version?: string;
+  filename?: string;
   format?: string;
-  status?: number;
-  status_str?: string;
   repository?: string;
   namespace?: string;
   uploaded_at?: string;
-  checksum_md5?: string;
-  checksum_sha1?: string;
-  checksum_sha256?: string;
-  checksum_sha512?: string;
-  self_url?: string;
-  self_html_url?: string;
-  cdn_url?: string;
-  size?: number;
-  size_str?: string;
-  description?: string;
-  summary?: string;
-}
+  uploader?: string;
 
-export interface PackageStatusData {
-  self_url?: string;
+  // Status
+  status?: number;
+  status_str?: string;
+  status_reason?: string | null;
+  status_updated_at?: string;
+
+  // Stage / sync
   stage?: number;
   stage_str?: string;
   stage_updated_at?: string;
-  status?: number;
-  status_reason?: string;
-  status_str?: string;
-  status_updated_at?: string;
   is_sync_awaiting?: boolean;
   is_sync_completed?: boolean;
   is_sync_failed?: boolean;
   is_sync_in_flight?: boolean;
   is_sync_in_progress?: boolean;
-  is_quarantined?: boolean;
   sync_finished_at?: string;
   sync_progress?: number;
-}
 
-// Get Package Status
+  // Quarantine / policy
+  is_quarantined?: boolean;
+  policy_violated?: boolean;
 
-export interface GetPackageStatusConfiguration {
-  repository?: string;
-  package?: string;
+  // Security scanning
+  security_scan_status?: string;
+  security_scan_started_at?: string;
+  security_scan_completed_at?: string;
+  vulnerability_scan_results_url?: string;
+
+  // Checksums
+  checksum_md5?: string;
+  checksum_sha1?: string;
+  checksum_sha256?: string;
+  checksum_sha512?: string;
+
+  // URLs
+  self_url?: string;
+  self_html_url?: string;
+  self_webapp_url?: string;
+  cdn_url?: string;
+
+  // Size / metadata
+  size?: number;
+  size_str?: string;
+  description?: string;
+  summary?: string;
+
+  // Tags
+  tags?: Record<string, unknown>;
+  tags_immutable?: Record<string, unknown>;
 }
 
 // Get Package

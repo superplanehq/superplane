@@ -172,27 +172,68 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 
 // Package represents a Cloudsmith package with its metadata.
 type Package struct {
-	Slug           string `json:"slug"`
-	SlugPerm       string `json:"slug_perm"`
-	Name           string `json:"name"`
-	Version        string `json:"version"`
-	Format         string `json:"format"`
-	Status         int    `json:"status"`
-	StatusStr      string `json:"status_str"`
-	Repository     string `json:"repository"`
-	Namespace      string `json:"namespace"`
-	UploadedAt     string `json:"uploaded_at"`
+	// Identity
+	Slug        string `json:"slug"`
+	SlugPerm    string `json:"slug_perm"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Version     string `json:"version"`
+	Filename    string `json:"filename"`
+	Format      string `json:"format"`
+	Repository  string `json:"repository"`
+	Namespace   string `json:"namespace"`
+	UploadedAt  string `json:"uploaded_at"`
+	Uploader    string `json:"uploader"`
+
+	// Status
+	Status          int    `json:"status"`
+	StatusStr       string `json:"status_str"`
+	StatusReason    string `json:"status_reason"`
+	StatusUpdatedAt string `json:"status_updated_at"`
+
+	// Stage / sync
+	Stage            int    `json:"stage"`
+	StageStr         string `json:"stage_str"`
+	StageUpdatedAt   string `json:"stage_updated_at"`
+	IsSyncAwaiting   bool   `json:"is_sync_awaiting"`
+	IsSyncCompleted  bool   `json:"is_sync_completed"`
+	IsSyncFailed     bool   `json:"is_sync_failed"`
+	IsSyncInFlight   bool   `json:"is_sync_in_flight"`
+	IsSyncInProgress bool   `json:"is_sync_in_progress"`
+	SyncFinishedAt   string `json:"sync_finished_at"`
+	SyncProgress     int    `json:"sync_progress"`
+
+	// Quarantine / policy
+	IsQuarantined  bool `json:"is_quarantined"`
+	PolicyViolated bool `json:"policy_violated"`
+
+	// Security scanning
+	SecurityScanStatus      string `json:"security_scan_status"`
+	SecurityScanStartedAt   string `json:"security_scan_started_at"`
+	SecurityScanCompletedAt string `json:"security_scan_completed_at"`
+	VulnerabilityResultsURL string `json:"vulnerability_scan_results_url"`
+
+	// Checksums
 	ChecksumMD5    string `json:"checksum_md5"`
 	ChecksumSHA1   string `json:"checksum_sha1"`
 	ChecksumSHA256 string `json:"checksum_sha256"`
 	ChecksumSHA512 string `json:"checksum_sha512"`
-	SelfURL        string `json:"self_url"`
-	SelfHTMLURL    string `json:"self_html_url"`
-	CDNURL         string `json:"cdn_url"`
-	Size           int64  `json:"size"`
-	SizeStr        string `json:"size_str"`
-	Description    string `json:"description"`
-	Summary        string `json:"summary"`
+
+	// URLs
+	SelfURL       string `json:"self_url"`
+	SelfHTMLURL   string `json:"self_html_url"`
+	SelfWebappURL string `json:"self_webapp_url"`
+	CDNURL        string `json:"cdn_url"`
+
+	// Size / metadata
+	Size        int64  `json:"size"`
+	SizeStr     string `json:"size_str"`
+	Description string `json:"description"`
+	Summary     string `json:"summary"`
+
+	// Tags
+	Tags          map[string]any `json:"tags"`
+	TagsImmutable map[string]any `json:"tags_immutable"`
 }
 
 // GetPackage fetches a single package identified by namespace, repository slug, and package identifier.
@@ -209,42 +250,6 @@ func (c *Client) GetPackage(owner, repo, identifier string) (*Package, error) {
 	}
 
 	return &pkg, nil
-}
-
-// PackageStatusInfo holds the sync and quarantine status from the /status/ endpoint.
-type PackageStatusInfo struct {
-	SelfURL          string `json:"self_url"`
-	Stage            int    `json:"stage"`
-	StageStr         string `json:"stage_str"`
-	StageUpdatedAt   string `json:"stage_updated_at"`
-	Status           int    `json:"status"`
-	StatusReason     string `json:"status_reason"`
-	StatusStr        string `json:"status_str"`
-	StatusUpdatedAt  string `json:"status_updated_at"`
-	IsSyncAwaiting   bool   `json:"is_sync_awaiting"`
-	IsSyncCompleted  bool   `json:"is_sync_completed"`
-	IsSyncFailed     bool   `json:"is_sync_failed"`
-	IsSyncInFlight   bool   `json:"is_sync_in_flight"`
-	IsSyncInProgress bool   `json:"is_sync_in_progress"`
-	IsQuarantined    bool   `json:"is_quarantined"`
-	SyncFinishedAt   string `json:"sync_finished_at"`
-	SyncProgress     int    `json:"sync_progress"`
-}
-
-// GetPackageStatusInfo fetches the sync/quarantine status for a package from the /status/ endpoint.
-func (c *Client) GetPackageStatusInfo(owner, repo, identifier string) (*PackageStatusInfo, error) {
-	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/status/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
-	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var info PackageStatusInfo
-	if err := json.Unmarshal(responseBody, &info); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &info, nil
 }
 
 const packagePageSize = 100

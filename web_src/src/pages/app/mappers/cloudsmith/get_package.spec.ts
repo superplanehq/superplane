@@ -23,29 +23,65 @@ describe("getPackageMapper.getExecutionDetails", () => {
   });
 
   it("extracts key package metadata fields", () => {
+    const pkg = buildPackageData({ self_webapp_url: "https://app.cloudsmith.com/acme/r/production/" });
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildPackageOutput(buildPackageData())] } },
+      execution: { outputs: { default: [buildPackageOutput(pkg)] } },
     });
     const details = getPackageMapper.getExecutionDetails(ctx);
     expect(details["Executed At"]).toBeDefined();
     expect(details["Package"]).toBe("my-package");
     expect(details["Format"]).toBe("python");
-    expect(details["Repository"]).toBe("acme/production");
     expect(details["Size"]).toBe("512.0 KB");
-    expect(details["URL"]).toBe(
-      "https://cloudsmith.io/~acme/repos/production/packages/detail/python/my-package/1.0.0/",
-    );
+    expect(details["URL"]).toBe("https://app.cloudsmith.com/acme/r/production/");
   });
 
-  it("does not include Version, Status, SHA-256 or Uploaded At", () => {
+  it("does not include Version, Repository, Sync Completed, Sync Progress, or Quarantined", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildPackageOutput(buildPackageData())] } },
     });
     const details = getPackageMapper.getExecutionDetails(ctx);
     expect(details["Version"]).toBeUndefined();
-    expect(details["Status"]).toBeUndefined();
-    expect(details["SHA-256"]).toBeUndefined();
-    expect(details["Uploaded At"]).toBeUndefined();
+    expect(details["Repository"]).toBeUndefined();
+    expect(details["Sync Completed"]).toBeUndefined();
+    expect(details["Sync Progress"]).toBeUndefined();
+    expect(details["Quarantined"]).toBeUndefined();
+  });
+
+  it("shows status and stage fields", () => {
+    const ctx = buildDetailsCtx({
+      execution: { outputs: { default: [buildPackageOutput(buildPackageData())] } },
+    });
+    const details = getPackageMapper.getExecutionDetails(ctx);
+    expect(details["Status"]).toBe("Available");
+    expect(details["Stage"]).toBe("Fully Synchronised");
+    expect(details["Security Scan"]).toBe("No Vulnerabilities Found");
+  });
+
+  it("uses self_webapp_url for the URL field", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildPackageOutput(
+              buildPackageData({
+                self_webapp_url: "https://app.cloudsmith.com/acme/r/production/docker/hello/",
+                self_html_url: "https://cloudsmith.io/~acme/repos/production/packages/detail/",
+              }),
+            ),
+          ],
+        },
+      },
+    });
+    const details = getPackageMapper.getExecutionDetails(ctx);
+    expect(details["URL"]).toBe("https://app.cloudsmith.com/acme/r/production/docker/hello/");
+  });
+
+  it("omits URL when self_webapp_url is missing", () => {
+    const ctx = buildDetailsCtx({
+      execution: { outputs: { default: [buildPackageOutput(buildPackageData({ self_webapp_url: undefined }))] } },
+    });
+    const details = getPackageMapper.getExecutionDetails(ctx);
+    expect(details["URL"]).toBeUndefined();
   });
 
   it("falls back to raw byte size when size_str is missing", () => {
@@ -54,23 +90,5 @@ describe("getPackageMapper.getExecutionDetails", () => {
     });
     const details = getPackageMapper.getExecutionDetails(ctx);
     expect(details["Size"]).toBe("2048 bytes");
-  });
-
-  it("omits URL when self_html_url is missing", () => {
-    const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildPackageOutput(buildPackageData({ self_html_url: undefined }))] } },
-    });
-    const details = getPackageMapper.getExecutionDetails(ctx);
-    expect(details["URL"]).toBeUndefined();
-  });
-
-  it("omits Repository when namespace is missing", () => {
-    const ctx = buildDetailsCtx({
-      execution: {
-        outputs: { default: [buildPackageOutput(buildPackageData({ namespace: undefined }))] },
-      },
-    });
-    const details = getPackageMapper.getExecutionDetails(ctx);
-    expect(details["Repository"]).toBeUndefined();
   });
 });

@@ -58,14 +58,14 @@ export const getPackageMapper: ComponentBaseMapper = {
 function addPackageDetails(details: Record<string, string>, pkg: PackageData): void {
   if (pkg.name) details["Package"] = pkg.name;
   if (pkg.format) details["Format"] = pkg.format;
-  if (pkg.namespace && pkg.repository) {
-    details["Repository"] = `${pkg.namespace}/${pkg.repository}`;
-  }
+  if (pkg.status_str) details["Status"] = pkg.status_str;
+  if (pkg.stage_str) details["Stage"] = pkg.stage_str;
+  if (pkg.security_scan_status) details["Security Scan"] = pkg.security_scan_status;
   if (pkg.size_str || pkg.size != null) {
     details["Size"] = pkg.size_str ?? `${pkg.size} bytes`;
   }
-  if (pkg.self_html_url) {
-    details["URL"] = pkg.self_html_url;
+  if (pkg.self_webapp_url) {
+    details["URL"] = pkg.self_webapp_url;
   }
 }
 

@@ -31,14 +31,17 @@ func (g *GetPackage) Description() string {
 }
 
 func (g *GetPackage) Documentation() string {
-	return `The Get Package component retrieves complete metadata for a specific Cloudsmith package.
+	return `The Get Package component retrieves complete metadata for a specific Cloudsmith package,
+including sync status, quarantine state, and security scan results.
 
 ## Use Cases
 
+- **Release gating**: Check that a package is Available and sync-completed before triggering downstream deployment steps
+- **Quarantine detection**: Detect when a package has been quarantined or has policy violations
 - **Audit trails**: Record full package metadata (checksums, format, upload time) for compliance
 - **Downstream enrichment**: Pass package details such as format or CDN URL to later workflow steps
 - **Checksum verification**: Retrieve SHA-256 or MD5 checksums to validate package integrity
-- **Package promotion**: Read source package attributes before replicating to another repository
+- **Security insights**: Check the security scan status and link to full vulnerability results
 
 ## Configuration
 
@@ -50,12 +53,17 @@ func (g *GetPackage) Documentation() string {
 Returns the complete package object including:
 - **name** / **version**: Package name and version string
 - **format**: Package format (e.g., ` + "`python`" + `, ` + "`debian`" + `, ` + "`docker`" + `, ` + "`maven`" + `)
-- **status** / **status_str**: Processing status
-- **uploaded_at**: ISO 8601 upload timestamp
+- **status** / **status_str**: Overall status code and label (e.g. ` + "`Available`" + `, ` + "`Quarantined`" + `, ` + "`Failed`" + `)
+- **stage** / **stage_str**: Processing stage (e.g. ` + "`Fully Synchronised`" + `)
+- **sync_progress**: Sync completion percentage (0–100)
+- **is_sync_completed** / **is_sync_failed**: Final sync outcome flags
+- **is_quarantined**: Whether the package has been quarantined
+- **security_scan_status**: Result of the most recent security scan
+- **vulnerability_scan_results_url**: URL to full vulnerability scan results
 - **checksum_md5** / **checksum_sha1** / **checksum_sha256** / **checksum_sha512**: Package checksums
 - **size** / **size_str**: Package size in bytes and human-readable form
-- **cdn_url**: Direct CDN download URL
-- **self_html_url**: Link to the package page in the Cloudsmith web UI`
+- **cdn_url** / **self_html_url**: Download and web UI URLs
+- **uploaded_at**: ISO 8601 upload timestamp`
 }
 
 func (g *GetPackage) Icon() string {
