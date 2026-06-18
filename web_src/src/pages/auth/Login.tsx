@@ -97,10 +97,7 @@ const ProductUpdatesOptIn: React.FC<{
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }> = ({ checked, onCheckedChange }) => (
-  <label
-    htmlFor="signup-product-updates"
-    className="mb-4 flex cursor-pointer items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
-  >
+  <label htmlFor="signup-product-updates" className="flex cursor-pointer items-start gap-2 text-sm text-gray-700">
     <Checkbox
       id="signup-product-updates"
       checked={checked}
@@ -312,6 +309,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showStandaloneProductUpdatesOptIn =
+    isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -611,10 +610,6 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && canSignup && magicCodeStep === "email" && (
-            <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
-          )}
-
           {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
             <form onSubmit={handleMagicCodeRequest} className="space-y-4">
               <div className="space-y-2">
@@ -629,6 +624,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCodeEmail(e.target.value)}
                 />
               </div>
+
+              {isSignupMode && (
+                <ProductUpdatesOptIn
+                  checked={signupProductUpdatesOptIn}
+                  onCheckedChange={setSignupProductUpdatesOptIn}
+                />
+              )}
 
               <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
                 Continue with email
@@ -777,6 +779,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 />
               </div>
 
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+
               <LoadingButton
                 type="submit"
                 disabled={!canSignup}
@@ -840,6 +844,12 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 <div className="h-px flex-1 bg-gray-300" />
               </div>
             )}
+
+          {!configLoading && showStandaloneProductUpdatesOptIn && (
+            <div className="mb-4">
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
+            </div>
+          )}
 
           {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
             <div className="space-y-3">
