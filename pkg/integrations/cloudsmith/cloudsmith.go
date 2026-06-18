@@ -74,7 +74,10 @@ func (c *Cloudsmith) Actions() []core.Action {
 }
 
 func (c *Cloudsmith) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnComplianceCheckCompleted{},
+		&OnPackageCreated{},
+	}
 }
 
 func (c *Cloudsmith) Sync(ctx core.SyncContext) error {

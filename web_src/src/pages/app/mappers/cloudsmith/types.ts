@@ -9,6 +9,15 @@ export interface GetRepositoryConfiguration {
   repository: string;
 }
 
+export interface WebhookTriggerNodeMetadata {
+  repository?: {
+    namespace?: string;
+    slug?: string;
+  };
+  webhookUrl?: string;
+  webhookId?: string;
+}
+
 export interface RepositoryData {
   name?: string;
   slug?: string;
