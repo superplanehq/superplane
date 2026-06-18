@@ -269,7 +269,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
-		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler()),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
 			 * grpc-gateway annotates the matched HTTP path template in the request context.

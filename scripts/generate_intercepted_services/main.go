@@ -81,7 +81,7 @@ func main() {
 		b.WriteString(fmt.Sprintf("\treturn &%s{inner: inner, chain: chain}\n", svc.structName))
 		b.WriteString("}\n\n")
 
-		b.WriteString(fmt.Sprintf("type %s struct {\n\t%s.Unimplemented%s\n\tinner %s.%s\n\tchain *UnaryChain\n}\n\n", svc.structName, svc.importName, strings.TrimSuffix(svc.serverName, "Server"), svc.importName, svc.serverName))
+		b.WriteString(fmt.Sprintf("type %s struct {\n\t%s.Unimplemented%s\n\tinner %s.%s\n\tchain *UnaryChain\n}\n\n", svc.structName, svc.importName, svc.serverName, svc.importName, svc.serverName))
 
 		for _, method := range methods {
 			b.WriteString(fmt.Sprintf("func (s *%s) %s(ctx context.Context, req *%s.%s) (*%s.%s, error) {\n", svc.structName, method.name, svc.importName, method.requestType, svc.importName, method.responseType))

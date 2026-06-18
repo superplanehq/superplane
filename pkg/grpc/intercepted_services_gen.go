@@ -29,7 +29,7 @@ func WrapUsersServer(inner pbUsers.UsersServer, chain *UnaryChain) pbUsers.Users
 }
 
 type interceptedUsersServer struct {
-	pbUsers.UnimplementedUsers
+	pbUsers.UnimplementedUsersServer
 	inner pbUsers.UsersServer
 	chain *UnaryChain
 }
@@ -52,7 +52,7 @@ func WrapGroupsServer(inner pbGroups.GroupsServer, chain *UnaryChain) pbGroups.G
 }
 
 type interceptedGroupsServer struct {
-	pbGroups.UnimplementedGroups
+	pbGroups.UnimplementedGroupsServer
 	inner pbGroups.GroupsServer
 	chain *UnaryChain
 }
@@ -145,7 +145,7 @@ func WrapRolesServer(inner pbRoles.RolesServer, chain *UnaryChain) pbRoles.Roles
 }
 
 type interceptedRolesServer struct {
-	pbRoles.UnimplementedRoles
+	pbRoles.UnimplementedRolesServer
 	inner pbRoles.RolesServer
 	chain *UnaryChain
 }
@@ -218,7 +218,7 @@ func WrapOrganizationsServer(inner pbOrganizations.OrganizationsServer, chain *U
 }
 
 type interceptedOrganizationsServer struct {
-	pbOrganizations.UnimplementedOrganizations
+	pbOrganizations.UnimplementedOrganizationsServer
 	inner pbOrganizations.OrganizationsServer
 	chain *UnaryChain
 }
@@ -451,7 +451,7 @@ func WrapIntegrationsServer(inner pbIntegrations.IntegrationsServer, chain *Unar
 }
 
 type interceptedIntegrationsServer struct {
-	pbIntegrations.UnimplementedIntegrations
+	pbIntegrations.UnimplementedIntegrationsServer
 	inner pbIntegrations.IntegrationsServer
 	chain *UnaryChain
 }
@@ -474,7 +474,7 @@ func WrapSecretsServer(inner pbSecrets.SecretsServer, chain *UnaryChain) pbSecre
 }
 
 type interceptedSecretsServer struct {
-	pbSecrets.UnimplementedSecrets
+	pbSecrets.UnimplementedSecretsServer
 	inner pbSecrets.SecretsServer
 	chain *UnaryChain
 }
@@ -567,7 +567,7 @@ func WrapMeServer(inner pbMe.MeServer, chain *UnaryChain) pbMe.MeServer {
 }
 
 type interceptedMeServer struct {
-	pbMe.UnimplementedMe
+	pbMe.UnimplementedMeServer
 	inner pbMe.MeServer
 	chain *UnaryChain
 }
@@ -590,7 +590,7 @@ func WrapActionsServer(inner pbActions.ActionsServer, chain *UnaryChain) pbActio
 }
 
 type interceptedActionsServer struct {
-	pbActions.UnimplementedActions
+	pbActions.UnimplementedActionsServer
 	inner pbActions.ActionsServer
 	chain *UnaryChain
 }
@@ -623,7 +623,7 @@ func WrapTriggersServer(inner pbTriggers.TriggersServer, chain *UnaryChain) pbTr
 }
 
 type interceptedTriggersServer struct {
-	pbTriggers.UnimplementedTriggers
+	pbTriggers.UnimplementedTriggersServer
 	inner pbTriggers.TriggersServer
 	chain *UnaryChain
 }
@@ -656,7 +656,7 @@ func WrapWidgetsServer(inner pbWidgets.WidgetsServer, chain *UnaryChain) pbWidge
 }
 
 type interceptedWidgetsServer struct {
-	pbWidgets.UnimplementedWidgets
+	pbWidgets.UnimplementedWidgetsServer
 	inner pbWidgets.WidgetsServer
 	chain *UnaryChain
 }
@@ -689,7 +689,7 @@ func WrapCanvasesServer(inner pbCanvases.CanvasesServer, chain *UnaryChain) pbCa
 }
 
 type interceptedCanvasesServer struct {
-	pbCanvases.UnimplementedCanvases
+	pbCanvases.UnimplementedCanvasesServer
 	inner pbCanvases.CanvasesServer
 	chain *UnaryChain
 }
@@ -874,56 +874,6 @@ func (s *interceptedCanvasesServer) ApplyCanvasAutoLayout(ctx context.Context, r
 	return resp.(*pbCanvases.ApplyCanvasAutoLayoutResponse), nil
 }
 
-func (s *interceptedCanvasesServer) CreateCanvasChangeRequest(ctx context.Context, req *pbCanvases.CreateCanvasChangeRequestRequest) (*pbCanvases.CreateCanvasChangeRequestResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_CreateCanvasChangeRequest_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.CreateCanvasChangeRequest(ctx, req.(*pbCanvases.CreateCanvasChangeRequestRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.CreateCanvasChangeRequestResponse), nil
-}
-
-func (s *interceptedCanvasesServer) ListCanvasChangeRequests(ctx context.Context, req *pbCanvases.ListCanvasChangeRequestsRequest) (*pbCanvases.ListCanvasChangeRequestsResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.ListCanvasChangeRequests(ctx, req.(*pbCanvases.ListCanvasChangeRequestsRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.ListCanvasChangeRequestsResponse), nil
-}
-
-func (s *interceptedCanvasesServer) DescribeCanvasChangeRequest(ctx context.Context, req *pbCanvases.DescribeCanvasChangeRequestRequest) (*pbCanvases.DescribeCanvasChangeRequestResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_DescribeCanvasChangeRequest_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.DescribeCanvasChangeRequest(ctx, req.(*pbCanvases.DescribeCanvasChangeRequestRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.DescribeCanvasChangeRequestResponse), nil
-}
-
-func (s *interceptedCanvasesServer) ActOnCanvasChangeRequest(ctx context.Context, req *pbCanvases.ActOnCanvasChangeRequestRequest) (*pbCanvases.ActOnCanvasChangeRequestResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.ActOnCanvasChangeRequest(ctx, req.(*pbCanvases.ActOnCanvasChangeRequestRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.ActOnCanvasChangeRequestResponse), nil
-}
-
-func (s *interceptedCanvasesServer) ResolveCanvasChangeRequest(ctx context.Context, req *pbCanvases.ResolveCanvasChangeRequestRequest) (*pbCanvases.ResolveCanvasChangeRequestResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_ResolveCanvasChangeRequest_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.ResolveCanvasChangeRequest(ctx, req.(*pbCanvases.ResolveCanvasChangeRequestRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.ResolveCanvasChangeRequestResponse), nil
-}
-
 func (s *interceptedCanvasesServer) DeleteCanvas(ctx context.Context, req *pbCanvases.DeleteCanvasRequest) (*pbCanvases.DeleteCanvasResponse, error) {
 	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_DeleteCanvas_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
 		return s.inner.DeleteCanvas(ctx, req.(*pbCanvases.DeleteCanvasRequest))
@@ -952,16 +902,6 @@ func (s *interceptedCanvasesServer) DeleteNodeQueueItem(ctx context.Context, req
 		return nil, err
 	}
 	return resp.(*pbCanvases.DeleteNodeQueueItemResponse), nil
-}
-
-func (s *interceptedCanvasesServer) UpdateNodePause(ctx context.Context, req *pbCanvases.UpdateNodePauseRequest) (*pbCanvases.UpdateNodePauseResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_UpdateNodePause_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.UpdateNodePause(ctx, req.(*pbCanvases.UpdateNodePauseRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.UpdateNodePauseResponse), nil
 }
 
 func (s *interceptedCanvasesServer) ListNodeExecutions(ctx context.Context, req *pbCanvases.ListNodeExecutionsRequest) (*pbCanvases.ListNodeExecutionsResponse, error) {
@@ -1034,16 +974,6 @@ func (s *interceptedCanvasesServer) ResolveExecutionErrors(ctx context.Context, 
 	return resp.(*pbCanvases.ResolveExecutionErrorsResponse), nil
 }
 
-func (s *interceptedCanvasesServer) ListCanvasEvents(ctx context.Context, req *pbCanvases.ListCanvasEventsRequest) (*pbCanvases.ListCanvasEventsResponse, error) {
-	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_ListCanvasEvents_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
-		return s.inner.ListCanvasEvents(ctx, req.(*pbCanvases.ListCanvasEventsRequest))
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*pbCanvases.ListCanvasEventsResponse), nil
-}
-
 func (s *interceptedCanvasesServer) ListRuns(ctx context.Context, req *pbCanvases.ListRunsRequest) (*pbCanvases.ListRunsResponse, error) {
 	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_ListRuns_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
 		return s.inner.ListRuns(ctx, req.(*pbCanvases.ListRunsRequest))
@@ -1052,6 +982,16 @@ func (s *interceptedCanvasesServer) ListRuns(ctx context.Context, req *pbCanvase
 		return nil, err
 	}
 	return resp.(*pbCanvases.ListRunsResponse), nil
+}
+
+func (s *interceptedCanvasesServer) DescribeRun(ctx context.Context, req *pbCanvases.DescribeRunRequest) (*pbCanvases.DescribeRunResponse, error) {
+	resp, err := s.chain.Invoke(ctx, pbCanvases.Canvases_DescribeRun_FullMethodName, req, func(ctx context.Context, req any) (any, error) {
+		return s.inner.DescribeRun(ctx, req.(*pbCanvases.DescribeRunRequest))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.(*pbCanvases.DescribeRunResponse), nil
 }
 
 func (s *interceptedCanvasesServer) ListCanvasMemories(ctx context.Context, req *pbCanvases.ListCanvasMemoriesRequest) (*pbCanvases.ListCanvasMemoriesResponse, error) {
@@ -1112,7 +1052,7 @@ func WrapCanvasFoldersServer(inner pbCanvasFolders.CanvasFoldersServer, chain *U
 }
 
 type interceptedCanvasFoldersServer struct {
-	pbCanvasFolders.UnimplementedCanvasFolders
+	pbCanvasFolders.UnimplementedCanvasFoldersServer
 	inner pbCanvasFolders.CanvasFoldersServer
 	chain *UnaryChain
 }
@@ -1175,7 +1115,7 @@ func WrapServiceAccountsServer(inner pbServiceAccounts.ServiceAccountsServer, ch
 }
 
 type interceptedServiceAccountsServer struct {
-	pbServiceAccounts.UnimplementedServiceAccounts
+	pbServiceAccounts.UnimplementedServiceAccountsServer
 	inner pbServiceAccounts.ServiceAccountsServer
 	chain *UnaryChain
 }
@@ -1248,7 +1188,7 @@ func WrapAgentsServer(inner pbAgents.AgentsServer, chain *UnaryChain) pbAgents.A
 }
 
 type interceptedAgentsServer struct {
-	pbAgents.UnimplementedAgents
+	pbAgents.UnimplementedAgentsServer
 	inner pbAgents.AgentsServer
 	chain *UnaryChain
 }
