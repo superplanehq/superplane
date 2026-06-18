@@ -175,19 +175,26 @@ func fetchAndSubstituteParams(repo *Repository, userParams map[string]string, or
 		return canvasBody, nil
 	}
 
-	if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
+	// A nil userParams map means the install bypassed the params wizard
+	// ("just take me there"), which falls back to schema defaults. Only
+	// enforce required-param validation when the user actually submitted
+	// values; otherwise required params without defaults would always fail.
+	if userParams != nil {
+		if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		}
+	}
+
+	// Validate secret_picker params against the user-supplied values (and
+	// explicit defaults), not the resolved map: ResolveInstallParams fills
+	// unset params with placeholder/param-name fallbacks that are not real
+	// secret names, so validating those would reject optional pickers left
+	// empty.
+	if err := ValidateSecretPickerParams(params.InstallParams, userParams, organizationID); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	// Validate the resolved values rather than the raw user input: defaults,
-	// placeholders, and param-name fallbacks are what actually get substituted
-	// into the canvas, so every secret_picker value that lands there must
-	// reference a real organization secret.
 	resolved := ResolveInstallParams(params.InstallParams, userParams)
-	if err := ValidateSecretPickerParams(params.InstallParams, resolved, organizationID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-
 	return SubstituteInstallParams(canvasBody, resolved), nil
 }
 

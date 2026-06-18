@@ -57,4 +57,35 @@ func TestValidateSecretPickerParams(t *testing.T) {
 		)
 		require.NoError(t, err)
 	})
+
+	t.Run("ignores placeholder/param-name fallbacks for empty optional pickers", func(t *testing.T) {
+		// An optional picker left empty must not be validated against the
+		// placeholder or param-name fallback that ResolveInstallParams would
+		// otherwise substitute, since those are not real secret names.
+		optionalSchema := []InstallParam{
+			{Name: "ssh_secret_name", Type: ParamTypeSecretPicker, Placeholder: "my-secret", Required: false},
+		}
+
+		err := ValidateSecretPickerParams(optionalSchema, nil, r.Organization.ID)
+		require.NoError(t, err)
+
+		err = ValidateSecretPickerParams(optionalSchema, map[string]string{"ssh_secret_name": ""}, r.Organization.ID)
+		require.NoError(t, err)
+	})
+
+	t.Run("validates an explicit default secret name", func(t *testing.T) {
+		// When the user omits the value, an explicit default is what gets
+		// substituted, so it must reference a real secret.
+		schemaWithDefault := []InstallParam{
+			{Name: "ssh_secret_name", Type: ParamTypeSecretPicker, Default: secret.Name},
+		}
+		require.NoError(t, ValidateSecretPickerParams(schemaWithDefault, nil, r.Organization.ID))
+
+		badDefault := []InstallParam{
+			{Name: "ssh_secret_name", Type: ParamTypeSecretPicker, Default: "does-not-exist"},
+		}
+		err := ValidateSecretPickerParams(badDefault, nil, r.Organization.ID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
 }

@@ -88,7 +88,14 @@ func ValidateSecretPickerParams(schema []InstallParam, values map[string]string,
 			continue
 		}
 
+		// Only validate a real, intended secret reference: a user-provided
+		// value, or an explicit default. The placeholder/param-name fallbacks
+		// applied by ResolveInstallParams are not valid secret names, so an
+		// optional picker left empty must not be treated as a missing secret.
 		secretName := strings.TrimSpace(values[p.Name])
+		if secretName == "" {
+			secretName = strings.TrimSpace(p.Default)
+		}
 		if secretName == "" {
 			continue
 		}
