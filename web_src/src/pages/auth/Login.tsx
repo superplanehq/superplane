@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -12,6 +12,7 @@ import {
   recordLastUsedLoginMethod,
   type LastUsedLoginMethod,
 } from "@/lib/lastUsedLoginMethod";
+import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 
 type AuthConfig = {
   providers: string[];
@@ -56,13 +57,28 @@ const getProviderLabel = (provider: string) => {
   }
 };
 
+const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode: boolean) => {
+  const params = new URLSearchParams(redirectQuery ? redirectQuery.slice(1) : "");
+  if (isSignupMode) {
+    params.set("signup", "true");
+  }
+
+  const query = params.toString();
+  return query ? `/auth/${provider}?${query}` : `/auth/${provider}`;
+};
+
 type MagicCodeStep = "email" | "code";
+type AuthMode = "login" | "signup";
+
+interface LoginProps {
+  mode?: AuthMode;
+}
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
   <p className="mt-2 text-center text-xs text-gray-500">You used {label} to log in last time</p>
 );
 
-export const Login: React.FC = () => {
+export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
@@ -73,7 +89,7 @@ export const Login: React.FC = () => {
   const [configError, setConfigError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(mode === "signup");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
@@ -109,6 +125,22 @@ export const Login: React.FC = () => {
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response) => {
+      const finalURL = response.url || "/";
+
+      try {
+        const parsedURL = new URL(finalURL, window.location.origin);
+        if (parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome") {
+          if (!parsedURL.searchParams.has("redirect") && redirectTarget) {
+            parsedURL.searchParams.set("redirect", redirectTarget);
+          }
+
+          window.location.href = `${parsedURL.pathname}${parsedURL.search}`;
+          return;
+        }
+      } catch {
+        // fall through to existing redirect behavior
+      }
+
       if (redirectTarget) {
         window.location.href = redirectTarget;
         return;
@@ -130,7 +162,6 @@ export const Login: React.FC = () => {
         // fall through to default redirect
       }
 
-      const finalURL = response.url || "/";
       window.location.href = finalURL;
     },
     [redirectTarget],
@@ -147,22 +178,31 @@ export const Login: React.FC = () => {
   }, [account, accountLoading, safeRedirect]);
 
   useEffect(() => {
+    setIsSignupMode(mode === "signup");
+    setFormError(null);
+    setMagicCodeStep("email");
+    setMagicCode("");
+    setShowPasswordLogin(false);
+  }, [mode]);
+
+  useEffect(() => {
     if (!magicLinkToken) return;
 
     const verifyMagicLink = async () => {
       setSubmitLoading(true);
       try {
-        const formData = new URLSearchParams();
-        formData.append("token", magicLinkToken);
-        if (inviteToken) {
-          formData.append("invite_token", inviteToken);
-        }
+        const { url, body } = buildMagicLinkVerifyRequest({
+          token: magicLinkToken,
+          inviteToken,
+          redirectTarget,
+          signupIntent: mode === "signup",
+        });
 
-        const response = await fetch("/auth/magic-code/verify", {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           credentials: "include",
-          body: formData.toString(),
+          body,
         });
 
         if (!response.ok) {
@@ -179,7 +219,7 @@ export const Login: React.FC = () => {
     };
 
     verifyMagicLink();
-  }, [magicLinkToken, inviteToken, handleRedirectAfterAuth]);
+  }, [magicLinkToken, inviteToken, redirectTarget, mode, handleRedirectAfterAuth]);
 
   useEffect(() => {
     let canceled = false;
@@ -232,19 +272,8 @@ export const Login: React.FC = () => {
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
-  const useMagicCodePrimary = authConfig.magicCodeEnabled && !showPasswordLogin;
-
-  useEffect(() => {
-    if (!canSignup && isSignupMode) {
-      setIsSignupMode(false);
-      setFormError(null);
-    }
-  }, [canSignup, isSignupMode]);
-
-  const handleToggleMode = (nextMode: "login" | "signup") => {
-    setIsSignupMode(nextMode === "signup");
-    setFormError(null);
-  };
+  const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
+  const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,6 +289,9 @@ export const Login: React.FC = () => {
     try {
       const formData = new URLSearchParams();
       formData.append("email", magicCodeEmail.trim());
+      if (isSignupMode) {
+        formData.append("signup", "true");
+      }
       if (redirectTarget) {
         formData.append("redirect", redirectTarget);
       }
@@ -299,6 +331,9 @@ export const Login: React.FC = () => {
       const formData = new URLSearchParams();
       formData.append("email", magicCodeEmail.trim());
       formData.append("code", magicCode.trim());
+      if (isSignupMode) {
+        formData.append("signup", "true");
+      }
       if (inviteToken) {
         formData.append("invite_token", inviteToken);
       }
@@ -450,8 +485,8 @@ export const Login: React.FC = () => {
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
 
   const getHeading = () => {
-    if (isSignupMode) return "Create your account";
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
@@ -493,7 +528,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "email" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
             <form onSubmit={handleMagicCodeRequest} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -514,7 +549,7 @@ export const Login: React.FC = () => {
             </form>
           )}
 
-          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "code" && (
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "code" && (
             <form onSubmit={handleMagicCodeVerify} className="space-y-4">
               <div className="space-y-2">
                 <Label>Code</Label>
@@ -532,7 +567,7 @@ export const Login: React.FC = () => {
               </div>
 
               <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
-                Sign in
+                Continue
               </LoadingButton>
 
               <div className="text-center">
@@ -725,7 +760,7 @@ export const Login: React.FC = () => {
                 <div key={provider}>
                   <Button variant="outline" className="w-full justify-center gap-2" asChild>
                     <a
-                      href={`/auth/${provider}${redirectQuery}`}
+                      href={providerAuthPath(provider, redirectQuery, isSignupMode)}
                       onClick={() => recordLastUsedLoginMethod(provider as LastUsedLoginMethod)}
                     >
                       {provider === "github" && (
@@ -765,26 +800,27 @@ export const Login: React.FC = () => {
           {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("signup")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Create an account
-              </button>
+              </Link>
             </div>
           )}
 
           {!configLoading && isSignupMode && (
             <div className="mt-6 text-sm text-gray-500">
               Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => handleToggleMode("login")}
-                className="font-medium text-gray-900 underline underline-offset-2"
-              >
+              <Link to={`/login${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
                 Sign in
-              </button>
+              </Link>
+            </div>
+          )}
+
+          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && !isSignupMode && canSignup && (
+            <div className="mt-6 text-center text-sm text-gray-500">
+              {"Don't have an account? "}
+              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
+                Sign up
+              </Link>
             </div>
           )}
         </div>
