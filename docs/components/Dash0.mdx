@@ -1,0 +1,1063 @@
+---
+title: "Dash0"
+---
+
+Connect to Dash0 to query data using Prometheus API
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert Notification" href="#on-alert-notification" description="Listen to Dash0 alert notification webhook events" />
+  <LinkCard title="On Synthetic Check Notification" href="#on-synthetic-check-notification" description="Listen to Dash0 synthetic check notification webhook events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Check Rule" href="#create-check-rule" description="Create a Prometheus-style alert check rule in Dash0" />
+  <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create an HTTP synthetic check in Dash0 to monitor endpoint availability and performance" />
+  <LinkCard title="Delete Check Rule" href="#delete-check-rule" description="Delete a check rule (Prometheus alert rule) from Dash0 by ID or origin" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete an HTTP synthetic check from Dash0 by ID" />
+  <LinkCard title="Get Check Rule" href="#get-check-rule" description="Retrieve a check rule (Prometheus alert rule) from Dash0 by ID or origin" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve an HTTP synthetic check configuration and operational metrics from Dash0" />
+  <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
+  <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Send Log Event" href="#send-log-event" description="Send a log record to Dash0 via OTLP HTTP ingestion for audit trails and observability correlation" />
+  <LinkCard title="Update Check Rule" href="#update-check-rule" description="Update an existing check rule (Prometheus alert rule) in Dash0" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
+</CardGrid>
+
+## Instructions
+
+To connect Dash0 to Superplane:
+
+1. Go to **Settings → Auth Tokens → + Add** to create a new API token.
+2. Give the token a name, grant it access to the Default or all Datasets, all Signal types, and all Permissions.
+3. Click **Save** and copy the **Token** into the **API Token** field below.
+4. Go to **Settings → Endpoints → Prometheus API** and copy the **Endpoint** into the **Prometheus API Base URL** field below.
+5. Click **Connect** to finish setup.
+
+<a id="on-alert-notification"></a>
+
+## On Alert Notification
+
+**Trigger key:** `dash0.onAlertNotification`
+
+The On Alert Notification trigger starts a workflow execution when Dash0 sends an alert notification webhook.
+
+### Setup
+
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all alert check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
+
+### Event Data
+
+The trigger emits the full JSON payload received from Dash0 as `dash0.alertNotification`.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "checkrules": [
+        {
+          "annotations": {
+            "summary": "High error rate detected"
+          },
+          "description": "Alert when API error rate is high",
+          "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) \u003e 0.05",
+          "for": "5m",
+          "id": "check_456",
+          "interval": "1m",
+          "keepFiringFor": "10m",
+          "labels": {
+            "env": "prod",
+            "service": "api"
+          },
+          "name": "API availability",
+          "thresholds": {
+            "critical": 0.05
+          },
+          "url": "https://app.dash0.com/check-rules/check_456"
+        }
+      ],
+      "dataset": "default",
+      "description": "Error rate exceeded threshold for API availability check.",
+      "end": "",
+      "id": "issue_123",
+      "issueIdentifier": "availability-api-high-error-rate",
+      "labels": [
+        {
+          "key": "service",
+          "value": {
+            "stringValue": "api"
+          }
+        },
+        {
+          "key": "env",
+          "value": {
+            "stringValue": "prod"
+          }
+        }
+      ],
+      "start": "2026-02-20T12:00:00Z",
+      "status": "critical",
+      "summary": "High error rate on API availability check",
+      "url": "https://app.dash0.com/issues/issue_123"
+    }
+  },
+  "timestamp": "2026-02-20T12:00:00Z",
+  "type": "dash0.alertNotification"
+}
+```
+
+<a id="on-synthetic-check-notification"></a>
+
+## On Synthetic Check Notification
+
+**Trigger key:** `dash0.onSyntheticCheckNotification`
+
+The On Synthetic Check Notification trigger starts a workflow execution when Dash0 sends a synthetic check notification webhook.
+
+### Setup
+
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all synthetic check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
+
+### Event Data
+
+The trigger emits the full JSON payload received from Dash0 as `dash0.syntheticCheckNotification`.
+
+### Labels Format
+
+Synthetic check notifications use a tuple-based label format where each label is an array of `[index, {key, value}]`.
+The trigger normalizes these labels into a flat `{key: value}` map in the emitted payload for easier downstream consumption.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "checkrules": [
+        {
+          "annotations": {
+            "summary": "API health check failure detected"
+          },
+          "description": "Monitor API health endpoint availability",
+          "expression": "",
+          "for": "5m",
+          "id": "check_101",
+          "interval": "1m",
+          "keepFiringFor": "10m",
+          "labels": {
+            "env": "prod",
+            "service": "api"
+          },
+          "name": "API Health Check",
+          "thresholds": {},
+          "url": "https://app.dash0.com/check-rules/check_101"
+        }
+      ],
+      "dataset": "default",
+      "description": "Synthetic check detected failures for API health endpoint.",
+      "end": "",
+      "id": "issue_789",
+      "issueIdentifier": "synthetic-check-api-health",
+      "labels": [
+        [
+          "0",
+          {
+            "key": "dash0.resource.type",
+            "value": {
+              "stringValue": "synthetic"
+            }
+          }
+        ],
+        [
+          "1",
+          {
+            "key": "dash0.synthetic_check.attempt_id",
+            "value": {
+              "stringValue": "73768e2c"
+            }
+          }
+        ],
+        [
+          "2",
+          {
+            "key": "dash0.synthetic_check.failed_critical_assertions",
+            "value": {
+              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
+            }
+          }
+        ],
+        [
+          "3",
+          {
+            "key": "dash0.synthetic_check.id",
+            "value": {
+              "stringValue": "api-health-check"
+            }
+          }
+        ],
+        [
+          "4",
+          {
+            "key": "dash0.synthetic_check.name",
+            "value": {
+              "stringValue": "API Health Check"
+            }
+          }
+        ]
+      ],
+      "start": "2026-02-20T12:00:00Z",
+      "status": "critical",
+      "summary": "Synthetic check failed: API Health Check",
+      "url": "https://app.dash0.com/issues/issue_789"
+    }
+  },
+  "timestamp": "2026-02-20T12:00:00Z",
+  "type": "dash0.syntheticCheckNotification"
+}
+```
+
+<a id="create-check-rule"></a>
+
+## Create Check Rule
+
+**Component key:** `dash0.createCheckRule`
+
+The Create Check Rule component creates a Prometheus-style alert check rule in Dash0 to monitor metrics and trigger alerts based on PromQL expressions.
+
+### Use Cases
+
+- **Service health monitoring**: Create alerts for service error rates, latency, or availability
+- **Resource monitoring**: Alert on high CPU, memory, or disk usage
+- **Business metrics**: Monitor key business metrics and trigger alerts when thresholds are exceeded
+- **SLO enforcement**: Create alerts based on Service Level Objectives (SLOs)
+
+### Configuration
+
+#### Name & Expression
+- **Name**: Human-readable name for the check rule
+- **Expression**: PromQL expression to evaluate. Supports $__threshold variable for dynamic thresholding
+
+#### Thresholds
+- **Degraded**: Threshold value for degraded state (warning)
+- **Critical**: Threshold value for critical state (alert)
+- Required when using $__threshold in the expression
+
+#### Evaluation
+- **Interval**: How often to evaluate the expression (1m, 5m, 10m)
+- **For**: Grace period before triggering (pending duration)
+- **Keep Firing For**: Grace period before resolving (resolution duration)
+
+#### Metadata
+- **Summary**: Short templatable summary (max 255 chars)
+- **Description**: Detailed templatable description (max 2048 chars)
+- **Labels**: Prometheus labels for routing and grouping
+- **Annotations**: Prometheus annotations for additional context
+
+#### Control
+- **Enabled**: Whether the check rule is active
+- **Dataset**: Dash0 dataset to query (defaults to "default")
+
+### Output
+
+Returns the created check rule details from the Dash0 API, including the rule ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "runbook": "https://wiki.example.com/runbooks/high-error-rate",
+      "summary": "Error rate is {{ $value }} errors/sec"
+    },
+    "dataset": "default",
+    "description": "The error rate has exceeded the configured threshold",
+    "enabled": true,
+    "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) \u003e $__threshold",
+    "for": "0s",
+    "id": "high-error-rate-alert",
+    "interval": "1m",
+    "keepFiringFor": "0s",
+    "labels": {
+      "severity": "high",
+      "team": "backend"
+    },
+    "name": "High error rate alert",
+    "summary": "Error rate is high",
+    "thresholds": {
+      "critical": 50,
+      "degraded": 10
+    }
+  },
+  "timestamp": "2026-03-06T12:00:00Z",
+  "type": "dash0.checkRule.created"
+}
+```
+
+<a id="create-http-synthetic-check"></a>
+
+## Create HTTP Synthetic Check
+
+**Component key:** `dash0.createHttpSyntheticCheck`
+
+The Create Synthetic Check component creates an HTTP synthetic check in Dash0 to monitor the availability and performance of your endpoints.
+
+### Use Cases
+
+- **Uptime monitoring**: Create checks to monitor API endpoints and websites
+- **Performance validation**: Set response time thresholds to catch regressions
+- **Deployment verification**: Create synthetic checks after deployments to verify availability
+- **Multi-region monitoring**: Monitor endpoints from multiple global locations
+
+### Configuration
+
+#### Name & Dataset
+- **Name**: Display name of the synthetic check
+- **Dataset**: The Dash0 dataset to create the check in (defaults to "default")
+
+#### Request
+- **URL**: Target URL to monitor
+- **Method**: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD)
+- **Redirects**: Whether to follow HTTP redirects
+- **Allow Insecure**: Skip TLS certificate validation (useful for staging environments)
+- **Headers**: Custom HTTP request headers
+- **Body**: Request body payload (for POST/PUT/PATCH)
+
+#### Schedule
+- **Interval**: How often the check runs (e.g. 30s, 1m, 5m, 1h, 2d)
+- **Locations**: Probe locations (Frankfurt, Oregon, North Virginia, London, Brussels, Melbourne)
+- **Strategy**: Execution strategy (all locations or round-robin)
+
+#### Assertions
+Each assertion has a kind, severity (critical or degraded), and kind-specific parameters:
+- **Status Code**: Validate the HTTP response status code
+- **Timing**: Set thresholds for response, request, SSL, connection, DNS, or total time
+- **Error Type**: Detect specific error types (DNS, connection, SSL, timeout)
+- **SSL Certificate Validity**: Enforce minimum days until certificate expiration
+- **Response Header**: Validate presence or value of a specific response header
+- **JSON Body**: Validate JSON response fields using JSONPath expressions
+- **Text Body**: Match plain-text response content
+
+#### Retries
+- **Attempts**: Number of retry attempts on failure
+- **Delay**: Delay between retries (e.g. 1s, 2s, 5s)
+
+### Output
+
+Returns the created synthetic check details from the Dash0 API, including the check ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "1"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              },
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "5000ms"
+                }
+              }
+            ],
+            "degradedAssertions": [
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "2000ms"
+                }
+              }
+            ]
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.created"
+}
+```
+
+<a id="delete-check-rule"></a>
+
+## Delete Check Rule
+
+**Component key:** `dash0.deleteCheckRule`
+
+The Delete Check Rule component removes a check rule (Prometheus alert rule) from Dash0 by its ID or origin. Use the check rule ID from a Create/Get/Update output or from the Dash0 dashboard.
+
+### Use Cases
+
+- **Cleanup**: Remove obsolete or test check rules
+- **Automation**: Delete check rules as part of automated workflows
+- **Resource management**: Clean up check rules when services are decommissioned
+
+### Configuration
+
+- **Check Rule**: The Dash0 check rule ID or origin to delete (required)
+- **Dataset**: The dataset the check rule belongs to (defaults to "default")
+
+### Output
+
+Returns a confirmation payload indicating successful deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "api-b8dad545-7920-49f9-96be-df053cda312d"
+  },
+  "timestamp": "2026-03-06T12:00:00Z",
+  "type": "dash0.checkRule.deleted"
+}
+```
+
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+**Component key:** `dash0.deleteHttpSyntheticCheck`
+
+The Delete HTTP Synthetic Check component removes a synthetic check from Dash0 by its ID. Use the check ID from a Create/Get/Update output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to delete (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+
+### Output
+
+Returns a confirmation payload (e.g. deleted id).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "64617368-3073-796e-7468-abc123def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.deleted"
+}
+```
+
+<a id="get-check-rule"></a>
+
+## Get Check Rule
+
+**Component key:** `dash0.getCheckRule`
+
+The Get Check Rule component retrieves the full configuration of an existing check rule (Prometheus alert rule) from Dash0.
+
+### Use Cases
+
+- **Configuration review**: Fetch current check rule settings for audit or documentation
+- **Workflow integration**: Retrieve check rule details to use in subsequent workflow steps
+- **Health monitoring**: Check if alert rules are properly configured
+
+### Configuration
+
+- **Check Rule**: The ID or origin of the check rule to retrieve (from Dash0)
+- **Dataset**: The Dash0 dataset the check rule belongs to (defaults to "default")
+
+### Output
+
+Returns the complete check rule configuration from the Dash0 API, including:
+- Name and expression (PromQL query)
+- Thresholds (degraded and critical)
+- Evaluation settings (interval, for, keepFiringFor)
+- Labels and annotations
+- Enabled status
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "runbook": "https://wiki.example.com/runbooks/high-error-rate",
+      "summary": "Error rate is {{ $value }} errors/sec"
+    },
+    "dataset": "default",
+    "description": "The error rate has exceeded the configured threshold",
+    "enabled": true,
+    "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) \u003e $__threshold",
+    "for": "0s",
+    "id": "high-error-rate-alert",
+    "interval": "1m",
+    "keepFiringFor": "0s",
+    "labels": {
+      "severity": "high",
+      "team": "backend"
+    },
+    "name": "High error rate alert",
+    "summary": "Error rate is high",
+    "thresholds": {
+      "critical": 50,
+      "degraded": 10
+    }
+  },
+  "timestamp": "2026-03-06T12:00:00Z",
+  "type": "dash0.checkRule.fetched"
+}
+```
+
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+**Component key:** `dash0.getHttpSyntheticCheck`
+
+The Get HTTP Synthetic Check component retrieves the full configuration and operational metrics of an existing HTTP synthetic check from Dash0.
+
+### Use Cases
+
+- **Health dashboards**: Fetch current uptime and performance metrics for display in workflows
+- **Audit and reporting**: Retrieve check configurations for compliance or documentation
+- **Incident response**: Quickly gather check status and recent performance data during incidents
+
+### Configuration
+
+- **Check ID**: The ID of the synthetic check to retrieve (from Dash0)
+- **Dataset**: The Dash0 dataset the check belongs to (defaults to "default")
+
+### Output Channels
+
+- **Healthy**: The check is passing — the most recent run outcome is "Healthy"
+- **Degraded**: The check is degraded — the most recent run outcome is "Degraded"
+- **Critical**: The check is failing — the most recent run outcome is "Critical"
+
+### Output
+
+Returns a combined payload with:
+
+#### Configuration
+The full synthetic check configuration from the Dash0 API, including:
+- Name, URL, HTTP method
+- Schedule (interval, locations, strategy)
+- Assertions (critical and degraded thresholds)
+- Retry settings
+
+#### Metrics
+Operational metrics from the Dash0 Prometheus API:
+- **Healthy Runs (24h/7d)**: Number of successful check runs
+- **Critical Runs (24h/7d)**: Number of failed check runs
+- **Total Runs (24h/7d)**: Total number of check runs
+- **Avg Duration (24h/7d)**: Mean end-to-end response time (in milliseconds)
+- **Last Outcome**: Most recent run outcome (Healthy or Critical)
+
+Note: Metrics are fetched on a best-effort basis. If Prometheus metrics are unavailable for a check, the configuration is still returned with null metric values.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "configuration": {
+      "kind": "Dash0SyntheticCheck",
+      "metadata": {
+        "annotations": {},
+        "description": "",
+        "labels": {
+          "dash0.com/dataset": "default",
+          "dash0.com/id": "64617368-3073-796e-7468-73599f287bf4",
+          "dash0.com/origin": "",
+          "dash0.com/version": "21"
+        },
+        "name": "New synthetic check"
+      },
+      "spec": {
+        "display": {
+          "name": "New synthetic check"
+        },
+        "enabled": true,
+        "labels": {},
+        "notifications": {
+          "channels": [],
+          "onlyCriticalChannels": []
+        },
+        "plugin": {
+          "kind": "http",
+          "spec": {
+            "assertions": {
+              "criticalAssertions": [
+                {
+                  "kind": "status_code",
+                  "spec": {
+                    "operator": "is",
+                    "value": "200"
+                  }
+                }
+              ],
+              "degradedAssertions": [
+                {
+                  "kind": "timing",
+                  "spec": {
+                    "operator": "lte",
+                    "type": "total",
+                    "value": "2000ms"
+                  }
+                }
+              ]
+            },
+            "request": {
+              "headers": [],
+              "method": "get",
+              "queryParameters": [],
+              "redirects": "follow",
+              "tls": {
+                "allowInsecure": false
+              },
+              "tracing": {
+                "addTracingHeaders": true
+              },
+              "url": "https://example.com/health"
+            }
+          }
+        },
+        "retries": {
+          "kind": "off",
+          "spec": {}
+        },
+        "schedule": {
+          "interval": "1m",
+          "locations": [
+            "be-brussels"
+          ],
+          "strategy": "all_locations"
+        }
+      }
+    },
+    "metrics": {
+      "avgDuration24hMs": 1004,
+      "avgDuration7dMs": 1004,
+      "criticalRuns24h": 2275,
+      "criticalRuns7d": 2438,
+      "healthyRuns24h": 6,
+      "healthyRuns7d": 37,
+      "lastOutcome": "Healthy",
+      "totalRuns24h": 2281,
+      "totalRuns7d": 2475
+    }
+  },
+  "timestamp": "2026-03-03T11:00:00Z",
+  "type": "dash0.syntheticCheck.fetched"
+}
+```
+
+<a id="list-issues"></a>
+
+## List Issues
+
+**Component key:** `dash0.listIssues`
+
+The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
+
+### Use Cases
+
+- **Health monitoring**: Check system health and route based on issue severity
+- **Alert routing**: Route alerts to different channels based on issue status
+- **Issue tracking**: Monitor and process active issues
+- **Automated remediation**: Trigger remediation workflows based on issues
+
+### Configuration
+
+- **Check Rules**: Optional list of check rules to filter issues (leave empty to get all issues)
+
+### Output Channels
+
+- **Clear**: No active issues detected
+- **Degraded**: One or more degraded issues detected
+- **Critical**: One or more critical issues detected
+
+### Output
+
+Returns a list of issues with:
+- **check_rule**: The check rule that generated the issue
+- **status**: Issue status (clear, degraded, critical)
+- **labels**: Metric labels associated with the issue
+- **metadata**: Additional issue metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "result": [
+        {
+          "metric": {
+            "service_name": "test"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
+            ]
+          ]
+        }
+      ],
+      "resultType": "vector"
+    },
+    "status": "success"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.issues.list"
+}
+```
+
+<a id="query-prometheus"></a>
+
+## Query Prometheus
+
+**Component key:** `dash0.queryPrometheus`
+
+The Query Prometheus component executes PromQL queries against the Dash0 Prometheus API.
+
+### Use Cases
+
+- **Metrics monitoring**: Query application and infrastructure metrics
+- **Alerting**: Check metric thresholds and trigger alerts
+- **Data analysis**: Analyze time-series data from your applications
+- **Performance monitoring**: Monitor system performance metrics
+
+### Configuration
+
+- **PromQL Query**: The Prometheus Query Language query to execute (supports expressions)
+- **Dataset**: The dataset to query (default: "default")
+- **Query Type**: 
+  - **Instant**: Query a single point in time
+  - **Range**: Query a time range with optional start, end, and step parameters
+
+### Output
+
+Returns the Prometheus query response including:
+- **status**: Query status (success or error)
+- **data**: Query results with metric labels and values
+- **dataType**: Result type (vector, matrix, scalar, or string)
+
+### Notes
+
+- Requires Dash0 API token and base URL configured in application settings
+- Supports all standard PromQL functions and operators
+- Range queries require start, end, and step parameters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "result": [
+        {
+          "metric": {
+            "service_name": "test"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
+            ]
+          ]
+        }
+      ],
+      "resultType": "vector"
+    },
+    "status": "success"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.prometheus.response"
+}
+```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+**Component key:** `dash0.sendLogEvent`
+
+The Send Log Event component sends log records from workflows to Dash0 via OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow events (deployments, approvals, alerts) as log lines
+- **Observability correlation**: Tie workflow activity to traces and metrics in Dash0
+- **Event tracking**: Create searchable log entries for workflow milestones
+- **Debugging**: Send diagnostic information from workflows to Dash0 Logs Explorer
+
+### Configuration
+
+- **Severity**: Log severity level (TRACE, DEBUG, INFO, WARN, ERROR, FATAL)
+- **Event Name**: Optional name for this log event (e.g. deployment.completed)
+- **Service Name**: Optional service identifier (becomes OTLP resource attribute 'service.name')
+- **Body**: The log message content (plain text or JSON string)
+- **Attributes**: Optional key-value pairs for additional log metadata
+- **Dataset**: Optional dataset name for log organization (defaults to "default")
+
+### Output
+
+Returns a confirmation that the log was sent along with the log record details:
+- **sent**: Boolean indicating success
+- **severityText**: The log severity level
+- **body**: The log message content
+- **eventName**: The event name (if provided)
+- **serviceName**: The service name (if provided)
+- **attributes**: Additional metadata (if provided)
+- **dataset**: The dataset name
+- **timestamp**: When the log was sent
+
+### Notes
+
+- Requires Dash0 API token and base URL configured in application settings
+- Logs appear in Dash0 Logs Explorer and can be correlated with traces and metrics
+- Use INFO severity for normal workflow events, WARN/ERROR for issues
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "env": "production"
+    },
+    "body": "Deployment started",
+    "dataset": "default",
+    "eventName": "deployment.created",
+    "sent": true,
+    "serviceName": "api-gateway",
+    "severityText": "INFO"
+  },
+  "timestamp": "2026-03-11T16:05:54.753430237Z",
+  "type": "dash0.log.sent"
+}
+```
+
+<a id="update-check-rule"></a>
+
+## Update Check Rule
+
+**Component key:** `dash0.updateCheckRule`
+
+The Update Check Rule component updates an existing check rule (Prometheus alert rule) in Dash0. Use the check rule ID from a previous Create Check Rule output or from the Dash0 dashboard.
+
+### Use Cases
+
+- **Threshold adjustment**: Update alert thresholds based on changing conditions
+- **Expression refinement**: Modify the PromQL query to better detect issues
+- **Notification changes**: Update labels and annotations for better routing
+- **Enable/disable**: Temporarily disable check rules during maintenance
+
+### Configuration
+
+- **Check Rule**: The Dash0 check rule ID to update (required)
+- **Dataset**: The dataset the check rule belongs to (defaults to "default")
+- **Name**, **Expression**, **Thresholds**, **Interval**, etc.: Same as Create Check Rule; the full spec is sent to replace the existing check rule
+
+### Output
+
+Returns the updated check rule details from the Dash0 API, including the rule ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "runbook": "https://wiki.example.com/runbooks/high-error-rate",
+      "summary": "Error rate is {{ $value }} errors/sec"
+    },
+    "dataset": "default",
+    "description": "The error rate has exceeded the configured threshold",
+    "enabled": true,
+    "expression": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) \u003e $__threshold",
+    "for": "30s",
+    "id": "high-error-rate-alert",
+    "interval": "1m",
+    "keepFiringFor": "5m",
+    "labels": {
+      "severity": "high",
+      "team": "backend"
+    },
+    "name": "High error rate alert",
+    "summary": "Error rate is high",
+    "thresholds": {
+      "critical": 75,
+      "degraded": 15
+    }
+  },
+  "timestamp": "2026-03-06T12:00:00Z",
+  "type": "dash0.checkRule.updated"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+**Component key:** `dash0.updateHttpSyntheticCheck`
+
+The Update HTTP Synthetic Check component updates an existing synthetic check in Dash0. Use the check ID from a previous Create HTTP Synthetic Check output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to update (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+- **Name**, **Request**, **Schedule**, **Assertions**, **Retries**: Same as Create HTTP Synthetic Check; the full spec is sent to replace the existing check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "2"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              }
+            ],
+            "degradedAssertions": []
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.updated"
+}
+```
+

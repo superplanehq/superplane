@@ -1,0 +1,1526 @@
+---
+title: "Core"
+sidebar:
+  order: 1
+---
+
+Built-in SuperPlane components.
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
+  <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
+  <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
+  <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
+  <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
+  <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
+  <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
+  <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
+  <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
+  <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
+  <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
+  <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
+  <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
+  <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
+  <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
+  <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
+  <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
+  <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
+  <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
+  <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
+  <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
+</CardGrid>
+
+<a id="on-error"></a>
+
+## On Error
+
+**Trigger key:** `onError`
+
+The On Error trigger reacts to unexpected failures anywhere in the canvas.
+
+### How It Works
+
+Whenever any node in the same canvas finishes in the **error** state (it could not
+execute - e.g. a network failure, invalid credentials, or an unhandled exception),
+every On Error node in that canvas fires a new run. This happens independently of how
+your nodes are connected: On Error nodes do not need an incoming connection.
+
+If you place multiple On Error nodes on a canvas, all of them receive every error.
+
+> Note: this reacts to the **error** state, not the **failed** state. A component that
+> executed successfully but produced a failure outcome (e.g. an HTTP request returning
+> 404, or a rejected approval) does **not** trigger On Error. Use a Filter or the
+> component's failure output channel for those cases.
+
+### Event Data
+
+Each emitted event carries:
+
+- `node`: the node that errored - its `id`, `name`, and `component` type
+- `error`: the failure `reason` and human-readable `message`
+- `run`: the `id` of the run that failed
+- `root`: the event that started the failed run - the originating `node` and
+  its `payload`
+- `payloads`: the payloads emitted by every upstream node in the failed run,
+  keyed by node name
+
+### Examples
+
+- `$['On Error'].node.name`: the name of the node that errored
+- `$['On Error'].error.message`: the error message
+- `$['On Error'].root.payload.data.version`: data from the event that triggered the failed run
+- `$['On Error'].payloads['Build'].data.version`: data from an upstream node in the failed run
+
+### Example Data
+
+```json
+{
+  "data": {
+    "error": {
+      "message": "request timeout after 30s",
+      "reason": "error"
+    },
+    "node": {
+      "component": "http",
+      "id": "http-deploy-to-prod-a1b2c3",
+      "name": "Deploy to Prod"
+    },
+    "payloads": {
+      "Manual Run": {
+        "data": {
+          "version": "1.4.2"
+        },
+        "type": "manual.run"
+      }
+    },
+    "root": {
+      "node": {
+        "component": "start",
+        "id": "manual-run-9z8y7x",
+        "name": "Manual Run"
+      },
+      "payload": {
+        "data": {
+          "version": "1.4.2"
+        },
+        "type": "manual.run"
+      }
+    },
+    "run": {
+      "id": "8f1c2d3e-4a5b-6c7d-8e9f-0a1b2c3d4e5f"
+    }
+  },
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "onError.triggered"
+}
+```
+
+<a id="schedule"></a>
+
+## Schedule
+
+**Trigger key:** `schedule`
+
+The Schedule trigger starts workflow executions automatically based on a configured schedule.
+
+### Use Cases
+
+- **Periodic tasks**: Run daily reports, backups, or maintenance tasks
+- **Data synchronization**: Regularly sync data between systems
+- **Monitoring**: Periodic health checks and monitoring
+- **Batch processing**: Process data on a recurring schedule
+
+### Schedule Types
+
+- **Minutes**: Trigger every N minutes (1-59)
+- **Hours**: Trigger every N hours at a specific minute (1-23 hours)
+- **Days**: Trigger every N days at a specific time (1-31 days)
+- **Weeks**: Trigger every N weeks on specific weekdays at a specific time (1-52 weeks)
+- **Months**: Trigger every N months on a specific day and time (1-24 months)
+- **Cron**: Use a cron expression for advanced scheduling patterns
+
+### Timezone Support
+
+For days, weeks, months, and cron schedules, you can specify a timezone to ensure triggers occur at the correct local time.
+
+### Cron Expressions
+
+Supports both 5-field and 6-field cron expressions:
+- **5-field**: `minute hour day month dayofweek` (e.g., `30 14 * * MON-FRI`)
+- **6-field**: `second minute hour day month dayofweek` (e.g., `0 30 14 * * MON-FRI`)
+
+### Event Data
+
+Each scheduled execution includes calendar information:
+- **calendar**: Year, month, day, hour, minute, second, week_day
+- **timezone**: Timezone information (for applicable schedule types)
+
+### Examples
+
+- **Every 15 minutes**: Minutes schedule with 15-minute interval
+- **Daily at 9 AM**: Days schedule with hour=9, minute=0
+- **Weekdays at 2 PM**: Weeks schedule with weekDays=[Monday-Friday], hour=14
+- **First of every month**: Months schedule with dayOfMonth=1
+
+### Example Data
+
+```json
+{
+  "data": {
+    "calendar": {
+      "day": "1",
+      "hour": "09",
+      "minute": "00",
+      "month": "January",
+      "second": "00",
+      "week_day": "Monday",
+      "year": "2024"
+    },
+    "timezone": "+00:00"
+  },
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "scheduler.tick"
+}
+```
+
+<a id="manual-run"></a>
+
+## Manual Run
+
+**Trigger key:** `start`
+
+The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
+
+### Use Cases
+
+- **Testing workflows**: Manually trigger workflows during development and testing
+- **One-off tasks**: Run workflows on-demand for specific operations
+- **Debugging**: Manually execute workflows to debug issues
+- **Ad-hoc processing**: Process data when needed without automation
+
+### How It Works
+
+1. Add the Manual Run trigger as the starting node of your workflow
+2. Configure one or more templates, each with a name, default payload, and optional parameters
+3. Click the "Run" button in the workflow UI, or invoke the `run` hook via the API/CLI to start an execution
+4. The workflow begins immediately with the configured payload for the selected template
+
+### Configuration
+
+Each Manual Run trigger exposes a list of templates. A template has:
+
+- `name` (required): a label used as the run target (and the event channel)
+- `parameters` (optional): a list of typed parameters exposed to payload expressions as `parameters["name"]` and used by the run form
+- `payload` (required): a default JSON object emitted when the template is used. Supports expressions such as `{{ now() }}` and `{{ parameters["my parameter"] }}` in JSON values.
+
+Each parameter has a `name` (plain text), required `type` (`string`, `number`, `boolean`, or `select`), an optional `title` for the run form label (defaults to `name` when unset), and an optional default (`defaultString`, `defaultNumber`, or `defaultBoolean`) whose editor matches the selected type. Select parameters also require an `options` list of `label` / `value` pairs; run-time values use the option `value` strings.
+
+### Event Data
+
+Manual runs emit an event with type `manual.run`. The data is the selected template's payload after expression resolution.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "message": "Hello, World!"
+  },
+  "timestamp": "2024-01-01T00:00:00Z",
+  "type": "manual.run"
+}
+```
+
+<a id="webhook"></a>
+
+## Webhook
+
+**Trigger key:** `webhook`
+
+The Webhook trigger starts a new workflow execution when an HTTP request is received at the generated webhook URL.
+
+### Use Cases
+
+- **External system integration**: Receive events from third-party services
+- **CI/CD pipelines**: Trigger workflows from build systems
+- **Form submissions**: Process data from web forms
+- **Event notifications**: Receive notifications from external applications
+
+### How It Works
+
+1. When you add a Webhook trigger to a workflow, SuperPlane generates a unique webhook URL
+2. Configure the authentication method for the webhook
+3. External systems can send HTTP requests to this URL
+4. Each request starts a new workflow execution with the request data
+
+### Authentication Methods
+
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
+- **Bearer Token**: Require a Bearer token in the `Authorization` header
+- **Header Token**: Require a raw token in a custom header (default: `X-Webhook-Token`)
+- **None (unsafe)**: No authentication (not recommended for production)
+
+### Request Data
+
+The webhook payload includes:
+- **body**: Parsed request body (JSON if possible, otherwise raw data)
+- **headers**: All HTTP headers from the request
+
+### Security
+
+- Each webhook has a unique secret key for authentication
+- Secrets can be reset using the "Reset Authentication" action
+- Maximum payload size: 64KB
+
+### Example Usage
+
+Send a POST request to the webhook URL with your payload. The workflow will receive the data and start execution.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "body": {
+      "event": "push",
+      "repository": "superplanehq/superplane"
+    },
+    "headers": {
+      "X-Event": [
+        "push"
+      ]
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "webhook"
+}
+```
+
+<a id="add-memory"></a>
+
+## Add Memory
+
+**Component key:** `addMemory`
+
+The Add Memory component appends one or more items to canvas-level memory storage.
+
+### Use Cases
+
+- Persist identifiers for later cleanup paths
+- Store cross-run mappings (for example pull request to resource ID)
+- Keep structured operational context per canvas
+
+### How It Works
+
+1. Reads `namespace` and value fields from configuration
+2. Appends a new memory row for the current canvas
+3. Emits `memory.added` with the saved payload
+
+### List Mode
+
+Enable "Input is a list" to add one memory row per element of a list expression.
+Configure `listSource` (the expression that yields the list) and `itemVariable`
+(the name to reference each element in field-value expressions, defaults to `item`).
+
+A single `memory.added` event is emitted with all written rows and the total `count`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "namespace": "machines",
+      "values": {
+        "creator": "alex",
+        "id": "1",
+        "pull_request": "123"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "memory.added"
+}
+```
+
+<a id="approval"></a>
+
+## Approval
+
+**Component key:** `approval`
+
+The Approval component pauses workflow execution and waits for manual approval from specified users, groups, or roles before continuing.
+
+### Use Cases
+
+- **Deployment approvals**: Require approval before deploying to production
+- **Financial transactions**: Get approval for high-value operations
+- **Content moderation**: Review content before publishing
+- **Compliance workflows**: Ensure regulatory approvals are obtained
+
+### How It Works
+
+1. When the Approval component executes, it creates approval requirements based on the configured approvers
+2. The workflow pauses and waits for all required approvals
+3. Approvers can approve or reject from the workflow UI
+4. Once all approvals are collected, the workflow continues:
+   - **Approved channel**: All required approvers approved
+   - **Rejected channel**: At least one approver rejected
+
+### Configuration
+
+- **Approvers**: List of users, groups, or roles who must approve
+  - **Everyone**: Any authenticated user can approve
+  - **Specific user**: Only the specified user can approve
+  - **Group**: Any member of the specified group can approve
+  - **Role**: Any user with the specified role can approve
+
+### Output Channels
+
+- **Approved**: Emitted when all required approvers have approved
+- **Rejected**: Emitted when at least one approver rejects (after all have responded)
+
+### Actions
+
+- **approve**: Approve a pending requirement (can include an optional comment)
+- **reject**: Reject a pending requirement (requires a reason)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "records": [
+      {
+        "approval": {
+          "approvedAt": "2024-01-01T12:00:00Z",
+          "comment": "Looks good"
+        },
+        "index": 0,
+        "state": "approved",
+        "type": "user",
+        "user": {
+          "email": "alex@example.com",
+          "id": "user_123",
+          "name": "Alex Doe"
+        }
+      }
+    ],
+    "result": "approved"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "approval.finished"
+}
+```
+
+<a id="delete-memory"></a>
+
+## Delete Memory
+
+**Component key:** `deleteMemory`
+
+The Delete Memory component removes memory rows from canvas-level memory storage.
+
+### Use Cases
+
+- Remove stale IDs after cleanup is complete
+- Keep memory stores bounded over time
+
+### How It Works
+
+1. Reads `namespace` and `matchList` from configuration
+2. Deletes memory rows matching all configured key/value pairs
+3. Emits `memory.deleted` to the `deleted` or `notFound` channel
+
+### Output Channels
+
+- **Deleted**: At least one matching memory row was removed
+- **Not Found**: No matching memory rows were removed
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "count": 1,
+      "deleted": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001"
+        }
+      ],
+      "matches": {
+        "creator": "igor",
+        "pull_request": 123
+      },
+      "namespace": "machines"
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.deleted"
+}
+```
+
+<a id="display"></a>
+
+## Display
+
+**Component key:** `display`
+
+The Display component displays a debug message from the latest execution.
+
+### Use Cases
+
+- **Debugging**: Display a message from the latest execution to help debug the workflow.
+- **Notifications**: Display a message from the latest execution to notify the user.
+- **Logging**: Display a message from the latest execution to log the workflow.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "Hello, World!"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "display.executed"
+}
+```
+
+<a id="filter"></a>
+
+## Filter
+
+**Component key:** `filter`
+
+The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
+
+### Use Cases
+
+- **Data validation**: Only process events that meet certain criteria
+- **Event filtering**: Filter out unwanted events before processing
+- **Conditional routing**: Stop processing events that don't match requirements
+- **Data quality**: Ensure only valid data continues through the workflow
+
+### How It Works
+
+1. The Filter component evaluates a boolean expression against the incoming event data
+2. If the expression evaluates to `true`, the event is emitted to the default output channel
+3. If the expression evaluates to `false`, the execution passes without emitting (effectively filtering out the event)
+
+### Expression Environment
+
+The expression has access to:
+- **$**: The run context data
+- **root()**: Access to the root event data
+- **previous()**: Access to previous node outputs (optionally with depth parameter)
+
+### Examples
+
+- `$["Node Name"].status == "active"`: Only forward events where status is "active"
+- `$["Node Name"].amount > 1000`: Filter events with amount greater than 1000
+- `$["Node Name"].user.role == "admin" && $["Node Name"].action == "delete"`: Complex condition checking multiple fields
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "filter.executed"
+}
+```
+
+<a id="for-each"></a>
+
+## For Each
+
+**Component key:** `forEach`
+
+The For Each component reads an array from the upstream payload and emits one downstream event per element.
+
+### Use Cases
+
+- Iterate over a list of results and process each one independently
+- Split runner output arrays into per-item workflow paths
+- Process each page, service, or record with the same downstream steps
+
+### How It Works
+
+1. Evaluates the configured array expression against the incoming event data
+2. Emits one `foreach.item` event to the `item` channel for each element
+3. If the array is empty, passes without emitting any events
+
+### Limits
+
+- At most 100 items per execution. Larger arrays fail with an error.
+- Self-hosted deployments can raise this cap with the `SUPERPLANE_MAX_EMIT_COUNT` environment variable.
+
+### Output Fields (per item)
+
+- **item**: The array element value
+- **index**: Zero-based index of the element
+- **totalCount**: Total number of items in the array
+
+### Expression Environment
+
+- **$**: The run context data
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "index": 0,
+    "item": {
+      "cost_usd": 42.5,
+      "service": "EC2"
+    },
+    "totalCount": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "foreach.item"
+}
+```
+
+<a id="graph-ql-request"></a>
+
+## GraphQL Request
+
+**Component key:** `graphql`
+
+The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
+
+### Request
+
+- **URL** — GraphQL HTTP endpoint (supports expressions)
+- **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
+- **Variables** — Key/value pairs merged into the request variables object
+- **Headers** — Request headers
+- **Authorization** — Optional bearer token stored in an organization Secret
+
+### Response
+
+- **status** - Response status code
+- **headers** - Response headers
+- **body** - Response body converted to JSON
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": {
+      "data": {
+        "viewer": {
+          "login": "octocat"
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": [
+        "application/json"
+      ]
+    },
+    "status": 200
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "graphql.request.finished"
+}
+```
+
+<a id="http-request"></a>
+
+## HTTP Request
+
+**Component key:** `http`
+
+The HTTP component allows you to make HTTP requests to external APIs and services as part of your workflow.
+
+### Use Cases
+
+- **API integration**: Call external REST APIs
+- **Webhook notifications**: Send notifications to external systems
+- **Data fetching**: Retrieve data from external services
+- **Service orchestration**: Coordinate with microservices
+
+### Supported Methods
+
+- GET, POST, PUT, DELETE, PATCH, HEAD
+
+HEAD requests do not send a body and the response body is empty by design.
+Use HEAD for health checks, URL validation, or to inspect response headers
+and status without downloading the full response payload.
+
+### Request Configuration
+
+- **URL**: The endpoint to call (supports expressions)
+- **Method**: HTTP method to use
+- **Query Parameters**: Optional URL query parameters
+- **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
+- **Body**: Request body in various formats:
+  - **JSON**: Structured JSON payload
+  - **Form Data**: URL-encoded form data
+  - **Plain Text**: Raw text content
+  - **XML**: XML formatted content
+
+### Response Handling
+
+The component emits the response with:
+- **status**: HTTP status code
+- **headers**: Response headers
+- **body**: Parsed response body (JSON if possible, otherwise string)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": {
+      "message": "ok"
+    },
+    "error": "Error to read request body: EOF",
+    "headers": {
+      "Content-Type": [
+        "application/json"
+      ]
+    },
+    "status": 200
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "http.request.finished"
+}
+```
+
+<a id="if"></a>
+
+## If
+
+**Component key:** `if`
+
+The If component evaluates a boolean expression and routes events to different output channels based on the result.
+
+### Use Cases
+
+- **Conditional branching**: Route events down different paths based on conditions
+- **Decision logic**: Implement if-then-else logic in workflows
+- **Data routing**: Send events to different processing paths
+- **Workflow control**: Control workflow flow based on event properties
+
+### How It Works
+
+1. The If component evaluates a boolean expression against the incoming event data
+2. If the expression evaluates to `true`, the event is emitted to the "True" output channel
+3. If the expression evaluates to `false`, the event is emitted to the "False" output channel
+
+### Output Channels
+
+- **True**: Events where the expression evaluates to `true`
+- **False**: Events where the expression evaluates to `false`
+
+### Expression Environment
+
+The expression has access to:
+- **$**: The run context data
+- **root()**: Access to the root event data
+- **previous()**: Access to previous node outputs (optionally with depth parameter)
+
+### Examples
+
+- `$["Node Name"].status == "approved"`: Route approved items to True channel
+- `$["Node Name"].amount > 1000`: Route high-value items to True channel
+- `$["Node Name"].user.role == "admin"`: Route admin actions to True channel
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "if.executed"
+}
+```
+
+<a id="loop"></a>
+
+## Loop
+
+**Component key:** `loop`
+
+The Loop component runs downstream steps repeatedly until an exit condition becomes true.
+
+### Use Cases
+
+- Poll an API until a resource reaches a ready state
+- Retry a workflow segment until validation passes
+- Paginate through results until all pages are processed
+- Run approval or review cycles until consensus is reached
+
+### How It Works
+
+1. On the first run, Loop emits to the **Next** channel and starts the loop session
+2. Connect downstream nodes to the Next output and wire the last step back to Loop
+3. When those steps finish, Loop evaluates the **Until Expression**
+4. If the expression is `true`, Loop emits on **Done** and the loop ends
+5. If the expression is `false`, Loop emits on **Next** again for another iteration
+
+### Wiring
+
+```
+Trigger → Loop → Step A → Step B ──┐
+              ↑                    │
+              └────────────────────┘
+```
+
+Edges back into Loop are allowed so downstream steps can return control for the next condition check.
+
+### Output Channels
+
+- **Done**: Emitted once when the loop stops. Payload is under `data.done` with `iterations`, `stopReason` (`conditionTrue` or `max_iterations`), and `elapsedMs`
+- **Next**: Emitted at the start of each iteration. Payload is under `data.next` with `iteration` and `maxIterations`
+
+### Limits
+
+- **Max Iterations** caps how many iterations are allowed (default 10, maximum 100)
+- **Timeout** caps the total wall-clock time of a single run (default 3600s, maximum 86400s). If the loop is still running when the timeout elapses, the run fails. This prevents a stuck run (e.g. downstream never reports back) from blocking subsequent runs on the node.
+
+### Delay Between Iterations
+
+Optionally wait before starting the next iteration. Uses the same fixed or exponential backoff strategies as the HTTP component retry settings. The first iteration always starts immediately; delays apply between subsequent iterations only.
+
+### Expression Environment
+
+The until expression has access to:
+
+- **$**: The run context data, including outputs from the latest iteration
+- **root()**: Access root event data
+- **previous()**: Access previous node outputs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "done": {
+      "elapsedMs": 4521,
+      "iterations": 3,
+      "stopReason": "conditionTrue"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "loop.done"
+}
+```
+
+<a id="merge"></a>
+
+## Merge
+
+**Component key:** `merge`
+
+The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+
+### Use Cases
+
+- **Parallel processing**: Wait for multiple parallel operations to complete
+- **Data aggregation**: Combine results from multiple sources
+- **Synchronization**: Synchronize multiple workflow branches
+- **Fan-in patterns**: Collect outputs from multiple upstream nodes
+
+### How It Works
+
+1. The Merge component waits for events from all distinct upstream source nodes
+2. Once all inputs are received, it emits the combined data to the Success channel
+3. Optional timeout and conditional stop features allow early completion
+
+### Configuration Options
+
+- **Enable Timeout**: Cancel merge after a specified time if not all inputs are received
+- **Enable Conditional Stop**: Stop waiting early when a condition is met (e.g., if one branch fails)
+
+### Output Channels
+
+- **Success**: Emitted when all upstream inputs are received
+- **Timeout**: Emitted if the timeout is reached before all inputs are received
+- **Fail**: Emitted if the conditional stop expression evaluates to true
+
+### Behavior
+
+- Tracks distinct source nodes (ignoring multiple channels from the same source)
+- Combines all received event data into the output
+- Supports timeout to prevent indefinite waiting
+- Supports conditional early stop based on expression evaluation
+
+### Example Output
+
+```json
+{
+  "data": {
+    "eventIDs": [
+      "event_1",
+      "event_2"
+    ],
+    "groupKey": "merge-group-123",
+    "sources": [
+      "node_a",
+      "node_b"
+    ],
+    "stopEarly": false
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "merge.finished"
+}
+```
+
+<a id="no-operation"></a>
+
+## No Operation
+
+**Component key:** `noop`
+
+The No Operation component is a pass-through component that forwards events to downstream nodes without any modification or processing.
+
+### Use Cases
+
+- **Testing workflows**: Use this component to test workflow connections and flow without side effects
+- **Placeholder nodes**: Temporarily replace components during workflow development
+- **Event forwarding**: Simply forward events when no processing is needed
+
+### Behavior
+
+When executed, the No Operation component immediately emits the incoming event data to the default output channel without any transformation. It has no configuration options and requires no setup.
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "noop.finished"
+}
+```
+
+<a id="read-memory"></a>
+
+## Read Memory
+
+**Component key:** `readMemory`
+
+The Read Memory component looks up values from canvas-level memory storage.
+
+### Use Cases
+
+- Retrieve previously stored IDs before cleanup actions
+- Check whether related data already exists
+- Rehydrate context from prior runs
+
+### How It Works
+
+1. Reads `namespace`, `resultMode`, `emitMode`, and `matchList` from configuration
+2. Finds memory rows matching all configured key/value pairs
+3. Emits `memory.read` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was found
+- **Not Found**: No matching memory rows were found
+
+### Limits
+
+- When **Emit Mode** is `oneByOne`, at most 100 events are emitted per execution.
+- Self-hosted deployments can raise this cap with the `SUPERPLANE_MAX_EMIT_COUNT` environment variable.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 1,
+    "emitMode": "allAtOnce",
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "resultMode": "latest",
+    "values": [
+      {
+        "creator": "igor",
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ]
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.read"
+}
+```
+
+<a id="run-shell-commands"></a>
+
+## Run Shell Commands
+
+**Component key:** `runner`
+
+Runs shell commands on a fleet runner.
+
+### Execution
+- **Host**: Commands run directly on the runner machine (Bash with a PTY).
+- **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
+- **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Commands**: One or more shell commands, one per line.
+- **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
+
+### Output channels
+- **Passed**: The commands finished with exit code **0**.
+- **Failed**: The commands finished with non-zero exit code.
+
+### Structured result
+If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the `runner.finished` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runner.finished"
+}
+```
+
+<a id="run-bash"></a>
+
+## Run Bash
+
+**Component key:** `runnerBash`
+
+Runs a Bash script on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Bash on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use an image that includes Bash (for example **Debian Bookworm (slim)**).
+
+### Script contract
+Your script runs as-is. The runner sets:
+
+- `SUPERPLANE_PAYLOAD_FILE` — path to a JSON file with upstream canvas data (same shape as workflow expressions)
+- `SUPERPLANE_RESULT_FILE` — path where your script must write a JSON-serializable **result**
+
+Stdout and stderr (for example `echo`) stream to **View logs**. Write the structured **result** to `SUPERPLANE_RESULT_FILE`; it is emitted on the finished event as **result**.
+
+Example:
+
+```bash
+##!/usr/bin/env bash
+set -euo pipefail
+
+num=$(jq -r '."GitHub PR".data.number' "$SUPERPLANE_PAYLOAD_FILE")
+echo "Processing PR #$num"
+printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Debian image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: Bash source executed by the runner.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerBash.finished"
+}
+```
+
+<a id="run-java-script"></a>
+
+## Run JavaScript
+
+**Component key:** `runnerJS`
+
+Runs JavaScript on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Node.js on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Node.js image (for example **Node.js 22 (Bookworm)**) so `node` is available.
+
+### Script contract
+Your script must define `function main()`. The runner injects upstream canvas data as the global `$` object (same shape as workflow expressions). Return a JSON-serializable value from `main()`; it is emitted on the finished event as **result**.
+
+Example:
+
+```javascript
+function main() {
+  return { pr: $['GitHub PR'].data.number };
+}
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Node.js image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: JavaScript source executed by Node.js.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerJS.finished"
+}
+```
+
+<a id="run-python"></a>
+
+## Run Python
+
+**Component key:** `runnerPython`
+
+Runs Python on a fleet runner.
+
+### Execution
+- **Host**: Script runs with Python 3 on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Python image (for example **Python 3.12 (slim)**) so `python3` is available.
+
+### Script contract
+Your script must define `def main(payload):`. The runner passes upstream canvas data as the `payload` argument (same shape as workflow expressions). Return a JSON-serializable value from `main()`; it is emitted on the finished event as **result**.
+
+Example:
+
+```python
+def main(payload):
+    return {"pr": payload["GitHub PR"]["data"]["number"]}
+```
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Defaults to a Python image in Docker mode.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
+- **Script**: Python source executed by Python 3.
+- **Setup commands**: Optional shell commands (one per line) run before the script in the same environment and working directory.
+- **Environment variables**: Optional key/value pairs available during execution.
+
+### Output channels
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerPython.finished"
+}
+```
+
+<a id="send-email-notification"></a>
+
+## Send Email Notification
+
+**Component key:** `sendEmail`
+
+The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
+
+### Use Cases
+
+- **Notifications**: Send email notifications for workflow events
+- **Alerts**: Email alerts for errors or important conditions
+- **Status updates**: Notify stakeholders about workflow progress
+- **User communications**: Send emails to users as part of automated workflows
+
+### Recipients
+
+Select recipients from your organization's users, groups, or roles. The system resolves the actual email addresses at send time.
+
+### Configuration
+
+- **Recipients**: List of users, groups, or roles
+- **Subject**: Email subject line (supports expressions)
+- **Body**: Email body content (supports expressions)
+
+### Output
+
+Emits the list of recipients and the subject to the default output channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "groups": [],
+    "roles": [],
+    "subject": "Deployment completed",
+    "to": [
+      "alice@example.com",
+      "bob@example.com"
+    ]
+  },
+  "timestamp": "2026-03-19T12:00:00.000000000Z",
+  "type": "sendEmail.sent"
+}
+```
+
+<a id="ssh-command"></a>
+
+## SSH Command
+
+**Component key:** `ssh`
+
+Run one or more commands on a remote host via SSH.
+
+### Authentication
+
+Choose **SSH key** or **Password**, then select the organization Secret and the key name within that secret that holds the credential.
+
+- **SSH key**: Secret key containing the private key (PEM/OpenSSH). Optionally a second secret+key for passphrase if the key is encrypted.
+- **Password**: Secret key containing the password.
+
+### Configuration
+
+- **Host**, **Port** (default 22), **Username**: Connection details.
+- **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
+- **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
+- **Command file** (file mode): Path to a file in the Files tab.
+- **Working directory**: Optional; Changes to this directory before running the command.
+- **Environment variables**: Optional list of key/value pairs available during command execution.
+- **Timeout (seconds)**: How long the command may run (default 60).
+- **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
+- **Execution retry** (optional): Enable to retry running the command when the exit status is not 0. Set number of retries and interval between attempts.
+
+### Output
+
+- **success**: Exit code 0
+- **failed**: Non-zero exit code
+
+### Example Output
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "stderr": "",
+    "stdout": "Hello, World!\n"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "ssh.command.executed"
+}
+```
+
+<a id="time-gate"></a>
+
+## Time Gate
+
+**Component key:** `timeGate`
+
+The Time Gate component delays event processing until the next valid day and time window, with optional excluded dates.
+
+### Use Cases
+
+- **Business hours**: Only process events during business hours
+- **Scheduled releases**: Delay deployments until off-peak hours
+- **Holiday handling**: Exclude specific dates from processing
+- **Time-based routing**: Route events based on time of day or specific dates
+
+### Configuration
+
+- **Active Days**: Days of the week when the gate can open
+- **Active Time**: Start and end times in HH:MM-HH:MM format (24-hour)
+- **Timezone**: Timezone offset for time calculations (default: current)
+- **Exclude Dates**: Specific MM/DD dates that override the rules above
+
+### Behavior
+
+- Events wait until the next valid time window is reached
+- Exclude dates override the day/time rules
+- Can be manually pushed through using the "Push Through" action
+- Automatically schedules execution when the time window is reached
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "timegate.finished"
+}
+```
+
+<a id="update-memory"></a>
+
+## Update Memory
+
+**Component key:** `updateMemory`
+
+The Update Memory component updates matching rows in canvas-level memory storage.
+
+### Use Cases
+
+- Patch stored records after external state changes
+- Enrich existing memory rows with additional fields
+- Keep identifiers and status data in sync
+
+### How It Works
+
+1. Reads `namespace`, `matchList`, and `valueList` from configuration
+2. Updates all matching memory rows in a single SQL operation
+3. Emits `memory.updated` to the `found` or `notFound` channel
+
+### Output Channels
+
+- **Found**: At least one matching memory row was updated
+- **Not Found**: No matching memory rows were updated
+
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one update per element.
+Both `matchList` and `valueList` field values are evaluated per element with the iteration
+variable in scope (defaults to `item`), so expressions like `item.uuid` resolve to the current
+element's value on every iteration. This means each item updates only its own matched row.
+All resulting updates are reported in a single `memory.updated` event.
+
+To use a single global match across iterations, write a `{{ ... }}` template (resolved before
+iteration starts) instead of a bare expression.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "count": 1,
+      "matches": {
+        "creator": "igor",
+        "pull_request": 123
+      },
+      "namespace": "machines",
+      "updated": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001",
+          "status": "running",
+          "updated_by": "workflow"
+        }
+      ],
+      "values": {
+        "status": "running",
+        "updated_by": "workflow"
+      }
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.updated"
+}
+```
+
+<a id="upsert-memory"></a>
+
+## Upsert Memory
+
+**Component key:** `upsertMemory`
+
+The Upsert Memory component updates matching rows in canvas-level memory storage, and creates a new row when no matches are found.
+
+### Use Cases
+
+- Keep one record per identifier (for example environment or pull request)
+- Replace ad-hoc update-then-add branching with one component
+- Persist latest status snapshots with stable matching keys
+
+### How It Works
+
+1. Reads `namespace`, `matchList`, and `valueList` from configuration
+2. Attempts to update all matching memory rows
+3. If no rows were updated, inserts a new memory row with the values
+4. Emits `memory.upserted` to the default channel with `operation` set to `updated` or `created`
+
+### Simplified Matching
+
+If `matchList` is empty, the component treats the namespace as a singleton record and upserts at namespace level.
+This lets you store just one field (for example `value`) without extra marker fields.
+
+### Output
+
+Always emits to the default channel. Check `data.operation` to know whether the component updated existing rows or created a new row.
+
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one upsert per element.
+Both `matchList` and `valueList` field values are evaluated per element with the iteration
+variable in scope (defaults to `item`), so expressions like `item.uuid` resolve to the current
+element's value on every iteration. This means each item upserts against its own matched row.
+All upserts are reported in a single `memory.upserted` event with per-item operation results.
+
+To use a single global match across iterations, write a `{{ ... }}` template (resolved before
+iteration starts) instead of a bare expression.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "count": 1,
+      "matches": {
+        "environment": "production",
+        "latest_deployment_source": "manual_run"
+      },
+      "namespace": "deployments",
+      "operation": "updated",
+      "records": [
+        {
+          "environment": "production",
+          "latest_deployment": "v1.0.1",
+          "latest_deployment_source": "manual_run"
+        }
+      ],
+      "values": {
+        "environment": "production",
+        "latest_deployment": "v1.0.1",
+        "latest_deployment_source": "manual_run"
+      }
+    }
+  },
+  "timestamp": "2026-02-28T00:00:00Z",
+  "type": "memory.upserted"
+}
+```
+
+<a id="wait"></a>
+
+## Wait
+
+**Component key:** `wait`
+
+The Wait component pauses workflow execution for a specified duration or until a specific time is reached.
+
+### Use Cases
+
+- **Rate limiting**: Add delays between API calls
+- **Scheduled execution**: Wait until a specific time before proceeding
+- **Retry delays**: Wait before retrying failed operations
+- **Time-based workflows**: Delay processing until a specific date/time
+
+### Wait Modes
+
+- **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
+  - Supports expressions for dynamic wait times
+  - Example: `{{$['Node Name'].data.retry_delay}}` or `{{$['Node Name'].data.status == "urgent" ? 0 : 30}}`
+  
+- **Countdown**: Wait until a specific date/time is reached
+  - Supports ISO 8601 date formats
+  - Supports expressions for dynamic target times
+  - Example: `{{$['Node Name'].data.release_date}}` or `{{$['Node Name'].data.run_time + duration("48h")}}`
+
+### Behavior
+
+- Execution pauses until the wait period completes
+- Can be manually pushed through using the "Push Through" action
+- Automatically resumes when the wait time expires
+- Emits metadata including start time, finish time, and result
+
+### Output
+
+The component emits a payload with:
+- **started_at**: When the wait began
+- **finished_at**: When the wait completed
+- **result**: Completion status (completed, cancelled)
+- **reason**: How it completed (timeout, manual_override, user_cancel)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "Alex Doe",
+      "email": "alex@example.com"
+    },
+    "finished_at": "2024-01-01T12:05:00Z",
+    "reason": "timeout",
+    "result": "completed",
+    "started_at": "2024-01-01T12:00:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "wait.finished"
+}
+```
+
