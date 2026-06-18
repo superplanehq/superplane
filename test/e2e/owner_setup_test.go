@@ -244,7 +244,7 @@ func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
 }
 
 func (s *ownerSetupSteps) assertPrivateNetworkAccessEnabled() {
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	assert.NoError(s.t, err, "load installation metadata")
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess, "expected private network access to be enabled")
 }
