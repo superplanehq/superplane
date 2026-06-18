@@ -570,7 +570,7 @@ The For Each component reads an array from the upstream payload and emits one do
 
 ### Limits
 
-- **Max Items** caps how many array elements are emitted per execution (default 50, maximum 100). Larger arrays fail with an error.
+- At most 100 items per execution. Larger arrays fail with an error.
 
 ### Output Fields (per item)
 

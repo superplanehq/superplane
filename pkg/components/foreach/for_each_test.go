@@ -1,7 +1,6 @@
 package foreach
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,11 +80,11 @@ func TestForEachExecute(t *testing.T) {
 		assert.ErrorContains(t, err, "expression must evaluate to an array")
 	})
 
-	t.Run("returns error when array exceeds default max items", func(t *testing.T) {
+	t.Run("returns error when array exceeds item limit", func(t *testing.T) {
 		component := &ForEach{}
 		execState := &contexts.ExecutionStateContext{}
 		execMetadata := &contexts.MetadataContext{}
-		items := make([]any, defaultMaxItems+1)
+		items := make([]any, maxItemsPerExecution+1)
 		exprCtx := &contexts.ExpressionContext{Output: items}
 
 		err := component.Execute(core.ExecutionContext{
@@ -95,27 +94,7 @@ func TestForEachExecute(t *testing.T) {
 			Expressions:    exprCtx,
 		})
 
-		assert.ErrorContains(t, err, "supports at most 50")
-	})
-
-	t.Run("respects configured max items", func(t *testing.T) {
-		component := &ForEach{}
-		execState := &contexts.ExecutionStateContext{}
-		execMetadata := &contexts.MetadataContext{}
-		items := make([]any, 10)
-		exprCtx := &contexts.ExpressionContext{Output: items}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"arrayExpression": `$["Runner"].items`,
-				"maxItems":        5,
-			},
-			Metadata:       execMetadata,
-			ExecutionState: execState,
-			Expressions:    exprCtx,
-		})
-
-		assert.ErrorContains(t, err, "supports at most 5")
+		assert.ErrorContains(t, err, "supports at most 100 items per execution")
 	})
 
 	t.Run("returns error when arrayExpression is missing", func(t *testing.T) {
@@ -133,38 +112,4 @@ func TestForEachExecute(t *testing.T) {
 
 		assert.ErrorContains(t, err, "arrayExpression is required")
 	})
-}
-
-func TestForEachValidateSpec(t *testing.T) {
-	t.Run("rejects maxItems above system limit", func(t *testing.T) {
-		err := validateSpec(Spec{
-			ArrayExpression: `$["Runner"].items`,
-			MaxItems:        MaxItemsLimit + 1,
-		})
-
-		assert.ErrorContains(t, err, "maxItems cannot exceed 100")
-	})
-
-	t.Run("rejects maxItems below one", func(t *testing.T) {
-		err := validateSpec(Spec{
-			ArrayExpression: `$["Runner"].items`,
-			MaxItems:        0,
-		})
-
-		assert.ErrorContains(t, err, "maxItems must be at least 1")
-	})
-}
-
-func TestForEachSetup(t *testing.T) {
-	component := &ForEach{}
-
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{
-			"arrayExpression": `$["Runner"].items`,
-			"maxItems":        MaxItemsLimit + 1,
-		},
-	})
-
-	require.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "maxItems cannot exceed 100"))
 }

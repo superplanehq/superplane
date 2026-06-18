@@ -16,10 +16,9 @@ const ComponentName = "forEach"
 const PayloadType = "foreach.item"
 const ChannelNameItem = "item"
 
-const (
-	defaultMaxItems = 50
-	MaxItemsLimit   = 100
-)
+// maxItemsPerExecution is the hard limit on how many downstream events For Each
+// may emit in a single run. This is not user-configurable.
+const maxItemsPerExecution = 100
 
 func init() {
 	registry.RegisterAction(ComponentName, &ForEach{})
@@ -29,7 +28,6 @@ type ForEach struct{}
 
 type Spec struct {
 	ArrayExpression string `json:"arrayExpression"`
-	MaxItems        int    `json:"maxItems"`
 }
 
 func (c *ForEach) Name() string {
@@ -61,7 +59,7 @@ func (c *ForEach) Documentation() string {
 
 ## Limits
 
-- **Max Items** caps how many array elements are emitted per execution (default ` + fmt.Sprintf("%d", defaultMaxItems) + `, maximum ` + fmt.Sprintf("%d", MaxItemsLimit) + `). Larger arrays fail with an error.
+- At most ` + fmt.Sprintf("%d", maxItemsPerExecution) + ` items per execution. Larger arrays fail with an error.
 
 ## Output Fields (per item)
 
@@ -103,19 +101,6 @@ func (c *ForEach) Configuration() []configuration.Field {
 			Description: "Expression that evaluates to the array to iterate over",
 			Required:    true,
 		},
-		{
-			Name:        "maxItems",
-			Label:       "Max Items",
-			Type:        configuration.FieldTypeNumber,
-			Description: "Maximum number of array items to emit per execution",
-			Default:     defaultMaxItems,
-			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: intPtr(1),
-					Max: intPtr(MaxItemsLimit),
-				},
-			},
-		},
 	}
 }
 
@@ -149,7 +134,6 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 	if err := ctx.Metadata.Set(map[string]any{
 		"arrayExpression": spec.ArrayExpression,
 		"count":           len(items),
-		"maxItems":        spec.MaxItems,
 	}); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
@@ -157,8 +141,8 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 	if len(items) == 0 {
 		return ctx.ExecutionState.Pass()
 	}
-	if len(items) > spec.MaxItems {
-		return fmt.Errorf("array has %d items; For Each supports at most %d per execution", len(items), spec.MaxItems)
+	if len(items) > maxItemsPerExecution {
+		return fmt.Errorf("array has %d items; For Each supports at most %d items per execution", len(items), maxItemsPerExecution)
 	}
 
 	payloads := make([]any, 0, len(items))
@@ -178,9 +162,6 @@ func decodeSpec(raw any) (Spec, error) {
 	if err := mapstructure.Decode(raw, &spec); err != nil {
 		return Spec{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if spec.MaxItems == 0 {
-		spec.MaxItems = defaultMaxItems
-	}
 	return spec, nil
 }
 
@@ -188,17 +169,7 @@ func validateSpec(spec Spec) error {
 	if spec.ArrayExpression == "" {
 		return fmt.Errorf("arrayExpression is required")
 	}
-	if spec.MaxItems < 1 {
-		return fmt.Errorf("maxItems must be at least 1")
-	}
-	if spec.MaxItems > MaxItemsLimit {
-		return fmt.Errorf("maxItems cannot exceed %d", MaxItemsLimit)
-	}
 	return nil
-}
-
-func intPtr(v int) *int {
-	return &v
 }
 
 func toSlice(v any) ([]any, error) {
