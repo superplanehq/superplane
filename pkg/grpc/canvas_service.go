@@ -175,10 +175,6 @@ func (s *CanvasService) DeleteNodeQueueItem(ctx context.Context, req *pb.DeleteN
 	return canvases.DeleteNodeQueueItem(ctx, s.registry, req.CanvasId, req.NodeId, req.ItemId)
 }
 
-func (s *CanvasService) UpdateNodePause(ctx context.Context, req *pb.UpdateNodePauseRequest) (*pb.UpdateNodePauseResponse, error) {
-	return canvases.UpdateNodePause(ctx, s.registry, req.CanvasId, req.NodeId, req.Paused)
-}
-
 func (s *CanvasService) ListNodeExecutions(ctx context.Context, req *pb.ListNodeExecutionsRequest) (*pb.ListNodeExecutionsResponse, error) {
 	return canvases.ListNodeExecutions(ctx, s.registry, req.CanvasId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }
@@ -278,15 +274,6 @@ func (s *CanvasService) InvokeNodeTriggerHook(ctx context.Context, req *pb.Invok
 	)
 }
 
-func (s *CanvasService) ListCanvasEvents(ctx context.Context, req *pb.ListCanvasEventsRequest) (*pb.ListCanvasEventsResponse, error) {
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
-	}
-
-	return canvases.ListCanvasEvents(ctx, s.registry, canvasID, req.Limit, req.Before)
-}
-
 func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (*pb.ListRunsResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {
@@ -294,6 +281,15 @@ func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (
 	}
 
 	return canvases.ListRuns(ctx, s.registry, canvasID, req.Limit, req.Before, req.States, req.Results)
+}
+
+func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas id")
+	}
+
+	return canvases.DescribeRun(ctx, s.registry, canvasID, req.RunId)
 }
 
 func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanvasMemoriesRequest) (*pb.ListCanvasMemoriesResponse, error) {

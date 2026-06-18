@@ -87,7 +87,7 @@ func InvokeNodeTriggerHook(
 			"parameters": expressionParameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
-		Build(node.Configuration.Data())
+		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to resolve trigger configuration: %v", err)
 	}

@@ -39,10 +39,8 @@ import {
 
 import type {
   CanvasChangesetChange,
-  CanvasesCanvasEventWithExecutions,
-  CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
-  CanvasesCanvasVersion,
+  CanvasesCanvasNodeExecution,
   ActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -54,6 +52,8 @@ import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
+import { useCanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
 import {
   useCanvasToolSidebarState,
@@ -218,8 +218,6 @@ export interface CanvasPageProps {
   onSelectCanvasView?: () => void;
   isRunInspectionMode?: boolean;
   onSelectConsole?: () => void;
-  /** Switches the canvas surface to the Versions tab. Omitted on templates. */
-  onSelectVersions?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
@@ -245,15 +243,6 @@ export interface CanvasPageProps {
   hasUncommittedDraftChanges?: boolean;
   readyToPublishDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  unpublishedDraftUpdatedAt?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -303,7 +292,7 @@ export interface CanvasPageProps {
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   toolSidebarRunsContent?: React.ReactNode;
@@ -324,7 +313,6 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
-  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
@@ -336,6 +324,8 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   /** When true, the canvas draft is active across Canvas, Console, and Memory tabs. */
   isEditing: boolean;
+  /** True while an edit session is active (editing a draft or previewing a version from the versions sidebar). Drives the permanent versions sidebar and the Edit/Exit header affordance. */
+  isEditSessionActive?: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
@@ -506,7 +496,6 @@ type CanvasNodeRendererCallbacks = {
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
-  onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
@@ -689,7 +678,6 @@ function buildInteractiveNodeBlockProps(
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
-    onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
     onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
@@ -865,6 +853,27 @@ function CanvasPage(props: CanvasPageProps) {
     showRunsSidebarToggle: showRunsSidebar,
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
+
+  const versionsSidebarBaseState = useCanvasVersionsSidebarState();
+  // Versions content is only produced during an edit session; within that session
+  // the sidebar can be shown/hidden with the header toggle.
+  const versionsContentAvailable = props.toolSidebarVersionsContent != null;
+  const showVersionsSidebarToggle = versionsContentAvailable;
+  const versionsSidebarState = {
+    ...versionsSidebarBaseState,
+    showVersionsSidebarToggle,
+  };
+  const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
+
+  // The collapse state is intentionally not persisted: the versions sidebar always
+  // starts expanded whenever the user (re)enters an edit session.
+  const isEditSessionActive = props.isEditSessionActive;
+  const { openVersionsSidebar } = versionsSidebarBaseState;
+  useEffect(() => {
+    if (isEditSessionActive) {
+      openVersionsSidebar();
+    }
+  }, [isEditSessionActive, openVersionsSidebar]);
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1438,6 +1447,7 @@ function CanvasPage(props: CanvasPageProps) {
           onResetStaging={props.onResetStaging}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
+          isEditSessionActive={props.isEditSessionActive}
           onSelectCanvasView={props.onSelectCanvasView}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
@@ -1446,7 +1456,6 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectConsole={props.onSelectConsole}
-          onSelectVersions={props.onSelectVersions}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
           filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
@@ -1464,20 +1473,12 @@ function CanvasPage(props: CanvasPageProps) {
           hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
           readyToPublishDraftChanges={props.readyToPublishDraftChanges}
           editTabTone={props.editTabTone}
-          unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
-          onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
-          startEditingDrafts={props.startEditingDrafts}
-          startEditingDefaultDraft={props.startEditingDefaultDraft}
-          startEditingMenuOpen={props.startEditingMenuOpen}
-          onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
-          onContinueDraftBranch={props.onContinueDraftBranch}
-          onCreateDraftBranch={props.onCreateDraftBranch}
-          createDraftBranchPending={props.createDraftBranchPending}
           activeDraftBranchLabel={props.activeDraftBranchLabel}
           activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
           runsSidebarState={runsSidebarState}
+          versionsSidebarState={versionsSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1488,7 +1489,7 @@ function CanvasPage(props: CanvasPageProps) {
 
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
-        <CanvasVersionsSidebar isOpen={props.headerMode === "versions" && props.toolSidebarVersionsContent != null}>
+        <CanvasVersionsSidebar isOpen={isVersionsSidebarOpen}>
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
@@ -1599,7 +1600,6 @@ function CanvasPage(props: CanvasPageProps) {
                   onDeactivate={props.onDeactivate}
                   onAnnotationUpdate={props.onAnnotationUpdate}
                   onAnnotationBlur={props.onAnnotationBlur}
-                  onTogglePause={props.onTogglePause}
                   runDisabled={props.runDisabled}
                   runDisabledTooltip={props.runDisabledTooltip}
                   onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -1629,7 +1629,7 @@ function CanvasPage(props: CanvasPageProps) {
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
                   runNodeDetailPaneOpen={bottomDetailPaneOpen}
-                  runsEvents={props.runsEvents}
+                  logRuns={props.logRuns}
                   runsNodes={props.runsNodes}
                   runsComponentIconMap={props.runsComponentIconMap}
                   onRunNodeSelect={props.onRunNodeSelect}
@@ -1984,6 +1984,7 @@ function CanvasContentHeader({
   onResetStaging,
   headerMode,
   isEditing,
+  isEditSessionActive,
   onSelectCanvasView,
   onEnterEditMode,
   enterEditModeDisabled,
@@ -1992,7 +1993,6 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectConsole,
-  onSelectVersions,
   onSelectMemory,
   onSelectFiles,
   filesHeaderActionsSlotId,
@@ -2010,20 +2010,12 @@ function CanvasContentHeader({
   hasUncommittedDraftChanges,
   readyToPublishDraftChanges,
   editTabTone,
-  unpublishedDraftUpdatedAt,
-  onDiscardDraftAndStartEdit,
-  startEditingDrafts,
-  startEditingDefaultDraft,
-  startEditingMenuOpen,
-  onStartEditingMenuOpenChange,
-  onContinueDraftBranch,
-  onCreateDraftBranch,
-  createDraftBranchPending,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
   toolSidebarState,
   runsSidebarState,
+  versionsSidebarState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -2061,6 +2053,7 @@ function CanvasContentHeader({
   onResetStaging?: () => void;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
+  isEditSessionActive?: boolean;
   onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -2069,7 +2062,6 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectConsole?: () => void;
-  onSelectVersions?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   filesHeaderActionsSlotId?: string;
@@ -2087,20 +2079,12 @@ function CanvasContentHeader({
   hasUncommittedDraftChanges?: boolean;
   readyToPublishDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  unpublishedDraftUpdatedAt?: string;
-  onDiscardDraftAndStartEdit?: () => void;
-  startEditingDrafts?: CanvasesCanvasVersion[];
-  startEditingDefaultDraft?: CanvasesCanvasVersion | null;
-  startEditingMenuOpen?: boolean;
-  onStartEditingMenuOpenChange?: (open: boolean) => void;
-  onContinueDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
+  versionsSidebarState: CanvasVersionsSidebarState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -2138,6 +2122,7 @@ function CanvasContentHeader({
       onResetStaging={onResetStaging}
       mode={headerMode}
       isEditing={isEditing}
+      isEditSessionActive={isEditSessionActive}
       onSelectCanvasView={onSelectCanvasView}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
@@ -2146,7 +2131,6 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectConsole={onSelectConsole}
-      onSelectVersions={onSelectVersions}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
       filesHeaderActionsSlotId={filesHeaderActionsSlotId}
@@ -2164,20 +2148,12 @@ function CanvasContentHeader({
       hasUncommittedDraftChanges={hasUncommittedDraftChanges}
       readyToPublishDraftChanges={readyToPublishDraftChanges}
       editTabTone={editTabTone}
-      unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-      onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
-      startEditingDrafts={startEditingDrafts}
-      startEditingDefaultDraft={startEditingDefaultDraft}
-      startEditingMenuOpen={startEditingMenuOpen}
-      onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
-      onContinueDraftBranch={onContinueDraftBranch}
-      onCreateDraftBranch={onCreateDraftBranch}
-      createDraftBranchPending={createDraftBranchPending}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
       runsSidebarState={runsSidebarState}
+      versionsSidebarState={versionsSidebarState}
     />
   );
 }
@@ -2255,7 +2231,6 @@ function CanvasContent({
   onEdgeCreate,
   onDuplicate,
   onDeactivate,
-  onTogglePause,
   onToggleView,
   onShowNodeDiff,
   onAnnotationUpdate,
@@ -2289,7 +2264,7 @@ function CanvasContent({
   runParticipantNodeIds,
   runSelectedNodeId,
   runNodeDetailPaneOpen,
-  runsEvents,
+  logRuns,
   runsNodes,
   runsComponentIconMap,
   onRunNodeSelect,
@@ -2308,7 +2283,6 @@ function CanvasContent({
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onDuplicate?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
-  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
@@ -2348,7 +2322,7 @@ function CanvasContent({
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
   runNodeDetailPaneOpen?: boolean;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -2445,7 +2419,7 @@ function CanvasContent({
     localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));
   }, [logSidebarHeight]);
 
-  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
+  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(logRuns || []), [logRuns]);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -2558,9 +2532,6 @@ function CanvasContent({
 
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
-
-  const onTogglePauseRef = useRef(onTogglePause);
-  onTogglePauseRef.current = onTogglePause;
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
@@ -2910,7 +2881,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
-    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
@@ -2928,7 +2898,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
-    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
@@ -3572,7 +3541,7 @@ function CanvasContent({
           counts={logCounts}
           activeTab={consoleTab}
           onTabChange={setConsoleTab}
-          runsEvents={runsEvents}
+          logRuns={logRuns}
           runsNodes={runsNodes}
           runsComponentIconMap={runsComponentIconMap}
           onRunNodeSelect={onRunNodeSelect}

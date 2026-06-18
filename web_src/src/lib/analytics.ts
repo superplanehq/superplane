@@ -3,6 +3,7 @@ export type IntegrationSource = "node_configuration" | "integrations_page" | "in
 import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
 import type { OrganizationsIntegration } from "@/api-client";
+import { getUtmEventProperties } from "@/lib/utmAttribution";
 // Tracks when a connect form was opened so duration_s can be computed on submit.
 // Keyed by integration name; last-write-wins for the same integration.
 const integrationConnectStartTimes = new Map<string, number>();
@@ -165,7 +166,10 @@ export const analytics = {
   },
 
   orgCreate: (organizationId: string) => {
-    posthog.capture("auth:org_create", { organization_id: organizationId });
+    posthog.capture("auth:org_create", {
+      organization_id: organizationId,
+      ...getUtmEventProperties(),
+    });
   },
 
   canvasRunItemOpen: (nodeRef: string | undefined, executionStatus: string, organizationId: string) => {

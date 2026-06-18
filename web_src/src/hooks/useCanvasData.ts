@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -17,8 +18,8 @@ import {
   canvasesDeleteCanvas,
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
-  canvasesListCanvasEvents,
   canvasesListRuns,
+  canvasesDescribeRun,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesCreateCanvasMemoryNamespace,
@@ -41,6 +42,7 @@ import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
   CanvasesCanvasSummary,
+  CanvasesCanvasRun,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -202,9 +204,6 @@ export const canvasKeys = {
       ...(states || []),
       ...(limit === undefined ? [] : [limit]),
     ] as const,
-  events: () => [...canvasKeys.all, "events"] as const,
-  eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
-  infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
   runs: () => [...canvasKeys.all, "runs"] as const,
   infiniteRuns: (canvasId: string, filters?: CanvasRunsFilters) =>
     [
@@ -214,6 +213,7 @@ export const canvasKeys = {
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
     ] as const,
+  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -1126,46 +1126,36 @@ export const useDeleteCanvas = (organizationId: string) => {
   });
 };
 
-export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 25;
-
-  return useInfiniteQuery({
-    queryKey: canvasKeys.infiniteEvents(canvasId),
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      const response = await canvasesListCanvasEvents(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: {
-            limit,
-            ...(pageParam ? { before: pageParam } : {}),
-          },
-        }),
-      );
-      return response.data;
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
-      const totalCount = lastPage?.totalCount || 0;
-
-      if (currentLoadedCount >= totalCount) return undefined;
-
-      if (lastPage?.events && lastPage.events.length > 0) {
-        const lastEvent = lastPage.events[lastPage.events.length - 1];
-        return lastEvent.createdAt;
-      }
-      return undefined;
-    },
-    initialPageParam: undefined as string | undefined,
-    staleTime: 0,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && enabled,
-  });
-};
-
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+};
+
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, runId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId: runId!,
+          },
+        }),
+      );
+      const described = response.data;
+      if (!described?.run) {
+        return described;
+      }
+
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      return upsertRunIntoDescribeRunData(current, described.run);
+    },
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && !!runId && enabled,
+  });
 };
 
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {

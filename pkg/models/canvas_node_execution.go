@@ -420,11 +420,9 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -489,11 +487,9 @@ func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutpu
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -543,11 +539,9 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
+		err := node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -584,11 +578,9 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
+		err := node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -663,9 +655,9 @@ func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec No
 // FindLastExecutionPerNode finds the most recent execution for each node in a workflow
 // using DISTINCT ON to get one execution per node_id, ordered by created_at DESC
 // Only returns executions for nodes that have not been deleted
-func FindLastExecutionPerNode(workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
+func FindLastExecutionPerNode(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
-	err := database.Conn().
+	err := tx.
 		Raw(`
 			SELECT DISTINCT ON (wne.node_id) wne.*
 			FROM workflow_node_executions wne

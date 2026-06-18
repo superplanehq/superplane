@@ -211,7 +211,12 @@ func CreateCanvas(
 		}
 	}
 
-	proto, err := SerializeCanvas(&canvas, false, user)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	proto, err := SerializeCanvas(&canvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, err
 	}

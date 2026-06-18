@@ -65,7 +65,14 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions)
+	db := database.DB(ctx)
+
+	resources, err := LoadNodeExecutionResources(db, executions)
+	if err != nil {
+		return nil, err
+	}
+
+	serialized, err := SerializeNodeExecutions(executions, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -78,40 +85,34 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
+type NodeExecutionResources struct {
+	rootEventsByID            map[string]models.CanvasEvent
+	outputEventsByExecutionID map[string][]models.CanvasEvent
+	cancelledByUsersByID      map[uuid.UUID]models.User
+}
+
+func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecution) (*NodeExecutionResources, error) {
 	var rootEvents, outputEvents []models.CanvasEvent
 	var rootEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
 	var cancelledByUsersErr error
 	var wg sync.WaitGroup
 
-	//
-	// Fetch all execution resources in parallel
-	//
 	wg.Add(3)
 
-	//
-	// Root events
-	//
 	go func() {
 		defer wg.Done()
-		rootEvents, rootEventsErr = models.FindCanvasEvents(rootEventIDs(executions))
+		rootEvents, rootEventsErr = models.FindCanvasEvents(db, rootEventIDs(executions))
 	}()
 
-	//
-	// Output events
-	//
 	go func() {
 		defer wg.Done()
-		outputEvents, outputEventsErr = models.FindCanvasEventsForExecutions(executionIDs(executions))
+		outputEvents, outputEventsErr = models.FindCanvasEventsForExecutions(db, executionIDs(executions))
 	}()
 
-	//
-	// Cancelled-by users
-	//
 	go func() {
 		defer wg.Done()
-		cancelledByUsers, cancelledByUsersErr = models.FindMaybeDeletedUsersByIDs(cancelledByIDs(executions))
+		cancelledByUsers, cancelledByUsersErr = models.FindMaybeDeletedUsersByIDs(db, cancelledByIDs(executions))
 	}()
 
 	wg.Wait()
@@ -125,11 +126,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.Can
 	if cancelledByUsersErr != nil {
 		return nil, fmt.Errorf("error finding cancelled-by users: %v", cancelledByUsersErr)
 	}
-
-	//
-	// Build lookup map for resources,
-	// so we don't have to iterate over the list on every loop iteration below.
-	//
 
 	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
 	for _, user := range cancelledByUsers {
@@ -150,17 +146,22 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.Can
 		}
 	}
 
-	//
-	// Combine everything into the response
-	//
+	return &NodeExecutionResources{
+		rootEventsByID:            rootEventsByID,
+		outputEventsByExecutionID: outputEventsByExecutionID,
+		cancelledByUsersByID:      cancelledByUsersByID,
+	}, nil
+}
+
+func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources *NodeExecutionResources) ([]*pb.CanvasNodeExecution, error) {
 	result := make([]*pb.CanvasNodeExecution, 0, len(executions))
 	for _, execution := range executions {
-		rootEvent, err := getRootEventForExecution(execution, rootEventsByID)
+		rootEvent, err := getRootEventForExecution(execution, resources.rootEventsByID)
 		if err != nil {
 			return nil, err
 		}
 
-		outputs, err := getOutputsForExecution(execution, outputEventsByExecutionID)
+		outputs, err := getOutputsForExecution(execution, resources.outputEventsByExecutionID)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +192,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution) ([]*pb.Can
 			Configuration:       configuration,
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
-			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
+			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
 		})
 	}
 

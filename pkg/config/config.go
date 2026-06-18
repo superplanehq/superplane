@@ -18,6 +18,14 @@ func UsageGRPCURL() string {
 	return os.Getenv("USAGE_GRPC_URL")
 }
 
+func MaxEmitCount() int {
+	return intFromEnv("SUPERPLANE_MAX_EMIT_COUNT", 100)
+}
+
+func MaxPayloadSize() int {
+	return intFromEnv("SUPERPLANE_MAX_PAYLOAD_SIZE", 64*1024)
+}
+
 // AnthropicAgentConfig holds the credentials and identifiers needed to talk
 // to a single Anthropic managed agent. Empty values mean managed agents are
 // disabled on this installation.

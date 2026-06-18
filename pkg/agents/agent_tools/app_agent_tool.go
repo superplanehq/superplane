@@ -148,7 +148,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"resource": {
 				Type:        "string",
-				Enum:        []string{"memory", "runs", "canvas_events", "event_executions", "node_executions", "node_queue_items", "node_events"},
+				Enum:        []string{"memory", "runs", "event_executions", "node_executions", "node_queue_items", "node_events"},
 				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read.",
 			},
 			"namespace": {

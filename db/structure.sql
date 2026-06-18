@@ -133,7 +133,9 @@ CREATE TABLE public.agent_sessions (
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    heartbeat_at timestamp with time zone
+    heartbeat_at timestamp with time zone,
+    agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -331,6 +333,7 @@ CREATE TABLE public.installation_metadata (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     allow_private_network_access boolean DEFAULT false NOT NULL,
+    signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -624,7 +627,8 @@ CREATE TABLE public.workflow_staged_files (
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
     updated_by uuid,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    base_head_sha character varying(40) NOT NULL
 );
 
 
@@ -646,9 +650,11 @@ CREATE TABLE public.workflow_versions (
     description text DEFAULT ''::text NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
-    branch_name text,
     display_name text DEFAULT ''::text NOT NULL,
-    CONSTRAINT workflow_versions_draft_branch_check CHECK (((((state)::text = 'draft'::text) AND (branch_name IS NOT NULL)) OR (((state)::text <> 'draft'::text) AND (branch_name IS NULL))))
+    commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    git_branch text NOT NULL,
+    materialization_status character varying(32) NOT NULL,
+    materialization_error text NOT NULL
 );
 
 
@@ -1479,10 +1485,24 @@ CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_file
 
 
 --
--- Name: idx_workflow_versions_draft_branch; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_versions_commit_sha; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_workflow_versions_draft_branch ON public.workflow_versions USING btree (workflow_id, branch_name) WHERE (((state)::text = 'draft'::text) AND (branch_name IS NOT NULL));
+CREATE INDEX idx_workflow_versions_commit_sha ON public.workflow_versions USING btree (workflow_id, commit_sha) WHERE ((commit_sha)::text <> ''::text);
+
+
+--
+-- Name: idx_workflow_versions_draft_git_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workflow_versions_draft_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch) WHERE ((state)::text = 'draft'::text);
+
+
+--
+-- Name: idx_workflow_versions_git_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch);
 
 
 --
@@ -1997,7 +2017,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260615161605	f
+20260618194426	f
 \.
 
 
