@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,11 @@ import {
   recordLastUsedLoginMethod,
   type LastUsedLoginMethod,
 } from "@/lib/lastUsedLoginMethod";
+import {
+  clearPendingSignupAnalyticsPreference,
+  confirmSignupAnalyticsPreference,
+  savePendingSignupAnalyticsPreference,
+} from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 
 type AuthConfig = {
@@ -67,6 +73,15 @@ const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode:
   return query ? `/auth/${provider}?${query}` : `/auth/${provider}`;
 };
 
+const isWelcomeRedirect = (response: Response) => {
+  try {
+    const parsedURL = new URL(response.url || "/", window.location.origin);
+    return parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome";
+  } catch {
+    return false;
+  }
+};
+
 type MagicCodeStep = "email" | "code";
 type AuthMode = "login" | "signup";
 
@@ -76,6 +91,24 @@ interface LoginProps {
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
   <p className="mt-2 text-center text-xs text-gray-500">You used {label} to log in last time</p>
+);
+
+const ProductUpdatesOptIn: React.FC<{
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}> = ({ checked, onCheckedChange }) => (
+  <label
+    htmlFor="signup-product-updates"
+    className="mb-4 flex cursor-pointer items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+  >
+    <Checkbox
+      id="signup-product-updates"
+      checked={checked}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange(e.target.checked)}
+      className="mt-0.5"
+    />
+    <span>I want to receive product updates</span>
+  </label>
 );
 
 export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
@@ -97,6 +130,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupProductUpdatesOptIn, setSignupProductUpdatesOptIn] = useState(true);
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
@@ -211,6 +245,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           return;
         }
 
+        if (mode === "signup" && !isWelcomeRedirect(response)) {
+          clearPendingSignupAnalyticsPreference();
+        }
+
         await handleRedirectAfterAuth(response);
       } catch {
         setFormError("Network error occurred");
@@ -284,6 +322,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       return;
     }
 
+    if (isSignupMode) {
+      savePendingSignupAnalyticsPreference({
+        email: magicCodeEmail.trim(),
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+    }
+
     setSubmitLoading(true);
 
     try {
@@ -303,6 +348,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
+        if (isSignupMode) {
+          clearPendingSignupAnalyticsPreference();
+        }
         setFormError("Failed to send code. Please try again.");
         setSubmitLoading(false);
         return;
@@ -311,6 +359,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       setMagicCodeStep("code");
       setSubmitLoading(false);
     } catch {
+      if (isSignupMode) {
+        clearPendingSignupAnalyticsPreference();
+      }
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -350,6 +401,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
+        if (isSignupMode) {
+          clearPendingSignupAnalyticsPreference();
+        }
         if (response.status === 401) {
           setFormError("Invalid or expired code. Please try again.");
         } else if (response.status === 403) {
@@ -362,8 +416,22 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
+      if (isSignupMode) {
+        if (isWelcomeRedirect(response)) {
+          confirmSignupAnalyticsPreference({
+            email: magicCodeEmail.trim(),
+            productUpdatesOptIn: signupProductUpdatesOptIn,
+          });
+        } else {
+          clearPendingSignupAnalyticsPreference();
+        }
+      }
+
       await handleRedirectAfterAuth(response);
     } catch {
+      if (isSignupMode) {
+        clearPendingSignupAnalyticsPreference();
+      }
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -475,11 +543,26 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
+      confirmSignupAnalyticsPreference({
+        email: signupEmail.trim(),
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+
       await handleRedirectAfterAuth(response);
     } catch {
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
+  };
+
+  const handleProviderClick = (provider: string) => {
+    if (isSignupMode) {
+      savePendingSignupAnalyticsPreference({
+        productUpdatesOptIn: signupProductUpdatesOptIn,
+      });
+    }
+
+    recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
   };
 
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
@@ -526,6 +609,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
               {formError}
             </div>
+          )}
+
+          {!configLoading && isSignupMode && canSignup && magicCodeStep === "email" && (
+            <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
           )}
 
           {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
@@ -761,7 +848,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                   <Button variant="outline" className="w-full justify-center gap-2" asChild>
                     <a
                       href={providerAuthPath(provider, redirectQuery, isSignupMode)}
-                      onClick={() => recordLastUsedLoginMethod(provider as LastUsedLoginMethod)}
+                      onClick={() => handleProviderClick(provider)}
                     >
                       {provider === "github" && (
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

@@ -34,6 +34,7 @@ vi.mock("@/lib/env", () => ({
 
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { confirmSignupAnalyticsPreference } from "@/lib/signupAnalytics";
 
 const mockAccount = {
   id: "user-123",
@@ -77,10 +78,13 @@ describe("posthog init", () => {
 describe("account identification", () => {
   beforeEach(() => {
     identify.mockClear();
+    capture.mockClear();
+    localStorage.clear();
     stubFetch(mockAccount);
   });
 
   afterEach(() => {
+    localStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -108,6 +112,35 @@ describe("account identification", () => {
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(identify).not.toHaveBeenCalled();
+  });
+
+  it("captures signup product update preference on account load", async () => {
+    confirmSignupAnalyticsPreference({
+      email: mockAccount.email,
+      productUpdatesOptIn: false,
+    });
+
+    render(
+      <AccountProvider>
+        <div />
+      </AccountProvider>,
+    );
+
+    await waitFor(() => {
+      expect(identify).toHaveBeenCalledWith("user-123", {
+        email: "john@example.com",
+        name: "John Doe",
+        installation_admin: false,
+        product_updates_opt_in: false,
+      });
+    });
+
+    expect(capture).toHaveBeenCalledWith("auth:signup", {
+      product_updates_opt_in: false,
+      $set: {
+        product_updates_opt_in: false,
+      },
+    });
   });
 });
 
