@@ -49,8 +49,8 @@ func (s *ExecutionStateContext) Pass() error {
 }
 
 func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	if len(payloads) > core.MaxEmitCount() {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount())
 	}
 
 	outputs := map[string][]any{
@@ -89,8 +89,8 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 }
 
 func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount)
+	if len(payloads) > core.MaxEmitCount() {
+		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), core.MaxEmitCount())
 	}
 
 	outputs := map[string][]any{

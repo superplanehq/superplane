@@ -227,8 +227,8 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payloads := buildPayloads(spec, matches, values)
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), core.MaxEmitCount)
+	if len(payloads) > core.MaxEmitCount() {
+		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), core.MaxEmitCount())
 	}
 
 	return ctx.ExecutionState.Emit(
