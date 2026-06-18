@@ -2,34 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { getWelcomeSurveyRedirectPath } from "./welcomeSurveyRedirect";
 
 const NEW_USER_ONBOARDING_SURVEY_NAME = "New User Onboarding Survey";
 const SURVEY_LOAD_FALLBACK_MS = 3000;
-
-const isValidRedirectPath = (path: string | null): path is string => {
-  if (!path || path[0] !== "/") {
-    return false;
-  }
-
-  if (path.length > 1 && path[1] === "/") {
-    return false;
-  }
-
-  return !path.startsWith("/welcome");
-};
-
-export const getWelcomeSurveyRedirectPath = (rawRedirect: string | null): string => {
-  if (!rawRedirect) {
-    return "/";
-  }
-
-  try {
-    const decoded = decodeURIComponent(rawRedirect);
-    return isValidRedirectPath(decoded) ? decoded : "/";
-  } catch {
-    return "/";
-  }
-};
 
 const findNewUserSurvey = (surveys: PostHogSurvey[]) =>
   surveys.find(
@@ -56,7 +32,12 @@ const WelcomeSurvey: React.FC = () => {
 
     let canceled = false;
     let surveyLoadFinished = false;
-    let fallbackTimer: number;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!canceled && !surveyLoadFinished) {
+        setShouldRedirect(true);
+      }
+    }, SURVEY_LOAD_FALLBACK_MS);
 
     const loadMatchingSurveys = () => {
       posthog.getActiveMatchingSurveys((surveys) => {
@@ -76,12 +57,6 @@ const WelcomeSurvey: React.FC = () => {
         setSurvey(matchingSurvey);
       }, true);
     };
-
-    fallbackTimer = window.setTimeout(() => {
-      if (!canceled && !surveyLoadFinished) {
-        setShouldRedirect(true);
-      }
-    }, SURVEY_LOAD_FALLBACK_MS);
 
     const unsubscribe = posthog.onSurveysLoaded(loadMatchingSurveys);
     loadMatchingSurveys();

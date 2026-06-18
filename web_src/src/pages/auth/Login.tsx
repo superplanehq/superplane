@@ -108,6 +108,120 @@ const ProductUpdatesOptIn: React.FC<{
   </label>
 );
 
+const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
+  if (!enabled) {
+    return;
+  }
+
+  savePendingSignupAnalyticsPreference({
+    email: email?.trim() || undefined,
+    productUpdatesOptIn,
+  });
+};
+
+const clearSignupPreference = (enabled: boolean) => {
+  if (enabled) {
+    clearPendingSignupAnalyticsPreference();
+  }
+};
+
+const buildMagicCodeRequestBody = (email: string, signup: boolean, redirectTarget: string) => {
+  const formData = new URLSearchParams();
+  formData.append("email", email.trim());
+  if (signup) {
+    formData.append("signup", "true");
+  }
+  if (redirectTarget) {
+    formData.append("redirect", redirectTarget);
+  }
+
+  return formData.toString();
+};
+
+const buildMagicCodeVerifyBody = (email: string, code: string, signup: boolean, inviteToken: string) => {
+  const formData = new URLSearchParams();
+  formData.append("email", email.trim());
+  formData.append("code", code.trim());
+  if (signup) {
+    formData.append("signup", "true");
+  }
+  if (inviteToken) {
+    formData.append("invite_token", inviteToken);
+  }
+
+  return formData.toString();
+};
+
+const buildSignupBody = (name: string, email: string, password: string, inviteToken: string) => {
+  const formData = new URLSearchParams();
+  formData.append("name", name);
+  formData.append("email", email.trim());
+  formData.append("password", password);
+  if (inviteToken) {
+    formData.append("invite_token", inviteToken);
+  }
+
+  return formData.toString();
+};
+
+const getMagicCodeVerifyError = async (response: Response) => {
+  if (response.status === 401) {
+    return "Invalid or expired code. Please try again.";
+  }
+
+  if (response.status === 403) {
+    const errorText = await response.text();
+    return errorText || "Sign-up is not allowed.";
+  }
+
+  return "Verification failed. Please try again.";
+};
+
+const getSignupError = async (response: Response) => {
+  if (response.status === 409) {
+    return "Account already exists. Please sign in.";
+  }
+
+  const errorText = await response.text();
+  return errorText || "Signup failed. Please try again.";
+};
+
+type SignupValidationFields = {
+  canSignup: boolean;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
+
+const getSignupValidationError = ({
+  canSignup,
+  firstName,
+  lastName,
+  email,
+  password,
+  confirmPassword,
+}: SignupValidationFields) => {
+  if (!canSignup) {
+    return "Signups are currently disabled.";
+  }
+
+  if (!firstName.trim() || !lastName.trim()) {
+    return "First and last names are required";
+  }
+
+  if (!email.trim() || !password || !confirmPassword) {
+    return "Email and password are required";
+  }
+
+  if (password !== confirmPassword) {
+    return "Passwords do not match";
+  }
+
+  return null;
+};
+
 export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
@@ -297,7 +411,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const allowedProviders = ["google", "github"];
   const activeProviders = allowedProviders.filter((provider) => providers.includes(provider));
   const hasProviders = activeProviders.length > 0;
-  const canSignup = authConfig.signupEnabled || inviteToken;
+  const canSignup = authConfig.signupEnabled || Boolean(inviteToken);
 
   useReportPageReady(!configLoading && !accountLoading, {
     failed: !!configError,
@@ -321,35 +435,19 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       return;
     }
 
-    if (isSignupMode) {
-      savePendingSignupAnalyticsPreference({
-        email: magicCodeEmail.trim(),
-        productUpdatesOptIn: signupProductUpdatesOptIn,
-      });
-    }
+    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn, magicCodeEmail);
 
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", magicCodeEmail.trim());
-      if (isSignupMode) {
-        formData.append("signup", "true");
-      }
-      if (redirectTarget) {
-        formData.append("redirect", redirectTarget);
-      }
-
       const response = await fetch("/auth/magic-code/request", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
+        body: buildMagicCodeRequestBody(magicCodeEmail, isSignupMode, redirectTarget),
       });
 
       if (!response.ok) {
-        if (isSignupMode) {
-          clearPendingSignupAnalyticsPreference();
-        }
+        clearSignupPreference(isSignupMode);
         setFormError("Failed to send code. Please try again.");
         setSubmitLoading(false);
         return;
@@ -358,9 +456,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       setMagicCodeStep("code");
       setSubmitLoading(false);
     } catch {
-      if (isSignupMode) {
-        clearPendingSignupAnalyticsPreference();
-      }
+      clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -378,16 +474,6 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", magicCodeEmail.trim());
-      formData.append("code", magicCode.trim());
-      if (isSignupMode) {
-        formData.append("signup", "true");
-      }
-      if (inviteToken) {
-        formData.append("invite_token", inviteToken);
-      }
-
       const url = redirectTarget
         ? `/auth/magic-code/verify?redirect=${encodeURIComponent(redirectTarget)}`
         : "/auth/magic-code/verify";
@@ -396,21 +482,12 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         credentials: "include",
-        body: formData.toString(),
+        body: buildMagicCodeVerifyBody(magicCodeEmail, magicCode, isSignupMode, inviteToken),
       });
 
       if (!response.ok) {
-        if (isSignupMode) {
-          clearPendingSignupAnalyticsPreference();
-        }
-        if (response.status === 401) {
-          setFormError("Invalid or expired code. Please try again.");
-        } else if (response.status === 403) {
-          const errorText = await response.text();
-          setFormError(errorText || "Sign-up is not allowed.");
-        } else {
-          setFormError("Verification failed. Please try again.");
-        }
+        clearSignupPreference(isSignupMode);
+        setFormError(await getMagicCodeVerifyError(response));
         setSubmitLoading(false);
         return;
       }
@@ -422,15 +499,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             productUpdatesOptIn: signupProductUpdatesOptIn,
           });
         } else {
-          clearPendingSignupAnalyticsPreference();
+          clearSignupPreference(true);
         }
       }
 
       await handleRedirectAfterAuth(response);
     } catch {
-      if (isSignupMode) {
-        clearPendingSignupAnalyticsPreference();
-      }
+      clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
@@ -490,37 +565,22 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!canSignup) {
-      setFormError("Signups are currently disabled.");
-      return;
-    }
-
-    if (!signupFirstName.trim() || !signupLastName.trim()) {
-      setFormError("First and last names are required");
-      return;
-    }
-
-    if (!signupEmail.trim() || !signupPassword || !signupConfirmPassword) {
-      setFormError("Email and password are required");
-      return;
-    }
-
-    if (signupPassword !== signupConfirmPassword) {
-      setFormError("Passwords do not match");
+    const validationError = getSignupValidationError({
+      canSignup,
+      firstName: signupFirstName,
+      lastName: signupLastName,
+      email: signupEmail,
+      password: signupPassword,
+      confirmPassword: signupConfirmPassword,
+    });
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("name", `${signupFirstName.trim()} ${signupLastName.trim()}`);
-      formData.append("email", signupEmail.trim());
-      formData.append("password", signupPassword);
-      if (inviteToken) {
-        formData.append("invite_token", inviteToken);
-      }
-
       const url = redirectTarget ? `/signup?redirect=${encodeURIComponent(redirectTarget)}` : "/signup";
       const response = await fetch(url, {
         method: "POST",
@@ -528,16 +588,16 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         credentials: "include",
-        body: formData.toString(),
+        body: buildSignupBody(
+          `${signupFirstName.trim()} ${signupLastName.trim()}`,
+          signupEmail,
+          signupPassword,
+          inviteToken,
+        ),
       });
 
       if (!response.ok) {
-        if (response.status === 409) {
-          setFormError("Account already exists. Please sign in.");
-        } else {
-          const errorText = await response.text();
-          setFormError(errorText || "Signup failed. Please try again.");
-        }
+        setFormError(await getSignupError(response));
         setSubmitLoading(false);
         return;
       }
@@ -555,11 +615,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const handleProviderClick = (provider: string) => {
-    if (isSignupMode) {
-      savePendingSignupAnalyticsPreference({
-        productUpdatesOptIn: signupProductUpdatesOptIn,
-      });
-    }
+    saveSignupPreference(isSignupMode, signupProductUpdatesOptIn);
 
     recordLastUsedLoginMethod(provider as LastUsedLoginMethod);
   };

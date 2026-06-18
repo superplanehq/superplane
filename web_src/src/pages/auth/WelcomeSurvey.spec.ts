@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getWelcomeSurveyRedirectPath } from "./WelcomeSurvey";
+import { getWelcomeSurveyRedirectPath } from "./welcomeSurveyRedirect";
 
 describe("getWelcomeSurveyRedirectPath", () => {
   it("returns a safe internal redirect", () => {
