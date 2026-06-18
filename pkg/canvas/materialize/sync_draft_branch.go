@@ -59,11 +59,7 @@ func syncDraftBranchFromGit(
 
 	snapshot, loadErr := loadRepoSnapshot(ctx, gitProvider, reg, orgID, repository.RepoID, headSHA)
 	if loadErr != nil {
-		ownerID := gitref.OwnerFromDraftBranchName(branchName)
-		if ownerID == nil {
-			ownerID = opts.CreatedBy
-		}
-		persistDraftMaterializationError(canvasID, branchName, ownerID, headSHA, loadErr)
+		persistDraftMaterializationError(canvasID, branchName, opts.CreatedBy, headSHA, loadErr)
 		return nil, loadErr
 	}
 
@@ -87,17 +83,12 @@ func syncDraftBranchFromGit(
 				}
 			}
 
-			ownerID := gitref.OwnerFromDraftBranchName(branchName)
-			if ownerID == nil {
-				ownerID = opts.CreatedBy
-			}
-
 			now := time.Now()
 			branch := branchName
 			draftVersion = &models.CanvasVersion{
 				ID:          uuid.New(),
 				WorkflowID:  canvasID,
-				OwnerID:     ownerID,
+				OwnerID:     opts.CreatedBy,
 				State:       models.CanvasVersionStateDraft,
 				BranchName:  &branch,
 				DisplayName: label,

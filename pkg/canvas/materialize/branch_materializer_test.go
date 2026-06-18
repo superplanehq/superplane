@@ -103,7 +103,7 @@ func TestBranchMaterializer_MaterializeDraft(t *testing.T) {
 
 	mainSHA := seedMainBranch(t, ctx, r, repository, canvas.Name)
 
-	draftBranch := gitref.DefaultDraftBranchName(r.User)
+	draftBranch := gitref.NewDraftBranchName()
 	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, draftBranch, models.CanvasGitBranchMain))
 	draftHead, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestBranchMaterializer_ReconcileBranchDeletion(t *testing.T) {
 
 	seedMainBranch(t, ctx, r, repository, canvas.Name)
 
-	draftBranch := gitref.DefaultDraftBranchName(r.User)
+	draftBranch := gitref.NewDraftBranchName()
 	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, draftBranch, models.CanvasGitBranchMain))
 	draftHead, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
 	require.NoError(t, err)
