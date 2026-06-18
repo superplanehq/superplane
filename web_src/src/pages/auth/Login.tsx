@@ -19,6 +19,7 @@ import {
   savePendingSignupAnalyticsPreference,
 } from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
+import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 
 type AuthConfig = {
   providers: string[];
@@ -71,15 +72,6 @@ const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode:
 
   const query = params.toString();
   return query ? `/auth/${provider}?${query}` : `/auth/${provider}`;
-};
-
-const isWelcomeRedirect = (response: Response) => {
-  try {
-    const parsedURL = new URL(response.url || "/", window.location.origin);
-    return parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome";
-  } catch {
-    return false;
-  }
 };
 
 type MagicCodeStep = "email" | "code";
@@ -269,21 +261,12 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const redirectTarget = safeRedirect || "";
 
   const handleRedirectAfterAuth = useCallback(
-    async (response: Response) => {
-      const finalURL = response.url || "/";
-
-      try {
-        const parsedURL = new URL(finalURL, window.location.origin);
-        if (parsedURL.origin === window.location.origin && parsedURL.pathname === "/welcome") {
-          if (!parsedURL.searchParams.has("redirect") && redirectTarget) {
-            parsedURL.searchParams.set("redirect", redirectTarget);
-          }
-
-          window.location.href = `${parsedURL.pathname}${parsedURL.search}`;
-          return;
-        }
-      } catch {
-        // fall through to existing redirect behavior
+    async (response: Response, authRedirectURL?: string) => {
+      const finalURL = authRedirectURL ?? response.url ?? "/";
+      const welcomeRedirectPath = getWelcomeRedirectPath(finalURL, redirectTarget);
+      if (welcomeRedirectPath) {
+        window.location.href = welcomeRedirectPath;
+        return;
       }
 
       if (redirectTarget) {
@@ -345,7 +328,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
         const response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
           credentials: "include",
           body,
         });
@@ -356,11 +342,12 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           return;
         }
 
-        if (mode === "signup" && !isWelcomeRedirect(response)) {
+        const authRedirectURL = await getAuthRedirectURL(response);
+        if (mode === "signup" && !getWelcomeRedirectPath(authRedirectURL, redirectTarget)) {
           clearPendingSignupAnalyticsPreference();
         }
 
-        await handleRedirectAfterAuth(response);
+        await handleRedirectAfterAuth(response, authRedirectURL);
       } catch {
         setFormError("Network error occurred");
         setSubmitLoading(false);
@@ -480,7 +467,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         credentials: "include",
         body: buildMagicCodeVerifyBody(magicCodeEmail, magicCode, isSignupMode, inviteToken),
       });
@@ -492,8 +482,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
+      const authRedirectURL = await getAuthRedirectURL(response);
       if (isSignupMode) {
-        if (isWelcomeRedirect(response)) {
+        if (getWelcomeRedirectPath(authRedirectURL, redirectTarget)) {
           confirmSignupAnalyticsPreference({
             email: magicCodeEmail.trim(),
             productUpdatesOptIn: signupProductUpdatesOptIn,
@@ -503,7 +494,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         }
       }
 
-      await handleRedirectAfterAuth(response);
+      await handleRedirectAfterAuth(response, authRedirectURL);
     } catch {
       clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
@@ -621,6 +612,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
+  const providerButtonsNeedTopSpacing = useMagicCodePrimary && magicCodeStep === "email";
 
   const getHeading = () => {
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
@@ -908,7 +900,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           )}
 
           {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
-            <div className="space-y-3">
+            <div className={providerButtonsNeedTopSpacing ? "mt-4 space-y-3" : "space-y-3"}>
               {activeProviders.map((provider) => (
                 <div key={provider}>
                   <Button variant="outline" className="w-full justify-center gap-2" asChild>
