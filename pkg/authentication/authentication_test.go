@@ -214,6 +214,24 @@ func TestGetRedirectURL(t *testing.T) {
 	})
 }
 
+func TestGetSignupRequiredRedirectURL(t *testing.T) {
+	t.Run("should redirect to signup with an auth error", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/github/callback", nil)
+
+		redirectURL := getSignupRequiredRedirectURL(req)
+
+		assert.Equal(t, "/signup?auth_error=signup_required", redirectURL)
+	})
+
+	t.Run("should preserve the original OAuth redirect", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/github/callback?state=%2Finvite%2Fabc", nil)
+
+		redirectURL := getSignupRequiredRedirectURL(req)
+
+		assert.Equal(t, "/signup?auth_error=signup_required&redirect=%2Finvite%2Fabc", redirectURL)
+	})
+}
+
 func TestHandler_checkSignupPolicy(t *testing.T) {
 	t.Run("should reject new magic-code account from login flow", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
@@ -316,6 +334,30 @@ func TestHandler_getPostAuthRedirectURL(t *testing.T) {
 		redirectURL := handler.getPostAuthRedirectURL(req, true)
 
 		assert.Equal(t, "/welcome", redirectURL)
+	})
+}
+
+func TestWritePostAuthRedirect(t *testing.T) {
+	t.Run("should return JSON redirect when requested", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", nil)
+		req.Header.Set("Accept", "application/json")
+		recorder := httptest.NewRecorder()
+
+		writePostAuthRedirect(recorder, req, "/welcome?redirect=%2Fcanvases")
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+		assert.JSONEq(t, `{"redirectUrl":"/welcome?redirect=%2Fcanvases"}`, recorder.Body.String())
+	})
+
+	t.Run("should keep browser redirects by default", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/magic-code/verify", nil)
+		recorder := httptest.NewRecorder()
+
+		writePostAuthRedirect(recorder, req, "/welcome")
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "/welcome", recorder.Header().Get("Location"))
 	})
 }
 
