@@ -55,7 +55,7 @@ func (c *ForEach) Documentation() string {
 
 ## Limits
 
-- At most ` + fmt.Sprintf("%d", core.MaxForEachItems()) + ` items per execution. Larger arrays fail with an error.
+- At most ` + fmt.Sprintf("%d", core.MaxEmitCount()) + ` items per execution. Larger arrays fail with an error.
 
 ## Output Fields (per item)
 
@@ -137,9 +137,9 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 	if len(items) == 0 {
 		return ctx.ExecutionState.Pass()
 	}
-	maxItems := core.MaxForEachItems()
-	if len(items) > maxItems {
-		return fmt.Errorf("array has %d items; For Each supports at most %d items per execution", len(items), maxItems)
+	maxEmitCount := core.MaxEmitCount()
+	if len(items) > maxEmitCount {
+		return fmt.Errorf("array has %d items; For Each supports at most %d items per execution", len(items), maxEmitCount)
 	}
 
 	payloads := make([]any, 0, len(items))

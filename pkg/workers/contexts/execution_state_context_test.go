@@ -62,7 +62,7 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
 
 		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
-		payloads := make([]any, core.MaxEmitCount+1)
+		payloads := make([]any, core.MaxEmitCount()+1)
 		for i := range payloads {
 			payloads[i] = map[string]any{"n": i}
 		}
