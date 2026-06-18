@@ -20,6 +20,7 @@ import {
 } from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
+import { SignupWaitlist } from "./SignupWaitlist";
 
 type AuthConfig = {
   providers: string[];
@@ -654,9 +655,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && !canSignup && (
-            <p className="text-sm text-gray-500">Signups are currently disabled.</p>
-          )}
+          {!configLoading && isSignupMode && !canSignup && <SignupWaitlist />}
 
           {!configLoading && !isSignupMode && !hasAnyFormMethod && (
             <p className="text-sm text-gray-500">No login methods are configured.</p>

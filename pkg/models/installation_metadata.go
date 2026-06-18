@@ -16,6 +16,7 @@ type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
+	SignupsEnabled            bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -54,6 +55,7 @@ func UpdateInstallationMetadataInTransaction(tx *gorm.DB, metadata *Installation
 		Where("id = ?", installationMetadataID).
 		Updates(map[string]any{
 			"allow_private_network_access": metadata.AllowPrivateNetworkAccess,
+			"signups_enabled":              metadata.SignupsEnabled,
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
@@ -72,6 +74,7 @@ func findOrCreateInstallationMetadataInTransaction(tx *gorm.DB) (*InstallationMe
 	metadata = InstallationMetadata{
 		ID:             installationMetadataID,
 		InstallationID: uuid.NewString(),
+		SignupsEnabled: true,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{
