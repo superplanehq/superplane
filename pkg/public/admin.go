@@ -35,6 +35,8 @@ type paginatedResponse struct {
 
 type installationSettingsResponse struct {
 	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
+	SignupsEnabled             bool     `json:"signups_enabled"`
+	SignupsBlockedByEnv        bool     `json:"signups_blocked_by_environment"`
 	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
 	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
 	BlockedHTTPHostsOverridden bool     `json:"blocked_http_hosts_overridden"`
@@ -51,6 +53,7 @@ type installationSettingsResponse struct {
 
 type installationSettingsRequest struct {
 	AllowPrivateNetworkAccess *bool   `json:"allow_private_network_access"`
+	SignupsEnabled            *bool   `json:"signups_enabled"`
 	SMTPEnabled               *bool   `json:"smtp_enabled"`
 	SMTPHost                  *string `json:"smtp_host"`
 	SMTPPort                  *int    `json:"smtp_port"`
@@ -132,13 +135,20 @@ var errInvalidInstallationSettingsRequest = errors.New("invalid installation set
 
 func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil {
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil {
 			metadata, err := models.GetInstallationMetadataInTransaction(tx)
 			if err != nil {
 				return err
 			}
 
-			metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+			if req.AllowPrivateNetworkAccess != nil {
+				metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+			}
+
+			if req.SignupsEnabled != nil {
+				metadata.SignupsEnabled = *req.SignupsEnabled
+			}
+
 			metadata.UpdatedAt = time.Now()
 
 			if err := models.UpdateInstallationMetadataInTransaction(tx, metadata); err != nil {
@@ -155,6 +165,11 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 }
 
 func (s *Server) buildInstallationSettingsResponse() (installationSettingsResponse, error) {
+	metadata, err := models.GetInstallationMetadata()
+	if err != nil {
+		return installationSettingsResponse{}, err
+	}
+
 	policy, err := networkpolicy.ResolveHTTPPolicy()
 	if err != nil {
 		return installationSettingsResponse{}, err
@@ -162,6 +177,8 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 
 	response := installationSettingsResponse{
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
+		SignupsEnabled:             metadata.SignupsEnabled,
+		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
 		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,

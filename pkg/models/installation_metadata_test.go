@@ -18,6 +18,7 @@ func TestGetInstallationMetadata(t *testing.T) {
 	assert.Equal(t, installationMetadataID, metadata.ID)
 	assert.NotEmpty(t, metadata.InstallationID)
 	assert.False(t, metadata.AllowPrivateNetworkAccess)
+	assert.True(t, metadata.SignupsEnabled)
 }
 
 func TestUpdateInstallationMetadata(t *testing.T) {
@@ -27,6 +28,7 @@ func TestUpdateInstallationMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	metadata.AllowPrivateNetworkAccess = true
+	metadata.SignupsEnabled = false
 	metadata.UpdatedAt = time.Now()
 
 	require.NoError(t, UpdateInstallationMetadata(metadata))
@@ -34,5 +36,6 @@ func TestUpdateInstallationMetadata(t *testing.T) {
 	updated, err := GetInstallationMetadata()
 	require.NoError(t, err)
 	assert.True(t, updated.AllowPrivateNetworkAccess)
+	assert.False(t, updated.SignupsEnabled)
 	assert.Equal(t, metadata.InstallationID, updated.InstallationID)
 }
