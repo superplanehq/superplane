@@ -211,7 +211,7 @@ func CreateCanvas(
 		}
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), &canvas)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
 	}

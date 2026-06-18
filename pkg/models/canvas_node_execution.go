@@ -655,9 +655,9 @@ func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec No
 // FindLastExecutionPerNode finds the most recent execution for each node in a workflow
 // using DISTINCT ON to get one execution per node_id, ordered by created_at DESC
 // Only returns executions for nodes that have not been deleted
-func FindLastExecutionPerNode(workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
+func FindLastExecutionPerNode(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
-	err := database.Conn().
+	err := tx.
 		Raw(`
 			SELECT DISTINCT ON (wne.node_id) wne.*
 			FROM workflow_node_executions wne

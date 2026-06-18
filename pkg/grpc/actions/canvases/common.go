@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -17,9 +16,9 @@ import (
 
 const canvasNameAlreadyExistsMessage = "Canvas with the same name already exists"
 
-func checkCanvasExistence(ctx context.Context, orgID, canvasID uuid.UUID) error {
+func checkCanvasExistence(ctx context.Context, db *gorm.DB, orgID, canvasID uuid.UUID) error {
 	return telemetry.RunSpan(ctx, "canvases.check_canvas_existence", func(ctx context.Context) error {
-		exists, err := models.CheckCanvasExistence(database.DB(ctx), orgID, canvasID)
+		exists, err := models.CheckCanvasExistence(db, orgID, canvasID)
 		if err != nil {
 			return err
 		}
@@ -31,11 +30,11 @@ func checkCanvasExistence(ctx context.Context, orgID, canvasID uuid.UUID) error 
 	})
 }
 
-func loadCanvas(ctx context.Context, orgID, canvasID uuid.UUID) (*models.Canvas, error) {
+func loadCanvas(ctx context.Context, db *gorm.DB, orgID, canvasID uuid.UUID) (*models.Canvas, error) {
 	var canvas *models.Canvas
 	err := telemetry.RunSpan(ctx, "canvases.find_canvas", func(ctx context.Context) error {
 		var findErr error
-		canvas, findErr = models.FindCanvasInTransaction(database.DB(ctx), orgID, canvasID)
+		canvas, findErr = models.FindCanvasInTransaction(db, orgID, canvasID)
 		return findErr
 	})
 	if err != nil {
@@ -45,11 +44,11 @@ func loadCanvas(ctx context.Context, orgID, canvasID uuid.UUID) (*models.Canvas,
 	return canvas, nil
 }
 
-func loadLiveCanvasVersion(ctx context.Context, canvas *models.Canvas) (*models.CanvasVersion, error) {
+func loadLiveCanvasVersion(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*models.CanvasVersion, error) {
 	var liveVersion *models.CanvasVersion
 	err := telemetry.RunSpan(ctx, "canvases.load_live_version", func(ctx context.Context) error {
 		var loadErr error
-		liveVersion, loadErr = models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), canvas)
+		liveVersion, loadErr = models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 		return loadErr
 	})
 	if err != nil {
@@ -59,20 +58,25 @@ func loadLiveCanvasVersion(ctx context.Context, canvas *models.Canvas) (*models.
 	return liveVersion, nil
 }
 
-func loadCanvasStatus(ctx context.Context, canvasID uuid.UUID) (*pb.Canvas_Status, error) {
+func loadCanvasStatus(ctx context.Context, db *gorm.DB, canvasID uuid.UUID) (*pb.Canvas_Status, error) {
 	var canvasStatus *pb.Canvas_Status
 	err := telemetry.RunSpan(ctx, "canvases.load_status", func(ctx context.Context) error {
-		lastExecutions, loadErr := models.FindLastExecutionPerNode(canvasID)
+		lastExecutions, loadErr := models.FindLastExecutionPerNode(db, canvasID)
 		if loadErr != nil {
 			return loadErr
 		}
 
-		serializedExecutions, loadErr := SerializeNodeExecutions(lastExecutions)
+		executionResources, loadErr := LoadNodeExecutionResources(db, lastExecutions)
 		if loadErr != nil {
 			return loadErr
 		}
 
-		lastEvents, loadErr := models.FindLastEventPerNode(canvasID)
+		serializedExecutions, loadErr := SerializeNodeExecutions(lastExecutions, executionResources)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		lastEvents, loadErr := models.FindLastEventPerNode(db, canvasID)
 		if loadErr != nil {
 			return loadErr
 		}

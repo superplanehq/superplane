@@ -19,7 +19,7 @@ import (
 )
 
 func UpdateCanvas(
-	_ context.Context,
+	ctx context.Context,
 	organizationID string,
 	id string,
 	name *string,
@@ -64,7 +64,7 @@ func UpdateCanvas(
 		}
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), refreshedCanvas)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), refreshedCanvas)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
 	}
