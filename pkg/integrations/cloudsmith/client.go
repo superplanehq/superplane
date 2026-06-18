@@ -285,6 +285,34 @@ func (c *Client) GetWebhook(owner, repository, slugPerm string) (*Webhook, error
 	return &webhook, nil
 }
 
+// UpdateWebhook refreshes an existing webhook's target URL and signing key
+// (PATCH). Cloudsmith only sets signature_key on write and never returns it, so
+// re-applying it keeps deliveries verifiable if the node secret rotated, without
+// recreating the webhook.
+func (c *Client) UpdateWebhook(owner, repository, slugPerm, targetURL, signatureKey string) (*Webhook, error) {
+	payload, err := json.Marshal(map[string]any{
+		"target_url":    targetURL,
+		"signature_key": signatureKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding webhook: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	responseBody, err := c.execRequest(http.MethodPatch, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
 // DeleteWebhook removes a webhook from a repository by its permanent slug.
 func (c *Client) DeleteWebhook(owner, repository, slugPerm string) error {
 	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",

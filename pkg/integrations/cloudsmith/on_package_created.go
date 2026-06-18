@@ -140,6 +140,15 @@ func (t *OnPackageCreated) Setup(ctx core.TriggerContext) error {
 		// targets our URL; otherwise recreate so the trigger self-heals.
 		existing, getErr := client.GetWebhook(owner, slug, metadata.WebhookID)
 		if getErr == nil && existing.TargetURL == metadata.WebhookURL {
+			// Re-apply the signing key in case the node secret rotated — Cloudsmith
+			// only sets it on write and never returns it for comparison.
+			secret, secErr := ctx.Webhook.GetSecret()
+			if secErr != nil {
+				return fmt.Errorf("failed to get webhook secret: %w", secErr)
+			}
+			if _, updErr := client.UpdateWebhook(owner, slug, metadata.WebhookID, metadata.WebhookURL, string(secret)); updErr != nil {
+				return fmt.Errorf("failed to refresh Cloudsmith webhook: %w", updErr)
+			}
 			return nil
 		}
 		if getErr == nil {

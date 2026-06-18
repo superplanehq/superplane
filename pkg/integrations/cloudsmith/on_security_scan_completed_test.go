@@ -55,6 +55,35 @@ func Test__OnSecurityScanCompleted__Setup(t *testing.T) {
 		require.NotNil(t, stored.Repository)
 		assert.Equal(t, "wh-sec", stored.WebhookID)
 	})
+
+	t.Run("healthy existing webhook refreshes the signing key without recreating", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: OnSecurityScanCompletedMetadata{
+				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
+				WebhookURL: "https://sp.example/hook",
+				WebhookID:  "wh-existing",
+			},
+		}
+		// GetWebhook returns a matching target, then UpdateWebhook (PATCH) succeeds.
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook"}`))},
+			},
+		}
+		err := trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			Metadata:      metadata,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "node-secret"},
+			Configuration: map[string]any{"repository": "weskk/superplane-compliance"},
+		})
+		require.NoError(t, err)
+		// Both responses (GET + PATCH) consumed -> the key was refreshed, not skipped.
+		assert.Empty(t, httpCtx.Responses)
+		stored := metadata.Metadata.(OnSecurityScanCompletedMetadata)
+		assert.Equal(t, "wh-existing", stored.WebhookID)
+	})
 }
 
 func Test__OnSecurityScanCompleted__HandleWebhook(t *testing.T) {
