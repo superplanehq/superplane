@@ -6,15 +6,27 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const paramsFileName = "params.json"
+
+// Supported InstallParam.Type values. New types added here must be recognised
+// by the install UI as well (see web_src/src/pages/install/types.ts).
+const (
+	ParamTypeString              = "string"
+	ParamTypeIntegrationResource = "integration-resource"
+	ParamTypeSecretPicker        = "secret_picker"
+)
 
 // InstallParam defines a single parameter for the install wizard.
 type InstallParam struct {
 	Name        string `json:"name"`
 	Label       string `json:"label"`
-	Type        string `json:"type"` // "string" or "integration-resource"
+	Type        string `json:"type"` // "string", "integration-resource", or "secret_picker"
 	Placeholder string `json:"placeholder,omitempty"`
 	Description string `json:"description,omitempty"`
 	Default     string `json:"default,omitempty"`
@@ -61,6 +73,39 @@ func ValidateInstallParams(schema []InstallParam, values map[string]string) erro
 			if p.Required && p.Default == "" {
 				return fmt.Errorf("install parameter %q is required", p.Name)
 			}
+		}
+	}
+	return nil
+}
+
+// ValidateSecretPickerParams confirms that every "secret_picker" parameter
+// value names an organization secret that actually exists, so installs cannot
+// reference deleted/typoed credentials and surface a confusing failure later
+// at node-execution time.
+func ValidateSecretPickerParams(schema []InstallParam, values map[string]string, organizationID uuid.UUID) error {
+	for _, p := range schema {
+		if p.Type != ParamTypeSecretPicker {
+			continue
+		}
+
+		// Only validate a real, intended secret reference: a user-provided
+		// value, or an explicit default. The placeholder/param-name fallbacks
+		// applied by ResolveInstallParams are not valid secret names, so an
+		// optional picker left empty must not be treated as a missing secret.
+		secretName := strings.TrimSpace(values[p.Name])
+		if secretName == "" {
+			secretName = strings.TrimSpace(p.Default)
+		}
+		if secretName == "" {
+			continue
+		}
+
+		_, err := models.FindSecretByName(models.DomainTypeOrganization, organizationID, secretName)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("install parameter %q: secret %q not found in organization", p.Name, secretName)
+			}
+			return fmt.Errorf("install parameter %q: failed to verify secret %q: %w", p.Name, secretName, err)
 		}
 	}
 	return nil

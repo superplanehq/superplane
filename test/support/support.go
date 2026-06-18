@@ -512,7 +512,8 @@ func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string
 		CanvasID:       canvas.ID,
 	})
 
-	require.NoError(t, canvas.CreatePendingRepository(r.GitProvider.Name(), repoID))
+	_, err := canvas.CreatePendingRepository(r.GitProvider.Name(), repoID)
+	require.NoError(t, err)
 
 	if register {
 		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)
