@@ -35,6 +35,8 @@ describe("onComplianceCheckCompletedTriggerRenderer", () => {
 
   it("maps the compliance fields to root event values", () => {
     const values = onComplianceCheckCompletedTriggerRenderer.getRootEventValues({ event });
+    expect(values["Received At"]).toBeDefined();
+    expect(values["Received At"]).not.toBe("-");
     expect(values["Package"]).toBe("sp-compliance-gpl");
     expect(values["Repository"]).toBe("weskk/superplane-compliance");
     expect(values["License"]).toBe("GPL-3.0-only");

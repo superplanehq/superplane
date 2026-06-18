@@ -4,6 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type { TriggerProps } from "@/ui/trigger";
 import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { OnComplianceCheckCompletedMetadata } from "./types";
@@ -48,6 +49,7 @@ export const onComplianceCheckCompletedTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as ComplianceCheckEvent | undefined;
 
     return {
+      "Received At": context.event?.createdAt ? formatTimestampInUserTimezone(context.event.createdAt) : "-",
       Package: stringOrDash(eventData?.name),
       Version: stringOrDash(eventData?.version),
       Repository:
