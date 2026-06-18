@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
 </CardGrid>
 
@@ -23,6 +24,106 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+
+<a id="get-package"></a>
+
+## Get Package
+
+**Component key:** `cloudsmith.getPackage`
+
+The Get Package component retrieves complete metadata for a specific Cloudsmith package,
+including sync status, quarantine state, and security scan results.
+
+### Use Cases
+
+- **Release gating**: Check that a package is Available and sync-completed before triggering downstream deployment steps
+- **Quarantine detection**: Detect when a package has been quarantined or has policy violations
+- **Audit trails**: Record full package metadata (checksums, format, upload time) for compliance
+- **Downstream enrichment**: Pass package details such as format or CDN URL to later workflow steps
+- **Checksum verification**: Retrieve SHA-256 or MD5 checksums to validate package integrity
+- **Security insights**: Check the security scan status and link to full vulnerability results
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use `{{ $['On Package Uploaded'].package.slug_perm }}` to reference an upstream trigger.
+
+### Output
+
+Returns the complete package object including:
+- **name** / **version**: Package name and version string
+- **format**: Package format (e.g., `python`, `debian`, `docker`, `maven`)
+- **status** / **status_str**: Overall status code and label (e.g. `Available`, `Quarantined`, `Failed`)
+- **stage** / **stage_str**: Processing stage (e.g. `Fully Synchronised`)
+- **sync_progress**: Sync completion percentage (0–100)
+- **is_sync_completed** / **is_sync_failed**: Final sync outcome flags
+- **is_quarantined**: Whether the package has been quarantined
+- **security_scan_status**: Result of the most recent security scan
+- **vulnerability_scan_results_url**: URL to full vulnerability scan results
+- **checksum_md5** / **checksum_sha1** / **checksum_sha256** / **checksum_sha512**: Package checksums
+- **size** / **size_str**: Package size in bytes and human-readable form
+- **cdn_url** / **self_html_url**: Download and web UI URLs
+- **uploaded_at**: ISO 8601 upload timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example package payload",
+    "display_name": "example-app",
+    "filename": "example-app",
+    "format": "docker",
+    "is_quarantined": true,
+    "is_sync_awaiting": false,
+    "is_sync_completed": true,
+    "is_sync_failed": false,
+    "is_sync_in_flight": false,
+    "is_sync_in_progress": false,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "policy_violated": false,
+    "repository": "example-repo",
+    "security_scan_completed_at": "2026-01-01T02:00:00Z",
+    "security_scan_started_at": "2026-01-01T01:59:00Z",
+    "security_scan_status": "Scan Detected Vulnerabilities",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/a=amd64;xpo=linux/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-abc1",
+    "slug_perm": "example-package-id",
+    "stage": 9,
+    "stage_str": "Fully Synchronised",
+    "stage_updated_at": "2026-01-01T01:58:00Z",
+    "status": 7,
+    "status_reason": "",
+    "status_str": "Quarantined",
+    "status_updated_at": "2026-01-01T02:05:00Z",
+    "summary": "",
+    "sync_finished_at": "2026-01-01T02:03:00Z",
+    "sync_progress": 100,
+    "tags": {
+      "version": [
+        "latest"
+      ]
+    },
+    "tags_immutable": {},
+    "uploaded_at": "2026-01-01T01:55:00Z",
+    "uploader": "example-user",
+    "version": "example-version",
+    "vulnerability_scan_results_url": "https://api.cloudsmith.io/v1/vulnerabilities/example-owner/example-repo/example-package-id/"
+  },
+  "timestamp": "2026-01-01T02:06:00Z",
+  "type": "cloudsmith.package.fetched"
+}
+```
 
 <a id="get-repository"></a>
 
