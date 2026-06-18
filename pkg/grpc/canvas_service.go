@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -419,4 +421,17 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 func (s *CanvasService) ApplyCanvasAutoLayout(ctx context.Context, req *pb.ApplyCanvasAutoLayoutRequest) (*pb.ApplyCanvasAutoLayoutResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.ApplyCanvasAutoLayout(ctx, organizationID, req.CanvasId, req.VersionId, req.AutoLayout)
+}
+
+func (s *CanvasService) ListNodeExecutionLogs(ctx context.Context, req *pb.ListNodeExecutionLogsRequest) (*pb.ListNodeExecutionLogsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListNodeExecutionLogs(uuid.MustParse(organizationID), req.CanvasId, req.ExecutionId, brokerBaseURL(), brokerAuthToken(), req.Limit, req.AfterSequence)
+}
+
+func brokerBaseURL() string {
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
+}
+
+func brokerAuthToken() string {
+	return strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
 }

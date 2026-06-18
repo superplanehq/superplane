@@ -361,6 +361,17 @@ service Canvases {
     };
   }
 
+  rpc ListNodeExecutionLogs(ListNodeExecutionLogsRequest) returns (ListNodeExecutionLogsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/logs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List node execution logs";
+      description: "Returns logs for a runner node execution, fetched from CloudWatch via task-broker";
+      tags: "CanvasNodeExecution";
+    };
+  }
+
   rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/runs/{run_id}"
@@ -896,6 +907,35 @@ message InvokeNodeTriggerHookRequest {
 
 message InvokeNodeTriggerHookResponse {
   google.protobuf.Struct result = 1;
+}
+
+message ListNodeExecutionLogsRequest {
+  string canvas_id = 1;
+  string execution_id = 2;
+  uint32 limit = 3;
+  int64 after_sequence = 4;
+}
+
+message ListNodeExecutionLogsResponse {
+  repeated CanvasNodeExecutionLog logs = 1;
+  bool has_next_page = 2;
+  int64 last_sequence = 3;
+}
+
+message CanvasNodeExecutionLog {
+  string id = 1;
+  string canvas_id = 2;
+  string node_id = 3;
+  string execution_id = 4;
+  string run_id = 5;
+  int64 sequence = 6;
+  string type = 7;
+  string text = 8;
+  string message = 9;
+  int32 command_index = 10;
+  string status = 11;
+  int64 duration_ms = 12;
+  google.protobuf.Timestamp created_at = 13;
 }
 
 message ListRunsRequest {
