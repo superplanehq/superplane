@@ -444,6 +444,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showSignupClosedNotice = showSignupUnavailable && authConfig.signupsBlockedByEnvironment;
   const showSignupEntryPoint = canSignup || !authConfig.signupsBlockedByEnvironment;
   const signupUnavailableReason = showSignupWaitlist ? "waitlist" : showSignupClosedNotice ? "closed" : null;
+  const showLastUsedMethodHints = !isSignupMode;
   const authErrorMessage = getAuthErrorMessage(authError, signupUnavailableReason);
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
@@ -791,7 +792,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 <LoadingButton type="submit" loading={submitLoading} loadingText="Logging in..." className="w-full">
                   Login
                 </LoadingButton>
-                {lastUsedMethod === "password" && <LastUsedHint label="email" />}
+                {showLastUsedMethodHints && lastUsedMethod === "password" && <LastUsedHint label="email" />}
               </div>
             </form>
           )}
@@ -975,7 +976,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                       <span>Continue with {getProviderLabel(provider)}</span>
                     </a>
                   </Button>
-                  {lastUsedMethod === provider && <LastUsedHint label={getProviderLabel(provider)} />}
+                  {showLastUsedMethodHints && lastUsedMethod === provider && (
+                    <LastUsedHint label={getProviderLabel(provider)} />
+                  )}
                 </div>
               ))}
             </div>
