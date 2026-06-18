@@ -173,42 +173,42 @@ function mergePendingOptimisticMessages(
   messages: AgentMessage[],
   currentData: InfiniteData<AgentMessagesPage> | undefined,
 ): AgentMessage[] {
-  const optimisticMessages = currentData?.pages.flatMap((page) => page.messages).filter(isOptimisticAgentMessage) ?? [];
+  const cachedMessages = currentData?.pages.flatMap((page) => page.messages) ?? [];
+  const optimisticMessages = cachedMessages.filter(isOptimisticAgentMessage);
   if (optimisticMessages.length === 0) {
     return messages;
   }
 
-  const messageIds = new Set(messages.map((message) => message.id));
-  const persistedUserMessageCounts = new Map<string, number>();
+  const knownMessageIds = new Set(cachedMessages.map((message) => message.id));
+  const serverMessageIds = new Set(messages.map((message) => message.id));
+
+  // Only persisted user messages that are new in this refetch (not already in the
+  // cache) can retire an optimistic send. A persisted message that is already
+  // cached has reconciled its own optimistic copy via onSuccess, so it must not
+  // retire a different in-flight send that happens to share the same role+content
+  // (image-only sends all have empty content and would otherwise collide).
+  const newlyPersistedCounts = new Map<string, number>();
   for (const message of messages) {
-    if (isOptimisticAgentMessage(message) || message.role !== "user") {
+    if (message.role !== "user" || isOptimisticAgentMessage(message) || knownMessageIds.has(message.id)) {
       continue;
     }
 
     const key = optimisticMessageMatchKey(message);
-    persistedUserMessageCounts.set(key, (persistedUserMessageCounts.get(key) ?? 0) + 1);
+    newlyPersistedCounts.set(key, (newlyPersistedCounts.get(key) ?? 0) + 1);
   }
 
   const pendingMessages = optimisticMessages.filter((message) => {
-    if (messageIds.has(message.id)) {
+    if (serverMessageIds.has(message.id)) {
       return false;
     }
 
-    // Image-only sends have empty content, which the role+content heuristic
-    // cannot use to tell an in-flight send apart from an already-persisted one.
-    // Keep them and let the mutation's onSuccess/onError remove the optimistic
-    // copy by id, so a later send isn't dropped by an earlier persisted image.
-    if (!message.content.trim()) {
-      return true;
-    }
-
     const key = optimisticMessageMatchKey(message);
-    const persistedCount = persistedUserMessageCounts.get(key) ?? 0;
+    const persistedCount = newlyPersistedCounts.get(key) ?? 0;
     if (persistedCount === 0) {
       return true;
     }
 
-    persistedUserMessageCounts.set(key, persistedCount - 1);
+    newlyPersistedCounts.set(key, persistedCount - 1);
     return false;
   });
 
