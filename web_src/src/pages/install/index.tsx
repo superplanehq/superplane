@@ -31,7 +31,7 @@ function InstallPageContent() {
   const presetOrganizationId = searchParams.get("organizationId")?.trim() || "";
   const parsedRepo = useMemo(() => parseGitHubRepoParam(repoParam), [repoParam]);
 
-  const { preview, organizations, defaultOrganizationId, loadError, isLoading } = useInstallPreview({
+  const { preview, organizations, defaultName, defaultOrganizationId, loadError, isLoading } = useInstallPreview({
     repoParam,
     hasValidRepo: Boolean(parsedRepo),
     presetName,
@@ -39,10 +39,12 @@ function InstallPageContent() {
   });
 
   const [organizationId, setOrganizationId] = useState("");
+  const [nameOverride, setNameOverride] = useState<string | null>(null);
 
   // Set org once loaded
   const effectiveOrgId = organizationId || defaultOrganizationId;
   const showOrgPicker = organizations.length > 1;
+  const canvasName = nameOverride ?? defaultName;
 
   useReportPageReady(!isLoading, {
     failed: !!(loadError || !preview || !repoParam),
@@ -92,7 +94,8 @@ function InstallPageContent() {
         <InstallProgressPanel
           app={app}
           organizationId={effectiveOrgId}
-          canvasName={presetName || preview.defaultName || undefined}
+          canvasName={canvasName}
+          onCanvasNameChange={setNameOverride}
           skipPreviewFetch
           preloadedIntegrations={preview.integrations}
           preloadedParams={preview.installParams}
