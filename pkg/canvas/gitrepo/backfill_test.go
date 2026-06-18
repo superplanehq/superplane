@@ -20,6 +20,16 @@ func TestBackfillCanvasRepository(t *testing.T) {
 
 	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "Draft #1", nil, nil)
 	require.NoError(t, err)
+	require.NotNil(t, draft.BranchName)
+
+	// The migration that backfills git_branch from branch_name ships in a
+	// separate PR, so emulate its result here: the git_branch-based backfill
+	// only acts on draft rows whose git_branch is populated.
+	draft.GitBranch = *draft.BranchName
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", draft.ID).
+		Update("git_branch", draft.GitBranch).Error)
 	require.True(t, gitref.IsDraftBranch(draft.GitBranch))
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {

@@ -59,7 +59,7 @@ func BackfillCanvasRepository(
 	if err := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("state = ?", models.CanvasVersionStateDraft).
-		Where("branch_name IS NOT NULL AND branch_name <> ''").
+		Where("git_branch <> ?", "").
 		Find(&drafts).Error; err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func BackfillDraftBranch(
 	canvasID uuid.UUID,
 	version *models.CanvasVersion,
 ) error {
-	if gitProvider == nil || version == nil || version.BranchName == nil {
+	if gitProvider == nil || version == nil || !gitref.IsDraftBranch(version.GitBranch) {
 		return nil
 	}
 
@@ -109,7 +109,7 @@ func BackfillDraftBranch(
 		return fmt.Errorf("repository not found: %w", err)
 	}
 
-	branchName := *version.BranchName
+	branchName := version.GitBranch
 	if !gitref.GitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
 		if err := gitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain); err != nil {
 			return fmt.Errorf("create draft branch %q: %w", branchName, err)

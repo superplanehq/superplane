@@ -75,10 +75,10 @@ func reconcileDraftBranchDeletionsInTransaction(
 	removed := make([]string, 0)
 
 	for i := range dbBranches {
-		if dbBranches[i].BranchName == nil {
+		branchName := dbBranches[i].GitBranch
+		if branchName == "" {
 			continue
 		}
-		branchName := *dbBranches[i].BranchName
 		if filterBranch != "" && branchName != filterBranch {
 			continue
 		}
