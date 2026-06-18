@@ -57,6 +57,7 @@ func (c *ForEach) Documentation() string {
 ## Limits
 
 - At most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` items per execution. Larger arrays fail with an error.
+- Self-hosted deployments can raise this cap with the ` + "`SUPERPLANE_MAX_EMIT_COUNT`" + ` environment variable.
 
 ## Output Fields (per item)
 

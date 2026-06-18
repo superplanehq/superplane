@@ -70,7 +70,12 @@ func (c *ReadMemory) Documentation() string {
 ## Output Channels
 
 - **Found**: At least one matching memory row was found
-- **Not Found**: No matching memory rows were found`
+- **Not Found**: No matching memory rows were found
+
+## Limits
+
+- When **Emit Mode** is ` + "`oneByOne`" + `, at most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` events are emitted per execution.
+- Self-hosted deployments can raise this cap with the ` + "`SUPERPLANE_MAX_EMIT_COUNT`" + ` environment variable.`
 
 }
 
