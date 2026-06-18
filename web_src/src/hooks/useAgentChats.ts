@@ -13,7 +13,13 @@ import {
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
-import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/CanvasToolSidebar/types";
+import {
+  fromApiChat,
+  fromApiMessage,
+  type AgentChat,
+  type AgentMessage,
+  type AgentOutgoingImage,
+} from "@/components/CanvasToolSidebar/types";
 import { analytics } from "@/lib/analytics";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
@@ -63,7 +69,9 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
           query: { beforeId: pageParam || undefined, limit: PAGE_SIZE },
         }),
       );
-      const messages = (response.data?.messages ?? []).map(fromApiMessage).filter((m): m is AgentMessage => m !== null);
+      const messages = (response.data?.messages ?? [])
+        .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
+        .filter((m): m is AgentMessage => m !== null);
       if (!pageParam && chatId) {
         return {
           messages: mergePendingOptimisticMessages(
@@ -86,17 +94,31 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
 export function useSendAgentChatMessage(organizationId: string | undefined, canvasId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ chatId, content, mode }: { chatId: string; content: string; mode?: AgentMode }) => {
+    mutationFn: async ({
+      chatId,
+      content,
+      mode,
+      images,
+    }: {
+      chatId: string;
+      content: string;
+      mode?: AgentMode;
+      images?: AgentOutgoingImage[];
+    }) => {
       const response = await agentsSendAgentChatMessage(
         withOrganizationHeader({
           organizationId,
           path: { chatId },
-          body: { content, mode: mode ? agentModeToApiMode[mode] : undefined },
+          body: {
+            content,
+            mode: mode ? agentModeToApiMode[mode] : undefined,
+            images: images && images.length > 0 ? images : undefined,
+          },
         }),
       );
-      return fromApiMessage(response.data?.message);
+      return fromApiMessage(response.data?.message, chatId, organizationId);
     },
-    onMutate: ({ chatId, content, mode }) => {
+    onMutate: ({ chatId, content, mode, images }) => {
       const submittedAt = Date.now();
       const optimisticMessage: AgentMessage = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -105,6 +127,10 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         toolName: "",
         toolCallId: "",
         toolStatus: "",
+        // Preview attachments inline while the request is in flight. The base64
+        // payload is rendered as a data URL; the server response later replaces
+        // this with out-of-band image URLs.
+        images: images?.map(({ mediaType, data }) => ({ mediaType, url: `data:${mediaType};base64,${data}` })),
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
@@ -166,6 +192,14 @@ function mergePendingOptimisticMessages(
   const pendingMessages = optimisticMessages.filter((message) => {
     if (messageIds.has(message.id)) {
       return false;
+    }
+
+    // Image-only sends have empty content, which the role+content heuristic
+    // cannot use to tell an in-flight send apart from an already-persisted one.
+    // Keep them and let the mutation's onSuccess/onError remove the optimistic
+    // copy by id, so a later send isn't dropped by an earlier persisted image.
+    if (!message.content.trim()) {
+      return true;
     }
 
     const key = optimisticMessageMatchKey(message);

@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -253,8 +254,8 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 	return contextReplayed, err
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
-	if content == "" {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, mode ...string) (*models.AgentSessionMessage, error) {
+	if content == "" && len(images) == 0 {
 		return nil, fmt.Errorf("message content is required")
 	}
 
@@ -276,7 +277,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, agentMode)
+	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, agentMode)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -289,7 +290,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 				}
 				return nil, recoverErr
 			}
-			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, agentMode)
+			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, agentMode)
 			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -310,6 +311,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		SessionID: sessionID,
 		Role:      messageRole,
 		Content:   content,
+		Images:    toSessionImages(images),
 	}
 	if err := models.AppendAgentSessionMessage(persisted); err != nil {
 		return nil, fmt.Errorf("persist user message: %w", err)
@@ -331,7 +333,15 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, mode Mode) (bool, error) {
+func toSessionImages(images []MessageImage) datatypes.JSONSlice[models.AgentSessionImage] {
+	out := make(datatypes.JSONSlice[models.AgentSessionImage], 0, len(images))
+	for _, image := range images {
+		out = append(out, models.AgentSessionImage{MediaType: image.MediaType, Data: image.Data})
+	}
+	return out
+}
+
+func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, mode Mode) (bool, error) {
 	message, contextReplayed, err := s.messageWithRewind(session, content)
 	if err != nil {
 		return false, err
@@ -339,6 +349,7 @@ func (s *Service) sendMessageToProvider(ctx context.Context, session *models.Age
 
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
 		ContextPreamble: s.buildPreamble(session, mode),
+		Images:          images,
 	})
 	return contextReplayed, err
 }
