@@ -16,6 +16,10 @@ const ComponentName = "forEach"
 const PayloadType = "foreach.item"
 const ChannelNameItem = "item"
 
+// maxItemsPerExecution is the hard limit on how many downstream events For Each
+// may emit in a single run. This is not user-configurable.
+const maxItemsPerExecution = 100
+
 func init() {
 	registry.RegisterAction(ComponentName, &ForEach{})
 }
@@ -55,7 +59,7 @@ func (c *ForEach) Documentation() string {
 
 ## Limits
 
-- At most ` + fmt.Sprintf("%d", core.MaxEmitCount) + ` items per execution. Larger arrays fail with an error.
+- At most ` + fmt.Sprintf("%d", maxItemsPerExecution) + ` items per execution. Larger arrays fail with an error.
 
 ## Output Fields (per item)
 
@@ -137,8 +141,8 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 	if len(items) == 0 {
 		return ctx.ExecutionState.Pass()
 	}
-	if len(items) > core.MaxEmitCount {
-		return fmt.Errorf("array has %d items; For Each supports at most %d per execution", len(items), core.MaxEmitCount)
+	if len(items) > maxItemsPerExecution {
+		return fmt.Errorf("array has %d items; For Each supports at most %d items per execution", len(items), maxItemsPerExecution)
 	}
 
 	payloads := make([]any, 0, len(items))
