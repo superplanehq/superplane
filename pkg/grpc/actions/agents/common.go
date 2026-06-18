@@ -89,18 +89,32 @@ func serializeMessage(message *models.AgentSessionMessage) *pb.AgentChatMessage 
 	return out
 }
 
-// serializeImages returns image metadata only. The base64 bytes are served
-// out-of-band by the dedicated image endpoint (see handleAgentChatMessageImage)
-// and intentionally omitted here, so a history page with several attachments
-// stays under the gRPC/HTTP response size limits. The client builds the image
-// URL from the message id and the image's position in this slice.
 func serializeImages(images []models.AgentSessionImage) []*pb.AgentChatImage {
 	if len(images) == 0 {
 		return nil
 	}
 	out := make([]*pb.AgentChatImage, 0, len(images))
 	for _, image := range images {
-		out = append(out, &pb.AgentChatImage{MediaType: image.MediaType})
+		mediaType := contentTypeToChatImageMediaType(image.MediaType)
+		if mediaType == pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED {
+			continue
+		}
+		out = append(out, &pb.AgentChatImage{MediaType: mediaType})
 	}
 	return out
+}
+
+func contentTypeToChatImageMediaType(mediaType string) pb.AgentChatImageMediaType {
+	switch mediaType {
+	case "image/png":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_PNG
+	case "image/jpeg":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_JPEG
+	case "image/gif":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_GIF
+	case "image/webp":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_WEBP
+	default:
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED
+	}
 }

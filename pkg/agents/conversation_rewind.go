@@ -83,10 +83,6 @@ func formatRewindEntry(message models.AgentSessionMessage) string {
 	}
 }
 
-// userRewindText renders a prior user turn for the text-only rewind. Image
-// attachments are not re-sent to the recreated provider session, so we note that
-// they were shared; otherwise an image-only turn would collapse to an empty
-// "User:" line and the model would lose that screenshots were part of the thread.
 func userRewindText(content string, imageCount int) string {
 	text := truncateText(content, rewindEntryMaxChars)
 	note := imageAttachmentNote(imageCount)

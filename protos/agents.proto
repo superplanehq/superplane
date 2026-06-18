@@ -112,19 +112,21 @@ message ListAgentChatMessagesResponse {
 message SendAgentChatMessageRequest {
   string chat_id = 1;
   string content = 2;
-  // Controls whether the agent should build, answer questions, or plan.
   AgentMode mode = 3;
-  // Images attached to the message (e.g. a pasted screenshot). Sent to the
-  // agent alongside the text so it can reason about them.
   repeated AgentChatImage images = 4;
 }
 
-// AgentChatImage is a base64-encoded image attached to a chat message.
+enum AgentChatImageMediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_PNG = 1;
+  MEDIA_TYPE_JPEG = 2;
+  MEDIA_TYPE_GIF = 3;
+  MEDIA_TYPE_WEBP = 4;
+}
+
 message AgentChatImage {
-  // IANA media type, e.g. "image/png" or "image/jpeg".
-  string media_type = 1;
-  // Base64-encoded image bytes, without a data URI prefix.
-  string data = 2;
+  AgentChatImageMediaType media_type = 1;
+  bytes data = 2;
 }
 
 message SendAgentChatMessageResponse {
@@ -163,6 +165,5 @@ message AgentChatMessage {
   string tool_name = 5;
   string tool_status = 6;
   google.protobuf.Timestamp created_at = 7;
-  // Images attached to the message by the user.
   repeated AgentChatImage images = 8;
 }

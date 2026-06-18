@@ -190,9 +190,6 @@ describe("useAgentChatMessages", () => {
       wrapper: wrapper(queryClient),
     });
 
-    // An earlier image-only message is already persisted in the cache (empty
-    // content), and a later image-only send is still in flight (also empty
-    // content). The earlier persisted message must not retire the in-flight send.
     queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"), {
       pages: [
         {
@@ -230,7 +227,7 @@ describe("useAgentChatMessages", () => {
 
     resolveList({
       data: {
-        messages: [{ id: "server-message-1", role: "user", content: "", images: [{ mediaType: "image/png" }] }],
+        messages: [{ id: "server-message-1", role: "user", content: "", images: [{ mediaType: "MEDIA_TYPE_PNG" }] }],
         hasMore: false,
       },
       request: new Request("https://superplane.test"),
@@ -285,11 +282,9 @@ describe("useAgentChatMessages", () => {
       throw new Error("list promise was not created");
     }
 
-    // The just-persisted image message arrives in the refetch (new id, not yet in
-    // cache): the optimistic copy should be retired so the bubble isn't doubled.
     resolveList({
       data: {
-        messages: [{ id: "server-message-1", role: "user", content: "", images: [{ mediaType: "image/png" }] }],
+        messages: [{ id: "server-message-1", role: "user", content: "", images: [{ mediaType: "MEDIA_TYPE_PNG" }] }],
         hasMore: false,
       },
       request: new Request("https://superplane.test"),

@@ -303,7 +303,7 @@ func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSess
 		Draft: draftResult{
 			VersionID:   draft.ID.String(),
 			DisplayName: draft.DisplayName,
-			BranchName:  stringValue(draft.BranchName),
+			BranchName:  draft.GitBranch,
 		},
 		StagingSummary: serializeStagingSummary(response.GetStagingSummary()),
 	}, nil

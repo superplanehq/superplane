@@ -1,4 +1,6 @@
-import type { AgentsAgentChatInfo, AgentsAgentChatMessage } from "@/api-client";
+import type { AgentsAgentChatImageMediaType, AgentsAgentChatInfo, AgentsAgentChatMessage } from "@/api-client";
+
+export type AgentImageMediaType = AgentsAgentChatImageMediaType;
 
 export type AgentChat = {
   id: string;
@@ -9,16 +11,13 @@ export type AgentChat = {
   updatedAt: string | null;
 };
 
-// Image attached to a stored message. Bytes are served out-of-band by the
-// image endpoint, so the message carries a URL rather than inline base64.
 export type AgentMessageImage = {
   mediaType: string;
   url: string;
 };
 
-// Image being composed/sent by the client, carrying the base64 payload.
 export type AgentOutgoingImage = {
-  mediaType: string;
+  mediaType: AgentImageMediaType;
   data: string;
 };
 
@@ -88,10 +87,8 @@ export function fromApiMessage(
     toolCallId: input.toolCallId ?? "",
     toolStatus: input.toolStatus ?? "",
     images: (input.images ?? [])
-      // Index matches the image's position in the stored message, which the
-      // server endpoint uses to address it; map before filtering to preserve it.
       .map((image, index) => ({
-        mediaType: image.mediaType ?? "",
+        mediaType: apiImageMediaTypeToMime(image.mediaType),
         url: agentMessageImageUrl(chatId, messageId, index, organizationId),
       }))
       .filter((image) => Boolean(image.mediaType)),
@@ -107,4 +104,34 @@ function agentMessageImageUrl(
 ): string {
   const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
   return `/api/v1/agents/chats/${chatId}/messages/${messageId}/images/${index}${query}`;
+}
+
+export function apiImageMediaTypeToMime(mediaType: string | undefined): string {
+  switch (mediaType) {
+    case "MEDIA_TYPE_PNG":
+      return "image/png";
+    case "MEDIA_TYPE_JPEG":
+      return "image/jpeg";
+    case "MEDIA_TYPE_GIF":
+      return "image/gif";
+    case "MEDIA_TYPE_WEBP":
+      return "image/webp";
+    default:
+      return "";
+  }
+}
+
+export function mimeToApiImageMediaType(mediaType: string): AgentImageMediaType {
+  switch (mediaType) {
+    case "image/png":
+      return "MEDIA_TYPE_PNG";
+    case "image/jpeg":
+      return "MEDIA_TYPE_JPEG";
+    case "image/gif":
+      return "MEDIA_TYPE_GIF";
+    case "image/webp":
+      return "MEDIA_TYPE_WEBP";
+    default:
+      return "MEDIA_TYPE_UNSPECIFIED";
+  }
 }

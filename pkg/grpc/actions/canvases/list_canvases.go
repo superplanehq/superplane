@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListCanvasesResponse, error) {
@@ -22,7 +24,7 @@ func ListCanvases(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Error(codes.Internal, "failed to list canvases")
 	}
 
-	protoCanvases, err := serializeCanvasSummaries(canvases)
+	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), canvases)
 	if err != nil {
 		log.Errorf("failed to serialize canvases for organization %s: %v", organizationID, err)
 		return nil, status.Error(codes.Internal, "failed to serialize canvases")
@@ -33,7 +35,7 @@ func ListCanvases(ctx context.Context, registry *registry.Registry, organization
 	}, nil
 }
 
-func serializeCanvasSummaries(canvases []models.Canvas) ([]*pb.CanvasSummary, error) {
+func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.CanvasSummary, error) {
 	//
 	// Get all users with a single query, to avoid N+1 queries.
 	//
@@ -44,7 +46,7 @@ func serializeCanvasSummaries(canvases []models.Canvas) ([]*pb.CanvasSummary, er
 		}
 	}
 
-	users, err := models.FindMaybeDeletedUsersByIDs(userIDs)
+	users, err := models.FindMaybeDeletedUsersByIDs(db, userIDs)
 	if err != nil {
 		return nil, err
 	}

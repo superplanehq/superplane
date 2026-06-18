@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"slices"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,16 +15,9 @@ import (
 )
 
 const (
-	maxChatImages = 8
-
-	// maxChatImagePayloadBytes caps the combined decoded image bytes per message.
-	// Images are sent as base64 (~4/3 larger) in the protobuf body, so this stays
-	// well under the gRPC server's 4 MiB receive limit, leaving room for the
-	// message text and framing.
+	maxChatImages            = 8
 	maxChatImagePayloadBytes = 2_500_000
 )
-
-var allowedChatImageMediaTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.SendAgentChatMessageRequest) (*pb.SendAgentChatMessageResponse, error) {
 	org, user, err := parseOrgUser(orgID, userID)
@@ -69,21 +61,36 @@ func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, 
 	out := make([]agentservice.MessageImage, 0, len(images))
 	total := 0
 	for _, image := range images {
-		if !slices.Contains(allowedChatImageMediaTypes, image.MediaType) {
-			return nil, status.Errorf(codes.InvalidArgument, "unsupported image media type: %q", image.MediaType)
+		mediaType, ok := chatImageMediaTypeToContentType(image.MediaType)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported image media type: %s", image.MediaType)
 		}
-		decoded, err := base64.StdEncoding.DecodeString(image.Data)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "image data must be valid base64")
-		}
-		if len(decoded) == 0 {
+		if len(image.Data) == 0 {
 			return nil, status.Error(codes.InvalidArgument, "image data is empty")
 		}
-		total += len(decoded)
+		total += len(image.Data)
 		if total > maxChatImagePayloadBytes {
 			return nil, status.Errorf(codes.InvalidArgument, "images exceed the %d byte limit per message", maxChatImagePayloadBytes)
 		}
-		out = append(out, agentservice.MessageImage{MediaType: image.MediaType, Data: image.Data})
+		out = append(out, agentservice.MessageImage{
+			MediaType: mediaType,
+			Data:      base64.StdEncoding.EncodeToString(image.Data),
+		})
 	}
 	return out, nil
+}
+
+func chatImageMediaTypeToContentType(mediaType pb.AgentChatImageMediaType) (string, bool) {
+	switch mediaType {
+	case pb.AgentChatImageMediaType_MEDIA_TYPE_PNG:
+		return "image/png", true
+	case pb.AgentChatImageMediaType_MEDIA_TYPE_JPEG:
+		return "image/jpeg", true
+	case pb.AgentChatImageMediaType_MEDIA_TYPE_GIF:
+		return "image/gif", true
+	case pb.AgentChatImageMediaType_MEDIA_TYPE_WEBP:
+		return "image/webp", true
+	default:
+		return "", false
+	}
 }

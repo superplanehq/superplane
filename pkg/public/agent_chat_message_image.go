@@ -13,10 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
-// handleAgentChatMessageImage streams a single image attached to an agent chat
-// message. Image bytes are served out-of-band (rather than embedded as base64
-// in the message list response) so chat history stays small enough to fit under
-// the gRPC/HTTP response size limits.
 func (s *Server) handleAgentChatMessageImage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
@@ -42,8 +38,6 @@ func (s *Server) handleAgentChatMessageImage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Agent sessions are private to their creator, so this both authorizes the
-	// request and scopes the lookup to the caller.
 	if _, err := models.FindAgentSessionForUser(user.OrganizationID, user.ID, sessionID); err != nil {
 		http.Error(w, "agent chat not found", http.StatusNotFound)
 		return

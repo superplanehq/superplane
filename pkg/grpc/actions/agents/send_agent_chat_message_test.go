@@ -3,7 +3,6 @@ package agents_test
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"testing"
 
 	"github.com/google/uuid"
@@ -135,14 +134,14 @@ func TestSendAgentChatMessage_ForwardsAndSerializesImages(t *testing.T) {
 	resp, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
 		ChatId:  uuid.NewString(),
 		Content: "",
-		Images:  []*pb.AgentChatImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+		Images:  []*pb.AgentChatImage{{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: []byte("hello")}},
 	})
 	require.NoError(t, err)
 	require.Len(t, forwarded, 1)
 	assert.Equal(t, "image/png", forwarded[0].MediaType)
+	assert.Equal(t, "aGVsbG8=", forwarded[0].Data)
 	require.Len(t, resp.Message.Images, 1)
-	assert.Equal(t, "image/png", resp.Message.Images[0].MediaType)
-	// Image bytes are served out-of-band, never embedded in the response.
+	assert.Equal(t, pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, resp.Message.Images[0].MediaType)
 	assert.Empty(t, resp.Message.Images[0].Data)
 }
 
@@ -155,9 +154,8 @@ func TestSendAgentChatMessage_RejectsInvalidImages(t *testing.T) {
 		name  string
 		image *pb.AgentChatImage
 	}{
-		{"unsupported media type", &pb.AgentChatImage{MediaType: "image/tiff", Data: "aGVsbG8="}},
-		{"invalid base64", &pb.AgentChatImage{MediaType: "image/png", Data: "not base64!!"}},
-		{"empty data", &pb.AgentChatImage{MediaType: "image/png", Data: ""}},
+		{"unsupported media type", &pb.AgentChatImage{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED, Data: []byte("hello")}},
+		{"empty data", &pb.AgentChatImage{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -176,13 +174,12 @@ func TestSendAgentChatMessage_RejectsImagesOverPayloadLimit(t *testing.T) {
 	defer r.Close()
 	svc := &stubService{}
 
-	// Two 2 MiB images decode to 4 MiB combined, over the per-message budget.
-	big := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0}, 2*1024*1024))
+	big := bytes.Repeat([]byte{0}, 2*1024*1024)
 	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
 		ChatId: uuid.NewString(),
 		Images: []*pb.AgentChatImage{
-			{MediaType: "image/png", Data: big},
-			{MediaType: "image/png", Data: big},
+			{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: big},
+			{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: big},
 		},
 	})
 	require.Error(t, err)

@@ -7,7 +7,7 @@ import { MentionDropdown } from "./MentionDropdown";
 import { MentionTextarea } from "./MentionTextarea";
 import { ImageAttachmentPreviews } from "./ImageAttachmentPreviews";
 import { MAX_IMAGE_ATTACHMENTS, isSupportedImageFile, useImageAttachments } from "./useImageAttachments";
-import type { AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
+import { mimeToApiImageMediaType, type AgentOutgoingImage } from "@/components/CanvasToolSidebar/types";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 
@@ -115,7 +115,10 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
   const handleSend = useCallback(async () => {
     const content = getMarkdown().trim();
     if (!content && !hasImages) return;
-    const outgoingImages = images.map(({ mediaType, data }) => ({ mediaType, data }));
+    const outgoingImages = images.map(({ mediaType, data }) => ({
+      mediaType: mimeToApiImageMediaType(mediaType),
+      data,
+    }));
     mentionsApi.snapshot();
     mentionsApi.clear();
     try {
@@ -130,8 +133,6 @@ function useComposerController({ onSend, sendPending, nodes, runs }: ComposerCon
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const files = imageFilesFromClipboard(e);
       if (files.length === 0) return;
-      // Only suppress the default paste when the clipboard is image-only, so a
-      // mixed text-and-image paste still inserts its text.
       if (e.clipboardData.getData("text/plain").length === 0) e.preventDefault();
       void addFiles(files);
     },

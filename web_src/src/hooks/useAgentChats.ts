@@ -16,6 +16,7 @@ import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import {
   fromApiChat,
   fromApiMessage,
+  apiImageMediaTypeToMime,
   type AgentChat,
   type AgentMessage,
   type AgentOutgoingImage,
@@ -127,10 +128,10 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         toolName: "",
         toolCallId: "",
         toolStatus: "",
-        // Preview attachments inline while the request is in flight. The base64
-        // payload is rendered as a data URL; the server response later replaces
-        // this with out-of-band image URLs.
-        images: images?.map(({ mediaType, data }) => ({ mediaType, url: `data:${mediaType};base64,${data}` })),
+        images: images?.map(({ mediaType, data }) => {
+          const mimeType = apiImageMediaTypeToMime(mediaType);
+          return { mediaType: mimeType, url: `data:${mimeType};base64,${data}` };
+        }),
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
@@ -182,11 +183,6 @@ function mergePendingOptimisticMessages(
   const knownMessageIds = new Set(cachedMessages.map((message) => message.id));
   const serverMessageIds = new Set(messages.map((message) => message.id));
 
-  // Only persisted user messages that are new in this refetch (not already in the
-  // cache) can retire an optimistic send. A persisted message that is already
-  // cached has reconciled its own optimistic copy via onSuccess, so it must not
-  // retire a different in-flight send that happens to share the same role+content
-  // (image-only sends all have empty content and would otherwise collide).
   const newlyPersistedCounts = new Map<string, number>();
   for (const message of messages) {
     if (message.role !== "user" || isOptimisticAgentMessage(message) || knownMessageIds.has(message.id)) {

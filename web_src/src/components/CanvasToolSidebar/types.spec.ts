@@ -60,7 +60,7 @@ describe("fromApiMessage", () => {
         id: "msg-2",
         role: "user",
         content: "look",
-        images: [{ mediaType: "image/png" }, {}, { mediaType: "image/jpeg" }],
+        images: [{ mediaType: "MEDIA_TYPE_PNG" }, {}, { mediaType: "MEDIA_TYPE_JPEG" }],
       },
       "chat-9",
       "org-7",
@@ -73,7 +73,7 @@ describe("fromApiMessage", () => {
 
   it("omits the organization query when no org is provided", () => {
     const msg = fromApiMessage(
-      { id: "msg-3", role: "user", content: "look", images: [{ mediaType: "image/png" }] },
+      { id: "msg-3", role: "user", content: "look", images: [{ mediaType: "MEDIA_TYPE_PNG" }] },
       "chat-9",
       undefined,
     );
