@@ -12,8 +12,7 @@ import (
 
 // inProcessMaterializer, when set, makes RequestBranchMaterialization run
 // materialization synchronously in-process instead of publishing a
-// repository_branch_updated message for the worker to consume. Production never
-// sets this: handlers stay worker-authoritative and the worker does the work.
+// repository_branch_updated message for the worker to consume.
 // Tests wire it (via support.Setup) so that materialized state is observable
 // without running the RabbitMQ worker, while the request path still goes through
 // the exact same "register pending row + request materialization" flow.
@@ -22,19 +21,9 @@ var (
 	inProcessMaterializer *materialize.BranchMaterializer
 )
 
-// SetInProcessMaterializer installs (or clears, with nil) the synchronous
-// in-process materializer. Test-only; never called from production code.
-func SetInProcessMaterializer(m *materialize.BranchMaterializer) {
-	inProcessMu.Lock()
-	defer inProcessMu.Unlock()
-	inProcessMaterializer = m
-}
-
-// RequestBranchMaterialization asks the materializer worker to project the tip of
-// branch into the database. Handlers call this after committing to git and
-// registering a pending workflow_versions row, so the expensive snapshot load and
-// node/webhook reconciliation happens in the worker instead of on the request
-// path. In tests an in-process materializer runs the same work synchronously.
+// RequestBranchMaterialization asks the materializer worker to project the tip
+// of branch into the database. Handlers call this after committing to git and
+// registering a pending workflow_versions row.
 func RequestBranchMaterialization(ctx context.Context, canvasID uuid.UUID, branch, headSHA string, pushedBy *uuid.UUID) error {
 	inProcessMu.RLock()
 	m := inProcessMaterializer
@@ -56,4 +45,10 @@ func RequestBranchMaterialization(ctx context.Context, canvasID uuid.UUID, branc
 		"",
 		pushedByID,
 	).PublishBranchUpdated()
+}
+
+func SetInProcessMaterializer(m *materialize.BranchMaterializer) {
+	inProcessMu.Lock()
+	defer inProcessMu.Unlock()
+	inProcessMaterializer = m
 }

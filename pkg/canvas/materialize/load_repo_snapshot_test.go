@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
 	"github.com/superplanehq/superplane/pkg/git/provider"
@@ -32,29 +31,24 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 	_, err = gitProvider.CreateRepository(ctx, repoID)
 	require.NoError(t, err)
 
-	canvasYAML, err := gitrepo.CanvasYAMLToBytes(&gitrepo.CanvasYAML{
-		APIVersion: "v1",
-		Kind:       "Canvas",
-		Metadata: gitrepo.CanvasYAMLMetadata{
-			Name:        "Health Monitor",
-			Description: "watches services",
-		},
-		Spec: gitrepo.CanvasYAMLSpec{
-			Nodes: []models.Node{
-				{
-					ID:   "node-1",
-					Name: "Check",
-					Type: models.NodeTypeComponent,
-					Ref: models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
+	canvasYAML := []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: Health Monitor
+  description: watches services
+spec:
+  nodes:
+    - id: node-1
+      name: Check
+      type: TYPE_ACTION
+      component: noop
+  edges: []
+`)
 
-	consoleYAML, err := gitrepo.EmptyConsoleYAMLToBytes(canvasID.String(), "Health Monitor")
+	consoleYAML, err := models.CanvasVersionToConsoleYML(&models.CanvasVersion{
+		WorkflowID: canvasID,
+		Name:       "Health Monitor",
+	})
 	require.NoError(t, err)
 
 	commitSHA, err := gitProvider.Commit(ctx, repoID, provider.CommitOptions{

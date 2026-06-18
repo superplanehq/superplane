@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,13 +25,34 @@ func newBranchMaterializer(r *support.ResourceRegistry) *materialize.BranchMater
 func seedMainBranch(t *testing.T, ctx context.Context, r *support.ResourceRegistry, repository *models.Repository, name string) string {
 	t.Helper()
 
-	sha, err := gitrepo.SeedMainRepository(ctx, r.GitProvider, repository, gitrepo.SeedRepositoryInput{
-		Canvas: &gitrepo.CanvasYAML{
-			APIVersion: "v1",
-			Kind:       "Canvas",
-			Metadata:   gitrepo.CanvasYAMLMetadata{Name: name},
+	canvasYAML := []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: ` + name + `
+spec:
+  nodes: []
+  edges: []
+`)
+
+	consoleYAML, err := models.CanvasVersionToConsoleYML(&models.CanvasVersion{
+		WorkflowID: repository.CanvasID,
+		Name:       name,
+	})
+	require.NoError(t, err)
+
+	_, err = r.GitProvider.CreateRepository(ctx, repository.RepoID)
+	if err != nil && err != git.ErrInvalidRepositoryID {
+		require.NoError(t, err)
+	}
+
+	sha, err := r.GitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
+		Branch:  models.CanvasGitBranchMain,
+		Message: "Initial canvas",
+		Author:  git.CommitAuthor{Name: "tester", Email: "tester@example.com"},
+		Operations: []git.FileOperation{
+			{Path: models.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))},
+			{Path: models.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))},
 		},
-		Author: git.CommitAuthor{Name: "tester", Email: "tester@example.com"},
 	})
 	require.NoError(t, err)
 	return sha
@@ -68,12 +88,15 @@ func TestBranchMaterializer_SkipsStaleLiveNotification(t *testing.T) {
 
 	staleSHA := seedMainBranch(t, ctx, r, repository, canvas.Name)
 
-	updated, err := gitrepo.CanvasYAMLToBytes(&gitrepo.CanvasYAML{
-		APIVersion: "v1",
-		Kind:       "Canvas",
-		Metadata:   gitrepo.CanvasYAMLMetadata{Name: canvas.Name, Description: "updated"},
-	})
-	require.NoError(t, err)
+	updated := []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: ` + canvas.Name + `
+  description: updated
+spec:
+  nodes: []
+  edges: []
+`)
 
 	newHead, err := r.GitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
 		Branch:          models.CanvasGitBranchMain,
