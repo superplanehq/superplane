@@ -41,6 +41,9 @@ const (
 	magicCodeMaxVerifyAttempts = 3
 	authSignupStatePrefix      = "signup:"
 	authSignupResultParam      = "auth_signup_result"
+	authErrorParam             = "auth_error"
+	authErrorSignupRequired    = "signup_required"
+	jsonContentType            = "application/json"
 )
 
 type Handler struct {
@@ -181,6 +184,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	account, wasCreated, err := a.findOrCreateAccountForProvider(mockUser, a.allowSignupFromRequest(r))
 
 	if err != nil {
+		if errors.Is(err, errSignupRequired) {
+			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+			return
+		}
+
 		if errorStatusForAccountError(err) == http.StatusForbidden {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
@@ -215,6 +223,11 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
+		if errors.Is(err, errSignupRequired) {
+			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+			return
+		}
+
 		if errorStatusForAccountError(err) == http.StatusForbidden {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
@@ -770,6 +783,20 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
+	writePostAuthRedirect(w, r, redirectURL)
+}
+
+func writePostAuthRedirect(w http.ResponseWriter, r *http.Request, redirectURL string) {
+	if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
+		w.Header().Set("Content-Type", jsonContentType)
+		if err := json.NewEncoder(w).Encode(map[string]string{"redirectUrl": redirectURL}); err != nil {
+			log.Errorf("Error encoding auth redirect response: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+
+		return
+	}
+
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
@@ -804,6 +831,18 @@ func addAuthSignupResult(redirectURL string, result string) string {
 	params.Set(authSignupResultParam, result)
 	parsedURL.RawQuery = params.Encode()
 	return parsedURL.String()
+}
+
+func getSignupRequiredRedirectURL(r *http.Request) string {
+	params := url.Values{}
+	params.Set(authErrorParam, authErrorSignupRequired)
+
+	redirectURL := getRedirectURL(r)
+	if redirectURL != "/" {
+		params.Set("redirect", redirectURL)
+	}
+
+	return fmt.Sprintf("/signup?%s", params.Encode())
 }
 
 func generateMagicCode() (string, error) {
