@@ -6,7 +6,7 @@ export interface OrganizationOption {
 export interface InstallParam {
   name: string;
   label: string;
-  type: string; // "string" or "integration-resource"
+  type: string; // "string", "integration-resource", or "secret_picker"
   placeholder?: string;
   description?: string;
   default?: string;
