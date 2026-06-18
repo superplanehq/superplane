@@ -118,7 +118,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       );
       return fromApiMessage(response.data?.message, chatId, organizationId);
     },
-    onMutate: ({ chatId, content, mode }) => {
+    onMutate: ({ chatId, content, mode, images }) => {
       const submittedAt = Date.now();
       const optimisticMessage: AgentMessage = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -127,6 +127,10 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         toolName: "",
         toolCallId: "",
         toolStatus: "",
+        // Preview attachments inline while the request is in flight. The base64
+        // payload is rendered as a data URL; the server response later replaces
+        // this with out-of-band image URLs.
+        images: images?.map(({ mediaType, data }) => ({ mediaType, url: `data:${mediaType};base64,${data}` })),
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
