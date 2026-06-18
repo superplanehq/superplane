@@ -13,7 +13,14 @@ import {
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
-import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/CanvasToolSidebar/types";
+import {
+  fromApiChat,
+  fromApiMessage,
+  apiImageMediaTypeToMime,
+  type AgentChat,
+  type AgentMessage,
+  type AgentOutgoingImage,
+} from "@/components/CanvasToolSidebar/types";
 import { analytics } from "@/lib/analytics";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
@@ -63,7 +70,9 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
           query: { beforeId: pageParam || undefined, limit: PAGE_SIZE },
         }),
       );
-      const messages = (response.data?.messages ?? []).map(fromApiMessage).filter((m): m is AgentMessage => m !== null);
+      const messages = (response.data?.messages ?? [])
+        .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
+        .filter((m): m is AgentMessage => m !== null);
       if (!pageParam && chatId) {
         return {
           messages: mergePendingOptimisticMessages(
@@ -86,17 +95,31 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
 export function useSendAgentChatMessage(organizationId: string | undefined, canvasId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ chatId, content, mode }: { chatId: string; content: string; mode?: AgentMode }) => {
+    mutationFn: async ({
+      chatId,
+      content,
+      mode,
+      images,
+    }: {
+      chatId: string;
+      content: string;
+      mode?: AgentMode;
+      images?: AgentOutgoingImage[];
+    }) => {
       const response = await agentsSendAgentChatMessage(
         withOrganizationHeader({
           organizationId,
           path: { chatId },
-          body: { content, mode: mode ? agentModeToApiMode[mode] : undefined },
+          body: {
+            content,
+            mode: mode ? agentModeToApiMode[mode] : undefined,
+            images: images && images.length > 0 ? images : undefined,
+          },
         }),
       );
-      return fromApiMessage(response.data?.message);
+      return fromApiMessage(response.data?.message, chatId, organizationId);
     },
-    onMutate: ({ chatId, content, mode }) => {
+    onMutate: ({ chatId, content, mode, images }) => {
       const submittedAt = Date.now();
       const optimisticMessage: AgentMessage = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -105,6 +128,10 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         toolName: "",
         toolCallId: "",
         toolStatus: "",
+        images: images?.map(({ mediaType, data }) => {
+          const mimeType = apiImageMediaTypeToMime(mediaType);
+          return { mediaType: mimeType, url: `data:${mimeType};base64,${data}` };
+        }),
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
@@ -147,34 +174,37 @@ function mergePendingOptimisticMessages(
   messages: AgentMessage[],
   currentData: InfiniteData<AgentMessagesPage> | undefined,
 ): AgentMessage[] {
-  const optimisticMessages = currentData?.pages.flatMap((page) => page.messages).filter(isOptimisticAgentMessage) ?? [];
+  const cachedMessages = currentData?.pages.flatMap((page) => page.messages) ?? [];
+  const optimisticMessages = cachedMessages.filter(isOptimisticAgentMessage);
   if (optimisticMessages.length === 0) {
     return messages;
   }
 
-  const messageIds = new Set(messages.map((message) => message.id));
-  const persistedUserMessageCounts = new Map<string, number>();
+  const knownMessageIds = new Set(cachedMessages.map((message) => message.id));
+  const serverMessageIds = new Set(messages.map((message) => message.id));
+
+  const newlyPersistedCounts = new Map<string, number>();
   for (const message of messages) {
-    if (isOptimisticAgentMessage(message) || message.role !== "user") {
+    if (message.role !== "user" || isOptimisticAgentMessage(message) || knownMessageIds.has(message.id)) {
       continue;
     }
 
     const key = optimisticMessageMatchKey(message);
-    persistedUserMessageCounts.set(key, (persistedUserMessageCounts.get(key) ?? 0) + 1);
+    newlyPersistedCounts.set(key, (newlyPersistedCounts.get(key) ?? 0) + 1);
   }
 
   const pendingMessages = optimisticMessages.filter((message) => {
-    if (messageIds.has(message.id)) {
+    if (serverMessageIds.has(message.id)) {
       return false;
     }
 
     const key = optimisticMessageMatchKey(message);
-    const persistedCount = persistedUserMessageCounts.get(key) ?? 0;
+    const persistedCount = newlyPersistedCounts.get(key) ?? 0;
     if (persistedCount === 0) {
       return true;
     }
 
-    persistedUserMessageCounts.set(key, persistedCount - 1);
+    newlyPersistedCounts.set(key, persistedCount - 1);
     return false;
   });
 
