@@ -20,11 +20,13 @@ import {
 } from "@/lib/signupAnalytics";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
+import { SignupWaitlist } from "./SignupWaitlist";
 
 type AuthConfig = {
   providers: string[];
   passwordLoginEnabled: boolean;
   signupEnabled: boolean;
+  signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
 };
 
@@ -76,13 +78,22 @@ const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode:
 
 type MagicCodeStep = "email" | "code";
 type AuthMode = "login" | "signup";
+type SignupUnavailableReason = "closed" | "waitlist" | null;
 
 interface LoginProps {
   mode?: AuthMode;
 }
 
-const getAuthErrorMessage = (authError: string | null) => {
+const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: SignupUnavailableReason) => {
   if (authError === "signup_required") {
+    if (signupUnavailableReason === "waitlist") {
+      return "No account exists for that provider yet. Join the waitlist to request access.";
+    }
+
+    if (signupUnavailableReason === "closed") {
+      return "No account exists for that provider yet. Signups are not available right now.";
+    }
+
     return "No account exists for that provider yet. Create an account to continue.";
   }
 
@@ -106,6 +117,13 @@ const ProductUpdatesOptIn: React.FC<{
     />
     <span>I want to receive product updates</span>
   </label>
+);
+
+const SignupClosedNotice: React.FC = () => (
+  <p className="text-left text-sm leading-6 text-gray-600">
+    This installation is not accepting new account signups right now. Contact your SuperPlane administrator if you need
+    access.
+  </p>
 );
 
 const saveSignupPreference = (enabled: boolean, productUpdatesOptIn: boolean, email?: string) => {
@@ -226,7 +244,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
-    signupEnabled: false,
+    signupEnabled: true,
+    signupsBlockedByEnvironment: false,
     magicCodeEnabled: false,
   });
   const [configLoading, setConfigLoading] = useState(true);
@@ -267,7 +286,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
   const magicLinkToken = searchParams.get("magic_link_token");
   const redirectTarget = safeRedirect || "";
-  const authErrorMessage = getAuthErrorMessage(searchParams.get("auth_error"));
+  const authError = searchParams.get("auth_error");
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response, authRedirectURL?: string) => {
@@ -382,6 +401,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             providers: data.providers || [],
             passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
             signupEnabled: Boolean(data.signupEnabled),
+            signupsBlockedByEnvironment: Boolean(data.signupsBlockedByEnvironment),
             magicCodeEnabled: Boolean(data.magicCodeEnabled),
           });
         }
@@ -419,6 +439,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
+  const showSignupUnavailable = !configLoading && isSignupMode && !canSignup;
+  const showSignupWaitlist = showSignupUnavailable && !authConfig.signupsBlockedByEnvironment;
+  const showSignupClosedNotice = showSignupUnavailable && authConfig.signupsBlockedByEnvironment;
+  const showSignupEntryPoint = canSignup || !authConfig.signupsBlockedByEnvironment;
+  const signupUnavailableReason = showSignupWaitlist ? "waitlist" : showSignupClosedNotice ? "closed" : null;
+  const showLastUsedMethodHints = !isSignupMode;
+  const authErrorMessage = getAuthErrorMessage(authError, signupUnavailableReason);
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
   const visibleFormError = formError ?? authErrorMessage;
@@ -626,11 +653,15 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
   const getHeading = () => {
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    if (showSignupClosedNotice) return "Signups are closed";
+    if (showSignupWaitlist) return "SuperPlane Cloud";
     if (isSignupMode) return "Create your account";
     return "Welcome to SuperPlane";
   };
 
   const getSubheading = () => {
+    if (showSignupClosedNotice) return "New accounts are not available.";
+    if (showSignupWaitlist) return "Join the waitlist for access.";
     if (isSignupMode) return "Set up your account.";
     if (useMagicCodePrimary && magicCodeStep === "code") return `We sent a code to ${magicCodeEmail}`;
     return "Log in to continue";
@@ -654,9 +685,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && !canSignup && (
-            <p className="text-sm text-gray-500">Signups are currently disabled.</p>
-          )}
+          {!configLoading && showSignupWaitlist && <SignupWaitlist />}
+          {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
 
           {!configLoading && !isSignupMode && !hasAnyFormMethod && (
             <p className="text-sm text-gray-500">No login methods are configured.</p>
@@ -762,7 +792,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 <LoadingButton type="submit" loading={submitLoading} loadingText="Logging in..." className="w-full">
                   Login
                 </LoadingButton>
-                {lastUsedMethod === "password" && <LastUsedHint label="email" />}
+                {showLastUsedMethodHints && lastUsedMethod === "password" && <LastUsedHint label="email" />}
               </div>
             </form>
           )}
@@ -946,13 +976,15 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                       <span>Continue with {getProviderLabel(provider)}</span>
                     </a>
                   </Button>
-                  {lastUsedMethod === provider && <LastUsedHint label={getProviderLabel(provider)} />}
+                  {showLastUsedMethodHints && lastUsedMethod === provider && (
+                    <LastUsedHint label={getProviderLabel(provider)} />
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
+          {!configLoading && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
               <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
@@ -970,14 +1002,18 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && !isSignupMode && canSignup && (
-            <div className="mt-6 text-center text-sm text-gray-500">
-              {"Don't have an account? "}
-              <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
-                Sign up
-              </Link>
-            </div>
-          )}
+          {!configLoading &&
+            useMagicCodePrimary &&
+            magicCodeStep === "email" &&
+            !isSignupMode &&
+            showSignupEntryPoint && (
+              <div className="mt-6 text-center text-sm text-gray-500">
+                {"Don't have an account? "}
+                <Link to={`/signup${redirectQuery}`} className="font-medium text-gray-900 underline underline-offset-2">
+                  Sign up
+                </Link>
+              </div>
+            )}
         </div>
       </div>
     </div>
