@@ -4,7 +4,9 @@ import { getRepositoryMapper } from "./get_repository";
 import { getPackageMapper } from "./get_package";
 import { onSecurityScanCompletedTriggerRenderer } from "./on_security_scan_completed";
 import { onPackageCreatedTriggerRenderer } from "./on_package_created";
-import { deletePackageMapper, resyncPackageMapper, tagPackageMapper } from "./package_operations";
+import { resyncPackageMapper } from "./resync_package";
+import { tagPackageMapper } from "./tag_package";
+import { deletePackageMapper } from "./delete_package";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getRepository: getRepositoryMapper,
