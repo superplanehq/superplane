@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -227,8 +228,8 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payloads := buildPayloads(spec, matches, values)
-	if len(payloads) > core.MaxEmitCount {
-		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), core.MaxEmitCount)
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), config.MaxEmitCount())
 	}
 
 	return ctx.ExecutionState.Emit(
