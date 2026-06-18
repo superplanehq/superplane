@@ -1,4 +1,7 @@
-package materialize
+// Package gitrepo builds and seeds the git representation of a canvas: the
+// canonical YAML encoders for canvas.yaml / console.yaml, the initial repository
+// seeding, and the backfill that migrates pre-git-first canvases into git.
+package gitrepo
 
 import (
 	"bytes"
@@ -63,7 +66,8 @@ func CanvasYAMLFromVersion(version *models.CanvasVersion) *CanvasYAML {
 	}
 }
 
-func BuildCanvasYAMLFromCanvas(canvas *CanvasYAML) ([]byte, error) {
+// CanvasYAMLToBytes encodes a canvas spec into canvas.yaml bytes.
+func CanvasYAMLToBytes(canvas *CanvasYAML) ([]byte, error) {
 	if canvas == nil {
 		return nil, fmt.Errorf("canvas yaml is required")
 	}
@@ -111,9 +115,10 @@ func BuildCanvasYAMLFromCanvas(canvas *CanvasYAML) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func BuildConsoleYAMLFromDashboard(console *models.ConsoleYAML) ([]byte, error) {
+// ConsoleYAMLToBytes encodes a console dashboard into console.yaml bytes.
+func ConsoleYAMLToBytes(console *models.ConsoleYAML) ([]byte, error) {
 	if console == nil {
-		return BuildEmptyConsoleYAML("", "")
+		return EmptyConsoleYAMLToBytes("", "")
 	}
 
 	jsonBytes, err := json.Marshal(console)
@@ -139,7 +144,8 @@ func BuildConsoleYAMLFromDashboard(console *models.ConsoleYAML) ([]byte, error) 
 	return buf.Bytes(), nil
 }
 
-func BuildEmptyConsoleYAML(canvasID, canvasName string) ([]byte, error) {
+// EmptyConsoleYAMLToBytes encodes a default console.yaml for a canvas.
+func EmptyConsoleYAMLToBytes(canvasID, canvasName string) ([]byte, error) {
 	if strings.TrimSpace(canvasID) == "" {
 		return models.CanvasVersionToConsoleYML(&models.CanvasVersion{Name: canvasName})
 	}
@@ -155,9 +161,10 @@ func BuildEmptyConsoleYAML(canvasID, canvasName string) ([]byte, error) {
 	})
 }
 
-func BuildConsoleYAMLFromVersion(version *models.CanvasVersion) ([]byte, error) {
+// ConsoleYAMLFromVersionToBytes encodes a console.yaml derived from a version row.
+func ConsoleYAMLFromVersionToBytes(version *models.CanvasVersion) ([]byte, error) {
 	if version == nil {
-		return BuildEmptyConsoleYAML("", "")
+		return EmptyConsoleYAMLToBytes("", "")
 	}
 
 	return models.CanvasVersionToConsoleYML(version)

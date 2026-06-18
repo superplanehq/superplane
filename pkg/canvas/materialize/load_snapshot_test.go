@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/canvas/gitref"
+	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
@@ -33,14 +34,14 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 	_, err = gitProvider.CreateRepository(ctx, repoID)
 	require.NoError(t, err)
 
-	canvasYAML, err := materialize.BuildCanvasYAMLFromCanvas(&materialize.CanvasYAML{
+	canvasYAML, err := gitrepo.CanvasYAMLToBytes(&gitrepo.CanvasYAML{
 		APIVersion: "v1",
 		Kind:       "Canvas",
-		Metadata: materialize.CanvasYAMLMetadata{
+		Metadata: gitrepo.CanvasYAMLMetadata{
 			Name:        "Health Monitor",
 			Description: "watches services",
 		},
-		Spec: materialize.CanvasYAMLSpec{
+		Spec: gitrepo.CanvasYAMLSpec{
 			Nodes: []models.Node{
 				{
 					ID:   "node-1",
@@ -55,7 +56,7 @@ func TestLoadRepoSnapshotFromGitCommit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	consoleYAML, err := materialize.BuildEmptyConsoleYAML(canvasID.String(), "Health Monitor")
+	consoleYAML, err := gitrepo.EmptyConsoleYAMLToBytes(canvasID.String(), "Health Monitor")
 	require.NoError(t, err)
 
 	commitSHA, err := gitProvider.Commit(ctx, repoID, provider.CommitOptions{

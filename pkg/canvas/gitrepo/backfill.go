@@ -1,4 +1,4 @@
-package materialize
+package gitrepo
 
 import (
 	"bytes"
@@ -156,14 +156,14 @@ func seedMissingSpecFiles(
 
 	ops := make([]git.FileOperation, 0, 2)
 	if !hasCanvas {
-		canvasYAML, buildErr := BuildCanvasYAMLFromCanvas(CanvasYAMLFromVersion(version))
+		canvasYAML, buildErr := CanvasYAMLToBytes(CanvasYAMLFromVersion(version))
 		if buildErr != nil {
 			return buildErr
 		}
 		ops = append(ops, git.FileOperation{Path: gitref.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))})
 	}
 	if !hasConsole {
-		consoleYAML, buildErr := BuildConsoleYAMLFromVersion(version)
+		consoleYAML, buildErr := ConsoleYAMLFromVersionToBytes(version)
 		if buildErr != nil {
 			return buildErr
 		}

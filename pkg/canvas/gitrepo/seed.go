@@ -1,4 +1,4 @@
-package materialize
+package gitrepo
 
 import (
 	"bytes"
@@ -41,19 +41,19 @@ func SeedMainRepository(
 		return "", fmt.Errorf("canvas yaml is required")
 	}
 
-	canvasYAML, err := BuildCanvasYAMLFromCanvas(input.Canvas)
+	canvasYAML, err := CanvasYAMLToBytes(input.Canvas)
 	if err != nil {
 		return "", err
 	}
 
 	var consoleYAML []byte
 	if input.Console != nil {
-		consoleYAML, err = BuildConsoleYAMLFromDashboard(input.Console)
+		consoleYAML, err = ConsoleYAMLToBytes(input.Console)
 		if err != nil {
 			return "", err
 		}
 	} else {
-		consoleYAML, err = BuildEmptyConsoleYAML(repository.CanvasID.String(), input.Canvas.Metadata.Name)
+		consoleYAML, err = EmptyConsoleYAMLToBytes(repository.CanvasID.String(), input.Canvas.Metadata.Name)
 		if err != nil {
 			return "", err
 		}
