@@ -46,7 +46,6 @@ type CanvasVersion struct {
 	Edges                 datatypes.JSONSlice[Edge]
 	ConsolePanels         datatypes.JSONType[[]ConsolePanel]
 	ConsoleLayout         datatypes.JSONType[[]ConsoleLayoutItem]
-	BranchName            *string
 	DisplayName           string
 	CommitSHA             string
 	GitBranch             string
@@ -76,8 +75,8 @@ func IsUserOwnedDraftVersion(version *CanvasVersion, userID uuid.UUID) bool {
 func IsRegisteredDraftVersion(version *CanvasVersion) bool {
 	return version != nil &&
 		version.State == CanvasVersionStateDraft &&
-		version.BranchName != nil &&
-		*version.BranchName != ""
+		version.GitBranch != "" &&
+		version.GitBranch != CanvasGitBranchMain
 }
 
 func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
@@ -211,7 +210,7 @@ func FindDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, bran
 	err := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Where("branch_name = ?", branchName).
+		Where("git_branch = ?", branchName).
 		First(&version).
 		Error
 	if err != nil {
@@ -226,7 +225,7 @@ func ListAllDraftBranchVersionsForCanvasInTransaction(tx *gorm.DB, canvasID uuid
 	err := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Where("branch_name IS NOT NULL").
+		Where("git_branch <> ?", "").
 		Order("updated_at DESC, created_at DESC").
 		Find(&versions).
 		Error
@@ -241,7 +240,7 @@ func DeleteDraftVersionByBranchInTransaction(tx *gorm.DB, canvasID uuid.UUID, br
 	return tx.
 		Where("workflow_id = ?", canvasID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Where("branch_name = ?", branchName).
+		Where("git_branch = ?", branchName).
 		Delete(&CanvasVersion{}).
 		Error
 }
@@ -260,8 +259,8 @@ func UpsertMaterializedVersionInTransaction(tx *gorm.DB, version *CanvasVersion)
 	var existing *CanvasVersion
 	var err error
 
-	if version.BranchName != nil && *version.BranchName != "" && version.State == CanvasVersionStateDraft {
-		existing, err = FindDraftVersionByBranchInTransaction(tx, version.WorkflowID, *version.BranchName)
+	if version.State == CanvasVersionStateDraft && IsRegisteredDraftVersion(version) {
+		existing, err = FindDraftVersionByBranchInTransaction(tx, version.WorkflowID, version.GitBranch)
 	} else if strings.TrimSpace(version.CommitSHA) != "" {
 		existing, err = FindVersionByCommitSHAInTransaction(tx, version.WorkflowID, version.CommitSHA)
 	}
@@ -272,8 +271,8 @@ func UpsertMaterializedVersionInTransaction(tx *gorm.DB, version *CanvasVersion)
 
 	if existing != nil {
 		version.ID = existing.ID
-		if version.BranchName == nil {
-			version.BranchName = existing.BranchName
+		if version.GitBranch == "" {
+			version.GitBranch = existing.GitBranch
 		}
 		if version.DisplayName == "" {
 			version.DisplayName = existing.DisplayName
@@ -420,7 +419,7 @@ func ListDraftBranchesForCanvasInTransaction(
 		Where("workflow_id = ?", canvasID).
 		Where("owner_id = ?", ownerID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Where("branch_name IS NOT NULL").
+		Where("git_branch <> ?", "").
 		Order("updated_at DESC, created_at DESC, id DESC")
 
 	if before != nil {
@@ -447,7 +446,7 @@ func CountDraftBranchesForCanvasInTransaction(tx *gorm.DB, canvasID uuid.UUID, o
 		Where("workflow_id = ?", canvasID).
 		Where("owner_id = ?", ownerID).
 		Where("state = ?", CanvasVersionStateDraft).
-		Where("branch_name IS NOT NULL").
+		Where("git_branch <> ?", "").
 		Count(&count).
 		Error
 	if err != nil {
@@ -484,7 +483,7 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	version.State = CanvasVersionStatePublished
 	version.PublishedAt = &now
 	version.UpdatedAt = &now
-	version.BranchName = nil
+	version.GitBranch = CanvasGitBranchMain
 	version.DisplayName = ""
 	version.Nodes = datatypes.NewJSONSlice(nodes)
 	version.Edges = datatypes.NewJSONSlice(edges)
@@ -572,7 +571,7 @@ func CreateDraftBranchFromLiveInTransaction(
 		Description: liveVersion.Description,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
-		BranchName:  &branchName,
+		GitBranch:   branchName,
 		DisplayName: displayName,
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
@@ -642,7 +641,7 @@ func PublishCanvasDraftInTransaction(
 	version.State = CanvasVersionStatePublished
 	version.PublishedAt = &now
 	version.UpdatedAt = &now
-	version.BranchName = nil
+	version.GitBranch = CanvasGitBranchMain
 	version.DisplayName = ""
 
 	if err := tx.Save(version).Error; err != nil {

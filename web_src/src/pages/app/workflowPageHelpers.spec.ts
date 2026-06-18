@@ -1,44 +1,59 @@
 import { describe, expect, it } from "vitest";
 import {
   clearRunDetailNodeSearchParams,
-  hasLoadedAllRuns,
+  isValidRunId,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
-} from "./runInspectionSync";
+} from "./workflowPageHelpers";
 
-describe("runInspectionSync", () => {
-  it("detects when all runs are loaded", () => {
-    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 1 }], false)).toBe(true);
-    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 2 }], true)).toBe(false);
-    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }], totalCount: 2 }], false)).toBe(true);
-    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }] }], true)).toBe(false);
-    expect(hasLoadedAllRuns([{ runs: [{ id: "run-1" }] }], false)).toBe(true);
-  });
+const validRunId = "550e8400-e29b-41d4-a716-446655440000";
 
-  it("clears stale run URLs only after the run list finishes loading", () => {
+describe("workflowPageHelpers run inspection", () => {
+  it("clears stale run URLs after describe settles without a run", () => {
     expect(
       shouldClearStaleRunUrl({
-        selectedRunId: "missing-run",
+        selectedRunId: validRunId,
         isRunInspectionMode: true,
         selectedRun: null,
-        isRunsQueryLoading: true,
-        isFetchingNextPage: false,
-        pages: [],
-        hasNextPage: true,
+        isRunResolveLoading: true,
+        describeRunSettled: false,
       }),
     ).toBe(false);
 
     expect(
       shouldClearStaleRunUrl({
-        selectedRunId: "missing-run",
+        selectedRunId: validRunId,
         isRunInspectionMode: true,
         selectedRun: null,
-        isRunsQueryLoading: false,
-        isFetchingNextPage: false,
-        pages: [{ runs: [], totalCount: 0 }],
-        hasNextPage: false,
+        isRunResolveLoading: false,
+        describeRunSettled: true,
       }),
     ).toBe(true);
+  });
+
+  it("clears malformed run ids immediately", () => {
+    expect(isValidRunId("not-a-uuid")).toBe(false);
+    expect(
+      shouldClearStaleRunUrl({
+        selectedRunId: "not-a-uuid",
+        isRunInspectionMode: true,
+        selectedRun: null,
+        isRunResolveLoading: false,
+        describeRunSettled: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not clear when the run resolved", () => {
+    expect(
+      shouldClearStaleRunUrl({
+        selectedRunId: validRunId,
+        isRunInspectionMode: true,
+        selectedRun: { id: validRunId },
+        isRunResolveLoading: false,
+        describeRunSettled: true,
+      }),
+    ).toBe(false);
   });
 
   it("clears run detail nodes that are not part of the selected run", () => {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -18,6 +19,7 @@ import {
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListRuns,
+  canvasesDescribeRun,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesCreateCanvasMemoryNamespace,
@@ -40,6 +42,7 @@ import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
   CanvasesCanvasSummary,
+  CanvasesCanvasRun,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -210,6 +213,7 @@ export const canvasKeys = {
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
     ] as const,
+  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -1125,6 +1129,33 @@ export const useDeleteCanvas = (organizationId: string) => {
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+};
+
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, runId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId: runId!,
+          },
+        }),
+      );
+      const described = response.data;
+      if (!described?.run) {
+        return described;
+      }
+
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      return upsertRunIntoDescribeRunData(current, described.run);
+    },
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && !!runId && enabled,
+  });
 };
 
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {

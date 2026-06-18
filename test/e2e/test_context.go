@@ -66,7 +66,6 @@ func (s *TestContext) Start() {
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
-	os.Setenv("AGENT_ENABLED", "yes")
 
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()

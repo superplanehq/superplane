@@ -34,7 +34,14 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions)
+	db := database.DB(ctx)
+
+	resources, err := LoadNodeExecutionResources(db, executions)
+	if err != nil {
+		return nil, err
+	}
+
+	serialized, err := SerializeNodeExecutions(executions, resources)
 	if err != nil {
 		return nil, err
 	}
