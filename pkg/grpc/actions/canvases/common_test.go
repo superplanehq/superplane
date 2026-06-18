@@ -106,7 +106,7 @@ func findRegisteredDraftBranch(t *testing.T, canvasID uuid.UUID, branchName stri
 	var version models.CanvasVersion
 	err := database.Conn().
 		Where("workflow_id = ?", canvasID).
-		Where("branch_name = ?", branchName).
+		Where("git_branch = ?", branchName).
 		Where("state = ?", models.CanvasVersionStateDraft).
 		First(&version).
 		Error
@@ -119,7 +119,7 @@ func findRegisteredDraftBranchErr(canvasID uuid.UUID, branchName string) error {
 	var version models.CanvasVersion
 	return database.Conn().
 		Where("workflow_id = ?", canvasID).
-		Where("branch_name = ?", branchName).
+		Where("git_branch = ?", branchName).
 		Where("state = ?", models.CanvasVersionStateDraft).
 		First(&version).
 		Error
