@@ -144,6 +144,14 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		return nil
 	}
 
+	// Materialization requests must name the commit to project. A message
+	// without a head SHA is malformed and can never succeed, so drop it rather
+	// than retry it forever.
+	if strings.TrimSpace(message.GetHeadSha()) == "" {
+		w.log("Dropping materialization for canvas %s branch %s: missing head sha", canvasID, message.GetBranch())
+		return nil
+	}
+
 	if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 		return err
 	}

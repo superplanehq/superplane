@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,22 +29,24 @@ func TestBackfillCanvasRepository(t *testing.T) {
 		Model(&models.CanvasVersion{}).
 		Where("id = ?", draft.ID).
 		Update("git_branch", draft.GitBranch).Error)
-	require.True(t, gitref.IsDraftBranch(draft.GitBranch))
+	require.True(t, models.IsDraftBranch(draft.GitBranch))
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		return gitrepo.BackfillCanvasRepository(ctx, tx, r.GitProvider, r.Organization.ID, canvas.ID)
 	}))
 
-	require.True(t, gitref.GitBranchExists(ctx, r.GitProvider, repository.RepoID, models.CanvasGitBranchMain))
-	require.True(t, gitref.GitBranchExists(ctx, r.GitProvider, repository.RepoID, draft.GitBranch))
+	_, err = r.GitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
+	require.NoError(t, err)
+	_, err = r.GitProvider.Head(ctx, repository.RepoID, draft.GitBranch)
+	require.NoError(t, err)
 
 	mainFiles, err := r.GitProvider.ListFiles(ctx, repository.RepoID, models.CanvasGitBranchMain)
 	require.NoError(t, err)
-	require.Contains(t, mainFiles, gitref.CanvasFileName)
-	require.Contains(t, mainFiles, gitref.ConsoleFileName)
+	require.Contains(t, mainFiles, models.CanvasFileName)
+	require.Contains(t, mainFiles, models.ConsoleFileName)
 
 	draftFiles, err := r.GitProvider.ListFiles(ctx, repository.RepoID, draft.GitBranch)
 	require.NoError(t, err)
-	require.Contains(t, draftFiles, gitref.CanvasFileName)
-	require.Contains(t, draftFiles, gitref.ConsoleFileName)
+	require.Contains(t, draftFiles, models.CanvasFileName)
+	require.Contains(t, draftFiles, models.ConsoleFileName)
 }

@@ -2,16 +2,16 @@ package materialize
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
@@ -26,12 +26,83 @@ type liveMaterializer struct {
 	WebhookBaseURL string
 }
 
-// materializeLive writes the live projection from a snapshot that the caller has
-// already loaded from git outside of any transaction, so no git RPC is held
-// across the DB connection. The publisher it invokes still runs inside the
-// transaction because node Setup() (webhooks, secrets) must commit atomically
-// with the node rows.
-func (m *liveMaterializer) materializeLive(
+// persist runs the live materialization inside a single transaction: it holds the
+// branch lock, runs the authoritative idempotency check, ensures the canvas name
+// is available, creates a new CanvasVersion instance, upserts the workflow_versions row,
+// and publishes the canvas.
+//
+// if the live version already matched headSHA it returns the existing version
+// without doing any work.
+func (m *liveMaterializer) persist(
+	ctx context.Context,
+	orgID uuid.UUID,
+	canvasID uuid.UUID,
+	headSHA string,
+	snapshot *repoSnapshot,
+) (*models.CanvasVersion, error) {
+	var version *models.CanvasVersion
+	txErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := lockBranchMaterialization(tx, canvasID, models.CanvasGitBranchMain); err != nil {
+			return err
+		}
+
+		canvas, err := models.FindCanvasInTransaction(tx, orgID, canvasID)
+		if err != nil {
+			return err
+		}
+
+		if existing, done, idempotentErr := liveAlreadyMaterializedInTransaction(tx, canvasID, canvas, headSHA); idempotentErr != nil {
+			return idempotentErr
+		} else if done {
+			version = existing
+			return nil
+		}
+
+		if nameErr := ensureCanvasNameAvailableInTransaction(tx, orgID, canvasID, snapshot.Name); nameErr != nil {
+			return nameErr
+		}
+
+		v, matErr := m.materializeLiveInTransaction(ctx, tx, orgID, canvasID, snapshot, headSHA)
+		if matErr != nil {
+			return matErr
+		}
+		version = v
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	return version, nil
+}
+
+// liveAlreadyMaterializedInTransaction is the authoritative, lock-protected
+// idempotency check for the live (main) branch.
+//
+// It returns the existing live version (nil when none exists) and a
+// boolean flag that is true when that version is already materialized at headSHA.
+func liveAlreadyMaterializedInTransaction(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	canvas *models.Canvas,
+	headSHA string,
+) (*models.CanvasVersion, bool, error) {
+	if canvas == nil || canvas.LiveVersionID == nil {
+		return nil, false, nil
+	}
+
+	version, err := models.FindCanvasVersionInTransaction(tx, canvasID, *canvas.LiveVersionID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	return version, materializedAt(version, headSHA), nil
+}
+
+func (m *liveMaterializer) materializeLiveInTransaction(
 	ctx context.Context,
 	tx *gorm.DB,
 	orgID uuid.UUID,
@@ -111,12 +182,8 @@ func (m *liveMaterializer) materializeLive(
 		return nil, err
 	}
 
-	if publishErr := messages.NewCanvasUpdatedMessage(canvasID.String(), orgID.String()).PublishUpdated(); publishErr != nil {
-		log.Errorf("failed to publish canvas updated message: %v", publishErr)
-	}
-	if publishErr := messages.NewCanvasVersionUpdatedMessage(canvasID.String(), nextVersion.ID.String()).PublishVersionUpdated(); publishErr != nil {
-		log.Errorf("failed to publish canvas version updated message: %v", publishErr)
-	}
+	publishCanvasUpdated(canvasID.String(), orgID.String())
+	publishCanvasVersionUpdated(canvasID.String(), nextVersion.ID.String())
 
 	return nextVersion, nil
 }
@@ -148,4 +215,21 @@ func publishLiveVersion(
 	}
 
 	return publisher.Publish(ctx)
+}
+
+func ensureCanvasNameAvailableInTransaction(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	canvasID uuid.UUID,
+	name string,
+) error {
+	existingCanvas, err := models.FindCanvasByNameInTransaction(tx, name, organizationID)
+	if err == nil && existingCanvas.ID != canvasID {
+		return models.ErrCanvasNameAlreadyExists
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	return nil
 }

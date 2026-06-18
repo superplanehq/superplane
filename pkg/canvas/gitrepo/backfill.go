@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -79,7 +78,7 @@ func backfillMainBranch(
 	repository *models.Repository,
 	liveVersion *models.CanvasVersion,
 ) error {
-	if !gitref.GitBranchExists(ctx, gitProvider, repository.RepoID, models.CanvasGitBranchMain) {
+	if !gitBranchExists(ctx, gitProvider, repository.RepoID, models.CanvasGitBranchMain) {
 		_, err := SeedMainRepository(ctx, gitProvider, repository, SeedRepositoryInput{
 			Canvas: CanvasYAMLFromVersion(liveVersion),
 			Author: backfillCommitAuthor,
@@ -100,7 +99,7 @@ func BackfillDraftBranch(
 	canvasID uuid.UUID,
 	version *models.CanvasVersion,
 ) error {
-	if gitProvider == nil || version == nil || !gitref.IsDraftBranch(version.GitBranch) {
+	if gitProvider == nil || version == nil || !models.IsDraftBranch(version.GitBranch) {
 		return nil
 	}
 
@@ -110,7 +109,7 @@ func BackfillDraftBranch(
 	}
 
 	branchName := version.GitBranch
-	if !gitref.GitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
+	if !gitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
 		if err := gitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain); err != nil {
 			return fmt.Errorf("create draft branch %q: %w", branchName, err)
 		}
@@ -143,9 +142,9 @@ func seedMissingSpecFiles(
 	hasConsole := false
 	for _, path := range files {
 		switch path {
-		case gitref.CanvasFileName:
+		case models.CanvasFileName:
 			hasCanvas = true
-		case gitref.ConsoleFileName:
+		case models.ConsoleFileName:
 			hasConsole = true
 		}
 	}
@@ -160,14 +159,14 @@ func seedMissingSpecFiles(
 		if buildErr != nil {
 			return buildErr
 		}
-		ops = append(ops, git.FileOperation{Path: gitref.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))})
+		ops = append(ops, git.FileOperation{Path: models.CanvasFileName, Content: bytes.NewReader(canvasYAML), SizeBytes: int64(len(canvasYAML))})
 	}
 	if !hasConsole {
 		consoleYAML, buildErr := ConsoleYAMLFromVersionToBytes(version)
 		if buildErr != nil {
 			return buildErr
 		}
-		ops = append(ops, git.FileOperation{Path: gitref.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))})
+		ops = append(ops, git.FileOperation{Path: models.ConsoleFileName, Content: bytes.NewReader(consoleYAML), SizeBytes: int64(len(consoleYAML))})
 	}
 
 	if len(ops) == 0 {
@@ -183,4 +182,10 @@ func seedMissingSpecFiles(
 		Operations:      ops,
 	})
 	return err
+}
+
+// gitBranchExists reports whether a branch ref exists in the git repository.
+func gitBranchExists(ctx context.Context, gitProvider git.Provider, repoID, branch string) bool {
+	_, err := gitProvider.Head(ctx, repoID, branch)
+	return err == nil
 }

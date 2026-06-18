@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/canvas/gitref"
 	"github.com/superplanehq/superplane/pkg/canvas/gitrepo"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -83,7 +82,7 @@ func TestBranchMaterializer_SkipsStaleLiveNotification(t *testing.T) {
 		Message:         "update canvas",
 		Author:          git.CommitAuthor{Name: "tester", Email: "tester@example.com"},
 		Operations: []git.FileOperation{
-			{Path: gitref.CanvasFileName, Content: bytes.NewReader(updated), SizeBytes: int64(len(updated))},
+			{Path: models.CanvasFileName, Content: bytes.NewReader(updated), SizeBytes: int64(len(updated))},
 		},
 	})
 	require.NoError(t, err)
@@ -103,7 +102,7 @@ func TestBranchMaterializer_MaterializeDraft(t *testing.T) {
 
 	mainSHA := seedMainBranch(t, ctx, r, repository, canvas.Name)
 
-	draftBranch := gitref.NewDraftBranchName()
+	draftBranch := models.NewDraftBranchName()
 	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, draftBranch, models.CanvasGitBranchMain))
 	draftHead, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
 	require.NoError(t, err)
@@ -121,14 +120,14 @@ func TestBranchMaterializer_MaterializeDraft(t *testing.T) {
 	require.Equal(t, r.User, *draft.OwnerID)
 }
 
-func TestBranchMaterializer_ReconcileBranchDeletion(t *testing.T) {
+func TestBranchMaterializer_SweepsDeletedDraftBranch(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
 
-	seedMainBranch(t, ctx, r, repository, canvas.Name)
+	mainSHA := seedMainBranch(t, ctx, r, repository, canvas.Name)
 
-	draftBranch := gitref.NewDraftBranchName()
+	draftBranch := models.NewDraftBranchName()
 	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, draftBranch, models.CanvasGitBranchMain))
 	draftHead, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
 	require.NoError(t, err)
@@ -138,6 +137,34 @@ func TestBranchMaterializer_ReconcileBranchDeletion(t *testing.T) {
 	_, err = models.FindDraftVersionByBranch(canvas.ID, draftBranch)
 	require.NoError(t, err)
 
+	// Deleting the branch from git leaves an orphaned projection. It is cleaned
+	// up opportunistically by the deletion sweep that runs at the start of the
+	// next materialization of any branch.
+	require.NoError(t, r.GitProvider.DeleteBranch(ctx, repository.RepoID, draftBranch))
+	require.NoError(t, m.MaterializeBranch(ctx, canvas.ID, models.CanvasGitBranchMain, mainSHA, nil))
+
+	_, err = models.FindDraftVersionByBranch(canvas.ID, draftBranch)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestBranchMaterializer_ReconcileBranchDeletion(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
+
+	seedMainBranch(t, ctx, r, repository, canvas.Name)
+
+	draftBranch := models.NewDraftBranchName()
+	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, draftBranch, models.CanvasGitBranchMain))
+	draftHead, err := r.GitProvider.Head(ctx, repository.RepoID, draftBranch)
+	require.NoError(t, err)
+
+	m := newBranchMaterializer(r)
+	require.NoError(t, m.MaterializeBranch(ctx, canvas.ID, draftBranch, draftHead, &r.User))
+	_, err = models.FindDraftVersionByBranch(canvas.ID, draftBranch)
+	require.NoError(t, err)
+
+	// The targeted entry point drops the projection of one deleted branch.
 	require.NoError(t, r.GitProvider.DeleteBranch(ctx, repository.RepoID, draftBranch))
 	require.NoError(t, m.ReconcileBranchDeletion(ctx, canvas.ID, draftBranch))
 
