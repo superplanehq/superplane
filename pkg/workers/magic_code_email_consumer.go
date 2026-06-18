@@ -89,6 +89,9 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 		if data.RedirectURL != "" {
 			magicLink += "&redirect=" + url.QueryEscape(data.RedirectURL)
 		}
+		if data.SignupIntent {
+			magicLink += "&signup=true"
+		}
 	}
 
 	readableCode := formatReadableCode(data.Code)
