@@ -44,7 +44,7 @@ func ListCanvasVersionsPaginated(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
 	}
 
-	if err := checkCanvasExistence(ctx, orgUUID, canvasUUID); err != nil {
+	if err := checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID); err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
