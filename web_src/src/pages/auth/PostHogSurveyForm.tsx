@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { analytics } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,9 +22,10 @@ export interface PostHogSurvey {
   questions: SurveyQuestion[];
 }
 
-interface OwnerSetupSurveyProps {
+interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
-  organizationId: string;
+  redirectTo: string;
+  onComplete?: () => void;
 }
 
 type SurveyAnswer = string | string[];
@@ -36,6 +37,7 @@ const parseChoiceLabel = (choice: string): { title: string; subtitle: string | n
   if (!match) {
     return { title: choice, subtitle: null };
   }
+
   return { title: match[1].trim(), subtitle: match[2].trim() };
 };
 
@@ -64,12 +66,13 @@ const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSe
   <div className="space-y-2">
     {choices.map((choice) => {
       const { title, subtitle } = parseChoiceLabel(choice);
+
       return (
         <Button
           key={choice}
           type="button"
           variant="outline"
-          className="w-full justify-start whitespace-normal h-auto py-3 text-left"
+          className="h-auto w-full justify-start whitespace-normal py-3 text-left"
           onClick={() => onSelect(choice)}
         >
           <span className="flex flex-col items-start">
@@ -95,10 +98,11 @@ const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selected
       {choices.map((choice) => {
         const isChecked = selectedChoices.includes(choice);
         const { title, subtitle } = parseChoiceLabel(choice);
+
         return (
           <label
             key={choice}
-            className="flex items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left cursor-pointer"
+            className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left"
           >
             <Checkbox
               checked={isChecked}
@@ -159,7 +163,7 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
     </div>
     <button
       type="button"
-      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+      className="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
       onClick={onSkip}
     >
       Skip this question
@@ -167,7 +171,28 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
   </div>
 );
 
-const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
+const buildSurveyResponseProps = (survey: PostHogSurvey, responses: SurveyResponses) => {
+  const responseProps: Record<string, string | string[]> = {};
+
+  survey.questions.forEach((question, index) => {
+    const answer = responses[index];
+    if (answer === undefined) {
+      return;
+    }
+
+    const key = question.id
+      ? `$survey_response_${question.id}`
+      : index === 0
+        ? "$survey_response"
+        : `$survey_response_${index}`;
+
+    responseProps[key] = answer;
+  });
+
+  return responseProps;
+};
+
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
@@ -180,25 +205,23 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
   const currentType = currentQuestion ? getQuestionType(currentQuestion, currentChoices.length > 0) : "text";
 
+  const handleComplete = useCallback(() => {
+    if (onComplete) {
+      onComplete();
+      return;
+    }
+
+    window.location.href = redirectTo;
+  }, [onComplete, redirectTo]);
+
   const finishSurvey = (responses: SurveyResponses) => {
     if (Object.keys(responses).length === 0) {
       analytics.surveyDismissed(survey.id);
     } else {
-      const responseProps: Record<string, string | string[]> = {};
-      survey.questions.forEach((question, index) => {
-        const answer = responses[index];
-        if (answer === undefined) return;
-        if (question.id) {
-          responseProps[`$survey_response_${question.id}`] = answer;
-        } else if (index === 0) {
-          responseProps["$survey_response"] = answer;
-        } else {
-          responseProps[`$survey_response_${index}`] = answer;
-        }
-      });
-      analytics.surveySent(survey.id, survey.name, responseProps);
+      analytics.surveySent(survey.id, survey.name, buildSurveyResponseProps(survey, responses));
     }
-    window.location.href = `/${organizationId}`;
+
+    handleComplete();
   };
 
   const advanceOrFinish = (responses: SurveyResponses) => {
@@ -209,6 +232,7 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setMultiAnswer([]);
       return;
     }
+
     finishSurvey(responses);
   };
 
@@ -219,7 +243,10 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
 
   const handleSubmitTextAnswer = () => {
     const answer = textAnswer.trim();
-    if (!answer) return;
+    if (!answer) {
+      return;
+    }
+
     const newResponses = { ...surveyResponses, [currentQuestionIndex]: answer };
     advanceOrFinish(newResponses);
   };
@@ -229,11 +256,15 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setMultiAnswer((previous) => [...previous, choice]);
       return;
     }
+
     setMultiAnswer((previous) => previous.filter((item) => item !== choice));
   };
 
   const handleSubmitMultiChoice = () => {
-    if (multiAnswer.length === 0) return;
+    if (multiAnswer.length === 0) {
+      return;
+    }
+
     const newResponses = { ...surveyResponses, [currentQuestionIndex]: multiAnswer };
     advanceOrFinish(newResponses);
   };
@@ -243,20 +274,24 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setTextAnswer("");
       setMultiAnswer([]);
-    } else {
-      finishSurvey(surveyResponses);
+      return;
     }
+
+    finishSurvey(surveyResponses);
   };
 
   useEffect(() => {
     if (currentQuestion) {
       return;
     }
-    analytics.surveyDismissed(survey.id);
-    window.location.href = `/${organizationId}`;
-  }, [currentQuestion, organizationId, survey.id]);
 
-  if (!currentQuestion) return null;
+    analytics.surveyDismissed(survey.id);
+    handleComplete();
+  }, [currentQuestion, handleComplete, survey.id]);
+
+  if (!currentQuestion) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
@@ -298,4 +333,4 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
 };
 
-export default OwnerSetupSurvey;
+export default PostHogSurveyForm;
