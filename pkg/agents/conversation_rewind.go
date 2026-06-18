@@ -71,7 +71,7 @@ func formatRewindEntry(message models.AgentSessionMessage) string {
 	content := strings.TrimSpace(message.Content)
 	switch message.Role {
 	case models.AgentMessageRoleUser:
-		return "User: " + truncateText(content, rewindEntryMaxChars)
+		return "User: " + userRewindText(content, len(message.Images))
 	case models.AgentMessageRoleAssistant:
 		return "Assistant: " + truncateText(content, rewindEntryMaxChars)
 	case models.AgentMessageRoleSystem:
@@ -80,6 +80,34 @@ func formatRewindEntry(message models.AgentSessionMessage) string {
 		return formatToolRewindEntry(message, content)
 	default:
 		return ""
+	}
+}
+
+// userRewindText renders a prior user turn for the text-only rewind. Image
+// attachments are not re-sent to the recreated provider session, so we note that
+// they were shared; otherwise an image-only turn would collapse to an empty
+// "User:" line and the model would lose that screenshots were part of the thread.
+func userRewindText(content string, imageCount int) string {
+	text := truncateText(content, rewindEntryMaxChars)
+	note := imageAttachmentNote(imageCount)
+	switch {
+	case note == "":
+		return text
+	case text == "":
+		return note
+	default:
+		return text + " " + note
+	}
+}
+
+func imageAttachmentNote(count int) string {
+	switch {
+	case count <= 0:
+		return ""
+	case count == 1:
+		return "[1 image attachment shared earlier]"
+	default:
+		return fmt.Sprintf("[%d image attachments shared earlier]", count)
 	}
 }
 

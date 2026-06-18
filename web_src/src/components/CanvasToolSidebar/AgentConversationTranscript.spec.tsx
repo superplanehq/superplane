@@ -73,10 +73,55 @@ describe("ConversationTranscript command groups", () => {
 });
 
 describe("ConversationTranscript user messages", () => {
+  it("renders attached images as linked thumbnails", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "fix this",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", url: "/api/v1/agents/chats/c-1/messages/user-with-image/images/0" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    const image = screen.getByRole("img", { name: "attachment" });
+    expect(image).toHaveAttribute("src", "/api/v1/agents/chats/c-1/messages/user-with-image/images/0");
+  });
+
   it("keeps compact user messages sticky", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Build a release workflow")} />);
 
     expect(screen.getByTestId("agent-user-message").parentElement).toHaveClass("sticky");
+  });
+
+  it("does not keep user messages with image attachments sticky", () => {
+    const groups: MessageGroup[] = [
+      {
+        type: "message",
+        message: {
+          id: "user-with-image",
+          role: "user",
+          content: "",
+          toolName: "",
+          toolCallId: "",
+          toolStatus: "",
+          images: [{ mediaType: "image/png", url: "/img/0" }],
+          createdAt: null,
+        },
+      },
+    ];
+
+    render(<ConversationTranscript {...baseProps} messageGroups={groups} />);
+
+    expect(screen.getByTestId("agent-user-message").parentElement).not.toHaveClass("sticky");
   });
 
   it("does not keep long user messages sticky", () => {
