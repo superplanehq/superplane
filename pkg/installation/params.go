@@ -126,11 +126,20 @@ func ResolveInstallParams(schema []InstallParam, values map[string]string) map[s
 
 // DefaultParamValues builds a fallback map from the schema using
 // default → placeholder → param name, in that priority order.
+//
+// secret_picker params are special: they must resolve to a real organization
+// secret name, so they only fall back to an explicit default. The placeholder
+// and param-name fallbacks are not valid secret names, and substituting them
+// into canvas.yaml would silently inject a bogus credential reference that
+// passes install validation but fails later at node-execution time. An empty
+// optional picker therefore resolves to an empty string (no substitution).
 func DefaultParamValues(schema []InstallParam) map[string]string {
 	defaults := make(map[string]string, len(schema))
 	for _, p := range schema {
 		if p.Default != "" {
 			defaults[p.Name] = p.Default
+		} else if p.Type == ParamTypeSecretPicker {
+			defaults[p.Name] = ""
 		} else if p.Placeholder != "" {
 			defaults[p.Name] = p.Placeholder
 		} else {
