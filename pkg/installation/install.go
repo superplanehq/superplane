@@ -77,7 +77,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, err
 	}
 
-	canvas, err := s.prepareCanvasForInstall(repo, name, req.InstallParams, req.Integrations)
+	canvas, err := s.prepareCanvasForInstall(repo, name, req.InstallParams, req.Integrations, req.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +87,15 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
-	canvasID, err := s.createCanvas(ctx, req.OrganizationID, canvas)
+	seedFiles, err := fetchSeedFiles(repo)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
+	canvasID, err := s.createCanvas(ctx, req.OrganizationID, canvas, seedFiles)
+	if err != nil {
+		return nil, translateInstallError(err)
 	}
 
 	if err := persistInstalledConsole(canvasID, console); err != nil {
@@ -137,8 +142,9 @@ func (s *Service) prepareCanvasForInstall(
 	name string,
 	userParams map[string]string,
 	integrations map[string]IntegrationMapping,
+	organizationID uuid.UUID,
 ) (*pb.Canvas, error) {
-	canvasBody, err := fetchAndSubstituteParams(repo, userParams)
+	canvasBody, err := fetchAndSubstituteParams(repo, userParams, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +160,7 @@ func (s *Service) prepareCanvasForInstall(
 	return canvas, nil
 }
 
-func fetchAndSubstituteParams(repo *Repository, userParams map[string]string) ([]byte, error) {
+func fetchAndSubstituteParams(repo *Repository, userParams map[string]string, organizationID uuid.UUID) ([]byte, error) {
 	canvasBody, _, err := fetchRawCanvasFile(repo)
 	if err != nil {
 		return nil, err
@@ -169,23 +175,36 @@ func fetchAndSubstituteParams(repo *Repository, userParams map[string]string) ([
 		return canvasBody, nil
 	}
 
+	// A nil userParams map means the install bypassed the params wizard
+	// ("just take me there"), which falls back to schema defaults. Only
+	// enforce required-param validation when the user actually submitted
+	// values; otherwise required params without defaults would always fail.
 	if userParams != nil {
 		if err := ValidateInstallParams(params.InstallParams, userParams); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 		}
-		resolved := ResolveInstallParams(params.InstallParams, userParams)
-		return SubstituteInstallParams(canvasBody, resolved), nil
 	}
 
-	return SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams)), nil
+	// Validate secret_picker params against the user-supplied values (and
+	// explicit defaults), not the resolved map: ResolveInstallParams fills
+	// unset params with placeholder/param-name fallbacks that are not real
+	// secret names, so validating those would reject optional pickers left
+	// empty.
+	if err := ValidateSecretPickerParams(params.InstallParams, userParams, organizationID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	resolved := ResolveInstallParams(params.InstallParams, userParams)
+	return SubstituteInstallParams(canvasBody, resolved), nil
 }
 
 func (s *Service) createCanvas(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	canvas *pb.Canvas,
+	seedFiles []models.RepositorySeedFile,
 ) (string, error) {
-	response, err := canvases.CreateCanvas(
+	response, err := canvases.CreateCanvasWithSeedFiles(
 		ctx,
 		s.Registry,
 		s.Encryptor,
@@ -196,6 +215,7 @@ func (s *Service) createCanvas(
 		canvas,
 		nil,
 		s.UsageService,
+		seedFiles,
 	)
 	if err != nil {
 		return "", err
@@ -207,6 +227,49 @@ func (s *Service) createCanvas(
 	}
 
 	return canvasID, nil
+}
+
+// translateInstallError rewrites canvas-creation status errors into messages
+// that match the install wizard's vocabulary. Callers see "App" rather than
+// "Canvas" because the install flow is a user-facing app installation, even
+// though the underlying resource is a canvas.
+func translateInstallError(err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return err
+	}
+
+	if st.Code() == codes.AlreadyExists {
+		return status.Error(codes.AlreadyExists, "An App with the same name already exists")
+	}
+
+	return err
+}
+
+// fetchSeedFiles downloads every file in the app repository except the spec
+// files (canvas.yaml/console.yaml) and params.json, converting them into
+// model rows ready to be persisted alongside the pending canvas repository.
+// Failures are surfaced as InvalidArgument so the install request returns a
+// useful 400 instead of leaving a half-installed canvas behind.
+func fetchSeedFiles(repo *Repository) ([]models.RepositorySeedFile, error) {
+	files, err := FetchRepositoryFiles(repo, repo.Ref)
+	if err != nil {
+		return nil, fmt.Errorf("fetch repository files: %w", err)
+	}
+
+	if len(files) == 0 {
+		return nil, nil
+	}
+
+	seedFiles := make([]models.RepositorySeedFile, 0, len(files))
+	for _, file := range files {
+		seedFiles = append(seedFiles, models.RepositorySeedFile{
+			Path:    file.Path,
+			Content: file.Content,
+		})
+	}
+
+	return seedFiles, nil
 }
 
 // ─── Console persistence ─────────────────────────────────────────────────────
