@@ -38,7 +38,17 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		}
 	}
 
-	proto, err := serializeCanvas(ctx, canvas, true, user)
+	liveVersion, err := loadLiveCanvasVersion(ctx, canvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	canvasStatus, err := loadCanvasStatus(ctx, canvas.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas status: %v", err)
+	}
+
+	proto, err := serializeCanvas(ctx, canvas, liveVersion, user, canvasStatus)
 	if err != nil {
 		log.Errorf("failed to serialize canvas %s: %v", canvas.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to serialize workflow")

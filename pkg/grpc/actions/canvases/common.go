@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,6 +43,56 @@ func loadCanvas(ctx context.Context, orgID, canvasID uuid.UUID) (*models.Canvas,
 	}
 
 	return canvas, nil
+}
+
+func loadLiveCanvasVersion(ctx context.Context, canvas *models.Canvas) (*models.CanvasVersion, error) {
+	var liveVersion *models.CanvasVersion
+	err := telemetry.RunSpan(ctx, "canvases.load_live_version", func(ctx context.Context) error {
+		var loadErr error
+		liveVersion, loadErr = models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), canvas)
+		return loadErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return liveVersion, nil
+}
+
+func loadCanvasStatus(ctx context.Context, canvasID uuid.UUID) (*pb.Canvas_Status, error) {
+	var canvasStatus *pb.Canvas_Status
+	err := telemetry.RunSpan(ctx, "canvases.load_status", func(ctx context.Context) error {
+		lastExecutions, loadErr := models.FindLastExecutionPerNode(canvasID)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		serializedExecutions, loadErr := SerializeNodeExecutions(lastExecutions)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		lastEvents, loadErr := models.FindLastEventPerNode(canvasID)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		serializedEvents, loadErr := SerializeCanvasEvents(lastEvents)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		canvasStatus = &pb.Canvas_Status{
+			LastExecutions: serializedExecutions,
+			LastEvents:     serializedEvents,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasStatus, nil
 }
 
 func ensureCanvasNameAvailableInTransaction(
