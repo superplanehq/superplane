@@ -328,15 +328,17 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(providerNames)
 
 	response := struct {
-		Providers            []string `json:"providers"`
-		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
-		SignupEnabled        bool     `json:"signupEnabled"`
-		MagicCodeEnabled     bool     `json:"magicCodeEnabled"`
+		Providers                   []string `json:"providers"`
+		PasswordLoginEnabled        bool     `json:"passwordLoginEnabled"`
+		SignupEnabled               bool     `json:"signupEnabled"`
+		SignupsBlockedByEnvironment bool     `json:"signupsBlockedByEnvironment"`
+		MagicCodeEnabled            bool     `json:"magicCodeEnabled"`
 	}{
-		Providers:            providerNames,
-		PasswordLoginEnabled: a.passwordLoginEnabled,
-		SignupEnabled:        !a.blockSignup,
-		MagicCodeEnabled:     a.magicCodeEnabled,
+		Providers:                   providerNames,
+		PasswordLoginEnabled:        a.passwordLoginEnabled,
+		SignupEnabled:               a.SignupsEnabled(),
+		SignupsBlockedByEnvironment: a.SignupsBlockedByEnvironment(),
+		MagicCodeEnabled:            a.magicCodeEnabled,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -430,7 +432,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.blockSignup && inviteToken == "" {
+	if !a.SignupsEnabled() && inviteToken == "" {
 		http.Error(w, SignupDisabledError, http.StatusForbidden)
 		return
 	}
@@ -723,7 +725,7 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 		return errSignupRequired
 	}
 
-	if a.blockSignup {
+	if !a.SignupsEnabled() {
 		return errSignupDisabled
 	}
 
@@ -925,7 +927,7 @@ func (a *Handler) parseMagicLinkToken(tokenString string) (email string, code st
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
-	account, _, err := a.findOrCreateAccountForProvider(gothUser, !a.blockSignup)
+	account, _, err := a.findOrCreateAccountForProvider(gothUser, a.SignupsEnabled())
 	return account, err
 }
 
@@ -972,7 +974,29 @@ func (a *Handler) allowSignupFromRequest(r *http.Request) bool {
 		return true
 	}
 
-	return !a.blockSignup && isSignupIntentFromRequest(r)
+	return a.SignupsEnabled() && isSignupIntentFromRequest(r)
+}
+
+func (a *Handler) SignupsEnabled() bool {
+	if a.blockSignup {
+		return false
+	}
+
+	metadata, err := models.GetInstallationMetadata(database.Conn())
+	return signupsEnabledFromMetadata(metadata, err)
+}
+
+func signupsEnabledFromMetadata(metadata *models.InstallationMetadata, err error) bool {
+	if err != nil {
+		log.Errorf("Error loading installation metadata for signup policy: %v", err)
+		return true
+	}
+
+	return metadata.SignupsEnabled
+}
+
+func (a *Handler) SignupsBlockedByEnvironment() bool {
+	return a.blockSignup
 }
 
 func allowSignupFromInvite(r *http.Request) bool {
