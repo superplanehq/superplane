@@ -264,11 +264,17 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	grpcGatewayMux := runtime.NewServeMux(
+	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+
+	var grpcGatewayMux *runtime.ServeMux
+	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
-		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
+		runtime.WithMiddlewares(
+			grpc.GatewayRecoveryMiddleware(),
+			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+		),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
