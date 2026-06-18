@@ -1,14 +1,23 @@
 {
-  "event": "package.synced",
-  "namespace": "weskk",
-  "repository": "superplane-compliance",
-  "name": "sp-compliance-gpl",
-  "version": "1.0.0",
-  "slug_perm": "f3XvJCI9ufJa",
-  "license": "GPL-3.0-only",
-  "spdx_license": "GPL-3.0-only",
-  "osi_approved": true,
-  "policy_violated": false,
-  "is_quarantined": true,
-  "status": "Quarantined"
+  "timestamp": "2026-06-17T20:27:43Z",
+  "type": "cloudsmith.package.complianceChecked",
+  "data": {
+    "event": "package.synced",
+    "namespace": "weskk",
+    "repository": "superplane-compliance",
+    "name": "sp-compliance-gpl",
+    "version": "1.0.0",
+    "slug_perm": "f3XvJCI9ufJa",
+    "license": "GPL-3.0-only",
+    "spdx_license": "GPL-3.0-only",
+    "osi_approved": true,
+    "policy_violated": false,
+    "is_quarantined": true,
+    "status": "Quarantined",
+    "security_scan_status": "Scan Detected No Vulnerabilities",
+    "vulnerability_scan_results_url": "https://api.cloudsmith.io/v1/vulnerabilities/weskk/superplane-compliance/f3XvJCI9ufJa/",
+    "has_vulnerabilities": false,
+    "max_severity": "Unknown",
+    "num_vulnerabilities": 0
+  }
 }

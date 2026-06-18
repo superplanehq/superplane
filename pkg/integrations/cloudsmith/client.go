@@ -182,6 +182,8 @@ type Package struct {
 	Namespace       string              `json:"namespace"`
 	Repository      string              `json:"repository"`
 	Format          string              `json:"format"`
+	Uploader        string              `json:"uploader"`
+	UploadedAt      string              `json:"uploaded_at"`
 	License         string              `json:"license"`
 	RawLicense      string              `json:"raw_license"`
 	SPDXLicense     string              `json:"spdx_license"`
@@ -195,54 +197,39 @@ type Package struct {
 	Tags            map[string][]string `json:"tags"`
 	SelfHTMLURL     string              `json:"self_html_url"`
 	SelfWebappURL   string              `json:"self_webapp_url"`
+
+	// Security-scan summary carried on the package object.
+	SecurityScanStatus          string `json:"security_scan_status"`
+	SecurityScanCompletedAt     string `json:"security_scan_completed_at"`
+	VulnerabilityScanResultsURL string `json:"vulnerability_scan_results_url"`
 }
 
-// GetPackage fetches a single package identified by its permanent slug within a
-// repository (owner/repository).
-func (c *Client) GetPackage(owner, repository, slugPerm string) (*Package, error) {
-	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/",
-		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+// VulnerabilityScan is one security-scan result for a package, returned by the
+// vulnerabilities API.
+type VulnerabilityScan struct {
+	Identifier         string `json:"identifier"`
+	CreatedAt          string `json:"created_at"`
+	HasVulnerabilities bool   `json:"has_vulnerabilities"`
+	MaxSeverity        string `json:"max_severity"`
+	NumVulnerabilities int    `json:"num_vulnerabilities"`
+}
+
+// GetPackageVulnerabilities returns the security-scan results for a package
+// (owner/repository, by permanent slug), newest first.
+func (c *Client) GetPackageVulnerabilities(owner, repository, identifier string) ([]VulnerabilityScan, error) {
+	requestURL := fmt.Sprintf("%s/vulnerabilities/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(identifier))
 	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var pkg Package
-	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+	var scans []VulnerabilityScan
+	if err := json.Unmarshal(responseBody, &scans); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &pkg, nil
-}
-
-const packagePageSize = 100
-
-// ListPackages returns every package in a repository (owner/repository),
-// following all pages until the API returns a page smaller than packagePageSize.
-func (c *Client) ListPackages(owner, repository string) ([]Package, error) {
-	var all []Package
-
-	for page := 1; ; page++ {
-		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d",
-			c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), page, packagePageSize)
-		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		var packages []Package
-		if err := json.Unmarshal(responseBody, &packages); err != nil {
-			return nil, fmt.Errorf("error parsing response: %v", err)
-		}
-
-		all = append(all, packages...)
-
-		if len(packages) < packagePageSize {
-			break
-		}
-	}
-
-	return all, nil
+	return scans, nil
 }
 
 // Webhook is the subset of a Cloudsmith webhook this integration manages.

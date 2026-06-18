@@ -67,7 +67,7 @@ func Test__OnComplianceCheckCompleted__Setup(t *testing.T) {
 	t.Run("healthy existing webhook is a no-op", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnComplianceCheckCompletedMetadata{
-				Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
+				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
 				WebhookURL: "https://superplane.example/hook",
 				WebhookID:  "wh-existing",
 			},
@@ -93,7 +93,7 @@ func Test__OnComplianceCheckCompleted__Setup(t *testing.T) {
 	t.Run("re-provisions when the remote webhook is gone", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnComplianceCheckCompletedMetadata{
-				Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
+				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
 				WebhookURL: "https://superplane.example/hook",
 				WebhookID:  "wh-deleted",
 			},
@@ -124,7 +124,7 @@ func Test__OnComplianceCheckCompleted__HandleWebhook(t *testing.T) {
 	metadata := func() *contexts.MetadataContext {
 		return &contexts.MetadataContext{
 			Metadata: OnComplianceCheckCompletedMetadata{
-				Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
+				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
 			},
 		}
 	}
@@ -232,6 +232,34 @@ func Test__OnComplianceCheckCompleted__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "Apache-2.0", event.License)
 	})
 
+	t.Run("enriches with vulnerability details from the API", func(t *testing.T) {
+		body := []byte(`{"data":{"name":"sp-compliance-gpl","slug_perm":"abc","namespace":"weskk","repository":"superplane-compliance","license":"GPL-3.0-only","security_scan_status":"3 Vulnerabilities Detected"}}`)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"identifier":"s1","has_vulnerabilities":true,"max_severity":"High","num_vulnerabilities":3}]`))},
+			},
+		}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Events:      events,
+			Metadata:    metadata(),
+			Webhook:     &contexts.NodeWebhookContext{}, // empty secret -> verification skipped
+			Headers:     http.Header{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			HTTP:        httpCtx,
+			Logger:      log.NewEntry(log.New()),
+		})
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		event := events.Payloads[0].Data.(ComplianceCheckEvent)
+		assert.Equal(t, "3 Vulnerabilities Detected", event.SecurityScanStatus)
+		assert.True(t, event.HasVulnerabilities)
+		assert.Equal(t, "High", event.MaxSeverity)
+		assert.Equal(t, 3, event.NumVulnerabilities)
+	})
+
 	t.Run("ignores events from a different repository", func(t *testing.T) {
 		body := []byte(`{"event":"package.synced","data":{"name":"other","slug_perm":"x","namespace":"weskk","repository":"some-other-repo"}}`)
 		events := &contexts.EventContext{}
@@ -262,7 +290,7 @@ func Test__OnComplianceCheckCompleted__Cleanup(t *testing.T) {
 			Logger:      log.NewEntry(log.New()),
 			Metadata: &contexts.MetadataContext{
 				Metadata: OnComplianceCheckCompletedMetadata{
-					Repository: &ComplianceRepositoryMetadata{Namespace: "weskk", Slug: "superplane-compliance"},
+					Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
 					WebhookID:  "wh-abc123",
 				},
 			},

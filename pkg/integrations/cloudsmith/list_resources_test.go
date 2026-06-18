@@ -134,40 +134,4 @@ func Test__Cloudsmith__ListResources(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error listing repositories")
 	})
-
-	t.Run("package lists packages in the repository parameter", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				okResponse(`[
-					{"name": "sp-compliance-mit", "version": "1.0.0", "slug_perm": "wxu9RDqPfCj0", "license": "MIT"},
-					{"name": "sp-compliance-gpl", "version": "1.0.0", "slug_perm": "f3XvJCI9ufJa", "license": "GPL-3.0-only"}
-				]`),
-			},
-		}
-
-		resources, err := integration.ListResources("package", core.ListResourcesContext{
-			HTTP:        httpContext,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
-			Parameters:  map[string]string{"repository": "weskk/superplane-compliance"},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, resources, 2)
-		assert.Equal(t, "package", resources[0].Type)
-		assert.Equal(t, "sp-compliance-mit 1.0.0 (MIT)", resources[0].Name)
-		assert.Equal(t, "wxu9RDqPfCj0", resources[0].ID)
-		assert.Equal(t, "f3XvJCI9ufJa", resources[1].ID)
-	})
-
-	t.Run("package returns empty when repository parameter is unset or an expression", func(t *testing.T) {
-		for _, repo := range []string{"", "{{ $.trigger.data.repository }}"} {
-			resources, err := integration.ListResources("package", core.ListResourcesContext{
-				HTTP:        &contexts.HTTPContext{},
-				Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
-				Parameters:  map[string]string{"repository": repo},
-			})
-			require.NoError(t, err)
-			assert.Empty(t, resources)
-		}
-	})
 }

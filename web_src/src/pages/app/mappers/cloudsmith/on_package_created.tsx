@@ -9,73 +9,60 @@ import { stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { WebhookTriggerNodeMetadata } from "./types";
 
-interface ComplianceCheckEvent {
+interface PackageCreatedEvent {
   event?: string;
   namespace?: string;
   repository?: string;
   name?: string;
   version?: string;
   slug_perm?: string;
+  format?: string;
   license?: string;
-  spdx_license?: string;
-  osi_approved?: boolean;
-  policy_violated?: boolean;
-  is_quarantined?: boolean;
+  uploader?: string;
+  uploaded_at?: string;
   status?: string;
-  security_scan_status?: string;
-  vulnerability_scan_results_url?: string;
-  has_vulnerabilities?: boolean;
-  max_severity?: string;
-  num_vulnerabilities?: number;
 }
 
-interface OnComplianceCheckCompletedConfiguration {
+interface OnPackageCreatedConfiguration {
   repository?: string;
 }
 
-const yesNo = (value: boolean | undefined): string => (value ? "Yes" : "No");
-
 /**
- * Renderer for the "cloudsmith.onComplianceCheckCompleted" trigger.
+ * Renderer for the "cloudsmith.onPackageCreated" trigger.
  */
-export const onComplianceCheckCompletedTriggerRenderer: TriggerRenderer = {
+export const onPackageCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as ComplianceCheckEvent | undefined;
-    const name = eventData?.name;
-    const version = eventData?.version;
+    const data = context.event?.data as PackageCreatedEvent | undefined;
+    const name = data?.name;
+    const version = data?.version;
 
-    const title = name ? `${name}${version ? ` ${version}` : ""}` : "Compliance check";
+    const title = name ? `${name}${version ? ` ${version}` : ""}` : "Package created";
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const data = (context.event?.data ?? {}) as ComplianceCheckEvent;
+    const data = (context.event?.data ?? {}) as PackageCreatedEvent;
     const repository = data.namespace && data.repository ? `${data.namespace}/${data.repository}` : data.repository;
     const receivedAt = context.event?.createdAt ? formatTimestampInUserTimezone(context.event.createdAt) : "-";
-    const vulnerabilities = typeof data.num_vulnerabilities === "number" ? String(data.num_vulnerabilities) : "-";
 
     return {
       "Received At": receivedAt,
       Package: stringOrDash(data.name),
       Version: stringOrDash(data.version),
       Repository: stringOrDash(repository),
+      Format: stringOrDash(data.format),
       License: stringOrDash(data.license),
-      "OSI Approved": yesNo(data.osi_approved),
-      Quarantined: yesNo(data.is_quarantined),
-      "Policy Violated": yesNo(data.policy_violated),
+      Uploader: stringOrDash(data.uploader),
       Status: stringOrDash(data.status),
-      "Security Scan": stringOrDash(data.security_scan_status),
-      Vulnerabilities: vulnerabilities,
-      "Max Severity": stringOrDash(data.max_severity),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as WebhookTriggerNodeMetadata | undefined;
-    const configuration = node.configuration as OnComplianceCheckCompletedConfiguration | undefined;
+    const configuration = node.configuration as OnPackageCreatedConfiguration | undefined;
     const metadataItems: MetadataItem[] = [];
 
     const repositoryLabel = metadata?.repository
@@ -93,7 +80,7 @@ export const onComplianceCheckCompletedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onComplianceCheckCompletedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const { title, subtitle } = onPackageCreatedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,

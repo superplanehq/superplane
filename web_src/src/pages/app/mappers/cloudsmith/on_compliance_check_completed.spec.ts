@@ -15,6 +15,10 @@ const event = {
     policy_violated: false,
     is_quarantined: true,
     status: "Quarantined",
+    security_scan_status: "Scan Detected No Vulnerabilities",
+    has_vulnerabilities: false,
+    max_severity: "Unknown",
+    num_vulnerabilities: 0,
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
@@ -44,5 +48,8 @@ describe("onComplianceCheckCompletedTriggerRenderer", () => {
     expect(values["Quarantined"]).toBe("Yes");
     expect(values["Policy Violated"]).toBe("No");
     expect(values["Status"]).toBe("Quarantined");
+    expect(values["Security Scan"]).toBe("Scan Detected No Vulnerabilities");
+    expect(values["Vulnerabilities"]).toBe("0");
+    expect(values["Max Severity"]).toBe("Unknown");
   });
 });

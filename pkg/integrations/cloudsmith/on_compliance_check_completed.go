@@ -29,15 +29,15 @@ type OnComplianceCheckCompletedConfiguration struct {
 	Repository string `json:"repository" mapstructure:"repository"`
 }
 
-type ComplianceRepositoryMetadata struct {
+type RepositoryRef struct {
 	Namespace string `json:"namespace" mapstructure:"namespace"`
 	Slug      string `json:"slug" mapstructure:"slug"`
 }
 
 type OnComplianceCheckCompletedMetadata struct {
-	Repository *ComplianceRepositoryMetadata `json:"repository" mapstructure:"repository"`
-	WebhookURL string                        `json:"webhookUrl" mapstructure:"webhookUrl"`
-	WebhookID  string                        `json:"webhookId" mapstructure:"webhookId"`
+	Repository *RepositoryRef `json:"repository" mapstructure:"repository"`
+	WebhookURL string         `json:"webhookUrl" mapstructure:"webhookUrl"`
+	WebhookID  string         `json:"webhookId" mapstructure:"webhookId"`
 }
 
 // ComplianceCheckEvent is the payload emitted to downstream nodes for each
@@ -55,6 +55,14 @@ type ComplianceCheckEvent struct {
 	PolicyViolated bool   `json:"policy_violated"`
 	IsQuarantined  bool   `json:"is_quarantined"`
 	Status         string `json:"status"`
+
+	// Security-scan summary from the payload, plus structured vulnerability
+	// details fetched (best-effort) from the vulnerabilities API.
+	SecurityScanStatus          string `json:"security_scan_status"`
+	VulnerabilityScanResultsURL string `json:"vulnerability_scan_results_url"`
+	HasVulnerabilities          bool   `json:"has_vulnerabilities"`
+	MaxSeverity                 string `json:"max_severity"`
+	NumVulnerabilities          int    `json:"num_vulnerabilities"`
 }
 
 func (t *OnComplianceCheckCompleted) Name() string {
@@ -70,9 +78,7 @@ func (t *OnComplianceCheckCompleted) Description() string {
 }
 
 func (t *OnComplianceCheckCompleted) Documentation() string {
-	return `The On Compliance Check Completed trigger starts a workflow whenever a package in the selected repository finishes processing — the point at which Cloudsmith has evaluated its license, policy, and governance compliance.
-
-> Vulnerability and security-scan events are handled by a separate component.
+	return `The On Compliance Check Completed trigger starts a workflow whenever a package in the selected repository finishes processing — the point at which Cloudsmith has evaluated its license, policy, and governance compliance. It also includes the package's security-scan summary and (best-effort) vulnerability details.
 
 ## Use Cases
 
@@ -90,7 +96,11 @@ This trigger provisions a Cloudsmith webhook automatically: on setup it register
 
 ## Output
 
-Emits the processed package's compliance fields: **namespace**, **repository**, **name**, **version**, **slug_perm**, **license**, **spdx_license**, **osi_approved**, **policy_violated**, **is_quarantined**, and **status**. Use these to filter downstream (for example, only act when ` + "`is_quarantined`" + ` is true).`
+Emits the processed package's compliance and security posture:
+- **Compliance**: **namespace**, **repository**, **name**, **version**, **slug_perm**, **license**, **spdx_license**, **osi_approved**, **policy_violated**, **is_quarantined**, **status**
+- **Security scan**: **security_scan_status** and **vulnerability_scan_results_url** (from the payload), plus **has_vulnerabilities**, **max_severity**, and **num_vulnerabilities** (fetched best-effort from the vulnerabilities API)
+
+Use these to filter downstream — for example, only act when ` + "`is_quarantined`" + ` is true or ` + "`max_severity`" + ` is High/Critical.`
 }
 
 func (t *OnComplianceCheckCompleted) Icon() string {
@@ -194,7 +204,7 @@ func (t *OnComplianceCheckCompleted) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Metadata.Set(OnComplianceCheckCompletedMetadata{
-		Repository: &ComplianceRepositoryMetadata{Namespace: owner, Slug: slug},
+		Repository: &RepositoryRef{Namespace: owner, Slug: slug},
 		WebhookURL: webhookURL,
 		WebhookID:  webhook.SlugPerm,
 	})
@@ -228,7 +238,7 @@ func (t *OnComplianceCheckCompleted) HandleWebhook(ctx core.WebhookRequestContex
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	pkg, err := parseCompliancePackage(ctx.Body)
+	pkg, err := parsePackageFromWebhook(ctx.Body)
 	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing webhook body: %w", err)
 	}
@@ -241,18 +251,36 @@ func (t *OnComplianceCheckCompleted) HandleWebhook(ctx core.WebhookRequestContex
 	}
 
 	event := ComplianceCheckEvent{
-		Event:          complianceWebhookEvent,
-		Namespace:      pkg.Namespace,
-		Repository:     pkg.Repository,
-		Name:           pkg.Name,
-		Version:        pkg.Version,
-		SlugPerm:       pkg.SlugPerm,
-		License:        pkg.License,
-		SPDXLicense:    pkg.SPDXLicense,
-		OSIApproved:    pkg.OSIApproved,
-		PolicyViolated: pkg.PolicyViolated,
-		IsQuarantined:  pkg.IsQuarantined,
-		Status:         pkg.Status,
+		Event:                       complianceWebhookEvent,
+		Namespace:                   pkg.Namespace,
+		Repository:                  pkg.Repository,
+		Name:                        pkg.Name,
+		Version:                     pkg.Version,
+		SlugPerm:                    pkg.SlugPerm,
+		License:                     pkg.License,
+		SPDXLicense:                 pkg.SPDXLicense,
+		OSIApproved:                 pkg.OSIApproved,
+		PolicyViolated:              pkg.PolicyViolated,
+		IsQuarantined:               pkg.IsQuarantined,
+		Status:                      pkg.Status,
+		SecurityScanStatus:          pkg.SecurityScanStatus,
+		VulnerabilityScanResultsURL: pkg.VulnerabilityScanResultsURL,
+	}
+
+	// Enrich with structured vulnerability details, which the package.synced
+	// payload does not carry. Best-effort: on any failure we still emit the
+	// compliance + scan-status fields rather than dropping the event.
+	if ctx.Integration != nil && pkg.SlugPerm != "" {
+		if client, clientErr := NewClient(ctx.HTTP, ctx.Integration); clientErr == nil {
+			if scans, scanErr := client.GetPackageVulnerabilities(pkg.Namespace, pkg.Repository, pkg.SlugPerm); scanErr == nil && len(scans) > 0 {
+				latest := scans[0]
+				event.HasVulnerabilities = latest.HasVulnerabilities
+				event.MaxSeverity = latest.MaxSeverity
+				event.NumVulnerabilities = latest.NumVulnerabilities
+			} else if scanErr != nil {
+				ctx.Logger.Infof("could not fetch vulnerability scan for %s: %v", pkg.SlugPerm, scanErr)
+			}
+		}
 	}
 
 	if err := ctx.Events.Emit("cloudsmith.package.complianceChecked", event); err != nil {
@@ -303,10 +331,10 @@ func verifyCloudsmithSignature(signature string, body, secret []byte) error {
 	return nil
 }
 
-// parseCompliancePackage extracts the package from a JSON-object webhook body.
+// parsePackageFromWebhook extracts the package from a JSON-object webhook body.
 // Cloudsmith delivers the package under a "data" key; we fall back to a
 // top-level object so the trigger is resilient to payload-shape differences.
-func parseCompliancePackage(body []byte) (*Package, error) {
+func parsePackageFromWebhook(body []byte) (*Package, error) {
 	var envelope struct {
 		Event string  `json:"event"`
 		Data  Package `json:"data"`
