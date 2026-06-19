@@ -83,6 +83,7 @@ export function useRepositorySelectedFileQuery(
   repositoryPathSet: Set<string>,
   generatedFilesByPath: Map<string, AppFile>,
   versionId?: string,
+  stage = false,
 ) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
@@ -91,6 +92,7 @@ export function useRepositorySelectedFileQuery(
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
     versionId,
+    stage,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };

@@ -100,6 +100,7 @@ export function useEditor({
     effectiveRepositoryPathSet,
     catalog.generatedFilesByPath,
     versionId,
+    isEditing,
   );
 
   useEditorLifecycle({
