@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -42,10 +43,14 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickStart := time.Now()
+
 			webhooks, err := models.ListDeletedWebhooks()
 			if err != nil {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
+
+			telemetry.RecordWebhookCleanupWorkerWebhooksCount(context.Background(), len(webhooks))
 
 			for _, webhook := range webhooks {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
@@ -61,21 +66,44 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 					}
 				}(webhook)
 			}
+
+			telemetry.RecordWebhookCleanupWorkerTickDuration(context.Background(), time.Since(tickStart))
 		}
 	}
 }
 
 func (w *WebhookCleanupWorker) LockAndProcessWebhook(webhook models.Webhook) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	start := time.Now()
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
+	defer func() {
+		telemetry.RecordWebhookCleanupWorkerWebhookProcessing(
+			context.Background(),
+			time.Since(start),
+			outcome,
+			reason,
+		)
+	}()
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockDeletedWebhook(tx, webhook.ID)
 		if err != nil {
 			w.log("Webhook %s already being processed - skipping", webhook.ID)
+			outcome = executorOutcomeSkipped
+			reason = executorReasonLocked
 			return nil
 		}
 
 		w.log("Processing webhook %s", webhook.ID)
 		return w.processWebhook(tx, r)
 	})
+	if err != nil {
+		w.log("Error processing webhook %s: %v", webhook.ID, err)
+		outcome = executorOutcomeFailed
+		reason = classifyProcessError(err)
+	}
+
+	return err
 }
 
 func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
