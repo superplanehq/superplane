@@ -55,7 +55,7 @@ import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
 import { draftVersionId } from "../lib/draftVersion";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
+import { isDraftVersion, isPublishedVersion } from "../pages/app/lib/canvas-versions";
 import {
   canvasVersionWithSpecFromYaml,
   fetchCanvasVersionWithSpec,
@@ -402,18 +402,27 @@ export const useInfiniteCanvasLiveVersions = (
   });
 };
 
+function resolveCanvasVersionStage(stage: boolean | CanvasesCanvasVersion | null | undefined): boolean {
+  if (typeof stage === "boolean") {
+    return stage;
+  }
+
+  return !!stage && isDraftVersion(stage);
+}
+
 export const useCanvasVersion = (
   organizationId: string,
   canvasId: string,
   versionId: string,
   enabled = true,
-  stage = false,
+  stage: boolean | CanvasesCanvasVersion | null = false,
 ) => {
+  const readStaged = resolveCanvasVersionStage(stage);
   return useQuery({
-    queryKey: stage
+    queryKey: readStaged
       ? canvasKeys.versionStagedDetail(canvasId, versionId)
       : canvasKeys.versionDetail(canvasId, versionId),
-    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, stage),
+    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, readStaged),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
   });
 };

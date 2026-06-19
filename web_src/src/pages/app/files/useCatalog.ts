@@ -77,14 +77,23 @@ export function useRepositoryPathLists(
   return { allPaths, visiblePaths, finalRepositoryPaths, commitPathError };
 }
 
-export function useRepositorySelectedFileQuery(
-  canvasId: string | undefined,
-  selectedPath: string | null,
-  repositoryPathSet: Set<string>,
-  generatedFilesByPath: Map<string, AppFile>,
-  versionId?: string,
+type UseRepositorySelectedFileQueryOptions = {
+  canvasId?: string;
+  selectedPath: string | null;
+  repositoryPathSet: Set<string>;
+  generatedFilesByPath: Map<string, AppFile>;
+  versionId?: string;
+  stage?: boolean;
+};
+
+export function useRepositorySelectedFileQuery({
+  canvasId,
+  selectedPath,
+  repositoryPathSet,
+  generatedFilesByPath,
+  versionId,
   stage = false,
-) {
+}: UseRepositorySelectedFileQueryOptions) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
   const selectedFileQuery = useCanvasRepositoryFile(
