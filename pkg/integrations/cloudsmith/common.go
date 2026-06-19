@@ -122,4 +122,3 @@ func defaultProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 func defaultHandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
-
