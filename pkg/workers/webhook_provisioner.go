@@ -171,7 +171,7 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 	//
 	// Phase 1: Lock and mark as provisioning in a short transaction.
 	//
-	lockedWebhook, err := w.lockAndMarkProvisioning(logger, webhook)
+	lockedWebhook, err := w.lockAndMarkProvisioning(webhook)
 	if err != nil {
 		logger.Errorf("Error locking and marking webhook as provisioning: %v", err)
 		outcome = executorOutcomeFailed
@@ -221,7 +221,7 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 // lockAndMarkProvisioning acquires a row lock and transitions the webhook
 // from "pending" to "provisioning". Returns nil if the row was already picked
 // up by another worker.
-func (w *WebhookProvisioner) lockAndMarkProvisioning(logger *log.Entry, webhook models.Webhook) (*models.Webhook, error) {
+func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*models.Webhook, error) {
 	var locked *models.Webhook
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -238,12 +238,15 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(logger *log.Entry, webhook 
 		return nil
 	})
 
-	if err != nil {
-		logger.Info("Webhook already being processed - skipping")
+	if err == nil {
+		return locked, nil
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
-	return locked, nil
+	return nil, err
 }
 
 // runIntegrationSetup calls the external webhook handler outside any
