@@ -36,6 +36,31 @@ window.SUPERPLANE_DASH0_ENVIRONMENT = "{{ .Dash0WebEnvironment }}";
 	}
 }
 
+func TestRenderIndexTemplateIncludesSignupWaitlistMailerLiteConfig(t *testing.T) {
+	t.Setenv("SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID", "account-1")
+	t.Setenv("SIGNUP_WAITLIST_MAILERLITE_FORM_ID", "form-1")
+
+	raw := []byte(`<script>
+window.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID = "{{ .SignupWaitlistMailerLiteAccountID }}";
+window.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID = "{{ .SignupWaitlistMailerLiteFormID }}";
+</script>`)
+
+	rendered, err := RenderIndexTemplate(raw)
+	if err != nil {
+		t.Fatalf("RenderIndexTemplate() error = %v", err)
+	}
+
+	body := string(rendered)
+	for _, want := range []string{
+		`window.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID = "account-1"`,
+		`window.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID = "form-1"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected rendered template to contain %q, got %q", want, body)
+		}
+	}
+}
+
 func TestDash0WebServiceNameDefaults(t *testing.T) {
 	t.Setenv("DASH0_WEB_SERVICE_NAME", "")
 
@@ -62,6 +87,8 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	t.Setenv("SENTRY_DSN", "")
 	t.Setenv("SENTRY_ENVIRONMENT", "")
 	t.Setenv("POSTHOG_KEY", "")
+	t.Setenv("SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID", "account-1")
+	t.Setenv("SIGNUP_WAITLIST_MAILERLITE_FORM_ID", "form-1")
 
 	data := newIndexTemplateDataFromEnv()
 	if data.Dash0WebOTLPEndpoint != "https://example.test:4318" {
@@ -75,5 +102,11 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	}
 	if data.Dash0WebEnvironment != "development" {
 		t.Fatalf("Dash0WebEnvironment = %q", data.Dash0WebEnvironment)
+	}
+	if data.SignupWaitlistMailerLiteAccountID != "account-1" {
+		t.Fatalf("SignupWaitlistMailerLiteAccountID = %q", data.SignupWaitlistMailerLiteAccountID)
+	}
+	if data.SignupWaitlistMailerLiteFormID != "form-1" {
+		t.Fatalf("SignupWaitlistMailerLiteFormID = %q", data.SignupWaitlistMailerLiteFormID)
 	}
 }
