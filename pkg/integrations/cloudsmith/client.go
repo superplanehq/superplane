@@ -444,6 +444,18 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
 	}
 
+	// Skip API calls when cached metadata matches and the stored name was already
+	// computed from pkg.Name+version (i.e. differs from the raw slug_perm value).
+	// A stored name equal to packageSlugPerm means the old slug format was cached.
+	var existing PackageNodeMetadata
+	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
+		existing.RepositoryID == repositoryID &&
+		existing.PackageID == packageSlugPerm &&
+		existing.PackageName != "" &&
+		existing.PackageName != packageSlugPerm {
+		return nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
