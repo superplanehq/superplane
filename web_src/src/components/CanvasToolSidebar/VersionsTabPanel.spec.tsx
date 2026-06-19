@@ -61,7 +61,7 @@ describe("VersionsTabPanel", () => {
     expect(screen.queryByTestId("canvas-create-draft-button")).not.toBeInTheDocument();
   });
 
-  it("renders the git-backed footer with a copy clone command action", () => {
+  it("does not render the git-backed footer", () => {
     render(
       <VersionsTabPanel
         liveVersions={[]}
@@ -71,8 +71,8 @@ describe("VersionsTabPanel", () => {
       />,
     );
 
-    expect(screen.getByTestId("versions-sidebar-footer")).toBeInTheDocument();
-    expect(screen.getByTestId("versions-sidebar-copy-clone-command")).toBeInTheDocument();
+    expect(screen.queryByTestId("versions-sidebar-footer")).not.toBeInTheDocument();
+    expect(screen.queryByText("This canvas is git-backed")).not.toBeInTheDocument();
   });
 
   it("selects a version when a row is clicked", () => {
