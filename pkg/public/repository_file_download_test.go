@@ -68,7 +68,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.NoError(t, server.RegisterGRPCGateway("localhost:50051"))
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 
 	authenticated := &r.Account.ID
 
