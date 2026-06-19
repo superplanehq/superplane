@@ -4,31 +4,13 @@ import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSideb
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  page: "history" | "queue" | "execution-chain";
+  page: "history" | "queue";
   onBackToOverview: () => void;
-  previousPage?: "overview" | "history" | "queue" | "execution-chain";
   compact?: boolean;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({
-  page,
-  onBackToOverview,
-  previousPage = "overview",
-  compact = false,
-}) => {
-  const getBackButtonText = () => {
-    if (page === "execution-chain") {
-      switch (previousPage) {
-        case "history":
-          return "Back to Run History";
-        case "queue":
-          return "Back to Queue";
-        default:
-          return "All Runs";
-      }
-    }
-    return "Back";
-  };
+export const PageHeader: React.FC<PageHeaderProps> = ({ page, onBackToOverview, compact = false }) => {
+  const backButtonText = page === "history" ? "Back to Run History" : "Back to Queue";
 
   if (compact) {
     return (
@@ -42,25 +24,20 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         )}
       >
         <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
-        {getBackButtonText()}
+        {backButtonText}
       </button>
     );
   }
 
   return (
-    <>
-      {/* Back to Overview Section */}
-      <div className="px-3 py-2 border-b-1 border-border">
-        <button
-          onClick={onBackToOverview}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-medium cursor-pointer"
-        >
-          <ArrowLeft size={16} />
-          {getBackButtonText()}
-        </button>
-      </div>
-
-      {/* Page Header with Search and Filter */}
-    </>
+    <div className="px-3 py-2 border-b-1 border-border">
+      <button
+        onClick={onBackToOverview}
+        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-medium cursor-pointer"
+      >
+        <ArrowLeft size={16} />
+        {backButtonText}
+      </button>
+    </div>
   );
 };

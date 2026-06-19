@@ -88,6 +88,37 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+/** Run inspection is only valid on the canvas tab; panel views must be cleared first. */
+export function clearNonCanvasViewSearchParam(params: URLSearchParams): void {
+  const view = params.get("view") ?? "";
+  if (!isWorkflowCanvasViewParam(view)) {
+    params.delete("view");
+  }
+}
+
+export function applyRunInspectionNavigationSearchParams(
+  params: URLSearchParams,
+  options: {
+    runId: string;
+    nodeId?: string | null;
+  },
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.set("run", options.runId);
+
+  if (options.nodeId) {
+    next.set("sidebar", "1");
+    next.set("node", options.nodeId);
+  } else {
+    next.delete("sidebar");
+    next.delete("node");
+  }
+
+  clearNonCanvasViewSearchParam(next);
+  next.delete("file");
+  return next;
+}
+
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isMemoryMode,
