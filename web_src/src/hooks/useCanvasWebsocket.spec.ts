@@ -342,7 +342,9 @@ describe("useCanvasWebsocket", () => {
     expect(stagedPredicate).toBeDefined();
     expect(stagedPredicate({ queryKey: canvasKeys.versionStagedDetail(testCanvasId, "version-1") })).toBe(true);
     expect(stagedPredicate({ queryKey: canvasKeys.consoleStaged(testCanvasId, "version-1") })).toBe(true);
-    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1", true) })).toBe(
+      true,
+    );
     expect(
       stagedPredicate({ queryKey: canvasKeys.repositoryFileContent(testCanvasId, "README.md", "version-1", true) }),
     ).toBe(true);

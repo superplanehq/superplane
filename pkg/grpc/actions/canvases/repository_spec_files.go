@@ -99,10 +99,14 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		if err := ensureStagedReadAllowed(ctx, version); err != nil {
+		if version.State != models.CanvasVersionStateDraft {
+			stage = false
+		} else if err := ensureStagedReadAllowed(ctx, version); err != nil {
 			return "", err
 		}
+	}
 
+	if stage {
 		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
 		if stagingErr != nil {
 			return "", stagingErr

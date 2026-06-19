@@ -81,6 +81,7 @@ export function useAppDraftStagingData({
     hasDraftGraphDiffVersusLive,
     suppressUnpublishedDraftDiscard,
     enabled: true,
+    stageActiveConsole: hasEditableVersion,
     registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration,
   });
