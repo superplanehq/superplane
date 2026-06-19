@@ -1,6 +1,7 @@
 package cloudsmith
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -204,8 +205,9 @@ type Package struct {
 	SyncProgress     int    `json:"sync_progress"`
 
 	// Quarantine / policy
-	IsQuarantined  bool `json:"is_quarantined"`
-	PolicyViolated bool `json:"policy_violated"`
+	IsQuarantined  bool   `json:"is_quarantined"`
+	PolicyViolated bool   `json:"policy_violated"`
+	License        string `json:"license"`
 
 	// Security scanning
 	SecurityScanStatus      string `json:"security_scan_status"`
@@ -443,4 +445,127 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		PackageID:           packageSlugPerm,
 		PackageName:         packageName,
 	})
+}
+
+// VulnerabilityScan is a package's security-scan summary, delivered under
+// context.vulnerability_scan_results on a package.security_scanned webhook.
+type VulnerabilityScan struct {
+	Identifier         string `json:"identifier"`
+	CreatedAt          string `json:"created_at"`
+	HasVulnerabilities bool   `json:"has_vulnerabilities"`
+	MaxSeverity        string `json:"max_severity"`
+	NumVulnerabilities int    `json:"num_vulnerabilities"`
+}
+
+// Webhook is the subset of a Cloudsmith webhook this integration manages.
+type Webhook struct {
+	SlugPerm  string   `json:"slug_perm"`
+	TargetURL string   `json:"target_url"`
+	Events    []string `json:"events"`
+	IsActive  bool     `json:"is_active"`
+}
+
+// requestBodyFormatJSONObject is the Cloudsmith webhook payload format that
+// delivers the package as a JSON object body (application/json).
+const requestBodyFormatJSONObject = 0
+
+// webhookPayload builds the create/update request body for a managed webhook:
+// the desired target URL, subscribed events, active flag, and (when set) the
+// signing key. Cloudsmith treats PATCH the same as POST for these fields, so the
+// two operations share one body.
+func webhookPayload(targetURL, signatureKey string, events []string) ([]byte, error) {
+	templates := make([]map[string]string, 0, len(events))
+	for _, event := range events {
+		templates = append(templates, map[string]string{"event": event, "template": ""})
+	}
+
+	body := map[string]any{
+		"target_url":          targetURL,
+		"events":              events,
+		"request_body_format": requestBodyFormatJSONObject,
+		"templates":           templates,
+		"is_active":           true,
+	}
+	if signatureKey != "" {
+		body["signature_key"] = signatureKey
+	}
+
+	return json.Marshal(body)
+}
+
+// CreateWebhook registers a webhook on a repository (owner/repository) that
+// posts the given events to targetURL as a JSON object. When signatureKey is
+// non-empty, Cloudsmith signs each delivery with HMAC-SHA1 of the body using
+// that key (sent in the X-Cloudsmith-Signature header).
+func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string, events []string) (*Webhook, error) {
+	payload, err := webhookPayload(targetURL, signatureKey, events)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding webhook: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repository))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
+// GetWebhook fetches a webhook by its permanent slug. The error (including
+// not-found) lets callers detect a webhook that was removed at Cloudsmith.
+func (c *Client) GetWebhook(owner, repository, slugPerm string) (*Webhook, error) {
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
+// UpdateWebhook re-asserts an existing webhook's desired state (PATCH): target
+// URL, subscribed events, active flag, and signing key. A webhook can be
+// disabled or have its events edited out of band at Cloudsmith, and the
+// signature_key is only set on write and never returned — re-applying all of
+// these on reconcile keeps deliveries flowing and verifiable without recreating
+// the webhook.
+func (c *Client) UpdateWebhook(owner, repository, slugPerm, targetURL, signatureKey string, events []string) (*Webhook, error) {
+	payload, err := webhookPayload(targetURL, signatureKey, events)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding webhook: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	responseBody, err := c.execRequest(http.MethodPatch, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var webhook Webhook
+	if err := json.Unmarshal(responseBody, &webhook); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
+// DeleteWebhook removes a webhook from a repository by its permanent slug.
+func (c *Client) DeleteWebhook(owner, repository, slugPerm string) error {
+	requestURL := fmt.Sprintf("%s/webhooks/%s/%s/%s/",
+		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
+	_, err := c.execRequest(http.MethodDelete, requestURL, nil)
+	return err
 }
