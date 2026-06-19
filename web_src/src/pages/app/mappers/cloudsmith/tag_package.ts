@@ -1,6 +1,9 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
+import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getBackgroundColorClass } from "@/lib/colors";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
@@ -11,12 +14,9 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { MetadataItem } from "@/ui/metadataList";
-import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
-import type { GetRepositoryConfiguration, RepositoryData, RepositoryNodeMetadata } from "./types";
+import type { PackageData, PackageNodeMetadata, PackageOperationConfiguration } from "./types";
 
-export const getRepositoryMapper: ComponentBaseMapper = {
+export const tagPackageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "cloudsmith";
@@ -26,8 +26,8 @@ export const getRepositoryMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
+      eventSections: lastExecution ? buildEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -40,11 +40,13 @@ export const getRepositoryMapper: ComponentBaseMapper = {
       details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const repository = outputs?.default?.[0]?.data as RepositoryData | undefined;
-    if (!repository) return details;
+    const pkg = (context.execution.outputs as { default?: OutputPayload[] } | undefined)?.default?.[0]?.data as
+      | PackageData
+      | undefined;
+    if (!pkg) return details;
 
-    addRepositoryDetails(details, repository);
+    if (pkg.repository) details["Repository"] = pkg.repository;
+    addPackageDetails(details, pkg);
 
     return details;
   },
@@ -55,37 +57,43 @@ export const getRepositoryMapper: ComponentBaseMapper = {
   },
 };
 
-function addRepositoryDetails(details: Record<string, string>, repository: RepositoryData): void {
-  details["Name"] = repository.name || "-";
-  details["Namespace"] = repository.namespace || "-";
-  details["Size"] = repository.size_str || (repository.size != null ? `${repository.size} bytes` : "-");
-  details["Packages"] = repository.package_count != null ? String(repository.package_count) : "-";
-  details["Downloads"] = repository.num_downloads != null ? String(repository.num_downloads) : "-";
-
-  if (repository.num_quarantined_packages) {
-    details["Quarantined Packages"] = String(repository.num_quarantined_packages);
-  }
-
-  if (repository.num_policy_violated_packages) {
-    details["Policy Violations"] = String(repository.num_policy_violated_packages);
-  }
+function addPackageDetails(details: Record<string, string>, pkg: PackageData): void {
+  if (pkg.display_name || pkg.name) details["Name"] = pkg.display_name || pkg.name || "";
+  if (pkg.format) details["Format"] = pkg.format;
+  if (pkg.status_str) details["Status"] = pkg.status_str;
+  if (pkg.self_webapp_url) details["URL"] = pkg.self_webapp_url;
 }
 
-function metadataList(node: NodeInfo): MetadataItem[] {
-  const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as RepositoryNodeMetadata | undefined;
-  const configuration = node.configuration as GetRepositoryConfiguration | undefined;
+function buildMetadata(node: NodeInfo): MetadataItem[] {
+  const items: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as PackageNodeMetadata | undefined;
+  const configuration = node.configuration as PackageOperationConfiguration | undefined;
 
   if (nodeMetadata?.repositoryName) {
-    metadata.push({ icon: "package", label: nodeMetadata.repositoryName });
+    items.push({ icon: "package", label: nodeMetadata.repositoryName });
   } else if (configuration?.repository) {
-    metadata.push({ icon: "package", label: configuration.repository });
+    items.push({ icon: "package", label: configuration.repository });
   }
 
-  return metadata;
+  if (nodeMetadata?.packageName) {
+    items.push({ icon: "archive", label: nodeMetadata.packageName });
+  } else if (configuration?.package) {
+    items.push({ icon: "archive", label: configuration.package });
+  }
+
+  if (configuration?.action) {
+    items.push({ icon: "zap", label: configuration.action });
+  }
+
+  if (configuration?.tags && configuration.tags.length > 0) {
+    const displayTags = configuration.tags.slice(0, 3);
+    items.push({ icon: "tag", label: displayTags.join(", ") });
+  }
+
+  return items;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.rootEvent || !execution.createdAt || !execution.rootEvent.id) {
     return [];
   }
