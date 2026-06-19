@@ -1,7 +1,5 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { useCallback } from "react";
-import { Copy, GitBranch, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { Plus } from "lucide-react";
 import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
 import { cn } from "@/lib/utils";
@@ -112,42 +110,6 @@ export function VersionsTabPanel({
           )}
         </section>
       </div>
-
-      <VersionsFooter />
-    </div>
-  );
-}
-
-// Placeholder until the canvas repository clone URL is wired through the API.
-const PLACEHOLDER_CLONE_COMMAND = "git clone <canvas-repository-url>";
-
-function VersionsFooter() {
-  const handleCopyCloneCommand = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(PLACEHOLDER_CLONE_COMMAND);
-      toast.success("Clone command copied");
-    } catch {
-      toast.error("Failed to copy clone command");
-    }
-  }, []);
-
-  return (
-    <div className="shrink-0 border-t border-slate-200 px-4 py-3" data-testid="versions-sidebar-footer">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-        <GitBranch className="size-3.5 text-slate-500" aria-hidden />
-        <span>This canvas is git-backed</span>
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={handleCopyCloneCommand}
-        className="mt-2 flex h-auto w-full items-center justify-between gap-2 rounded border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-xs font-normal text-slate-700 shadow-none hover:bg-slate-100"
-        data-testid="versions-sidebar-copy-clone-command"
-        title="Copy clone command"
-      >
-        <code className="min-w-0 flex-1 truncate font-mono text-[11px]">{PLACEHOLDER_CLONE_COMMAND}</code>
-        <Copy className="size-3.5 shrink-0 text-slate-500" aria-hidden />
-      </Button>
     </div>
   );
 }
