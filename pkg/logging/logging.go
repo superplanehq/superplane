@@ -54,3 +54,9 @@ func WithIntegration(logger *log.Entry, integration models.Integration) *log.Ent
 		"integration_id":   integration.ID,
 	})
 }
+
+func WithWebhook(logger *log.Entry, webhook models.Webhook) *log.Entry {
+	return logger.WithFields(log.Fields{
+		"webhook_id": webhook.ID,
+	})
+}
