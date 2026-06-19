@@ -5,8 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import InstallationSettings from "./InstallationSettings";
 
 type SignupWaitlistWindow = Window & {
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID?: string;
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID?: string;
+  SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID?: string;
+  SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID?: string;
 };
 
 const waitlistWindow = window as SignupWaitlistWindow;
@@ -49,8 +49,8 @@ const renderInstallationSettings = () =>
   );
 
 afterEach(() => {
-  delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID;
-  delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID;
+  delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID;
+  delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID;
   vi.unstubAllGlobals();
 });
 
@@ -67,8 +67,8 @@ describe("InstallationSettings", () => {
   });
 
   it("shows signup access settings when waitlist config is complete", async () => {
-    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID = "account-1";
-    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID = "form-1";
+    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
+    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
     mockInstallationSettingsFetch();
 
     renderInstallationSettings();
