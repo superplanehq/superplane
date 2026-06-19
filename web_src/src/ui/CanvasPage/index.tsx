@@ -125,12 +125,7 @@ export interface CanvasEdge extends ReactFlowEdge {
 interface FocusRequest {
   nodeId: string;
   requestId: number;
-  tab?: "latest" | "settings" | "execution-chain";
-  executionChain?: {
-    eventId: string;
-    executionId?: string | null;
-    triggerEvent?: SidebarEvent | null;
-  };
+  tab?: "latest" | "settings";
 }
 
 export interface NodeEditData {
@@ -298,12 +293,7 @@ export interface CanvasPageProps {
   toolSidebarRunsContent?: React.ReactNode;
   toolSidebarVersionsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
-  onRunExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onRunExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
@@ -383,28 +373,17 @@ export interface CanvasPageProps {
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
 
-  // Execution chain lazy loading
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<unknown[]>;
-
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
-  // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
   components?: ActionsAction[];
   triggers?: TriggersTrigger[];
-
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
-  onExecutionChainHandled?: () => void;
 
   /** Returns to the current live canvas version from a published history preview. */
   onSeeCurrentVersion?: () => void;
@@ -806,7 +785,6 @@ function CanvasPage(props: CanvasPageProps) {
   );
   const [liveNodeDetailPaneHeight, setLiveNodeDetailPaneHeight] = useState(320);
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
-  const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
@@ -888,7 +866,7 @@ function CanvasPage(props: CanvasPageProps) {
     props.onTriggerModalHostReady?.(openCanvasModal);
   }, [props, openCanvasModal]);
   useEffect(() => {
-    if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
+    if (!props.focusRequest?.tab) {
       return;
     }
 
@@ -1336,7 +1314,6 @@ function CanvasPage(props: CanvasPageProps) {
         resolveRunId={props.resolveRunIdForSidebarEvent}
         fetchRunId={props.fetchRunIdForSidebarEvent}
         onSelectRun={props.onSelectRunFromSidebarEvent}
-        loadExecutionChain={props.loadExecutionChain}
         getExecutionState={props.getExecutionState}
         onSidebarClose={handleSidebarClose}
         editingNodeData={editingNodeData}
@@ -1351,9 +1328,6 @@ function CanvasPage(props: CanvasPageProps) {
         workflowNodes={props.workflowNodes}
         components={props.components}
         triggers={props.triggers}
-        onHighlightedNodesChange={setHighlightedNodeIds}
-        focusRequest={props.focusRequest}
-        onExecutionChainHandled={props.onExecutionChainHandled}
         readOnly={readOnly}
         canReadIntegrations={props.canReadIntegrations}
         canCreateIntegrations={props.canCreateIntegrations}
@@ -1370,10 +1344,8 @@ function CanvasPage(props: CanvasPageProps) {
       props.canCreateIntegrations,
       props.canReadIntegrations,
       props.canUpdateIntegrations,
-      props.components,
       props.configurationSaveMode,
       props.fetchRunIdForSidebarEvent,
-      props.focusRequest,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
       props.getAutocompleteExampleObj,
@@ -1386,10 +1358,10 @@ function CanvasPage(props: CanvasPageProps) {
       props.getSidebarData,
       props.getTabData,
       props.integrations,
+      props.components,
+      props.triggers,
       props.isEditing,
-      props.loadExecutionChain,
       props.loadSidebarData,
-      props.onExecutionChainHandled,
       props.onLoadMoreHistory,
       props.onLoadMoreQueue,
       props.onReEmit,
@@ -1397,7 +1369,6 @@ function CanvasPage(props: CanvasPageProps) {
       props.onSelectRunFromSidebarEvent,
       props.organizationId,
       props.resolveRunIdForSidebarEvent,
-      props.triggers,
       props.workflowNodes,
       readOnly,
       state,
@@ -1610,7 +1581,6 @@ function CanvasPage(props: CanvasPageProps) {
                   onZoomChange={setCanvasZoom}
                   hasFitToViewRef={hasFitToViewRef}
                   viewportRefProp={props.viewportRef}
-                  highlightedNodeIds={highlightedNodeIds}
                   workflowNodes={props.workflowNodes}
                   setCurrentTab={setCurrentTab}
                   showBottomStatusControls={props.showBottomStatusControls}
@@ -1711,7 +1681,6 @@ function Sidebar({
   getAllQueueEvents,
   getHasMoreQueue,
   getLoadingMoreQueue,
-  loadExecutionChain,
   getExecutionState,
   onSidebarClose,
   editingNodeData,
@@ -1726,9 +1695,6 @@ function Sidebar({
   workflowNodes,
   components,
   triggers,
-  onHighlightedNodesChange,
-  focusRequest,
-  onExecutionChainHandled,
   readOnly,
   canReadIntegrations,
   canCreateIntegrations,
@@ -1756,7 +1722,6 @@ function Sidebar({
   getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
-  loadExecutionChain?: (eventId: string) => Promise<unknown[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
@@ -1778,9 +1743,6 @@ function Sidebar({
   workflowNodes?: ComponentsNode[];
   components?: ActionsAction[];
   triggers?: TriggersTrigger[];
-  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
-  focusRequest?: FocusRequest | null;
-  onExecutionChainHandled?: () => void;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -1902,7 +1864,6 @@ function Sidebar({
           );
         }
       }}
-      loadExecutionChain={loadExecutionChain}
       getExecutionState={getExecutionState}
       showSettingsTab={true}
       nodeConfigMode="edit"
@@ -1938,14 +1899,6 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
-      actions={components}
-      triggers={triggers}
-      onHighlightedNodesChange={onHighlightedNodesChange}
-      executionChainEventId={focusRequest?.executionChain?.eventId || null}
-      executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
-      executionChainTriggerEvent={focusRequest?.executionChain?.triggerEvent || null}
-      executionChainRequestId={focusRequest?.requestId}
-      onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
       hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
@@ -2245,7 +2198,6 @@ function CanvasContent({
   runDisabledTooltip,
   onPendingConnectionNodeClick,
   onNodeClick,
-  highlightedNodeIds,
   workflowNodes,
   setCurrentTab,
   showBottomStatusControls = true,
@@ -2303,7 +2255,6 @@ function CanvasContent({
   runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onNodeClick?: (nodeId: string) => void;
-  highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
@@ -2326,12 +2277,7 @@ function CanvasContent({
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
-  onRunExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onRunExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
@@ -2994,7 +2940,7 @@ function CanvasContent({
         : "";
     const runParticipantSet =
       runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0 ? new Set(runParticipantNodeIds) : null;
-    const edgeHoverActive = highlightedNodeIds.size > 0;
+    const edgeHoverActive = false;
     const runDimActive = runParticipantSet !== null;
     const hasHighlightedNodes = edgeHoverActive || runDimActive;
     const visibleNodeIds = new Set<string>();
@@ -3004,7 +2950,7 @@ function CanvasContent({
       const isHighlighted = isCanvasNodeHighlighted({
         nodeId: node.id,
         edgeHoverActive,
-        highlightedNodeIds,
+        highlightedNodeIds: new Set<string>(),
         runDimActive,
         runParticipantSet,
       });
@@ -3078,7 +3024,6 @@ function CanvasContent({
     hoveredEdge,
     connectingFrom,
     state.edges,
-    highlightedNodeIds,
     blockConnectingFrom,
     runParticipantNodeIds,
     runSelectableSet,
