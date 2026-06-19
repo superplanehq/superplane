@@ -6,6 +6,13 @@ Automate repository, package, and artifact management on Cloudsmith
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Package Created" href="#on-package-created" description="Trigger a workflow when a new package is created (uploaded) in a Cloudsmith repository" />
+  <LinkCard title="On Security Scan Completed" href="#on-security-scan-completed" description="Trigger a workflow when a Cloudsmith package's security (vulnerability) scan completes" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
@@ -20,10 +27,107 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 SuperPlane authenticates to Cloudsmith using a service account API key, which is not tied to an individual user.
 
 1. In the Cloudsmith web dashboard, go to the **Accounts** tab and click on **Services**
-2. Click on **New Service**. Give the servie a name like **Superplane** and optional description. Assign the **Manager** role to the service.
+2. Click on **New Service**. Give the service a name like **Superplane** and optional description. Assign the **Manager** role to the service.
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
-5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
+
+<a id="on-package-created"></a>
+
+## On Package Created
+
+**Trigger key:** `cloudsmith.onPackageCreated`
+
+The On Package Created trigger starts a workflow whenever a new package is uploaded to the selected repository.
+
+### Use Cases
+
+- **Ingestion pipelines**: React to new artifacts as they land — promote, tag, or notify
+- **Auditing**: Record who uploaded which package and when
+- **Fan-out**: Kick off downstream checks (e.g. fetch repository details) for each new package
+
+### Configuration
+
+- **Repository**: The repository to watch, in the form `owner/repository` (required)
+
+### Webhook Setup
+
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.created` event, and removes it when the trigger is deleted. The Cloudsmith service account needs the **Admin** privilege on the repository for this. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
+
+### Output
+
+Emits the new package's details: **namespace**, **repository**, **name**, **version**, **slug_perm**, **format**, **license**, **uploader**, **uploaded_at**, and **status**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "package.created",
+    "format": "npm",
+    "license": "MIT",
+    "name": "sp-compliance-mit",
+    "namespace": "weskk",
+    "repository": "superplane-compliance",
+    "slug_perm": "wxu9RDqPfCj0",
+    "status": "Completed",
+    "uploaded_at": "2026-06-17T14:50:00.843111Z",
+    "uploader": "superplane-dnig",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-06-17T14:50:00Z",
+  "type": "cloudsmith.package.created"
+}
+```
+
+<a id="on-security-scan-completed"></a>
+
+## On Security Scan Completed
+
+**Trigger key:** `cloudsmith.onSecurityScanCompleted`
+
+The On Security Scan Completed trigger starts a workflow whenever Cloudsmith finishes scanning a package in the selected repository for vulnerabilities.
+
+### Use Cases
+
+- **Block vulnerable packages**: Quarantine or reject a package when its scan finds High/Critical vulnerabilities
+- **Security alerts**: Notify a channel when vulnerabilities are detected
+- **Audit**: Record the scan outcome for every package
+
+### Configuration
+
+- **Repository**: The repository to watch, in the form `owner/repository` (required)
+
+### Webhook Setup
+
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.security_scanned` event, and removes it when the trigger is deleted. The Cloudsmith service account needs the **Admin** privilege on the repository for this. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
+
+### Output
+
+Emits the package's identity (**namespace**, **repository**, **name**, **version**, **slug_perm**, **format**) and the scan results: **security_scan_status**, **has_vulnerabilities**, **max_severity**, **num_vulnerabilities**, and **vulnerability_scan_results_url**. Because this fires when the scan *completes*, the vulnerability fields are settled — filter downstream, e.g. only act when `max_severity` is High/Critical.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "package.security_scanned",
+    "format": "npm",
+    "has_vulnerabilities": true,
+    "max_severity": "High",
+    "name": "sp-compliance-gpl",
+    "namespace": "weskk",
+    "num_vulnerabilities": 2,
+    "repository": "superplane-compliance",
+    "security_scan_status": "2 Vulnerabilities Detected",
+    "slug_perm": "f3XvJCI9ufJa",
+    "version": "1.0.0",
+    "vulnerability_scan_results_url": "https://api.cloudsmith.io/v1/vulnerabilities/weskk/superplane-compliance/f3XvJCI9ufJa/"
+  },
+  "timestamp": "2026-06-18T14:17:58Z",
+  "type": "cloudsmith.package.securityScanned"
+}
+```
 
 <a id="get-package"></a>
 
