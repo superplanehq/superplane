@@ -193,9 +193,13 @@ func decodeTagPackageSpec(configuration any) (TagPackageSpec, error) {
 		return TagPackageSpec{}, fmt.Errorf("action must be one of %s, %s, %s, or %s", TagActionAdd, TagActionClear, TagActionReplace, TagActionRemove)
 	}
 
-	spec.Tags = cleanTags(spec.Tags)
-	if spec.Action != TagActionClear && len(spec.Tags) == 0 {
-		return TagPackageSpec{}, errors.New("tags are required unless action is Clear")
+	if spec.Action == TagActionClear {
+		spec.Tags = nil
+	} else {
+		spec.Tags = cleanTags(spec.Tags)
+		if len(spec.Tags) == 0 {
+			return TagPackageSpec{}, errors.New("tags are required unless action is Clear")
+		}
 	}
 
 	return spec, nil
