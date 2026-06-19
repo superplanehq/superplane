@@ -415,7 +415,7 @@ export function AppPage() {
     data: loadedCanvasVersion,
     isLoading: loadedCanvasVersionLoading,
     isFetching: loadedCanvasVersionFetching,
-  } = useCanvasVersion(organizationId!, canvasId!, activeCanvasVersionId, !!activeCanvasVersionId, true);
+  } = useCanvasVersion(organizationId!, canvasId!, activeCanvasVersionId, !!activeCanvasVersionId, activeCanvasVersion);
   const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
   const latestDraftVersion = draftVersions[0];
   const isViewingDraftVersion = !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion);

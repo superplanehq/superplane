@@ -140,11 +140,17 @@ type CreateSessionResult struct {
 	ProviderSessionID string
 }
 
+type MessageImage struct {
+	MediaType string
+	Data      string
+}
+
 // SendMessageOptions.ContextPreamble is prepended to the user's message so
 // providers that need caller context inline (e.g. the canvas/session
 // identifiers) receive it without a separate system message.
 type SendMessageOptions struct {
 	ContextPreamble string
+	Images          []MessageImage
 }
 
 type Provider interface {

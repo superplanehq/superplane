@@ -76,7 +76,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		result.Draft = &draftResult{
 			VersionID:   draft.ID.String(),
 			DisplayName: draft.DisplayName,
-			BranchName:  stringValue(draft.BranchName),
+			BranchName:  draft.GitBranch,
 		}
 	}
 

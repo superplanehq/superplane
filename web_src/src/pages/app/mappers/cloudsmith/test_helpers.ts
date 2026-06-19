@@ -1,5 +1,5 @@
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { RepositoryData } from "./types";
+import type { PackageData, RepositoryData } from "./types";
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
@@ -62,5 +62,50 @@ export function buildRepositoryData(overrides?: Partial<RepositoryData>): Reposi
     self_html_url: "https://cloudsmith.io/~acme/repos/production/",
     self_webapp_url: "https://cloudsmith.io/~acme/repos/production/",
     ...overrides,
+  };
+}
+
+export function buildPackageData(overrides?: Partial<PackageData>): PackageData {
+  return {
+    slug: "my-package-1-0-0",
+    slug_perm: "perm123abc456",
+    name: "my-package",
+    version: "1.0.0",
+    format: "python",
+    repository: "production",
+    namespace: "acme",
+    uploaded_at: "2026-01-15T10:00:00.000Z",
+    status: 2,
+    status_str: "Available",
+    status_updated_at: "2026-01-15T10:00:05.000Z",
+    stage: 9,
+    stage_str: "Fully Synchronised",
+    stage_updated_at: "2026-01-15T10:00:05.000Z",
+    is_sync_awaiting: false,
+    is_sync_completed: true,
+    is_sync_failed: false,
+    is_sync_in_flight: false,
+    is_sync_in_progress: false,
+    sync_finished_at: "2026-01-15T10:00:05.000Z",
+    sync_progress: 100,
+    is_quarantined: false,
+    policy_violated: false,
+    security_scan_status: "No Vulnerabilities Found",
+    checksum_md5: "d41d8cd98f00b204e9800998ecf8427e",
+    checksum_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    size: 524288,
+    size_str: "512.0 KB",
+    cdn_url: "https://dl.cloudsmith.io/public/acme/production/python/my-package-1.0.0.tar.gz",
+    self_html_url: "https://cloudsmith.io/~acme/repos/production/packages/detail/python/my-package/1.0.0/",
+    self_webapp_url: "https://app.cloudsmith.com/acme/r/production/python/my-package/1.0.0/",
+    ...overrides,
+  };
+}
+
+export function buildPackageOutput(data: unknown, type = "cloudsmith.package.details"): OutputPayload {
+  return {
+    type,
+    timestamp: new Date().toISOString(),
+    data,
   };
 }

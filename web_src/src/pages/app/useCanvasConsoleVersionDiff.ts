@@ -45,6 +45,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   hasDraftGraphDiffVersusLive: boolean;
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
+  stageActiveConsole: boolean;
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
   getConsoleMutationGeneration?: () => number;
 };
@@ -55,13 +56,13 @@ export function useCanvasConsoleVersionDiff({
   hasDraftGraphDiffVersusLive,
   suppressUnpublishedDraftDiscard,
   enabled,
+  stageActiveConsole,
   registerIgnoredCanvasVersionUpdatedEcho,
   getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  // The active console drives the editor, so it is fetched with stage=true and
-  // therefore carries the effective draft: committed changes plus the
-  // uncommitted staged edits the editor is showing.
-  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, true);
+  // The active console drives the editor. Staged reads (stage=true) apply only
+  // while editing a draft; published version previews use committed content.
+  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, stageActiveConsole);
   const draftDiffVersionId = versionIds.active || versionIds.draft;
   // Committed draft console (stage=false) is the publish basis: only committed
   // changes get promoted to live, so the publishable indicators below diff this
