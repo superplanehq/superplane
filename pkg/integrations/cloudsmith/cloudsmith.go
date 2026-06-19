@@ -50,7 +50,7 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 2. Click on **New Service**. Give the service a name like **Superplane** and optional description. Assign the **Manager** role to the service.
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
-5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege — admin access is enough for the **On Package Created** and **On Security Scan Completed** triggers to register and remove their webhooks automatically.
+5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
 `
 }
 
