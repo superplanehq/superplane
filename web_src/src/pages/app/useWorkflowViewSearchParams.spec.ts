@@ -44,14 +44,18 @@ describe("useWorkflowViewSearchParams", () => {
     expect(setSearchParams).not.toHaveBeenCalled();
   });
 
-  it("ignores run inspection when a non-canvas view is active", () => {
+  it("migrates conflicting non-canvas views when run inspection is requested", async () => {
     const setSearchParams = vi.fn();
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWorkflowViewSearchParams(makeSearchParams({ view: "console", run: "run-42" }), setSearchParams),
     );
 
-    expect(result.current.isRunInspectionMode).toBe(false);
-    expect(result.current.selectedRunId).toBeNull();
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+
+    expect(next.get("view")).toBeNull();
+    expect(next.get("run")).toBe("run-42");
   });
 
   it("migrates conflicting run params on non-canvas views", async () => {
@@ -62,8 +66,8 @@ describe("useWorkflowViewSearchParams", () => {
 
     const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
 
-    expect(next.get("view")).toBe("memory");
-    expect(next.get("run")).toBeNull();
+    expect(next.get("view")).toBeNull();
+    expect(next.get("run")).toBe("run-42");
   });
 
   it("accepts legacy dashboard view links and migrates them to console", async () => {
