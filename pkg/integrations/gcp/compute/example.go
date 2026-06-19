@@ -46,6 +46,12 @@ var exampleOutputDeleteStaticIPBytes []byte
 //go:embed example_output_manage_static_ip.json
 var exampleOutputManageStaticIPBytes []byte
 
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
 var (
 	exampleOutputCreateVMOnce sync.Once
 	exampleOutputCreateVM     map[string]any
@@ -85,6 +91,12 @@ var (
 
 	exampleOutputManageStaticIPOnce sync.Once
 	exampleOutputManageStaticIP     map[string]any
+
+	exampleOutputCreateLoadBalancerOnce sync.Once
+	exampleOutputCreateLoadBalancer     map[string]any
+
+	exampleOutputDeleteLoadBalancerOnce sync.Once
+	exampleOutputDeleteLoadBalancer     map[string]any
 )
 
 func (c *CreateVM) ExampleOutput() map[string]any {
@@ -137,4 +149,12 @@ func (d *DeleteStaticIP) ExampleOutput() map[string]any {
 
 func (m *ManageStaticIP) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageStaticIPOnce, exampleOutputManageStaticIPBytes, &exampleOutputManageStaticIP)
+}
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+}
+
+func (d *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
 }
