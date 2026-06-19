@@ -30,9 +30,7 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 2. Click on **New Service**. Give the service a name like **Superplane** and optional description. Assign the **Manager** role to the service.
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
-5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
-
-> The service's role must allow managing webhooks on the repository. The **On Package Created** and **On Security Scan Completed** triggers register a webhook automatically during setup and remove it on teardown — the **Manager** role above covers this.
+5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege — admin access is enough for the **On Package Created** and **On Security Scan Completed** triggers to register and remove their webhooks automatically.
 
 <a id="on-package-created"></a>
 
@@ -54,7 +52,7 @@ The On Package Created trigger starts a workflow whenever a new package is uploa
 
 ### Webhook Setup
 
-This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.created` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.created` event, and removes it when the trigger is deleted. The Cloudsmith service account needs the **Admin** privilege on the repository for this. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
 
 ### Output
 
@@ -102,7 +100,7 @@ The On Security Scan Completed trigger starts a workflow whenever Cloudsmith fin
 
 ### Webhook Setup
 
-This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.security_scanned` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the `package.security_scanned` event, and removes it when the trigger is deleted. The Cloudsmith service account needs the **Admin** privilege on the repository for this. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
 
 ### Output
 

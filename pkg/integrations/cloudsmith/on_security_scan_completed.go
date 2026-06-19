@@ -71,7 +71,7 @@ func (t *OnSecurityScanCompleted) Documentation() string {
 
 ## Webhook Setup
 
-This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the ` + "`package.security_scanned`" + ` event, and removes it when the trigger is deleted. The Cloudsmith service account must have permission to manage webhooks on the repository. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
+This trigger provisions a Cloudsmith webhook automatically: on setup it registers SuperPlane's webhook URL on the selected repository for the ` + "`package.security_scanned`" + ` event, and removes it when the trigger is deleted. The Cloudsmith service account needs the **Admin** privilege on the repository for this. Each delivery is signed (HMAC-SHA1) with a per-node secret and verified on receipt, so forged or unsigned requests are rejected.
 
 ## Output
 
