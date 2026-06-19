@@ -47,10 +47,10 @@ func (c *Cloudsmith) Instructions() string {
 SuperPlane authenticates to Cloudsmith using a service account API key, which is not tied to an individual user.
 
 1. In the Cloudsmith web dashboard, go to the **Accounts** tab and click on **Services**
-2. Click on **New Service**. Give the servie a name like **Superplane** and optional description. Assign the **Manager** role to the service.
+2. Click on **New Service**. Give the service a name like **Superplane** and optional description. Assign the **Manager** role to the service.
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
-5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**
+5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
 `
 }
 
@@ -70,11 +70,15 @@ func (c *Cloudsmith) Configuration() []configuration.Field {
 func (c *Cloudsmith) Actions() []core.Action {
 	return []core.Action{
 		&GetRepository{},
+		&GetPackage{},
 	}
 }
 
 func (c *Cloudsmith) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnSecurityScanCompleted{},
+		&OnPackageCreated{},
+	}
 }
 
 func (c *Cloudsmith) Sync(ctx core.SyncContext) error {

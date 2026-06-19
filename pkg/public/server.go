@@ -29,7 +29,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
@@ -58,9 +57,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
-	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -260,13 +257,25 @@ func newGRPCGatewayMarshaler() runtime.Marshaler {
 	}
 }
 
-func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
+func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
+	if services == nil {
+		return fmt.Errorf("grpc services are required")
+	}
+
 	ctx := context.Background()
 
-	grpcGatewayMux := runtime.NewServeMux(
+	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+
+	var grpcGatewayMux *runtime.ServeMux
+	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMiddlewares(
+			grpc.GatewayRecoveryMiddleware(),
+			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+		),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
 			 * grpc-gateway annotates the matched HTTP path template in the request context.
@@ -283,75 +292,72 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
 	)
 
-	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
-	opts = append(opts, telemetry.GRPCGatewayDialOptions()...)
-
-	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err := pbUsers.RegisterUsersHandlerServer(ctx, grpcGatewayMux, services.Users)
 	if err != nil {
 		return err
 	}
 
-	err = pbGroups.RegisterGroupsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbGroups.RegisterGroupsHandlerServer(ctx, grpcGatewayMux, services.Groups)
 	if err != nil {
 		return err
 	}
 
-	err = pbRoles.RegisterRolesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbRoles.RegisterRolesHandlerServer(ctx, grpcGatewayMux, services.Roles)
 	if err != nil {
 		return err
 	}
 
-	err = pbOrg.RegisterOrganizationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbOrg.RegisterOrganizationsHandlerServer(ctx, grpcGatewayMux, services.Organizations)
 	if err != nil {
 		return err
 	}
 
-	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerServer(ctx, grpcGatewayMux, services.Integrations)
 	if err != nil {
 		return err
 	}
 
-	err = pbSecret.RegisterSecretsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbSecret.RegisterSecretsHandlerServer(ctx, grpcGatewayMux, services.Secrets)
 	if err != nil {
 		return err
 	}
 
-	err = pbMe.RegisterMeHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbMe.RegisterMeHandlerServer(ctx, grpcGatewayMux, services.Me)
 	if err != nil {
 		return err
 	}
 
-	err = pbActions.RegisterActionsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbActions.RegisterActionsHandlerServer(ctx, grpcGatewayMux, services.Actions)
 	if err != nil {
 		return err
 	}
 
-	err = pbTriggers.RegisterTriggersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbTriggers.RegisterTriggersHandlerServer(ctx, grpcGatewayMux, services.Triggers)
 	if err != nil {
 		return err
 	}
 
-	err = pbWidgets.RegisterWidgetsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbWidgets.RegisterWidgetsHandlerServer(ctx, grpcGatewayMux, services.Widgets)
 	if err != nil {
 		return err
 	}
 
-	err = pbCanvases.RegisterCanvasesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbCanvases.RegisterCanvasesHandlerServer(ctx, grpcGatewayMux, services.Canvases)
 	if err != nil {
 		return err
 	}
 
-	err = pbCanvasFolders.RegisterCanvasFoldersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbCanvasFolders.RegisterCanvasFoldersHandlerServer(ctx, grpcGatewayMux, services.CanvasFolders)
 	if err != nil {
 		return err
 	}
 
-	err = pbServiceAccounts.RegisterServiceAccountsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbServiceAccounts.RegisterServiceAccountsHandlerServer(ctx, grpcGatewayMux, services.ServiceAccounts)
 	if err != nil {
 		return err
 	}
 
-	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbAgents.RegisterAgentsHandlerServer(ctx, grpcGatewayMux, services.Agents)
 	if err != nil {
 		return err
 	}
@@ -378,6 +384,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/repository/file",
 		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
+	).Methods(http.MethodGet)
+
+	s.Router.Handle(
+		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
+		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
 	).Methods(http.MethodGet)
 
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))

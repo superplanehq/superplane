@@ -61,11 +61,13 @@ function queryKeyStartsWith(queryKey: readonly unknown[], prefix: readonly unkno
 
 function isDraftRepositoryFileQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
   const repositoryPrefix = canvasKeys.repository(canvasId);
+  const fileSegmentIndex = repositoryPrefix.length;
   return (
     queryKeyStartsWith(queryKey, repositoryPrefix) &&
-    queryKey.length === repositoryPrefix.length + 3 &&
-    queryKey[repositoryPrefix.length] === "file" &&
-    queryKey[repositoryPrefix.length + 2] === versionId
+    queryKey.length === repositoryPrefix.length + 4 &&
+    queryKey[fileSegmentIndex] === "file" &&
+    queryKey[fileSegmentIndex + 2] === versionId &&
+    queryKey[fileSegmentIndex + 3] === "staged"
   );
 }
 

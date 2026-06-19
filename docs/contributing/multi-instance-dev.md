@@ -30,7 +30,6 @@ These are the ports you can override per repo:
 | Purpose | Env var | Example (A) | Example (B) |
 | --- | --- | --- | --- |
 | Public API | `PUBLIC_API_PORT` | `8000` | `8001` |
-| Internal gRPC | `INTERNAL_API_PORT` | `50051` | `50052` |
 | Vite dev server | `VITE_DEV_PORT` | `5173` | `5174` |
 | Vite preview | `VITE_PREVIEW_PORT` | `4173` | `4174` |
 | Storybook | `STORYBOOK_PORT` | `6006` | `6007` |
