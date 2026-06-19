@@ -130,6 +130,7 @@ import { useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
+  applyRunInspectionNavigationSearchParams,
   clearComponentSidebarSearchParams,
   getExitEditModeDisabledTooltip,
   getRunActionState,
@@ -4216,17 +4217,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
       startTransition(() => {
-        setSearchParams(
-          (current) => {
-            const next = new URLSearchParams(current);
-            next.set("run", runId);
-            next.delete("sidebar");
-            next.delete("node");
-            next.delete("file");
-            return next;
-          },
-          { replace: true },
-        );
+        setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
     [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
@@ -4254,19 +4245,11 @@ export function AppPage() {
       }
 
       setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.set("run", runId);
-          if (inspectorNodeId) {
-            next.set("sidebar", "1");
-            next.set("node", inspectorNodeId);
-          } else {
-            next.delete("sidebar");
-            next.delete("node");
-          }
-          next.delete("file");
-          return next;
-        },
+        (current) =>
+          applyRunInspectionNavigationSearchParams(current, {
+            runId,
+            nodeId: inspectorNodeId,
+          }),
         { replace: true },
       );
     },
@@ -4280,14 +4263,11 @@ export function AppPage() {
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       setRunDetailNodeId(options.nodeId);
       setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.set("run", options.runId);
-          next.set("sidebar", "1");
-          next.set("node", options.nodeId);
-          next.delete("file");
-          return next;
-        },
+        (current) =>
+          applyRunInspectionNavigationSearchParams(current, {
+            runId: options.runId,
+            nodeId: options.nodeId,
+          }),
         { replace: true },
       );
     },
@@ -4301,19 +4281,11 @@ export function AppPage() {
       preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
       clearDismissedRunDetail();
       setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.set("run", runId);
-          if (preservedNodeId) {
-            next.set("sidebar", "1");
-            next.set("node", preservedNodeId);
-          } else {
-            next.delete("sidebar");
-            next.delete("node");
-          }
-          next.delete("file");
-          return next;
-        },
+        (current) =>
+          applyRunInspectionNavigationSearchParams(current, {
+            runId,
+            nodeId: preservedNodeId,
+          }),
         { replace: true },
       );
     },

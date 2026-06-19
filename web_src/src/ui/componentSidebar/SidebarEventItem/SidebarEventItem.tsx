@@ -10,19 +10,10 @@ import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentB
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
-export interface ExecutionChainItem extends EventStateStyle {
-  name: string;
-  nodeId: string;
-  executionId: string;
-  state: string;
-  payload?: any;
-}
-
 export interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
-  executionChain?: ExecutionChainItem[];
 }
 
 interface SidebarEventItemProps {
@@ -57,22 +48,20 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   getExecutionState,
 }) => {
   // Determine default active tab based on available data
-  const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
+  const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" => {
     if (!tabData) return "current";
     if (tabData.current) return "current";
     if (tabData.root) return "root";
     if (tabData.payload) return "payload";
-    // Execution chain will be loaded lazily, so don't default to it
     return "current";
   }, [tabData]);
 
-  const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
+  const [activeTab, setActiveTab] = useState<"current" | "root" | "payload">(getDefaultActiveTab());
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const executionChainItems = tabData?.executionChain ?? [];
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -115,11 +104,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         setActiveTab(defaultTab);
       } else if (activeTab === "payload" && !tabData.payload) {
         setActiveTab(defaultTab);
-      } else if (activeTab === "executionChain" && executionChainItems.length === 0) {
-        setActiveTab(defaultTab);
       }
     }
-  }, [tabData, activeTab, getDefaultActiveTab, executionChainItems.length]);
+  }, [tabData, activeTab, getDefaultActiveTab]);
 
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
@@ -230,18 +217,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     }`}
                   >
                     Root
-                  </button>
-                )}
-                {tabData.executionChain && tabData.executionChain.length > 0 && (
-                  <button
-                    onClick={() => setActiveTab("executionChain")}
-                    className={`px-5 py-1 text-sm font-medium ${
-                      activeTab === "executionChain"
-                        ? "text-gray-800 border-b-1 border-black"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    Execution Chain
                   </button>
                 )}
               </div>
@@ -377,26 +352,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   enableClipboard={false}
                 />
               </div>
-            </div>
-          )}
-
-          {activeTab === "executionChain" && executionChainItems.length > 0 && (
-            <div className="w-full flex flex-col px-2 py-2">
-              <div className="text-sm text-gray-500 ml-2">
-                {executionChainItems.length} execution{executionChainItems.length === 1 ? "" : "s"}
-              </div>
-              {executionChainItems.map((execution, chainIndex) => (
-                <div key={chainIndex} className="flex flex-col">
-                  <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
-                    <div
-                      className={`uppercase text-xs py-[1px] px-[4px] font-semibold rounded flex items-center justify-center text-white ${execution.badgeColor} flex-shrink-0`}
-                    >
-                      <span>{execution.state}</span>
-                    </div>
-                    <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
 
