@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -36,7 +37,7 @@ func Test__EventContext__Emit(t *testing.T) {
 	t.Run("rejects large payload", func(t *testing.T) {
 		ctx := NewEventContext(database.Conn(), &nodes[0], nil)
 		largePayload := map[string]any{
-			"value": strings.Repeat("a", DefaultMaxPayloadSize+100),
+			"value": strings.Repeat("a", config.MaxPayloadSize()+100),
 		}
 
 		err := ctx.Emit("test.payload", largePayload)

@@ -570,7 +570,8 @@ The For Each component reads an array from the upstream payload and emits one do
 
 ### Limits
 
-- At most 500 items per execution. Larger arrays fail with an error.
+- At most 100 items per execution. Larger arrays fail with an error.
+- Self-hosted deployments can raise this cap with the `SUPERPLANE_MAX_EMIT_COUNT` environment variable.
 
 ### Output Fields (per item)
 
@@ -943,6 +944,11 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 - **Found**: At least one matching memory row was found
 - **Not Found**: No matching memory rows were found
+
+### Limits
+
+- When **Emit Mode** is `oneByOne`, at most 100 events are emitted per execution.
+- Self-hosted deployments can raise this cap with the `SUPERPLANE_MAX_EMIT_COUNT` environment variable.
 
 ### Example Output
 

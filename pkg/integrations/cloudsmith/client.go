@@ -171,37 +171,280 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 	return all, nil
 }
 
-// Package holds the Cloudsmith package fields relevant to license / policy /
-// governance compliance. Vulnerability fields are intentionally omitted — they
-// are covered by a separate component.
+// Package represents a Cloudsmith package with its metadata.
 type Package struct {
-	Name            string              `json:"name"`
-	Version         string              `json:"version"`
-	Slug            string              `json:"slug"`
-	SlugPerm        string              `json:"slug_perm"`
-	Namespace       string              `json:"namespace"`
-	Repository      string              `json:"repository"`
-	Format          string              `json:"format"`
-	Uploader        string              `json:"uploader"`
-	UploadedAt      string              `json:"uploaded_at"`
-	License         string              `json:"license"`
-	RawLicense      string              `json:"raw_license"`
-	SPDXLicense     string              `json:"spdx_license"`
-	OSIApproved     bool                `json:"osi_approved"`
-	PolicyViolated  bool                `json:"policy_violated"`
-	IsQuarantined   bool                `json:"is_quarantined"`
-	IsQuarantinable bool                `json:"is_quarantinable"`
-	Stage           string              `json:"stage_str"`
-	Status          string              `json:"status_str"`
-	StatusReason    string              `json:"status_reason"`
-	Tags            map[string][]string `json:"tags"`
-	SelfHTMLURL     string              `json:"self_html_url"`
-	SelfWebappURL   string              `json:"self_webapp_url"`
+	// Identity
+	Slug        string `json:"slug"`
+	SlugPerm    string `json:"slug_perm"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Version     string `json:"version"`
+	Filename    string `json:"filename"`
+	Format      string `json:"format"`
+	Repository  string `json:"repository"`
+	Namespace   string `json:"namespace"`
+	UploadedAt  string `json:"uploaded_at"`
+	Uploader    string `json:"uploader"`
 
-	// Security-scan summary carried on the package object.
-	SecurityScanStatus          string `json:"security_scan_status"`
-	SecurityScanCompletedAt     string `json:"security_scan_completed_at"`
-	VulnerabilityScanResultsURL string `json:"vulnerability_scan_results_url"`
+	// Status
+	Status          int    `json:"status"`
+	StatusStr       string `json:"status_str"`
+	StatusReason    string `json:"status_reason"`
+	StatusUpdatedAt string `json:"status_updated_at"`
+
+	// Stage / sync
+	Stage            int    `json:"stage"`
+	StageStr         string `json:"stage_str"`
+	StageUpdatedAt   string `json:"stage_updated_at"`
+	IsSyncAwaiting   bool   `json:"is_sync_awaiting"`
+	IsSyncCompleted  bool   `json:"is_sync_completed"`
+	IsSyncFailed     bool   `json:"is_sync_failed"`
+	IsSyncInFlight   bool   `json:"is_sync_in_flight"`
+	IsSyncInProgress bool   `json:"is_sync_in_progress"`
+	SyncFinishedAt   string `json:"sync_finished_at"`
+	SyncProgress     int    `json:"sync_progress"`
+
+	// Quarantine / policy
+	IsQuarantined  bool   `json:"is_quarantined"`
+	PolicyViolated bool   `json:"policy_violated"`
+	License        string `json:"license"`
+
+	// Security scanning
+	SecurityScanStatus      string `json:"security_scan_status"`
+	SecurityScanStartedAt   string `json:"security_scan_started_at"`
+	SecurityScanCompletedAt string `json:"security_scan_completed_at"`
+	VulnerabilityResultsURL string `json:"vulnerability_scan_results_url"`
+
+	// Checksums
+	ChecksumMD5    string `json:"checksum_md5"`
+	ChecksumSHA1   string `json:"checksum_sha1"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+	ChecksumSHA512 string `json:"checksum_sha512"`
+
+	// URLs
+	SelfURL       string `json:"self_url"`
+	SelfHTMLURL   string `json:"self_html_url"`
+	SelfWebappURL string `json:"self_webapp_url"`
+	CDNURL        string `json:"cdn_url"`
+
+	// Size / metadata
+	Size        int64  `json:"size"`
+	SizeStr     string `json:"size_str"`
+	Description string `json:"description"`
+	Summary     string `json:"summary"`
+
+	// Tags
+	Tags          map[string]any `json:"tags"`
+	TagsImmutable map[string]any `json:"tags_immutable"`
+}
+
+// GetPackage fetches a single package identified by namespace, repository slug, and package identifier.
+func (c *Client) GetPackage(owner, repo, identifier string) (*Package, error) {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+const packagePageSize = 100
+
+// ListPackages returns all packages in the given repository, following pagination.
+func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
+	var all []Package
+
+	for page := 1; ; page++ {
+		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), page, packagePageSize)
+		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var packages []Package
+		if err := json.Unmarshal(responseBody, &packages); err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		all = append(all, packages...)
+
+		if len(packages) < packagePageSize {
+			break
+		}
+	}
+
+	return all, nil
+}
+
+var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")
+
+// parseRepositoryID splits a Cloudsmith repository identifier of the form
+// "owner/repository" into its namespace (owner) and slug (identifier) parts.
+func parseRepositoryID(raw string) (owner string, identifier string, err error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", "", errInvalidRepositoryID
+	}
+
+	parts := strings.Split(value, "/")
+	if len(parts) != 2 {
+		return "", "", errInvalidRepositoryID
+	}
+
+	owner = strings.TrimSpace(parts[0])
+	identifier = strings.TrimSpace(parts[1])
+	if owner == "" || identifier == "" {
+		return "", "", errInvalidRepositoryID
+	}
+
+	return owner, identifier, nil
+}
+
+// RepositoryNodeMetadata caches the human-readable repository name so the UI can
+// display it without re-fetching from the API on every render.
+type RepositoryNodeMetadata struct {
+	RepositoryID        string `json:"repositoryId" mapstructure:"repositoryId"`
+	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
+	RepositoryNamespace string `json:"repositoryNamespace" mapstructure:"repositoryNamespace"`
+	RepositorySlug      string `json:"repositorySlug" mapstructure:"repositorySlug"`
+}
+
+// PackageNodeMetadata caches both the repository and package display names so the
+// UI can show human-readable labels without extra API calls.
+type PackageNodeMetadata struct {
+	RepositoryID        string `json:"repositoryId" mapstructure:"repositoryId"`
+	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
+	RepositoryNamespace string `json:"repositoryNamespace" mapstructure:"repositoryNamespace"`
+	RepositorySlug      string `json:"repositorySlug" mapstructure:"repositorySlug"`
+	PackageID           string `json:"packageId" mapstructure:"packageId"`
+	PackageName         string `json:"packageName" mapstructure:"packageName"`
+}
+
+// resolveRepositoryMetadata stores display metadata for the selected repository.
+// Expressions are stored verbatim because they can only be resolved at execution time.
+func resolveRepositoryMetadata(ctx core.SetupContext, repositoryID string) error {
+	if strings.Contains(repositoryID, "{{") {
+		return ctx.Metadata.Set(RepositoryNodeMetadata{
+			RepositoryID:   repositoryID,
+			RepositoryName: repositoryID,
+		})
+	}
+
+	owner, identifier, err := parseRepositoryID(repositoryID)
+	if err != nil {
+		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
+	}
+
+	var existing RepositoryNodeMetadata
+	decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if decodeErr == nil && existing.RepositoryID == repositoryID && existing.RepositoryName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repository, err := client.GetRepository(owner, identifier)
+	if err != nil {
+		return fmt.Errorf("failed to fetch repository %q: %w", repositoryID, err)
+	}
+
+	name := repository.Name
+	if name == "" {
+		name = identifier
+	}
+
+	return ctx.Metadata.Set(RepositoryNodeMetadata{
+		RepositoryID:        repositoryID,
+		RepositoryName:      name,
+		RepositoryNamespace: owner,
+		RepositorySlug:      identifier,
+	})
+}
+
+// resolvePackageMetadata fetches and caches both the repository and package names
+// for display in the canvas node. Expressions are stored verbatim.
+func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm string) error {
+	repoIsExpr := strings.Contains(repositoryID, "{{")
+	pkgIsExpr := strings.Contains(packageSlugPerm, "{{")
+
+	// If the repository itself is an expression we cannot resolve either field at setup time.
+	if repoIsExpr {
+		return ctx.Metadata.Set(PackageNodeMetadata{
+			RepositoryID:   repositoryID,
+			RepositoryName: repositoryID,
+			PackageID:      packageSlugPerm,
+			PackageName:    packageSlugPerm,
+		})
+	}
+
+	owner, identifier, err := parseRepositoryID(repositoryID)
+	if err != nil {
+		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
+	}
+
+	var existing PackageNodeMetadata
+	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
+		existing.RepositoryID == repositoryID &&
+		existing.PackageID == packageSlugPerm &&
+		existing.PackageName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repository, err := client.GetRepository(owner, identifier)
+	if err != nil {
+		return fmt.Errorf("failed to fetch repository %q: %w", repositoryID, err)
+	}
+
+	repoName := repository.Name
+	if repoName == "" {
+		repoName = identifier
+	}
+
+	// Package is an expression — store the resolved repository name but leave
+	// the package fields verbatim until the expression is evaluated at runtime.
+	if pkgIsExpr {
+		return ctx.Metadata.Set(PackageNodeMetadata{
+			RepositoryID:        repositoryID,
+			RepositoryName:      repoName,
+			RepositoryNamespace: owner,
+			RepositorySlug:      identifier,
+			PackageID:           packageSlugPerm,
+			PackageName:         packageSlugPerm,
+		})
+	}
+
+	pkg, err := client.GetPackage(owner, identifier, packageSlugPerm)
+	if err != nil {
+		return fmt.Errorf("failed to fetch package %q: %w", packageSlugPerm, err)
+	}
+
+	packageName := pkg.Slug
+	if packageName == "" {
+		packageName = packageSlugPerm
+	}
+
+	return ctx.Metadata.Set(PackageNodeMetadata{
+		RepositoryID:        repositoryID,
+		RepositoryName:      repoName,
+		RepositoryNamespace: owner,
+		RepositorySlug:      identifier,
+		PackageID:           packageSlugPerm,
+		PackageName:         packageName,
+	})
 }
 
 // VulnerabilityScan is a package's security-scan summary, delivered under
@@ -229,8 +472,7 @@ const requestBodyFormatJSONObject = 0
 // CreateWebhook registers a webhook on a repository (owner/repository) that
 // posts the given events to targetURL as a JSON object. When signatureKey is
 // non-empty, Cloudsmith signs each delivery with HMAC-SHA1 of the body using
-// that key (sent in the X-Cloudsmith-Signature header) so the receiver can
-// verify authenticity.
+// that key (sent in the X-Cloudsmith-Signature header).
 func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string, events []string) (*Webhook, error) {
 	templates := make([]map[string]string, 0, len(events))
 	for _, event := range events {
@@ -319,81 +561,4 @@ func (c *Client) DeleteWebhook(owner, repository, slugPerm string) error {
 		c.BaseURL, url.PathEscape(owner), url.PathEscape(repository), url.PathEscape(slugPerm))
 	_, err := c.execRequest(http.MethodDelete, requestURL, nil)
 	return err
-}
-
-var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")
-
-// parseRepositoryID splits a Cloudsmith repository identifier of the form
-// "owner/repository" into its namespace (owner) and slug (identifier) parts.
-func parseRepositoryID(raw string) (owner string, identifier string, err error) {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return "", "", errInvalidRepositoryID
-	}
-
-	parts := strings.Split(value, "/")
-	if len(parts) != 2 {
-		return "", "", errInvalidRepositoryID
-	}
-
-	owner = strings.TrimSpace(parts[0])
-	identifier = strings.TrimSpace(parts[1])
-	if owner == "" || identifier == "" {
-		return "", "", errInvalidRepositoryID
-	}
-
-	return owner, identifier, nil
-}
-
-// RepositoryNodeMetadata caches the human-readable repository name so the UI can
-// display it without re-fetching from the API on every render.
-type RepositoryNodeMetadata struct {
-	RepositoryID        string `json:"repositoryId" mapstructure:"repositoryId"`
-	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
-	RepositoryNamespace string `json:"repositoryNamespace" mapstructure:"repositoryNamespace"`
-	RepositorySlug      string `json:"repositorySlug" mapstructure:"repositorySlug"`
-}
-
-// resolveRepositoryMetadata stores display metadata for the selected repository.
-// Expressions are stored verbatim because they can only be resolved at execution time.
-func resolveRepositoryMetadata(ctx core.SetupContext, repositoryID string) error {
-	if strings.Contains(repositoryID, "{{") {
-		return ctx.Metadata.Set(RepositoryNodeMetadata{
-			RepositoryID:   repositoryID,
-			RepositoryName: repositoryID,
-		})
-	}
-
-	owner, identifier, err := parseRepositoryID(repositoryID)
-	if err != nil {
-		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
-	}
-
-	var existing RepositoryNodeMetadata
-	decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if decodeErr == nil && existing.RepositoryID == repositoryID && existing.RepositoryName != "" {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	repository, err := client.GetRepository(owner, identifier)
-	if err != nil {
-		return fmt.Errorf("failed to fetch repository %q: %w", repositoryID, err)
-	}
-
-	name := repository.Name
-	if name == "" {
-		name = identifier
-	}
-
-	return ctx.Metadata.Set(RepositoryNodeMetadata{
-		RepositoryID:        repositoryID,
-		RepositoryName:      name,
-		RepositoryNamespace: owner,
-		RepositorySlug:      identifier,
-	})
 }

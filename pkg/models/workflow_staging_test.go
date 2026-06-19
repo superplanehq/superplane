@@ -34,6 +34,7 @@ func TestWorkflowStagingUpsertListAndDiscard(t *testing.T) {
 		r.Organization.ID,
 		"canvas.yaml",
 		"nodes: []",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -50,6 +51,7 @@ func TestWorkflowStagingUpsertListAndDiscard(t *testing.T) {
 		r.Organization.ID,
 		"canvas.yaml",
 		"nodes: [updated]",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -60,6 +62,7 @@ func TestWorkflowStagingUpsertListAndDiscard(t *testing.T) {
 		r.Organization.ID,
 		"console.yaml",
 		"panels: []",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -102,6 +105,7 @@ func TestWorkflowStagingMarkDeleted(t *testing.T) {
 		draft.ID,
 		r.Organization.ID,
 		"console.yaml",
+		"",
 		&updatedBy,
 	))
 
@@ -115,6 +119,7 @@ func TestWorkflowStagingMarkDeleted(t *testing.T) {
 		r.Organization.ID,
 		"console.yaml",
 		"panels: [restored]",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -148,6 +153,7 @@ func TestWorkflowStagingIsolatedByDraft(t *testing.T) {
 		r.Organization.ID,
 		"canvas.yaml",
 		"draft: first",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -179,6 +185,7 @@ func TestWorkflowStagingCascadesOnDraftDelete(t *testing.T) {
 		r.Organization.ID,
 		"canvas.yaml",
 		"nodes: []",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)

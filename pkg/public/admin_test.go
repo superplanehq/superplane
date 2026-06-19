@@ -146,6 +146,7 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		err := json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.False(t, result.AllowPrivateNetworkAccess)
+		assert.True(t, result.SignupsEnabled)
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
 		assert.False(t, result.SMTPEnabled)
@@ -167,7 +168,7 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		metadata, err := models.GetInstallationMetadata()
+		metadata, err := models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		assert.True(t, metadata.AllowPrivateNetworkAccess)
 
@@ -177,6 +178,32 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		assert.True(t, result.AllowPrivateNetworkAccess)
 		assert.Empty(t, result.EffectiveBlockedHTTPHosts)
 		assert.Empty(t, result.EffectivePrivateIPRanges)
+	})
+
+	t.Run("admin can disable signups through installation settings", func(t *testing.T) {
+		body, err := json.Marshal(map[string]bool{
+			"signups_enabled": false,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		metadata, err := models.GetInstallationMetadata(database.Conn())
+		require.NoError(t, err)
+		assert.False(t, metadata.SignupsEnabled)
+
+		var result installationSettingsResponse
+		err = json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.False(t, result.SignupsEnabled)
 	})
 
 	t.Run("admin can read existing smtp settings", func(t *testing.T) {
@@ -278,14 +305,16 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 	t.Run("admin installation settings updates are atomic", func(t *testing.T) {
 		require.NoError(t, models.DeleteEmailSettings(models.EmailProviderSMTP))
 
-		metadata, err := models.GetInstallationMetadata()
+		metadata, err := models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		metadata.AllowPrivateNetworkAccess = false
+		metadata.SignupsEnabled = true
 		metadata.UpdatedAt = time.Now()
-		require.NoError(t, models.UpdateInstallationMetadata(metadata))
+		require.NoError(t, models.UpdateInstallationMetadata(database.Conn(), metadata))
 
 		body, err := json.Marshal(map[string]any{
 			"allow_private_network_access": true,
+			"signups_enabled":              false,
 			"smtp_enabled":                 true,
 			"smtp_host":                    "smtp.internal",
 			"smtp_port":                    2525,
@@ -306,9 +335,10 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 
-		metadata, err = models.GetInstallationMetadata()
+		metadata, err = models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		assert.False(t, metadata.AllowPrivateNetworkAccess)
+		assert.True(t, metadata.SignupsEnabled)
 
 		_, err = models.FindEmailSettings(models.EmailProviderSMTP)
 		require.Error(t, err)

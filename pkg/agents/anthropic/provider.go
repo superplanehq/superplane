@@ -15,6 +15,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 )
 
 const ProviderName = "anthropic"
@@ -46,6 +47,10 @@ func New(cfg Config) (*Provider, error) {
 }
 
 func (p *Provider) Name() string { return ProviderName }
+
+func (p *Provider) ToolSchemaRevision() string {
+	return agenttools.SchemaRevision()
+}
 
 func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	body := map[string]any{
@@ -96,11 +101,25 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		return fmt.Errorf("anthropic: provider session id is required")
 	}
 
+	content := []map[string]any{
+		{"type": "text", "text": withPreamble(message, opts.ContextPreamble)},
+	}
+	for _, image := range opts.Images {
+		content = append(content, map[string]any{
+			"type": "image",
+			"source": map[string]string{
+				"type":       "base64",
+				"media_type": image.MediaType,
+				"data":       image.Data,
+			},
+		})
+	}
+
 	body := map[string]any{
 		"events": []map[string]any{
 			{
 				"type":    "user.message",
-				"content": []map[string]string{{"type": "text", "text": withPreamble(message, opts.ContextPreamble)}},
+				"content": content,
 			},
 		},
 	}
@@ -259,6 +278,21 @@ func (p *Provider) DeleteSession(ctx context.Context, providerSessionID string) 
 
 	if _, err := p.client.executeHTTP(ctx, http.MethodDelete, "/sessions/"+url.PathEscape(providerSessionID), nil); err != nil {
 		return fmt.Errorf("anthropic: delete session: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Provider) ArchiveSession(ctx context.Context, providerSessionID string) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+url.PathEscape(providerSessionID)+"/archive", nil); err != nil {
+		if isProviderSessionUnavailable(err) {
+			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
+		}
+		return fmt.Errorf("anthropic: archive session: %w", err)
 	}
 
 	return nil

@@ -1,6 +1,5 @@
 import type {
   CanvasesCanvasEvent,
-  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
@@ -11,6 +10,10 @@ import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "../mappers";
 import { buildEventInfo, buildExecutionInfo, getNodeComponentName } from "../utils";
+
+export type CanvasEventWithExecutions = CanvasesCanvasEvent & {
+  executions?: CanvasesCanvasNodeExecutionRef[];
+};
 
 export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
@@ -116,7 +119,7 @@ export function getStatusBadgeProps(status: string) {
 
 export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
 
-export function getRunRootEventForDisplay(run: CanvasesCanvasRun): CanvasesCanvasEventWithExecutions | null {
+export function getRunRootEventForDisplay(run: CanvasesCanvasRun): CanvasEventWithExecutions | null {
   const rootEvent = run.rootEvent;
   if (!rootEvent?.id) {
     return null;
@@ -160,7 +163,7 @@ function matchesStatusFilter(executions: CanvasesCanvasNodeExecutionRef[], statu
 }
 
 function matchesSearchQuery(
-  event: CanvasesCanvasEventWithExecutions,
+  event: CanvasEventWithExecutions,
   executions: CanvasesCanvasNodeExecutionRef[],
   nodes: ComponentsNode[],
   query: string,

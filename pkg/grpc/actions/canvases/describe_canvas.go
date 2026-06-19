@@ -21,7 +21,9 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	orgID := uuid.MustParse(organizationID)
-	canvas, err := findCanvas(ctx, orgID, canvasID)
+	db := database.DB(ctx)
+
+	canvas, err := loadCanvas(ctx, db, orgID, canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
@@ -30,7 +32,7 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 	if canvas.CreatedBy != nil {
 		err = telemetry.RunSpan(ctx, "canvases.load_creator", func(ctx context.Context) error {
 			var loadErr error
-			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(database.DB(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
+			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(db, canvas.OrganizationID.String(), canvas.CreatedBy.String())
 			return loadErr
 		})
 		if err != nil {
@@ -38,7 +40,17 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		}
 	}
 
-	proto, err := serializeCanvas(ctx, canvas, true, user)
+	liveVersion, err := loadLiveCanvasVersion(ctx, db, canvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	canvasStatus, err := loadCanvasStatus(ctx, db, canvas.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas status: %v", err)
+	}
+
+	proto, err := serializeCanvas(ctx, canvas, liveVersion, user, canvasStatus)
 	if err != nil {
 		log.Errorf("failed to serialize canvas %s: %v", canvas.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to serialize workflow")

@@ -62,7 +62,6 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	t.Setenv("SENTRY_DSN", "")
 	t.Setenv("SENTRY_ENVIRONMENT", "")
 	t.Setenv("POSTHOG_KEY", "")
-	t.Setenv("AGENT_ENABLED", "no")
 
 	data := newIndexTemplateDataFromEnv()
 	if data.Dash0WebOTLPEndpoint != "https://example.test:4318" {
@@ -76,8 +75,5 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	}
 	if data.Dash0WebEnvironment != "development" {
 		t.Fatalf("Dash0WebEnvironment = %q", data.Dash0WebEnvironment)
-	}
-	if data.AgentEnabled {
-		t.Fatal("expected AgentEnabled to be false")
 	}
 }

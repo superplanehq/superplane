@@ -60,9 +60,13 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
+func FindCanvasEvents(tx *gorm.DB, ids []string) ([]CanvasEvent, error) {
+	if len(ids) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("id IN ?", ids).
 		Find(&events).
 		Error
@@ -74,9 +78,13 @@ func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
 	return events, nil
 }
 
-func FindCanvasEventsForExecutions(executionIDs []string) ([]CanvasEvent, error) {
+func FindCanvasEventsForExecutions(tx *gorm.DB, executionIDs []string) ([]CanvasEvent, error) {
+	if len(executionIDs) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("execution_id IN ?", executionIDs).
 		Find(&events).
 		Error
@@ -417,9 +425,9 @@ func (e *CanvasEvent) RoutedInTransaction(tx *gorm.DB) error {
 // FindLastEventPerNode finds the most recent event for each node in a workflow
 // using DISTINCT ON to get one event per node_id, ordered by created_at DESC
 // Only returns events for nodes that have not been deleted
-func FindLastEventPerNode(canvasID uuid.UUID) ([]CanvasEvent, error) {
+func FindLastEventPerNode(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Raw(`
 			SELECT DISTINCT ON (we.node_id) we.*
 			FROM workflow_events we

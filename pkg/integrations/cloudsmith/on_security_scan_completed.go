@@ -236,7 +236,7 @@ func (t *OnSecurityScanCompleted) HandleWebhook(ctx core.WebhookRequestContext) 
 		SlugPerm:                    pkg.SlugPerm,
 		Format:                      pkg.Format,
 		SecurityScanStatus:          pkg.SecurityScanStatus,
-		VulnerabilityScanResultsURL: pkg.VulnerabilityScanResultsURL,
+		VulnerabilityScanResultsURL: pkg.VulnerabilityResultsURL,
 		HasVulnerabilities:          scan.HasVulnerabilities,
 		MaxSeverity:                 scan.MaxSeverity,
 		NumVulnerabilities:          scan.NumVulnerabilities,

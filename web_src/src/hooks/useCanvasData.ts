@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -18,6 +19,7 @@ import {
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListRuns,
+  canvasesDescribeRun,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesCreateCanvasMemoryNamespace,
@@ -40,6 +42,7 @@ import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
   CanvasesCanvasSummary,
+  CanvasesCanvasRun,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -52,7 +55,7 @@ import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
 import { draftVersionId } from "../lib/draftVersion";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/app/lib/canvas-versions";
+import { isDraftVersion, isPublishedVersion } from "../pages/app/lib/canvas-versions";
 import {
   canvasVersionWithSpecFromYaml,
   fetchCanvasVersionWithSpec,
@@ -210,6 +213,7 @@ export const canvasKeys = {
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
     ] as const,
+  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -235,8 +239,8 @@ export const canvasKeys = {
   consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
-  repositoryFile: (canvasId: string, path: string, versionId?: string) =>
-    [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live"] as const,
+  repositoryFile: (canvasId: string, path: string, versionId?: string, stage = false) =>
+    [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live", stage ? "staged" : "committed"] as const,
   // Raw repository-file content keyed per stage so cached reads can be reused
   // and deduped (e.g. the Files diff and committed-baseline lookups). It
   // prefix-extends `repositoryFile`, so any invalidation of a file (or the
@@ -398,18 +402,27 @@ export const useInfiniteCanvasLiveVersions = (
   });
 };
 
+function resolveCanvasVersionStage(stage: boolean | CanvasesCanvasVersion | null | undefined): boolean {
+  if (typeof stage === "boolean") {
+    return stage;
+  }
+
+  return !!stage && isDraftVersion(stage);
+}
+
 export const useCanvasVersion = (
   organizationId: string,
   canvasId: string,
   versionId: string,
   enabled = true,
-  stage = false,
+  stage: boolean | CanvasesCanvasVersion | null = false,
 ) => {
+  const readStaged = resolveCanvasVersionStage(stage);
   return useQuery({
-    queryKey: stage
+    queryKey: readStaged
       ? canvasKeys.versionStagedDetail(canvasId, versionId)
       : canvasKeys.versionDetail(canvasId, versionId),
-    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, stage),
+    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, readStaged),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
   });
 };
@@ -1127,6 +1140,33 @@ export type CanvasRunsFilters = {
   results?: CanvasesCanvasRunResult[];
 };
 
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, runId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId: runId!,
+          },
+        }),
+      );
+      const described = response.data;
+      if (!described?.run) {
+        return described;
+      }
+
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      return upsertRunIntoDescribeRunData(current, described.run);
+    },
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && !!runId && enabled,
+  });
+};
+
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
   const limit = 25;
 
@@ -1756,10 +1796,13 @@ export const useUpdateCanvasConsole = (
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 
-async function fetchRepositoryFileContent(canvasId: string, path: string, versionId?: string): Promise<string> {
-  // Draft file reads (versionId present) return effective staged content so the
-  // Files tab reflects uncommitted edits.
-  return fetchRepositorySpecFileContent(canvasId, path, versionId, !!versionId);
+async function fetchRepositoryFileContent(
+  canvasId: string,
+  path: string,
+  versionId?: string,
+  stage = false,
+): Promise<string> {
+  return fetchRepositorySpecFileContent(canvasId, path, versionId, stage);
 }
 
 // fetchRepositoryFileContentCached reads raw repository-file content through the
@@ -1822,12 +1865,13 @@ export const useCanvasRepositoryFile = (
   path: string | null,
   enabled: boolean = true,
   versionId?: string,
+  stage = false,
 ) => {
   const normalizedPath = path ?? "";
   return useQuery({
-    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId),
+    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId, stage),
     queryFn: async () => {
-      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId);
+      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId, stage);
       return {
         path: normalizedPath,
         content,

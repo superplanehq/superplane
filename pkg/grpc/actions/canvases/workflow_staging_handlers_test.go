@@ -205,3 +205,28 @@ func TestStagedReadRequiresDraftOwner(t *testing.T) {
 	_, err = ReadRepositorySpecFileStaged(otherCtx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
 	require.Error(t, err)
 }
+
+func TestReadRepositorySpecFileStagedPublishedVersionReturnsCommitted(t *testing.T) {
+	r, ctx, canvasID, versionID := setupStagingDraft(t)
+	orgID := r.Organization.ID.String()
+
+	committed, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+
+	_, err = PublishCanvasVersion(
+		ctx,
+		r.Encryptor,
+		r.Registry,
+		r.GitProvider,
+		orgID,
+		canvasID,
+		versionID,
+		testWebhookBaseURL,
+		r.AuthService,
+	)
+	require.NoError(t, err)
+
+	stagedRead, err := ReadRepositorySpecFileStaged(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	assert.Equal(t, committed, stagedRead)
+}

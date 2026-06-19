@@ -235,7 +235,7 @@ func (t *OnPackageCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *
 		License:    pkg.License,
 		Uploader:   pkg.Uploader,
 		UploadedAt: pkg.UploadedAt,
-		Status:     pkg.Status,
+		Status:     pkg.StatusStr,
 	}
 
 	if err := ctx.Events.Emit("cloudsmith.package.created", event); err != nil {
