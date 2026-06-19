@@ -232,6 +232,10 @@ func ReadStagedRepositoryFile(
 		return "", false, false, err
 	}
 
+	if version.State != models.CanvasVersionStateDraft {
+		return "", false, false, nil
+	}
+
 	if err := ensureStagedReadAllowed(ctx, version); err != nil {
 		return "", false, false, err
 	}
