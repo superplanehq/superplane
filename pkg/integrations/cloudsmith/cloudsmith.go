@@ -71,6 +71,9 @@ func (c *Cloudsmith) Actions() []core.Action {
 	return []core.Action{
 		&GetRepository{},
 		&GetPackage{},
+		&ResyncPackage{},
+		&TagPackage{},
+		&DeletePackage{},
 	}
 }
 
