@@ -197,8 +197,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
-	err = server.RegisterGRPCGateway("localhost:50051")
-	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, gitProvider, nil)
 
 	response := execRequest(server, requestParams{
 		method: "GET",

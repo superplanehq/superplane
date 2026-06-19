@@ -94,13 +94,14 @@ export function useEditor({
   const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
 
-  const selection = useRepositorySelectedFileQuery(
+  const selection = useRepositorySelectedFileQuery({
     canvasId,
-    tabs.selectedPath,
-    effectiveRepositoryPathSet,
-    catalog.generatedFilesByPath,
+    selectedPath: tabs.selectedPath,
+    repositoryPathSet: effectiveRepositoryPathSet,
+    generatedFilesByPath: catalog.generatedFilesByPath,
     versionId,
-  );
+    stage: isEditing,
+  });
 
   useEditorLifecycle({
     canvasId,
