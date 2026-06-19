@@ -8,13 +8,15 @@ import (
 )
 
 type indexTemplateData struct {
-	SentryDSN            string
-	SentryEnvironment    string
-	PostHogKey           string
-	Dash0WebOTLPEndpoint string
-	Dash0WebAuthToken    string
-	Dash0WebServiceName  string
-	Dash0WebEnvironment  string
+	SentryDSN                         string
+	SentryEnvironment                 string
+	PostHogKey                        string
+	Dash0WebOTLPEndpoint              string
+	Dash0WebAuthToken                 string
+	Dash0WebServiceName               string
+	Dash0WebEnvironment               string
+	SignupWaitlistMailerLiteAccountID string
+	SignupWaitlistMailerLiteFormID    string
 }
 
 func dash0WebEnvironment() string {
@@ -39,13 +41,15 @@ func dash0WebServiceName() string {
 
 func newIndexTemplateDataFromEnv() indexTemplateData {
 	return indexTemplateData{
-		SentryDSN:            os.Getenv("SENTRY_DSN"),
-		SentryEnvironment:    os.Getenv("SENTRY_ENVIRONMENT"),
-		PostHogKey:           os.Getenv("POSTHOG_KEY"),
-		Dash0WebOTLPEndpoint: os.Getenv("DASH0_WEB_OTLP_ENDPOINT"),
-		Dash0WebAuthToken:    os.Getenv("DASH0_WEB_AUTH_TOKEN"),
-		Dash0WebServiceName:  dash0WebServiceName(),
-		Dash0WebEnvironment:  dash0WebEnvironment(),
+		SentryDSN:                         os.Getenv("SENTRY_DSN"),
+		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
+		PostHogKey:                        os.Getenv("POSTHOG_KEY"),
+		Dash0WebOTLPEndpoint:              os.Getenv("DASH0_WEB_OTLP_ENDPOINT"),
+		Dash0WebAuthToken:                 os.Getenv("DASH0_WEB_AUTH_TOKEN"),
+		Dash0WebServiceName:               dash0WebServiceName(),
+		Dash0WebEnvironment:               dash0WebEnvironment(),
+		SignupWaitlistMailerLiteAccountID: os.Getenv("SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID"),
+		SignupWaitlistMailerLiteFormID:    os.Getenv("SIGNUP_WAITLIST_MAILERLITE_FORM_ID"),
 	}
 }
 
