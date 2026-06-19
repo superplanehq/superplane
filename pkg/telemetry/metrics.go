@@ -18,18 +18,18 @@ var (
 	metricsReady atomic.Bool
 
 	queueWorkerTickHistogram         metric.Float64Histogram
-	queueWorkerNodesCountHistogram   metric.Int64Histogram
+	queueWorkerNodesCountGauge       metric.Int64Gauge
 	queueWorkerNodesCounter          metric.Int64Counter
 	queueWorkerNodeDurationHistogram metric.Float64Histogram
 	queueWorkerStuckItems            metric.Int64Histogram
 
 	executorWorkerTickHistogram              metric.Float64Histogram
-	executorWorkerNodesCountHistogram        metric.Int64Histogram
+	executorWorkerNodesCountGauge            metric.Int64Gauge
 	executorWorkerExecutionsCounter          metric.Int64Counter
 	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
 	eventWorkerTickHistogram          metric.Float64Histogram
-	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsCountGauge       metric.Int64Gauge
 	eventWorkerEventsCounter          metric.Int64Counter
 	eventWorkerEventDurationHistogram metric.Float64Histogram
 
@@ -37,7 +37,7 @@ var (
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
 
 	webhookProvisionerWorkerTickHistogram            metric.Float64Histogram
-	webhookProvisionerWorkerWebhooksCountHistogram   metric.Int64Histogram
+	webhookProvisionerWorkerWebhooksCountGauge       metric.Int64Gauge
 	webhookProvisionerWorkerWebhooksCounter          metric.Int64Counter
 	webhookProvisionerWorkerWebhookDurationHistogram metric.Float64Histogram
 
@@ -50,7 +50,7 @@ var (
 	workflowCleanupWorkerCanvasesCountHistogram metric.Int64Histogram
 
 	runFinalizerTickHistogram        metric.Float64Histogram
-	runFinalizerRunsCountHistogram   metric.Int64Histogram
+	runFinalizerRunsCountGauge       metric.Int64Gauge
 	runFinalizerRunsCounter          metric.Int64Counter
 	runFinalizerRunDurationHistogram metric.Float64Histogram
 
@@ -131,9 +131,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	queueWorkerNodesCountHistogram, err = meter.Int64Histogram(
+	queueWorkerNodesCountGauge, err = meter.Int64Gauge(
 		"queue_worker.tick.nodes.ready",
-		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
+		metric.WithDescription("Number of workflow nodes ready to be processed on the last queue worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -167,9 +167,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	executorWorkerNodesCountHistogram, err = meter.Int64Histogram(
+	executorWorkerNodesCountGauge, err = meter.Int64Gauge(
 		"executor_worker.tick.nodes.pending",
-		metric.WithDescription("Number of pending workflow node executions each tick"),
+		metric.WithDescription("Number of pending workflow node executions on the last executor worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -203,9 +203,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	eventWorkerEventsCountHistogram, err = meter.Int64Histogram(
+	eventWorkerEventsCountGauge, err = meter.Int64Gauge(
 		"event_worker.tick.events.pending",
-		metric.WithDescription("Number of pending workflow events each tick"),
+		metric.WithDescription("Number of pending workflow events on the last event worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -257,9 +257,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	webhookProvisionerWorkerWebhooksCountHistogram, err = meter.Int64Histogram(
+	webhookProvisionerWorkerWebhooksCountGauge, err = meter.Int64Gauge(
 		"webhook_provisioner_worker.tick.webhooks.pending",
-		metric.WithDescription("Number of pending webhooks each tick"),
+		metric.WithDescription("Number of pending webhooks on the last webhook provisioner tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -347,9 +347,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	runFinalizerRunsCountHistogram, err = meter.Int64Histogram(
+	runFinalizerRunsCountGauge, err = meter.Int64Gauge(
 		"run_finalizer.tick.runs.started",
-		metric.WithDescription("Number of started workflow runs processed each sweep tick"),
+		metric.WithDescription("Number of started workflow runs on the last run finalizer sweep tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -521,7 +521,7 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 		return
 	}
 
-	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
+	queueWorkerNodesCountGauge.Record(ctx, int64(count))
 }
 
 func RecordQueueWorkerNodeProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
@@ -557,7 +557,7 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 		return
 	}
 
-	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
+	executorWorkerNodesCountGauge.Record(ctx, int64(count))
 }
 
 func RecordExecutorWorkerExecution(ctx context.Context, d time.Duration, outcome, reason, component string) {
@@ -595,7 +595,7 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 		return
 	}
 
-	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+	eventWorkerEventsCountGauge.Record(ctx, int64(count))
 }
 
 func RecordEventWorkerEventProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
@@ -647,7 +647,7 @@ func RecordWebhookProvisionerWorkerWebhooksCount(ctx context.Context, count int)
 		return
 	}
 
-	webhookProvisionerWorkerWebhooksCountHistogram.Record(ctx, int64(count))
+	webhookProvisionerWorkerWebhooksCountGauge.Record(ctx, int64(count))
 }
 
 func RecordWebhookProvisionerWorkerWebhookProcessing(ctx context.Context, d time.Duration, outcome, reason, appName string) {
@@ -737,7 +737,7 @@ func RecordRunFinalizerRunsCount(ctx context.Context, count int) {
 		return
 	}
 
-	runFinalizerRunsCountHistogram.Record(ctx, int64(count))
+	runFinalizerRunsCountGauge.Record(ctx, int64(count))
 }
 
 func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigger, outcome, reason string) {
