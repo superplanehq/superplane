@@ -405,6 +405,19 @@ CREATE TABLE public.repositories (
 
 
 --
+-- Name: repository_seed_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repository_seed_files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    repository_id uuid NOT NULL,
+    path text NOT NULL,
+    content bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -941,6 +954,22 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: repository_seed_files repository_seed_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repository_seed_files repository_seed_files_repository_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_repository_id_path_key UNIQUE (repository_id, path);
+
+
+--
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1308,6 +1337,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
+
+
+--
+-- Name: idx_repository_seed_files_repository_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_files USING btree (repository_id);
 
 
 --
@@ -1739,6 +1775,14 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: repository_seed_files repository_seed_files_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id) ON DELETE CASCADE;
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2018,7 +2062,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260618203501	f
+20260618234242	f
 \.
 
 
