@@ -40,7 +40,7 @@ func mustRunnerLiveLogServer(t *testing.T, r *support.ResourceRegistry) (*Server
 		false,
 	)
 	require.NoError(t, err)
-	require.NoError(t, server.RegisterGRPCGateway("localhost:50051"))
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 	return server, signer
 }
 

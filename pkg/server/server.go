@@ -311,31 +311,31 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go magicCodeEmailConsumer.Start()
 }
 
-func startInternalAPI(
-	baseURL, webhooksBaseURL, basePath string,
+func buildGRPCServices(
+	baseURL, webhooksBaseURL string,
 	encryptor crypto.Encryptor,
-	jwtSigner *jwt.Signer,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
-) {
-	log.Println("Starting Internal API")
+) (*grpc.Services, error) {
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("initialize usage service: %w", err)
+	}
 
-	grpc.RunServer(
-		baseURL,
-		webhooksBaseURL,
-		basePath,
-		encryptor,
-		jwtSigner,
-		authService,
-		registry,
-		oidcProvider,
-		gitProvider,
-		agentService,
-		lookupInternalAPIPort(),
-	)
+	return grpc.NewServices(grpc.ServicesConfig{
+		BaseURL:         baseURL,
+		WebhooksBaseURL: webhooksBaseURL,
+		Encryptor:       encryptor,
+		AuthService:     authService,
+		Registry:        registry,
+		OIDCProvider:    oidcProvider,
+		GitProvider:     gitProvider,
+		AgentService:    agentService,
+		UsageService:    usageService,
+	})
 }
 
 func startPublicAPI(
@@ -346,6 +346,7 @@ func startPublicAPI(
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
 	gitProvider gitprovider.Provider,
+	grpcServices *grpc.Services,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -386,21 +387,14 @@ func startPublicAPI(
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
-		log.Println("Adding gRPC Gateway to Public API")
+	log.Println("Registering gRPC gateway handlers on Public API")
 
-		grpcServerAddr := os.Getenv("GRPC_SERVER_ADDR")
-		if grpcServerAddr == "" {
-			grpcServerAddr = "localhost:50051"
-		}
-
-		err := server.RegisterGRPCGateway(grpcServerAddr)
-		if err != nil {
-			log.Fatalf("Failed to register gRPC gateway: %v", err)
-		}
-
-		server.RegisterOpenAPIHandler()
+	err = server.RegisterGRPCGateway(grpcServices)
+	if err != nil {
+		log.Fatalf("Failed to register gRPC gateway: %v", err)
 	}
+
+	server.RegisterOpenAPIHandler()
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -425,20 +419,6 @@ func lookupPublicAPIPort() int {
 			port = v
 		} else {
 			log.Warnf("Invalid PUBLIC_API_PORT %q, falling back to 8000", p)
-		}
-	}
-
-	return port
-}
-
-func lookupInternalAPIPort() int {
-	port := 50051
-
-	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
-		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
-			port = v
-		} else {
-			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
 		}
 	}
 
@@ -603,7 +583,23 @@ func Start() {
 
 	agentProvider, agentService := buildAgentService(authService)
 
+	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
+		services, err := buildGRPCServices(
+			baseURL,
+			webhooksBaseURL,
+			encryptorInstance,
+			authService,
+			registry,
+			oidcProvider,
+			gitProvider,
+			agentService,
+		)
+		if err != nil {
+			log.Fatalf("failed to build gRPC services: %v", err)
+		}
+		grpcServices = services
+
 		go startPublicAPI(
 			baseURL,
 			basePath,
@@ -613,21 +609,7 @@ func Start() {
 			oidcProvider,
 			authService,
 			gitProvider,
-		)
-	}
-
-	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(
-			baseURL,
-			webhooksBaseURL,
-			basePath,
-			encryptorInstance,
-			jwtSigner,
-			authService,
-			registry,
-			oidcProvider,
-			gitProvider,
-			agentService,
+			grpcServices,
 		)
 	}
 
