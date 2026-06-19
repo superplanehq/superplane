@@ -37,6 +37,7 @@ describe("SignupWaitlist", () => {
     document.cookie = "hubspotutk=visitor-1; path=/";
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
+    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION = "eu1";
 
     render(<SignupWaitlist />);
 
@@ -48,7 +49,7 @@ describe("SignupWaitlist", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.hsforms.com/submissions/v3/integration/submit/portal-1/form-1",
+      "https://api-eu1.hsforms.com/submissions/v3/integration/submit/portal-1/form-1",
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },

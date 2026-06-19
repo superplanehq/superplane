@@ -14,8 +14,18 @@ type HubSpotSubmissionPayload = {
   context?: HubSpotSubmissionContext;
 };
 
-const hubSpotSubmissionURL = ({ portalID, formID }: SignupWaitlistConfig) =>
-  `https://api.hsforms.com/submissions/v3/integration/submit/${encodeURIComponent(portalID)}/${encodeURIComponent(formID)}`;
+const defaultHubSpotFormsHost = "api.hsforms.com";
+
+const getHubSpotFormsHost = (region?: string) => {
+  if (!region || region === "na1") {
+    return defaultHubSpotFormsHost;
+  }
+
+  return `api-${region}.hsforms.com`;
+};
+
+const hubSpotSubmissionURL = ({ portalID, formID, region }: SignupWaitlistConfig) =>
+  `https://${getHubSpotFormsHost(region)}/submissions/v3/integration/submit/${encodeURIComponent(portalID)}/${encodeURIComponent(formID)}`;
 
 const getCookieValue = (name: string) => {
   const prefix = `${name}=`;

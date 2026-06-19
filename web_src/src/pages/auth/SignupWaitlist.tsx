@@ -8,10 +8,12 @@ import { submitSignupWaitlistEmail } from "@/lib/hubspotForms";
 import { Text } from "@/components/Text/text";
 import { getSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 
+type SignupWaitlistStatus = "idle" | "submitting" | "submitted" | "failed";
+
 export const SignupWaitlist: React.FC = () => {
   const hubSpotConfig = getSignupWaitlistConfig();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "submitted" | "failed">("idle");
+  const [status, setStatus] = useState<SignupWaitlistStatus>("idle");
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
