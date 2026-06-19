@@ -1,61 +1,85 @@
 import type React from "react";
 import { useEffect } from "react";
 import { Text } from "@/components/Text/text";
+import { getSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 
-const mailerLiteScriptID = "mailerlite-universal-script";
-const mailerLiteAccountID = "1905484";
+const hubSpotScriptID = "hubspot-forms-script";
+const hubSpotFormTargetID = "signup-waitlist-hubspot-form";
 
-type MailerLiteClient = {
-  (...args: unknown[]): void;
-  q?: unknown[][];
+type HubSpotFormOptions = {
+  portalId: string;
+  formId: string;
+  target: string;
+  region?: string;
 };
 
-type MailerLiteWindow = Window & {
-  ml?: MailerLiteClient;
-};
-
-const ensureMailerLiteClient = () => {
-  const win = window as MailerLiteWindow;
-  if (win.ml) {
-    return win.ml;
-  }
-
-  const queuedClient: MailerLiteClient = (...args: unknown[]) => {
-    queuedClient.q = queuedClient.q || [];
-    queuedClient.q.push(args);
+type HubSpotWindow = Window & {
+  hbspt?: {
+    forms?: {
+      create: (options: HubSpotFormOptions) => void;
+    };
   };
-
-  win.ml = queuedClient;
-  return queuedClient;
 };
 
-const loadMailerLiteScript = () => {
-  if (document.getElementById(mailerLiteScriptID)) {
-    return;
+const loadHubSpotScript = () => {
+  const existingScript = document.getElementById(hubSpotScriptID) as HTMLScriptElement | null;
+  if (existingScript) {
+    return existingScript;
   }
 
   const script = document.createElement("script");
-  script.id = mailerLiteScriptID;
+  script.id = hubSpotScriptID;
   script.async = true;
-  script.src = "https://assets.mailerlite.com/js/universal.js";
+  script.src = "https://js.hsforms.net/forms/embed/v2.js";
   document.head.appendChild(script);
+  return script;
 };
 
 export const SignupWaitlist: React.FC = () => {
+  const hubSpotConfig = getSignupWaitlistConfig();
+  const hubSpotPortalID = hubSpotConfig?.portalID;
+  const hubSpotFormID = hubSpotConfig?.formID;
+  const hubSpotRegion = hubSpotConfig?.region;
+  const hasHubSpotForm = Boolean(hubSpotPortalID && hubSpotFormID);
+
   useEffect(() => {
-    const ml = ensureMailerLiteClient();
-    loadMailerLiteScript();
-    ml("account", mailerLiteAccountID);
-  }, []);
+    if (!hubSpotPortalID || !hubSpotFormID) {
+      return;
+    }
+
+    const renderForm = () => {
+      const forms = (window as HubSpotWindow).hbspt?.forms;
+      if (!forms) {
+        return;
+      }
+
+      forms.create({
+        portalId: hubSpotPortalID,
+        formId: hubSpotFormID,
+        target: `#${hubSpotFormTargetID}`,
+        ...(hubSpotRegion ? { region: hubSpotRegion } : {}),
+      });
+    };
+
+    if ((window as HubSpotWindow).hbspt?.forms) {
+      renderForm();
+      return;
+    }
+
+    const script = loadHubSpotScript();
+    script.addEventListener("load", renderForm);
+
+    return () => script.removeEventListener("load", renderForm);
+  }, [hubSpotFormID, hubSpotPortalID, hubSpotRegion]);
 
   return (
     <div className="space-y-4">
       <Text className="text-left text-sm leading-6 text-gray-600">
-        We are opening access gradually while demand is high. Leave your email and we will send an invite as soon as
-        capacity is available.
+        We are opening access gradually while demand is high.
+        {hasHubSpotForm && " Leave your email and we will send an invite as soon as capacity is available."}
       </Text>
 
-      <div className="ml-embedded -mx-5" data-form="BwOnd2" />
+      {hasHubSpotForm && <div id={hubSpotFormTargetID} className="-mx-5" />}
     </div>
   );
 };

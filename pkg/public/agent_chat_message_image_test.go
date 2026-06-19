@@ -27,7 +27,7 @@ func TestAgentChatMessageImage(t *testing.T) {
 		"", "http://localhost", "http://localhost", "test", "/app/templates", r.AuthService, nil, false,
 	)
 	require.NoError(t, err)
-	require.NoError(t, server.RegisterGRPCGateway("localhost:50051"))
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 
 	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)

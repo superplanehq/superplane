@@ -422,21 +422,24 @@ func (e *CanvasEvent) RoutedInTransaction(tx *gorm.DB) error {
 	return tx.Save(e).Error
 }
 
-// FindLastEventPerNode finds the most recent event for each node in a workflow
-// using DISTINCT ON to get one event per node_id, ordered by created_at DESC
-// Only returns events for nodes that have not been deleted
+// FindLastEventPerNode finds the most recent event for each node in a workflow.
+// Only returns events for nodes that have not been deleted.
 func FindLastEventPerNode(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	err := tx.
 		Raw(`
-			SELECT DISTINCT ON (we.node_id) we.*
-			FROM workflow_events we
-			INNER JOIN workflow_nodes wn
-				ON we.workflow_id = wn.workflow_id
-				AND we.node_id = wn.node_id
-			WHERE we.workflow_id = ?
-			AND wn.deleted_at IS NULL
-			ORDER BY we.node_id, we.created_at DESC
+			SELECT we.*
+			FROM workflow_nodes wn
+			INNER JOIN LATERAL (
+				SELECT *
+				FROM workflow_events
+				WHERE workflow_id = wn.workflow_id
+				  AND node_id = wn.node_id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) we ON true
+			WHERE wn.workflow_id = ?
+			  AND wn.deleted_at IS NULL
 		`, canvasID).
 		Scan(&events).
 		Error
