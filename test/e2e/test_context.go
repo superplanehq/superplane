@@ -40,7 +40,6 @@ func (s *TestContext) Start() {
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
-	os.Setenv("START_GRPC_GATEWAY", "yes")
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_EVENT_ROUTER", "yes")

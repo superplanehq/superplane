@@ -387,20 +387,14 @@ func startPublicAPI(
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
-		log.Println("Registering gRPC gateway handlers on Public API")
+	log.Println("Registering gRPC gateway handlers on Public API")
 
-		if grpcServices == nil {
-			log.Fatal("gRPC services are required when START_GRPC_GATEWAY=yes")
-		}
-
-		err := server.RegisterGRPCGateway(grpcServices)
-		if err != nil {
-			log.Fatalf("Failed to register gRPC gateway: %v", err)
-		}
-
-		server.RegisterOpenAPIHandler()
+	err = server.RegisterGRPCGateway(grpcServices)
+	if err != nil {
+		log.Fatalf("Failed to register gRPC gateway: %v", err)
 	}
+
+	server.RegisterOpenAPIHandler()
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -590,7 +584,7 @@ func Start() {
 	agentProvider, agentService := buildAgentService(authService)
 
 	var grpcServices *grpc.Services
-	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
+	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
 			baseURL,
 			webhooksBaseURL,
@@ -605,9 +599,7 @@ func Start() {
 			log.Fatalf("failed to build gRPC services: %v", err)
 		}
 		grpcServices = services
-	}
 
-	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(
 			baseURL,
 			basePath,
@@ -619,10 +611,6 @@ func Start() {
 			gitProvider,
 			grpcServices,
 		)
-	}
-
-	if os.Getenv("START_INTERNAL_API") == "yes" {
-		log.Warn("START_INTERNAL_API is deprecated and ignored; gRPC handlers run in-process via the public API gateway")
 	}
 
 	startWorkers(

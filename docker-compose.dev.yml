@@ -35,7 +35,6 @@ services:
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
-      START_GRPC_GATEWAY: "yes"
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
