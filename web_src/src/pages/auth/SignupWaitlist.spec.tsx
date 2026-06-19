@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SignupWaitlist } from "./SignupWaitlist";
@@ -25,6 +25,7 @@ describe("SignupWaitlist", () => {
     const { container } = render(<SignupWaitlist />);
 
     expect(container.querySelector(".ml-embedded")).toBeNull();
+    expect(screen.queryByText(/Leave your email/)).toBeNull();
     expect(document.getElementById("mailerlite-universal-script")).toBeNull();
   });
 
@@ -35,6 +36,7 @@ describe("SignupWaitlist", () => {
     const { container } = render(<SignupWaitlist />);
 
     expect(container.querySelector(".ml-embedded")).toHaveAttribute("data-form", "form-1");
+    expect(screen.getByText(/Leave your email/)).toBeInTheDocument();
     await waitFor(() => {
       expect(document.getElementById("mailerlite-universal-script")).toHaveAttribute(
         "src",
