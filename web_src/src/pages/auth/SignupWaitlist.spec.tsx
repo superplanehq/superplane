@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SignupWaitlist } from "./SignupWaitlist";
@@ -7,11 +8,6 @@ type SignupWaitlistWindow = Window & {
   SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID?: string;
   SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID?: string;
   SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION?: string;
-  hbspt?: {
-    forms?: {
-      create: ReturnType<typeof vi.fn>;
-    };
-  };
 };
 
 const waitlistWindow = window as SignupWaitlistWindow;
@@ -20,51 +16,67 @@ afterEach(() => {
   delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID;
   delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID;
   delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION;
-  delete waitlistWindow.hbspt;
-  document.getElementById("hubspot-forms-script")?.remove();
+  document.cookie = "hubspotutk=; Max-Age=0; path=/";
+  vi.unstubAllGlobals();
 });
 
 describe("SignupWaitlist", () => {
-  it("does not render the HubSpot form without complete config", () => {
+  it("does not render the notify form without complete HubSpot config", () => {
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
 
-    const { container } = render(<SignupWaitlist />);
+    render(<SignupWaitlist />);
 
-    expect(container.querySelector("#signup-waitlist-hubspot-form")).toBeNull();
+    expect(screen.queryByLabelText("Email")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Notify me" })).toBeNull();
     expect(screen.queryByText(/Leave your email/)).toBeNull();
-    expect(document.getElementById("hubspot-forms-script")).toBeNull();
   });
 
-  it("renders the HubSpot form when portal and form IDs are configured", async () => {
-    const createForm = vi.fn();
-    waitlistWindow.hbspt = { forms: { create: createForm } };
-    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
-    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
-    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION = "eu1";
-
-    const { container } = render(<SignupWaitlist />);
-
-    expect(container.querySelector("#signup-waitlist-hubspot-form")).toBeInTheDocument();
-    expect(screen.getByText(/Leave your email/)).toBeInTheDocument();
-    await waitFor(() => {
-      expect(createForm).toHaveBeenCalledWith({
-        portalId: "portal-1",
-        formId: "form-1",
-        target: "#signup-waitlist-hubspot-form",
-        region: "eu1",
-      });
-    });
-  });
-
-  it("loads the HubSpot script when the forms client is not ready", () => {
+  it("submits the native notify form to HubSpot", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    document.cookie = "hubspotutk=visitor-1; path=/";
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
     waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
 
     render(<SignupWaitlist />);
 
-    expect(document.getElementById("hubspot-forms-script")).toHaveAttribute(
-      "src",
-      "https://js.hsforms.net/forms/embed/v2.js",
+    await userEvent.type(screen.getByLabelText("Email"), " person@example.com ");
+    await userEvent.click(screen.getByRole("button", { name: "Notify me" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("You are on the waitlist");
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.hsforms.com/submissions/v3/integration/submit/portal-1/form-1",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.fields).toEqual([{ name: "email", value: "person@example.com" }]);
+    expect(body.context).toEqual(
+      expect.objectContaining({
+        hutk: "visitor-1",
+        pageUri: expect.any(String),
+      }),
+    );
+  });
+
+  it("shows a retryable error when HubSpot rejects the submission", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1";
+    waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1";
+
+    render(<SignupWaitlist />);
+
+    await userEvent.type(screen.getByLabelText("Email"), "person@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Notify me" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("We could not save your email");
+    });
   });
 });

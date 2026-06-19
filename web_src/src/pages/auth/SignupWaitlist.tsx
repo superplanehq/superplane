@@ -1,85 +1,87 @@
 import type React from "react";
-import { useEffect } from "react";
+import { useState } from "react";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { submitSignupWaitlistEmail } from "@/lib/hubspotForms";
 import { Text } from "@/components/Text/text";
 import { getSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 
-const hubSpotScriptID = "hubspot-forms-script";
-const hubSpotFormTargetID = "signup-waitlist-hubspot-form";
-
-type HubSpotFormOptions = {
-  portalId: string;
-  formId: string;
-  target: string;
-  region?: string;
-};
-
-type HubSpotWindow = Window & {
-  hbspt?: {
-    forms?: {
-      create: (options: HubSpotFormOptions) => void;
-    };
-  };
-};
-
-const loadHubSpotScript = () => {
-  const existingScript = document.getElementById(hubSpotScriptID) as HTMLScriptElement | null;
-  if (existingScript) {
-    return existingScript;
-  }
-
-  const script = document.createElement("script");
-  script.id = hubSpotScriptID;
-  script.async = true;
-  script.src = "https://js.hsforms.net/forms/embed/v2.js";
-  document.head.appendChild(script);
-  return script;
-};
-
 export const SignupWaitlist: React.FC = () => {
   const hubSpotConfig = getSignupWaitlistConfig();
-  const hubSpotPortalID = hubSpotConfig?.portalID;
-  const hubSpotFormID = hubSpotConfig?.formID;
-  const hubSpotRegion = hubSpotConfig?.region;
-  const hasHubSpotForm = Boolean(hubSpotPortalID && hubSpotFormID);
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "submitted" | "failed">("idle");
 
-  useEffect(() => {
-    if (!hubSpotPortalID || !hubSpotFormID) {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!hubSpotConfig || !trimmedEmail || status === "submitting") {
       return;
     }
 
-    const renderForm = () => {
-      const forms = (window as HubSpotWindow).hbspt?.forms;
-      if (!forms) {
-        return;
-      }
-
-      forms.create({
-        portalId: hubSpotPortalID,
-        formId: hubSpotFormID,
-        target: `#${hubSpotFormTargetID}`,
-        ...(hubSpotRegion ? { region: hubSpotRegion } : {}),
-      });
-    };
-
-    if ((window as HubSpotWindow).hbspt?.forms) {
-      renderForm();
-      return;
+    setStatus("submitting");
+    try {
+      await submitSignupWaitlistEmail(hubSpotConfig, trimmedEmail);
+      setEmail("");
+      setStatus("submitted");
+    } catch {
+      setStatus("failed");
     }
-
-    const script = loadHubSpotScript();
-    script.addEventListener("load", renderForm);
-
-    return () => script.removeEventListener("load", renderForm);
-  }, [hubSpotFormID, hubSpotPortalID, hubSpotRegion]);
+  };
 
   return (
     <div className="space-y-4">
       <Text className="text-left text-sm leading-6 text-gray-600">
         We are opening access gradually while demand is high.
-        {hasHubSpotForm && " Leave your email and we will send an invite as soon as capacity is available."}
+        {hubSpotConfig && " Leave your email and we will send an invite as capacity opens."}
       </Text>
 
-      {hasHubSpotForm && <div id={hubSpotFormTargetID} className="-mx-5" />}
+      {hubSpotConfig && (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="signup-waitlist-email">Email</Label>
+            <Input
+              id="signup-waitlist-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (status !== "submitting") {
+                  setStatus("idle");
+                }
+              }}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+              data-1p-ignore
+            />
+          </div>
+
+          <LoadingButton
+            type="submit"
+            className="w-full"
+            loading={status === "submitting"}
+            loadingText="Saving..."
+            disabled={!email.trim()}
+          >
+            Notify me
+          </LoadingButton>
+
+          {status === "submitted" && (
+            <p className="text-left text-sm leading-6 text-gray-700" role="status">
+              You are on the waitlist. We will email you when access opens.
+            </p>
+          )}
+
+          {status === "failed" && (
+            <p className="text-left text-sm leading-6 text-red-600" role="alert">
+              We could not save your email. Please try again.
+            </p>
+          )}
+        </form>
+      )}
     </div>
   );
 };
