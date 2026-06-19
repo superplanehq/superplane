@@ -444,14 +444,6 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
 	}
 
-	var existing PackageNodeMetadata
-	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
-		existing.RepositoryID == repositoryID &&
-		existing.PackageID == packageSlugPerm &&
-		existing.PackageName != "" {
-		return nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
