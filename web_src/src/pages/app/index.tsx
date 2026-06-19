@@ -124,7 +124,6 @@ import { useCanvasYaml } from "./useCanvasYaml";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
-import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunsDetailState } from "./useRunsDetailState";
@@ -1048,9 +1047,6 @@ export function AppPage() {
     [showLiveActivity, nodeEventsMap],
   );
 
-  // Execution chain data utilities for lazy loading
-  const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas ?? undefined);
-
   const {
     registerIgnoredCanvasUpdatedEcho,
     registerIgnoredCanvasVersionUpdatedEcho,
@@ -1868,15 +1864,9 @@ export function AppPage() {
   const [focusRequest, setFocusRequest] = useState<{
     nodeId: string;
     requestId: number;
-    tab?: "latest" | "settings" | "execution-chain";
-    executionChain?: {
-      eventId: string;
-      executionId?: string | null;
-      triggerEvent?: SidebarEvent | null;
-    };
+    tab?: "latest" | "settings";
   } | null>(null);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
@@ -1934,23 +1924,6 @@ export function AppPage() {
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
       setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
-    },
-    [handleSidebarChange],
-  );
-
-  const handleLogRunExecutionSelect = useCallback(
-    (options: { nodeId: string; eventId: string; executionId: string; triggerEvent?: SidebarEvent }) => {
-      handleSidebarChange(true, options.nodeId);
-      setFocusRequest({
-        nodeId: options.nodeId,
-        requestId: Date.now(),
-        tab: "execution-chain",
-        executionChain: {
-          eventId: options.eventId,
-          executionId: options.executionId,
-          triggerEvent: options.triggerEvent,
-        },
-      });
     },
     [handleSidebarChange],
   );
@@ -4300,6 +4273,27 @@ export function AppPage() {
     [clearDismissedRunDetail, exitEditableVersionForRunInspection, searchParams, setRunDetailNodeId, setSearchParams],
   );
 
+  const handleLogRunExecutionSelect = useCallback(
+    (options: { runId: string; nodeId: string }) => {
+      exitEditableVersionForRunInspection();
+      clearDismissedRunDetail();
+      preserveRunDetailNodeOnNextRunChangeRef.current = true;
+      setRunDetailNodeId(options.nodeId);
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("run", options.runId);
+          next.set("sidebar", "1");
+          next.set("node", options.nodeId);
+          next.delete("file");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
+  );
+
   const handleNavigateRun = useCallback(
     (runId: string) => {
       exitEditableVersionForRunInspection();
@@ -5083,7 +5077,6 @@ export function AppPage() {
           resolveRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? resolveRunIdForSidebarEvent : undefined}
           fetchRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? fetchRunIdForSidebarEvent : undefined}
           onSelectRunFromSidebarEvent={liveSidebarRunLookupEnabled ? handleSelectRunFromSidebarEvent : undefined}
-          loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
           components={allComponents}
@@ -5099,7 +5092,6 @@ export function AppPage() {
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
-          onExecutionChainHandled={handleExecutionChainHandled}
         />
         {isDraftCanvasLoading ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">

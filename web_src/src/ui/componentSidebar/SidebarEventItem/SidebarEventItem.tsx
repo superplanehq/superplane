@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
 import { resolveIcon, isUrl } from "@/lib/utils";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isCancelledError } from "@tanstack/react-query";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
@@ -34,17 +33,10 @@ interface SidebarEventItemProps {
   isOpen: boolean;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
-  onTriggerNavigate?: (event: SidebarEvent) => void;
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<any[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
@@ -58,12 +50,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   isOpen,
   onToggleOpen,
   onEventClick,
-  onTriggerNavigate,
   tabData,
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
-  loadExecutionChain,
   getExecutionState,
 }) => {
   // Determine default active tab based on available data
@@ -80,11 +70,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
-  const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
-  const [executionChainLoading, setExecutionChainLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const executionChainLoadInFlightRef = useRef(false);
+  const executionChainItems = tabData?.executionChain ?? [];
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -101,111 +89,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     );
     return map[state];
   }, [event.nodeId, event.originalExecution, getExecutionState, event.kind, event.state]);
-
-  // Function to load execution chain data lazily
-  const loadExecutionChainData = useCallback(
-    async (forceReload = false) => {
-      if (!loadExecutionChain || executionChainLoadInFlightRef.current) return;
-
-      if (executionChainData && !forceReload) return;
-
-      const rootEventId = tabData?.root?.["Event ID"];
-      if (!rootEventId || typeof rootEventId !== "string") return;
-
-      try {
-        executionChainLoadInFlightRef.current = true;
-        if (!forceReload) {
-          setExecutionChainLoading(true);
-        }
-        const currentNodeId = event.nodeId || tabData?.current?.["Node ID"] || "";
-        const currentExecution = tabData?.current;
-
-        const rawExecutionChain = await loadExecutionChain(rootEventId, currentNodeId, currentExecution, forceReload);
-
-        const processedChainData = rawExecutionChain.map((exec: any) => {
-          if (!getExecutionState) return {};
-
-          const { map, state } = getExecutionState(exec.nodeId, exec);
-          const eventStyle = map[state];
-
-          let payload: Record<string, unknown> = {};
-          if (exec.outputs) {
-            const outputData: unknown[] = Object.values(exec.outputs)?.find((output) => {
-              return Array.isArray(output) && output?.length > 0;
-            }) as unknown[];
-
-            if (outputData?.length > 0) {
-              const output = outputData?.[0] as Record<string, unknown>;
-              if (output["data"]) {
-                payload = (output["data"] as Record<string, unknown>) || {};
-              } else {
-                payload = output || {};
-              }
-            }
-          }
-
-          const mainItem: ExecutionChainItem = {
-            ...eventStyle,
-            name: exec.nodeId || "Unknown",
-            nodeId: exec.nodeId || "",
-            executionId: exec.id || "",
-            payload,
-            state: state,
-          };
-
-          return mainItem;
-        }) as ExecutionChainItem[];
-
-        setExecutionChainData(processedChainData);
-      } catch (error) {
-        if (isCancelledError(error)) {
-          return;
-        }
-        if (!forceReload) {
-          setExecutionChainData([]);
-        }
-      } finally {
-        executionChainLoadInFlightRef.current = false;
-        if (!forceReload) {
-          setExecutionChainLoading(false);
-        }
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loadExecutionChain, tabData, event.nodeId],
-  );
-
-  // Use ref to track current values without causing re-renders
-  const pollingRef = useRef<{
-    activeTab: string;
-    hasInProgress: boolean;
-    loadData: (() => void) | null;
-  }>({
-    activeTab,
-    hasInProgress: executionChainData?.some((item) => item.state === "running") || false,
-    loadData: null,
-  });
-
-  pollingRef.current.activeTab = activeTab;
-  pollingRef.current.hasInProgress =
-    ["waiting", "running", "pending"].includes(event.state || "") ||
-    executionChainData?.some((item) => item.state !== "running" && item.state !== "failed") ||
-    false;
-  pollingRef.current.loadData = () => loadExecutionChainData(true);
-
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      const { activeTab: currentTab, hasInProgress, loadData } = pollingRef.current;
-
-      if (currentTab === "executionChain" && hasInProgress && loadData) {
-        loadData();
-      }
-    }, 1500);
-
-    return () => {
-      clearInterval(pollInterval);
-    };
-  }, []);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -232,10 +115,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         setActiveTab(defaultTab);
       } else if (activeTab === "payload" && !tabData.payload) {
         setActiveTab(defaultTab);
+      } else if (activeTab === "executionChain" && executionChainItems.length === 0) {
+        setActiveTab(defaultTab);
       }
-      // For execution chain, don't auto-switch away since it's loaded on demand
     }
-  }, [tabData, activeTab, getDefaultActiveTab]);
+  }, [tabData, activeTab, getDefaultActiveTab, executionChainItems.length]);
 
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
@@ -261,12 +145,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       data-event-kind={event.kind || "execution"}
       onClick={(e) => {
         e.stopPropagation();
-        // For trigger events and component executions, navigate to execution chain instead of toggling inline
-        if ((event.kind === "trigger" || event.kind === "execution") && onTriggerNavigate) {
-          onTriggerNavigate(event);
-        } else {
-          onToggleOpen(event.id);
-        }
+        onToggleOpen(event.id);
         onEventClick?.(event);
       }}
       onMouseEnter={() => setIsHovered(true)}
@@ -353,14 +232,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     Root
                   </button>
                 )}
-                {(tabData?.executionChain || tabData?.root) && (
+                {tabData.executionChain && tabData.executionChain.length > 0 && (
                   <button
-                    onClick={() => {
-                      setActiveTab("executionChain");
-                      if (activeTab !== "executionChain") {
-                        loadExecutionChainData();
-                      }
-                    }}
+                    onClick={() => setActiveTab("executionChain")}
                     className={`px-5 py-1 text-sm font-medium ${
                       activeTab === "executionChain"
                         ? "text-gray-800 border-b-1 border-black"
@@ -506,36 +380,23 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             </div>
           )}
 
-          {activeTab === "executionChain" && (tabData?.root || executionChainData) && (
+          {activeTab === "executionChain" && executionChainItems.length > 0 && (
             <div className="w-full flex flex-col px-2 py-2">
-              {executionChainLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-sm text-gray-500">Loading execution chain...</div>
-                </div>
-              ) : executionChainData && executionChainData.length > 0 ? (
-                <>
-                  <div className="text-sm text-gray-500 ml-2">
-                    {executionChainData.length} execution{executionChainData.length === 1 ? "" : "s"}
-                  </div>
-                  {executionChainData.map((execution, index) => (
-                    <div key={index} className="flex flex-col">
-                      {/* Main execution */}
-                      <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
-                        <div
-                          className={`uppercase text-xs py-[1px] px-[4px] font-semibold rounded flex items-center justify-center text-white ${execution.badgeColor} flex-shrink-0`}
-                        >
-                          <span>{execution.state}</span>
-                        </div>
-                        <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
-                      </div>
+              <div className="text-sm text-gray-500 ml-2">
+                {executionChainItems.length} execution{executionChainItems.length === 1 ? "" : "s"}
+              </div>
+              {executionChainItems.map((execution, chainIndex) => (
+                <div key={chainIndex} className="flex flex-col">
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0 group hover:bg-gray-100">
+                    <div
+                      className={`uppercase text-xs py-[1px] px-[4px] font-semibold rounded flex items-center justify-center text-white ${execution.badgeColor} flex-shrink-0`}
+                    >
+                      <span>{execution.state}</span>
                     </div>
-                  ))}
-                </>
-              ) : (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-sm text-gray-500">No execution chain data available</div>
+                    <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
