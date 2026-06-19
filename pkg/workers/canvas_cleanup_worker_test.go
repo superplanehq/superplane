@@ -331,7 +331,8 @@ func Test__CanvasCleanupWorker_DeletesGitRepositoryAfterCanvasCleanup(t *testing
 	worker := NewCanvasCleanupWorker(gitProvider)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	repoID := "repo-" + canvas.ID.String()
-	require.NoError(t, canvas.CreatePendingRepository(gitProvider.Name(), repoID))
+	_, err := canvas.CreatePendingRepository(gitProvider.Name(), repoID)
+	require.NoError(t, err)
 
 	require.NoError(t, canvas.SoftDelete())
 	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
