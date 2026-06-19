@@ -1,13 +1,9 @@
 import type React from "react";
 import { useEffect } from "react";
 import { Text } from "@/components/Text/text";
+import { getSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 
 const mailerLiteScriptID = "mailerlite-universal-script";
-
-type MailerLiteConfig = {
-  accountID: string;
-  formID: string;
-};
 
 type MailerLiteClient = {
   (...args: unknown[]): void;
@@ -16,20 +12,6 @@ type MailerLiteClient = {
 
 type MailerLiteWindow = Window & {
   ml?: MailerLiteClient;
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID?: string;
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID?: string;
-};
-
-const getMailerLiteConfig = (): MailerLiteConfig | null => {
-  const win = window as MailerLiteWindow;
-  const accountID = win.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID?.trim();
-  const formID = win.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID?.trim();
-
-  if (!accountID || !formID) {
-    return null;
-  }
-
-  return { accountID, formID };
 };
 
 const ensureMailerLiteClient = () => {
@@ -60,7 +42,7 @@ const loadMailerLiteScript = () => {
 };
 
 export const SignupWaitlist: React.FC = () => {
-  const mailerLiteConfig = getMailerLiteConfig();
+  const mailerLiteConfig = getSignupWaitlistConfig();
   const mailerLiteAccountID = mailerLiteConfig?.accountID;
   const mailerLiteFormID = mailerLiteConfig?.formID;
   const hasMailerLiteForm = Boolean(mailerLiteFormID);
