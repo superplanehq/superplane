@@ -45,6 +45,40 @@ func Test__OnPackageCreated__Setup(t *testing.T) {
 		assert.Equal(t, "weskk", stored.Repository.Namespace)
 		assert.Equal(t, "wh-pc", stored.WebhookID)
 	})
+
+	t.Run("reconcile re-asserts the event and active flag on an existing webhook", func(t *testing.T) {
+		const webhookURL = "http://localhost:3000/api/v1/webhooks/wh-pc"
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// GetWebhook: still present and targeting our URL, but disabled and
+				// stripped of its event out of band at Cloudsmith.
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-pc","target_url":"` + webhookURL + `","events":[],"is_active":false}`))},
+				// UpdateWebhook (PATCH) succeeds.
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-pc","target_url":"` + webhookURL + `","events":["package.created"],"is_active":true}`))},
+			},
+		}
+		metadata := &contexts.MetadataContext{
+			Metadata: OnPackageCreatedMetadata{
+				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
+				WebhookURL: webhookURL,
+				WebhookID:  "wh-pc",
+			},
+		}
+		err := trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			Metadata:      metadata,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "s3cr3t"},
+			Configuration: map[string]any{"repository": "weskk/superplane-compliance"},
+		})
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 2)
+		patch := httpCtx.Requests[1]
+		assert.Equal(t, http.MethodPatch, patch.Method)
+		patchBody, _ := io.ReadAll(patch.Body)
+		assert.Contains(t, string(patchBody), `"is_active":true`)
+		assert.Contains(t, string(patchBody), "package.created")
+	})
 }
 
 func Test__OnPackageCreated__HandleWebhook(t *testing.T) {

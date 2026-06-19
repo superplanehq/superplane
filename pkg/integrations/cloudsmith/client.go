@@ -469,11 +469,11 @@ type Webhook struct {
 // delivers the package as a JSON object body (application/json).
 const requestBodyFormatJSONObject = 0
 
-// CreateWebhook registers a webhook on a repository (owner/repository) that
-// posts the given events to targetURL as a JSON object. When signatureKey is
-// non-empty, Cloudsmith signs each delivery with HMAC-SHA1 of the body using
-// that key (sent in the X-Cloudsmith-Signature header).
-func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string, events []string) (*Webhook, error) {
+// webhookPayload builds the create/update request body for a managed webhook:
+// the desired target URL, subscribed events, active flag, and (when set) the
+// signing key. Cloudsmith treats PATCH the same as POST for these fields, so the
+// two operations share one body.
+func webhookPayload(targetURL, signatureKey string, events []string) ([]byte, error) {
 	templates := make([]map[string]string, 0, len(events))
 	for _, event := range events {
 		templates = append(templates, map[string]string{"event": event, "template": ""})
@@ -490,7 +490,15 @@ func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string
 		body["signature_key"] = signatureKey
 	}
 
-	payload, err := json.Marshal(body)
+	return json.Marshal(body)
+}
+
+// CreateWebhook registers a webhook on a repository (owner/repository) that
+// posts the given events to targetURL as a JSON object. When signatureKey is
+// non-empty, Cloudsmith signs each delivery with HMAC-SHA1 of the body using
+// that key (sent in the X-Cloudsmith-Signature header).
+func (c *Client) CreateWebhook(owner, repository, targetURL, signatureKey string, events []string) (*Webhook, error) {
+	payload, err := webhookPayload(targetURL, signatureKey, events)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding webhook: %v", err)
 	}
@@ -527,15 +535,14 @@ func (c *Client) GetWebhook(owner, repository, slugPerm string) (*Webhook, error
 	return &webhook, nil
 }
 
-// UpdateWebhook refreshes an existing webhook's target URL and signing key
-// (PATCH). Cloudsmith only sets signature_key on write and never returns it, so
-// re-applying it keeps deliveries verifiable if the node secret rotated, without
-// recreating the webhook.
-func (c *Client) UpdateWebhook(owner, repository, slugPerm, targetURL, signatureKey string) (*Webhook, error) {
-	payload, err := json.Marshal(map[string]any{
-		"target_url":    targetURL,
-		"signature_key": signatureKey,
-	})
+// UpdateWebhook re-asserts an existing webhook's desired state (PATCH): target
+// URL, subscribed events, active flag, and signing key. A webhook can be
+// disabled or have its events edited out of band at Cloudsmith, and the
+// signature_key is only set on write and never returned — re-applying all of
+// these on reconcile keeps deliveries flowing and verifiable without recreating
+// the webhook.
+func (c *Client) UpdateWebhook(owner, repository, slugPerm, targetURL, signatureKey string, events []string) (*Webhook, error) {
+	payload, err := webhookPayload(targetURL, signatureKey, events)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding webhook: %v", err)
 	}

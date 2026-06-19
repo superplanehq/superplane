@@ -56,7 +56,7 @@ func Test__OnSecurityScanCompleted__Setup(t *testing.T) {
 		assert.Equal(t, "wh-sec", stored.WebhookID)
 	})
 
-	t.Run("healthy existing webhook refreshes the signing key without recreating", func(t *testing.T) {
+	t.Run("reconcile re-asserts the event and active flag on an existing webhook", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnSecurityScanCompletedMetadata{
 				Repository: &RepositoryRef{Namespace: "weskk", Slug: "superplane-compliance"},
@@ -64,11 +64,12 @@ func Test__OnSecurityScanCompleted__Setup(t *testing.T) {
 				WebhookID:  "wh-existing",
 			},
 		}
-		// GetWebhook returns a matching target, then UpdateWebhook (PATCH) succeeds.
+		// GetWebhook: still present and targeting our URL, but disabled and
+		// stripped of its event out of band; UpdateWebhook (PATCH) then succeeds.
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook","events":[],"is_active":false}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"slug_perm":"wh-existing","target_url":"https://sp.example/hook","events":["package.security_scanned"],"is_active":true}`))},
 			},
 		}
 		err := trigger.Setup(core.TriggerContext{
@@ -79,8 +80,14 @@ func Test__OnSecurityScanCompleted__Setup(t *testing.T) {
 			Configuration: map[string]any{"repository": "weskk/superplane-compliance"},
 		})
 		require.NoError(t, err)
-		// Both responses (GET + PATCH) consumed -> the key was refreshed, not skipped.
+		// Both responses (GET + PATCH) consumed -> the webhook was reconciled, not skipped.
 		assert.Empty(t, httpCtx.Responses)
+		require.Len(t, httpCtx.Requests, 2)
+		patch := httpCtx.Requests[1]
+		assert.Equal(t, http.MethodPatch, patch.Method)
+		patchBody, _ := io.ReadAll(patch.Body)
+		assert.Contains(t, string(patchBody), `"is_active":true`)
+		assert.Contains(t, string(patchBody), "package.security_scanned")
 		stored := metadata.Metadata.(OnSecurityScanCompletedMetadata)
 		assert.Equal(t, "wh-existing", stored.WebhookID)
 	})
