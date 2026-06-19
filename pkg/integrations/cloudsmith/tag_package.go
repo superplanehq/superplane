@@ -145,6 +145,9 @@ func (t *TagPackage) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to tag package: %v", err)
 	}
+	if pkg == nil {
+		return fmt.Errorf("tag returned empty response")
+	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageTaggedPayloadType, []any{pkg})
 }

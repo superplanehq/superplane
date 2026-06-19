@@ -75,6 +75,9 @@ func (r *ResyncPackage) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to resync package: %v", err)
 	}
+	if pkg == nil {
+		return fmt.Errorf("resync returned empty response")
+	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PackageResyncedPayloadType, []any{pkg})
 }
