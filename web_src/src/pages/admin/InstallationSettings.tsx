@@ -3,6 +3,7 @@ import { Input, InputGroup } from "@/components/Input/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
@@ -618,6 +619,7 @@ const InstallationSettings: React.FC = () => {
   }
 
   const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, signupsEnabled, smtpForm);
+  const showSignupAccessSection = hasSignupWaitlistConfig();
 
   return (
     <div>
@@ -629,14 +631,16 @@ const InstallationSettings: React.FC = () => {
       </div>
 
       <div className="mt-5 bg-white px-6">
-        <SignupAccessSection
-          enabled={signupsEnabled}
-          blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
-          hasChanges={derivedState.hasSignupChanges}
-          saving={savingSignups}
-          onChange={setSignupsEnabled}
-          onSave={saveSignupSettings}
-        />
+        {showSignupAccessSection ? (
+          <SignupAccessSection
+            enabled={signupsEnabled}
+            blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
+            hasChanges={derivedState.hasSignupChanges}
+            saving={savingSignups}
+            onChange={setSignupsEnabled}
+            onSave={saveSignupSettings}
+          />
+        ) : null}
 
         <NetworkPolicySection
           allowPrivateNetworkAccess={allowPrivateNetworkAccess}

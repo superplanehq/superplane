@@ -18,9 +18,11 @@ import {
   confirmSignupAnalyticsPreference,
   savePendingSignupAnalyticsPreference,
 } from "@/lib/signupAnalytics";
+import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
+import { getSignupUnavailableReason, type SignupUnavailableReason } from "./signupUnavailableReason";
 
 type AuthConfig = {
   providers: string[];
@@ -78,7 +80,6 @@ const providerAuthPath = (provider: string, redirectQuery: string, isSignupMode:
 
 type MagicCodeStep = "email" | "code";
 type AuthMode = "login" | "signup";
-type SignupUnavailableReason = "closed" | "waitlist" | null;
 
 interface LoginProps {
   mode?: AuthMode;
@@ -440,10 +441,15 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
   const showSignupUnavailable = !configLoading && isSignupMode && !canSignup;
-  const showSignupWaitlist = showSignupUnavailable && !authConfig.signupsBlockedByEnvironment;
-  const showSignupClosedNotice = showSignupUnavailable && authConfig.signupsBlockedByEnvironment;
+  const hasConfiguredSignupWaitlist = hasSignupWaitlistConfig();
+  const signupUnavailableReason = getSignupUnavailableReason(
+    showSignupUnavailable,
+    authConfig.signupsBlockedByEnvironment,
+    hasConfiguredSignupWaitlist,
+  );
+  const showSignupWaitlist = signupUnavailableReason === "waitlist";
+  const showSignupClosedNotice = signupUnavailableReason === "closed";
   const showSignupEntryPoint = canSignup || !authConfig.signupsBlockedByEnvironment;
-  const signupUnavailableReason = showSignupWaitlist ? "waitlist" : showSignupClosedNotice ? "closed" : null;
   const showLastUsedMethodHints = !isSignupMode;
   const authErrorMessage = getAuthErrorMessage(authError, signupUnavailableReason);
   const showStandaloneProductUpdatesOptIn =
