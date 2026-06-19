@@ -239,8 +239,8 @@ export const canvasKeys = {
   consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
-  repositoryFile: (canvasId: string, path: string, versionId?: string) =>
-    [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live"] as const,
+  repositoryFile: (canvasId: string, path: string, versionId?: string, stage = false) =>
+    [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live", stage ? "staged" : "committed"] as const,
   // Raw repository-file content keyed per stage so cached reads can be reused
   // and deduped (e.g. the Files diff and committed-baseline lookups). It
   // prefix-extends `repositoryFile`, so any invalidation of a file (or the
@@ -1787,10 +1787,13 @@ export const useUpdateCanvasConsole = (
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 
-async function fetchRepositoryFileContent(canvasId: string, path: string, versionId?: string): Promise<string> {
-  // Draft file reads (versionId present) return effective staged content so the
-  // Files tab reflects uncommitted edits.
-  return fetchRepositorySpecFileContent(canvasId, path, versionId, !!versionId);
+async function fetchRepositoryFileContent(
+  canvasId: string,
+  path: string,
+  versionId?: string,
+  stage = false,
+): Promise<string> {
+  return fetchRepositorySpecFileContent(canvasId, path, versionId, stage);
 }
 
 // fetchRepositoryFileContentCached reads raw repository-file content through the
@@ -1853,12 +1856,13 @@ export const useCanvasRepositoryFile = (
   path: string | null,
   enabled: boolean = true,
   versionId?: string,
+  stage = false,
 ) => {
   const normalizedPath = path ?? "";
   return useQuery({
-    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId),
+    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId, stage),
     queryFn: async () => {
-      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId);
+      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId, stage);
       return {
         path: normalizedPath,
         content,

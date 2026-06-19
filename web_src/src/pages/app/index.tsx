@@ -411,11 +411,18 @@ export function AppPage() {
     return canvasVersions.find(isPublishedVersion)?.metadata?.id;
   }, [liveCanvasVersionId, paginatedVersions, canvasVersions]);
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
+  const shouldStageActiveVersionRead = !!activeCanvasVersion && isDraftVersion(activeCanvasVersion);
   const {
     data: loadedCanvasVersion,
     isLoading: loadedCanvasVersionLoading,
     isFetching: loadedCanvasVersionFetching,
-  } = useCanvasVersion(organizationId!, canvasId!, activeCanvasVersionId, !!activeCanvasVersionId, true);
+  } = useCanvasVersion(
+    organizationId!,
+    canvasId!,
+    activeCanvasVersionId,
+    !!activeCanvasVersionId,
+    shouldStageActiveVersionRead,
+  );
   const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
   const latestDraftVersion = draftVersions[0];
   const isViewingDraftVersion = !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion);
