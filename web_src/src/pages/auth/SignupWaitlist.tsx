@@ -63,6 +63,7 @@ export const SignupWaitlist: React.FC = () => {
   const mailerLiteConfig = getMailerLiteConfig();
   const mailerLiteAccountID = mailerLiteConfig?.accountID;
   const mailerLiteFormID = mailerLiteConfig?.formID;
+  const hasMailerLiteForm = Boolean(mailerLiteFormID);
 
   useEffect(() => {
     if (!mailerLiteAccountID) {
@@ -77,11 +78,11 @@ export const SignupWaitlist: React.FC = () => {
   return (
     <div className="space-y-4">
       <Text className="text-left text-sm leading-6 text-gray-600">
-        We are opening access gradually while demand is high. Leave your email and we will send an invite as soon as
-        capacity is available.
+        We are opening access gradually while demand is high.
+        {hasMailerLiteForm && " Leave your email and we will send an invite as soon as capacity is available."}
       </Text>
 
-      {mailerLiteFormID && <div className="ml-embedded -mx-5" data-form={mailerLiteFormID} />}
+      {hasMailerLiteForm && <div className="ml-embedded -mx-5" data-form={mailerLiteFormID} />}
     </div>
   );
 };
