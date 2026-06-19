@@ -41,9 +41,7 @@ function migrateConflictingRunParam(view: string, params: URLSearchParams): URLS
   }
 
   const next = new URLSearchParams(params);
-  next.delete("run");
-  next.delete("sidebar");
-  next.delete("node");
+  next.delete("view");
   return next;
 }
 

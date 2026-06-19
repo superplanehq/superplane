@@ -1,88 +1,89 @@
 import type React from "react";
-import { useEffect } from "react";
+import { useState } from "react";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { submitSignupWaitlistEmail } from "@/lib/hubspotForms";
 import { Text } from "@/components/Text/text";
+import { getSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 
-const mailerLiteScriptID = "mailerlite-universal-script";
-
-type MailerLiteConfig = {
-  accountID: string;
-  formID: string;
-};
-
-type MailerLiteClient = {
-  (...args: unknown[]): void;
-  q?: unknown[][];
-};
-
-type MailerLiteWindow = Window & {
-  ml?: MailerLiteClient;
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID?: string;
-  SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID?: string;
-};
-
-const getMailerLiteConfig = (): MailerLiteConfig | null => {
-  const win = window as MailerLiteWindow;
-  const accountID = win.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_ACCOUNT_ID?.trim();
-  const formID = win.SUPERPLANE_SIGNUP_WAITLIST_MAILERLITE_FORM_ID?.trim();
-
-  if (!accountID || !formID) {
-    return null;
-  }
-
-  return { accountID, formID };
-};
-
-const ensureMailerLiteClient = () => {
-  const win = window as MailerLiteWindow;
-  if (win.ml) {
-    return win.ml;
-  }
-
-  const queuedClient: MailerLiteClient = (...args: unknown[]) => {
-    queuedClient.q = queuedClient.q || [];
-    queuedClient.q.push(args);
-  };
-
-  win.ml = queuedClient;
-  return queuedClient;
-};
-
-const loadMailerLiteScript = () => {
-  if (document.getElementById(mailerLiteScriptID)) {
-    return;
-  }
-
-  const script = document.createElement("script");
-  script.id = mailerLiteScriptID;
-  script.async = true;
-  script.src = "https://assets.mailerlite.com/js/universal.js";
-  document.head.appendChild(script);
-};
+type SignupWaitlistStatus = "idle" | "submitting" | "submitted" | "failed";
 
 export const SignupWaitlist: React.FC = () => {
-  const mailerLiteConfig = getMailerLiteConfig();
-  const mailerLiteAccountID = mailerLiteConfig?.accountID;
-  const mailerLiteFormID = mailerLiteConfig?.formID;
-  const hasMailerLiteForm = Boolean(mailerLiteFormID);
+  const hubSpotConfig = getSignupWaitlistConfig();
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<SignupWaitlistStatus>("idle");
 
-  useEffect(() => {
-    if (!mailerLiteAccountID) {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!hubSpotConfig || !trimmedEmail || status === "submitting") {
       return;
     }
 
-    const ml = ensureMailerLiteClient();
-    loadMailerLiteScript();
-    ml("account", mailerLiteAccountID);
-  }, [mailerLiteAccountID]);
+    setStatus("submitting");
+    try {
+      await submitSignupWaitlistEmail(hubSpotConfig, trimmedEmail);
+      setEmail("");
+      setStatus("submitted");
+    } catch {
+      setStatus("failed");
+    }
+  };
 
   return (
     <div className="space-y-4">
       <Text className="text-left text-sm leading-6 text-gray-600">
         We are opening access gradually while demand is high.
-        {hasMailerLiteForm && " Leave your email and we will send an invite as soon as capacity is available."}
+        {hubSpotConfig && " Leave your email and we will send an invite as capacity opens."}
       </Text>
 
-      {hasMailerLiteForm && <div className="ml-embedded -mx-5" data-form={mailerLiteFormID} />}
+      {hubSpotConfig && (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="signup-waitlist-email">Email</Label>
+            <Input
+              id="signup-waitlist-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (status !== "submitting") {
+                  setStatus("idle");
+                }
+              }}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+              data-1p-ignore
+            />
+          </div>
+
+          <LoadingButton
+            type="submit"
+            className="w-full"
+            loading={status === "submitting"}
+            loadingText="Saving..."
+            disabled={!email.trim()}
+          >
+            Notify me
+          </LoadingButton>
+
+          {status === "submitted" && (
+            <p className="text-left text-sm leading-6 text-gray-700" role="status">
+              You are on the waitlist. We will email you when access opens.
+            </p>
+          )}
+
+          {status === "failed" && (
+            <p className="text-left text-sm leading-6 text-red-600" role="alert">
+              We could not save your email. Please try again.
+            </p>
+          )}
+        </form>
+      )}
     </div>
   );
 };
