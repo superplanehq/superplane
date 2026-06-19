@@ -751,7 +751,7 @@ export const ComponentSidebar = ({
           >
             {page !== "overview" && (
               <div className="flex flex-col flex-1 min-h-0 bg-white">
-                <PageHeader page={page} onBackToOverview={handleBackToOverview} compact={isBottomLayout} />
+                <PageHeader onBackToOverview={handleBackToOverview} compact={isBottomLayout} />
                 <HistoryQueuePage
                   page={page}
                   events={allEvents}

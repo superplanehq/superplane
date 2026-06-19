@@ -4,13 +4,12 @@ import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSideb
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  page: "history" | "queue";
   onBackToOverview: () => void;
   compact?: boolean;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({ page, onBackToOverview, compact = false }) => {
-  const backButtonText = page === "history" ? "Back to Run History" : "Back to Queue";
+export const PageHeader: React.FC<PageHeaderProps> = ({ onBackToOverview, compact = false }) => {
+  const backButtonText = "Back";
 
   if (compact) {
     return (
