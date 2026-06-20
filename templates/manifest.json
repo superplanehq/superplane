@@ -103,5 +103,23 @@
     ],
     "agentInstructions": "The user just installed TLS Monitor. This canvas checks TLS certificate expiry for HTTPS endpoints. Setup involves: 1) Adding endpoints via the 'Add Endpoint' manual trigger, 2) Optionally connecting Discord and setting a channel on the notification nodes, 3) Running 'Run Checks Now' to do the first scan. The schedule runs checks hourly by default.",
     "agentInitialMessage": "Welcome! TLS Monitor checks certificate expiry for your HTTPS endpoints.\n\n**1. Add endpoints**\nClick **Add Endpoint** and enter a hostname (e.g. `example.com`). Add as many as you need.\n\n**2. Run the first check**\nClick **Run Checks Now** to scan all endpoints immediately. After this, checks run automatically every hour.\n\n**3. (Optional) Discord notifications**\nConnect a [Discord](integration:discord) integration and set the channel on the three notification nodes (expiring soon, expired, invalid) to get alerts when certificates need attention.\n\nThe console shows all endpoints with their status, expiry date, and days remaining. Let me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_semantic_pull_requests",
+    "icon": "github",
+    "title": "Semantic Pull Requests",
+    "description": "Enforce semantic PR title conventions, publish commit statuses, and track merged PRs by type in a weekly bar chart.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "CI/CD",
+      "Compliance"
+    ],
+    "requirements": [
+      "GitHub integration connected to the target repository"
+    ],
+    "agentInstructions": "The user just installed Semantic Pull Requests. This canvas validates PR titles against semantic types (feat, fix, docs, chore), publishes commit statuses, and tracks merge statistics. Setup involves: 1) Connecting the GitHub integration, 2) Running the Setup trigger with the repository as owner/repo to backfill weekly stats. For private repos, a GITHUB_TOKEN secret is needed on the Fetch weekly stats node.",
+    "agentInitialMessage": "Welcome! Semantic Pull Requests enforces title conventions on your PRs and tracks merge statistics.\n\n**1. Connect GitHub** - [GitHub](integration:github)\nThe integration needs access to the repository you want to monitor.\n\n**2. Run Setup**\nClick the **Setup** trigger and enter your repository as `owner/repo` (e.g. `my-org/my-app`). This backfills weekly merge statistics for the current year.\n\n**3. (Optional) Private repos**\nAdd a `GITHUB_TOKEN` secret to the **Fetch weekly stats** runner node. The token needs Pull requests:Read permission.\n\nOnce set up, every new PR will get a title check with a commit status. Let me know if you need help!"
   }
 ]
