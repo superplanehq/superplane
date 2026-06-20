@@ -147,6 +147,7 @@ func TestLoopStartLoop(t *testing.T) {
 	assert.Equal(t, 1, md.Iteration)
 	assert.True(t, md.Active)
 	assert.False(t, execState.Finished)
+	assert.True(t, execState.SubRuns)
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 	assert.True(t, scheduled.called)
 	assert.Equal(t, timeoutHook, scheduled.actionName)
@@ -292,6 +293,7 @@ func TestLoopHandleFeedbackRepeatsNextWhenUntilIsFalse(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, id)
 	assert.Equal(t, anchorID, *id)
+	assert.True(t, anchorExecState.SubRuns)
 	assert.Equal(t, ChannelNameNext, anchorExecState.Channel)
 	assert.False(t, anchorExecState.Finished)
 	md, ok := anchorMetadata.Metadata.(ExecutionMetadata)
@@ -396,9 +398,11 @@ func TestLoopHandleNextIterationHook(t *testing.T) {
 		ExecutionState: execState,
 	})
 	require.NoError(t, err)
+	assert.True(t, execState.SubRuns)
 	assert.Equal(t, ChannelNameNext, execState.Channel)
 	assert.Equal(t, PayloadTypeNext, execState.Type)
 	assert.False(t, execState.Finished)
+	assert.NotEmpty(t, execState.KVs[loopChildRootEventKey])
 
 	payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)["next"].(map[string]any)
 	assert.Equal(t, 3, payload["iteration"])
@@ -538,6 +542,13 @@ func (f *finishedExecutionState) EmitAndContinue(channel, payloadType string, pa
 }
 func (f *finishedExecutionState) EmitSubRuns(channel, payloadType string, payloads []any) error {
 	return f.ExecutionStateContext.EmitSubRuns(channel, payloadType, payloads)
+}
+func (f *finishedExecutionState) EmitSubRunsAndContinue(
+	channel,
+	payloadType string,
+	payloads []any,
+) ([]string, error) {
+	return f.ExecutionStateContext.EmitSubRunsAndContinue(channel, payloadType, payloads)
 }
 func (f *finishedExecutionState) Pass() error { return f.ExecutionStateContext.Pass() }
 func (f *finishedExecutionState) Fail(reason, message string) error {

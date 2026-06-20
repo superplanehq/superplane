@@ -810,6 +810,9 @@ func (f *fakeExecutionState) EmitAndContinue(channel, payloadType string, payloa
 func (f *fakeExecutionState) EmitSubRuns(channel, payloadType string, payloads []any) error {
 	return nil
 }
+func (f *fakeExecutionState) EmitSubRunsAndContinue(channel, payloadType string, payloads []any) ([]string, error) {
+	return nil, nil
+}
 func (f *fakeExecutionState) Pass() error                       { return nil }
 func (f *fakeExecutionState) Fail(reason, message string) error { return nil }
 

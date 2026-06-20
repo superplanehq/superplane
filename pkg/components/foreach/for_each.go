@@ -25,7 +25,6 @@ type ForEach struct{}
 
 type Spec struct {
 	ArrayExpression string `json:"arrayExpression"`
-	IsolateRuns     bool   `json:"isolateRuns"`
 }
 
 func (c *ForEach) Name() string {
@@ -60,11 +59,10 @@ func (c *ForEach) Documentation() string {
 - At most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` items per execution. Larger arrays fail with an error.
 - Self-hosted deployments can raise this cap with the ` + "`SUPERPLANE_MAX_EMIT_COUNT`" + ` environment variable.
 
-## Sub-runs (optional)
+## Sub-runs
 
-- Enable ` + "`Isolate runs`" + ` to emit each item as a child run of the current run.
-- Child runs are linked to the parent run and can be inspected independently.
-- When disabled (default), all items stay in the same run.
+- Every emitted item starts a child run linked to the current run.
+- This keeps per-item execution history isolated and traceable.
 
 ## Output Fields (per item)
 
@@ -105,13 +103,6 @@ func (c *ForEach) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Description: "Expression that evaluates to the array to iterate over",
 			Required:    true,
-		},
-		{
-			Name:        "isolateRuns",
-			Label:       "Isolate runs",
-			Type:        configuration.FieldTypeBool,
-			Description: "Emit each item as a child run linked to the current run",
-			Default:     false,
 		},
 	}
 }
@@ -167,11 +158,7 @@ func (c *ForEach) Execute(ctx core.ExecutionContext) error {
 		})
 	}
 
-	if spec.IsolateRuns {
-		return ctx.ExecutionState.EmitSubRuns(ChannelNameItem, PayloadType, payloads)
-	}
-
-	return ctx.ExecutionState.Emit(ChannelNameItem, PayloadType, payloads)
+	return ctx.ExecutionState.EmitSubRuns(ChannelNameItem, PayloadType, payloads)
 }
 
 func decodeSpec(raw any) (Spec, error) {

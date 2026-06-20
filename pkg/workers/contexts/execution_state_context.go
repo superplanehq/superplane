@@ -118,24 +118,71 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 }
 
 func (s *ExecutionStateContext) EmitSubRuns(channel, payloadType string, payloads []any) error {
+	newEvents, err := s.createSubRunRootEvents(channel, payloadType, payloads)
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.execution.PassInTransaction(s.tx, map[string][]any{}); err != nil {
+		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
+	}
+
+	return nil
+}
+
+func (s *ExecutionStateContext) EmitSubRunsAndContinue(
+	channel,
+	payloadType string,
+	payloads []any,
+) ([]string, error) {
+	newEvents, err := s.createSubRunRootEvents(channel, payloadType, payloads)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := s.execution.EmitOutputsInTransaction(s.tx, map[string][]any{}); err != nil {
+		return nil, err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
+	}
+
+	rootEventIDs := make([]string, 0, len(newEvents))
+	for _, event := range newEvents {
+		rootEventIDs = append(rootEventIDs, event.ID.String())
+	}
+
+	return rootEventIDs, nil
+}
+
+func (s *ExecutionStateContext) createSubRunRootEvents(
+	channel,
+	payloadType string,
+	payloads []any,
+) ([]models.CanvasEvent, error) {
 	if len(payloads) > config.MaxEmitCount() {
-		return fmt.Errorf("cannot emit %d sub-runs (max %d per execution)", len(payloads), config.MaxEmitCount())
+		return nil, fmt.Errorf("cannot emit %d sub-runs (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
 	newEvents := make([]models.CanvasEvent, 0, len(payloads))
 	for _, payload := range payloads {
 		data, err := marshalStructuredPayload(payloadType, payload)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if len(data) > s.maxPayloadSize {
-			return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+			return nil, fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
 		}
 
 		childRun, err := models.CreateChildCanvasRunInTransaction(s.tx, s.execution.RunID, s.execution.ID)
 		if err != nil {
-			return fmt.Errorf("failed to create child run: %w", err)
+			return nil, fmt.Errorf("failed to create child run: %w", err)
 		}
 
 		now := time.Now()
@@ -150,21 +197,13 @@ func (s *ExecutionStateContext) EmitSubRuns(channel, payloadType string, payload
 		}
 
 		if err := s.tx.Create(&newEvent).Error; err != nil {
-			return fmt.Errorf("failed to create sub-run root event: %w", err)
+			return nil, fmt.Errorf("failed to create sub-run root event: %w", err)
 		}
 
 		newEvents = append(newEvents, newEvent)
 	}
 
-	if _, err := s.execution.PassInTransaction(s.tx, map[string][]any{}); err != nil {
-		return err
-	}
-
-	if s.onNewEvents != nil {
-		s.onNewEvents(newEvents)
-	}
-
-	return nil
+	return newEvents, nil
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {

@@ -253,6 +253,8 @@ type ExecutionStateContext struct {
 	Type           string
 	Payloads       []any
 	SubRuns        bool
+	SubRunRootIDs  []string
+	NextSubRunIDs  []string
 	KVs            map[string]string
 }
 
@@ -306,6 +308,21 @@ func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 func (c *ExecutionStateContext) EmitSubRuns(channel, payloadType string, payloads []any) error {
 	c.SubRuns = true
 	return c.Emit(channel, payloadType, payloads)
+}
+
+func (c *ExecutionStateContext) EmitSubRunsAndContinue(channel, payloadType string, payloads []any) ([]string, error) {
+	c.SubRuns = true
+	if err := c.EmitAndContinue(channel, payloadType, payloads); err != nil {
+		return nil, err
+	}
+
+	ids := c.NextSubRunIDs
+	if len(ids) == 0 {
+		ids = []string{uuid.NewString()}
+	}
+	c.SubRunRootIDs = append(c.SubRunRootIDs, ids...)
+
+	return ids, nil
 }
 
 func (c *ExecutionStateContext) Fail(reason, message string) error {

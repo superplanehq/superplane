@@ -18,9 +18,10 @@ import (
 const ComponentName = "loop"
 
 const (
-	loopSessionKey    = "loop_session"
-	nextIterationHook = "nextIteration"
-	timeoutHook       = "timeout"
+	loopSessionKey        = "loop_session"
+	loopChildRootEventKey = "loop_child_root_event"
+	nextIterationHook     = "nextIteration"
+	timeoutHook           = "timeout"
 
 	ChannelNameNext = "next"
 	ChannelNameDone = "done"
@@ -108,11 +109,11 @@ func (c *Loop) Documentation() string {
 
 ## How It Works
 
-1. On the first run, Loop emits to the **Next** channel and starts the loop session
+1. On the first run, Loop emits to the **Next** channel as a child run and starts the loop session
 2. Connect downstream nodes to the Next output and wire the last step back to Loop
 3. When those steps finish, Loop evaluates the **Until Expression**
 4. If the expression is ` + "`true`" + `, Loop emits on **Done** and the loop ends
-5. If the expression is ` + "`false`" + `, Loop emits on **Next** again for another iteration
+5. If the expression is ` + "`false`" + `, Loop emits on **Next** again as a new child run for another iteration
 
 ## Wiring
 
@@ -127,7 +128,7 @@ Edges back into Loop are allowed so downstream steps can return control for the 
 ## Output Channels
 
 - **Done**: Emitted once when the loop stops. Payload is under ` + "`data.done`" + ` with ` + "`iterations`" + `, ` + "`stopReason`" + ` (` + "`conditionTrue`" + ` or ` + "`max_iterations`" + `), and ` + "`elapsedMs`" + `
-- **Next**: Emitted at the start of each iteration. Payload is under ` + "`data.next`" + ` with ` + "`iteration`" + ` and ` + "`maxIterations`" + `
+- **Next**: Emitted at the start of each iteration as a child run. Payload is under ` + "`data.next`" + ` with ` + "`iteration`" + ` and ` + "`maxIterations`" + `
 
 ## Limits
 
@@ -283,7 +284,7 @@ func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 		return nil, err
 	}
 
-	session, err := ctx.FindExecutionByKV(loopSessionKey, ctx.RootEventID)
+	session, err := c.findSessionForRootEvent(ctx, ctx.RootEventID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find loop session: %w", err)
 	}
@@ -345,11 +346,7 @@ func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, e
 		return nil, err
 	}
 
-	return &session.ID, session.ExecutionState.EmitAndContinue(
-		ChannelNameNext,
-		PayloadTypeNext,
-		[]any{nextPayload(md.Iteration, spec.MaxIterations)},
-	)
+	return &session.ID, c.emitNextIterationSubRun(session.ExecutionState, md.Iteration, spec.MaxIterations)
 }
 
 // hasActiveSession reports whether this node already has a loop run in progress.
@@ -419,11 +416,7 @@ func (c *Loop) dequeueAndReady(ctx core.ProcessQueueContext) error {
 func (c *Loop) emitNextIteration(anchor *core.ExecutionContext, spec Spec, md ExecutionMetadata) (*uuid.UUID, error) {
 	delay := iterationDelay(spec.DelayBetweenIterations, md.Iteration)
 	if delay <= 0 {
-		return &anchor.ID, anchor.ExecutionState.EmitAndContinue(
-			ChannelNameNext,
-			PayloadTypeNext,
-			[]any{nextPayload(md.Iteration, spec.MaxIterations)},
-		)
+		return &anchor.ID, c.emitNextIterationSubRun(anchor.ExecutionState, md.Iteration, spec.MaxIterations)
 	}
 
 	md.WaitingBetweenIterations = true
@@ -638,11 +631,45 @@ func (c *Loop) handleNextIteration(ctx core.ActionHookContext) error {
 		return fmt.Errorf("failed to update loop metadata: %w", err)
 	}
 
-	return ctx.ExecutionState.EmitAndContinue(
+	return c.emitNextIterationSubRun(ctx.ExecutionState, md.Iteration, md.MaxIterations)
+}
+
+func (c *Loop) findSessionForRootEvent(
+	ctx core.ProcessQueueContext,
+	rootEventID string,
+) (*core.ExecutionContext, error) {
+	session, err := ctx.FindExecutionByKV(loopSessionKey, rootEventID)
+	if err != nil {
+		return nil, err
+	}
+	if session != nil {
+		return session, nil
+	}
+
+	return ctx.FindExecutionByKV(loopChildRootEventKey, rootEventID)
+}
+
+func (c *Loop) emitNextIterationSubRun(
+	executionState core.ExecutionStateContext,
+	iteration,
+	maxIterations int,
+) error {
+	emittedRootEventIDs, err := executionState.EmitSubRunsAndContinue(
 		ChannelNameNext,
 		PayloadTypeNext,
-		[]any{nextPayload(md.Iteration, md.MaxIterations)},
+		[]any{nextPayload(iteration, maxIterations)},
 	)
+	if err != nil {
+		return err
+	}
+
+	for _, rootEventID := range emittedRootEventIDs {
+		if err := executionState.SetKV(loopChildRootEventKey, rootEventID); err != nil {
+			return fmt.Errorf("failed to store loop child root event: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func readHookMetadata(ctx core.ActionHookContext) (ExecutionMetadata, error) {
