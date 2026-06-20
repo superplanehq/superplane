@@ -14,10 +14,18 @@ if (typeof window !== "undefined") {
   environment = sentryWindow.SUPERPLANE_SENTRY_ENVIRONMENT;
 }
 
+// Patterns for known browser-extension noise that should never be reported.
+// Cardano wallet extensions (Eternl, Nami, Flint, Yoroi, Lace, Gero, Typhon, …)
+// inject themselves into every page and emit console warnings like
+// "initEternlDomAPI: href https://…", which `captureConsoleIntegration` would
+// otherwise report as warnings to Sentry.
+export const ignoredErrorPatterns: (string | RegExp)[] = [/\binit\w+DomAPI\b/];
+
 if (dsn) {
   Sentry.init({
     dsn,
     environment,
+    ignoreErrors: ignoredErrorPatterns,
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
