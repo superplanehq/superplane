@@ -88,7 +88,7 @@
   },
   {
     "repo": "github.com/superplanehq/app_tls_monitor",
-    "icon": "discord",
+    "icon": "shield-check",
     "title": "TLS Monitor",
     "description": "Monitor TLS certificate expiry for HTTPS endpoints. Add hostnames, check certificates on a schedule, and get Discord notifications when certificates are expiring.",
     "integrations": [
