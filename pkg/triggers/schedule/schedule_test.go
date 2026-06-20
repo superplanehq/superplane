@@ -620,3 +620,43 @@ func TestHandleHookRun(t *testing.T) {
 		t.Errorf("expected payload type to be scheduler.tick, got %q", eventCtx.Payloads[0].Type)
 	}
 }
+
+func TestHandleHookRunSchedulesAbsoluteNextTrigger(t *testing.T) {
+	schedule := &Schedule{}
+	eventCtx := &contexts.EventContext{}
+	metadataCtx := &contexts.MetadataContext{}
+	requestCtx := &contexts.RequestContext{}
+
+	_, err := schedule.HandleHook(core.TriggerHookContext{
+		Name: HookRun,
+		Configuration: Configuration{
+			Type:            TypeMinutes,
+			MinutesInterval: intPtr(1),
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   eventCtx,
+		Metadata: metadataCtx,
+		Requests: requestCtx,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	metadata, ok := metadataCtx.Metadata.(Metadata)
+	if !ok {
+		t.Fatalf("expected metadata to be %T, got %T", Metadata{}, metadataCtx.Metadata)
+	}
+
+	if metadata.NextTrigger == nil {
+		t.Fatal("expected next trigger to be stored in metadata")
+	}
+
+	nextTrigger, err := time.Parse(time.RFC3339Nano, *metadata.NextTrigger)
+	if err != nil {
+		t.Fatalf("unexpected next trigger format: %v", err)
+	}
+
+	if !requestCtx.RunAt.Equal(nextTrigger) {
+		t.Fatalf("expected request run_at %v to equal next trigger %v", requestCtx.RunAt, nextTrigger)
+	}
+}

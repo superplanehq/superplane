@@ -22,7 +22,10 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
-	runAt := time.Now().Add(interval)
+	return c.ScheduleActionCallAt(actionName, parameters, time.Now().Add(interval))
+}
+
+func (c *ExecutionRequestContext) ScheduleActionCallAt(actionName string, parameters map[string]any, runAt time.Time) error {
 	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: actionName,

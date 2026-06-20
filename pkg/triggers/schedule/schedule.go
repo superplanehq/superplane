@@ -365,7 +365,7 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	now := time.Now()
 
 	if config.Type == TypeMinutes && metadata.ReferenceTime == nil {
-		referenceTime := now.Format(time.RFC3339)
+		referenceTime := now.Format(time.RFC3339Nano)
 		metadata.ReferenceTime = &referenceTime
 	}
 
@@ -378,7 +378,7 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	// If the configuration didn't change, don't schedule a new action.
 	//
 	if metadata.NextTrigger != nil {
-		currentTrigger, err := time.Parse(time.RFC3339, *metadata.NextTrigger)
+		currentTrigger, err := time.Parse(time.RFC3339Nano, *metadata.NextTrigger)
 		if err != nil {
 			return fmt.Errorf("error parsing next trigger: %v", err)
 		}
@@ -391,12 +391,12 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	//
 	// Always schedule the next and save the next trigger in the metadata.
 	//
-	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	err = ctx.Requests.ScheduleActionCallAt("emitEvent", map[string]any{}, *nextTrigger)
 	if err != nil {
 		return err
 	}
 
-	formatted := nextTrigger.Format(time.RFC3339)
+	formatted := nextTrigger.Format(time.RFC3339Nano)
 	return ctx.Metadata.Set(Metadata{
 		NextTrigger:   &formatted,
 		ReferenceTime: metadata.ReferenceTime,
@@ -478,12 +478,12 @@ func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 		return err
 	}
 
-	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	err = ctx.Requests.ScheduleActionCallAt("emitEvent", map[string]any{}, *nextTrigger)
 	if err != nil {
 		return err
 	}
 
-	formatted := nextTrigger.Format(time.RFC3339)
+	formatted := nextTrigger.Format(time.RFC3339Nano)
 	ctx.Logger.Infof("Next trigger at: %v", formatted)
 
 	return ctx.Metadata.Set(Metadata{
@@ -582,7 +582,7 @@ func nextMinutesTrigger(interval int, now time.Time, referenceTime *string) (*ti
 	var reference time.Time
 	if referenceTime != nil {
 		var err error
-		reference, err = time.Parse(time.RFC3339, *referenceTime)
+		reference, err = time.Parse(time.RFC3339Nano, *referenceTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse reference time: %w", err)
 		}

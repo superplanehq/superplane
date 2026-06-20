@@ -184,7 +184,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node, onNewEvents),
-		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Requests:      contexts.NewCurrentNodeRequestContext(tx, node, request.ID),
 	}
 
 	if node.WebhookID != nil {
@@ -242,7 +242,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		Logger:        logger,
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
-		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Requests:      contexts.NewCurrentNodeRequestContext(tx, node, request.ID),
 	}
 
 	if node.AppInstallationID != nil {

@@ -398,12 +398,20 @@ type RequestContext struct {
 	Duration time.Duration
 	Action   string
 	Params   map[string]any
+	RunAt    time.Time
 }
 
 func (c *RequestContext) ScheduleActionCall(action string, params map[string]any, duration time.Duration) error {
 	c.Action = action
 	c.Params = params
 	c.Duration = duration
+	return nil
+}
+
+func (c *RequestContext) ScheduleActionCallAt(action string, params map[string]any, runAt time.Time) error {
+	c.Action = action
+	c.Params = params
+	c.RunAt = runAt
 	return nil
 }
 

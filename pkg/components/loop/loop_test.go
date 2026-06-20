@@ -545,12 +545,20 @@ type scheduledRequestContext struct {
 	called     bool
 	actionName string
 	interval   time.Duration
+	runAt      time.Time
 }
 
 func (s *scheduledRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
 	s.called = true
 	s.actionName = actionName
 	s.interval = interval
+	return nil
+}
+
+func (s *scheduledRequestContext) ScheduleActionCallAt(actionName string, parameters map[string]any, runAt time.Time) error {
+	s.called = true
+	s.actionName = actionName
+	s.runAt = runAt
 	return nil
 }
 

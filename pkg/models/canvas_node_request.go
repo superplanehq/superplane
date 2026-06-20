@@ -46,6 +46,7 @@ type InvokeAction struct {
 func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	var request CanvasNodeRequest
 
+	now := time.Now()
 	query := tx.
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
@@ -56,6 +57,8 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 			Options:  "SKIP LOCKED",
 		}).
 		Where("workflow_node_requests.id = ?", id).
+		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.run_at <= ?", now).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
@@ -108,6 +111,18 @@ func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string)
 	}
 
 	return &request, nil
+}
+
+func CompletePendingNodeRequestInTransaction(tx *gorm.DB, id uuid.UUID) error {
+	return tx.
+		Model(&CanvasNodeRequest{}).
+		Where("id = ?", id).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).
+		Error
 }
 
 func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
