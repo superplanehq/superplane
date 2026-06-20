@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -61,6 +62,20 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		event.CustomName = customName
 	}
 
+	parentRunID, err := resolveParentRunID(payload)
+	if err != nil {
+		return fmt.Errorf("invalid _superplane.parentRunId: %w", err)
+	}
+
+	if parentRunID != nil {
+		linkedRun, err := models.CreateLinkedCanvasRunInTransaction(s.tx, s.node.WorkflowID, *parentRunID, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create linked run: %w", err)
+		}
+
+		event.RunID = linkedRun.ID
+	}
+
 	err = s.tx.Create(&event).Error
 	if err != nil {
 		return err
@@ -109,4 +124,41 @@ func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string,
 	}
 
 	return &resolvedName, nil
+}
+
+func resolveParentRunID(payload any) (*uuid.UUID, error) {
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+
+	rawSuperplane, ok := payloadMap["_superplane"]
+	if !ok || rawSuperplane == nil {
+		return nil, nil
+	}
+
+	superplaneMap, ok := rawSuperplane.(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+
+	rawParentRunID, ok := superplaneMap["parentRunId"]
+	if !ok {
+		rawParentRunID = superplaneMap["parent_run_id"]
+	}
+	if rawParentRunID == nil {
+		return nil, nil
+	}
+
+	parentRunID, ok := rawParentRunID.(string)
+	if !ok {
+		return nil, fmt.Errorf("expected string, got %T", rawParentRunID)
+	}
+
+	parsedParentRunID, err := uuid.Parse(parentRunID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsedParentRunID, nil
 }

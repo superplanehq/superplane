@@ -163,6 +163,63 @@ func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
 	assert.Len(t, runs, 2, "expected only running+passed runs from canvas A")
 }
 
+func Test__ListCanvasRuns__ChildRunsAreHiddenByDefault(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	parentRun := createRunForRootEvent(t, rootEvent)
+	parentExecution := createExecutionForRun(t, parentRun, rootEvent.ID, "node-1")
+
+	var childRun *models.CanvasRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		childRun, err = models.CreateChildCanvasRunInTransaction(tx, parentRun.ID, parentExecution.ID)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		childRootEvent := models.CanvasEvent{
+			WorkflowID: childRun.WorkflowID,
+			NodeID:     parentExecution.NodeID,
+			Channel:    "item",
+			RunID:      childRun.ID,
+			Data:       models.NewJSONValue(map[string]any{"type": "foreach.item", "timestamp": now, "data": map[string]any{"index": 0}}),
+			State:      models.CanvasEventStatePending,
+			CreatedAt:  &now,
+		}
+		return tx.Create(&childRootEvent).Error
+	}))
+
+	defaultRuns, err := models.ListCanvasRuns(canvas.ID, 50, nil, models.CanvasRunFilters{})
+	require.NoError(t, err)
+	require.Len(t, defaultRuns, 1)
+	assert.Equal(t, parentRun.ID, defaultRuns[0].ID)
+
+	count, err := models.CountCanvasRuns(canvas.ID, models.CanvasRunFilters{})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+
+	allRuns, err := models.ListCanvasRuns(canvas.ID, 50, nil, models.CanvasRunFilters{IncludeChildRuns: true})
+	require.NoError(t, err)
+	require.Len(t, allRuns, 2)
+
+	childOnlyRuns, err := models.ListCanvasRuns(canvas.ID, 50, nil, models.CanvasRunFilters{ParentRunID: &parentRun.ID})
+	require.NoError(t, err)
+	require.Len(t, childOnlyRuns, 1)
+	assert.Equal(t, childRun.ID, childOnlyRuns[0].ID)
+}
+
 func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string) *models.CanvasRun {
 	now := time.Now()
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)

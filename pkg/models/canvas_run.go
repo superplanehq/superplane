@@ -24,14 +24,16 @@ const (
 )
 
 type CanvasRun struct {
-	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	WorkflowID uuid.UUID
-	VersionID  uuid.UUID
-	State      string
-	Result     string
-	CreatedAt  *time.Time
-	UpdatedAt  *time.Time
-	FinishedAt *time.Time
+	ID                   uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	WorkflowID           uuid.UUID
+	VersionID            uuid.UUID
+	ParentRunID          *uuid.UUID
+	SpawnedByExecutionID *uuid.UUID
+	State                string
+	Result               string
+	CreatedAt            *time.Time
+	UpdatedAt            *time.Time
+	FinishedAt           *time.Time
 }
 
 func (r *CanvasRun) TableName() string {
@@ -120,6 +122,68 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, resu
 	return run, nil
 }
 
+func CreateLinkedCanvasRunInTransaction(tx *gorm.DB, workflowID, parentRunID uuid.UUID, spawnedByExecutionID *uuid.UUID) (*CanvasRun, error) {
+	var parentRun CanvasRun
+	err := tx.
+		Select("id").
+		Where("id = ?", parentRunID).
+		First(&parentRun).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	run := &CanvasRun{
+		WorkflowID:           workflowID,
+		VersionID:            liveVersion.ID,
+		ParentRunID:          &parentRun.ID,
+		SpawnedByExecutionID: spawnedByExecutionID,
+		State:                CanvasRunStateStarted,
+		CreatedAt:            &now,
+		UpdatedAt:            &now,
+	}
+
+	if err := tx.Create(run).Error; err != nil {
+		return nil, err
+	}
+
+	return run, nil
+}
+
+func CreateChildCanvasRunInTransaction(tx *gorm.DB, parentRunID, spawnedByExecutionID uuid.UUID) (*CanvasRun, error) {
+	var parentRun CanvasRun
+	err := tx.
+		Where("id = ?", parentRunID).
+		First(&parentRun).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	run := &CanvasRun{
+		WorkflowID:           parentRun.WorkflowID,
+		VersionID:            parentRun.VersionID,
+		ParentRunID:          &parentRun.ID,
+		SpawnedByExecutionID: &spawnedByExecutionID,
+		State:                CanvasRunStateStarted,
+		CreatedAt:            &now,
+		UpdatedAt:            &now,
+	}
+
+	if err := tx.Create(run).Error; err != nil {
+		return nil, err
+	}
+
+	return run, nil
+}
+
 func ListStartedCanvasRuns(limit int) ([]CanvasRun, error) {
 	return ListStartedCanvasRunsInTransaction(database.Conn(), limit)
 }
@@ -140,8 +204,10 @@ func ListStartedCanvasRunsInTransaction(tx *gorm.DB, limit int) ([]CanvasRun, er
 }
 
 type CanvasRunFilters struct {
-	States  []string
-	Results []string
+	States           []string
+	Results          []string
+	IncludeChildRuns bool
+	ParentRunID      *uuid.UUID
 }
 
 func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
@@ -190,6 +256,12 @@ func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters Can
 }
 
 func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
+	if filters.ParentRunID != nil {
+		query = query.Where("parent_run_id = ?", *filters.ParentRunID)
+	} else if !filters.IncludeChildRuns {
+		query = query.Where("parent_run_id IS NULL")
+	}
+
 	hasStates := len(filters.States) > 0
 	hasResults := len(filters.Results) > 0
 
@@ -203,6 +275,21 @@ func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
 	default:
 		return query
 	}
+}
+
+func ListChildCanvasRunsInTransaction(tx *gorm.DB, workflowID, parentRunID uuid.UUID) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("parent_run_id = ?", parentRunID).
+		Order("created_at ASC").
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
 }
 
 func ListExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {

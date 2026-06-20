@@ -625,7 +625,9 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    parent_run_id uuid,
+    spawned_by_execution_id uuid
 );
 
 
@@ -1494,6 +1496,20 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree (parent_run_id);
+
+
+--
+-- Name: idx_workflow_runs_spawned_by_execution_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_spawned_by_execution_id ON public.workflow_runs USING btree (spawned_by_execution_id);
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1959,6 +1975,22 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_runs workflow_runs_spawned_by_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_spawned_by_execution_id_fkey FOREIGN KEY (spawned_by_execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2062,7 +2094,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260618234242	f
+20260620120800	f
 \.
 
 

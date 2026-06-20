@@ -114,6 +114,12 @@ type ExecutionStateContext interface {
 	EmitAndContinue(channel, payloadType string, payloads []any) error
 
 	/*
+	 * Spawn child runs from the current execution.
+	 * Each payload starts a new root event and run linked to the current run.
+	 */
+	EmitSubRuns(channel, payloadType string, payloads []any) error
+
+	/*
 	 * Pass the execution, without emitting any payloads from it.
 	 */
 	Pass() error

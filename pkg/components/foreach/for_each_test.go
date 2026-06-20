@@ -65,6 +65,35 @@ func TestForEachExecute(t *testing.T) {
 		assert.Empty(t, execState.Payloads)
 	})
 
+	t.Run("emits sub-runs when isolateRuns is enabled", func(t *testing.T) {
+		component := &ForEach{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		exprCtx := &contexts.ExpressionContext{
+			Output: []any{
+				map[string]any{"service": "EC2"},
+				map[string]any{"service": "S3"},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"arrayExpression": `$["Runner"].by_service`,
+				"isolateRuns":     true,
+			},
+			Metadata:       execMetadata,
+			ExecutionState: execState,
+			Expressions:    exprCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execState.SubRuns)
+		assert.True(t, execState.Passed)
+		assert.Equal(t, ChannelNameItem, execState.Channel)
+		assert.Equal(t, PayloadType, execState.Type)
+		require.Len(t, execState.Payloads, 2)
+	})
+
 	t.Run("returns error when expression result is not an array", func(t *testing.T) {
 		component := &ForEach{}
 		execState := &contexts.ExecutionStateContext{}

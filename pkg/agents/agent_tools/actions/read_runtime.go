@@ -116,7 +116,7 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		if err != nil {
 			return nil, err
 		}
-		return protoPayload(canvasactions.ListRuns(ctx, a.registry, canvasID, input.Limit, before, states, results))
+		return protoPayload(canvasactions.ListRuns(ctx, a.registry, canvasID, input.Limit, before, states, results, "", false))
 	case "event_executions":
 		if strings.TrimSpace(input.EventID) == "" {
 			return nil, fmt.Errorf("event_id is required for event_executions")

@@ -904,6 +904,8 @@ message ListRunsRequest {
   google.protobuf.Timestamp before = 3;
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
+  string parent_run_id = 6;
+  bool include_child_runs = 7;
 }
 
 message ListRunsResponse {
@@ -920,6 +922,7 @@ message DescribeRunRequest {
 
 message DescribeRunResponse {
   CanvasRun run = 1;
+  repeated CanvasRun child_runs = 2;
 }
 
 message CanvasMemory {
@@ -1010,6 +1013,8 @@ message CanvasRun {
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp finished_at = 9;
   string version_id = 10;
+  string parent_run_id = 11;
+  string spawned_by_execution_id = 12;
 }
 
 message ListEventExecutionsRequest {

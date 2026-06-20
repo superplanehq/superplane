@@ -17,10 +17,20 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
+func ListRuns(
+	ctx context.Context,
+	registry *registry.Registry,
+	canvasID uuid.UUID,
+	limit uint32,
+	before *timestamppb.Timestamp,
+	states []pb.CanvasRun_State,
+	results []pb.CanvasRun_Result,
+	parentRunID string,
+	includeChildRuns bool,
+) (*pb.ListRunsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	filters, err := buildCanvasRunFilters(states, results)
+	filters, err := buildCanvasRunFilters(states, results, parentRunID, includeChildRuns)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +100,22 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 	}, nil
 }
 
-func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (models.CanvasRunFilters, error) {
+func buildCanvasRunFilters(
+	states []pb.CanvasRun_State,
+	results []pb.CanvasRun_Result,
+	parentRunID string,
+	includeChildRuns bool,
+) (models.CanvasRunFilters, error) {
+	var parentRunUUID *uuid.UUID
+	if parentRunID != "" {
+		parsed, err := uuid.Parse(parentRunID)
+		if err != nil {
+			return models.CanvasRunFilters{}, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid parent run id: %v", err))
+		}
+
+		parentRunUUID = &parsed
+	}
+
 	modelStates := make([]string, 0, len(states))
 	for _, state := range states {
 		modelState, err := ProtoRunStateToModel(state)
@@ -112,8 +137,10 @@ func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_R
 	}
 
 	return models.CanvasRunFilters{
-		States:  modelStates,
-		Results: modelResults,
+		States:           modelStates,
+		Results:          modelResults,
+		IncludeChildRuns: includeChildRuns,
+		ParentRunID:      parentRunUUID,
 	}, nil
 }
 
@@ -172,15 +199,17 @@ func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, exec
 	}
 
 	serialized := &pb.CanvasRun{
-		Id:         run.ID.String(),
-		CanvasId:   run.WorkflowID.String(),
-		VersionId:  run.VersionID.String(),
-		RootEvent:  serializedRootEvent,
-		State:      RunStateToProto(run.State),
-		Result:     RunResultToProto(run.Result),
-		Executions: executionRefs,
-		CreatedAt:  timestamppb.New(*run.CreatedAt),
-		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
+		Id:                   run.ID.String(),
+		CanvasId:             run.WorkflowID.String(),
+		VersionId:            run.VersionID.String(),
+		RootEvent:            serializedRootEvent,
+		State:                RunStateToProto(run.State),
+		Result:               RunResultToProto(run.Result),
+		Executions:           executionRefs,
+		CreatedAt:            timestamppb.New(*run.CreatedAt),
+		UpdatedAt:            timestamppb.New(*run.UpdatedAt),
+		ParentRunId:          runIDString(run.ParentRunID),
+		SpawnedByExecutionId: runIDString(run.SpawnedByExecutionID),
 	}
 
 	if run.FinishedAt != nil {
@@ -188,6 +217,14 @@ func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, exec
 	}
 
 	return serialized, nil
+}
+
+func runIDString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+
+	return id.String()
 }
 
 func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {

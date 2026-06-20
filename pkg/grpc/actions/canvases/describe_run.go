@@ -48,7 +48,38 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		return nil, err
 	}
 
+	childRuns, err := models.ListChildCanvasRunsInTransaction(db, canvasID, run.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	childRunIDs := make([]uuid.UUID, 0, len(childRuns))
+	for _, childRun := range childRuns {
+		childRunIDs = append(childRunIDs, childRun.ID)
+	}
+
+	childRootEventsByRunID, err := listRootEventsForRuns(ctx, canvasID, childRunIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	childExecutions, err := models.ListExecutionsForRunsInTransaction(db, canvasID, childRunIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	childExecutionsByRunID := make(map[string][]models.CanvasNodeExecution, len(childRunIDs))
+	for _, execution := range childExecutions {
+		childExecutionsByRunID[execution.RunID.String()] = append(childExecutionsByRunID[execution.RunID.String()], execution)
+	}
+
+	serializedChildRuns, err := SerializeCanvasRuns(childRuns, childRootEventsByRunID, childExecutionsByRunID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.DescribeRunResponse{
-		Run: serializedRun,
+		Run:       serializedRun,
+		ChildRuns: serializedChildRuns,
 	}, nil
 }

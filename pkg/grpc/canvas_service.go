@@ -280,7 +280,17 @@ func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (
 		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
 	}
 
-	return canvases.ListRuns(ctx, s.registry, canvasID, req.Limit, req.Before, req.States, req.Results)
+	return canvases.ListRuns(
+		ctx,
+		s.registry,
+		canvasID,
+		req.Limit,
+		req.Before,
+		req.States,
+		req.Results,
+		req.ParentRunId,
+		req.IncludeChildRuns,
+	)
 }
 
 func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {

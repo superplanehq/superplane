@@ -536,6 +536,9 @@ func (f *finishedExecutionState) Emit(channel, payloadType string, payloads []an
 func (f *finishedExecutionState) EmitAndContinue(channel, payloadType string, payloads []any) error {
 	return f.ExecutionStateContext.EmitAndContinue(channel, payloadType, payloads)
 }
+func (f *finishedExecutionState) EmitSubRuns(channel, payloadType string, payloads []any) error {
+	return f.ExecutionStateContext.EmitSubRuns(channel, payloadType, payloads)
+}
 func (f *finishedExecutionState) Pass() error { return f.ExecutionStateContext.Pass() }
 func (f *finishedExecutionState) Fail(reason, message string) error {
 	return f.ExecutionStateContext.Fail(reason, message)

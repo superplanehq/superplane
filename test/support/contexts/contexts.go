@@ -252,6 +252,7 @@ type ExecutionStateContext struct {
 	Channel        string
 	Type           string
 	Payloads       []any
+	SubRuns        bool
 	KVs            map[string]string
 }
 
@@ -300,6 +301,11 @@ func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 	}
 	c.Payloads = wrappedPayloads
 	return nil
+}
+
+func (c *ExecutionStateContext) EmitSubRuns(channel, payloadType string, payloads []any) error {
+	c.SubRuns = true
+	return c.Emit(channel, payloadType, payloads)
 }
 
 func (c *ExecutionStateContext) Fail(reason, message string) error {

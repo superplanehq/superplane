@@ -59,15 +59,9 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	}
 
 	for _, payload := range payloads {
-		event := map[string]any{
-			"type":      payloadType,
-			"timestamp": time.Now(),
-			"data":      payload,
-		}
-
-		data, err := json.Marshal(event)
+		data, err := marshalStructuredPayload(payloadType, payload)
 		if err != nil {
-			return fmt.Errorf("failed to marshal payload: %w", err)
+			return err
 		}
 
 		if len(data) > s.maxPayloadSize {
@@ -99,15 +93,9 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 	}
 
 	for _, payload := range payloads {
-		event := map[string]any{
-			"type":      payloadType,
-			"timestamp": time.Now(),
-			"data":      payload,
-		}
-
-		data, err := json.Marshal(event)
+		data, err := marshalStructuredPayload(payloadType, payload)
 		if err != nil {
-			return fmt.Errorf("failed to marshal payload: %w", err)
+			return err
 		}
 
 		if len(data) > s.maxPayloadSize {
@@ -119,6 +107,56 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 
 	newEvents, err := s.execution.EmitOutputsInTransaction(s.tx, outputs)
 	if err != nil {
+		return err
+	}
+
+	if s.onNewEvents != nil {
+		s.onNewEvents(newEvents)
+	}
+
+	return nil
+}
+
+func (s *ExecutionStateContext) EmitSubRuns(channel, payloadType string, payloads []any) error {
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("cannot emit %d sub-runs (max %d per execution)", len(payloads), config.MaxEmitCount())
+	}
+
+	newEvents := make([]models.CanvasEvent, 0, len(payloads))
+	for _, payload := range payloads {
+		data, err := marshalStructuredPayload(payloadType, payload)
+		if err != nil {
+			return err
+		}
+
+		if len(data) > s.maxPayloadSize {
+			return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+		}
+
+		childRun, err := models.CreateChildCanvasRunInTransaction(s.tx, s.execution.RunID, s.execution.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create child run: %w", err)
+		}
+
+		now := time.Now()
+		newEvent := models.CanvasEvent{
+			WorkflowID: s.execution.WorkflowID,
+			NodeID:     s.execution.NodeID,
+			Channel:    channel,
+			Data:       models.NewJSONValue(json.RawMessage(data)),
+			RunID:      childRun.ID,
+			State:      models.CanvasEventStatePending,
+			CreatedAt:  &now,
+		}
+
+		if err := s.tx.Create(&newEvent).Error; err != nil {
+			return fmt.Errorf("failed to create sub-run root event: %w", err)
+		}
+
+		newEvents = append(newEvents, newEvent)
+	}
+
+	if _, err := s.execution.PassInTransaction(s.tx, map[string][]any{}); err != nil {
 		return err
 	}
 
@@ -154,4 +192,19 @@ func (s *ExecutionStateContext) GetKV(key string) (string, error) {
 		return "", err
 	}
 	return value, nil
+}
+
+func marshalStructuredPayload(payloadType string, payload any) ([]byte, error) {
+	event := map[string]any{
+		"type":      payloadType,
+		"timestamp": time.Now(),
+		"data":      payload,
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	return data, nil
 }
