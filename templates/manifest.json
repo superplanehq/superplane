@@ -121,5 +121,26 @@
     ],
     "agentInstructions": "The user just installed Semantic Pull Requests. This canvas validates PR titles against semantic types (feat, fix, docs, chore), publishes commit statuses, and tracks merge statistics. Setup involves: 1) Connecting the GitHub integration, 2) Running the Setup trigger with the repository as owner/repo to backfill weekly stats. For private repos, a GITHUB_TOKEN secret is needed on the Fetch weekly stats node.",
     "agentInitialMessage": "Welcome! Semantic Pull Requests enforces title conventions on your PRs and tracks merge statistics.\n\n**1. Connect GitHub** - [GitHub](integration:github)\nThe integration needs access to the repository you want to monitor.\n\n**2. Run Setup**\nClick the **Setup** trigger and enter your repository as `owner/repo` (e.g. `my-org/my-app`). This backfills weekly merge statistics for the current year.\n\n**3. (Optional) Private repos**\nAdd a `GITHUB_TOKEN` secret to the **Fetch weekly stats** runner node. The token needs Pull requests:Read permission.\n\nOnce set up, every new PR will get a title check with a commit status. Let me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_coolify-watcher",
+    "icon": "coolify",
+    "title": "Coolify Watcher",
+    "description": "Keep an eye on a Coolify host. On every poll it SSHes into the server, captures a JSON snapshot of host and container stats, stores it in canvas memory, and renders it on a live dashboard - including one-click restarts of any Coolify-managed app or service.",
+    "integrations": [
+      "coolify"
+    ],
+    "tags": [
+      "Monitoring",
+      "Infrastructure"
+    ],
+    "requirements": [
+      "Coolify integration with permission to list and control applications and services",
+      "A reachable Coolify host with SSH access",
+      "An SSH secret in your org with key 'pw' holding the host password",
+      "The Coolify host IP and SSH username for the install parameters"
+    ],
+    "agentInstructions": "The user just installed the Coolify Watcher app. This canvas monitors a Coolify host: a scheduled trigger lists Coolify applications and services, runs an SSH health script that returns a JSON snapshot of host and container stats, and writes the results into the coolifyHost, coolifyStats, coolifyApps, and coolifyServices memory namespaces for a live dashboard. A second trigger restarts a selected app or service (via coolify.controlApplication / coolify.controlService). Setup usually involves: 1) Connecting the Coolify integration, 2) Creating an org secret with key 'pw' containing the SSH password for the host, 3) Supplying the SSH host IP, SSH user, and secret name as install parameters. SSH uses password authentication against the secret key 'pw'.",
+    "agentInitialMessage": "Welcome! This canvas is a health monitor for a Coolify host. On each scan it lists your Coolify apps and services, SSHes into the host to capture CPU, memory, disk, uptime, and per-container stats, stores everything in SuperPlane memory, and powers a live dashboard. It can also restart any Coolify-managed app or service on demand.\n\nThe canvas is structurally wired, but it still needs your environment-specific values. Here's the setup checklist:\n\n---\n\n**What needs to be done:**\n\n**1. Connect Coolify** - [Coolify](integration:coolify)\nThe list and control nodes ([List Applications](node:coolify-listapplications-coolify-listapplications-9cp6fn), [List Services](node:coolify-listservices-coolify-listservices-iwmbto), [Control Application](node:coolify-controlapplication-coolify-controlapplication-j8d2ha), [Control Service](node:coolify-controlservice-coolify-controlservice-r3n7c6)) all use your Coolify integration.\n\n**2. Create the SSH secret**\nThe [SSH Dump](node:ssh-ssh-jca97f) node connects to the host with password authentication, reading a secret with the key `pw`. Create an org secret holding your Coolify host's SSH password under that key.\n\n**3. Provide the SSH connection details**\nThe install asks for the Coolify host IP (`SSH Host`), the SSH username (`SSH User`), and the name of the secret you just created (`SSH Secret Name`).\n\n---\n\nLet's gather the environment-specific values:\n\n:::survey\nWhat is the Coolify host IP for SSH? (e.g. `1.1.1.1`)\n- [input]\n\nWhat SSH user should connect to the host? (e.g. `root`)\n- [input]\n\nDoes the SSH password secret (with key `pw`) already exist in your org?\n- I need to create it\n- It already exists\n:::\n\nOnce you've shared those details, I'll get the watcher polling your Coolify host and populating the dashboard."
   }
 ]
