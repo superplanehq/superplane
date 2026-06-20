@@ -231,6 +231,34 @@ describe("RunsTabPanel", () => {
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 
+  it("navigates back to parent run detail when the current run is a sub-run", async () => {
+    const user = userEvent.setup();
+    const onNavigateRun = vi.fn();
+    const onBackToRunList = vi.fn();
+
+    render(
+      <RunsTabPanel
+        runs={[]}
+        selectedRunId="child-run-1"
+        selectedRun={makeRun({
+          id: "child-run-1",
+          parentRunId: "parent-run-1",
+          rootEvent: { ...makeRun().rootEvent, customName: "Child run" },
+        })}
+        initialOpenDetail
+        onNavigateRun={onNavigateRun}
+        onBackToRunList={onBackToRunList}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    await user.click(screen.getByTestId("run-detail-back"));
+    expect(onNavigateRun).toHaveBeenCalledWith("parent-run-1");
+    expect(onBackToRunList).not.toHaveBeenCalled();
+    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+  });
+
   it("opens run detail when initialOpenDetail arrives after mount", () => {
     const runs = [makeRun()];
 

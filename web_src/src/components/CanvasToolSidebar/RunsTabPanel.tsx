@@ -120,9 +120,15 @@ export function RunsTabPanel({
   );
 
   const handleBack = useCallback(() => {
+    if (selectedRun?.parentRunId) {
+      (onNavigateRun ?? onSelectRun)(selectedRun.parentRunId);
+      setSidebarView("detail");
+      return;
+    }
+
     setSidebarView("list");
     onBackToRunList?.();
-  }, [onBackToRunList]);
+  }, [onBackToRunList, onNavigateRun, onSelectRun, selectedRun?.parentRunId]);
 
   const handleSelectLiveCanvas = useCallback(() => {
     setSidebarView("list");

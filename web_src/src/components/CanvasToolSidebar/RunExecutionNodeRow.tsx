@@ -1,5 +1,6 @@
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "@/ui/Runs/runNodeDetailModel";
@@ -12,6 +13,9 @@ interface RunExecutionNodeRowProps {
   isTrigger: boolean;
   isSelected: boolean;
   onSelect: (nodeId: string) => void;
+  hasSubRuns?: boolean;
+  isSubRunsExpanded?: boolean;
+  onToggleSubRuns?: (nodeId: string) => void;
 }
 
 function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
@@ -35,6 +39,9 @@ export function RunExecutionNodeRow({
   isTrigger,
   isSelected,
   onSelect,
+  hasSubRuns = false,
+  isSubRunsExpanded = false,
+  onToggleSubRuns,
 }: RunExecutionNodeRowProps) {
   const iconSrc = getHeaderIconSrc(workflowNode?.component);
   const iconSlug = workflowNode?.component ? componentIconMap[workflowNode.component] : undefined;
@@ -70,6 +77,23 @@ export function RunExecutionNodeRow({
         className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
+      {hasSubRuns && onToggleSubRuns ? (
+        <button
+          type="button"
+          className="shrink-0 rounded p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+          aria-label={isSubRunsExpanded ? "Collapse sub-runs" : "Expand sub-runs"}
+          data-testid="run-execution-row-sub-runs-toggle"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleSubRuns(nodeId);
+          }}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          {isSubRunsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+      ) : null}
       {badge ? <EventSectionStatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );

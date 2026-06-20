@@ -1,5 +1,5 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export function RunDetailPanel({
   onNavigateRun,
   onNavigateOlder,
 }: RunDetailPanelProps) {
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [run, nodeMap]);
 
@@ -51,46 +52,57 @@ export function RunDetailPanel({
     {
       parentRunId: run.id || undefined,
     },
-    !!run.id && !!selectedNodeId,
+    !!run.id,
   );
 
   const executionChain = useMemo(() => buildExecutionChain(executions, triggerNodeId), [executions, triggerNodeId]);
-  const selectedExecutionIDs = useMemo(() => {
-    if (!selectedNodeId) {
-      return new Set<string>();
-    }
-
-    return new Set(
+  const childRunsByNodeId = useMemo(() => {
+    const byNodeId = new Map<string, CanvasesCanvasRun[]>();
+    const executionNodeByID = new Map(
       (run.executions || [])
-        .filter((execution) => execution.nodeId === selectedNodeId && execution.id)
-        .map((execution) => execution.id as string),
+        .filter((execution): execution is { id: string; nodeId: string } => !!execution.id && !!execution.nodeId)
+        .map((execution) => [execution.id, execution.nodeId]),
     );
-  }, [run.executions, selectedNodeId]);
-
-  const childRunsForSelectedNode = useMemo(() => {
-    if (!selectedNodeId) {
-      return [];
-    }
-
-    const allowRootLinkedRuns = selectedNodeId === run.rootEvent?.nodeId;
     const pages = childRunsQuery.data?.pages || [];
     const seen = new Set<string>();
 
-    return pages
-      .flatMap((page) => page?.runs || [])
-      .filter((childRun): childRun is CanvasesCanvasRun => {
-        if (!childRun.id || seen.has(childRun.id)) {
-          return false;
-        }
-        seen.add(childRun.id);
+    for (const childRun of pages.flatMap((page) => page?.runs || [])) {
+      if (!childRun.id || seen.has(childRun.id)) {
+        continue;
+      }
 
-        if (childRun.spawnedByExecutionId) {
-          return selectedExecutionIDs.has(childRun.spawnedByExecutionId);
-        }
+      seen.add(childRun.id);
 
-        return allowRootLinkedRuns;
-      });
-  }, [childRunsQuery.data?.pages, run.rootEvent?.nodeId, selectedExecutionIDs, selectedNodeId]);
+      const parentNodeId = childRun.spawnedByExecutionId
+        ? executionNodeByID.get(childRun.spawnedByExecutionId)
+        : run.rootEvent?.nodeId;
+      if (!parentNodeId) {
+        continue;
+      }
+
+      const existingRuns = byNodeId.get(parentNodeId) || [];
+      existingRuns.push(childRun);
+      byNodeId.set(parentNodeId, existingRuns);
+    }
+
+    return byNodeId;
+  }, [childRunsQuery.data?.pages, run.executions, run.rootEvent?.nodeId]);
+
+  const toggleNodeSubRuns = (nodeId: string) => {
+    setExpandedNodeIds((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setExpandedNodeIds(new Set());
+  }, [run.id]);
 
   const copyRunLink = async () => {
     const url = new URL(window.location.href);
@@ -195,15 +207,17 @@ export function RunDetailPanel({
         ) : executionChain.length === 0 ? (
           <p className="px-3 py-4 text-xs text-gray-400">No executed nodes in this run.</p>
         ) : (
-          <>
-            {executionChain.map((nodeId) => {
-              const isTrigger = nodeId === triggerNodeId;
-              const workflowNode = workflowNodes.find((node) => node.id === nodeId);
-              const execution = executions.find((item) => item.nodeId === nodeId);
+          executionChain.map((nodeId) => {
+            const isTrigger = nodeId === triggerNodeId;
+            const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+            const execution = executions.find((item) => item.nodeId === nodeId);
+            const childRuns = childRunsByNodeId.get(nodeId) || [];
+            const hasSubRuns = childRuns.length > 0;
+            const isSubRunsExpanded = expandedNodeIds.has(nodeId);
 
-              return (
+            return (
+              <div key={nodeId}>
                 <RunExecutionNodeRow
-                  key={nodeId}
                   nodeId={nodeId}
                   workflowNode={workflowNode}
                   componentIconMap={componentIconMap}
@@ -211,55 +225,52 @@ export function RunDetailPanel({
                   isTrigger={isTrigger}
                   isSelected={selectedNodeId === nodeId}
                   onSelect={onSelectNode}
+                  hasSubRuns={hasSubRuns}
+                  isSubRunsExpanded={isSubRunsExpanded}
+                  onToggleSubRuns={hasSubRuns ? toggleNodeSubRuns : undefined}
                 />
-              );
-            })}
-            <div className="border-t border-t-slate-950/10 px-3 py-2" data-testid="run-detail-sub-runs">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sub-runs</p>
-              {!selectedNodeId ? (
-                <p className="mt-2 text-xs text-gray-400">Select a node to load sub-runs.</p>
-              ) : childRunsQuery.isLoading ? (
-                <p className="mt-2 text-xs text-gray-400">Loading sub-runs...</p>
-              ) : childRunsForSelectedNode.length === 0 ? (
-                <p className="mt-2 text-xs text-gray-400">No sub-runs generated by this node.</p>
-              ) : (
-                <div className="mt-2 space-y-1.5">
-                  {childRunsForSelectedNode.map((childRun) => {
-                    const childRunPresentation = buildRunPresentation(childRun, nodeMap);
-                    return (
-                      <button
-                        key={childRun.id}
+                {isSubRunsExpanded ? (
+                  <div
+                    className="space-y-1 border-b border-b-slate-950/10 bg-gray-50 px-3 py-2"
+                    data-testid="run-detail-sub-run-group"
+                  >
+                    {childRuns.map((childRun) => {
+                      const childRunPresentation = buildRunPresentation(childRun, nodeMap);
+                      return (
+                        <button
+                          key={childRun.id}
+                          type="button"
+                          className="flex w-full items-center justify-between rounded border border-slate-950/10 bg-white px-2 py-1.5 text-left hover:bg-gray-50"
+                          onClick={() => childRun.id && onNavigateRun?.(childRun.id)}
+                          disabled={!onNavigateRun}
+                          data-testid="run-detail-sub-run-row"
+                        >
+                          <span className="min-w-0 truncate pr-2 text-xs font-medium text-gray-700">
+                            {childRunPresentation.title}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-gray-400">
+                            {childRun.createdAt ? <TimeAgo date={childRun.createdAt} /> : "now"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {childRunsQuery.hasNextPage ? (
+                      <Button
                         type="button"
-                        className="flex w-full items-center justify-between rounded border border-slate-950/10 px-2 py-1.5 text-left hover:bg-gray-50"
-                        onClick={() => childRun.id && onNavigateRun?.(childRun.id)}
-                        disabled={!onNavigateRun}
-                        data-testid="run-detail-sub-run-row"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => childRunsQuery.fetchNextPage()}
+                        disabled={childRunsQuery.isFetchingNextPage}
                       >
-                        <span className="min-w-0 truncate pr-2 text-xs font-medium text-gray-700">
-                          {childRunPresentation.title}
-                        </span>
-                        <span className="shrink-0 text-[10px] text-gray-400">
-                          {childRun.createdAt ? <TimeAgo date={childRun.createdAt} /> : "now"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {childRunsQuery.hasNextPage ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => childRunsQuery.fetchNextPage()}
-                      disabled={childRunsQuery.isFetchingNextPage}
-                    >
-                      {childRunsQuery.isFetchingNextPage ? "Loading..." : "Load more sub-runs"}
-                    </Button>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </>
+                        {childRunsQuery.isFetchingNextPage ? "Loading..." : "Load more sub-runs"}
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

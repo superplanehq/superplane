@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunDetailPanel } from "./RunDetailPanel";
 
@@ -73,11 +73,22 @@ const workflowNodes: SuperplaneComponentsNode[] = [
 ];
 
 describe("RunDetailPanel", () => {
-  it("loads child runs for the selected node and navigates on click", async () => {
+  beforeEach(() => {
+    useInfiniteCanvasRunsMock.mockReset();
+    useInfiniteCanvasRunsMock.mockReturnValue({
+      data: { pages: [{ runs: [] as CanvasesCanvasRun[] }] },
+      isLoading: false,
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+    });
+  });
+
+  it("expands a node row with sub-runs and navigates on click", async () => {
     const user = userEvent.setup();
     const onNavigateRun = vi.fn();
 
-    useInfiniteCanvasRunsMock.mockReturnValueOnce({
+    useInfiniteCanvasRunsMock.mockReturnValue({
       data: {
         pages: [
           {
@@ -123,15 +134,16 @@ describe("RunDetailPanel", () => {
         }}
         workflowNodes={workflowNodes}
         componentIconMap={{}}
-        selectedNodeId="action-1"
+        selectedNodeId={null}
         onSelectNode={() => {}}
         onBack={() => {}}
         onNavigateRun={onNavigateRun}
       />,
     );
 
-    expect(screen.getByTestId("run-detail-sub-runs")).toBeInTheDocument();
-    expect(screen.getByText("Child run")).toBeInTheDocument();
+    await user.click(screen.getByTestId("run-execution-row-sub-runs-toggle"));
+    expect(screen.getByTestId("run-detail-sub-run-group")).toBeInTheDocument();
+    expect(screen.getByTestId("run-detail-sub-run-row")).toHaveTextContent("Child run");
     await user.click(screen.getByText("Child run"));
     expect(onNavigateRun).toHaveBeenCalledWith("child-run-1");
   });
