@@ -116,9 +116,8 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 }
 
 func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
-	trigger := &OnTopicMessage{}
-
 	t.Run("notification for configured topic -> emits event", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "Notification",
@@ -167,6 +166,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("subscription confirmation for different topic -> ignored", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -206,6 +206,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("confirmation for configured topic -> confirms subscription", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -251,6 +252,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("unsupported message type -> bad request", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: []byte(`{
 				"Type": "UnknownType",
@@ -267,6 +269,64 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, http.StatusBadRequest, status)
 	})
+}
+
+func Test__OnTopicMessage__fetchSigningCertificate__cachesByURL(t *testing.T) {
+	trigger := &OnTopicMessage{}
+	_, certPEM := createTestSigningCert(t)
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader(certPEM)),
+		}},
+	}
+
+	ctx := core.WebhookRequestContext{HTTP: httpContext, Logger: log.NewEntry(log.New())}
+
+	cert1, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1, "first call should fetch the certificate over HTTP")
+
+	cert2, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1, "second call should be served from cache, not a new HTTP request")
+	assert.Same(t, cert1, cert2)
+}
+
+func Test__OnTopicMessage__fetchSigningCertificate__refetchesAfterTTL(t *testing.T) {
+	trigger := &OnTopicMessage{}
+	_, certPEM := createTestSigningCert(t)
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM))},
+		},
+	}
+
+	ctx := core.WebhookRequestContext{HTTP: httpContext, Logger: log.NewEntry(log.New())}
+
+	_, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	trigger.certCache.Store(testSigningCertURL, cachedCert{
+		cert:      mustLoadCachedCert(t, trigger, testSigningCertURL),
+		fetchedAt: time.Now().Add(-signingCertCacheTTL - time.Minute),
+	})
+
+	_, err = trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 2, "expired cache entry should trigger a re-fetch")
+}
+
+func mustLoadCachedCert(t *testing.T, trigger *OnTopicMessage, url string) *x509.Certificate {
+	t.Helper()
+
+	raw, ok := trigger.certCache.Load(url)
+	require.True(t, ok)
+	return raw.(cachedCert).cert
 }
 
 const testSigningCertURL = "https://sns.us-east-1.amazonaws.com/test.pem"
