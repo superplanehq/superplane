@@ -12,6 +12,13 @@ vi.mock("@/hooks/useCanvasData", () => ({
     data: { executions: [] },
     isLoading: false,
   }),
+  useInfiniteCanvasRuns: () => ({
+    data: { pages: [{ runs: [] }] },
+    isLoading: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
 }));
 
 vi.mock("@/components/TimeAgo", () => ({

@@ -212,6 +212,8 @@ export const canvasKeys = {
       "infinite",
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
+      ...(filters?.parentRunId ? ["parentRunId", filters.parentRunId] : []),
+      ...(filters?.includeChildRuns ? ["includeChildRuns", "true"] : []),
     ] as const,
   run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
@@ -1138,6 +1140,8 @@ export const useDeleteCanvas = (organizationId: string) => {
 export type CanvasRunsFilters = {
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+  parentRunId?: string;
+  includeChildRuns?: boolean;
 };
 
 export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
@@ -1180,6 +1184,8 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
             limit,
             ...(filters.states?.length ? { states: filters.states } : {}),
             ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(filters.parentRunId ? { parentRunId: filters.parentRunId } : {}),
+            ...(filters.includeChildRuns ? { includeChildRuns: filters.includeChildRuns } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

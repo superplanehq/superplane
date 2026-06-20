@@ -4,6 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunDetailPanel } from "./RunDetailPanel";
 
+const { useInfiniteCanvasRunsMock } = vi.hoisted(() => ({
+  useInfiniteCanvasRunsMock: vi.fn(() => ({
+    data: { pages: [{ runs: [] as CanvasesCanvasRun[] }] },
+    isLoading: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  })),
+}));
+
 vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
     data: {
@@ -18,6 +28,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
     },
     isLoading: false,
   }),
+  useInfiniteCanvasRuns: useInfiniteCanvasRunsMock,
 }));
 
 vi.mock("@/components/TimeAgo", () => ({
@@ -62,6 +73,69 @@ const workflowNodes: SuperplaneComponentsNode[] = [
 ];
 
 describe("RunDetailPanel", () => {
+  it("loads child runs for the selected node and navigates on click", async () => {
+    const user = userEvent.setup();
+    const onNavigateRun = vi.fn();
+
+    useInfiniteCanvasRunsMock.mockReturnValueOnce({
+      data: {
+        pages: [
+          {
+            runs: [
+              {
+                id: "child-run-1",
+                canvasId: "canvas-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                spawnedByExecutionId: "exec-action-1",
+                createdAt: "2026-05-01T12:03:00Z",
+                rootEvent: {
+                  id: "child-event-1",
+                  nodeId: "action-1",
+                  customName: "Child run",
+                  createdAt: "2026-05-01T12:03:00Z",
+                },
+                executions: [],
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+    });
+
+    render(
+      <RunDetailPanel
+        canvasId="canvas-1"
+        run={{
+          ...makeRun(),
+          executions: [
+            {
+              id: "exec-action-1",
+              nodeId: "action-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+            },
+          ],
+        }}
+        workflowNodes={workflowNodes}
+        componentIconMap={{}}
+        selectedNodeId="action-1"
+        onSelectNode={() => {}}
+        onBack={() => {}}
+        onNavigateRun={onNavigateRun}
+      />,
+    );
+
+    expect(screen.getByTestId("run-detail-sub-runs")).toBeInTheDocument();
+    expect(screen.getByText("Child run")).toBeInTheDocument();
+    await user.click(screen.getByText("Child run"));
+    expect(onNavigateRun).toHaveBeenCalledWith("child-run-1");
+  });
+
   it("renders run metadata and execution chain rows", () => {
     render(
       <RunDetailPanel

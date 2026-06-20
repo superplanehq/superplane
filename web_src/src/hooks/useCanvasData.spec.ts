@@ -166,6 +166,33 @@ describe("useInfiniteCanvasRuns", () => {
       );
     });
   });
+
+  it("passes parent run filter for child-run loading", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: [],
+        totalCount: 0,
+        hasNextPage: false,
+      },
+    });
+
+    renderHook(() => useInfiniteCanvasRuns("canvas-1", { parentRunId: "run-parent-1" }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { canvasId: "canvas-1" },
+          query: {
+            limit: 25,
+            parentRunId: "run-parent-1",
+          },
+        }),
+      );
+    });
+  });
 });
 
 describe("useDescribeRun", () => {
