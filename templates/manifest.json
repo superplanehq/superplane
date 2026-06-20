@@ -85,5 +85,23 @@
     ],
     "agentInstructions": "The user just installed OSS Guard. This canvas checks open-source license compatibility on pull requests using osv-scanner. Setup involves: 1) Connecting the GitHub integration, 2) Running the 'Run Setup' manual trigger with the repository as owner/repo, 3) Running 'Scan Main' to populate the console dashboard. For private repos, a GITHUB_TOKEN secret is needed on the runner nodes.",
     "agentInitialMessage": "Welcome! OSS Guard checks open-source license compatibility on every pull request.\n\nHere's how to get started:\n\n**1. Connect GitHub** - [GitHub](integration:github)\nThe integration needs access to the repository you want to monitor.\n\n**2. Run Setup**\nClick the **Run Setup** trigger and enter your repository as `owner/repo` (for example, `my-org/my-app`). This saves the repository to canvas memory.\n\n**3. Scan Main**\nClick **Scan Main** to run the first license scan against your `main` branch. This populates the console dashboard with license statistics and any unapproved dependencies.\n\n**4. (Optional) Private repos**\nIf your repository is private, add a `GITHUB_TOKEN` secret to the **Run license check** and **Run setup scan** runner nodes. The token needs Contents:Read permission.\n\n---\n\nOnce setup is complete, every new PR will automatically get a license check with a commit status. Let me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_tls_monitor",
+    "icon": "discord",
+    "title": "TLS Monitor",
+    "description": "Monitor TLS certificate expiry for HTTPS endpoints. Add hostnames, check certificates on a schedule, and get Discord notifications when certificates are expiring.",
+    "integrations": [
+      "discord"
+    ],
+    "tags": [
+      "Monitoring",
+      "Security"
+    ],
+    "requirements": [
+      "Discord integration for expiry notifications (optional)"
+    ],
+    "agentInstructions": "The user just installed TLS Monitor. This canvas checks TLS certificate expiry for HTTPS endpoints. Setup involves: 1) Adding endpoints via the 'Add Endpoint' manual trigger, 2) Optionally connecting Discord and setting a channel on the notification nodes, 3) Running 'Run Checks Now' to do the first scan. The schedule runs checks hourly by default.",
+    "agentInitialMessage": "Welcome! TLS Monitor checks certificate expiry for your HTTPS endpoints.\n\n**1. Add endpoints**\nClick **Add Endpoint** and enter a hostname (e.g. `example.com`). Add as many as you need.\n\n**2. Run the first check**\nClick **Run Checks Now** to scan all endpoints immediately. After this, checks run automatically every hour.\n\n**3. (Optional) Discord notifications**\nConnect a [Discord](integration:discord) integration and set the channel on the three notification nodes (expiring soon, expired, invalid) to get alerts when certificates need attention.\n\nThe console shows all endpoints with their status, expiry date, and days remaining. Let me know if you need help!"
   }
 ]
