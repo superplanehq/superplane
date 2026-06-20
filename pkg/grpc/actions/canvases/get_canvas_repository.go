@@ -78,7 +78,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 	// and let the repository provisioner worker handle the rest.
 	// This is a trick to provision repositories for existing canvases lazily.
 	//
-	err = canvas.CreatePendingRepository(gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+	_, err = canvas.CreatePendingRepository(gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
 	}))
