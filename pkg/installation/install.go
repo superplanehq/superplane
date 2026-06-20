@@ -87,7 +87,8 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	seedFiles, err := fetchSeedFiles(repo)
+	resolvedParams := resolveInstallParamsForRepo(repo, req.InstallParams)
+	seedFiles, err := fetchSeedFiles(repo, resolvedParams)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
@@ -246,12 +247,26 @@ func translateInstallError(err error) error {
 	return err
 }
 
+// resolveInstallParamsForRepo loads params.json from the repo and resolves
+// install parameter values. Returns nil when no params are configured.
+func resolveInstallParamsForRepo(repo *Repository, userParams map[string]string) map[string]string {
+	params, err := FetchParams(repo, repo.Ref)
+	if err != nil || params == nil || len(params.InstallParams) == 0 {
+		return nil
+	}
+
+	return ResolveInstallParams(params.InstallParams, userParams)
+}
+
 // fetchSeedFiles downloads every file in the app repository except the spec
 // files (canvas.yaml/console.yaml) and params.json, converting them into
 // model rows ready to be persisted alongside the pending canvas repository.
+// When resolvedParams is non-nil, {{ install_params.xxx }} placeholders in
+// file contents are replaced with the resolved values, matching the
+// substitution applied to canvas.yaml.
 // Failures are surfaced as InvalidArgument so the install request returns a
 // useful 400 instead of leaving a half-installed canvas behind.
-func fetchSeedFiles(repo *Repository) ([]models.RepositorySeedFile, error) {
+func fetchSeedFiles(repo *Repository, resolvedParams map[string]string) ([]models.RepositorySeedFile, error) {
 	files, err := FetchRepositoryFiles(repo, repo.Ref)
 	if err != nil {
 		return nil, fmt.Errorf("fetch repository files: %w", err)
@@ -263,9 +278,14 @@ func fetchSeedFiles(repo *Repository) ([]models.RepositorySeedFile, error) {
 
 	seedFiles := make([]models.RepositorySeedFile, 0, len(files))
 	for _, file := range files {
+		content := file.Content
+		if len(resolvedParams) > 0 {
+			content = SubstituteInstallParams(content, resolvedParams)
+		}
+
 		seedFiles = append(seedFiles, models.RepositorySeedFile{
 			Path:    file.Path,
-			Content: file.Content,
+			Content: content,
 		})
 	}
 
