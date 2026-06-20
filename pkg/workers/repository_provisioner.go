@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"gorm.io/datatypes"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -197,7 +199,12 @@ func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, r
 		}
 
 		w.log("Repository created for canvas %s", repository.CanvasID)
-		return repository.MarkReady(tx)
+
+		if err := repository.MarkReady(tx); err != nil {
+			return err
+		}
+
+		return clearRepositoryNotFoundErrors(tx, repository.CanvasID)
 	})
 }
 
@@ -239,4 +246,30 @@ func (w *RepositoryProvisionerWorker) commitSeedFiles(ctx context.Context, tx *g
 
 func (w *RepositoryProvisionerWorker) log(format string, v ...any) {
 	log.Printf("[RepositoryProvisioner] "+format, v...)
+}
+
+// clearRepositoryNotFoundErrors removes stale "repository not found" error
+// messages from canvas nodes. These errors occur when the canvas is published
+// before the repository provisioner finishes committing seed files. Once the
+// repository is ready, the errors are no longer valid and confuse users.
+func clearRepositoryNotFoundErrors(tx *gorm.DB, canvasID uuid.UUID) error {
+	version, err := models.FindLiveCanvasVersionInTransaction(tx, canvasID)
+	if err != nil {
+		return nil // no live version — nothing to clear
+	}
+
+	updated := false
+	nodes := version.Nodes
+	for i := range nodes {
+		if nodes[i].ErrorMessage != nil && strings.Contains(*nodes[i].ErrorMessage, "repository not found") {
+			nodes[i].ErrorMessage = nil
+			updated = true
+		}
+	}
+
+	if !updated {
+		return nil
+	}
+
+	return tx.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error
 }
