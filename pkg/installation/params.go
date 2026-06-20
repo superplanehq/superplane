@@ -33,8 +33,9 @@ type InstallParam struct {
 	Required    bool   `json:"required"`
 
 	// For type "integration-resource"
-	Integration  string `json:"integration,omitempty"`  // integration type name (e.g. "digitalocean")
-	ResourceType string `json:"resourceType,omitempty"` // resource type (e.g. "region", "size", "image")
+	Integration    string `json:"integration,omitempty"`    // integration type name (e.g. "digitalocean")
+	ResourceType   string `json:"resourceType,omitempty"`   // resource type (e.g. "region", "size", "image")
+	UseNameAsValue bool   `json:"useNameAsValue,omitempty"` // when true, substitute the resource name instead of the ID
 }
 
 // ParamsFile is the structure of params.json in the app repo.
