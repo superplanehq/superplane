@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func setupStagingDraft(t *testing.T) (*support.ResourceRegistry, context.Context, string, string) {
@@ -185,6 +187,31 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	hasStaging, err := models.HasWorkflowStaging(uuid.MustParse(versionID))
 	require.NoError(t, err)
 	assert.False(t, hasStaging)
+}
+
+func TestCommitCanvasStagingPendingRepository(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+
+	canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusPending, false)
+	created, err := CreateCanvasVersion(ctx, orgID, canvas.ID.String(), "")
+	require.NoError(t, err)
+	canvasID := canvas.ID.String()
+	versionID := created.GetVersion().GetMetadata().GetId()
+
+	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: "README.md", Content: []byte("staged readme")},
+	})
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.Error(t, err)
+
+	s, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, s.Code(),
+		"committing git files for a not-yet-provisioned repository should be a 4xx, not a 500")
 }
 
 func TestStagedReadRequiresDraftOwner(t *testing.T) {

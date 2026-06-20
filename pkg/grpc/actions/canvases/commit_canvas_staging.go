@@ -50,13 +50,18 @@ func CommitCanvasStaging(
 
 	var gitRevertOps []gitprovider.FileOperation
 	if len(gitOps) > 0 {
+		repository, repoErr := findReadyRepositoryForCommit(canvas)
+		if repoErr != nil {
+			return nil, repoErr
+		}
+
 		var snapshotErr error
-		gitRevertOps, snapshotErr = snapshotGitFilesBeforeCommit(ctx, gitProvider, canvas, gitOps)
+		gitRevertOps, snapshotErr = snapshotGitFilesBeforeCommit(ctx, gitProvider, repository, gitOps)
 		if snapshotErr != nil {
 			return nil, snapshotErr
 		}
 
-		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), resolvedStagingCommitMessage(commitMessages...), gitOps); err != nil {
+		if err := commitStagedGitFiles(ctx, gitProvider, repository, organizationID, userUUID.String(), resolvedStagingCommitMessage(commitMessages...), gitOps); err != nil {
 			return nil, err
 		}
 	}
@@ -77,7 +82,15 @@ func CommitCanvasStaging(
 			specOps,
 		); err != nil {
 			if len(gitRevertOps) > 0 {
-				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
+				repository, repoErr := findReadyRepositoryForCommit(canvas)
+				if repoErr != nil {
+					log.Errorf(
+						"failed to revert git commit after spec apply failure for canvas %s version %s: repository not ready: %v",
+						canvasID,
+						versionID,
+						repoErr,
+					)
+				} else if revertErr := revertGitFileCommit(ctx, gitProvider, repository, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
 					log.Errorf(
 						"failed to revert git commit after spec apply failure for canvas %s version %s: %v",
 						canvasID,
@@ -147,12 +160,38 @@ func stagedCommitOperations(rows []models.WorkflowStaging) (specOps, gitOps []*p
 	return specOps, gitOps
 }
 
+// findReadyRepositoryForCommit loads the canvas's repository row and rejects
+// commits that target a repository that has not been provisioned yet
+// (status=pending) or whose provisioning failed (status=error). Without this
+// guard, calls to gitProvider.Head/Commit/GetFile against the unprovisioned
+// repo bubble up as opaque HTTP 500s when the user clicks Publish on a draft
+// that contains staged non-spec files. Mirrors the pattern used by
+// GetCanvasRepository and ListCanvasRepositoryFiles, but surfaces a 4xx
+// (FailedPrecondition) so the UI can prompt the user to wait/resolve instead
+// of hitting Sentry.
+func findReadyRepositoryForCommit(canvas *models.Canvas) (*models.Repository, error) {
+	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+	}
+
+	if repository.Status != models.RepositoryStatusReady {
+		return nil, status.Errorf(
+			codes.FailedPrecondition,
+			"canvas repository is not ready (status=%s); cannot commit staged repository files",
+			repository.Status,
+		)
+	}
+
+	return repository, nil
+}
+
 // commitStagedGitFiles commits the non-spec staged files to the canvas git
 // repository, authored by the committing user.
 func commitStagedGitFiles(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
+	repository *models.Repository,
 	organizationID string,
 	userID string,
 	message string,
@@ -160,11 +199,6 @@ func commitStagedGitFiles(
 ) error {
 	if gitProvider == nil {
 		return status.Error(codes.FailedPrecondition, "git provider is not configured")
-	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
@@ -216,16 +250,11 @@ func commitStagedGitFiles(
 func snapshotGitFilesBeforeCommit(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
+	repository *models.Repository,
 	gitOps []*pb.CanvasRepositoryFileOperation,
 ) ([]gitprovider.FileOperation, error) {
 	if gitProvider == nil {
 		return nil, status.Error(codes.FailedPrecondition, "git provider is not configured")
-	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	revertOps := make([]gitprovider.FileOperation, 0, len(gitOps))
@@ -279,7 +308,7 @@ func snapshotGitFilesBeforeCommit(
 func revertGitFileCommit(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
+	repository *models.Repository,
 	organizationID string,
 	userID string,
 	revertOps []gitprovider.FileOperation,
@@ -304,7 +333,7 @@ func revertGitFileCommit(
 		pbOps = append(pbOps, pbOp)
 	}
 
-	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, "Revert staged file commit", pbOps)
+	return commitStagedGitFiles(ctx, gitProvider, repository, organizationID, userID, "Revert staged file commit", pbOps)
 }
 
 func resolvedStagingCommitMessage(messages ...string) string {
