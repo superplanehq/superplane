@@ -308,7 +308,7 @@ function ParamsSection({
                   type: "integration-resource",
                   placeholder: param.placeholder,
                   required: param.required,
-                  typeOptions: { resource: { type: param.resourceType } },
+                  typeOptions: { resource: { type: param.resourceType, useNameAsValue: param.useNameAsValue } },
                 }}
                 value={values[param.name]}
                 onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: normalizeResourceValue(val) }))}
