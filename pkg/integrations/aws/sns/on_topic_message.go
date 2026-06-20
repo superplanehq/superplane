@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -32,7 +33,20 @@ type OnTopicMessageMetadata struct {
 	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
 }
 
-type OnTopicMessage struct{}
+// signingCertCacheTTL bounds how long a fetched SNS signing certificate is reused
+// before being re-fetched. AWS does not document a rotation cadence for these
+// certificates, so this is a conservative refresh window rather than a value tied
+// to any known rotation schedule.
+const signingCertCacheTTL = time.Hour
+
+type cachedCert struct {
+	cert      *x509.Certificate
+	fetchedAt time.Time
+}
+
+type OnTopicMessage struct {
+	certCache sync.Map
+}
 
 func (t *OnTopicMessage) Name() string {
 	return "aws.sns.onTopicMessage"
@@ -297,9 +311,6 @@ func (t *OnTopicMessage) verifyMessageSignature(ctx core.WebhookRequestContext, 
 		return fmt.Errorf("failed to build string to sign: %w", err)
 	}
 
-	//
-	// TODO: it would be good to not fetch the certificate every time.
-	//
 	cert, err := t.fetchSigningCertificate(ctx, message.SigningCertURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch signing certificate: %w", err)
@@ -403,6 +414,13 @@ func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext,
 		return nil, fmt.Errorf("SigningCertURL host must be an AWS SNS domain")
 	}
 
+	if rawCachedCertEntry, ok := t.certCache.Load(signingCertURL); ok {
+		cachedCertEntry := rawCachedCertEntry.(cachedCert)
+		if time.Since(cachedCertEntry.fetchedAt) < signingCertCacheTTL {
+			return cachedCertEntry.cert, nil
+		}
+	}
+
 	req, err := http.NewRequest(http.MethodGet, parsedURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate request: %w", err)
@@ -453,6 +471,8 @@ func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext,
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
 		return nil, fmt.Errorf("signing certificate is not currently valid")
 	}
+
+	t.certCache.Store(signingCertURL, cachedCert{cert: cert, fetchedAt: now})
 
 	return cert, nil
 }
