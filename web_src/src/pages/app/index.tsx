@@ -2742,8 +2742,18 @@ export function AppPage() {
       return canvasRef.current;
     }
 
+    // When editing a draft, prefer the in-memory draft ref over the live canvas
+    // cache. After an explicit commit, `canvasKeys.detail` is invalidated and
+    // refetches the live version spec — which does NOT contain the draft's
+    // committed changes. Using it as the save source would stage the live version
+    // and overwrite the correctly-committed draft row when publish auto-commits.
+    // See: github.com/superplanehq/superplane/issues/5611
+    if (activeCanvasVersionIdRef.current) {
+      return canvasRef.current || queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+    }
+
     return queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvasRef.current;
-  }, [organizationId, canvasId, queryClient]);
+  }, [organizationId, canvasId, queryClient, activeCanvasVersionIdRef]);
 
   const hasPendingLocalDraftChanges = useCallback(() => {
     if (!activeCanvasVersionIdRef.current) {
@@ -3889,6 +3899,7 @@ export function AppPage() {
     setIsPreparingVersionAction,
     flushRepositoryFileStaging,
     cancelPendingCanvasSaves,
+    setLastSavedWorkflowSnapshot,
     onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
     recoverIfDraftMissing,
   });

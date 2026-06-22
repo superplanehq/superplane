@@ -27,6 +27,7 @@ type UseDraftStagingActionsOptions = {
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
   flushRepositoryFileStaging?: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
+  setLastSavedWorkflowSnapshot?: (workflow: CanvasesCanvas | null) => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
   // Recovers from a deleted draft when a mutation fails; returns whether it
   // handled the error (only true when the draft is confirmed gone).
@@ -95,6 +96,7 @@ export function useDraftStagingActions({
   setIsPreparingVersionAction,
   flushRepositoryFileStaging,
   cancelPendingCanvasSaves,
+  setLastSavedWorkflowSnapshot,
   onCanvasDraftRestoredToCommitted,
   recoverIfDraftMissing,
 }: UseDraftStagingActionsOptions) {
@@ -124,6 +126,12 @@ export function useDraftStagingActions({
       draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
       setDraftCanvasSpec(null);
       setStagingResetNonce((nonce) => nonce + 1);
+      // Reset the save-signature baseline to null after commit so
+      // hasPendingLocalDraftChanges() returns false until the next user edit.
+      // Without this, the post-commit cache invalidation can refresh the live
+      // canvas spec into canvasRef, making the signature differ from the committed
+      // draft and triggering a spurious staging write. See: #5611
+      setLastSavedWorkflowSnapshot?.(null);
       showSuccessToast("Changes committed");
     } catch (error) {
       if (await recoverIfDraftMissing?.(error, activeCanvasVersionId)) {
@@ -147,6 +155,7 @@ export function useDraftStagingActions({
     queryClient,
     setDraftCanvasSpec,
     setIsPreparingVersionAction,
+    setLastSavedWorkflowSnapshot,
     setStagingResetNonce,
   ]);
 
