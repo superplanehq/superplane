@@ -4,7 +4,12 @@ import type { CanvasNode } from "@/ui/CanvasPage";
 
 import { consoleToYaml, parseConsoleYaml } from "../console/consoleYaml";
 
-import { buildCanvasYamlFromWorkflow, parseCanvasYamlToSpec } from "./canvas-yaml-staging";
+import {
+  buildCanvasYamlFromWorkflow,
+  parseCanvasYamlMetadata,
+  parseCanvasYamlToSpec,
+  type ParsedCanvasYamlMetadata,
+} from "./canvas-yaml-staging";
 
 export function applyRenderedNodePositions(workflow: CanvasesCanvas, canvasNodes?: CanvasNode[]): CanvasesCanvas {
   if (!canvasNodes?.length) {
@@ -44,6 +49,10 @@ export function materializeCanvasSpec(workflow: CanvasesCanvas, canvasNodes?: Ca
 
 export function dematerializeCanvasSpec(yamlText: string): CanvasesCanvas["spec"] | null {
   return parseCanvasYamlToSpec(yamlText);
+}
+
+export function dematerializeCanvasMetadata(yamlText: string): ParsedCanvasYamlMetadata | null {
+  return parseCanvasYamlMetadata(yamlText);
 }
 
 export function materializeConsoleSpec(input: {
