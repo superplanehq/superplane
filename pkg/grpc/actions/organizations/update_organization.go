@@ -11,7 +11,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Organization) (*pb.UpdateOrganizationResponse, error) {
@@ -25,7 +25,14 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 
 	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "organization not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "organization not found")
+		}
+
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to load organization for update")
+		return nil, status.Error(codes.Internal, "failed to update organization")
 	}
 
 	if pbOrganization.Metadata.Name != "" {
@@ -44,8 +51,10 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		log.Errorf("Error updating organization %s: %v", orgID, err)
-		return nil, err
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to save organization update")
+		return nil, status.Error(codes.Internal, "failed to update organization")
 	}
 
 	response := &pb.UpdateOrganizationResponse{
@@ -54,8 +63,8 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
 				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
+				CreatedAt:   protoTime(organization.CreatedAt),
+				UpdatedAt:   protoTime(organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
 				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),

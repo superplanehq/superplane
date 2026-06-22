@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -27,8 +28,10 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 			return nil, status.Error(codes.NotFound, "organization not found")
 		}
 
-		log.Errorf("Error describing organization %s: %v", orgID, err)
-		return nil, err
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to describe organization")
+		return nil, status.Error(codes.Internal, "failed to describe organization")
 	}
 
 	response := &pb.DescribeOrganizationResponse{
@@ -37,8 +40,8 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
 				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
+				CreatedAt:   protoTime(organization.CreatedAt),
+				UpdatedAt:   protoTime(organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
 				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
@@ -47,4 +50,17 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 	}
 
 	return response, nil
+}
+
+// protoTime converts a nullable time.Time pointer into a protobuf
+// Timestamp without panicking when the pointer is nil. Organizations
+// should always have CreatedAt/UpdatedAt populated, but historical or
+// partially-migrated rows can have NULL values; without this guard the
+// describe handler panics, which the gateway translates into an
+// information-level HTTP 500 in Sentry with no underlying context.
+func protoTime(t *time.Time) *timestamppb.Timestamp {
+	if t == nil {
+		return nil
+	}
+	return timestamppb.New(*t)
 }
