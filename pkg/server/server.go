@@ -298,10 +298,6 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 }
 
 func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
-	log.Println("Starting Invitation Email Consumer")
-	invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go invitationEmailConsumer.Start()
-
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()

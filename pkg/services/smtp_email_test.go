@@ -6,9 +6,6 @@ import (
 	"crypto/tls"
 	"io"
 	"net/smtp"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,50 +105,4 @@ func TestBuildMultipartEmail(t *testing.T) {
 	assert.Contains(t, msg, "plain body")
 	assert.Contains(t, msg, "Content-Type: text/html")
 	assert.Contains(t, msg, "<p>html body</p>")
-}
-
-func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
-	tmpDir := t.TempDir()
-	templateDir := filepath.Join(tmpDir, "email")
-	require.NoError(t, os.MkdirAll(templateDir, 0o755))
-
-	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "invitation.txt"), []byte("Invite {{.ToEmail}}"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "invitation.html"), []byte("<p>Invite {{.ToEmail}}</p>"), 0o644))
-
-	settings := &SMTPSettings{
-		Host:      "smtp.example.com",
-		Port:      587,
-		Username:  "user",
-		Password:  "pass",
-		FromName:  "SuperPlane",
-		FromEmail: "noreply@example.com",
-		UseTLS:    true,
-	}
-
-	provider := &fakeSettingsProvider{settings: settings}
-	service := NewSMTPEmailService(provider, tmpDir)
-
-	fakeClient := &fakeSMTPClient{extensions: map[string]bool{"STARTTLS": true}}
-	originalDial := smtpDial
-	smtpDial = func(addr string) (smtpClient, error) {
-		return fakeClient, nil
-	}
-	t.Cleanup(func() {
-		smtpDial = originalDial
-	})
-
-	err := service.SendInvitationEmail("user@example.com", "Org", "https://example.com", "inviter@example.com")
-	require.NoError(t, err)
-
-	assert.Equal(t, "noreply@example.com", fakeClient.mailFrom)
-	assert.Equal(t, []string{"user@example.com"}, fakeClient.rcpt)
-	assert.True(t, fakeClient.startedTLS)
-	assert.True(t, fakeClient.authCalled)
-	assert.True(t, fakeClient.quitCalled)
-	assert.True(t, fakeClient.closeCalled)
-
-	message := fakeClient.message.String()
-	assert.Contains(t, message, "Subject: You have been invited to join an organization on SuperPlane")
-	assert.Contains(t, message, "To: user@example.com")
-	assert.True(t, strings.Contains(message, "Invite user@example.com"))
 }
