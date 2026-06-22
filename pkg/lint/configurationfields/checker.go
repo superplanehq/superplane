@@ -45,7 +45,7 @@ func Run() ([]Issue, error) {
 
 	var issues []Issue
 
-	for _, action := range reg.ListActions() {
+	for _, action := range reg.ListRegisteredActions() {
 		issues = append(issues, checkOwner("action", action.Name(), "configuration", action.Configuration())...)
 	}
 

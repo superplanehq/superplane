@@ -28,4 +28,18 @@ describe("buildBuildingBlockCategories", () => {
       "deploy",
     ]);
   });
+
+  it("does not include unavailable components", () => {
+    const components = [
+      { name: "sendEmail", label: "Send Email", available: false },
+      { name: "noop", label: "Noop" },
+    ];
+
+    const categories = buildBuildingBlockCategories([], components, []);
+
+    const blockNames = categories.flatMap((category) => category.blocks.map((block) => block.name));
+
+    expect(blockNames).not.toContain("sendEmail");
+    expect(blockNames).toContain("noop");
+  });
 });

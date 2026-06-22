@@ -257,8 +257,20 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 }
 
 func (r *Registry) ListActions() []core.Action {
+	return r.listActions(true)
+}
+
+func (r *Registry) ListRegisteredActions() []core.Action {
+	return r.listActions(false)
+}
+
+func (r *Registry) listActions(onlyAvailable bool) []core.Action {
 	actions := make([]core.Action, 0, len(r.Actions))
 	for _, action := range r.Actions {
+		if onlyAvailable && !core.IsActionAvailable(action) {
+			continue
+		}
+
 		actions = append(actions, action)
 	}
 
