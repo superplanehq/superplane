@@ -4,7 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpComputeIcon from "@/assets/icons/integrations/gcp.compute.svg";
 
 export const onVMInstanceTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
@@ -23,7 +23,7 @@ export const onVMInstanceTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     return {
       title: node.name || definition.label || "On VM Instance",
-      iconSrc: gcpIcon,
+      iconSrc: gcpComputeIcon,
       iconSlug: definition.icon || "cloud",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "gray"),
