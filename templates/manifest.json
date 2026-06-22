@@ -166,5 +166,26 @@
     ],
     "agentInstructions": "The user just installed the Cluster Autoscaler app (DigitalOcean variant). This canvas reacts to Grafana HighCPU alerts, provisions DigitalOcean droplets, bootstraps a Docker workload over SSH, stores active workers in the cluster_nodes memory namespace, periodically scales down when the cluster is above the minimum, and sends Discord notifications. If the user completed the install wizard, the SSH secret, SSH key, Discord channel, and droplet settings are already configured. The main remaining task is updating the bootstrap commands in the SSH node to match their workload. If the user skipped the wizard, setup involves: 1) Connecting Grafana, DigitalOcean, and Discord integrations, 2) Creating the SSH secret, 3) Updating the Discord channel, droplet settings, and workload bootstrap commands.",
     "agentInitialMessage": "Welcome! This canvas is a closed-loop autoscaler for a DigitalOcean droplet fleet. It scales up from a Grafana `HighCPU` alert, records active workers in SuperPlane memory, runs a scheduled scale-down check every 10 minutes, and posts capacity changes to Discord.\n\n---\n\n**If you used the install wizard**, your SSH credentials, Discord channel, and droplet settings are already configured. Here's what's left:\n\n**1. Review the bootstrap commands**\nThe [Bootstrap Worker](node:join-ssh) SSH node runs `docker pull` and `docker run` with `nginxdemos/hello:latest` as the default workload. Update these commands for your real worker process.\n\n**2. Verify the Grafana alert**\nThe [Grafana HighCPU Alert](node:t-alert-up) trigger listens for alerts matching `HighCPU`. The query nodes use a Prometheus data source named `prometheus`. Make sure both are configured in your Grafana.\n\n**3. Test it**\nTrigger the Grafana alert or use the canvas manually to verify a droplet is created and bootstrapped.\n\n---\n\n**If you skipped the wizard:**\n\n1. Connect [Grafana](integration:grafana), [DigitalOcean](integration:digitalocean), and [Discord](integration:discord)\n2. Create an SSH secret with key `private-key` matching a DigitalOcean SSH key\n3. Set the SSH secret and SSH key on the [Bootstrap Worker](node:join-ssh) and [Create Droplet](node:create-server) nodes\n4. Set the Discord channel on all notification nodes\n5. Review droplet settings (region, size, image) on the [Create Droplet](node:create-server) node\n6. Update bootstrap commands for your workload\n\nLet me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_pr_docs_drift",
+    "icon": "claude",
+    "title": "PR Docs Review",
+    "description": "Review every pull request for documentation impact using Claude AI. Maintainers approve or reject via PR comments, and tracking issues are created automatically.",
+    "integrations": [
+      "github",
+      "claude"
+    ],
+    "tags": [
+      "CI/CD",
+      "AI",
+      "Documentation"
+    ],
+    "requirements": [
+      "GitHub integration connected to both the source and docs repositories",
+      "Claude integration with a configured agent"
+    ],
+    "agentInstructions": "The user just installed the PR Docs Review app. This canvas uses a Claude AI agent to review PRs for documentation impact. If the user completed the install wizard, the source and docs repositories are configured. The remaining setup is: 1) Connecting a Claude integration and setting the agent on the Analyze Docs Impact node, 2) Customizing docs_review_guidelines.md in the Files tab for their project. If the user skipped the wizard, they also need to set the repository names on all GitHub nodes.",
+    "agentInitialMessage": "Welcome! This app reviews every PR for documentation impact using Claude AI.\n\n---\n\n**If you used the install wizard**, your repositories are already configured. Here's what's left:\n\n**1. Connect Claude**\nConnect a [Claude](integration:claude) integration and set the agent on the [Analyze Docs Impact](node:analyze-docs) node.\n\n**2. Customize the review guidelines**\nEdit `docs_review_guidelines.md` in the **Files** tab. This tells the AI agent what to check, what to skip, and how to format its response. Add your docs site URL, list files to skip, and tailor the review criteria to your project.\n\n**3. Test it**\nOpen a PR on your source repository. The agent will analyze it and post a comment if docs changes are needed. Use `/docs-agree` to create a tracking issue or `/docs-reject` to override.\n\n---\n\n**If you skipped the wizard:**\n\n1. Connect [GitHub](integration:github) and [Claude](integration:claude)\n2. Set the source repository on all GitHub trigger and action nodes\n3. Set the docs repository on the Create Docs Issue and Close Docs Issue nodes\n4. Configure the Claude agent on the Analyze Docs Impact node\n5. Customize `docs_review_guidelines.md`\n\nLet me know if you need help!"
   }
 ]
