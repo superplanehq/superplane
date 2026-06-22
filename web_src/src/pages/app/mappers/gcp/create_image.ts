@@ -10,10 +10,10 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
 import type { ImageNodeMetadata } from "./image_helpers";
+import computeIcon from "@/assets/icons/integrations/gcp.compute.svg";
 
 interface CreateImageConfiguration {
   name?: string;
@@ -45,7 +45,7 @@ export const createImageMapper: ComponentBaseMapper = {
     const componentName = context.componentDefinition.name ?? "gcp";
 
     return {
-      iconSrc: gcpIcon,
+      iconSrc: computeIcon,
       iconSlug: context.componentDefinition?.icon ?? "image",
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
