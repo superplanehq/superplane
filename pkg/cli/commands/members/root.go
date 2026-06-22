@@ -50,40 +50,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	removeCmd.Flags().StringVar(&removeEmail, "email", "", "identify member by email instead of id")
 	core.Bind(removeCmd, &removeCommand{email: &removeEmail}, options)
 
-	invitationsCmd := &cobra.Command{
-		Use:     "invitations",
-		Short:   "Manage pending organization invitations",
-		Aliases: []string{"invitation"},
-	}
-
-	invitationsListCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List pending invitations",
-		Args:  cobra.NoArgs,
-	}
-	core.Bind(invitationsListCmd, &invitationsListCommand{}, options)
-
-	var invitationsCreateEmail string
-	invitationsCreateCmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create an invitation",
-		Args:  cobra.NoArgs,
-	}
-	invitationsCreateCmd.Flags().StringVar(&invitationsCreateEmail, "email", "", "email address to invite")
-	_ = invitationsCreateCmd.MarkFlagRequired("email")
-	core.Bind(invitationsCreateCmd, &invitationsCreateCommand{email: &invitationsCreateEmail}, options)
-
-	invitationsRemoveCmd := &cobra.Command{
-		Use:   "remove <invitation-id>",
-		Short: "Remove a pending invitation",
-		Args:  cobra.ExactArgs(1),
-	}
-	core.Bind(invitationsRemoveCmd, &invitationsRemoveCommand{}, options)
-
-	invitationsCmd.AddCommand(invitationsListCmd)
-	invitationsCmd.AddCommand(invitationsCreateCmd)
-	invitationsCmd.AddCommand(invitationsRemoveCmd)
-
 	inviteLinkCmd := &cobra.Command{
 		Use:   "invite-link",
 		Short: "Manage the organization invite link",
@@ -121,7 +87,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(getCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(removeCmd)
-	root.AddCommand(invitationsCmd)
 	root.AddCommand(inviteLinkCmd)
 
 	return root
