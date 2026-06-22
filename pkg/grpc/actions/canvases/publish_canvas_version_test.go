@@ -110,6 +110,38 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, s.Code())
 	})
 
+	t.Run("draft version with staged changes -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-staged")
+		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
+		draftVersionUUID := uuid.MustParse(draftVersionID)
+
+		_, err := models.UpsertWorkflowStagingPath(
+			draftVersionUUID,
+			r.Organization.ID,
+			"canvas.yaml",
+			"apiVersion: v1\nkind: Canvas\nspec:\n  nodes: []\n  edges: []\n",
+			"",
+			&r.User,
+		)
+		require.NoError(t, err)
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry, r.GitProvider,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, s.Code())
+		assert.Contains(t, s.Message(), "staged changes")
+
+		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), draftVersionUUID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasVersionStateDraft, version.State)
+	})
+
 	t.Run("version not found -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-missing-version")

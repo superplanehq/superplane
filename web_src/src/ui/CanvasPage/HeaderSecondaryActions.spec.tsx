@@ -89,4 +89,28 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
+
+  it("keeps the publish button visible while publish is pending", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-edit"
+        isEditing
+        hasStagingChanges={false}
+        commitStagingPending={false}
+        publishVersionDisabled
+        publishVersionLabel="Publish"
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-publish-version-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-publish-version-button")).toHaveTextContent("Publish");
+    expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
+  });
 });
