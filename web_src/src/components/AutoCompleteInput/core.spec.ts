@@ -40,6 +40,27 @@ describe("getSuggestions", () => {
     expect(suggestions.some((item) => item.label === "trim")).toBe(true);
   });
 
+  it("suggests the memory namespace by prefix", () => {
+    const suggestions = getSuggestions("mem", "mem".length, {});
+    const memorySuggestion = suggestions.find((item) => item.label === "memory");
+    expect(memorySuggestion).toBeDefined();
+    expect(memorySuggestion?.kind).toBe("variable");
+    expect(memorySuggestion?.insertText).toBe("memory.");
+  });
+
+  it("suggests memory namespace methods after dot", () => {
+    const suggestions = getSuggestions("memory.", "memory.".length, {});
+    const findSuggestion = suggestions.find((item) => item.label === "find");
+    const findFirstSuggestion = suggestions.find((item) => item.label === "findFirst");
+
+    expect(findSuggestion).toBeDefined();
+    expect(findSuggestion?.kind).toBe("function");
+    expect(findSuggestion?.example).toBe('memory.find("machines", {"sandbox_id": "12121"})');
+    expect(findFirstSuggestion).toBeDefined();
+    expect(findFirstSuggestion?.kind).toBe("function");
+    expect(findFirstSuggestion?.example).toBe('memory.findFirst("machines", {"creator": "igor"}).sandbox_id');
+  });
+
   it("suggests root() payload fields after dot", () => {
     const suggestions = getSuggestions("root().", "root().".length, {
       __root: { github: { ref: "main" }, user: "alice" },
