@@ -113,4 +113,29 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.getByTestId("canvas-publish-version-button")).toHaveTextContent("Publish");
     expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
   });
+
+  it("keeps staging controls disabled while reset settles after staging clears", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-edit"
+        isEditing
+        hasStagingChanges={false}
+        commitStagingPending={false}
+        resetStagingPending
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onDiscardVersion={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
+  });
 });
