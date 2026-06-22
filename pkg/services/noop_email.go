@@ -9,14 +9,6 @@ type SentInvitationEmail struct {
 	InviterEmail     string
 }
 
-type SentNotificationEmail struct {
-	Bcc      []string
-	Title    string
-	Body     string
-	URL      string
-	URLLabel string
-}
-
 type SentMagicCodeEmail struct {
 	ToEmail   string
 	Code      string
@@ -24,17 +16,15 @@ type SentMagicCodeEmail struct {
 }
 
 type NoopEmailService struct {
-	mu                sync.Mutex
-	invitationEmails  []SentInvitationEmail
-	notificationEmail []SentNotificationEmail
-	magicCodeEmails   []SentMagicCodeEmail
+	mu               sync.Mutex
+	invitationEmails []SentInvitationEmail
+	magicCodeEmails  []SentMagicCodeEmail
 }
 
 func NewNoopEmailService() *NoopEmailService {
 	return &NoopEmailService{
-		invitationEmails:  []SentInvitationEmail{},
-		notificationEmail: []SentNotificationEmail{},
-		magicCodeEmails:   []SentMagicCodeEmail{},
+		invitationEmails: []SentInvitationEmail{},
+		magicCodeEmails:  []SentMagicCodeEmail{},
 	}
 }
 
@@ -63,24 +53,6 @@ func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return nil
 }
 
-func (s *NoopEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	bccCopy := make([]string, len(bccEmails))
-	copy(bccCopy, bccEmails)
-
-	s.notificationEmail = append(s.notificationEmail, SentNotificationEmail{
-		Bcc:      bccCopy,
-		Title:    title,
-		Body:     body,
-		URL:      url,
-		URLLabel: urlLabel,
-	})
-
-	return nil
-}
-
 func (s *NoopEmailService) SentInvitationEmails() []SentInvitationEmail {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -99,20 +71,10 @@ func (s *NoopEmailService) SentMagicCodeEmails() []SentMagicCodeEmail {
 	return emails
 }
 
-func (s *NoopEmailService) SentNotificationEmails() []SentNotificationEmail {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	emails := make([]SentNotificationEmail, len(s.notificationEmail))
-	copy(emails, s.notificationEmail)
-	return emails
-}
-
 func (s *NoopEmailService) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.invitationEmails = []SentInvitationEmail{}
-	s.notificationEmail = []SentNotificationEmail{}
 	s.magicCodeEmails = []SentMagicCodeEmail{}
 }
