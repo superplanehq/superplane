@@ -35,6 +35,7 @@ export function SecondaryHeaderActions({
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
+  publishVersionPending,
   onResetStaging,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
@@ -87,6 +88,7 @@ export function SecondaryHeaderActions({
             hasStagingChanges={hasStagingChanges}
             onCommitStaging={onCommitStaging}
             commitStagingPending={commitStagingPending}
+            publishVersionPending={publishVersionPending}
             onResetStaging={onResetStaging}
           />
         </>
@@ -140,6 +142,7 @@ function EditModePublishDiscardActions({
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
+  publishVersionPending,
   onResetStaging,
 }: Pick<
   HeaderProps,
@@ -153,13 +156,19 @@ function EditModePublishDiscardActions({
   | "hasStagingChanges"
   | "onCommitStaging"
   | "commitStagingPending"
+  | "publishVersionPending"
   | "onResetStaging"
 >) {
   // Keep showing the staging controls while a commit is in flight even after
   // `hasStagingChanges` optimistically flips false, so the commit button stays
   // pending/disabled until staging settles and never flashes an enabled
   // [Reset][Commit] (or a premature Discard/Publish).
-  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || !!commitStagingPending);
+  //
+  // A publish runs an embedded commit, which would otherwise surface the staging
+  // controls mid-publish; `publishVersionPending` forces the [Discard][Publish]
+  // branch (both disabled) for the whole publish flow.
+  const showStagingActions =
+    !publishVersionPending && !!onCommitStaging && (!!hasStagingChanges || !!commitStagingPending);
 
   // Staging and committed states are mutually exclusive: while there are staged
   // edits the user can only Reset/Commit them; once everything is committed they
@@ -180,15 +189,15 @@ function EditModePublishDiscardActions({
       {onDiscardVersion ? (
         <DiscardDraftButton
           onDiscard={() => onDiscardVersion()}
-          disabled={!!discardVersionDisabled}
+          disabled={!!discardVersionDisabled || !!publishVersionPending}
           disabledTooltip={discardVersionDisabledTooltip}
         />
       ) : null}
       <PublishVersionButton
         onPublish={() => onPublishVersion?.()}
         label={publishVersionLabel || "Publish"}
-        disabled={publishVersionDisabled || !onPublishVersion}
-        publishVersionDisabled={!!publishVersionDisabled}
+        disabled={publishVersionDisabled || !!publishVersionPending || !onPublishVersion}
+        publishVersionDisabled={!!publishVersionDisabled || !!publishVersionPending}
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       />
     </div>

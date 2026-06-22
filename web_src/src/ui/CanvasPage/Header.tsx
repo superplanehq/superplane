@@ -56,6 +56,8 @@ export interface HeaderProps {
   /** Commit staged canvas.yaml/console.yaml into the draft version row. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
+  /** True while a publish flow is in progress; keeps the Discard/Publish controls (disabled) instead of the staging controls. */
+  publishVersionPending?: boolean;
   /** Discard staged edits, reverting to the last committed draft. */
   onResetStaging?: () => void;
   mode?: HeaderMode;
