@@ -136,33 +136,6 @@ var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
 	return &smtpClientAdapter{client: client}, nil
 }
 
-func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error {
-	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
-	if err != nil {
-		return err
-	}
-
-	templateData := InvitationTemplateData{
-		ToEmail:          toEmail,
-		OrganizationName: organizationName,
-		InvitationLink:   invitationLink,
-		InviterEmail:     inviterEmail,
-	}
-
-	plainTextContent, err := s.renderTemplate("invitation.txt", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render invitation plain text template: %w", err)
-	}
-
-	htmlContent, err := s.renderTemplate("invitation.html", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render invitation HTML template: %w", err)
-	}
-
-	subject := "You have been invited to join an organization on SuperPlane"
-	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
-}
-
 func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
 	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
 	if err != nil {

@@ -153,44 +153,6 @@ func renderMemberText(stdout io.Writer, user openapi_client.SuperplaneUsersUser)
 	return nil
 }
 
-func renderInvitationListText(stdout io.Writer, invitations []openapi_client.OrganizationsInvitation) error {
-	if len(invitations) == 0 {
-		_, err := fmt.Fprintln(stdout, "No invitations found.")
-		return err
-	}
-
-	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-	_, _ = fmt.Fprintln(writer, "ID\tEMAIL\tSTATE\tCREATED_AT")
-
-	for _, invitation := range invitations {
-		createdAt := ""
-		if invitation.HasCreatedAt() {
-			createdAt = invitation.GetCreatedAt().Format(time.RFC3339)
-		}
-		_, _ = fmt.Fprintf(
-			writer,
-			"%s\t%s\t%s\t%s\n",
-			invitation.GetId(),
-			invitation.GetEmail(),
-			invitation.GetState(),
-			createdAt,
-		)
-	}
-
-	return writer.Flush()
-}
-
-func renderInvitationText(stdout io.Writer, invitation openapi_client.OrganizationsInvitation) error {
-	_, _ = fmt.Fprintf(stdout, "ID: %s\n", invitation.GetId())
-	_, _ = fmt.Fprintf(stdout, "Email: %s\n", invitation.GetEmail())
-	_, _ = fmt.Fprintf(stdout, "State: %s\n", invitation.GetState())
-	_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", invitation.GetOrganizationId())
-	if invitation.HasCreatedAt() {
-		_, _ = fmt.Fprintf(stdout, "Created At: %s\n", invitation.GetCreatedAt().Format(time.RFC3339))
-	}
-	return nil
-}
-
 func renderInviteLinkText(stdout io.Writer, link openapi_client.OrganizationsInviteLink) error {
 	_, _ = fmt.Fprintf(stdout, "ID: %s\n", link.GetId())
 	_, _ = fmt.Fprintf(stdout, "Enabled: %t\n", link.GetEnabled())
