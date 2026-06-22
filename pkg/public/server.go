@@ -267,13 +267,21 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	authorizer := authorization.NewGatewayAuthorizer(s.authService)
 
 	var grpcGatewayMux *runtime.ServeMux
+	// The authorization middleware needs a reference to the mux it lives in to
+	// render gateway error responses on auth failures. We can't pass the mux
+	// directly here because grpc-gateway evaluates WithMiddlewares as part of
+	// the NewServeMux argument list, before the mux variable is assigned —
+	// passing grpcGatewayMux by value would freeze a nil pointer in the
+	// closure (causing a panic on every auth-denied request). A late-binding
+	// getter reads the assigned mux at request time instead.
+	getGRPCGatewayMux := func() *runtime.ServeMux { return grpcGatewayMux }
 	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
-			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+			grpc.GatewayAuthorizationMiddleware(getGRPCGatewayMux, authorizer),
 		),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
