@@ -110,13 +110,9 @@ func TestBuildMultipartEmail(t *testing.T) {
 	assert.Contains(t, msg, "<p>html body</p>")
 }
 
-func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
+func TestSMTPEmailService_SendMagicCodeEmail(t *testing.T) {
 	tmpDir := t.TempDir()
-	templateDir := filepath.Join(tmpDir, "email")
-	require.NoError(t, os.MkdirAll(templateDir, 0o755))
-
-	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "invitation.txt"), []byte("Invite {{.ToEmail}}"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "invitation.html"), []byte("<p>Invite {{.ToEmail}}</p>"), 0o644))
+	writeMagicCodeTemplates(t, tmpDir)
 
 	settings := &SMTPSettings{
 		Host:      "smtp.example.com",
@@ -134,13 +130,14 @@ func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
 	fakeClient := &fakeSMTPClient{extensions: map[string]bool{"STARTTLS": true}}
 	originalDial := smtpDial
 	smtpDial = func(addr string) (smtpClient, error) {
+		assert.Equal(t, "smtp.example.com:587", addr)
 		return fakeClient, nil
 	}
 	t.Cleanup(func() {
 		smtpDial = originalDial
 	})
 
-	err := service.SendInvitationEmail("user@example.com", "Org", "https://example.com", "inviter@example.com")
+	err := service.SendMagicCodeEmail("user@example.com", "123456", "https://example.com/login?token=a&next=b")
 	require.NoError(t, err)
 
 	assert.Equal(t, "noreply@example.com", fakeClient.mailFrom)
@@ -151,7 +148,77 @@ func TestSMTPEmailService_SendInvitationEmail(t *testing.T) {
 	assert.True(t, fakeClient.closeCalled)
 
 	message := fakeClient.message.String()
-	assert.Contains(t, message, "Subject: You have been invited to join an organization on SuperPlane")
+	assert.Contains(t, message, "From: SuperPlane <noreply@example.com>")
+	assert.Contains(t, message, "Subject: Your SuperPlane sign-in code")
 	assert.Contains(t, message, "To: user@example.com")
-	assert.True(t, strings.Contains(message, "Invite user@example.com"))
+	assert.True(t, strings.Contains(message, "Code 123456"))
+	assert.True(t, strings.Contains(message, "https://example.com/login?token=a&next=b"))
+	assert.True(t, strings.Contains(message, "<p>Code 123456</p>"))
+}
+
+func TestRenderEmailTemplate(t *testing.T) {
+	tmpDir := t.TempDir()
+	templateDir := filepath.Join(tmpDir, "email")
+	require.NoError(t, os.MkdirAll(templateDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.txt"), []byte("Open {{.MagicLink}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.html"), []byte("<a href=\"{{.MagicLink}}\">Open</a>"), 0o644))
+
+	data := MagicCodeTemplateData{MagicLink: "https://example.com/login?token=a&next=b"}
+
+	text, err := renderEmailTemplate(tmpDir, "magic_code.txt", data)
+	require.NoError(t, err)
+	assert.Equal(t, "Open https://example.com/login?token=a&next=b", text)
+
+	html, err := renderEmailTemplate(tmpDir, "magic_code.html", data)
+	require.NoError(t, err)
+	assert.Contains(t, html, "token=a&amp;next=b")
+}
+
+func TestBuildEmailService(t *testing.T) {
+	assert.Nil(t, BuildEmailService(nil, EmailServiceConfig{}))
+
+	smtpService := BuildEmailService(nil, EmailServiceConfig{
+		TemplateDir:       "templates",
+		OwnerSetupEnabled: true,
+	})
+	assert.IsType(t, &SMTPEmailService{}, smtpService)
+
+	assert.Nil(t, BuildEmailService(nil, EmailServiceConfig{TemplateDir: "templates"}))
+
+	resendService := BuildEmailService(nil, EmailServiceConfig{
+		TemplateDir:  "templates",
+		ResendAPIKey: "re_test",
+		FromName:     "SuperPlane",
+		FromEmail:    "noreply@example.com",
+	})
+	assert.IsType(t, &ResendEmailService{}, resendService)
+}
+
+func TestNoopEmailService(t *testing.T) {
+	service := NewNoopEmailService()
+
+	require.NoError(t, service.SendMagicCodeEmail("user@example.com", "123456", "https://example.com"))
+
+	emails := service.SentMagicCodeEmails()
+	require.Len(t, emails, 1)
+	assert.Equal(t, SentMagicCodeEmail{
+		ToEmail:   "user@example.com",
+		Code:      "123456",
+		MagicLink: "https://example.com",
+	}, emails[0])
+
+	emails[0].Code = "mutated"
+	assert.Equal(t, "123456", service.SentMagicCodeEmails()[0].Code)
+
+	service.Reset()
+	assert.Empty(t, service.SentMagicCodeEmails())
+}
+
+func writeMagicCodeTemplates(t *testing.T, root string) {
+	t.Helper()
+
+	templateDir := filepath.Join(root, "email")
+	require.NoError(t, os.MkdirAll(templateDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.txt"), []byte("Code {{.Code}}\n{{.MagicLink}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.html"), []byte("<p>Code {{.Code}}</p><a href=\"{{.MagicLink}}\">Open</a>"), 0o644))
 }

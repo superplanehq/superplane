@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -322,7 +321,6 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),

@@ -34,7 +34,7 @@ var bakedInCanvasTemplates = []embeddedCanvasTemplate{
 	{
 		Name:        "health-check-monitor",
 		DisplayName: "Health Check Monitor",
-		Description: "Monitor any endpoint and get notified when it goes down. Alerts only when the endpoint transitions from healthy to failing (not on every failed check). The alert email includes approximately how long the endpoint was healthy. No integrations required.",
+		Description: "Monitor any endpoint and mark when it goes down. The failure marker only runs when the endpoint transitions from healthy to failing, not on every failed check. No integrations required.",
 		Filename:    "templates/health-check-monitor.yaml",
 	},
 }

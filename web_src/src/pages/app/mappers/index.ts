@@ -261,7 +261,6 @@ import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
-import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
@@ -300,7 +299,6 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
-  sendEmail: sendEmailMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -463,7 +461,6 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
-  sendEmail: SEND_EMAIL_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
