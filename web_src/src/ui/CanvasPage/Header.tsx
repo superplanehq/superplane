@@ -56,6 +56,7 @@ export interface HeaderProps {
   /** Commit staged canvas.yaml/console.yaml into the draft version row. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
+  resetStagingPending?: boolean;
   /** Discard staged edits, reverting to the last committed draft. */
   onResetStaging?: () => void;
   mode?: HeaderMode;
