@@ -356,7 +356,7 @@ export function AppPage() {
     setSearchParams,
   });
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
-  const createDraftBranchMutation = useCreateDraftBranch(organizationId!, canvasId!);
+  const createDraftBranchMutation = useCreateDraftBranch(canvasId!);
   const deleteDraftBranchMutation = useDeleteDraftBranch(organizationId!, canvasId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
@@ -483,33 +483,27 @@ export function AppPage() {
   ]);
 
   const canvas = useMemo(() => {
-    if (!liveCanvas) {
-      return liveCanvas;
-    }
-
-    // Draft editing uses the local query cache as source of truth so
-    // optimistic/local edits are not overwritten by slower version fetches.
+    // Edit mode is self-contained: spec + name/description come from the draft
+    // version's repository files (canvas.yaml), so it renders without the
+    // DescribeCanvas response. `liveCanvas` is only reused opportunistically.
     if (isViewingDraftVersion) {
-      if (draftSpecToRender) {
-        return {
-          ...liveCanvas,
-          spec: draftSpecToRender,
-        };
-      }
-
-      return null;
+      if (!draftSpecToRender) return null;
+      return {
+        ...(liveCanvas ?? {}),
+        metadata: {
+          ...(liveCanvas?.metadata ?? {}),
+          id: liveCanvas?.metadata?.id ?? canvasId,
+          name: selectedCanvasVersion?.metadata?.name || liveCanvas?.metadata?.name || "Canvas",
+          description: selectedCanvasVersion?.metadata?.description ?? liveCanvas?.metadata?.description ?? "",
+        },
+        spec: draftSpecToRender,
+      };
     }
-
+    if (!liveCanvas) return liveCanvas;
     const versionSpec = selectedCanvasVersion?.spec;
-    if (!versionSpec) {
-      return liveCanvas;
-    }
-
-    return {
-      ...liveCanvas,
-      spec: versionSpec,
-    };
-  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
+    if (!versionSpec) return liveCanvas;
+    return { ...liveCanvas, spec: versionSpec };
+  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender, canvasId]);
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   // Editing a draft always implies an active edit session; previewing the
