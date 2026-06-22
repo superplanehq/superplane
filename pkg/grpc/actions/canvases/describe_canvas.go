@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -26,6 +27,12 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 	canvas, err := loadCanvas(ctx, db, orgID, canvasID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(1 * time.Second):
 	}
 
 	var user *models.User
