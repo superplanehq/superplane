@@ -40,7 +40,7 @@ func TestComponentsAndTriggersUseCamelCaseNames(t *testing.T) {
 	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 
-	for _, a := range reg.ListActions() {
+	for _, a := range reg.ListRegisteredActions() {
 		assert.True(t, isValidName(a.Name()), "Action %q is not camelCase", a.Name())
 	}
 

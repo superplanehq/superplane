@@ -39,3 +39,33 @@ func TestMaxPayloadSize(t *testing.T) {
 		assert.Equal(t, 64*1024, MaxPayloadSize())
 	})
 }
+
+func TestUsesDatabaseSMTPEmailSettings(t *testing.T) {
+	t.Run("uses database SMTP settings when owner setup is enabled", func(t *testing.T) {
+		t.Setenv("OWNER_SETUP_ENABLED", "yes")
+		assert.True(t, UsesDatabaseSMTPEmailSettings())
+	})
+
+	t.Run("does not use database SMTP settings for hosted email configuration", func(t *testing.T) {
+		t.Setenv("OWNER_SETUP_ENABLED", "no")
+		assert.False(t, UsesDatabaseSMTPEmailSettings())
+	})
+}
+
+func TestResendEmailConfigured(t *testing.T) {
+	t.Run("requires all resend email settings", func(t *testing.T) {
+		t.Setenv("RESEND_API_KEY", "key")
+		t.Setenv("EMAIL_FROM_NAME", "SuperPlane")
+		t.Setenv("EMAIL_FROM_ADDRESS", "noreply@example.com")
+
+		assert.True(t, ResendEmailConfigured())
+	})
+
+	t.Run("returns false when a setting is missing", func(t *testing.T) {
+		t.Setenv("RESEND_API_KEY", "key")
+		t.Setenv("EMAIL_FROM_NAME", "SuperPlane")
+		t.Setenv("EMAIL_FROM_ADDRESS", "")
+
+		assert.False(t, ResendEmailConfigured())
+	})
+}

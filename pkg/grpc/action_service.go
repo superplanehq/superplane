@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -29,6 +30,10 @@ func (s *ActionService) ListActions(ctx context.Context, req *pb.ListActionsRequ
 func (s *ActionService) DescribeAction(ctx context.Context, req *pb.DescribeActionRequest) (*pb.DescribeActionResponse, error) {
 	action, err := s.registry.GetAction(req.Name)
 	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "action %s not found", req.Name)
+	}
+
+	if !core.IsActionAvailable(action) {
 		return nil, status.Errorf(codes.NotFound, "action %s not found", req.Name)
 	}
 

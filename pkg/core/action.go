@@ -108,6 +108,19 @@ type Action interface {
 	Cleanup(ctx SetupContext) error
 }
 
+type AvailableAction interface {
+	IsAvailable() bool
+}
+
+func IsActionAvailable(action Action) bool {
+	availableAction, ok := action.(AvailableAction)
+	if !ok {
+		return true
+	}
+
+	return availableAction.IsAvailable()
+}
+
 type OutputChannel struct {
 	Name        string
 	Label       string

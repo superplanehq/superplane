@@ -2,6 +2,8 @@ import type { IntegrationsIntegrationDefinition, ActionsAction, TriggersTrigger 
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
 
+type ActionWithAvailability = ActionsAction & { available?: boolean };
+
 export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {
   return categories.flatMap((c) => c.blocks);
 }
@@ -11,13 +13,14 @@ export function buildBuildingBlockCategories(
   components: ActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
-  const runnerCategory = runners(triggers, components);
+  const availableComponents = components.filter(isActionAvailable);
+  const runnerCategory = runners(triggers, availableComponents);
 
   return [
-    core(triggers, components),
+    core(triggers, availableComponents),
     ...(runnerCategory ? [runnerCategory] : []),
-    debugging(triggers, components),
-    memory(triggers, components),
+    debugging(triggers, availableComponents),
+    memory(triggers, availableComponents),
     ...buildIntegrationCategories(integrations),
   ];
 }
@@ -89,7 +92,7 @@ function buildIntegrationCategory(integration: IntegrationsIntegrationDefinition
 
   const actions = actionsFromCapabilities(integration.capabilities);
   if (actions) {
-    actions.forEach((c) => {
+    actions.filter(isActionAvailable).forEach((c) => {
       blocks.push(toComponentBlock(c, integration.name));
     });
   }
@@ -163,6 +166,10 @@ function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
 function isRunnerBlock(component: { name?: string }): boolean {
   const name = component.name || "";
   return name === "runner" || name === "runnerJS" || name === "runnerBash" || name === "runnerPython";
+}
+
+function isActionAvailable(action: ActionWithAvailability): boolean {
+  return action.available !== false;
 }
 
 function isCoreComponent(component: { name?: string }): boolean {

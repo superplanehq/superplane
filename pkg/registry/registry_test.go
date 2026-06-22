@@ -13,6 +13,15 @@ import (
 	"github.com/superplanehq/superplane/test/support/impl"
 )
 
+type availableAction struct {
+	core.Action
+	available bool
+}
+
+func (a availableAction) IsAvailable() bool {
+	return a.available
+}
+
 func TestRegistry_FindActionHook(t *testing.T) {
 	t.Run("finds hook on registered action", func(t *testing.T) {
 		called := false
@@ -592,6 +601,45 @@ func TestRegistry_ListFunctionsSortByName(t *testing.T) {
 	require.Len(t, widgets, 2)
 	assert.Equal(t, "w1", widgets[0].Name())
 	assert.Equal(t, "w2", widgets[1].Name())
+}
+
+func TestRegistry_ListActionsFiltersUnavailableActions(t *testing.T) {
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"available": registry.NewPanicableAction(availableAction{
+				Action:    impl.NewDummyAction(impl.DummyActionOptions{Name: "available"}),
+				available: true,
+			}),
+			"unavailable": registry.NewPanicableAction(availableAction{
+				Action:    impl.NewDummyAction(impl.DummyActionOptions{Name: "unavailable"}),
+				available: false,
+			}),
+		},
+	}
+
+	actions := r.ListActions()
+	require.Len(t, actions, 1)
+	assert.Equal(t, "available", actions[0].Name())
+}
+
+func TestRegistry_ListRegisteredActionsIncludesUnavailableActions(t *testing.T) {
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"available": registry.NewPanicableAction(availableAction{
+				Action:    impl.NewDummyAction(impl.DummyActionOptions{Name: "available"}),
+				available: true,
+			}),
+			"unavailable": registry.NewPanicableAction(availableAction{
+				Action:    impl.NewDummyAction(impl.DummyActionOptions{Name: "unavailable"}),
+				available: false,
+			}),
+		},
+	}
+
+	actions := r.ListRegisteredActions()
+	require.Len(t, actions, 2)
+	assert.Equal(t, "available", actions[0].Name())
+	assert.Equal(t, "unavailable", actions[1].Name())
 }
 
 func TestRegistry__AllCapability(t *testing.T) {
