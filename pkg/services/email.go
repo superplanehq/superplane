@@ -13,15 +13,7 @@ import (
 )
 
 type EmailService interface {
-	SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error
 	SendMagicCodeEmail(toEmail, code, magicLink string) error
-}
-
-type InvitationTemplateData struct {
-	ToEmail          string
-	OrganizationName string
-	InvitationLink   string
-	InviterEmail     string
 }
 
 type MagicCodeTemplateData struct {
@@ -45,44 +37,6 @@ func NewResendEmailService(apiKey, fromName, fromEmail, templateDir string) *Res
 		templateDir: templateDir,
 		client:      resend.NewClient(apiKey),
 	}
-}
-
-func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error {
-	templateData := InvitationTemplateData{
-		ToEmail:          toEmail,
-		OrganizationName: organizationName,
-		InvitationLink:   invitationLink,
-		InviterEmail:     inviterEmail,
-	}
-
-	plainTextContent, err := s.renderTemplate("invitation.txt", templateData)
-	if err != nil {
-		log.Errorf("Error rendering plain text template: %v", err)
-		return fmt.Errorf("failed to render plain text template: %w", err)
-	}
-
-	htmlContent, err := s.renderTemplate("invitation.html", templateData)
-	if err != nil {
-		log.Errorf("Error rendering HTML template: %v", err)
-		return fmt.Errorf("failed to render HTML template: %w", err)
-	}
-
-	params := &resend.SendEmailRequest{
-		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
-		To:      []string{toEmail},
-		Subject: "You have been invited to join an organization on SuperPlane",
-		Text:    plainTextContent,
-		Html:    htmlContent,
-	}
-
-	response, err := s.client.Emails.Send(params)
-	if err != nil {
-		log.Errorf("Error sending invitation email to %s: %v", toEmail, err)
-		return err
-	}
-
-	log.Infof("Invitation email sent successfully to %s (ID: %s)", toEmail, response.Id)
-	return nil
 }
 
 func (s *ResendEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
