@@ -106,6 +106,11 @@ export function useDraftStagingActions({
     }
 
     try {
+      // Cancel any pending auto-saves (e.g. debounced position updates) before
+      // flushing staging. Without this, a save that fires concurrently with the
+      // commit can overwrite the committed version row with stale local state
+      // when publish subsequently runs its own auto-commit.
+      cancelPendingCanvasSaves?.();
       await flushRepositoryFileStaging?.();
       const isReady = await ensureVersionActionDraftReady("Unable to prepare staged changes for commit");
       if (!isReady) {
@@ -131,6 +136,7 @@ export function useDraftStagingActions({
   }, [
     activeCanvasVersionId,
     canvasId,
+    cancelPendingCanvasSaves,
     commitCanvasStagingMutation,
     consoleMutationGenerationRef,
     draftCanvasSpecsRef,
