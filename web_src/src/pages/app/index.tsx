@@ -3854,10 +3854,7 @@ export function AppPage() {
     setSearchParams,
     refreshLatestLiveCanvasData,
     cancelPendingCanvasSaves,
-    ensureVersionActionDraftReady,
-    commitCanvasStagingMutation,
     publishCanvasVersionMutation,
-    consoleMutationGenerationRef,
     setIsPreparingVersionAction,
   });
 
@@ -5028,7 +5025,7 @@ export function AppPage() {
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
           onCommitStaging={handleCommitStaging}
-          commitStagingPending={isPreparingVersionAction || commitCanvasStagingMutation.isPending}
+          commitStagingPending={commitCanvasStagingMutation.isPending}
           onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
