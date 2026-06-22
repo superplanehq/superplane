@@ -10,11 +10,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Image Push" href="#on-image-push" description="Listen to DockerHub image push events" />
+  <LinkCard title="On Vulnerability Scan" href="#on-vulnerability-scan" description="Listen to Docker Scout vulnerability scan events for a DockerHub repository" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Delete Tag" href="#delete-tag" description="Delete a tag from a DockerHub repository" />
   <LinkCard title="Get Image Tag" href="#get-image-tag" description="Get metadata for a DockerHub image tag" />
 </CardGrid>
 
@@ -73,6 +75,97 @@ This trigger generates a webhook URL in SuperPlane. Add that URL as a DockerHub 
   },
   "timestamp": "2026-02-03T12:00:00Z",
   "type": "dockerhub.image.push"
+}
+```
+
+<a id="on-vulnerability-scan"></a>
+
+## On Vulnerability Scan
+
+**Trigger key:** `dockerhub.onVulnerabilityScan`
+
+The On Vulnerability Scan trigger fires when Docker Scout completes a vulnerability scan for an image in a DockerHub repository.
+
+### Use Cases
+
+- **Security gating**: Block promotion pipelines when critical vulnerabilities are detected
+- **Alerting**: Notify teams when newly pushed images contain high-severity CVEs
+- **Remediation workflows**: Automatically open issues or tickets for vulnerable images
+
+### Configuration
+
+- **Repository**: DockerHub repository name, in the format of `namespace/name`
+- **Minimum Severity**: Optional filter — only fire when the scan contains at least one vulnerability at this severity or higher (`low`, `medium`, `high`, `critical`)
+
+### Webhook Setup
+
+This trigger generates a webhook URL in SuperPlane. Register that URL as a Docker Scout notification webhook for the selected repository so Docker Scout can deliver scan completion events.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": {
+      "created_at": "2026-02-03T12:00:00Z",
+      "payload": {
+        "criticalities": {
+          "critical": 2,
+          "high": 5,
+          "low": 8,
+          "medium": 10,
+          "unspecified": 1
+        },
+        "digest": "sha256:abc123def456",
+        "fixable_count": 7,
+        "repository": {
+          "full_name": "superplane/demo",
+          "name": "demo",
+          "namespace": "superplane"
+        },
+        "tag": "v1.2.3"
+      },
+      "type": "image_vulnerability"
+    },
+    "stream": "vulnerability"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.image.vulnerability_scan"
+}
+```
+
+<a id="delete-tag"></a>
+
+## Delete Tag
+
+**Component key:** `dockerhub.deleteTag`
+
+The Delete Tag component permanently removes a tag from a DockerHub repository.
+
+### Use Cases
+
+- **Cleanup pipelines**: Remove stale or temporary tags after a deployment succeeds
+- **Release workflows**: Delete RC or beta tags once a release is promoted to stable
+- **Policy enforcement**: Prune tags that violate naming conventions
+
+### Configuration
+
+- **Repository**: DockerHub repository name, in the format of `namespace/name`
+- **Tag**: Image tag to delete (for example: `v1.2.3-rc1`)
+
+> **Warning**: This action is irreversible. The tag cannot be recovered after deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "namespace": "superplane",
+    "repository": "demo",
+    "tag": "v1.2.3-rc1"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.deletedTag"
 }
 ```
 

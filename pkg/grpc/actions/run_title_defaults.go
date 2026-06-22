@@ -38,6 +38,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"dash0.onAlertNotification":             "{{ root().data.issue.summary }}",
 	"dash0.onSyntheticCheckNotification":    "{{ root().data.issue.summary }}",
 	"dockerhub.onImagePush":                 "{{ root().data.repository.repo_name }}:{{ root().data.push_data.tag }}",
+	"dockerhub.onVulnerabilityScan":         "{{ root().data.event.payload.repository.full_name }}:{{ root().data.event.payload.tag }} - {{ root().data.event.payload.criticalities.critical }} critical",
 	"elastic.onAlertFires":                  "{{ root().data.ruleName }}",
 	"elastic.onCaseStatusChange":            "{{ root().data.title }}",
 	"elastic.onDocumentIndexed":             "{{ root().data.index }}",
