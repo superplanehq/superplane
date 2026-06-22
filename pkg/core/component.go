@@ -39,7 +39,6 @@ type ExecutionContext struct {
 	Requests       RequestContext
 	Auth           AuthReader
 	Integration    IntegrationContext
-	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
 	Files          RepositoryFilesContext
@@ -196,17 +195,6 @@ type ProcessQueueContext struct {
 	// same source)
 	//
 	DistinctIncomingSources func() ([]Node, error)
-}
-
-type NotificationReceivers struct {
-	Emails []string
-	Groups []string
-	Roles  []string
-}
-
-type NotificationContext interface {
-	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
-	IsAvailable() bool
 }
 
 type SecretsContext interface {
