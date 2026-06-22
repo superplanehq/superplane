@@ -147,6 +147,12 @@ export function useDraftRecovery({
         return;
       }
 
+      // Cancel any pending auto-saves (e.g. debounced position updates triggered
+      // by a post-commit re-render) before the publish-time staging commit.
+      // Without this, a rogue staging write can overwrite the correctly-committed
+      // version row with stale local state. See: github.com/superplanehq/superplane/issues/5611
+      cancelPendingCanvasSaves?.();
+
       // Flush staged edits into the committed row before promoting it to live.
       consoleMutationGenerationRef.current += 1;
       await commitCanvasStagingMutation.mutateAsync();
@@ -167,6 +173,7 @@ export function useDraftRecovery({
     canvasId,
     activeCanvasVersionId,
     activeCanvasVersionIdRef,
+    cancelPendingCanvasSaves,
     ensureVersionActionDraftReady,
     queryClient,
     consoleMutationGenerationRef,
