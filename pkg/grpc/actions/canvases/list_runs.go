@@ -179,12 +179,9 @@ func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, exec
 		State:      RunStateToProto(run.State),
 		Result:     RunResultToProto(run.Result),
 		Executions: executionRefs,
-		CreatedAt:  timestamppb.New(*run.CreatedAt),
-		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
-	}
-
-	if run.FinishedAt != nil {
-		serialized.FinishedAt = timestamppb.New(*run.FinishedAt)
+		CreatedAt:  timestampOrNil(run.CreatedAt),
+		UpdatedAt:  timestampOrNil(run.UpdatedAt),
+		FinishedAt: timestampOrNil(run.FinishedAt),
 	}
 
 	return serialized, nil
@@ -239,11 +236,10 @@ func RunResultToProto(result string) pb.CanvasRun_Result {
 }
 
 func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
-	if len(runs) > 0 {
-		return timestamppb.New(*runs[len(runs)-1].CreatedAt)
+	if len(runs) == 0 {
+		return nil
 	}
-
-	return nil
+	return timestampOrNil(runs[len(runs)-1].CreatedAt)
 }
 
 func serializeCanvasRuns(

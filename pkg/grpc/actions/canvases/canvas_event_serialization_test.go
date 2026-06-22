@@ -53,3 +53,60 @@ func Test__SerializeCanvasEvent__ConvertsJSONNumbersForProto(t *testing.T) {
 	require.True(t, ok)
 	assert.Nil(t, nested["missing"])
 }
+
+func Test__SerializeCanvasEvent__HandlesNonMapData(t *testing.T) {
+	now := time.Now()
+
+	cases := []struct {
+		name string
+		data any
+	}{
+		{name: "nil data", data: nil},
+		{name: "scalar string", data: "hello"},
+		{name: "scalar number", data: json.Number("42")},
+		{name: "boolean", data: true},
+		{name: "array", data: []any{"a", "b"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			event := models.CanvasEvent{
+				ID:         uuid.New(),
+				WorkflowID: uuid.New(),
+				NodeID:     "trigger",
+				Channel:    "default",
+				Data:       models.NewJSONValue(tc.data),
+				CreatedAt:  &now,
+			}
+
+			serialized, err := SerializeCanvasEvent(event)
+			require.NoError(t, err)
+			require.NotNil(t, serialized)
+			require.NotNil(t, serialized.Data)
+
+			if tc.data == nil {
+				assert.Empty(t, serialized.Data.AsMap())
+				return
+			}
+
+			payload := serialized.Data.AsMap()
+			require.Contains(t, payload, "value")
+		})
+	}
+}
+
+func Test__SerializeCanvasEvent__HandlesNilCreatedAt(t *testing.T) {
+	event := models.CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: uuid.New(),
+		NodeID:     "trigger",
+		Channel:    "default",
+		Data:       models.NewJSONValue(map[string]any{"k": "v"}),
+		CreatedAt:  nil,
+	}
+
+	serialized, err := SerializeCanvasEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, serialized)
+	assert.Nil(t, serialized.CreatedAt)
+}

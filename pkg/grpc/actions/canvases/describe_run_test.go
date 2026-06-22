@@ -3,10 +3,12 @@ package canvases
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -76,4 +78,73 @@ func Test__DescribeRun(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, status.Code(err))
 	})
+
+	// Regression: a root event whose persisted JSON payload is not a top-level
+	// object (e.g. raw scalar / array / null) must not surface as HTTP 500 from
+	// DescribeRun. The gRPC `data` field is a Struct, but the serializer should
+	// normalize unexpected payloads instead of returning a bare error.
+	t.Run("root event with non-map data -> serializes successfully", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+			[]models.Edge{},
+		)
+
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+		run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
+
+		// Overwrite the persisted payload AFTER the run has been finalized,
+		// because createFinishedRun calls Save on the in-memory event and
+		// would otherwise reset Data back to its default value.
+		res := database.Conn().Exec(
+			`UPDATE workflow_events SET data = '"raw-string-payload"'::jsonb WHERE id = ?`,
+			rootEvent.ID,
+		)
+		require.NoError(t, res.Error)
+		require.EqualValues(t, 1, res.RowsAffected)
+
+		response, err := DescribeRun(context.Background(), r.Registry, canvas.ID, run.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Run)
+		require.NotNil(t, response.Run.RootEvent)
+		require.Contains(t, response.Run.RootEvent.Data.AsMap(), "value")
+		assert.Equal(t, "raw-string-payload", response.Run.RootEvent.Data.AsMap()["value"])
+	})
+}
+
+// SerializeCanvasRun must not panic when the persisted row has nil time
+// pointers. The columns themselves are NOT NULL today, but the model field
+// types are *time.Time and historically have been dereferenced unconditionally,
+// turning any divergence into a 500 instead of a clean nil-typed timestamp.
+func Test__SerializeCanvasRun__HandlesNilTimestamps(t *testing.T) {
+	canvasID := uuid.New()
+	run := models.CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvasID,
+		VersionID:  uuid.New(),
+		State:      models.CanvasRunStateFinished,
+		Result:     models.CanvasRunResultPassed,
+		CreatedAt:  nil,
+		UpdatedAt:  nil,
+		FinishedAt: nil,
+	}
+
+	rootEventCreatedAt := time.Now()
+	rootEvent := models.CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: canvasID,
+		NodeID:     "trigger",
+		Channel:    "default",
+		Data:       models.NewJSONValue(map[string]any{"k": "v"}),
+		CreatedAt:  &rootEventCreatedAt,
+	}
+
+	serialized, err := SerializeCanvasRun(run, rootEvent, nil)
+	require.NoError(t, err)
+	require.NotNil(t, serialized)
+	assert.Nil(t, serialized.CreatedAt)
+	assert.Nil(t, serialized.UpdatedAt)
+	assert.Nil(t, serialized.FinishedAt)
 }
