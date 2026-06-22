@@ -33,7 +33,7 @@ type UseDraftRecoveryOptions = {
   commitCanvasStagingMutation: CommitMutation;
   publishCanvasVersionMutation: PublishMutation;
   consoleMutationGenerationRef: MutableRefObject<number>;
-  setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
+  setIsPublishingVersion: Dispatch<SetStateAction<boolean>>;
 };
 
 // Owns the draft publish + exit-to-live + recovery lifecycle, guarding publish
@@ -55,7 +55,7 @@ export function useDraftRecovery({
   commitCanvasStagingMutation,
   publishCanvasVersionMutation,
   consoleMutationGenerationRef,
-  setIsPreparingVersionAction,
+  setIsPublishingVersion,
 }: UseDraftRecoveryOptions) {
   const queryClient = useQueryClient();
 
@@ -125,7 +125,7 @@ export function useDraftRecovery({
     }
 
     let versionIdToPublish = "";
-    setIsPreparingVersionAction(true);
+    setIsPublishingVersion(true);
     try {
       const isReady = await ensureVersionActionDraftReady(
         "Unable to prepare the latest version changes for publishing",
@@ -160,7 +160,7 @@ export function useDraftRecovery({
       }
       showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
     } finally {
-      setIsPreparingVersionAction(false);
+      setIsPublishingVersion(false);
     }
   }, [
     organizationId,
@@ -172,7 +172,7 @@ export function useDraftRecovery({
     consoleMutationGenerationRef,
     commitCanvasStagingMutation,
     publishCanvasVersionMutation,
-    setIsPreparingVersionAction,
+    setIsPublishingVersion,
     exitDraftToLive,
     recoverFromMissingDraft,
     recoverIfDraftMissing,
