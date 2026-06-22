@@ -253,6 +253,9 @@ describe("WidgetTable row actions — confirm dialog preview", () => {
     const params = screen.getByTestId("widget-row-action-start-parameters");
     expect(params.textContent).toContain('"template": "default"');
     expect(params.textContent).toContain('"number": "42"');
+    expect(params.getAttribute("class")).toContain("overflow-x-auto");
+    expect(params.getAttribute("class")).toContain("whitespace-pre");
+    expect(params.getAttribute("class")).not.toContain("break-all");
   });
 });
 

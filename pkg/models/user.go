@@ -192,9 +192,13 @@ func FindHumanUsersByIDs(ids []string) ([]User, error) {
 // Make sure you really need to use it this one,
 // and not FindActiveUserByID instead.
 func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
+	return FindMaybeDeletedUserByIDInTransaction(database.Conn(), orgID, id)
+}
+
+func FindMaybeDeletedUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, error) {
 	var user User
 
-	err := database.Conn().Unscoped().
+	err := tx.Unscoped().
 		Where("id = ?", id).
 		Where("organization_id = ?", orgID).
 		First(&user).
@@ -281,9 +285,13 @@ func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, erro
 }
 
 func FindActiveUserByEmail(orgID, email string) (*User, error) {
+	return FindActiveUserByEmailInTransaction(database.Conn(), orgID, email)
+}
+
+func FindActiveUserByEmailInTransaction(tx *gorm.DB, orgID, email string) (*User, error) {
 	var user User
 
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&user).
@@ -317,9 +325,13 @@ func FindMaybeDeletedUserByEmailInTransaction(tx *gorm.DB, orgID, email string) 
 }
 
 func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
+	return FindActiveUserByTokenHashInTransaction(database.Conn(), tokenHash)
+}
+
+func FindActiveUserByTokenHashInTransaction(tx *gorm.DB, tokenHash string) (*User, error) {
 	var user User
 
-	err := database.Conn().
+	err := tx.
 		Where("token_hash = ?", tokenHash).
 		First(&user).
 		Error
@@ -327,13 +339,13 @@ func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
 	return &user, err
 }
 
-func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
+func FindMaybeDeletedUsersByIDs(tx *gorm.DB, ids []uuid.UUID) ([]User, error) {
 	if len(ids) == 0 {
 		return []User{}, nil
 	}
 
 	var users []User
-	err := database.Conn().Unscoped().
+	err := tx.Unscoped().
 		Where("id IN ?", ids).
 		Find(&users).
 		Error

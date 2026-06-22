@@ -73,11 +73,11 @@ func (p *cleanupGitProvider) DeleteRepository(_ context.Context, repoID string) 
 	return p.err
 }
 
-func (p *cleanupGitProvider) ListFiles(context.Context, string) ([]string, error) {
+func (p *cleanupGitProvider) ListFiles(context.Context, string, string) ([]string, error) {
 	return nil, errors.New("not used")
 }
 
-func (p *cleanupGitProvider) GetFile(context.Context, string, string) (io.ReadCloser, error) {
+func (p *cleanupGitProvider) GetFile(context.Context, string, string, string) (io.ReadCloser, error) {
 	return nil, errors.New("not used")
 }
 
@@ -85,8 +85,24 @@ func (p *cleanupGitProvider) Commit(context.Context, string, git.CommitOptions) 
 	return "", errors.New("not used")
 }
 
-func (p *cleanupGitProvider) Head(context.Context, string) (string, error) {
+func (p *cleanupGitProvider) Head(context.Context, string, string) (string, error) {
 	return "", errors.New("not used")
+}
+
+func (p *cleanupGitProvider) ListBranches(context.Context, string, string) ([]string, error) {
+	return nil, errors.New("not used")
+}
+
+func (p *cleanupGitProvider) CreateBranch(context.Context, string, string, string) error {
+	return errors.New("not used")
+}
+
+func (p *cleanupGitProvider) MergeBranch(context.Context, string, string, string, string, git.CommitAuthor) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (p *cleanupGitProvider) DeleteBranch(context.Context, string, string) error {
+	return errors.New("not used")
 }
 
 func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {
@@ -169,7 +185,7 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	// Create associated data
 	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID)
 	support.CreateQueueItem(t, canvas.ID, "node-1", event1.ID, event2.ID)
 
 	// Create canvas node execution KV
@@ -315,7 +331,8 @@ func Test__CanvasCleanupWorker_DeletesGitRepositoryAfterCanvasCleanup(t *testing
 	worker := NewCanvasCleanupWorker(gitProvider)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	repoID := "repo-" + canvas.ID.String()
-	require.NoError(t, canvas.CreatePendingRepository(gitProvider.Name(), repoID))
+	_, err := canvas.CreatePendingRepository(gitProvider.Name(), repoID)
+	require.NoError(t, err)
 
 	require.NoError(t, canvas.SoftDelete())
 	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
@@ -568,7 +585,7 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	)
 
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID, nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
 
 	//
 	// Soft delete the canvas using the new soft delete method

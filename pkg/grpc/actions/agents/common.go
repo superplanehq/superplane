@@ -19,7 +19,7 @@ type AgentsService interface {
 	EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
 	GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error)
 	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
-	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error)
+	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []agentservice.MessageImage, mode ...string) (*models.AgentSessionMessage, error)
 	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
 	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
 }
@@ -81,9 +81,40 @@ func serializeMessage(message *models.AgentSessionMessage) *pb.AgentChatMessage 
 		ToolCallId: message.ToolCallID,
 		ToolName:   message.ToolName,
 		ToolStatus: message.ToolStatus,
+		Images:     serializeImages(message.Images),
 	}
 	if message.CreatedAt != nil {
 		out.CreatedAt = timestamppb.New(*message.CreatedAt)
 	}
 	return out
+}
+
+func serializeImages(images []models.AgentSessionImage) []*pb.AgentChatImage {
+	if len(images) == 0 {
+		return nil
+	}
+	out := make([]*pb.AgentChatImage, 0, len(images))
+	for _, image := range images {
+		mediaType := contentTypeToChatImageMediaType(image.MediaType)
+		if mediaType == pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED {
+			continue
+		}
+		out = append(out, &pb.AgentChatImage{MediaType: mediaType})
+	}
+	return out
+}
+
+func contentTypeToChatImageMediaType(mediaType string) pb.AgentChatImageMediaType {
+	switch mediaType {
+	case "image/png":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_PNG
+	case "image/jpeg":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_JPEG
+	case "image/gif":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_GIF
+	case "image/webp":
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_WEBP
+	default:
+		return pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED
+	}
 }

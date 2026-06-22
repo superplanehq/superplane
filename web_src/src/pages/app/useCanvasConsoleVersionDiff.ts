@@ -2,17 +2,21 @@ import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useStat
 
 import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
-import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
-import { consoleToYaml } from "./console/consoleYaml";
+import {
+  buildDraftConsoleDiffSummary,
+  getDraftConsoleDiffCounts,
+  hasDraftVersusLiveConsoleDiff,
+} from "./draftConsoleDiff";
+import { materializeConsoleSpec } from "./lib/workflow-spec-files";
 import { getDraftChangeIndicators } from "./lib/version-action-state";
-import type { CanvasesConsole } from "@/api-client";
+import type { CanvasConsoleData } from "@/hooks/useCanvasData";
 
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
 
-function consoleYamlText(canvasId: string, consoleData?: CanvasesConsole | null): string {
-  return consoleToYaml({
+function consoleYamlText(canvasId: string, consoleData?: CanvasConsoleData | null): string {
+  return materializeConsoleSpec({
     panels: (consoleData?.panels ?? []).map((panel) => ({
       id: panel.id ?? "",
       type: panel.type ?? "markdown",
@@ -41,7 +45,9 @@ type UseCanvasConsoleVersionDiffArgs = {
   hasDraftGraphDiffVersusLive: boolean;
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
+  stageActiveConsole: boolean;
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+  getConsoleMutationGeneration?: () => number;
 };
 
 export function useCanvasConsoleVersionDiff({
@@ -50,10 +56,17 @@ export function useCanvasConsoleVersionDiff({
   hasDraftGraphDiffVersusLive,
   suppressUnpublishedDraftDiscard,
   enabled,
+  stageActiveConsole,
   registerIgnoredCanvasVersionUpdatedEcho,
+  getConsoleMutationGeneration,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled);
+  // The active console drives the editor. Staged reads (stage=true) apply only
+  // while editing a draft; published version previews use committed content.
+  const consoleQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled, stageActiveConsole);
   const draftDiffVersionId = versionIds.active || versionIds.draft;
+  // Committed draft console (stage=false) is the publish basis: only committed
+  // changes get promoted to live, so the publishable indicators below diff this
+  // against live.
   const draftConsoleQuery = useCanvasConsole(
     canvasId,
     draftDiffVersionId || undefined,
@@ -64,18 +77,34 @@ export function useCanvasConsoleVersionDiff({
     () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleQuery.data),
     [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],
   );
+
+  // The on-canvas diff surfaces (X-ray panel badges, the diff summary, and the
+  // "Show diff" modal) mirror the canvas tab, which diffs the *effective* draft
+  // against live. Prefer the staged console; fall back to the committed draft
+  // while it loads or when no version is actively being edited.
+  const effectiveConsoleData = consoleQuery.data ?? draftConsoleQuery.data;
+  const hasEffectiveConsoleDiffVersusLive = useMemo(
+    () => hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, effectiveConsoleData),
+    [liveConsoleQuery.data, effectiveConsoleData],
+  );
   const draftConsoleDiff = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive) return undefined;
-    return { diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, draftConsoleQuery.data) };
-  }, [hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+    if (!hasEffectiveConsoleDiffVersusLive) return undefined;
+    return {
+      diffCounts: getDraftConsoleDiffCounts(liveConsoleQuery.data, effectiveConsoleData),
+    };
+  }, [hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
+  const draftConsoleDiffSummary = useMemo(() => {
+    if (!hasEffectiveConsoleDiffVersusLive) return undefined;
+    return buildDraftConsoleDiffSummary(liveConsoleQuery.data, effectiveConsoleData);
+  }, [hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
   const consoleYamlDiffPayload = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive || !draftConsoleQuery.data) return null;
+    if (!hasEffectiveConsoleDiffVersusLive || !effectiveConsoleData) return null;
     const liveYamlText = consoleYamlText(canvasId, liveConsoleQuery.data);
-    const draftYamlText = consoleYamlText(canvasId, draftConsoleQuery.data);
+    const draftYamlText = consoleYamlText(canvasId, effectiveConsoleData);
 
     if (liveYamlText === draftYamlText) return null;
     return { liveYamlText, draftYamlText, filename: "console.yaml" };
-  }, [canvasId, hasDraftConsoleDiffVersusLive, liveConsoleQuery.data, draftConsoleQuery.data]);
+  }, [canvasId, hasEffectiveConsoleDiffVersusLive, liveConsoleQuery.data, effectiveConsoleData]);
   const [consoleDiffOpen, setConsoleDiffOpen] = useState(false);
   const onShowConsoleDiff = useCallback(() => setConsoleDiffOpen(true), []);
   useEffect(() => {
@@ -86,13 +115,14 @@ export function useCanvasConsoleVersionDiff({
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
-    hasLatestDraftVersion: !!versionIds.draft,
+    hasLatestDraftVersion: !!(versionIds.active || versionIds.draft),
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
     hasDraftDiffVersusLive,
   });
   const updateConsoleMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
     registerIgnoredCanvasVersionUpdatedEcho,
+    getMutationGeneration: getConsoleMutationGeneration,
   });
 
   return {
@@ -102,6 +132,7 @@ export function useCanvasConsoleVersionDiff({
       draftConsoleDiff,
       onShowConsoleDiff: consoleYamlDiffPayload ? onShowConsoleDiff : undefined,
     },
+    draftConsoleDiffSummary,
     consoleYamlDiffModal: consoleYamlDiffPayload
       ? createElement(
           Suspense,

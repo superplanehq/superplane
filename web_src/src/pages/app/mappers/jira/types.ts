@@ -2,6 +2,8 @@ export interface JiraProject {
   id?: string;
   key?: string;
   name?: string;
+  style?: string;
+  simplified?: boolean;
 }
 
 export interface JiraStatus {
@@ -47,6 +49,43 @@ export interface JiraNodeMetadata {
   status?: string;
 }
 
+export interface JiraWorkflowStatus {
+  id?: string;
+  name?: string;
+  category?: string;
+  isCurrent?: boolean;
+}
+
+export interface JiraWorkflowAvailableTransition {
+  id?: string;
+  name?: string;
+  toStatusId?: string;
+  toStatus?: string;
+}
+
+export interface JiraWorkflow {
+  issueKey?: string;
+  issueType?: string;
+  projectKey?: string;
+  workflowName?: string;
+  workflowSchemeId?: string;
+  workflowSchemeName?: string;
+  currentStatus?: string;
+  currentStatusId?: string;
+  statuses?: JiraWorkflowStatus[];
+  availableTransitions?: JiraWorkflowAvailableTransition[];
+}
+
+export interface JiraApproval {
+  id?: string;
+  name?: string;
+  finalDecision?: string;
+  approvers?: Array<{
+    approver?: JiraUser;
+    approverDecision?: string;
+  }>;
+}
+
 export interface CreateIssueConfiguration {
   project?: string;
   issueType?: string;
@@ -78,4 +117,25 @@ export interface DeleteIssueConfiguration {
   project?: string;
   issueKey?: string;
   deleteSubtasks?: boolean;
+}
+
+export interface GetWorkflowConfiguration {
+  project?: string;
+  issueKey?: string;
+}
+
+export interface TransitionIssueConfiguration {
+  project?: string;
+  issueKey?: string;
+  targetStatus?: string;
+  comment?: string;
+  resolution?: string;
+}
+
+export interface ApproveWorkflowConfiguration {
+  issueKey?: string;
+  decision?: string;
+  approvalSelector?: string;
+  approvalId?: string;
+  comment?: string;
 }

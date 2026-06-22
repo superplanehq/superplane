@@ -90,6 +90,7 @@ func (c *Client) executeHTTP(ctx context.Context, method, path string, body any)
 	if resp.StatusCode >= 400 {
 		return nil, &apiError{
 			StatusCode: resp.StatusCode,
+			Path:       path,
 			Message:    truncate(string(data), 500),
 		}
 	}
@@ -114,6 +115,7 @@ func (c *Client) openStream(ctx context.Context, path string) (io.ReadCloser, er
 		resp.Body.Close()
 		return nil, &apiError{
 			StatusCode: resp.StatusCode,
+			Path:       path,
 			Message:    truncate(string(body), 500),
 		}
 	}
@@ -127,12 +129,14 @@ type fileMetadata struct {
 
 type apiError struct {
 	StatusCode int
+	Path       string
 	Message    string
 }
 
 type agentMetadata struct {
-	System  string `json:"system"`
-	Version int    `json:"version"`
+	System  string          `json:"system"`
+	Version int             `json:"version"`
+	Tools   json.RawMessage `json:"tools,omitempty"`
 }
 
 func (e *apiError) Error() string {
@@ -157,6 +161,7 @@ func (c *Client) updateAgentSystemPrompt(ctx context.Context, agentID string, ve
 	body := map[string]any{
 		"system":  prompt,
 		"version": version,
+		"tools":   defaultAgentTools(),
 	}
 	data, err := c.executeHTTP(ctx, http.MethodPost, "/agents/"+url.PathEscape(agentID), body)
 	if err != nil {

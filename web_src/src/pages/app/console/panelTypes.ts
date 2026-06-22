@@ -20,19 +20,20 @@ import type {
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
-import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
+import { normalizeRowAction, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
+import type { WidgetSort, WidgetSortOrder } from "./widget/types";
+import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 import { validateNumberDataSource } from "./numberDataSourceValidation";
 import { validateNumberMetrics } from "./numberMetricsValidation";
-import { validateMarkdownVariables, type MarkdownVariable } from "./markdownVariables";
+import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "node", "nodes", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 export interface PanelTypeMeta {
@@ -50,6 +51,12 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "markdown",
     label: "Markdown",
     description: "Free-form notes, docs, or runbooks rendered as GitHub-flavored markdown.",
+  },
+  html: {
+    type: "html",
+    label: "HTML",
+    description:
+      "Custom HTML with inline styles, scoped <style>, and Tailwind classes. Scripts and external resources are blocked.",
   },
   node: {
     type: "node",
@@ -92,6 +99,14 @@ export interface MarkdownPanelContent {
   /** Named variables referenced from the markdown body via `{{ name.field }}`. */
   variables?: MarkdownVariable[];
 }
+
+/**
+ * Content shape for the `html` panel. Structurally identical to
+ * {@link MarkdownPanelContent} - title, raw body, and the shared variable
+ * system - but the body is HTML rendered through the strict sanitizer in
+ * `htmlSanitize.ts` instead of the markdown pipeline.
+ */
+export type HtmlPanelContent = MarkdownPanelContent;
 
 export interface NodePanelContent {
   title?: string;
@@ -240,6 +255,7 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
   switch (type) {
     case "markdown":
+    case "html":
       return { title: defaultTitle ?? "", body: "", variables: [] } satisfies MarkdownPanelContent;
     case "node":
       return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
@@ -278,6 +294,9 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
 export function validatePanelContent(type: PanelType, content: unknown): string | null {
   switch (type) {
     case "markdown":
+    case "html":
+      // Both kinds carry the same `title?` + `body?` + variables shape; only
+      // the renderer differs (markdown pipeline vs. HTML sanitizer).
       return validateMarkdownContent(content);
     case "node":
       return validateNodeContent(content);
@@ -295,19 +314,6 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
 export function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
-}
-
-function validateMarkdownContent(content: unknown): string | null {
-  if (content === undefined || content === null) return null;
-  const obj = asObject(content);
-  if (!obj) return "content must be an object.";
-  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
-    return "content.title must be a string.";
-  }
-  if (obj.body !== undefined && obj.body !== null && typeof obj.body !== "string") {
-    return "content.body must be a string.";
-  }
-  return validateMarkdownVariables(obj.variables);
 }
 
 function validateNodeContent(content: unknown): string | null {
@@ -469,7 +475,7 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
 function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
   const ds = asObject(raw);
   if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return { kind: "runs", limit: typeof ds.limit === "number" ? ds.limit : 100 };
+  if (ds?.kind === "runs") return { kind: "runs", limit: optionalNumber(ds.limit) };
   if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
   return { kind: "memory", namespace: "" };
 }
@@ -478,8 +484,12 @@ function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelD
   return {
     kind: "executions",
     node: stringOrUndefined(ds.node),
-    limit: typeof ds.limit === "number" ? ds.limit : 50,
+    limit: optionalNumber(ds.limit),
   };
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
@@ -527,51 +537,7 @@ function validateChartContent(content: unknown): string | null {
   return validateChartRender(render);
 }
 
-const ALLOWED_CHART_TYPES = ["bar", "stacked-bar", "line", "area", "donut"];
-
-function validateChartRender(render: Record<string, unknown>): string | null {
-  if (render.kind !== "chart") return 'render.kind must be "chart".';
-  if (typeof render.type !== "string" || !ALLOWED_CHART_TYPES.includes(render.type)) {
-    return `render.type must be one of ${ALLOWED_CHART_TYPES.join(", ")}.`;
-  }
-  if (typeof render.xField !== "string" || render.xField.trim() === "") {
-    return "render.xField must be a non-empty string.";
-  }
-  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
-    return "render.seriesField must be a string.";
-  }
-  if (!Array.isArray(render.series) || render.series.length === 0) {
-    return "render.series must be a non-empty array.";
-  }
-  for (let i = 0; i < render.series.length; i += 1) {
-    const seriesError = validateChartSeries(render.series[i], i);
-    if (seriesError) return seriesError;
-  }
-  const legendError = validateChartLegend(render.legend);
-  if (legendError) return legendError;
-  return validateSort(render.sort);
-}
-
-function validateChartLegend(legend: unknown): string | null {
-  if (legend === undefined) return null;
-  if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
-    return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
-  }
-  return null;
-}
-
-function validateChartSeries(raw: unknown, index: number): string | null {
-  const series = asObject(raw);
-  if (!series) return `render.series[${index}] must be an object.`;
-  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
-    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
-      return `render.series[${index}].${key} must be a string.`;
-    }
-  }
-  return null;
-}
-
-function validateSort(sort: unknown): string | null {
+export function validateSort(sort: unknown): string | null {
   if (sort === undefined || sort === null) return null;
   const obj = asObject(sort);
   if (!obj) return "render.sort must be an object.";

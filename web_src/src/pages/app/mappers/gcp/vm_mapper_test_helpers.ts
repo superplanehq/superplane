@@ -1,4 +1,4 @@
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
@@ -42,4 +42,25 @@ export function buildDetailsCtx(overrides?: {
 }): ExecutionDetailsContext {
   const node = buildNode(overrides?.node);
   return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
+}
+
+export function buildComponentCtx(
+  nodeOverrides?: Partial<NodeInfo>,
+  componentName = "gcp.compute.createVM",
+): ComponentBaseContext {
+  const node = buildNode({ componentName, ...nodeOverrides });
+  return {
+    nodes: [node],
+    node,
+    componentDefinition: {
+      name: node.componentName,
+      label: "GCP",
+      description: "",
+      icon: "gcp",
+      color: "gray",
+    },
+    lastExecutions: [],
+    currentUser: undefined,
+    actions: { invokeNodeExecutionHook: async () => {} },
+  };
 }

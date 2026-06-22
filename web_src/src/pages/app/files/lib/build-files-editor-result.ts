@@ -1,9 +1,10 @@
+import { isWorkflowSpecPath } from "../../lib/workflow-spec-paths";
 import {
   getRepositoryFileListErrorMessage,
   getRepositoryFileListLoading,
   getSelectedFileViewState,
 } from "./files-view-state";
-import type { PendingFileChange, AppFile } from "../types";
+import type { PendingFileChange, StagedFileDiff, AppFile } from "../types";
 
 type EditorViewParams = {
   catalog: {
@@ -22,6 +23,7 @@ type EditorViewParams = {
   };
   pending: {
     pendingChangesByPath: Record<string, PendingFileChange>;
+    specDraftByPath: Record<string, string>;
     newFilePath: string | null;
     startNewFile: () => void;
     createNewFile: () => void;
@@ -37,6 +39,9 @@ type EditorViewParams = {
     selectedFileQuery: Parameters<typeof getSelectedFileViewState>[0]["selectedFileQuery"];
   };
   loadedContentByPath: Record<string, string>;
+  committedContentByPath: Record<string, string>;
+  stagedDiffPaths: string[];
+  stagedFileDiffs: StagedFileDiff[];
   canManageRepositoryFiles: boolean;
   leftOffset: number;
   isDiffOpen: boolean;
@@ -52,6 +57,9 @@ export function buildFilesEditorResult({
   pendingChanges,
   selection,
   loadedContentByPath,
+  committedContentByPath,
+  stagedDiffPaths,
+  stagedFileDiffs,
   canManageRepositoryFiles,
   leftOffset,
   isDiffOpen,
@@ -59,10 +67,13 @@ export function buildFilesEditorResult({
   headerActionsHost,
 }: EditorViewParams) {
   const selectedChange = tabs.selectedPath ? pending.pendingChangesByPath[tabs.selectedPath] : undefined;
+  const selectedSpecDraft =
+    tabs.selectedPath && isWorkflowSpecPath(tabs.selectedPath) ? pending.specDraftByPath[tabs.selectedPath] : undefined;
   const editorView = getSelectedFileViewState({
     selectedPath: tabs.selectedPath,
     selectedGeneratedFile: selection.selectedGeneratedFile,
     selectedChange,
+    selectedSpecDraft,
     loadedContentByPath,
     selectedPathExistsInRepository: selection.selectedPathExistsInRepository,
     selectedFileQuery: selection.selectedFileQuery,
@@ -78,11 +89,15 @@ export function buildFilesEditorResult({
     openTabs: tabs.openTabs,
     pendingChanges,
     pendingChangesByPath: pending.pendingChangesByPath,
+    specDraftByPath: pending.specDraftByPath,
     newFilePath: pending.newFilePath,
     isDiffOpen,
     setIsDiffOpen,
     headerActionsHost,
     loadedContentByPath,
+    committedContentByPath,
+    stagedDiffPaths,
+    stagedFileDiffs,
     selectedContent: editorView.selectedContent,
     selectedIsDeleted: editorView.selectedIsDeleted,
     selectedGeneratedFile: selection.selectedGeneratedFile,

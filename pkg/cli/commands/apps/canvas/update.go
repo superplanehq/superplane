@@ -3,6 +3,7 @@ package canvas
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
@@ -14,7 +15,7 @@ import (
 
 type updateCommand struct {
 	file            *string
-	draft           *bool
+	draftID         *string
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -61,53 +62,76 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if c.autoLayoutNodes != nil {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
-	draftMode := c.draft != nil && *c.draft
 
-	canvasID, canvas, err := resolveCanvasForFileUpdate(filePath)
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
+	draftMode := draftID != ""
+
+	canvasID, _, err := resolveCanvasForFileUpdate(filePath)
 	if err != nil {
 		return err
 	}
 
-	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
+	yamlBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read canvas yaml: %w", err)
+	}
+
+	var targetVersionID string
+	if draftMode {
+		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
+	} else {
+		targetVersionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	}
 	if err != nil {
 		return err
 	}
 
-	if changeManagementEnabled && !draftMode {
-		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
-	}
-
-	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
-	body.SetCanvas(canvas)
-	body.SetVersionId(targetVersionID)
-
+	var autoLayout *openapi_client.CanvasesCanvasAutoLayout
 	if layout.HasFlags(ctx) {
-		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+		parsed, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr
 		}
-		if autoLayout != nil {
-			body.SetAutoLayout(*autoLayout)
-		}
+		autoLayout = parsed
 	} else {
-		body.SetAutoLayout(layout.DefaultAutoLayout())
+		defaultLayout := layout.DefaultAutoLayout()
+		autoLayout = &defaultLayout
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
-		Body(body).
+	if err := common.CommitRepositorySpecFile(
+		ctx,
+		canvasID,
+		targetVersionID,
+		common.CanvasYAMLRepositoryPath,
+		yamlBytes,
+		"Update canvas.yaml",
+		autoLayout,
+		true,
+	); err != nil {
+		return err
+	}
+
+	versionResponse, _, err := ctx.API.CanvasVersionAPI.
+		CanvasesDescribeCanvasVersion(ctx.Context, canvasID, targetVersionID).
 		Execute()
 	if err != nil {
 		return err
 	}
+	version := versionResponse.GetVersion()
+	if version.Metadata == nil {
+		return fmt.Errorf("updated version metadata is missing")
+	}
 
-	version := response.GetVersion()
-	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
+	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID)
+	if err != nil {
+		return fmt.Errorf("canvas draft updated but failed to read canvas.yaml: %w", err)
+	}
+
+	versionForValidation := versionWithSpecFromYAML(version, string(canvasYAML))
+	if errText := formatNodeSpecErrorsForCLI(versionForValidation); errText != "" {
 		return fmt.Errorf("%s", errText)
 	}
 
@@ -128,18 +152,27 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		metadata := version.GetMetadata()
-		spec := version.GetSpec()
+		versionForOutput := versionWithSpecFromYAML(version, string(canvasYAML))
+		spec, ok := versionForOutput.GetSpecOk()
+		nodeCount := 0
+		edgeCount := 0
+		if ok && spec != nil {
+			nodeCount = len(spec.GetNodes())
+			edgeCount = len(spec.GetEdges())
+		}
 
 		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
-		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
-		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", nodeCount)
+		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)
 
 		integrations := make(map[string]struct{})
-		for _, node := range spec.GetNodes() {
-			if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
-				if id := ref.GetId(); id != "" {
-					integrations[id] = struct{}{}
+		if ok && spec != nil {
+			for _, node := range spec.GetNodes() {
+				if ref, refOk := node.GetIntegrationOk(); refOk && ref != nil {
+					if id := ref.GetId(); id != "" {
+						integrations[id] = struct{}{}
+					}
 				}
 			}
 		}
@@ -147,11 +180,26 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
-		if warnText := formatNodeSpecWarningsForCLI(version); warnText != "" {
+		if warnText := formatNodeSpecWarningsForCLI(versionForOutput); warnText != "" {
 			_, err = fmt.Fprint(stdout, warnText)
 		}
 		return err
 	})
+}
+
+func versionWithSpecFromYAML(version openapi_client.CanvasesCanvasVersion, canvasYAML string) openapi_client.CanvasesCanvasVersion {
+	trimmed := strings.TrimSpace(canvasYAML)
+	if trimmed == "" {
+		return version
+	}
+
+	resource, err := models.ParseCanvas([]byte(trimmed))
+	if err != nil || resource.Spec == nil {
+		return version
+	}
+
+	version.SetSpec(*resource.Spec)
+	return version
 }
 
 // formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).

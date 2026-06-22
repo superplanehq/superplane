@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -46,39 +45,26 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	userUUID := uuid.MustParse(userID)
 	if version.State == models.CanvasVersionStatePublished {
 		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersion(version, organizationID),
+			Version: SerializeCanvasVersionMetadata(version, organizationID, nil),
 		}, nil
 	}
 
 	canAccess := false
-	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		// Drafts: only the owning user can describe them.
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
-			canAccess = true
-			return nil
-		} else if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-			return draftErr
-		}
-
-		// Snapshots tied to a change request are visible to any
-		// authenticated org member, mirroring DescribeCanvasChangeRequest
-		// which already returns the snapshot's full spec to reviewers.
-		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
-			canAccess = true
-			return nil
-		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
-			return requestErr
-		}
-		return nil
-	}); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to resolve version access: %v", err)
+	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
+		canAccess = true
 	}
 
 	if !canAccess {
 		return nil, status.Error(codes.PermissionDenied, "version is not visible in current flow")
 	}
 
+	state, _, err := stagingSummaryForVersion(version.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version:        SerializeCanvasVersionMetadata(version, organizationID, nil),
+		StagingSummary: state,
 	}, nil
 }

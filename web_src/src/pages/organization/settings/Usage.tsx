@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Cpu, Database, Gauge, Layers3, Users } from "lucide-react";
+import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { isUsagePageForced } from "@/lib/env";
@@ -35,6 +36,10 @@ export function Usage({ organizationId }: UsageProps) {
   const forceUsagePage = isUsagePageForced();
   const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
   const anyError = [error, usersError, integrationsError].find(Boolean);
+
+  useReportPageReady(!anyLoading, {
+    failed: !!anyError,
+  });
 
   if (anyLoading) {
     return (
@@ -105,7 +110,6 @@ function UsageContent({
     [data.limits, memberCount, integrationCount],
   );
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
-  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
   const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   return (
@@ -120,7 +124,7 @@ function UsageContent({
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <UsageMetricCard
           title="Canvases"
           value={canvasUsage.value}
@@ -134,13 +138,6 @@ function UsageContent({
           subtitle={eventUsage.subtitle}
           progress={eventUsage.progress}
           icon={Activity}
-        />
-        <UsageMetricCard
-          title="Agent Token Budget"
-          value={agentTokenUsage.value}
-          subtitle={agentTokenUsage.subtitle}
-          progress={agentTokenUsage.progress}
-          icon={Cpu}
         />
       </div>
 
@@ -253,16 +250,6 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   );
 }
 
-function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
-  return buildBucketUsage(
-    data?.usage?.agentTokenBucketLevel ?? 0,
-    data?.usage?.agentTokenBucketCapacity,
-    data?.usage?.agentTokenBucketLastUpdatedAt,
-    data?.usage?.nextAgentTokenBucketDecreaseAt,
-    "Rolling agent token usage for the current 30-day window.",
-  );
-}
-
 function formatCountWithLimit(count: number, limit: number | undefined) {
   return `${formatNumber(count)} / ${formatNumericLimit(limit)}`;
 }
@@ -302,12 +289,6 @@ function buildLimitCards(
       value: formatStringLimit(limits?.maxEventsPerMonth),
       icon: Gauge,
       description: "Rolling 30-day event allowance.",
-    },
-    {
-      label: "Agent tokens per month",
-      value: formatStringLimit(limits?.maxAgentTokensPerMonth),
-      icon: Cpu,
-      description: "Rolling 30-day agent token allowance.",
     },
   ];
 }

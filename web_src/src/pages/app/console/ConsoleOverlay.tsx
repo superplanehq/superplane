@@ -1,11 +1,8 @@
 import { useCallback, useMemo, useRef } from "react";
-import type {
-  ConsoleLayoutItem as ApiConsoleLayoutItem,
-  ConsolePanel as ApiConsolePanel,
-  SuperplaneComponentsNode,
-} from "@/api-client";
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
+import type { DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import type {
   ConsoleLayoutItem,
@@ -63,6 +60,11 @@ export type ConsoleOverlayProps = {
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
   consoleYamlReadOnly?: boolean;
+  visualDiff?: {
+    enabled: boolean;
+    summary?: DraftConsoleDiffSummary;
+  };
+  onEffectiveConsoleChange?: (next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => void;
 };
 
 export function ConsoleOverlay({
@@ -85,33 +87,15 @@ export function ConsoleOverlay({
   onConsoleAddPanel,
   onConsoleOpenYaml,
   consoleYamlReadOnly,
+  visualDiff,
+  onEffectiveConsoleChange,
 }: ConsoleOverlayProps) {
   const updateConsoleMutationRef = useRef(updateConsoleMutation);
   updateConsoleMutationRef.current = updateConsoleMutation;
 
-  const panels: ConsolePanel[] = useMemo(
-    () =>
-      (consoleQuery.data?.panels || []).map((panel: ApiConsolePanel) => ({
-        id: panel.id || "",
-        type: panel.type || "markdown",
-        content: (panel.content as Record<string, unknown>) || {},
-      })),
-    [consoleQuery.data?.panels],
-  );
+  const panels: ConsolePanel[] = useMemo(() => consoleQuery.data?.panels ?? [], [consoleQuery.data?.panels]);
 
-  const layout: ConsoleLayoutItem[] = useMemo(
-    () =>
-      (consoleQuery.data?.layout || []).map((item: ApiConsoleLayoutItem) => ({
-        i: item.i || "",
-        x: item.x || 0,
-        y: item.y || 0,
-        w: item.w || 12,
-        h: item.h || 6,
-        ...(item.minW !== undefined ? { minW: item.minW } : {}),
-        ...(item.minH !== undefined ? { minH: item.minH } : {}),
-      })),
-    [consoleQuery.data?.layout],
-  );
+  const layout: ConsoleLayoutItem[] = useMemo(() => consoleQuery.data?.layout ?? [], [consoleQuery.data?.layout]);
 
   const handleChange = useCallback((next: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] }) => {
     updateConsoleMutationRef.current.mutate(next);
@@ -142,8 +126,10 @@ export function ConsoleOverlay({
             errorMessage={consoleQuery.error ? String(consoleQuery.error) : undefined}
             readOnly={readOnly}
             onChange={handleChange}
+            onEffectiveChange={onEffectiveConsoleChange}
             addPanelDialogOpen={addPanelDialogOpen}
             onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
+            visualDiff={visualDiff}
           />
         </div>
         {showConsoleEditControls ? (

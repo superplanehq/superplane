@@ -112,8 +112,21 @@ message ListAgentChatMessagesResponse {
 message SendAgentChatMessageRequest {
   string chat_id = 1;
   string content = 2;
-  // Controls whether the agent should build, answer questions, or plan.
   AgentMode mode = 3;
+  repeated AgentChatImage images = 4;
+}
+
+enum AgentChatImageMediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_PNG = 1;
+  MEDIA_TYPE_JPEG = 2;
+  MEDIA_TYPE_GIF = 3;
+  MEDIA_TYPE_WEBP = 4;
+}
+
+message AgentChatImage {
+  AgentChatImageMediaType media_type = 1;
+  bytes data = 2;
 }
 
 message SendAgentChatMessageResponse {
@@ -152,4 +165,5 @@ message AgentChatMessage {
   string tool_name = 5;
   string tool_status = 6;
   google.protobuf.Timestamp created_at = 7;
+  repeated AgentChatImage images = 8;
 }

@@ -172,6 +172,10 @@ func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNu
 	return c.underlying.PullRequests.Merge(ctx, c.owner, repository, pullNumber, commitMessage, options)
 }
 
+func (c *Client) AddPullRequestReviewers(ctx context.Context, repository string, pullNumber int, reviewers github.ReviewersRequest) (*github.PullRequest, *github.Response, error) {
+	return c.underlying.PullRequests.RequestReviewers(ctx, c.owner, repository, pullNumber, reviewers)
+}
+
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	return c.underlying.Repositories.CreateStatus(ctx, c.owner, repository, sha, status)
 }
@@ -218,6 +222,10 @@ func (c *Client) RemoveIssueAssignees(ctx context.Context, repository string, is
 
 func (c *Client) CreateIssueComment(ctx context.Context, repository string, issueNumber int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
 	return c.underlying.Issues.CreateComment(ctx, c.owner, repository, issueNumber, comment)
+}
+
+func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
+	return c.underlying.Issues.EditComment(ctx, c.owner, repository, commentID, comment)
 }
 
 func (c *Client) CreateIssue(ctx context.Context, repository string, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {

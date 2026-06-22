@@ -29,6 +29,9 @@ function dispatchAgentEvent(
     case "session_failed":
       handleStatusEvent(data, callbacks);
       return;
+    case "session_notice":
+      callbacks.onNotice?.(data.error ?? "");
+      return;
     case "outcome_evaluation_start":
     case "outcome_evaluation_end":
       handleOutcomeEvent(data, callbacks);
@@ -81,6 +84,8 @@ export type AgentStreamCallbacks = {
   onPersistedMessage?: (message: AgentMessage) => void;
   onStatusChange?: (status: string, error?: string) => void;
   onOutcomeEvent?: (event: "start" | "end", evaluation: OutcomeEvaluation) => void;
+  /** A recoverable, non-terminal provider notice (session.error). */
+  onNotice?: (message: string) => void;
 };
 
 export function useAgentSessionWebsocket(

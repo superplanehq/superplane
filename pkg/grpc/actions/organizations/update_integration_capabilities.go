@@ -215,6 +215,7 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 	}
 
 	capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
+	logging.ForIntegration(*integration).WithField("source", "capability_update").Info("Integration operation may write secrets")
 	nextStep, err := setupProvider.OnCapabilityUpdate(core.CapabilityUpdateContext{
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},

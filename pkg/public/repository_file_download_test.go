@@ -68,7 +68,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.NoError(t, server.RegisterGRPCGateway("localhost:50051"))
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 
 	authenticated := &r.Account.ID
 
@@ -128,7 +128,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 
 	t.Run("returns file contents", func(t *testing.T) {
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID)
+		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
 		require.NoError(t, err)
 
 		_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, git.CommitOptions{

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
 )
 
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
@@ -30,6 +30,10 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	runConsumer := testconsumer.New(amqpURL, messages.CanvasRunRoutingKey)
 	runConsumer.Start()
 	defer runConsumer.Stop()
+
+	terminalEventConsumer := testconsumer.New(amqpURL, messages.EventTerminalRoutingKey)
+	terminalEventConsumer.Start()
+	defer terminalEventConsumer.Stop()
 
 	//
 	// Create a simple canvas with just a trigger and a component nodes.
@@ -53,7 +57,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	// Create the root event for the trigger node, and process it.
 	//
 	event := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	err := router.LockAndProcessEvent(logger, *event)
+	err := router.LockAndProcessEvent(logger, *event, time.Now())
 	require.NoError(t, err)
 
 	//
@@ -78,6 +82,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
+	assert.False(t, terminalEventConsumer.HasReceivedMessage())
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
@@ -115,7 +120,7 @@ func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T)
 		assert.NotEqual(t, event.ID, pending.ID)
 	}
 
-	require.NoError(t, router.LockAndProcessEvent(logger, *event))
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
 
 	updatedEvent, err := models.FindCanvasEvent(event.ID)
 	require.NoError(t, err)
@@ -169,7 +174,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
 	require.NoError(t, err)
 	require.NoError(t, triggerEvent.Routed())
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID)
 	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
@@ -182,7 +187,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, outputEvent)
+	err = router.LockAndProcessEvent(logger, outputEvent, time.Now())
 	require.NoError(t, err)
 
 	updatedEvent, err := models.FindCanvasEvent(outputEvent.ID)
@@ -226,7 +231,7 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, triggerEvent.Routed())
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID)
 	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
@@ -236,227 +241,19 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
-	err = router.LockAndProcessEvent(logger, events[0])
+	err = router.LockAndProcessEvent(logger, events[0], time.Now())
 	require.NoError(t, err)
 
 	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
 	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	finalizer := NewRunFinalizer(amqpURL)
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err = models.FindCanvasRunByRootEventInTransaction(database.Conn(), triggerEvent.ID)
+	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
 	assert.NotNil(t, updatedRun.FinishedAt)
-}
-
-func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-	router := NewEventRouter(amqpURL)
-	logger := log.NewEntry(log.New())
-	r := support.Setup(t)
-
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
-	executionConsumer.Start()
-	defer executionConsumer.Stop()
-
-	//
-	// Create a blueprint with this structure:
-	//
-	//   if-1 --true--> up
-	//        --false-> down
-	//
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{ID: "if-1", Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{Name: "up", NodeID: "if-1", NodeOutputChannel: "true"},
-			{Name: "down", NodeID: "if-1", NodeOutputChannel: "false"},
-		},
-	)
-
-	// Create a canvas that uses this custom component
-	customComponentNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "trigger-1",
-				Type:   models.NodeTypeTrigger,
-			},
-			{
-				NodeID: customComponentNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()},
-				}),
-			},
-			{
-				NodeID: "next-up",
-				Type:   models.NodeTypeComponent,
-			},
-			{
-				NodeID: "next-down",
-				Type:   models.NodeTypeComponent,
-			},
-		},
-		[]models.Edge{
-			{SourceID: "trigger-1", TargetID: customComponentNode, Channel: "default"},
-			{SourceID: customComponentNode, TargetID: "next-up", Channel: "up"},
-			{SourceID: customComponentNode, TargetID: "next-down", Channel: "down"},
-		},
-	)
-
-	//
-	// Create parent execution for the custom component
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
-	require.NoError(t, rootEvent.Routed())
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
-
-	//
-	// Create and pass child execution,
-	// emit output event on "true" channel.
-	//
-	childExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
-	_, err := childExecution.Pass(map[string][]any{
-		"true": {map[string]any{}},
-	})
-	require.NoError(t, err)
-
-	//
-	// Process the child output event,
-	// verify parent execution is completed,
-	// and verify parent execution emitted events only on the "up" channel, NOT on "down"
-	//
-	events, err := models.ListCanvasEvents(canvas.ID, customComponentNode+":if-1", 10, nil)
-	require.NoError(t, err)
-	require.Len(t, events, 1)
-	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, childOutputEvent)
-	require.NoError(t, err)
-
-	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, parent.State)
-
-	parentOutputEvents, err := models.ListCanvasEvents(canvas.ID, customComponentNode, 10, nil)
-	require.NoError(t, err)
-	assert.Len(t, filterEventsByChannel(parentOutputEvents, "up"), 1)
-	assert.Len(t, filterEventsByChannel(parentOutputEvents, "down"), 0)
-
-	assert.True(t, executionConsumer.HasReceivedMessage())
-}
-
-func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
-	amqpURL, _ := config.RabbitMQURL()
-	router := NewEventRouter(amqpURL)
-	logger := log.NewEntry(log.New())
-	r := support.Setup(t)
-
-	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
-	executionConsumer.Start()
-	defer executionConsumer.Stop()
-
-	//
-	// Create a blueprint with this structure:
-	//
-	//   filter-1 --default--> default
-	//
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{ID: "filter-1", Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{Name: "default", NodeID: "filter-1", NodeOutputChannel: "default"},
-		},
-	)
-
-	// Create a canvas that uses this custom component
-	customComponentNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "trigger-1",
-				Type:   models.NodeTypeTrigger,
-			},
-			{
-				NodeID: customComponentNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref: datatypes.NewJSONType(models.NodeRef{
-					Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()},
-				}),
-			},
-			{
-				NodeID: "next",
-				Type:   models.NodeTypeComponent,
-			},
-		},
-		[]models.Edge{
-			{SourceID: "trigger-1", TargetID: customComponentNode, Channel: "default"},
-			{SourceID: customComponentNode, TargetID: "next", Channel: "default"},
-		},
-	)
-
-	//
-	// Create parent execution for the custom component
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
-	require.NoError(t, rootEvent.Routed())
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
-
-	//
-	// Create and pass child execution, emitting 5 events.
-	//
-	childExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
-	_, err := childExecution.Pass(map[string][]any{
-		"default": {
-			map[string]any{},
-			map[string]any{},
-			map[string]any{},
-			map[string]any{},
-			map[string]any{},
-		},
-	})
-	require.NoError(t, err)
-
-	//
-	// Process one of the child output events,
-	// verify parent execution is completed,
-	// emitting 5 events too.
-	//
-	events, err := models.ListCanvasEvents(canvas.ID, customComponentNode+":filter-1", 10, nil)
-	require.NoError(t, err)
-	require.Len(t, events, 5)
-	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, childOutputEvent)
-	require.NoError(t, err)
-
-	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, parent.State)
-
-	parentOutputEvents, err := models.ListCanvasEvents(canvas.ID, customComponentNode, 10, nil)
-	require.NoError(t, err)
-	assert.Len(t, filterEventsByChannel(parentOutputEvents, "default"), 5)
-
-	assert.True(t, executionConsumer.HasReceivedMessage())
-}
-
-func filterEventsByChannel(events []models.CanvasEvent, channel string) []models.CanvasEvent {
-	var filtered []models.CanvasEvent
-	for _, event := range events {
-		if event.Channel == channel {
-			filtered = append(filtered, event)
-		}
-	}
-	return filtered
 }

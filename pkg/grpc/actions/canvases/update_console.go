@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -22,9 +21,10 @@ func UpdateConsole(
 	organizationID,
 	canvasID string,
 	versionID string,
-	panels []*pb.Console_Panel,
-	layout []*pb.Console_LayoutItem,
-) (*pb.UpdateConsoleResponse, error) {
+	modelPanels []models.ConsolePanel,
+	modelLayout []models.ConsoleLayoutItem,
+	discardStaging bool,
+) (*models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -49,16 +49,6 @@ func UpdateConsole(
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
-	modelPanels, err := deserializeConsolePanels(panels)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	modelLayout := deserializeConsoleLayout(layout)
-
 	if err := validateConsoleInput(modelPanels, modelLayout); err != nil {
 		return nil, err
 	}
@@ -78,19 +68,8 @@ func UpdateConsole(
 			return loadErr
 		}
 
-		if version.State == models.CanvasVersionStatePublished {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
-		}
-
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
-		}
-
-		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr != nil {
-			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
-			}
-			return draftErr
+		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+			return err
 		}
 
 		v, updateErr := models.UpdateCanvasVersionConsoleInTransaction(tx, version, modelPanels, modelLayout)
@@ -99,6 +78,11 @@ func UpdateConsole(
 		}
 
 		newVersion = v
+
+		if discardStaging {
+			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+		}
+
 		return nil
 	})
 
@@ -114,12 +98,7 @@ func UpdateConsole(
 		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
 	}
 
-	console, err := serializeConsole(newVersion)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to serialize console")
-	}
-
-	return &pb.UpdateConsoleResponse{Console: console}, nil
+	return newVersion, nil
 }
 
 func validateConsoleInput(panels []models.ConsolePanel, layout []models.ConsoleLayoutItem) error {

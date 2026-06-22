@@ -3,32 +3,27 @@ package canvases
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 func UpdateCanvas(
-	_ context.Context,
-	authService authorization.Authorization,
+	ctx context.Context,
 	organizationID string,
 	id string,
 	name *string,
 	description *string,
-	changeManagement *pb.Canvas_ChangeManagement,
 ) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
@@ -39,19 +34,11 @@ func UpdateCanvas(
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
-				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-			}
-		}
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return updateCanvasInTransaction(tx, authService, organizationID, organizationUUID, canvasID, name, description, changeManagement)
+		return updateCanvasInTransaction(tx, organizationUUID, canvasID, name, description)
 	})
 	if err != nil {
 		if s, ok := status.FromError(err); ok {
@@ -77,7 +64,12 @@ func UpdateCanvas(
 		}
 	}
 
-	serializedCanvas, err := SerializeCanvas(refreshedCanvas, false, user)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), refreshedCanvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	serializedCanvas, err := SerializeCanvas(refreshedCanvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to serialize canvas")
 	}
@@ -87,13 +79,10 @@ func UpdateCanvas(
 
 func updateCanvasInTransaction(
 	tx *gorm.DB,
-	authService authorization.Authorization,
-	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasID uuid.UUID,
 	name *string,
 	description *string,
-	changeManagement *pb.Canvas_ChangeManagement,
 ) error {
 	lockedCanvas, err := lockCanvasForUpdate(tx, organizationUUID, canvasID)
 	if err != nil {
@@ -107,14 +96,11 @@ func updateCanvasInTransaction(
 
 	changed, err := applyCanvasLiveVersionUpdates(
 		tx,
-		authService,
-		organizationID,
 		organizationUUID,
 		canvasID,
 		liveVersion,
 		name,
 		description,
-		changeManagement,
 	)
 	if err != nil {
 		return err
@@ -138,7 +124,6 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 			"organization_id",
 			"live_version_id",
 			"folder_id",
-			"is_template",
 			"name",
 			"created_by",
 			"created_at",
@@ -158,14 +143,11 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 
 func applyCanvasLiveVersionUpdates(
 	tx *gorm.DB,
-	authService authorization.Authorization,
-	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasID uuid.UUID,
 	liveVersion *models.CanvasVersion,
 	name *string,
 	description *string,
-	changeManagement *pb.Canvas_ChangeManagement,
 ) (bool, error) {
 	nameChanged, err := applyCanvasNameUpdate(tx, organizationUUID, canvasID, liveVersion, name)
 	if err != nil {
@@ -174,12 +156,7 @@ func applyCanvasLiveVersionUpdates(
 
 	descriptionChanged := applyCanvasDescriptionUpdate(liveVersion, description)
 
-	changeManagementChanged, err := applyCanvasChangeManagementUpdate(authService, organizationID, liveVersion, changeManagement)
-	if err != nil {
-		return false, err
-	}
-
-	return nameChanged || descriptionChanged || changeManagementChanged, nil
+	return nameChanged || descriptionChanged, nil
 }
 
 func applyCanvasNameUpdate(
@@ -220,61 +197,6 @@ func applyCanvasDescriptionUpdate(liveVersion *models.CanvasVersion, description
 	}
 
 	liveVersion.Description = *description
-	return true
-}
-
-func applyCanvasChangeManagementUpdate(
-	authService authorization.Authorization,
-	organizationID string,
-	liveVersion *models.CanvasVersion,
-	changeManagement *pb.Canvas_ChangeManagement,
-) (bool, error) {
-	if changeManagement == nil {
-		return false, nil
-	}
-
-	nextApprovers, err := parseCanvasChangeRequestApprovalConfig(changeManagement)
-	if err != nil {
-		return false, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
-	}
-
-	if nextApprovers != nil {
-		if err := validateCanvasChangeRequestApprovers(authService, organizationID, nextApprovers); err != nil {
-			return false, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
-		}
-	}
-
-	approversChanged := applyCanvasApproversUpdate(liveVersion, nextApprovers)
-	changeManagementEnabledChanged := applyCanvasChangeManagementEnabledUpdate(liveVersion, changeManagement.Enabled)
-
-	return approversChanged || changeManagementEnabledChanged, nil
-}
-
-func applyCanvasApproversUpdate(
-	liveVersion *models.CanvasVersion,
-	nextApprovers []models.CanvasChangeRequestApprover,
-) bool {
-	if nextApprovers == nil {
-		return false
-	}
-
-	currentApprovers := liveVersion.EffectiveChangeRequestApprovers()
-	if slices.EqualFunc(currentApprovers, nextApprovers, func(left, right models.CanvasChangeRequestApprover) bool {
-		return left.Type == right.Type && left.User == right.User && left.Role == right.Role
-	}) {
-		return false
-	}
-
-	liveVersion.ChangeRequestApprovers = datatypes.NewJSONSlice(nextApprovers)
-	return true
-}
-
-func applyCanvasChangeManagementEnabledUpdate(liveVersion *models.CanvasVersion, enabled bool) bool {
-	if liveVersion.ChangeManagementEnabled == enabled {
-		return false
-	}
-
-	liveVersion.ChangeManagementEnabled = enabled
 	return true
 }
 

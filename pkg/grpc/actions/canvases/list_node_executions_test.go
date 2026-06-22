@@ -133,7 +133,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		rootEvent.CustomName = &customName
 		require.NoError(t, database.Conn().Save(rootEvent).Error)
 		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 		//
 		// List executions for the node
@@ -192,7 +192,7 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 	//
 	for i := 0; i < 1000; i++ {
 		event := support.EmitCanvasEventForNode(b, canvas.ID, "manual", "default", nil)
-		execution := support.CreateCanvasNodeExecution(b, canvas.ID, "node-1", event.ID, event.ID, nil)
+		execution := support.CreateCanvasNodeExecution(b, canvas.ID, "node-1", event.ID, event.ID)
 		_, err := execution.Pass(map[string][]any{"default": {map[string]any{"data": "test"}}})
 		require.NoError(b, err)
 	}
@@ -200,9 +200,12 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 	executions, err := models.ListNodeExecutions(canvas.ID, "node-1", []string{}, []string{}, 1000, nil)
 	require.NoError(b, err)
 
+	resources, err := LoadNodeExecutionResources(database.Conn(), executions)
+	require.NoError(b, err)
+
 	b.ResetTimer()
 	for b.Loop() {
-		pb, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
+		pb, err := SerializeNodeExecutions(executions, resources)
 		require.NoError(b, err)
 		require.NotNil(b, pb)
 		assert.Len(b, pb, 1000)

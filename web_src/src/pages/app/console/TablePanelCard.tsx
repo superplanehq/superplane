@@ -17,11 +17,16 @@ interface TablePanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function TablePanelCard({ panel, readOnly, onDelete, onChange }: TablePanelCardProps) {
+export function TablePanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: TablePanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeTablePanelContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -29,14 +34,14 @@ export function TablePanelCard({ panel, readOnly, onDelete, onChange }: TablePan
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <TablePanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<TablePanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="table"
         initialContent={content}
@@ -56,13 +61,23 @@ function TablePanelBody({ content }: { content: TablePanelContent }) {
 }
 
 function TablePanelDataBound({ content, canvasId }: { content: TablePanelContent; canvasId: string }) {
-  const { rows, isLoading, error } = useWidgetData(
+  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore } = useWidgetData(
     canvasId,
     content.dataSource,
     renderNeedsRunNodeOutputs(content.render),
+    true,
   );
   if (error) return <PanelError message={error} />;
-  return <WidgetTable render={content.render} rows={rows} isLoading={isLoading} />;
+  return (
+    <WidgetTable
+      render={content.render}
+      rows={rows}
+      isLoading={isLoading}
+      hasMore={hasMore}
+      isFetchingMore={isFetchingMore}
+      onLoadMore={loadMore}
+    />
+  );
 }
 
 function PanelError({ message }: { message: string }) {

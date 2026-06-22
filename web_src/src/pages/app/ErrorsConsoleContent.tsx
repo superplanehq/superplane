@@ -1,16 +1,14 @@
 import React, { useMemo } from "react";
 import { CircleX } from "lucide-react";
 import type {
-  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/app/lib/canvas-runs";
-import { buildTriggerSidebarEvent } from "./utils";
 
 function NodeIcon({
   node,
@@ -58,31 +56,23 @@ function ErrorItemRow({
 }: {
   item: {
     execution: CanvasesCanvasNodeExecutionRef;
-    event: CanvasesCanvasEventWithExecutions;
+    run: CanvasesCanvasRun;
+    rootEventId: string;
     node: ComponentsNode | undefined;
-    triggerNode: ComponentsNode | undefined;
   };
   componentIconMap: Record<string, string>;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }) {
   const nodeName = item.node?.name || item.execution.nodeId || "Unknown";
   const { badgeColor, label } = getStatusBadgeProps("error");
-  const triggerSidebarEvent = buildTriggerSidebarEvent(item.event, item.triggerNode);
 
   const handleSelect = () => {
-    if (onExecutionSelect && item.execution.id && item.event.id && item.execution.nodeId) {
+    if (onExecutionSelect && item.run.id && item.execution.nodeId) {
       onExecutionSelect({
+        runId: item.run.id,
         nodeId: item.execution.nodeId,
-        eventId: item.event.id,
-        executionId: item.execution.id,
-        triggerEvent: triggerSidebarEvent,
       });
     } else if (onNodeSelect && item.execution.nodeId) {
       onNodeSelect(item.execution.nodeId);
@@ -132,7 +122,7 @@ function ErrorItemRow({
 }
 
 export function ErrorsConsoleContent({
-  events,
+  runs,
   nodes,
   componentIconMap = {},
   searchQuery,
@@ -140,49 +130,46 @@ export function ErrorsConsoleContent({
   onExecutionSelect,
   onAcknowledgeErrors,
 }: {
-  events: CanvasesCanvasEventWithExecutions[];
+  runs: CanvasesCanvasRun[];
   nodes: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   searchQuery: string;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }) {
   const errorItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const items: {
       execution: CanvasesCanvasNodeExecutionRef;
-      event: CanvasesCanvasEventWithExecutions;
+      run: CanvasesCanvasRun;
+      rootEventId: string;
       node: ComponentsNode | undefined;
-      triggerNode: ComponentsNode | undefined;
     }[] = [];
 
-    for (const event of events) {
-      const triggerNode = nodes.find((n) => n.id === event.nodeId);
-      for (const exec of event.executions || []) {
+    for (const run of runs) {
+      const rootEventId = run.rootEvent?.id;
+      if (!rootEventId) continue;
+
+      for (const exec of run.executions || []) {
         if (exec.result !== "RESULT_FAILED") continue;
         if (exec.resultReason === "RESULT_REASON_ERROR_RESOLVED") continue;
 
         const node = findNode(nodes, exec.nodeId);
 
         if (query) {
-          const searchable = [node?.name, exec.nodeId, exec.resultMessage, event.id]
+          const searchable = [node?.name, exec.nodeId, exec.resultMessage, rootEventId]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
           if (!searchable.includes(query)) continue;
         }
 
-        items.push({ execution: exec, event, node, triggerNode });
+        items.push({ execution: exec, run, rootEventId, node });
       }
     }
     return items;
-  }, [events, nodes, searchQuery]);
+  }, [runs, nodes, searchQuery]);
 
   const allErrorIds = useMemo(() => errorItems.map((item) => item.execution.id!).filter(Boolean), [errorItems]);
 

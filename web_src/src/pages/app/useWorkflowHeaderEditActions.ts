@@ -18,54 +18,77 @@ interface WorkflowStartupActionsConfig {
 }
 
 interface WorkflowHeaderEditActionsConfig {
-  isRunsMode: boolean;
-  handleExitRunsMode: () => void;
+  isRunInspectionMode: boolean;
+  isVersionsMode: boolean;
+  handleClearRunInspection: () => void;
+  handleExitVersionsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
-  setIsRunsMode: (value: boolean) => void;
-  setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
   startup?: WorkflowStartupActionsConfig;
 }
 
+function clearRunInspectionSearchParams(current: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(current);
+  next.delete("run");
+  return next;
+}
+
 export function useWorkflowHeaderEditActions({
-  isRunsMode,
-  handleExitRunsMode,
+  isRunInspectionMode,
+  isVersionsMode,
+  handleClearRunInspection,
+  handleExitVersionsMode,
   handleToggleEditMode,
-  setIsRunsMode,
-  setSelectedRunId,
   setRunDetailNodeId,
   setSearchParams,
   startup,
 }: WorkflowHeaderEditActionsConfig) {
   const handleEnterEditModeFromHeader = useCallback(async () => {
-    if (isRunsMode) {
-      setIsRunsMode(false);
-      setSelectedRunId(null);
+    if (isRunInspectionMode) {
       setRunDetailNodeId(null);
-      setSearchParams(clearRunsViewSearchParams, { replace: true });
+      setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      await Promise.resolve();
+    } else if (isVersionsMode) {
+      handleExitVersionsMode();
     }
 
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunsMode, setIsRunsMode, setRunDetailNodeId, setSearchParams, setSelectedRunId]);
+  }, [
+    handleExitVersionsMode,
+    handleToggleEditMode,
+    isRunInspectionMode,
+    isVersionsMode,
+    setRunDetailNodeId,
+    setSearchParams,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
     }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
+  }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
-  useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
+  useAutoEditMode(startup, handleToggleEditMode, setRunDetailNodeId, setSearchParams);
   useAutoPlaceholderNode(startup);
 
-  return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
+  const clearRunInspectionForEdit = useCallback(() => {
+    if (!isRunInspectionMode) {
+      return;
+    }
+
+    setRunDetailNodeId(null);
+    setSearchParams(clearRunInspectionSearchParams, { replace: true });
+  }, [isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+
+  return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit };
 }
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
   handleToggleEditMode: () => Promise<void>,
+  setRunDetailNodeId: (value: string | null) => void,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -83,19 +106,32 @@ function useAutoEditMode(
 
     triggeredRef.current = true;
 
-    void handleToggleEditMode().then(() => {
-      const next = new URLSearchParams(searchParams);
-      next.delete("edit");
-      setSearchParams(next, { replace: true });
-    });
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
-}
+    void (async () => {
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+        await Promise.resolve();
+      }
 
-function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("view");
-  next.delete("run");
-  return next;
+      await handleToggleEditMode();
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("edit");
+          return next;
+        },
+        { replace: true },
+      );
+    })();
+  }, [
+    searchParams,
+    setSearchParams,
+    setRunDetailNodeId,
+    hasEditableVersion,
+    canUpdateCanvas,
+    canvasLoaded,
+    handleToggleEditMode,
+  ]);
 }
 
 /**

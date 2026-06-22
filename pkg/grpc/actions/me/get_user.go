@@ -2,14 +2,15 @@ package me
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,9 +27,9 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	user, err := models.FindActiveUserByID(orgID, userID)
+	user, err := loadUser(ctx, orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		return nil, err
 	}
 
 	userProto := &pb.User{
@@ -49,7 +50,12 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		}, nil
 	}
 
-	roles, err := authService.GetUserRolesForOrg(userID, user.OrganizationID.String())
+	var roles []*authorization.RoleDefinition
+	err = telemetry.RunSpan(ctx, "auth.load_user_roles", func(ctx context.Context) error {
+		var loadErr error
+		roles, loadErr = authService.GetUserRolesForOrg(ctx, userID, user.OrganizationID.String())
+		return loadErr
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get user roles")
 	}
@@ -62,7 +68,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	for _, role := range roles {
 		userProto.Roles = append(userProto.Roles, role.Name)
 		for _, permission := range role.Permissions {
-			key := fmt.Sprintf("%s:%s", permission.Resource, permission.Action)
+			key := permission.Resource + ":" + permission.Action
 			permissionSet[key] = &pbAuth.Permission{
 				Resource:   permission.Resource,
 				Action:     permission.Action,
@@ -78,10 +84,12 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 
 	userProto.Permissions = permissions
 
-	//
-	// Add information about the groups the user is a member of.
-	//
-	groups, err := authService.GetUserGroups(user.OrganizationID.String(), models.DomainTypeOrganization, userID)
+	var groups []string
+	err = telemetry.RunSpan(ctx, "auth.load_user_groups", func(ctx context.Context) error {
+		var loadErr error
+		groups, loadErr = authService.GetUserGroups(ctx, user.OrganizationID.String(), models.DomainTypeOrganization, userID)
+		return loadErr
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get user groups")
 	}
@@ -91,4 +99,18 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	return &pb.MeResponse{
 		User: userProto,
 	}, nil
+}
+
+func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
+	var user *models.User
+	err := telemetry.RunSpan(ctx, "auth.load_user", func(ctx context.Context) error {
+		var loadErr error
+		user, loadErr = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+		return loadErr
+	})
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	return user, nil
 }

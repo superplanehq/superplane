@@ -25,14 +25,22 @@ import (
 )
 
 const (
-	ec2ServiceName       = "ec2"
-	ssmServiceName       = "ssm"
-	ssmTargetPrefix      = "AmazonSSM."
-	ec2APIVersion        = "2016-11-15"
-	ResourceTypeImageOS  = "ec2.imageOS"
-	maxPublicImagesPerOS = 200
-	defaultUbuntuImages  = 12
-	defaultDebianImages  = 8
+	ec2ServiceName                    = "ec2"
+	ssmServiceName                    = "ssm"
+	cloudWatchServiceName             = "monitoring"
+	ssmTargetPrefix                   = "AmazonSSM."
+	ec2APIVersion                     = "2016-11-15"
+	cloudWatchAPIVersion              = "2010-08-01"
+	ResourceTypeImageOS               = "ec2.imageOS"
+	ResourceTypeElasticIP             = "ec2.elasticIp"
+	ResourceTypeElasticIPUnassociated = "ec2.elasticIpUnassociated"
+	ResourceTypeElasticIPAssociation  = "ec2.elasticIpAssociation"
+	ResourceTypePublicIPv4Pool        = "ec2.publicIpv4Pool"
+	ResourceTypeCustomerOwnedIPv4Pool = "ec2.customerOwnedIpv4Pool"
+	ResourceTypeIpamPool              = "ec2.ipamPool"
+	maxPublicImagesPerOS              = 200
+	defaultUbuntuImages               = 12
+	defaultDebianImages               = 8
 )
 
 type Client struct {
@@ -112,6 +120,22 @@ type InstanceTypeInfo struct {
 	MemoryMiB    int    `json:"memoryMiB" mapstructure:"memoryMiB"`
 }
 
+type GetMetricStatisticsInput struct {
+	Namespace  string
+	MetricName string
+	InstanceID string
+	StartTime  time.Time
+	EndTime    time.Time
+	Period     int
+	Statistic  string
+}
+
+type CloudWatchDatapoint struct {
+	Timestamp string
+	Average   float64
+	Sum       float64
+}
+
 type RunInstancesOutput struct {
 	RequestID  string `json:"requestId" mapstructure:"requestId"`
 	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
@@ -135,6 +159,62 @@ type StartInstancesOutput struct {
 	RequestID  string `json:"requestId" mapstructure:"requestId"`
 	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
 	State      string `json:"state" mapstructure:"state"`
+}
+
+type AllocateAddressInput struct {
+	PublicIPv4Pool        string
+	CustomerOwnedIPv4Pool string
+	IpamPoolID            string
+	Address               string
+	Tags                  []common.Tag
+}
+
+type AllocateAddressOutput struct {
+	RequestID    string `json:"requestId,omitempty" mapstructure:"requestId"`
+	AllocationID string `json:"allocationId" mapstructure:"allocationId"`
+	PublicIP     string `json:"publicIp" mapstructure:"publicIp"`
+	Domain       string `json:"domain" mapstructure:"domain"`
+	Region       string `json:"region" mapstructure:"region"`
+}
+
+type AssociateAddressInput struct {
+	AllocationID       string
+	InstanceID         string
+	NetworkInterfaceID string
+	AllowReassociation bool
+}
+
+type AssociateAddressOutput struct {
+	RequestID     string `json:"requestId,omitempty" mapstructure:"requestId"`
+	AssociationID string `json:"associationId" mapstructure:"associationId"`
+	Region        string `json:"region" mapstructure:"region"`
+}
+
+type ElasticIP struct {
+	AllocationID  string `json:"allocationId" mapstructure:"allocationId"`
+	AssociationID string `json:"associationId,omitempty" mapstructure:"associationId"`
+	PublicIP      string `json:"publicIp" mapstructure:"publicIp"`
+	InstanceID    string `json:"instanceId,omitempty" mapstructure:"instanceId"`
+	Domain        string `json:"domain" mapstructure:"domain"`
+}
+
+type PublicIPv4Pool struct {
+	PoolID      string `json:"poolId" mapstructure:"poolId"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
+}
+
+type CustomerOwnedIPv4Pool struct {
+	PoolID                   string `json:"poolId" mapstructure:"poolId"`
+	LocalGatewayRouteTableID string `json:"localGatewayRouteTableId,omitempty" mapstructure:"localGatewayRouteTableId"`
+}
+
+type IpamPool struct {
+	PoolID                 string `json:"ipamPoolId" mapstructure:"ipamPoolId"`
+	Description            string `json:"description,omitempty" mapstructure:"description"`
+	AddressFamily          string `json:"addressFamily" mapstructure:"addressFamily"`
+	PubliclyAdvertisable   bool   `json:"publiclyAdvertisable" mapstructure:"publiclyAdvertisable"`
+	Locale                 string `json:"locale,omitempty" mapstructure:"locale"`
+	AllocationResourceType string `json:"allocationResourceType,omitempty" mapstructure:"allocationResourceType"`
 }
 
 type CreateImageInput struct {
@@ -582,6 +662,83 @@ func (c *Client) RebootInstances(instanceID string) error {
 	return nil
 }
 
+func (c *Client) ModifyInstanceType(instanceID, instanceType string) error {
+	params := url.Values{}
+	params.Set("InstanceId", strings.TrimSpace(instanceID))
+	params.Set("InstanceType.Value", strings.TrimSpace(instanceType))
+
+	response := modifyInstanceAttributeResponse{}
+	if err := c.postForm("ModifyInstanceAttribute", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ModifyInstanceAttribute returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) ModifySecurityGroups(instanceID string, groupIDs []string) error {
+	params := url.Values{}
+	params.Set("InstanceId", strings.TrimSpace(instanceID))
+
+	index := 1
+	for _, id := range groupIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("GroupId.%d", index), trimmed)
+		index++
+	}
+
+	response := modifyInstanceAttributeResponse{}
+	if err := c.postForm("ModifyInstanceAttribute", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ModifyInstanceAttribute for security groups returned false")
+	}
+
+	return nil
+}
+
+// GetMetricStatistics retrieves CloudWatch metric data points for an EC2 instance.
+// Statistic should be "Average" for CPU/memory metrics, "Sum" for network metrics.
+func (c *Client) GetMetricStatistics(input GetMetricStatisticsInput) ([]CloudWatchDatapoint, error) {
+	params := url.Values{}
+	params.Set("Namespace", input.Namespace)
+	params.Set("MetricName", input.MetricName)
+	params.Set("Dimensions.member.1.Name", "InstanceId")
+	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
+	params.Set("StartTime", input.StartTime.UTC().Format(time.RFC3339))
+	params.Set("EndTime", input.EndTime.UTC().Format(time.RFC3339))
+	params.Set("Period", fmt.Sprintf("%d", input.Period))
+	params.Set("Statistics.member.1", input.Statistic)
+
+	response := getMetricStatisticsResponse{}
+	if err := c.postCloudWatchForm("GetMetricStatistics", params, &response); err != nil {
+		return nil, err
+	}
+
+	points := make([]CloudWatchDatapoint, 0, len(response.Datapoints))
+	for _, dp := range response.Datapoints {
+		points = append(points, CloudWatchDatapoint{
+			Timestamp: dp.Timestamp,
+			Average:   dp.Average,
+			Sum:       dp.Sum,
+		})
+	}
+
+	return points, nil
+}
+
+func (c *Client) postCloudWatchForm(action string, params url.Values, out any) error {
+	return c.postSignedForm(cloudWatchServiceName, cloudWatchAPIVersion, action, params, out)
+}
+
 func (c *Client) StartInstances(instanceID string) (*StartInstancesOutput, error) {
 	params := url.Values{}
 	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
@@ -601,6 +758,279 @@ func (c *Client) StartInstances(instanceID string) (*StartInstancesOutput, error
 		InstanceID: instance.InstanceID,
 		State:      instance.CurrentState.Name,
 	}, nil
+}
+
+func (c *Client) AllocateAddress(input AllocateAddressInput) (*AllocateAddressOutput, error) {
+	params := url.Values{}
+	params.Set("Domain", "vpc")
+
+	if pool := strings.TrimSpace(input.PublicIPv4Pool); pool != "" {
+		params.Set("PublicIpv4Pool", pool)
+	}
+	if pool := strings.TrimSpace(input.CustomerOwnedIPv4Pool); pool != "" {
+		params.Set("CustomerOwnedIpv4Pool", pool)
+	}
+	if pool := strings.TrimSpace(input.IpamPoolID); pool != "" {
+		params.Set("IpamPoolId", pool)
+	}
+	if address := strings.TrimSpace(input.Address); address != "" {
+		params.Set("Address", address)
+	}
+	if len(input.Tags) > 0 {
+		params.Set("TagSpecification.1.ResourceType", "elastic-ip")
+		for i, tag := range input.Tags {
+			prefix := fmt.Sprintf("TagSpecification.1.Tag.%d.", i+1)
+			params.Set(prefix+"Key", tag.Key)
+			params.Set(prefix+"Value", tag.Value)
+		}
+	}
+
+	response := allocateAddressResponse{}
+	if err := c.postForm("AllocateAddress", params, &response); err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(response.AllocationID) == "" {
+		return nil, fmt.Errorf("response did not include allocation ID")
+	}
+
+	return &AllocateAddressOutput{
+		RequestID:    response.RequestID,
+		AllocationID: response.AllocationID,
+		PublicIP:     response.PublicIP,
+		Domain:       response.Domain,
+		Region:       c.region,
+	}, nil
+}
+
+func (c *Client) ReleaseAddress(allocationID string) error {
+	params := url.Values{}
+	params.Set("AllocationId", strings.TrimSpace(allocationID))
+
+	response := releaseAddressResponse{}
+	if err := c.postForm("ReleaseAddress", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("ReleaseAddress returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) AssociateAddress(input AssociateAddressInput) (*AssociateAddressOutput, error) {
+	params := url.Values{}
+	params.Set("AllocationId", strings.TrimSpace(input.AllocationID))
+
+	if input.AllowReassociation {
+		params.Set("AllowReassociation", "true")
+	}
+
+	instanceID := strings.TrimSpace(input.InstanceID)
+	networkInterfaceID := strings.TrimSpace(input.NetworkInterfaceID)
+	if instanceID != "" {
+		params.Set("InstanceId", instanceID)
+	}
+	if networkInterfaceID != "" {
+		params.Set("NetworkInterfaceId", networkInterfaceID)
+	}
+
+	response := associateAddressResponse{}
+	if err := c.postForm("AssociateAddress", params, &response); err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(response.AssociationID) == "" {
+		return nil, fmt.Errorf("response did not include association ID")
+	}
+
+	return &AssociateAddressOutput{
+		RequestID:     response.RequestID,
+		AssociationID: response.AssociationID,
+		Region:        c.region,
+	}, nil
+}
+
+func (c *Client) DisassociateAddress(associationID string) error {
+	params := url.Values{}
+	params.Set("AssociationId", strings.TrimSpace(associationID))
+
+	response := disassociateAddressResponse{}
+	if err := c.postForm("DisassociateAddress", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("DisassociateAddress returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) ListAddresses() ([]ElasticIP, error) {
+	response := describeAddressesResponse{}
+	if err := c.postForm("DescribeAddresses", url.Values{}, &response); err != nil {
+		return nil, err
+	}
+
+	addresses := make([]ElasticIP, 0, len(response.Addresses))
+	for _, address := range response.Addresses {
+		allocationID := strings.TrimSpace(address.AllocationID)
+		if allocationID == "" {
+			continue
+		}
+
+		addresses = append(addresses, ElasticIP{
+			AllocationID:  allocationID,
+			AssociationID: strings.TrimSpace(address.AssociationID),
+			PublicIP:      strings.TrimSpace(address.PublicIP),
+			InstanceID:    strings.TrimSpace(address.InstanceID),
+			Domain:        strings.TrimSpace(address.Domain),
+		})
+	}
+
+	return addresses, nil
+}
+
+func (c *Client) ListPublicIPv4Pools() ([]PublicIPv4Pool, error) {
+	pools := []PublicIPv4Pool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "10")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describePublicIpv4PoolsResponse{}
+		if err := c.postForm("DescribePublicIpv4Pools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			poolID := strings.TrimSpace(pool.PoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, PublicIPv4Pool{
+				PoolID:      poolID,
+				Description: strings.TrimSpace(pool.Description),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func (c *Client) ListCustomerOwnedIPv4Pools() ([]CustomerOwnedIPv4Pool, error) {
+	pools := []CustomerOwnedIPv4Pool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeCoipPoolsResponse{}
+		if err := c.postForm("DescribeCoipPools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			poolID := strings.TrimSpace(pool.PoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, CustomerOwnedIPv4Pool{
+				PoolID:                   poolID,
+				LocalGatewayRouteTableID: strings.TrimSpace(pool.LocalGatewayRouteTableID),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func (c *Client) ListIpamPoolsForElasticIP() ([]IpamPool, error) {
+	pools := []IpamPool{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeIpamPoolsResponse{}
+		if err := c.postForm("DescribeIpamPools", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, pool := range response.Pools {
+			if !isIpamPoolForElasticIP(pool, c.region) {
+				continue
+			}
+
+			poolID := strings.TrimSpace(pool.IpamPoolID)
+			if poolID == "" {
+				continue
+			}
+
+			pools = append(pools, IpamPool{
+				PoolID:                 poolID,
+				Description:            strings.TrimSpace(pool.Description),
+				AddressFamily:          strings.TrimSpace(pool.AddressFamily),
+				PubliclyAdvertisable:   pool.PubliclyAdvertisable,
+				Locale:                 strings.TrimSpace(pool.Locale),
+				AllocationResourceType: strings.TrimSpace(pool.AllocationResourceType),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return pools, nil
+}
+
+func isIpamPoolForElasticIP(pool xmlIpamPool, region string) bool {
+	if !strings.EqualFold(strings.TrimSpace(pool.AddressFamily), "ipv4") {
+		return false
+	}
+	if !pool.PubliclyAdvertisable {
+		return false
+	}
+
+	locale := strings.TrimSpace(pool.Locale)
+	if locale != "" && locale != region {
+		return false
+	}
+
+	allocationType := strings.TrimSpace(pool.AllocationResourceType)
+	if allocationType != "" && !strings.EqualFold(allocationType, "ec2") {
+		return false
+	}
+
+	return true
 }
 
 func (c *Client) ListSubnets() ([]Subnet, error) {
@@ -1518,6 +1948,78 @@ type startInstancesResponse struct {
 	Instances []xmlInstanceStateChange `xml:"instancesSet>item"`
 }
 
+type allocateAddressResponse struct {
+	RequestID    string `xml:"requestId"`
+	PublicIP     string `xml:"publicIp"`
+	Domain       string `xml:"domain"`
+	AllocationID string `xml:"allocationId"`
+}
+
+type releaseAddressResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type associateAddressResponse struct {
+	RequestID     string `xml:"requestId"`
+	AssociationID string `xml:"associationId"`
+}
+
+type disassociateAddressResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type describeAddressesResponse struct {
+	RequestID string       `xml:"requestId"`
+	Addresses []xmlAddress `xml:"addressesSet>item"`
+}
+
+type xmlAddress struct {
+	PublicIP      string `xml:"publicIp"`
+	AllocationID  string `xml:"allocationId"`
+	AssociationID string `xml:"associationId"`
+	InstanceID    string `xml:"instanceId"`
+	Domain        string `xml:"domain"`
+}
+
+type describePublicIpv4PoolsResponse struct {
+	RequestID string              `xml:"requestId"`
+	Pools     []xmlPublicIpv4Pool `xml:"publicIpv4PoolSet>item"`
+	NextToken string              `xml:"nextToken"`
+}
+
+type xmlPublicIpv4Pool struct {
+	PoolID      string `xml:"poolId"`
+	Description string `xml:"description"`
+}
+
+type describeCoipPoolsResponse struct {
+	RequestID string        `xml:"requestId"`
+	Pools     []xmlCoipPool `xml:"coipPoolSet>item"`
+	NextToken string        `xml:"nextToken"`
+}
+
+type xmlCoipPool struct {
+	PoolID                   string `xml:"poolId"`
+	LocalGatewayRouteTableID string `xml:"localGatewayRouteTableId"`
+}
+
+type describeIpamPoolsResponse struct {
+	RequestID string        `xml:"requestId"`
+	Pools     []xmlIpamPool `xml:"ipamPoolSet>item"`
+	NextToken string        `xml:"nextToken"`
+}
+
+type xmlIpamPool struct {
+	IpamPoolID             string `xml:"ipamPoolId"`
+	Description            string `xml:"description"`
+	AddressFamily          string `xml:"addressFamily"`
+	PubliclyAdvertisable   bool   `xml:"publiclyAdvertisable"`
+	Locale                 string `xml:"locale"`
+	AllocationResourceType string `xml:"allocationResourceType"`
+}
+
 type xmlInstanceStateChange struct {
 	InstanceID   string `xml:"instanceId"`
 	CurrentState struct {
@@ -1561,6 +2063,21 @@ type createSecurityGroupResponse struct {
 type authorizeSecurityGroupIngressResponse struct {
 	RequestID string `xml:"requestId"`
 	Return    bool   `xml:"return"`
+}
+
+type modifyInstanceAttributeResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type getMetricStatisticsResponse struct {
+	Datapoints []xmlCloudWatchDatapoint `xml:"GetMetricStatisticsResult>Datapoints>member"`
+}
+
+type xmlCloudWatchDatapoint struct {
+	Timestamp string  `xml:"Timestamp"`
+	Average   float64 `xml:"Average"`
+	Sum       float64 `xml:"Sum"`
 }
 
 type describeKeyPairsResponse struct {
@@ -1857,4 +2374,253 @@ func publicImageResourceName(image Image) string {
 	}
 
 	return fmt.Sprintf("%s (%s, %s)", name, image.ImageID, architecture)
+}
+
+// ── CloudWatch alarm types and methods ──────────────────────────────────────
+
+type PutMetricAlarmInput struct {
+	AlarmName          string
+	AlarmDescription   string
+	InstanceID         string
+	MetricName         string
+	Statistic          string
+	Period             int
+	EvaluationPeriods  int
+	Threshold          float64
+	ComparisonOperator string
+	TreatMissingData   string
+	// AlarmActions is a list of ARNs to invoke when the alarm enters ALARM state.
+	// Entries may be SNS topic ARNs or EC2 automation ARNs
+	// (arn:aws:automate:<region>:ec2:recover|reboot|stop|terminate).
+	AlarmActions []string
+}
+
+type MetricAlarm struct {
+	AlarmName          string           `json:"alarmName" mapstructure:"alarmName"`
+	AlarmArn           string           `json:"alarmArn" mapstructure:"alarmArn"`
+	AlarmDescription   string           `json:"alarmDescription" mapstructure:"alarmDescription"`
+	Namespace          string           `json:"namespace" mapstructure:"namespace"`
+	MetricName         string           `json:"metricName" mapstructure:"metricName"`
+	Statistic          string           `json:"statistic" mapstructure:"statistic"`
+	Period             int              `json:"period" mapstructure:"period"`
+	EvaluationPeriods  int              `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
+	Threshold          float64          `json:"threshold" mapstructure:"threshold"`
+	ComparisonOperator string           `json:"comparisonOperator" mapstructure:"comparisonOperator"`
+	StateValue         string           `json:"stateValue" mapstructure:"stateValue"`
+	StateReason        string           `json:"stateReason" mapstructure:"stateReason"`
+	TreatMissingData   string           `json:"treatMissingData" mapstructure:"treatMissingData"`
+	Dimensions         []AlarmDimension `json:"dimensions" mapstructure:"dimensions"`
+	Region             string           `json:"region" mapstructure:"region"`
+}
+
+type AlarmDimension struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
+type describeAlarmsResponse struct {
+	XMLName xml.Name             `xml:"DescribeAlarmsResponse"`
+	Result  describeAlarmsResult `xml:"DescribeAlarmsResult"`
+}
+
+type describeAlarmsResult struct {
+	MetricAlarms []xmlMetricAlarm `xml:"MetricAlarms>member"`
+	NextToken    string           `xml:"NextToken"`
+}
+
+type xmlMetricAlarm struct {
+	AlarmName          string              `xml:"AlarmName"`
+	AlarmArn           string              `xml:"AlarmArn"`
+	AlarmDescription   string              `xml:"AlarmDescription"`
+	Namespace          string              `xml:"Namespace"`
+	MetricName         string              `xml:"MetricName"`
+	Statistic          string              `xml:"Statistic"`
+	Period             int                 `xml:"Period"`
+	EvaluationPeriods  int                 `xml:"EvaluationPeriods"`
+	Threshold          float64             `xml:"Threshold"`
+	ComparisonOperator string              `xml:"ComparisonOperator"`
+	StateValue         string              `xml:"StateValue"`
+	StateReason        string              `xml:"StateReason"`
+	TreatMissingData   string              `xml:"TreatMissingData"`
+	Dimensions         []xmlAlarmDimension `xml:"Dimensions>member"`
+}
+
+type xmlAlarmDimension struct {
+	Name  string `xml:"Name"`
+	Value string `xml:"Value"`
+}
+
+func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
+	params := url.Values{}
+	params.Set("AlarmName", strings.TrimSpace(input.AlarmName))
+	params.Set("Namespace", alarmNamespaceEC2)
+	params.Set("MetricName", strings.TrimSpace(input.MetricName))
+	params.Set("Dimensions.member.1.Name", "InstanceId")
+	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
+
+	statistic := strings.TrimSpace(input.Statistic)
+	if statistic == "" {
+		statistic = "Average"
+	}
+	params.Set("Statistic", statistic)
+	params.Set("ComparisonOperator", strings.TrimSpace(input.ComparisonOperator))
+	params.Set("Threshold", strconv.FormatFloat(input.Threshold, 'f', -1, 64))
+
+	period := input.Period
+	if period <= 0 {
+		period = 300
+	}
+	params.Set("Period", strconv.Itoa(period))
+
+	evaluationPeriods := input.EvaluationPeriods
+	if evaluationPeriods <= 0 {
+		evaluationPeriods = 1
+	}
+	params.Set("EvaluationPeriods", strconv.Itoa(evaluationPeriods))
+
+	description := strings.TrimSpace(input.AlarmDescription)
+	if description != "" {
+		params.Set("AlarmDescription", description)
+	}
+
+	treatMissing := strings.TrimSpace(input.TreatMissingData)
+	if treatMissing != "" {
+		params.Set("TreatMissingData", treatMissing)
+	}
+
+	for i, arn := range input.AlarmActions {
+		arn = strings.TrimSpace(arn)
+		if arn != "" {
+			params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
+		}
+	}
+
+	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "PutMetricAlarm", params, nil)
+}
+
+func (c *Client) DescribeAlarm(alarmName string) (*MetricAlarm, error) {
+	params := url.Values{}
+	params.Set("AlarmNames.member.1", strings.TrimSpace(alarmName))
+
+	response := describeAlarmsResponse{}
+	if err := c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DescribeAlarms", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Result.MetricAlarms) == 0 {
+		return nil, fmt.Errorf("alarm not found: %s", alarmName)
+	}
+
+	return alarmFromXML(response.Result.MetricAlarms[0], c.region), nil
+}
+
+func (c *Client) ListAlarms() ([]MetricAlarm, error) {
+	return c.listAlarms(url.Values{})
+}
+
+func (c *Client) ListAlarmsForInstance(instanceID string) ([]MetricAlarm, error) {
+	all, err := c.listAlarms(url.Values{})
+	if err != nil {
+		return nil, err
+	}
+
+	target := strings.TrimSpace(instanceID)
+	filtered := make([]MetricAlarm, 0, len(all))
+	for _, alarm := range all {
+		for _, dim := range alarm.Dimensions {
+			if dim.Name == "InstanceId" && dim.Value == target {
+				filtered = append(filtered, alarm)
+				break
+			}
+		}
+	}
+
+	return filtered, nil
+}
+
+func (c *Client) listAlarms(base url.Values) ([]MetricAlarm, error) {
+	alarms := []MetricAlarm{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		for k, vs := range base {
+			params[k] = vs
+		}
+		params.Set("MaxRecords", "100")
+
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeAlarmsResponse{}
+		if err := c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DescribeAlarms", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, xmlAlarm := range response.Result.MetricAlarms {
+			alarms = append(alarms, *alarmFromXML(xmlAlarm, c.region))
+		}
+
+		nextToken = strings.TrimSpace(response.Result.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return alarms, nil
+}
+
+func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
+	dimensions := make([]AlarmDimension, 0, len(x.Dimensions))
+	for _, d := range x.Dimensions {
+		dimensions = append(dimensions, AlarmDimension{Name: d.Name, Value: d.Value})
+	}
+
+	return &MetricAlarm{
+		AlarmName:          x.AlarmName,
+		AlarmArn:           x.AlarmArn,
+		AlarmDescription:   x.AlarmDescription,
+		Namespace:          x.Namespace,
+		MetricName:         x.MetricName,
+		Statistic:          x.Statistic,
+		Period:             x.Period,
+		EvaluationPeriods:  x.EvaluationPeriods,
+		Threshold:          x.Threshold,
+		ComparisonOperator: x.ComparisonOperator,
+		StateValue:         x.StateValue,
+		StateReason:        x.StateReason,
+		TreatMissingData:   x.TreatMissingData,
+		Dimensions:         dimensions,
+		Region:             region,
+	}
+}
+
+func alarmToMap(alarm *MetricAlarm) map[string]any {
+	if alarm == nil {
+		return map[string]any{}
+	}
+
+	dims := make([]map[string]any, 0, len(alarm.Dimensions))
+	for _, d := range alarm.Dimensions {
+		dims = append(dims, map[string]any{"name": d.Name, "value": d.Value})
+	}
+
+	return map[string]any{
+		"alarmName":          alarm.AlarmName,
+		"alarmArn":           alarm.AlarmArn,
+		"alarmDescription":   alarm.AlarmDescription,
+		"namespace":          alarm.Namespace,
+		"metricName":         alarm.MetricName,
+		"statistic":          alarm.Statistic,
+		"period":             alarm.Period,
+		"evaluationPeriods":  alarm.EvaluationPeriods,
+		"threshold":          alarm.Threshold,
+		"comparisonOperator": alarm.ComparisonOperator,
+		"stateValue":         alarm.StateValue,
+		"stateReason":        alarm.StateReason,
+		"treatMissingData":   alarm.TreatMissingData,
+		"dimensions":         dims,
+		"region":             alarm.Region,
+	}
 }

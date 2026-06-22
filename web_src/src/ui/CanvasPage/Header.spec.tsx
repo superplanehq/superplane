@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
+import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { Header } from "./Header";
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -14,6 +16,10 @@ vi.mock("./components/CanvasProjectSwitcher", () => ({
 
 vi.mock("./components/CanvasToolSidebarTrigger", () => ({
   CanvasToolSidebarTrigger: () => null,
+}));
+
+vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
+  CanvasRunsSidebarTrigger: () => null,
 }));
 
 vi.mock("./components/CanvasModeToggle", () => ({
@@ -35,7 +41,31 @@ const toolSidebarState = {
   switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
-function renderHeader(mode: "runs" | "version-live") {
+const runsSidebarState = {
+  isRunsSidebarOpen: true,
+  showRunsSidebarToggle: true,
+  handleRunsSidebarToggle: vi.fn(),
+  openRunsSidebar: vi.fn(),
+  closeRunsSidebar: vi.fn(),
+} satisfies CanvasRunsSidebarState;
+
+const versionsSidebarState = {
+  isVersionsSidebarOpen: false,
+  showVersionsSidebarToggle: true,
+  handleVersionsSidebarToggle: vi.fn(),
+  openVersionsSidebar: vi.fn(),
+  closeVersionsSidebar: vi.fn(),
+} satisfies CanvasVersionsSidebarState;
+
+function renderHeader(
+  mode: "version-live" | "version-edit" | "versions",
+  options?: {
+    isEditing?: boolean;
+    activeDraftBranchLabel?: string;
+    onExitEditMode?: () => void;
+    canvasName?: string;
+  },
+) {
   render(
     <MemoryRouter initialEntries={["/org/org-1/app/canvas-1"]}>
       <Routes>
@@ -43,10 +73,15 @@ function renderHeader(mode: "runs" | "version-live") {
           path="/org/:organizationId/app/:appId"
           element={
             <Header
-              canvasName="Test Canvas"
+              canvasName={options && "canvasName" in options ? options.canvasName : "Test Canvas"}
               mode={mode}
+              isEditing={options?.isEditing}
+              activeDraftBranchLabel={options?.activeDraftBranchLabel}
               onEnterEditMode={vi.fn()}
+              onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
+              runsSidebarState={runsSidebarState}
+              versionsSidebarState={versionsSidebarState}
             />
           }
         />
@@ -56,15 +91,31 @@ function renderHeader(mode: "runs" | "version-live") {
 }
 
 describe("Header", () => {
-  it("hides enter edit actions in runs mode", () => {
-    renderHeader("runs");
+  it("shows enter edit actions on the live canvas tab", () => {
+    renderHeader("version-live");
+
+    expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
+  });
+
+  it("hides enter edit actions on the versions tab", () => {
+    renderHeader("versions");
 
     expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 
-  it("shows enter edit actions outside runs mode", () => {
-    renderHeader("version-live");
+  it("renders without crashing when canvasName is undefined", () => {
+    expect(() => renderHeader("version-live", { canvasName: undefined })).not.toThrow();
+  });
 
-    expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
+  it("shows the active draft label and exit control in edit mode", () => {
+    renderHeader("version-edit", {
+      isEditing: true,
+      activeDraftBranchLabel: "Draft #1",
+      onExitEditMode: vi.fn(),
+    });
+
+    expect(screen.getByTestId("active-draft-branch-chip")).toHaveTextContent("Editing: Draft #1");
+    expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Exit edit");
+    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 });

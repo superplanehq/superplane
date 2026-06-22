@@ -30,7 +30,6 @@ These are the ports you can override per repo:
 | Purpose | Env var | Example (A) | Example (B) |
 | --- | --- | --- | --- |
 | Public API | `PUBLIC_API_PORT` | `8000` | `8001` |
-| Internal gRPC | `INTERNAL_API_PORT` | `50051` | `50052` |
 | Vite dev server | `VITE_DEV_PORT` | `5173` | `5174` |
 | Vite preview | `VITE_PREVIEW_PORT` | `4173` | `4174` |
 | Storybook | `STORYBOOK_PORT` | `6006` | `6007` |
@@ -39,5 +38,6 @@ These are the ports you can override per repo:
 | PgWeb | `PGWEB_PORT` | `8081` | `8082` |
 | RabbitMQ | `RABBITMQ_PORT` | `5672` | `5673` |
 | RabbitMQ UI | `RABBITMQ_MANAGEMENT_PORT` | `15672` | `15673` |
+| pprof | `PPROF_PORT` | `6060` | `6061` |
 | Base URL | `BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |
 | Webhooks base URL | `WEBHOOKS_BASE_URL` | `http://localhost:8000` | `http://localhost:8001` |

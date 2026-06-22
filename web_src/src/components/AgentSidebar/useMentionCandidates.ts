@@ -3,6 +3,8 @@ import type { MentionCandidate } from "./MentionDropdown";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 
+const emptyMentionCandidates: MentionCandidate[] = [];
+
 function timeAgo(dateStr?: string): string {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -45,12 +47,17 @@ export function useMentionCandidates(
   nodes: SuperplaneComponentsNode[] | undefined,
   runs: CanvasesCanvasRun[] | undefined,
   filter: string,
+  enabled = true,
 ): MentionCandidate[] {
   return useMemo(() => {
+    if (!enabled) {
+      return emptyMentionCandidates;
+    }
+
     const filterLower = filter.toLowerCase();
     return [
       ...(nodes ? buildNodeCandidates(nodes, filterLower) : []),
       ...(runs ? buildRunCandidates(runs, filterLower) : []),
     ];
-  }, [nodes, runs, filter]);
+  }, [nodes, runs, filter, enabled]);
 }

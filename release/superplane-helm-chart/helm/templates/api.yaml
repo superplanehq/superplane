@@ -67,12 +67,10 @@ spec:
                 name: {{ include "secrets.session.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.dash0Web.name" . }}
           env:
             - name: START_PUBLIC_API
-              value: "yes"
-            - name: START_INTERNAL_API
-              value: "yes"
-            - name: START_GRPC_GATEWAY
               value: "yes"
             - name: START_EVENT_DISTRIBUTER
               value: "yes"

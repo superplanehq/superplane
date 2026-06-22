@@ -293,6 +293,171 @@ func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
 	assert.Contains(t, err.Error(), "namespace")
 }
 
+func TestValidateMarkdownVariables_MemoryListMode(t *testing.T) {
+	// `mode: list` is the new opt-in that resolves the variable to every
+	// matching memory row so authors can use CEL list macros. We exercise
+	// the validator across the documented happy/sad paths so YAML diffs and
+	// the FE editor surface the same errors.
+	build := func(source map[string]any) ConsolePanel {
+		return ConsolePanel{
+			ID:   "p1",
+			Type: ConsolePanelTypeMarkdown,
+			Content: map[string]any{
+				"variables": []any{
+					map[string]any{"name": "rows", "source": source},
+				},
+			},
+		}
+	}
+
+	t.Run("accepts mode: list with no limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list",
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts mode: list with an integer limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 25,
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts mode: list with a whole-number float64 limit (YAML decoder shape)", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": float64(10),
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects an unknown mode", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "many",
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mode")
+	})
+
+	t.Run("rejects a non-numeric limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": "5",
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+
+	t.Run("rejects a fractional limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 1.5,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+
+	t.Run("rejects a zero / negative limit", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": 0,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+
+		err = validateMarkdownContent(build(map[string]any{
+			"kind": "memory", "namespace": "n", "mode": "list", "limit": -3,
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "limit")
+	})
+}
+
+func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeHTML,
+		Content: map[string]any{
+			"title": "Status",
+			"body":  `<div class="p-2"><strong>{{ rec.status }}</strong></div>`,
+			"variables": []any{
+				map[string]any{
+					"name":   "rec",
+					"source": map[string]any{"kind": "memory", "namespace": "deploys"},
+				},
+			},
+		},
+	}
+	assert.NoError(t, validateHTMLContent(panel))
+}
+
+func TestValidateHTMLContent_RejectsNonStringBody(t *testing.T) {
+	panel := ConsolePanel{
+		ID:      "p1",
+		Type:    ConsolePanelTypeHTML,
+		Content: map[string]any{"body": 42},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.body must be a string")
+}
+
+func TestValidateHTMLContent_RejectsNonStringTitle(t *testing.T) {
+	panel := ConsolePanel{
+		ID:      "p1",
+		Type:    ConsolePanelTypeHTML,
+		Content: map[string]any{"title": 42},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.title must be a string")
+}
+
+func TestValidateHTMLContent_PropagatesVariableValidation(t *testing.T) {
+	panel := ConsolePanel{
+		ID:   "p1",
+		Type: ConsolePanelTypeHTML,
+		Content: map[string]any{
+			"variables": []any{
+				map[string]any{
+					"name":   "1bad",
+					"source": map[string]any{"kind": "memory", "namespace": "n"},
+				},
+			},
+		},
+	}
+	err := validateHTMLContent(panel)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "valid identifier")
+}
+
+func TestConsoleFromYML_AcceptsHTMLPanel(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: html-1
+      type: html
+      content:
+        title: Status
+        body: '<div class="p-2"><strong>{{ rec.status }}</strong></div>'
+        variables:
+          - name: rec
+            source:
+              kind: memory
+              namespace: deploys
+  layout:
+    - i: html-1
+      x: 0
+      y: 0
+      w: 6
+      h: 3
+`
+
+	resource, err := ConsoleFromYML([]byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, resource.Spec.Panels, 1)
+	assert.Equal(t, ConsolePanelTypeHTML, resource.Spec.Panels[0].Type)
+}
+
 func TestDashboardFromYML_AcceptsMarkdownVariables(t *testing.T) {
 	yaml := `apiVersion: v1
 kind: Console
@@ -838,6 +1003,60 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "render.seriesField must be a string",
 		},
+		{
+			name: "chart xFormat must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":    "chart",
+						"type":    "bar",
+						"xField":  "createdAt",
+						"xFormat": 7,
+						"series":  []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.xFormat must be a string",
+		},
+		{
+			name: "chart yLabel must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"yLabel": false,
+						"series": []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.yLabel must be a string",
+		},
+		{
+			name: "chart yFormat must be a string",
+			panel: ConsolePanel{
+				ID:   "chart",
+				Type: ConsolePanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":    "chart",
+						"type":    "bar",
+						"xField":  "service",
+						"yFormat": 1.5,
+						"series":  []any{map[string]any{"field": "cost"}},
+					},
+				},
+			},
+			contains: "render.yFormat must be a string",
+		},
 	}
 
 	for _, tt := range tests {
@@ -864,6 +1083,30 @@ func TestValidateConsoleContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) 
 						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
 					},
 					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "chart",
+			Type: ConsolePanelTypeChart,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":    "chart",
+					"type":    "bar",
+					"xField":  "createdAt",
+					"xFormat": "date",
+					"yLabel":  "USD",
+					"yFormat": "number",
+					"series":  []any{map[string]any{"field": "cost", "label": "Cost", "prefix": "$"}},
 				},
 			},
 		},

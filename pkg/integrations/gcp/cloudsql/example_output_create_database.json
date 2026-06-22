@@ -1,0 +1,12 @@
+{
+  "data": {
+    "name": "app_db",
+    "instance": "my-instance",
+    "project": "my-project",
+    "charset": "UTF8",
+    "collation": "en_US.UTF8",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance/databases/app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}

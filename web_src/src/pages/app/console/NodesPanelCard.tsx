@@ -22,6 +22,7 @@ interface NodesPanelCardProps {
   readOnly: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onEditingChange?: (editing: boolean) => void;
 }
 
 /**
@@ -34,9 +35,13 @@ interface NodesPanelCardProps {
  * mirror the single-node panel so authorization and runtime behavior stay
  * consistent across both panel types.
  */
-export function NodesPanelCard({ panel, readOnly, onDelete, onChange }: NodesPanelCardProps) {
+export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: NodesPanelCardProps) {
   const [editing, setEditing] = useState(false);
   const content = normalizeContent(panel.content);
+  const setEditingState = (next: boolean) => {
+    setEditing(next);
+    onEditingChange?.(next);
+  };
 
   return (
     <>
@@ -44,14 +49,14 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange }: NodesPan
         title={content.title}
         fallbackTitle={panel.id}
         readOnly={readOnly}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setEditingState(true)}
         onDelete={onDelete}
       >
         <NodesPanelBody content={content} />
       </TypedPanelShell>
       <PanelEditorDialog<NodesPanelContent>
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={setEditingState}
         panelId={panel.id}
         panelType="nodes"
         initialContent={content}

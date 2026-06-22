@@ -1,7 +1,5 @@
-import { meMe } from "@/api-client";
 import type { AuthorizationPermission } from "@/api-client";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { useQuery } from "@tanstack/react-query";
+import { useMe } from "@/hooks/useMe";
 import { useCallback, useEffect, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { COMMAND_SHORTCUT } from "./constants";
@@ -9,18 +7,10 @@ import { subscribeToOpenCommandPalette } from "./controller";
 import { isEditableTarget } from "./route";
 import type { CommandPage } from "./types";
 
-export function usePalettePermissions(organizationId: string | null, enabled: boolean) {
-  const { data: permissions = [], isLoading } = useQuery({
-    queryKey: ["command-palette", "permissions", organizationId],
-    queryFn: async () => {
-      const response = await meMe(withOrganizationHeader({ organizationId, query: { includePermissions: true } }));
-      return response.data?.user?.permissions || [];
-    },
-    enabled: enabled && !!organizationId,
-    staleTime: 5 * 60 * 1000,
-  });
+export function usePalettePermissions(organizationId: string | null) {
+  const { data: me, isLoading } = useMe(true, organizationId);
 
-  const permissionSet = useMemo(() => toPermissionSet(permissions), [permissions]);
+  const permissionSet = useMemo(() => toPermissionSet(me?.permissions ?? []), [me?.permissions]);
 
   const canAct = useCallback(
     (resource: string, action: string) => {
@@ -35,6 +25,8 @@ export function usePalettePermissions(organizationId: string | null, enabled: bo
 }
 
 export function useCommandPaletteShortcuts({
+  canvasId,
+  organizationId,
   createCanvas,
   createCanvasDisabled,
   enabled,
@@ -45,6 +37,8 @@ export function useCommandPaletteShortcuts({
   setPage,
   setSearch,
 }: {
+  canvasId: string | null;
+  organizationId: string | null;
   createCanvas: () => Promise<void>;
   createCanvasDisabled: boolean;
   enabled: boolean;
@@ -76,6 +70,12 @@ export function useCommandPaletteShortcuts({
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
 
+      if (canToggleCommandPalette({ canvasId, event, open, organizationId, usesModifier })) {
+        event.preventDefault();
+        setOpen((prev) => !prev);
+        return;
+      }
+
       if (usesModifier && event.key === COMMAND_SHORTCUT && !isEditableTarget(event.target)) {
         if (createCanvasDisabled) return;
         event.preventDefault();
@@ -91,7 +91,7 @@ export function useCommandPaletteShortcuts({
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [createCanvas, createCanvasDisabled, enabled, open, page, search, setOpen, setPage]);
+  }, [canvasId, organizationId, createCanvas, createCanvasDisabled, enabled, open, page, search, setOpen, setPage]);
 }
 
 function toPermissionSet(permissions: AuthorizationPermission[]) {
@@ -105,4 +105,24 @@ function toPermissionSet(permissions: AuthorizationPermission[]) {
       })
       .filter((value): value is string => !!value),
   );
+}
+
+function canToggleCommandPalette({
+  canvasId,
+  event,
+  open,
+  organizationId,
+  usesModifier,
+}: {
+  canvasId: string | null;
+  event: KeyboardEvent;
+  open: boolean;
+  organizationId: string | null;
+  usesModifier: boolean;
+}) {
+  if (!usesModifier) return false;
+  if (event.key !== "k") return false;
+  if (canvasId) return false;
+  if (!organizationId) return false;
+  return open || !isEditableTarget(event.target);
 }

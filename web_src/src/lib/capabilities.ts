@@ -1,11 +1,11 @@
 import type {
   IntegrationsCapabilityDefinition,
   IntegrationsIntegrationDefinition,
-  SuperplaneActionsAction,
+  ActionsAction,
   TriggersTrigger,
 } from "@/api-client";
 
-export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): SuperplaneActionsAction[] {
+export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): ActionsAction[] {
   return capabilities
     .filter((capability) => capability.type === "TYPE_ACTION")
     .map((capability) => ({
@@ -14,6 +14,7 @@ export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefi
       description: capability.description,
       configuration: capability.configuration,
       outputChannels: capability.outputChannels,
+      exampleOutput: capability.exampleOutput,
     }));
 }
 
@@ -25,6 +26,7 @@ export function triggersFromCapabilities(capabilities: IntegrationsCapabilityDef
       label: capability.label,
       description: capability.description,
       configuration: capability.configuration,
+      exampleData: capability.exampleData,
     }));
 }
 

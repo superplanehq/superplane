@@ -34,7 +34,7 @@ import {
   useStoredOutcomeState,
   useThinkingIndicator,
 } from "./agentConversationState";
-import type { AgentMessage } from "./types";
+import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
@@ -42,6 +42,7 @@ type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  initialStatus: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
@@ -57,7 +58,7 @@ type DraftActionsBarProps = {
 };
 
 type ConversationHandlers = {
-  handleSend: (content: string) => Promise<void>;
+  handleSend: (content: string, images?: AgentOutgoingImage[]) => Promise<void>;
   handleStop: () => void;
   handleQuickAction: (action: string) => Promise<void>;
   handleStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => Promise<void>;
@@ -93,6 +94,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       chatId={chatId}
       canvasId={canvasId}
       organizationId={organizationId}
+      initialStatus={chatQuery.data?.status ?? "idle"}
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
@@ -104,6 +106,7 @@ function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  initialStatus,
   agentMode,
   onModeSwitch,
   isEditing,
@@ -112,13 +115,18 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
-  const [status, setStatus] = useState<string>("idle");
+  const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
   const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+
+  useEffect(() => {
+    setStatus(initialStatus || "idle");
+  }, [initialStatus]);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {
@@ -158,10 +166,14 @@ function ChatConversation({
     interruptMutation,
     sendMutation,
     setError,
+    setNotice,
     setOutcomeState,
   });
 
-  const wsCallbacks = useMemo(() => createWebsocketCallbacks(setStatus, setError, setOutcomeState), [setOutcomeState]);
+  const wsCallbacks = useMemo(
+    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+    [setOutcomeState],
+  );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
@@ -174,6 +186,7 @@ function ChatConversation({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
+        notice={notice}
         canvasId={canvasId}
         organizationId={organizationId}
         messageGroups={messageGroups}
@@ -210,7 +223,7 @@ function ChatConversation({
         sending={agentBusy}
         sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={statusLabel(status)}
+        statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={modeDisabled}
@@ -288,6 +301,7 @@ function useConversationHandlers({
   interruptMutation,
   sendMutation,
   setError,
+  setNotice,
   setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
@@ -296,6 +310,7 @@ function useConversationHandlers({
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   setError: (value: string | null) => void;
+  setNotice: (value: string | null) => void;
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void;
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
@@ -305,16 +320,17 @@ function useConversationHandlers({
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string, images?: AgentOutgoingImage[]) => {
       const { sendMutation: send } = mutationsRef.current;
-      if (!content.trim() || send.isPending) return;
+      if ((!content.trim() && (images?.length ?? 0) === 0) || send.isPending) return;
       setError(null);
-      await send.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
+      setNotice(null);
+      await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, setError],
+    [agentMode, chatId, setError, setNotice],
   );
 
   const handleStop = useCallback(() => {
@@ -375,6 +391,14 @@ function DraftActionsBar({
     onVersionPublished,
   });
 
+  useEffect(() => {
+    if (!latestDraft) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+  }, [canvasId, latestDraft]);
+
   if (!latestDraft) return null;
 
   return (
@@ -400,7 +424,7 @@ function ComposerWithCanvasData({
 }: {
   canvasId: string;
   organizationId: string;
-  onSend: (content: string) => Promise<void>;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
   sending: boolean;
   sendPending: boolean;

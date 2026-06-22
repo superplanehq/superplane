@@ -161,6 +161,280 @@ describe("celExpr", () => {
     });
   });
 
+  describe("parseJson builtin", () => {
+    // cel-js's grammar does not allow postfix `.foo` / `[i]` / `.method(...)`
+    // after a function call result. So `parseJson(blob).items` is a parse
+    // error. The builtin is still useful when composed with other functions
+    // (`size(...)`, `string(...)`, equality), or when the whole expression
+    // is `parseJson(value)` and the renderer consumes the structured result.
+    it("parses a JSON array string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(tags)");
+      expect(evalExpr(compiled, { tags: '["a","b"]' }, buildEnv())).toEqual(["a", "b"]);
+    });
+
+    it("parses a JSON object string and returns it wholesale", () => {
+      const compiled = compileExpr("parseJson(blob)");
+      const result = evalExpr(compiled, { blob: '{"items":[{"id":1}]}' }, buildEnv());
+      expect(result).toEqual({ items: [{ id: 1 }] });
+    });
+
+    it("composes with size() to count parsed elements", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: '["a","b","c"]' }, buildEnv())).toBe(3);
+    });
+
+    it("passes already-parsed values through unchanged", () => {
+      const compiled = compileExpr("size(parseJson(tags))");
+      expect(evalExpr(compiled, { tags: ["a", "b", "c"] }, buildEnv())).toBe(3);
+    });
+
+    it("returns null for malformed JSON so equality checks stay defined", () => {
+      const compiled = compileExpr("parseJson(bad) == null");
+      expect(evalExpr(compiled, { bad: "not json" }, buildEnv())).toBe(true);
+    });
+
+    it("returns null for null inputs without throwing", () => {
+      const compiled = compileExpr("parseJson(value)");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBeNull();
+    });
+
+    it("works inside templated interpolation when the whole expression is parseJson", () => {
+      const template = compileTemplate("Tags: {{ parseJson(blob) }}");
+      const result = evalTemplate(template, { blob: '["a","b"]' }, buildEnv(), String);
+      // Template stringify uses String() on the parsed value; nested objects
+      // serialize via JS's default Array#toString. Authors who need pretty
+      // formatting should compose `string()` or shape the data upstream.
+      expect(result).toBe("Tags: a,b");
+    });
+  });
+
+  describe("string trimming builtins", () => {
+    // These exist because cel-js doesn't allow postfix `[i]` / `.method()`
+    // after a function-call result. The user-facing requirement is "first
+    // line" / "first X chars" against runs data (raw multi-line outputs);
+    // each helper returns the scalar directly so authors don't need
+    // chaining the language can't parse.
+
+    describe("firstLine", () => {
+      it("returns the text before the first newline", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "hello\nworld\nbye" }, buildEnv())).toBe("hello");
+      });
+
+      it("treats CRLF and bare CR the same as LF", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "alpha\r\nbeta" }, buildEnv())).toBe("alpha");
+        expect(evalExpr(compiled, { message: "alpha\rbeta" }, buildEnv())).toBe("alpha");
+      });
+
+      it("returns the input unchanged when there is no newline", () => {
+        const compiled = compileExpr("firstLine(message)");
+        expect(evalExpr(compiled, { message: "single line" }, buildEnv())).toBe("single line");
+      });
+
+      it("returns empty string for null inputs", () => {
+        const compiled = compileExpr("firstLine(value)");
+        expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      });
+
+      it("composes with another builtin that takes a string", () => {
+        const compiled = compileExpr("upper(firstLine(message))");
+        expect(evalExpr(compiled, { message: "hello\nworld" }, buildEnv())).toBe("HELLO");
+      });
+    });
+
+    describe("substring", () => {
+      it("returns the first N characters when end is supplied", () => {
+        const compiled = compileExpr("substring(message, 0, 5)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello");
+      });
+
+      it("returns the tail when only start is supplied", () => {
+        const compiled = compileExpr("substring(message, 6)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("world");
+      });
+
+      it("clamps end past the string length", () => {
+        const compiled = compileExpr("substring(message, 0, 999)");
+        expect(evalExpr(compiled, { message: "hi" }, buildEnv())).toBe("hi");
+      });
+
+      it("returns empty string when end <= start", () => {
+        const compiled = compileExpr("substring(message, 5, 2)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("");
+      });
+
+      it("treats negative start as offset from the end", () => {
+        const compiled = compileExpr("substring(message, -3)");
+        expect(evalExpr(compiled, { message: "hello" }, buildEnv())).toBe("llo");
+      });
+
+      it("coerces non-string input via String(value)", () => {
+        const compiled = compileExpr("substring(value, 0, 3)");
+        expect(evalExpr(compiled, { value: 12345 }, buildEnv())).toBe("123");
+      });
+
+      it("returns empty string for null / undefined input", () => {
+        const compiled = compileExpr("substring(value, 0, 5)");
+        expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      });
+    });
+
+    describe("truncate", () => {
+      it("returns the input unchanged when shorter than the limit", () => {
+        const compiled = compileExpr('truncate(message, 80, "…")');
+        expect(evalExpr(compiled, { message: "short" }, buildEnv())).toBe("short");
+      });
+
+      it("clips long input to N characters and appends the suffix", () => {
+        const compiled = compileExpr('truncate(message, 5, "…")');
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello…");
+      });
+
+      it("omits the suffix when none is supplied", () => {
+        const compiled = compileExpr("truncate(message, 5)");
+        expect(evalExpr(compiled, { message: "hello world" }, buildEnv())).toBe("hello");
+      });
+
+      it("returns the original text for non-numeric or negative limits", () => {
+        const env = buildEnv();
+        expect(evalExpr(compileExpr("truncate(message, value)"), { message: "abcdef", value: "nope" }, env)).toBe(
+          "abcdef",
+        );
+        expect(evalExpr(compileExpr("truncate(message, -1)"), { message: "abcdef" }, env)).toBe("abcdef");
+      });
+    });
+
+    describe("splitIndex", () => {
+      it("returns the nth segment as a scalar", () => {
+        // cel-js copies string literals verbatim — `"\n"` in CEL source is
+        // backslash + n, not a newline — so `splitIndex` unescapes the
+        // separator. The JS-side `\\n` here matches what an author would
+        // type in their YAML cell expression.
+        const compiled = compileExpr('splitIndex(message, "\\n", 0)');
+        expect(evalExpr(compiled, { message: "first\nsecond\nthird" }, buildEnv())).toBe("first");
+      });
+
+      it("treats CRLF and bare CR the same as LF for a newline separator", () => {
+        // Run output often arrives with Windows (`\r\n`) or classic-Mac (`\r`)
+        // line endings. Splitting on a bare `\n` would leave a trailing `\r`
+        // on the first segment, disagreeing with `firstLine`. They must match.
+        const compiled = compileExpr('splitIndex(message, "\\n", 0)');
+        expect(evalExpr(compiled, { message: "first\r\nsecond" }, buildEnv())).toBe("first");
+        expect(evalExpr(compiled, { message: "first\rsecond" }, buildEnv())).toBe("first");
+      });
+
+      it("preserves a literal backslash that is not part of a recognized escape", () => {
+        const compiled = compileExpr('splitIndex(value, "\\?", 0)');
+        expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
+      });
+
+      it("supports non-newline separators", () => {
+        const compiled = compileExpr('splitIndex(value, ",", 1)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("b");
+      });
+
+      it("treats negative indexes as offsets from the end", () => {
+        const compiled = compileExpr('splitIndex(value, ",", -1)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("c");
+      });
+
+      it("returns empty string for out-of-range indexes", () => {
+        const compiled = compileExpr('splitIndex(value, ",", 9)');
+        expect(evalExpr(compiled, { value: "a,b,c" }, buildEnv())).toBe("");
+      });
+
+      it("returns the input unchanged when the separator is empty", () => {
+        const compiled = compileExpr('splitIndex(value, "", 0)');
+        expect(evalExpr(compiled, { value: "abc" }, buildEnv())).toBe("abc");
+      });
+    });
+
+    describe("trim / replace / indexOf", () => {
+      it("trims leading and trailing whitespace by default", () => {
+        const compiled = compileExpr("trim(value)");
+        expect(evalExpr(compiled, { value: "  hello  " }, buildEnv())).toBe("hello");
+      });
+
+      it("trims a custom character set when supplied", () => {
+        const compiled = compileExpr('trim(value, "/")');
+        expect(evalExpr(compiled, { value: "///path///" }, buildEnv())).toBe("path");
+      });
+
+      it("replaces every occurrence of old with new", () => {
+        const compiled = compileExpr('replace(value, "a", "X")');
+        expect(evalExpr(compiled, { value: "banana" }, buildEnv())).toBe("bXnXnX");
+      });
+
+      it("returns -1 from indexOf when the substring is missing", () => {
+        const compiled = compileExpr('indexOf(value, "z")');
+        expect(evalExpr(compiled, { value: "abc" }, buildEnv())).toBe(-1);
+      });
+
+      it("composes inside templated interpolation for runs-style trimming", () => {
+        const template = compileTemplate('Summary: {{ truncate(firstLine(message), 20, "…") }}');
+        const result = evalTemplate(template, { message: "  long\nrest of message" }, buildEnv(), String);
+        expect(result).toBe("Summary:   long");
+      });
+    });
+  });
+
+  describe("join builtin", () => {
+    // `join` exists specifically so authors can flatten the result of a `.map`
+    // macro chain into a single string. cel-js doesn't allow `.method()`
+    // postfix after a function-call result, so the canonical form is
+    // `join(list.map(x, expr), sep)`.
+    it("joins a list of strings with the separator", () => {
+      const compiled = compileExpr('join(["a", "b", "c"], ", ")');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("a, b, c");
+    });
+
+    it("uses an empty separator when sep is missing or not a string", () => {
+      const compiled = compileExpr('join(["x", "y"], 0)');
+      expect(evalExpr(compiled, {}, buildEnv())).toBe("xy");
+    });
+
+    it("renders null / undefined / number elements as their string form", () => {
+      const compiled = compileExpr('join(value, "|")');
+      expect(evalExpr(compiled, { value: ["a", null, 2, "b"] }, buildEnv())).toBe("a||2|b");
+    });
+
+    it("returns an empty string for non-array inputs", () => {
+      const compiled = compileExpr('join(value, ",")');
+      expect(evalExpr(compiled, { value: "not a list" }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      expect(evalExpr(compiled, { value: 42 }, buildEnv())).toBe("");
+    });
+
+    it("composes with a list.map macro to render an HTML list", () => {
+      const compiled = compileExpr('join(items.map(x, "<li>" + x.name + "</li>"), "")');
+      const result = evalExpr(compiled, { items: [{ name: "alice" }, { name: "bob" }] }, buildEnv());
+      expect(result).toBe("<li>alice</li><li>bob</li>");
+    });
+
+    it("composes with list.filter to skip rows before joining", () => {
+      const compiled = compileExpr('join(items.filter(x, x.active).map(x, x.name), ", ")');
+      const result = evalExpr(
+        compiled,
+        {
+          items: [
+            { name: "a", active: true },
+            { name: "b", active: false },
+            { name: "c", active: true },
+          ],
+        },
+        buildEnv(),
+      );
+      expect(result).toBe("a, c");
+    });
+
+    it("works inside templated interpolation", () => {
+      const template = compileTemplate('Hits: {{ join(tags, ", ") }}');
+      const result = evalTemplate(template, { tags: ["red", "blue"] }, buildEnv(), String);
+      expect(result).toBe("Hits: red, blue");
+    });
+  });
+
   describe("error reporting", () => {
     it("reports a compile error for invalid CEL", () => {
       const compiled = compileExpr("value /");
