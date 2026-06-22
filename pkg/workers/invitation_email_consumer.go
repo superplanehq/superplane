@@ -71,16 +71,27 @@ func (c *InvitationEmailConsumer) Stop() {
 }
 
 func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
+	start := time.Now()
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
+	defer func() {
+		recordEmailWorkerProcessing(start, emailTypeInvitation, outcome, reason)
+	}()
+
 	data := &protos.InvitationCreated{}
 	err := proto.Unmarshal(delivery.Body(), data)
 	if err != nil {
 		log.Errorf("Error unmarshaling invitation created message: %v", err)
+		outcome = executorOutcomeFailed
+		reason = emailWorkerReasonInvalidMessage
 		return err
 	}
 
 	invitationID, err := uuid.Parse(data.InvitationId)
 	if err != nil {
 		log.Errorf("Invalid invitation ID %s: %v", data.InvitationId, err)
+		outcome = executorOutcomeSkipped
+		reason = emailWorkerReasonInvalidMessage
 		return nil
 	}
 
@@ -88,10 +99,14 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warnf("Invitation %s not found", invitationID)
+			outcome = executorOutcomeSkipped
+			reason = emailWorkerReasonInvitationNotFound
 			return nil
 		}
 
 		log.Errorf("Error finding invitation %s: %v", invitationID, err)
+		outcome = executorOutcomeFailed
+		reason = executorReasonInternal
 		return err
 	}
 
@@ -99,21 +114,32 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warnf("Organization %s not found for invitation %s", invitation.OrganizationID, invitationID)
+			outcome = executorOutcomeSkipped
+			reason = emailWorkerReasonOrganizationNotFound
 			return nil
 		}
 
 		log.Errorf("Error finding organization %s: %v", invitation.OrganizationID, err)
+		outcome = executorOutcomeFailed
+		reason = executorReasonInternal
 		return err
 	}
 
 	if invitation.State != models.InvitationStatePending {
 		log.Infof("Invitation %s is not pending (state: %s), skipping email", invitationID, invitation.State)
+		outcome = executorOutcomeSkipped
+		reason = emailWorkerReasonInvitationNotPending
 		return nil
 	}
 
 	inviter, err := models.FindUnscopedUserByID(invitation.InvitedBy.String())
 	if err != nil {
 		log.Errorf("Error finding inviter %s: %v", invitation.InvitedBy, err)
+		outcome = executorOutcomeFailed
+		reason = executorReasonInternal
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			reason = emailWorkerReasonInviterNotFound
+		}
 		return err
 	}
 
@@ -126,6 +152,8 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 
 	if err != nil {
 		log.Errorf("Failed to send invitation email for %s: %v", invitationID, err)
+		outcome = executorOutcomeFailed
+		reason = emailWorkerReasonSendError
 		return err
 	}
 
