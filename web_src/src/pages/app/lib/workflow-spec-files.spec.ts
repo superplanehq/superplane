@@ -6,6 +6,7 @@ import { buildAppFiles } from "../files/lib/app-files";
 
 import {
   buildCanvasYamlExportPayload,
+  dematerializeCanvasMetadata,
   dematerializeCanvasSpec,
   materializeCanvasSpec,
   parseCanvasYamlForImport,
@@ -64,5 +65,19 @@ describe("workflow-spec-files", () => {
   it("parses canvas yaml for import with validation errors", () => {
     expect(parseCanvasYamlForImport("")).toEqual({ ok: false, error: "Please provide a YAML definition." });
     expect(parseCanvasYamlForImport("kind: Workflow\nspec:\n  nodes: []").ok).toBe(false);
+  });
+
+  it("dematerializes canvas-level metadata from canvas.yaml", () => {
+    const yamlText = materializeCanvasSpec(sampleWorkflow);
+    expect(dematerializeCanvasMetadata(yamlText)).toEqual({
+      id: "canvas-abc",
+      name: "My Workflow",
+      description: "",
+    });
+  });
+
+  it("returns null canvas metadata for empty or non-canvas yaml", () => {
+    expect(dematerializeCanvasMetadata("")).toBeNull();
+    expect(dematerializeCanvasMetadata("kind: Workflow\nmetadata:\n  name: Nope")).toBeNull();
   });
 });
