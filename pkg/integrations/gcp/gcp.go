@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/monitoring"
 	gcpprometheus "github.com/superplanehq/superplane/pkg/integrations/gcp/prometheus"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/storage"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -45,6 +46,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	cloudsql.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudsql.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	storage.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (storage.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
@@ -114,7 +118,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances, ` + "`roles/storage.admin`" + ` to manage Cloud Storage buckets)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -214,6 +218,9 @@ func (g *GCP) Actions() []core.Action {
 		&cloudsql.CreateInstance{},
 		&cloudsql.GetInstance{},
 		&cloudsql.DeleteInstance{},
+		&storage.CreateBucket{},
+		&storage.GetBucket{},
+		&storage.DeleteBucket{},
 		&gcpprometheus.Query{},
 		&gcpprometheus.QueryRange{},
 	}
@@ -1030,6 +1037,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return cloudsql.ListRegionResources(reqCtx, client)
 	case cloudsql.ResourceTypeTier:
 		return cloudsql.ListTierResources(reqCtx, client, p["region"])
+	case storage.ResourceTypeBucket:
+		return storage.ListBucketResources(reqCtx, client)
 	default:
 		return nil, nil
 	}
