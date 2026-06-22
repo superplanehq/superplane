@@ -185,40 +185,6 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
-func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
-	if len(bccEmails) == 0 {
-		return nil
-	}
-
-	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if title == "" {
-		title = "SuperPlane Notification"
-	}
-
-	templateData := NotificationTemplateData{
-		Title:    title,
-		Body:     body,
-		URL:      url,
-		URLLabel: urlLabel,
-	}
-
-	plainTextContent, err := s.renderTemplate("notification.txt", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render notification plain text template: %w", err)
-	}
-
-	htmlContent, err := s.renderTemplate("notification.html", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render notification HTML template: %w", err)
-	}
-
-	return s.sendEmail(settings, nil, bccEmails, title, plainTextContent, htmlContent)
-}
-
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	return renderEmailTemplate(s.templateDir, templateName, data)
 }
