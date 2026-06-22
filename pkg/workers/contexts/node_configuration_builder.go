@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strconv"
@@ -154,13 +155,16 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
-	if field.TypeOptions != nil {
-		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
-			if obj, ok := asAnyMap(value); ok {
-				return b.resolveWithSchema(obj, field.TypeOptions.Object.Schema)
-			}
+	switch field.Type {
+	case configuration.FieldTypeObject:
+		return b.resolveObjectFieldValue(value, field)
+	case configuration.FieldTypeNumber, configuration.FieldTypeBool:
+		if text, ok := value.(string); ok {
+			return b.resolveTemplateExpressionsPreservingWholeValue(text)
 		}
+	}
 
+	if field.TypeOptions != nil {
 		if field.TypeOptions.List != nil && field.TypeOptions.List.ItemDefinition != nil {
 			if list, ok := value.([]any); ok {
 				return b.resolveListItems(list, field.TypeOptions.List.ItemDefinition)
@@ -174,18 +178,12 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
 	result := make([]any, len(list))
 	for i, item := range list {
-		if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
-			if itemMap, ok := asAnyMap(item); ok {
-				resolved, err := b.resolveWithSchema(itemMap, itemDef.Schema)
-				if err != nil {
-					return nil, fmt.Errorf("list item %d: %w", i, err)
-				}
-				result[i] = resolved
-				continue
-			}
-		}
-
-		resolved, err := b.resolveValue(item)
+		resolved, err := b.resolveFieldValue(item, configuration.Field{
+			Type: itemDef.Type,
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{Schema: itemDef.Schema},
+			},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("list item %d: %w", i, err)
 		}
@@ -224,6 +222,192 @@ func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 	default:
 		return v, nil
 	}
+}
+
+func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field configuration.Field) (any, error) {
+	schema := objectFieldSchema(field)
+	if len(schema) > 0 {
+		obj, err := b.resolveSchemaObjectValue(value)
+		if err != nil {
+			return nil, err
+		}
+
+		return b.resolveWithSchema(obj, schema)
+	}
+
+	return b.resolveObjectValue(value)
+}
+
+func objectFieldSchema(field configuration.Field) []configuration.Field {
+	if field.TypeOptions == nil || field.TypeOptions.Object == nil {
+		return nil
+	}
+
+	return field.TypeOptions.Object.Schema
+}
+
+func (b *NodeConfigurationBuilder) resolveSchemaObjectValue(value any) (map[string]any, error) {
+	if obj, ok := asAnyMap(value); ok {
+		return obj, nil
+	}
+
+	text, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("object field must resolve to an object")
+	}
+
+	if expression, ok := unwrapExpressionTemplate(text); ok {
+		resolved, err := b.ResolveExpression(expression)
+		if err != nil {
+			return nil, err
+		}
+
+		obj, ok := asAnyMap(resolved)
+		if !ok {
+			return nil, fmt.Errorf("object field must resolve to an object")
+		}
+
+		return obj, nil
+	}
+
+	resolved, err := b.ResolveTemplateExpressions(text)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedText, ok := resolved.(string)
+	if !ok {
+		return nil, fmt.Errorf("object field must resolve to an object")
+	}
+
+	decoded, err := decodeJSONValue(resolvedText)
+	if err != nil {
+		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
+	}
+
+	obj, ok := asAnyMap(decoded)
+	if !ok {
+		return nil, fmt.Errorf("object field must resolve to an object")
+	}
+
+	return obj, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveObjectValue(value any) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return b.resolveObjectString(v)
+	case map[string]any:
+		return b.resolveValuePreservingTypes(v)
+	case map[string]string:
+		anyMap := make(map[string]any, len(v))
+		for key, value := range v {
+			anyMap[key] = value
+		}
+		return b.resolveValuePreservingTypes(anyMap)
+	case []any:
+		return b.resolveValuePreservingTypes(v)
+	default:
+		return b.resolveValuePreservingTypes(v)
+	}
+}
+
+func (b *NodeConfigurationBuilder) resolveObjectString(value string) (any, error) {
+	resolved, err := b.resolveTemplateExpressionsPreservingWholeValue(value)
+	if err != nil {
+		return nil, err
+	}
+
+	text, ok := resolved.(string)
+	if !ok {
+		return resolved, nil
+	}
+
+	decoded, err := decodeJSONValue(text)
+	if err != nil {
+		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
+	}
+
+	return b.resolveValuePreservingTypes(decoded)
+}
+
+func (b *NodeConfigurationBuilder) resolveValuePreservingTypes(value any) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return b.resolveTemplateExpressionsPreservingWholeValue(v)
+	case map[string]any:
+		result := make(map[string]any, len(v))
+		for key, value := range v {
+			resolved, err := b.resolveValuePreservingTypes(value)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
+	case map[string]string:
+		result := make(map[string]any, len(v))
+		for key, value := range v {
+			resolved, err := b.resolveTemplateExpressionsPreservingWholeValue(value)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
+	case []any:
+		result := make([]any, len(v))
+		for i, item := range v {
+			resolved, err := b.resolveValuePreservingTypes(item)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = resolved
+		}
+		return result, nil
+	default:
+		return v, nil
+	}
+}
+
+func (b *NodeConfigurationBuilder) resolveTemplateExpressionsPreservingWholeValue(value string) (any, error) {
+	if expression, ok := unwrapExpressionTemplate(value); ok {
+		return b.ResolveExpression(expression)
+	}
+
+	return b.ResolveTemplateExpressions(value)
+}
+
+func unwrapExpressionTemplate(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	matches := expressionRegex.FindStringSubmatch(trimmed)
+	if len(matches) != 2 || matches[0] != trimmed {
+		return "", false
+	}
+
+	expression := strings.TrimSpace(matches[1])
+	if expression == "" {
+		return "", false
+	}
+
+	return expression, true
+}
+
+func decodeJSONValue(value string) (any, error) {
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+
+	var decoded any
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return nil, fmt.Errorf("must contain a single JSON value")
+	}
+
+	return decoded, nil
 }
 
 func asAnyMap(value any) (map[string]any, bool) {
