@@ -89,4 +89,32 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
+
+  it("keeps the Discard/Publish controls (disabled) during a publish even though it runs an embedded commit", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-edit"
+        isEditing
+        hasStagingChanges={false}
+        commitStagingPending
+        publishVersionPending
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onDiscardVersion={vi.fn()}
+        onPublishVersion={vi.fn()}
+        publishVersionDisabled
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    const publishButton = screen.getByTestId("canvas-publish-version-button");
+    expect(publishButton).toBeInTheDocument();
+    expect(publishButton).toBeDisabled();
+    expect(screen.getByText("Discard")).toBeDisabled();
+    expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-reset-staging-button")).not.toBeInTheDocument();
+  });
 });

@@ -313,6 +313,7 @@ export function AppPage() {
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
+  const [isPublishingVersion, setIsPublishingVersion] = useState(false);
   const [stagingResetNonce, setStagingResetNonce] = useState(0);
   const flushRepositoryFileStagingRef = useRef<(() => Promise<void>) | null>(null);
   const handleFlushRepositoryFileStagingReady = useCallback((flush: (() => Promise<void>) | null) => {
@@ -3852,7 +3853,7 @@ export function AppPage() {
     commitCanvasStagingMutation,
     publishCanvasVersionMutation,
     consoleMutationGenerationRef,
-    setIsPreparingVersionAction,
+    setIsPublishingVersion,
   });
 
   const handleCanvasDraftRestoredToCommitted = useCallback(
@@ -4733,7 +4734,6 @@ export function AppPage() {
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     deleteDraftBranchMutation.isPending ||
-    deleteDraftBranchMutation.isPending ||
     !activeCanvasVersionId;
   const resetDraftDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -4896,7 +4896,7 @@ export function AppPage() {
             files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
             stagingResetNonce,
-            suspendRepositoryFileStaging: isPreparingVersionAction,
+            suspendRepositoryFileStaging: isPreparingVersionAction || isPublishingVersion,
             onSpecFileChange,
             onLocalFilesStagingChange: handleLocalFilesStagingChange,
             onFlushRepositoryFileStagingReady: handleFlushRepositoryFileStagingReady,
@@ -5023,6 +5023,7 @@ export function AppPage() {
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
           onCommitStaging={handleCommitStaging}
           commitStagingPending={isPreparingVersionAction || commitCanvasStagingMutation.isPending}
+          publishVersionPending={isPublishingVersion}
           onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
