@@ -13,7 +13,7 @@ import (
 func main() {
 	reg, _ := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
 	integrations := reg.ListIntegrations()
-	coreActions := reg.ListActions()
+	coreActions := reg.ListRegisteredActions()
 	coreTriggers := reg.ListTriggers()
 
 	actionsCount := len(coreActions)

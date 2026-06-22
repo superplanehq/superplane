@@ -37,7 +37,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
-  <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
+  <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using SMTP settings" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
@@ -1197,7 +1197,7 @@ def main(payload):
 
 **Component key:** `sendEmail`
 
-The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
+The Send Email Notification component sends emails through the self-hosted installation's configured SMTP settings without requiring a separate integration setup.
 
 ### Use Cases
 

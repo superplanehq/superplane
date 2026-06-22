@@ -41,7 +41,7 @@ func GenerateFiles() ([]File, error) {
 
 	files := make([]File, 0, len(integrations)+1)
 
-	coreDoc, err := renderCoreComponentsDoc(reg.ListActions(), reg.ListTriggers())
+	coreDoc, err := renderCoreComponentsDoc(reg.ListRegisteredActions(), reg.ListTriggers())
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func GenerateComponentIndexFile() (File, error) {
 		return integrations[i].Label() < integrations[j].Label()
 	})
 
-	content := renderComponentIndex(reg.ListActions(), reg.ListTriggers(), integrations)
+	content := renderComponentIndex(reg.ListRegisteredActions(), reg.ListTriggers(), integrations)
 	return File{Name: "Index.md", Content: content}, nil
 }
 

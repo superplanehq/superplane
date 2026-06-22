@@ -49,6 +49,10 @@ func (s *PanicableAction) Color() string {
 	return s.underlying.Color()
 }
 
+func (s *PanicableAction) IsAvailable() bool {
+	return core.IsActionAvailable(s.underlying)
+}
+
 func (s *PanicableAction) ExampleOutput() map[string]any {
 	return s.underlying.ExampleOutput()
 }

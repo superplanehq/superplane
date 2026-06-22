@@ -18,6 +18,16 @@ func UsageGRPCURL() string {
 	return os.Getenv("USAGE_GRPC_URL")
 }
 
+func UsesDatabaseSMTPEmailSettings() bool {
+	return os.Getenv("OWNER_SETUP_ENABLED") == "yes"
+}
+
+func ResendEmailConfigured() bool {
+	return os.Getenv("RESEND_API_KEY") != "" &&
+		os.Getenv("EMAIL_FROM_NAME") != "" &&
+		os.Getenv("EMAIL_FROM_ADDRESS") != ""
+}
+
 func MaxEmitCount() int {
 	return intFromEnv("SUPERPLANE_MAX_EMIT_COUNT", 100)
 }

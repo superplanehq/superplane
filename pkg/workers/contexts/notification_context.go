@@ -2,9 +2,9 @@ package contexts
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,14 +26,12 @@ func NewNotificationContext(tx *gorm.DB, orgID, workflowID uuid.UUID) *Notificat
 }
 
 func (c *NotificationContext) IsAvailable() bool {
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
+	if config.UsesDatabaseSMTPEmailSettings() {
 		_, err := models.FindEmailSettings(models.EmailProviderSMTP)
 		return err == nil
 	}
 
-	return os.Getenv("RESEND_API_KEY") != "" &&
-		os.Getenv("EMAIL_FROM_NAME") != "" &&
-		os.Getenv("EMAIL_FROM_ADDRESS") != ""
+	return config.ResendEmailConfigured()
 }
 
 func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {

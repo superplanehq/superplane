@@ -23,6 +23,18 @@ func newAuthWithUsers(users map[string]string) *contexts.AuthContext {
 	return &contexts.AuthContext{Users: userMap}
 }
 
+func allowSendEmailForTest(t *testing.T) {
+	t.Helper()
+
+	t.Setenv("OWNER_SETUP_ENABLED", "yes")
+
+	original := smtpEmailSettingsConfigured
+	smtpEmailSettingsConfigured = func() bool { return true }
+	t.Cleanup(func() {
+		smtpEmailSettingsConfigured = original
+	})
+}
+
 type mockNotificationContext struct {
 	calls     []notificationCall
 	err       error
@@ -89,6 +101,7 @@ func TestSendEmail_Configuration(t *testing.T) {
 
 func TestSendEmail_Setup(t *testing.T) {
 	c := &SendEmail{}
+	allowSendEmailForTest(t)
 
 	t.Run("valid user recipient", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
@@ -239,8 +252,27 @@ func TestSendEmail_Setup(t *testing.T) {
 	})
 }
 
+func TestSendEmail_SetupRejectsHostedInstallations(t *testing.T) {
+	c := &SendEmail{}
+	t.Setenv("OWNER_SETUP_ENABLED", "no")
+
+	err := c.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"recipients": []any{
+				map[string]any{"type": "user", "user": testUserID1},
+			},
+			"subject": "Test",
+			"body":    "Body",
+		},
+		Metadata: &contexts.MetadataContext{},
+	})
+
+	assert.ErrorContains(t, err, "only available for self-hosted installations using SMTP")
+}
+
 func TestSendEmail_Execute(t *testing.T) {
 	c := &SendEmail{}
+	allowSendEmailForTest(t)
 
 	t.Run("resolves user IDs to emails and sends", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
@@ -368,6 +400,26 @@ func TestSendEmail_Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		assert.ErrorContains(t, err, "body is required")
 	})
+}
+
+func TestSendEmail_ExecuteRejectsHostedInstallations(t *testing.T) {
+	c := &SendEmail{}
+	t.Setenv("OWNER_SETUP_ENABLED", "no")
+
+	err := c.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"recipients": []any{
+				map[string]any{"type": "user", "user": testUserID1},
+			},
+			"subject": "Test",
+			"body":    "Body",
+		},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Notifications:  &mockNotificationContext{available: true},
+		Auth:           newAuthWithUsers(map[string]string{testUserID1: "alice@example.com"}),
+	})
+
+	assert.ErrorContains(t, err, "only available for self-hosted installations using SMTP")
 }
 
 func TestBuildReceivers(t *testing.T) {

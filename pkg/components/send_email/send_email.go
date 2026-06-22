@@ -1,13 +1,16 @@
 package sendemail
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -25,6 +28,13 @@ func init() {
 }
 
 type SendEmail struct{}
+
+var errSMTPOnly = errors.New("sendEmail is only available for self-hosted installations using SMTP email settings")
+
+var smtpEmailSettingsConfigured = func() bool {
+	_, err := models.FindEmailSettings(models.EmailProviderSMTP)
+	return err == nil
+}
 
 type Config struct {
 	Recipients []Recipient `json:"recipients" mapstructure:"recipients"`
@@ -52,11 +62,11 @@ func (c *SendEmail) Label() string {
 }
 
 func (c *SendEmail) Description() string {
-	return "Send an email notification using the system email provider"
+	return "Send an email notification using SMTP settings"
 }
 
 func (c *SendEmail) Documentation() string {
-	return `The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
+	return `The Send Email Notification component sends emails through the self-hosted installation's configured SMTP settings without requiring a separate integration setup.
 
 ## Use Cases
 
@@ -90,6 +100,14 @@ func (c *SendEmail) Color() string {
 
 func (c *SendEmail) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (c *SendEmail) IsAvailable() bool {
+	if !config.UsesDatabaseSMTPEmailSettings() {
+		return false
+	}
+
+	return smtpEmailSettingsConfigured()
 }
 
 func (c *SendEmail) Configuration() []configuration.Field {
@@ -170,6 +188,10 @@ func (c *SendEmail) Configuration() []configuration.Field {
 }
 
 func (c *SendEmail) Setup(ctx core.SetupContext) error {
+	if !c.IsAvailable() {
+		return errSMTPOnly
+	}
+
 	var config Config
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -218,6 +240,10 @@ func (c *SendEmail) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 }
 
 func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
+	if !c.IsAvailable() {
+		return errSMTPOnly
+	}
+
 	var config Config
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -236,7 +262,7 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if !ctx.Notifications.IsAvailable() {
-		return fmt.Errorf("email delivery is not configured for this organization; configure SMTP settings or a Resend API key")
+		return fmt.Errorf("email delivery is not configured for this organization; configure SMTP settings")
 	}
 
 	receivers, err := buildReceivers(config, ctx.Auth)

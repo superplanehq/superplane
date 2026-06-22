@@ -194,7 +194,7 @@ func loadExamples() (map[string]exampleRecord, error) {
 		}
 	}
 
-	for _, action := range reg.ListActions() {
+	for _, action := range reg.ListRegisteredActions() {
 		add(nodeKindAction, action.Name(), cloneMap(action.ExampleOutput()))
 	}
 
