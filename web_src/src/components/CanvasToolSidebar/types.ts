@@ -1,6 +1,6 @@
-import type { AgentsAgentChatImageMediaType, AgentsAgentChatInfo, AgentsAgentChatMessage } from "@/api-client";
+import type { AgentsAgentChatImage, AgentsAgentChatInfo, AgentsAgentChatMessage } from "@/api-client";
 
-export type AgentImageMediaType = AgentsAgentChatImageMediaType;
+export type AgentImageMediaType = NonNullable<AgentsAgentChatImage["mediaType"]>;
 
 export type AgentChat = {
   id: string;
