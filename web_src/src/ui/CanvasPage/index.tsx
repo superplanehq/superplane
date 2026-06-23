@@ -194,6 +194,7 @@ export interface CanvasPageProps {
   /** Commits staged canvas.yaml/console.yaml edits into the draft version row. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
+  resetStagingPending?: boolean;
   /** Discards staged edits, reverting to the last committed draft. */
   onResetStaging?: () => void;
   headerMode?: "default" | "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
@@ -1404,6 +1405,7 @@ function CanvasPage(props: CanvasPageProps) {
           hasStagingChanges={props.hasStagingChanges}
           onCommitStaging={props.onCommitStaging}
           commitStagingPending={props.commitStagingPending}
+          resetStagingPending={props.resetStagingPending}
           onResetStaging={props.onResetStaging}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
@@ -1917,6 +1919,7 @@ function CanvasContentHeader({
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
+  resetStagingPending,
   onResetStaging,
   headerMode,
   isEditing,
@@ -1980,6 +1983,7 @@ function CanvasContentHeader({
   hasStagingChanges?: boolean;
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
+  resetStagingPending?: boolean;
   onResetStaging?: () => void;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
@@ -2035,6 +2039,7 @@ function CanvasContentHeader({
       hasStagingChanges={hasStagingChanges}
       onCommitStaging={onCommitStaging}
       commitStagingPending={commitStagingPending}
+      resetStagingPending={resetStagingPending}
       onResetStaging={onResetStaging}
       mode={headerMode}
       isEditing={isEditing}
