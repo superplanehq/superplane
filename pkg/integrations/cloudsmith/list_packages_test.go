@@ -106,7 +106,12 @@ func Test__ListPackages__Execute(t *testing.T) {
 		assert.True(t, executionState.Passed)
 		assert.Equal(t, "default", executionState.Channel)
 		assert.Equal(t, "cloudsmith.packages.listed", executionState.Type)
-		assert.Len(t, executionState.Payloads, 2)
+		require.Len(t, executionState.Payloads, 1)
+		wrapped, ok := executionState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		result, ok := wrapped["data"].(ListPackagesResult)
+		require.True(t, ok)
+		assert.Len(t, result.Packages, 2)
 	})
 
 	t.Run("empty repository returns error", func(t *testing.T) {

@@ -148,6 +148,24 @@ export interface ListPackagesConfiguration {
   vulnerabilityStatus?: string;
 }
 
+export interface TrimmedPackageData {
+  description?: string;
+  display_name?: string;
+  format?: string;
+  is_quarantined?: boolean;
+  license?: string;
+  policy_violated?: boolean;
+  repository?: string;
+  slug_perm?: string;
+  stage_str?: string;
+  status_str?: string;
+  tags?: Record<string, unknown>;
+}
+
+export interface ListPackagesData {
+  packages?: TrimmedPackageData[];
+}
+
 // Promote Package
 
 export interface PromotePackageConfiguration {
