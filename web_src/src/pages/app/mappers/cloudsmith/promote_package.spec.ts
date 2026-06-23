@@ -54,7 +54,11 @@ describe("promotePackageEventStateRegistry.getState", () => {
   const { getState } = promotePackageEventStateRegistry;
 
   it("returns copied when mode is copy (default)", () => {
-    const execution = buildExecution({ result: "RESULT_PASSED", state: "STATE_FINISHED", configuration: { mode: "copy" } });
+    const execution = buildExecution({
+      result: "RESULT_PASSED",
+      state: "STATE_FINISHED",
+      configuration: { mode: "copy" },
+    });
     expect(getState(execution)).toBe("copied");
   });
 
@@ -64,12 +68,20 @@ describe("promotePackageEventStateRegistry.getState", () => {
   });
 
   it("returns moved when mode is move", () => {
-    const execution = buildExecution({ result: "RESULT_PASSED", state: "STATE_FINISHED", configuration: { mode: "move" } });
+    const execution = buildExecution({
+      result: "RESULT_PASSED",
+      state: "STATE_FINISHED",
+      configuration: { mode: "move" },
+    });
     expect(getState(execution)).toBe("moved");
   });
 
   it("returns failed for a failed execution", () => {
-    const execution = buildExecution({ result: "RESULT_FAILED", state: "STATE_FINISHED", configuration: { mode: "move" } });
+    const execution = buildExecution({
+      result: "RESULT_FAILED",
+      state: "STATE_FINISHED",
+      configuration: { mode: "move" },
+    });
     expect(getState(execution)).toBe("failed");
   });
 
@@ -90,13 +102,19 @@ describe("promotePackageMapper metadata", () => {
       },
       metadata: {},
     });
-    const metadata = promotePackageMapper.props({
-      nodes: [node],
-      node,
-      componentDefinition: { name: "cloudsmith.promotePackage", label: "Promote Package", description: "", icon: "copy", color: "blue" },
-      lastExecutions: [],
-      integration: undefined,
-    }).metadata ?? [];
+    const metadata =
+      promotePackageMapper.props({
+        nodes: [node],
+        node,
+        componentDefinition: {
+          name: "cloudsmith.promotePackage",
+          label: "Promote Package",
+          description: "",
+          icon: "copy",
+          color: "blue",
+        },
+        lastExecutions: [],
+      }).metadata ?? [];
     const labels = metadata.map((m) => m.label);
     expect(labels).toContain("acme/production");
   });
@@ -111,13 +129,19 @@ describe("promotePackageMapper metadata", () => {
       },
       metadata: {},
     });
-    const metadata = promotePackageMapper.props({
-      nodes: [node],
-      node,
-      componentDefinition: { name: "cloudsmith.promotePackage", label: "Promote Package", description: "", icon: "copy", color: "blue" },
-      lastExecutions: [],
-      integration: undefined,
-    }).metadata ?? [];
+    const metadata =
+      promotePackageMapper.props({
+        nodes: [node],
+        node,
+        componentDefinition: {
+          name: "cloudsmith.promotePackage",
+          label: "Promote Package",
+          description: "",
+          icon: "copy",
+          color: "blue",
+        },
+        lastExecutions: [],
+      }).metadata ?? [];
     const labels = metadata.map((m) => m.label);
     expect(labels).toContain("Move");
   });
@@ -132,13 +156,19 @@ describe("promotePackageMapper metadata", () => {
       },
       metadata: {},
     });
-    const metadata = promotePackageMapper.props({
-      nodes: [node],
-      node,
-      componentDefinition: { name: "cloudsmith.promotePackage", label: "Promote Package", description: "", icon: "copy", color: "blue" },
-      lastExecutions: [],
-      integration: undefined,
-    }).metadata ?? [];
+    const metadata =
+      promotePackageMapper.props({
+        nodes: [node],
+        node,
+        componentDefinition: {
+          name: "cloudsmith.promotePackage",
+          label: "Promote Package",
+          description: "",
+          icon: "copy",
+          color: "blue",
+        },
+        lastExecutions: [],
+      }).metadata ?? [];
     const labels = metadata.map((m) => m.label);
     expect(labels).toContain("Copy");
   });
