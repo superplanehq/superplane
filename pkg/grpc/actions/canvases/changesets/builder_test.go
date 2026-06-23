@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -202,15 +201,15 @@ func Test__ChangesetBuilder(t *testing.T) {
 		steps.assertNoError()
 		steps.assertOperationCount(1)
 
-		op := steps.findNodeOperation(pb.CanvasChangeset_Change_ADD_NODE, "node-a")
+		op := steps.findNodeOperation(ChangeTypeAddNode, "node-a")
 		require.NotNil(t, op)
-		require.Equal(t, integrationID, op.GetNode().GetIntegrationId())
+		require.Equal(t, integrationID, op.Node.IntegrationID)
 	})
 }
 
 type ChangesetBuilderSteps struct {
 	t         *testing.T
-	changeset *pb.CanvasChangeset
+	changeset *CanvasChangeset
 	err       error
 }
 
@@ -235,48 +234,48 @@ func (s *ChangesetBuilderSteps) assertOperationCount(count int) {
 }
 
 func (s *ChangesetBuilderSteps) assertHasDeleteNode(nodeID string) {
-	op := s.findNodeOperation(pb.CanvasChangeset_Change_DELETE_NODE, nodeID)
+	op := s.findNodeOperation(ChangeTypeDeleteNode, nodeID)
 	require.NotNil(s.t, op, "expected DELETE_NODE operation for %s", nodeID)
 }
 
 func (s *ChangesetBuilderSteps) assertHasAddNode(nodeID string, name string, block string, configuration map[string]any) {
-	op := s.findNodeOperation(pb.CanvasChangeset_Change_ADD_NODE, nodeID)
+	op := s.findNodeOperation(ChangeTypeAddNode, nodeID)
 	require.NotNil(s.t, op, "expected ADD_NODE operation for %s", nodeID)
-	require.Equal(s.t, name, op.GetNode().GetName())
-	require.Equal(s.t, block, op.GetNode().GetBlock())
-	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
+	require.Equal(s.t, name, op.Node.Name)
+	require.Equal(s.t, block, op.Node.Block)
+	require.Equal(s.t, configuration, op.Node.Configuration.AsMap())
 }
 
 func (s *ChangesetBuilderSteps) assertHasUpdateNode(nodeID string, name string, block string, configuration map[string]any) {
-	op := s.findNodeOperation(pb.CanvasChangeset_Change_UPDATE_NODE, nodeID)
+	op := s.findNodeOperation(ChangeTypeUpdateNode, nodeID)
 	require.NotNil(s.t, op, "expected UPDATE_NODE operation for %s", nodeID)
-	require.Equal(s.t, name, op.GetNode().GetName())
-	require.Equal(s.t, block, op.GetNode().GetBlock())
-	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
+	require.Equal(s.t, name, op.Node.Name)
+	require.Equal(s.t, block, op.Node.Block)
+	require.Equal(s.t, configuration, op.Node.Configuration.AsMap())
 }
 
 func (s *ChangesetBuilderSteps) assertHasDisconnect(sourceID string, targetID string, channel string) {
-	op := s.findEdgeOperation(pb.CanvasChangeset_Change_DELETE_EDGE, sourceID, targetID, channel)
+	op := s.findEdgeOperation(ChangeTypeDeleteEdge, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected DISCONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
 func (s *ChangesetBuilderSteps) assertHasConnect(sourceID string, targetID string, channel string) {
-	op := s.findEdgeOperation(pb.CanvasChangeset_Change_ADD_EDGE, sourceID, targetID, channel)
+	op := s.findEdgeOperation(ChangeTypeAddEdge, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected CONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
-func (s *ChangesetBuilderSteps) findNodeOperation(operationType pb.CanvasChangeset_Change_Type, nodeID string) *pb.CanvasChangeset_Change {
+func (s *ChangesetBuilderSteps) findNodeOperation(operationType ChangeType, nodeID string) *Change {
 	for _, change := range s.changeset.Changes {
-		if change.GetType() != operationType {
+		if change.Type != operationType {
 			continue
 		}
 
-		node := change.GetNode()
+		node := change.Node
 		if node == nil {
 			continue
 		}
 
-		if node.GetId() == nodeID {
+		if node.ID == nodeID {
 			return change
 		}
 	}
@@ -284,26 +283,26 @@ func (s *ChangesetBuilderSteps) findNodeOperation(operationType pb.CanvasChanges
 	return nil
 }
 
-func (s *ChangesetBuilderSteps) findEdgeOperation(operationType pb.CanvasChangeset_Change_Type, sourceID string, targetID string, channel string) *pb.CanvasChangeset_Change {
+func (s *ChangesetBuilderSteps) findEdgeOperation(operationType ChangeType, sourceID string, targetID string, channel string) *Change {
 	for _, change := range s.changeset.Changes {
-		if change.GetType() != operationType {
+		if change.Type != operationType {
 			continue
 		}
 
-		edge := change.GetEdge()
+		edge := change.Edge
 		if edge == nil {
 			continue
 		}
 
-		if edge.GetSourceId() != sourceID {
+		if edge.SourceID != sourceID {
 			continue
 		}
 
-		if edge.GetTargetId() != targetID {
+		if edge.TargetID != targetID {
 			continue
 		}
 
-		if edge.GetChannel() != channel {
+		if edge.Channel != channel {
 			continue
 		}
 
