@@ -1385,7 +1385,7 @@ function CanvasPage(props: CanvasPageProps) {
       )}
     >
       {/* Header at the top spanning full width */}
-      <div className="relative z-30">
+      <div className="relative z-40">
         <CanvasContentHeader
           canvasName={props.title ?? ""}
           organizationId={props.organizationId}
