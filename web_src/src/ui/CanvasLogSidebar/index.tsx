@@ -7,7 +7,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { cn } from "@/lib/utils";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
-import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error";
@@ -48,12 +47,7 @@ export interface CanvasLogSidebarProps {
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
-  onRunExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onRunExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }
 
