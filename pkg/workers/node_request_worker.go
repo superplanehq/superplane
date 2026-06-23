@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -30,6 +30,7 @@ type NodeRequestWorker struct {
 	webhookBaseURL string
 	authService    authorization.Authorization
 	gitProvider    gitprovider.Provider
+	logger         *log.Entry
 }
 
 func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
@@ -40,6 +41,7 @@ func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registr
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
 		authService:    authService,
+		logger:         log.WithFields(log.Fields{"worker": "NodeRequestWorker"}),
 	}
 }
 
@@ -56,14 +58,14 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 
 			requests, err := models.ListNodeRequests()
 			if err != nil {
-				w.log("Error finding workflow nodes ready to be processed: %v", err)
+				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-					w.log("Error acquiring semaphore: %v", err)
+					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
@@ -71,12 +73,12 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessRequest(request); err != nil {
-						w.log("Error processing request %s: %v", request.ID, err)
+						w.logger.Errorf("Error processing request %s: %v", request.ID, err)
 					}
 
 					if request.ExecutionID != nil {
 						if err := messages.PublishCanvasExecutionByID(request.WorkflowID, *request.ExecutionID); err != nil {
-							w.log("Error publishing execution state: %v", err)
+							w.logger.Errorf("Error publishing execution state: %v", err)
 						}
 					}
 				}(request)
@@ -88,6 +90,10 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 }
 
 func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
+	logger := w.logger.WithFields(log.Fields{"request": request.ID})
+
+	logger.Infof("Locking and processing request")
+
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
@@ -95,15 +101,21 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
-		if err != nil {
-			w.log("Request %s already being processed - skipping", request.ID)
+		if err == nil {
+			return w.processRequest(logger, tx, r, onNewEvents)
+		}
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Infof("Request already processed - skipping")
 			return nil
 		}
 
-		return w.processRequest(tx, r, onNewEvents)
+		logger.Errorf("Error locking request: %v", err)
+		return err
 	})
 
 	if err != nil {
+		logger.Errorf("Error locking and processing request: %v", err)
 		return err
 	}
 
@@ -114,24 +126,24 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	return nil
 }
 
-func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) processRequest(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeHook(tx, request, onNewEvents)
+		return w.invokeHook(logger, tx, request, onNewEvents)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	if request.ExecutionID == nil {
-		return w.invokeNodeHook(tx, request, onNewEvents)
+		return w.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentHook(tx, request, onNewEvents)
+	return w.invokeComponentHook(logger, tx, request, onNewEvents)
 }
 
-func (w *NodeRequestWorker) invokeNodeHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
@@ -139,16 +151,16 @@ func (w *NodeRequestWorker) invokeNodeHook(tx *gorm.DB, request *models.CanvasNo
 
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return w.invokeTriggerHook(tx, request, node, onNewEvents)
+		return w.invokeTriggerHook(logger, tx, request, node, onNewEvents)
 
 	case models.NodeTypeComponent:
-		return w.invokeNodeComponentHook(tx, request, node, onNewEvents)
+		return w.invokeNodeComponentHook(logger, tx, request, node, onNewEvents)
 	}
 
 	return fmt.Errorf("unsupported node type %s for node hook", node.Type)
 }
 
-func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("node %s is not a trigger", node.NodeID)
@@ -179,7 +191,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		Name:          spec.InvokeAction.ActionName,
 		Parameters:    spec.InvokeAction.Parameters,
 		Configuration: resolvedConfiguration,
-		Logger:        logging.ForNode(*node),
+		Logger:        logging.WithNode(logger, *node),
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node, onNewEvents),
@@ -194,7 +206,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				w.log("integration %s not found - completing request", *node.AppInstallationID)
+				logger.Infof("Integration %s not found - completing request", *node.AppInstallationID)
 				return request.Complete(tx)
 			}
 
@@ -204,20 +216,23 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
+	logger.Infof("Invoking trigger hook")
 	_, err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
 
+	logger.Infof("Trigger hook completed")
 	err = tx.Save(&node).Error
 	if err != nil {
 		return fmt.Errorf("error saving node after action handler: %v", err)
 	}
 
+	logger.Infof("Request completed")
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Component == nil {
 		return fmt.Errorf("node %s is not a component", node.NodeID)
@@ -233,7 +248,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
-	logger := logging.ForNode(*node)
+	logger = logging.WithNode(logger, *node)
 	hookCtx := core.ActionHookContext{
 		Name:          spec.InvokeAction.ActionName,
 		Configuration: node.Configuration.Data(),
@@ -248,7 +263,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				w.log("integration %s not found - completing request", *node.AppInstallationID)
+				logger.Infof("Integration %s not found - completing request", *node.AppInstallationID)
 				return request.Complete(tx)
 			}
 
@@ -260,20 +275,23 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		hookCtx.Logger = logger
 	}
 
+	logger.Infof("Invoking component hook")
 	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
 
+	logger.Infof("Component hook completed")
 	err = tx.Save(&node).Error
 	if err != nil {
 		return fmt.Errorf("error saving node after action handler: %v", err)
 	}
 
+	logger.Infof("Request completed")
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
 	}
@@ -283,10 +301,11 @@ func (w *NodeRequestWorker) invokeComponentHook(tx *gorm.DB, request *models.Can
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
-	return w.invokeExecutionComponentHook(tx, request, execution, onNewEvents)
+	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents)
 }
 
 func (w *NodeRequestWorker) invokeExecutionComponentHook(
+	logger *log.Entry,
 	tx *gorm.DB,
 	request *models.CanvasNodeRequest,
 	execution *models.CanvasNodeExecution,
@@ -312,7 +331,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
-	logger := logging.ForExecution(execution)
+	logger = logging.WithExecution(logger, execution)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
@@ -336,20 +355,20 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
+	logger.Infof("Invoking component execution hook")
+
 	hookCtx.Logger = logger
 	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
 
+	logger.Infof("Component execution hook completed")
 	err = tx.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
 	}
 
+	logger.Infof("Request completed")
 	return request.Complete(tx)
-}
-
-func (w *NodeRequestWorker) log(format string, v ...any) {
-	log.Printf("[NodeRequestWorker] "+format, v...)
 }
