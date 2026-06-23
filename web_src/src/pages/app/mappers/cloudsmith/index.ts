@@ -3,7 +3,7 @@ import { buildActionStateRegistry } from "../utils";
 import { getRepositoryMapper } from "./get_repository";
 import { getPackageMapper } from "./get_package";
 import { listPackagesMapper } from "./list_packages";
-import { promotePackageMapper } from "./promote_package";
+import { promotePackageMapper, promotePackageEventStateRegistry } from "./promote_package";
 import { onSecurityScanCompletedTriggerRenderer } from "./on_security_scan_completed";
 import { onPackageCreatedTriggerRenderer } from "./on_package_created";
 import { resyncPackageMapper } from "./resync_package";
@@ -29,7 +29,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRepository: buildActionStateRegistry("fetched"),
   getPackage: buildActionStateRegistry("fetched"),
   listPackages: buildActionStateRegistry("listed"),
-  promotePackage: buildActionStateRegistry("promoted"),
+  promotePackage: promotePackageEventStateRegistry,
   onSecurityScanCompleted: buildActionStateRegistry("triggered"),
   onPackageCreated: buildActionStateRegistry("triggered"),
   resyncPackage: buildActionStateRegistry("resynced"),
