@@ -54,7 +54,7 @@ function setupHook({
   headerMode = "version-live",
   isRunInspectionMode = false,
   hasEditableVersion = false,
-  hasPendingLocalCanvasState = false,
+  hasLocalSaveActivity = false,
   activeCanvasVersionId = "live-version",
   activateCanvasVersionForEditing = vi.fn(() => true),
   selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]),
@@ -64,7 +64,7 @@ function setupHook({
   headerMode?: CanvasPageHeaderMode;
   isRunInspectionMode?: boolean;
   hasEditableVersion?: boolean;
-  hasPendingLocalCanvasState?: boolean;
+  hasLocalSaveActivity?: boolean;
   activeCanvasVersionId?: string;
   activateCanvasVersionForEditing?: (versionId: string, version: CanvasesCanvasVersion) => boolean;
   selectableVersionsById?: Map<string, CanvasesCanvasVersion>;
@@ -83,7 +83,7 @@ function setupHook({
     isRunInspectionMode,
     selectableVersionsById,
     hasEditableVersion,
-    hasPendingLocalCanvasState,
+    hasLocalSaveActivity,
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
     setSuppressUnpublishedDraftDiscard,
@@ -158,7 +158,7 @@ describe("useAgentDraftEditor", () => {
       canvasId: "canvas-retry-conflict-clear",
       versionId,
       hasEditableVersion: true,
-      hasPendingLocalCanvasState: true,
+      hasLocalSaveActivity: true,
       activeCanvasVersionId: "other-draft",
     });
 
@@ -167,7 +167,7 @@ describe("useAgentDraftEditor", () => {
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
 
-    hook.updateProps({ hasPendingLocalCanvasState: false });
+    hook.updateProps({ hasLocalSaveActivity: false });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
     expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
@@ -207,7 +207,7 @@ describe("useAgentDraftEditor", () => {
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
 
     activateCanvasVersionForEditing.mockReturnValue(true);
-    hook.updateProps({ hasPendingLocalCanvasState: true });
+    hook.updateProps({ hasLocalSaveActivity: true });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(2));
   });
