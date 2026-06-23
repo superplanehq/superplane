@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import type { HeaderProps } from "./Header";
+import { isCanvasTabHeaderMode } from "./canvasTabHeaderMode";
 
 export function SecondaryHeaderActions({
   mode,
@@ -32,7 +33,7 @@ export function SecondaryHeaderActions({
   resetStagingPending,
   onResetStaging,
 }: HeaderProps) {
-  const onCanvasTab = mode === "version-live" || mode === "version-edit";
+  const onCanvasTab = isCanvasTabHeaderMode(mode);
   const onConsoleTab = mode === "console";
 
   return (
