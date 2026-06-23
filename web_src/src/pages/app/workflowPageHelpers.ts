@@ -3,7 +3,7 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
   ActionsAction,

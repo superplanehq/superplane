@@ -14,7 +14,7 @@ import type {
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
   ActionsAction,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,

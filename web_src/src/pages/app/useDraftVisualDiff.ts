@@ -2,7 +2,7 @@ import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
   ActionsAction,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
