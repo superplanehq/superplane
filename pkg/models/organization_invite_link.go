@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrganizationInviteLink struct {
@@ -56,6 +57,11 @@ func CreateInviteLink(organizationID uuid.UUID) (*OrganizationInviteLink, error)
 	return CreateInviteLinkInTransaction(database.Conn(), organizationID)
 }
 
+// CreateInviteLinkInTransaction inserts an invite link for the organization.
+// The insert uses ON CONFLICT DO NOTHING on the organization_id unique key so
+// that two concurrent callers racing to seed the invite link for the same
+// organization both succeed and end up returning the same row instead of one
+// of them failing with a unique-violation error.
 func CreateInviteLinkInTransaction(tx *gorm.DB, organizationID uuid.UUID) (*OrganizationInviteLink, error) {
 	inviteLink := &OrganizationInviteLink{
 		OrganizationID: organizationID,
@@ -63,12 +69,18 @@ func CreateInviteLinkInTransaction(tx *gorm.DB, organizationID uuid.UUID) (*Orga
 		Enabled:        true,
 	}
 
-	err := tx.Create(inviteLink).Error
+	err := tx.
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "organization_id"}},
+			DoNothing: true,
+		}).
+		Create(inviteLink).
+		Error
 	if err != nil {
 		return nil, err
 	}
 
-	return inviteLink, nil
+	return FindInviteLinkByOrganizationIDInTransaction(tx, organizationID.String())
 }
 
 func SaveInviteLink(inviteLink *OrganizationInviteLink) error {
