@@ -28,6 +28,7 @@ type UseDraftRecoveryOptions = {
   setSearchParams: SetSearchParams;
   refreshLatestLiveCanvasData: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
+  ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
   publishCanvasVersionMutation: PublishMutation;
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
 };
@@ -47,6 +48,7 @@ export function useDraftRecovery({
   setSearchParams,
   refreshLatestLiveCanvasData,
   cancelPendingCanvasSaves,
+  ensureVersionActionDraftReady,
   publishCanvasVersionMutation,
   setIsPreparingVersionAction,
 }: UseDraftRecoveryOptions) {
@@ -120,6 +122,15 @@ export function useDraftRecovery({
     let versionIdToPublish = "";
     setIsPreparingVersionAction(true);
     try {
+      const isReady = await ensureVersionActionDraftReady(
+        "Unable to prepare the latest version changes for publishing",
+      );
+      if (!isReady) {
+        return;
+      }
+
+      // Read the ref only after prepare settles — the user may have left draft
+      // mode while saves were still being flushed.
       versionIdToPublish = activeCanvasVersionIdRef.current;
       if (!versionIdToPublish) {
         return;
@@ -149,6 +160,7 @@ export function useDraftRecovery({
     activeCanvasVersionId,
     activeCanvasVersionIdRef,
     queryClient,
+    ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
     setIsPreparingVersionAction,
     exitDraftToLive,

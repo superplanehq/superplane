@@ -3759,6 +3759,7 @@ export function AppPage() {
     setSearchParams,
     refreshLatestLiveCanvasData,
     cancelPendingCanvasSaves,
+    ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
     setIsPreparingVersionAction,
   });

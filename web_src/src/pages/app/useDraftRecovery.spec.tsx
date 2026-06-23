@@ -50,7 +50,8 @@ describe("useDraftRecovery", () => {
     ensureDraftVersionExists.mockResolvedValue(true);
   });
 
-  it("publishes the committed draft without preparing or committing staging", async () => {
+  it("publishes the committed draft after flushing pending saves without committing staging", async () => {
+    const ensureVersionActionDraftReady = vi.fn().mockResolvedValue(true);
     const publishCanvasVersionMutation = { mutateAsync: vi.fn().mockResolvedValue({}) };
     const setIsPreparingVersionAction = vi.fn();
     const setSearchParams = vi.fn();
@@ -71,6 +72,7 @@ describe("useDraftRecovery", () => {
           setSearchParams,
           refreshLatestLiveCanvasData,
           cancelPendingCanvasSaves: vi.fn(),
+          ensureVersionActionDraftReady,
           publishCanvasVersionMutation,
           setIsPreparingVersionAction,
         }),
@@ -81,11 +83,50 @@ describe("useDraftRecovery", () => {
       await result.current.handlePublishVersion();
     });
 
+    expect(ensureVersionActionDraftReady).toHaveBeenCalledWith(
+      "Unable to prepare the latest version changes for publishing",
+    );
     expect(ensureDraftVersionExists).toHaveBeenCalledWith(expect.any(QueryClient), "org-1", "canvas-1", "draft-1");
     expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-1");
     expect(refreshLatestLiveCanvasData).toHaveBeenCalledTimes(1);
     expect(showSuccessToast).toHaveBeenCalledWith("Version published");
     expect(setIsPreparingVersionAction).toHaveBeenNthCalledWith(1, true);
+    expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
+  });
+
+  it("does not publish when pending saves fail to settle", async () => {
+    const ensureVersionActionDraftReady = vi.fn().mockResolvedValue(false);
+    const publishCanvasVersionMutation = { mutateAsync: vi.fn().mockResolvedValue({}) };
+    const setIsPreparingVersionAction = vi.fn();
+    const activeCanvasVersionIdRef = { current: "draft-1" };
+
+    const { result } = renderHook(
+      () =>
+        useDraftRecovery({
+          organizationId: "org-1",
+          canvasId: "canvas-1",
+          activeCanvasVersionId: "draft-1",
+          activeCanvasVersionIdRef,
+          draftCanvasSpecsRef: { current: new Map([["draft-1", { nodes: [], edges: [] }]]) },
+          setActiveCanvasVersion: vi.fn(),
+          setDraftCanvasSpec: vi.fn(),
+          exitToLive: vi.fn(),
+          setSearchParams: vi.fn(),
+          refreshLatestLiveCanvasData: vi.fn(),
+          cancelPendingCanvasSaves: vi.fn(),
+          ensureVersionActionDraftReady,
+          publishCanvasVersionMutation,
+          setIsPreparingVersionAction,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.handlePublishVersion();
+    });
+
+    expect(publishCanvasVersionMutation.mutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
     expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
   });
 });
