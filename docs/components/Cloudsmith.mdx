@@ -16,11 +16,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Delete Package" href="#delete-package" description="Delete a package from a Cloudsmith repository" />
   <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
-  <LinkCard title="Resync Package" href="#resync-package" description="Schedule a Cloudsmith package for resynchronization" />
-  <LinkCard title="Tag Package" href="#tag-package" description="Add, replace, clear, or remove tags for a Cloudsmith package" />
+  <LinkCard title="List Packages" href="#list-packages" description="List packages in a Cloudsmith repository with optional filtering by sync status, quarantine, and vulnerability" />
+  <LinkCard title="Promote Package" href="#promote-package" description="Copy or move a package from one Cloudsmith repository to another" />
 </CardGrid>
 
 ## Instructions
@@ -34,6 +33,8 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 3. Click on **Create Service** and copy the generated API key.
 4. Paste the API key below.
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
+
+> **Note:** The **Promote Package** action (copy or move a package between repositories) requires **Admin** privilege on **both** the source and destination repositories. Make sure the service account has been granted Admin access to every repository it needs to promote packages to or from.
 
 <a id="on-package-created"></a>
 
@@ -129,36 +130,6 @@ Emits the package's identity (**namespace**, **repository**, **name**, **version
   },
   "timestamp": "2026-06-18T14:17:58Z",
   "type": "cloudsmith.package.securityScanned"
-}
-```
-
-<a id="delete-package"></a>
-
-## Delete Package
-
-**Component key:** `cloudsmith.deletePackage`
-
-The Delete Package component deletes a package from a Cloudsmith repository.
-
-### Configuration
-
-- **Repository**: The repository that contains the package.
-- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
-
-### Output
-
-Emits the deleted package identifier on the default channel.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "package": "example-package-id",
-    "repository": "example-owner/example-repo"
-  },
-  "timestamp": "2026-01-01T00:00:00Z",
-  "type": "cloudsmith.package.deleted"
 }
 ```
 
@@ -330,129 +301,151 @@ Returns the repository object including:
 }
 ```
 
-<a id="resync-package"></a>
+<a id="list-packages"></a>
 
-## Resync Package
+## List Packages
 
-**Component key:** `cloudsmith.resyncPackage`
+**Component key:** `cloudsmith.listPackages`
 
-The Resync Package component schedules a Cloudsmith package for resynchronization.
+The List Packages component fetches all packages in a Cloudsmith repository and optionally filters them by sync status, quarantine state, or vulnerability scan result.
+
+### Use Cases
+
+- **Release auditing**: List all fully synchronized packages before a release gate
+- **Quarantine monitoring**: Enumerate quarantined packages for a security review workflow
+- **Vulnerability triage**: Retrieve packages with detected vulnerabilities and route them to a remediation step
+- **Inventory**: Collect a complete snapshot of packages in a repository for reporting
 
 ### Configuration
 
-- **Repository**: The repository that contains the package.
-- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+- **Repository** (required): The repository to list packages from, in the form `owner/repository`.
+- **Sync Status** (optional): Filter by package synchronization state (`Any`, `Fully Synchronised`, `Awaiting Sync`, `Sync Failed`).
+- **Quarantine Status** (optional): Filter by quarantine state (`Any`, `Quarantined`, `Not Quarantined`).
+- **Vulnerability Status** (optional): Filter by security scan result (`Any`, `No Vulnerabilities`, `Vulnerabilities Found`).
 
 ### Output
 
-Emits the package returned by Cloudsmith on the default channel.
+Returns a list of package objects. Each package includes:
+- **name** / **version**: Package name and version string
+- **format**: Package format (e.g., `docker`, `python`, `debian`)
+- **status_str** / **stage_str**: Human-readable status and sync stage
+- **is_quarantined**: Whether the package is quarantined
+- **security_scan_status**: Result of the most recent security scan
+- **self_webapp_url**: URL to the package in the Cloudsmith web app
+- **uploaded_at**: ISO 8601 upload timestamp
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
-    "checksum_md5": "00000000000000000000000000000000",
-    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-app.manifest.json",
     "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "description": "Example resynced package payload",
     "display_name": "example-app",
-    "filename": "example-app",
-    "format": "docker",
-    "is_quarantined": false,
-    "is_sync_completed": false,
-    "name": "example-app",
-    "namespace": "example-owner",
-    "repository": "example-repo",
-    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/a=amd64;xpo=linux;id=example-package-id/",
-    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
-    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
-    "size": 123456,
-    "size_str": "",
-    "slug": "example-app-abc1",
-    "slug_perm": "example-package-id",
-    "status": 2,
-    "status_str": "Queued",
-    "summary": "",
-    "tags": {
-      "version": [
-        "latest"
-      ]
-    },
-    "tags_immutable": {},
-    "uploaded_at": "2026-01-01T00:00:00Z",
-    "version": "example-version"
-  },
-  "timestamp": "2026-01-01T00:05:00Z",
-  "type": "cloudsmith.package.resynced"
-}
-```
-
-<a id="tag-package"></a>
-
-## Tag Package
-
-**Component key:** `cloudsmith.tagPackage`
-
-The Tag Package component updates tags for a Cloudsmith package.
-
-### Configuration
-
-- **Repository**: The repository that contains the package.
-- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
-- **Action**: `Add`, `Clear`, `Replace`, or `Remove`.
-- **Tags**: Tags to apply. Not required when the action is `Clear`.
-- **Immutable**: Marks newly created tags immutable when supported by Cloudsmith.
-
-### Output
-
-Emits the updated package returned by Cloudsmith on the default channel.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
-    "checksum_md5": "00000000000000000000000000000000",
-    "checksum_sha1": "0000000000000000000000000000000000000000",
-    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "description": "Example tagged package payload",
-    "display_name": "example-app",
-    "filename": "example-app",
     "format": "docker",
     "is_quarantined": false,
     "is_sync_completed": true,
+    "is_sync_failed": false,
     "name": "example-app",
     "namespace": "example-owner",
+    "policy_violated": false,
     "repository": "example-repo",
-    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/",
-    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
-    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
-    "size": 123456,
-    "size_str": "",
-    "slug": "example-app-abc1",
-    "slug_perm": "example-package-id",
-    "status": 4,
-    "status_str": "Completed",
-    "summary": "",
-    "tags": {
-      "info": [
-        "example"
-      ],
-      "version": [
-        "latest"
-      ]
-    },
-    "tags_immutable": {},
-    "uploaded_at": "2026-01-01T00:00:00Z",
-    "version": "example-version"
+    "security_scan_status": "No Vulnerabilities Found",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/1.2.0/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/1.2.0/example-pkg-id",
+    "size": 54525952,
+    "size_str": "52.0 MB",
+    "slug": "example-app-abc2",
+    "slug_perm": "example-pkg-id",
+    "stage": 9,
+    "stage_str": "Fully Synchronised",
+    "status": 2,
+    "status_str": "Available",
+    "sync_progress": 100,
+    "uploaded_at": "2026-01-15T14:30:00Z",
+    "uploader": "example-user",
+    "version": "1.2.0"
   },
-  "timestamp": "2026-06-19T10:21:49.411256712Z",
-  "type": "cloudsmith.package.tagged"
+  "timestamp": "2026-01-15T14:35:00Z",
+  "type": "cloudsmith.packages.listed"
+}
+```
+
+<a id="promote-package"></a>
+
+## Promote Package
+
+**Component key:** `cloudsmith.promotePackage`
+
+The Promote Package component copies or moves a package from a source repository to a destination repository within the same Cloudsmith namespace.
+
+### Use Cases
+
+- **Promotion pipelines**: Move a package from staging to production after all checks pass
+- **Multi-environment distribution**: Copy a package to multiple target repositories simultaneously
+- **Artifact archiving**: Move packages from active repositories to archive repositories
+- **Release management**: Promote a vetted version from a dev channel to a release channel
+
+### Configuration
+
+- **Source Repository** (required): The repository that currently holds the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use `{{ $['On Package Created'].data.slug_perm }}` to reference an upstream trigger.
+- **Destination Repository** (required): The target repository to promote the package into, in the form `owner/repository`.
+- **Mode** (required): Whether to `copy` (keep the original) or `move` (remove from source).
+
+### Output
+
+Returns the promoted package as it appears in the destination repository, including:
+- **name** / **version**: Package name and version
+- **format**: Package format (e.g., `docker`, `python`, `debian`)
+- **repository** / **namespace**: Where the package now lives
+- **self_webapp_url**: URL to the promoted package in the Cloudsmith web app
+- **slug_perm**: Permanent identifier of the package in the destination
+- **uploaded_at**: Original upload timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-prod-repo/docker/example-app.manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "display_name": "example-app",
+    "format": "docker",
+    "is_quarantined": false,
+    "is_sync_awaiting": false,
+    "is_sync_completed": true,
+    "is_sync_failed": false,
+    "is_sync_in_flight": false,
+    "is_sync_in_progress": false,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "policy_violated": false,
+    "repository": "example-prod-repo",
+    "security_scan_status": "No Vulnerabilities Found",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-prod-repo/packages/detail/docker/example-app/1.2.0/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-prod-repo/example-pkg-prod-id/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-prod-repo/docker/example-app/1.2.0/example-pkg-prod-id",
+    "size": 54525952,
+    "size_str": "52.0 MB",
+    "slug": "example-app-xyz9",
+    "slug_perm": "example-pkg-prod-id",
+    "stage": 9,
+    "stage_str": "Fully Synchronised",
+    "status": 2,
+    "status_str": "Available",
+    "sync_progress": 100,
+    "tags": {},
+    "tags_immutable": {},
+    "uploaded_at": "2026-01-15T14:30:00Z",
+    "uploader": "example-user",
+    "version": "1.2.0"
+  },
+  "timestamp": "2026-01-15T15:00:00Z",
+  "type": "cloudsmith.package.promoted"
 }
 ```
 

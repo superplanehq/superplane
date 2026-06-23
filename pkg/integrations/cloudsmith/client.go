@@ -312,10 +312,20 @@ const packagePageSize = 100
 
 // ListPackages returns all packages in the given repository, following pagination.
 func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
+	return c.ListPackagesWithFilters(owner, repo, "")
+}
+
+// ListPackagesWithFilters returns packages filtered by a Lucene-style query string,
+// following pagination. An empty query returns all packages.
+func (c *Client) ListPackagesWithFilters(owner, repo, query string) ([]Package, error) {
 	var all []Package
 
 	for page := 1; ; page++ {
 		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), page, packagePageSize)
+		if query != "" {
+			requestURL += "&query=" + url.QueryEscape(query)
+		}
+
 		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
 		if err != nil {
 			return nil, err
@@ -334,6 +344,51 @@ func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
 	}
 
 	return all, nil
+}
+
+// CopyPackage copies a package to a destination repository (by slug) within the same namespace.
+// Returns the copied package in the destination.
+func (c *Client) CopyPackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/copy/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+// MovePackage moves a package to a destination repository (by slug) within the same namespace.
+// The package is removed from the source repository after a successful move.
+// Returns the moved package in the destination.
+func (c *Client) MovePackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/move/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
 }
 
 var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")

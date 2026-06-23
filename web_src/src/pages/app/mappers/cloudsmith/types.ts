@@ -138,3 +138,33 @@ export interface PackageOperationResult {
   package?: string;
   data?: PackageData;
 }
+
+// List Packages
+
+export interface ListPackagesConfiguration {
+  repository?: string;
+  syncStatus?: string;
+  quarantineStatus?: string;
+  vulnerabilityStatus?: string;
+}
+
+// Promote Package
+
+export interface PromotePackageConfiguration {
+  sourceRepository?: string;
+  package?: string;
+  destinationRepository?: string;
+  mode?: string;
+}
+
+export interface PromotePackageResult {
+  name?: string;
+  version?: string;
+  format?: string;
+  repository?: string;
+  namespace?: string;
+  status_str?: string;
+  stage_str?: string;
+  self_webapp_url?: string;
+  slug_perm?: string;
+}
