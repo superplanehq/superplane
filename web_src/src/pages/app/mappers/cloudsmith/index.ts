@@ -28,7 +28,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRepository: buildActionStateRegistry("fetched"),
   getPackage: buildActionStateRegistry("fetched"),
-  listPackages: buildActionStateRegistry("listed"),
+  listPackages: buildActionStateRegistry("completed"),
   promotePackage: promotePackageEventStateRegistry,
   onSecurityScanCompleted: buildActionStateRegistry("triggered"),
   onPackageCreated: buildActionStateRegistry("triggered"),
