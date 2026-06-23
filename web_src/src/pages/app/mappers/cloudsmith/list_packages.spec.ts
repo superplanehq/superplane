@@ -88,9 +88,7 @@ describe("listPackagesMapper.getExecutionDetails", () => {
     const ctx = buildDetailsCtx({
       execution: {
         outputs: {
-          default: [
-            buildListPackagesOutput([buildTrimmedPackage({ format: "docker", status_str: "Available" })]),
-          ],
+          default: [buildListPackagesOutput([buildTrimmedPackage({ format: "docker", status_str: "Available" })])],
         },
       },
     });
