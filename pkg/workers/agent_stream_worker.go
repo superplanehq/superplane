@@ -39,6 +39,19 @@ var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
+var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent) error {
+	return messages.NewAgentRunFinishedMessage(
+		session.OrganizationID.String(),
+		session.ID.String(),
+		evt.Model,
+		evt.Usage.InputTokens,
+		evt.Usage.OutputTokens,
+		evt.Usage.TotalTokens,
+		evt.Usage.CacheReadTokens,
+		evt.Usage.CacheWriteTokens,
+	).Publish()
+}
+
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider           agents.Provider
@@ -435,6 +448,10 @@ func handleProviderEvent(
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
+	if evt.Type == agents.ProviderEventTurnCompleted {
+		publishAgentTokenUsage(session, evt)
+	}
+
 	// Drop late events from a turn the user has already stopped — closes
 	// the race between InterruptSession's commit and provider SSE bytes
 	// already in flight.
@@ -464,7 +481,6 @@ func handleProviderEvent(
 			return errCustomToolResultsRequired
 		}
 	case agents.ProviderEventTurnCompleted:
-		publishAgentTokenUsage(session, evt)
 		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
 	case agents.ProviderEventOutcomeEvaluationStart:
 		publishOutcomeEvaluationStart(evt, publish)
@@ -490,17 +506,7 @@ func publishAgentTokenUsage(session *models.AgentSession, evt agents.ProviderEve
 		return
 	}
 
-	err := messages.NewAgentRunFinishedMessage(
-		session.OrganizationID.String(),
-		session.ID.String(),
-		evt.Model,
-		evt.Usage.InputTokens,
-		evt.Usage.OutputTokens,
-		evt.Usage.TotalTokens,
-		evt.Usage.CacheReadTokens,
-		evt.Usage.CacheWriteTokens,
-	).Publish()
-	if err != nil {
+	if err := publishAgentRunFinished(session, evt); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
 			"organization_id": session.OrganizationID,
