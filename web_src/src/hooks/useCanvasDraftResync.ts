@@ -18,8 +18,6 @@ interface UseCanvasDraftResyncOptions {
   setDraftCanvasSpec: Dispatch<SetStateAction<CanvasSpec>>;
   setActiveCanvasVersion: Dispatch<SetStateAction<CanvasesCanvasVersion | null>>;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
-  setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
-  setHasNonPositionalUnsavedChanges: Dispatch<SetStateAction<boolean>>;
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
 }
 
@@ -44,8 +42,6 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
     setDraftCanvasSpec,
     setActiveCanvasVersion,
     setLastSavedWorkflowSnapshot,
-    setHasUnsavedChanges,
-    setHasNonPositionalUnsavedChanges,
     setStagingResetNonce,
   } = options;
   const queryClient = useQueryClient();
@@ -73,8 +69,6 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
       if (restored) {
         setLastSavedWorkflowSnapshot(restored);
       }
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
     },
     [
       organizationId,
@@ -84,8 +78,6 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
       setDraftCanvasSpec,
       setActiveCanvasVersion,
       setLastSavedWorkflowSnapshot,
-      setHasUnsavedChanges,
-      setHasNonPositionalUnsavedChanges,
     ],
   );
 
