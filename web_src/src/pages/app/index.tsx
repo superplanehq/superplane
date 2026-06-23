@@ -3730,7 +3730,6 @@ export function AppPage() {
     getWorkflowViewPresentation({
       ...urlViewFlags,
       hasEditableVersion,
-      isViewingPendingApprovalVersion: false,
       isViewingCurrentLiveVersion,
     });
 
