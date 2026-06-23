@@ -54,6 +54,9 @@ var (
 	runFinalizerRunsCounter          metric.Int64Counter
 	runFinalizerRunDurationHistogram metric.Float64Histogram
 
+	emailWorkerEmailsCounter        metric.Int64Counter
+	emailWorkerEmailDurationSeconds metric.Float64Histogram
+
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
 
@@ -368,6 +371,24 @@ func InitMetrics(ctx context.Context) error {
 	runFinalizerRunDurationHistogram, err = meter.Float64Histogram(
 		"run_finalizer.run.duration.seconds",
 		metric.WithDescription("Duration of RunFinalizer run processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	emailWorkerEmailsCounter, err = meter.Int64Counter(
+		"email_worker.emails.total",
+		metric.WithDescription("Email worker processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	emailWorkerEmailDurationSeconds, err = meter.Float64Histogram(
+		"email_worker.email.duration.seconds",
+		metric.WithDescription("Duration of email worker processing"),
 		metric.WithUnit("s"),
 	)
 	if err != nil {
@@ -757,6 +778,28 @@ func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigg
 		d.Seconds(),
 		metric.WithAttributes(
 			attribute.String("trigger", trigger),
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
+func RecordEmailWorkerEmailProcessing(ctx context.Context, d time.Duration, emailType, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("email_type", emailType),
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	emailWorkerEmailsCounter.Add(ctx, 1, attrs)
+	emailWorkerEmailDurationSeconds.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("email_type", emailType),
 			attribute.String("outcome", outcome),
 		),
 	)
