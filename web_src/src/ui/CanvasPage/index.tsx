@@ -196,7 +196,7 @@ export interface CanvasPageProps {
   resetStagingPending?: boolean;
   /** Discards staged edits, reverting to the last committed draft. */
   onResetStaging?: () => void;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;

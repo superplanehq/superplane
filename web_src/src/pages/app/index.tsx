@@ -89,7 +89,6 @@ import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
 import { resolveFilesHeaderVersionActions, useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
-import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
@@ -247,11 +246,6 @@ export function AppPage() {
     setIsConsoleYamlOpen,
     selectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
-  const { handleExitVersionsMode } = useVersionsModeActions({
-    setIsConsoleAddPanelOpen,
-    setIsConsoleYamlOpen,
-    setSearchParams,
-  });
   const preserveRunDetailNodeOnNextRunChangeRef = useRef(false);
   const clearRunDetailNodeSearch = useCallback(() => {
     setSearchParams(
@@ -281,15 +275,6 @@ export function AppPage() {
     clearRunDetailNodeSearch,
   );
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
-  // `view=versions` is a legacy URL state: the Versions tab was removed in favor
-  // of the in-edit-session sidebar, so such links would otherwise render a
-  // read-only canvas with no sidebar and no way back. Normalize the param away so
-  // the canvas loads normally with the Edit entry point available.
-  useEffect(() => {
-    if (urlViewFlags.isVersionsMode) {
-      handleExitVersionsMode();
-    }
-  }, [urlViewFlags.isVersionsMode, handleExitVersionsMode]);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -4042,7 +4027,6 @@ export function AppPage() {
     handleExitConsoleMode,
     handleExitMemoryMode,
     handleExitFilesMode,
-    handleExitVersionsMode,
     handleClearRunInspection,
     handleToggleEditMode,
     setIsConsoleAddPanelOpen,
@@ -4051,9 +4035,7 @@ export function AppPage() {
 
   const { handleEnterEditModeFromHeader, clearRunInspectionForEdit } = useWorkflowHeaderEditActions({
     isRunInspectionMode,
-    isVersionsMode: urlViewFlags.isVersionsMode,
     handleClearRunInspection,
-    handleExitVersionsMode,
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,
@@ -4449,8 +4431,7 @@ export function AppPage() {
     !editSessionActive &&
     !urlViewFlags.isConsoleMode &&
     !urlViewFlags.isMemoryMode &&
-    !urlViewFlags.isFilesMode &&
-    !urlViewFlags.isVersionsMode;
+    !urlViewFlags.isFilesMode;
 
   // The versions sidebar is available only during an edit session while on the
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).

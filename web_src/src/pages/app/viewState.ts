@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version";
 
@@ -23,7 +23,7 @@ export function blocksBuildingBlocksShortcut(headerMode: WorkflowHeaderMode): bo
 }
 
 export function allowsBuildingBlocksSidebar(headerMode: WorkflowHeaderMode): boolean {
-  return headerMode !== "console" && headerMode !== "versions" && !isPanelHeaderMode(headerMode);
+  return headerMode !== "console" && !isPanelHeaderMode(headerMode);
 }
 
 export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined): boolean {
@@ -54,7 +54,6 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
   const isRunInspectionMode = Boolean(run) && isWorkflowCanvasViewParam(view);
   return {
     isRunInspectionMode,
-    isVersionsMode: view === "versions",
     isMemoryMode: view === "memory",
     isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
@@ -123,19 +122,13 @@ export function getWorkflowHeaderMode({
   isConsoleMode,
   isMemoryMode,
   isFilesMode,
-  isVersionsMode,
 }: {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
-  isVersionsMode: boolean;
 }): WorkflowHeaderMode {
   if (isConsoleMode) {
     return "console";
-  }
-
-  if (isVersionsMode) {
-    return "versions";
   }
 
   if (isMemoryMode) {
@@ -172,7 +165,6 @@ export function getWorkflowViewPresentation({
   isRunInspectionMode,
   isMemoryMode,
   isFilesMode,
-  isVersionsMode,
   hasEditableVersion,
   isViewingCurrentLiveVersion,
 }: {
@@ -180,21 +172,20 @@ export function getWorkflowViewPresentation({
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
-  isVersionsMode: boolean;
   hasEditableVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode || isVersionsMode;
+  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode, isVersionsMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingCurrentLiveVersion,
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunInspectionMode || isVersionsMode || isFilesMode,
+    readOnlyViewModes: isRunInspectionMode || isFilesMode,
   };
 }
 
