@@ -1,4 +1,4 @@
-import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasFolderColor } from "@/hooks/useCanvasData";
 
 export interface CanvasCardData {
@@ -9,7 +9,7 @@ export interface CanvasCardData {
   canvasFolderId?: string;
   createdBy: { name: string };
   nodes?: SuperplaneComponentsNode[];
-  edges?: SuperplaneComponentsEdge[];
+  edges?: ComponentsEdge[];
 }
 
 export interface CanvasFolderData {

@@ -1,9 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type {
-  CanvasesCanvas,
-  SuperplaneComponentsEdge as ComponentsEdge,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { CanvasesCanvas, ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import type { CanvasNode } from "@/ui/CanvasPage";
