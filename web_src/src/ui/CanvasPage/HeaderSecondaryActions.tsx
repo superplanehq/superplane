@@ -2,18 +2,12 @@ import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
   mode,
   isEditing = false,
-  onSave,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
   hasUnpublishedDraftChanges,
   hasUnpublishedConsoleDraftChanges,
   hasUncommittedCanvasDraftChanges,
@@ -42,15 +36,6 @@ export function SecondaryHeaderActions({
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
-      {mode === "default" && onSave && !saveButtonHidden ? (
-        <SaveButton
-          onSave={onSave}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
-          saveIsPrimary={saveIsPrimary}
-        />
-      ) : null}
-
       <FilesHeaderActionsSlot isEditing={isEditing} mode={mode} slotId={filesHeaderActionsSlotId} />
 
       {isEditing ? (
@@ -345,51 +330,6 @@ function ExitEditButton({
   }
 
   return button;
-}
-
-function SaveButton({
-  onSave,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
-}: {
-  onSave: () => void;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  saveIsPrimary?: boolean;
-}) {
-  if (saveDisabled && saveDisabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <Button
-              onClick={onSave}
-              size="sm"
-              variant={saveIsPrimary ? "default" : "outline"}
-              data-testid="save-canvas-button"
-              disabled={saveDisabled}
-            >
-              Save
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Button
-      onClick={onSave}
-      size="sm"
-      variant={saveIsPrimary ? "default" : "outline"}
-      data-testid="save-canvas-button"
-      disabled={saveDisabled}
-    >
-      Save
-    </Button>
-  );
 }
 
 function DiscardDraftButton({

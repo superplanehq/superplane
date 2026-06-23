@@ -46,7 +46,6 @@ export type RunPositionAutoSaveOptions = {
   canvasId?: string;
   pendingPositionUpdatesRef: MutableRefObject<Map<string, { x: number; y: number }>>;
   isReadOnly: boolean;
-  hasNonPositionalUnsavedChanges: boolean;
   canvasRef: MutableRefObject<CanvasesCanvas | null>;
   queryClient: QueryClient;
   activeCanvasVersionIdRef: MutableRefObject<string>;
@@ -64,7 +63,6 @@ export async function runPositionAutoSave({
   canvasId,
   pendingPositionUpdatesRef,
   isReadOnly,
-  hasNonPositionalUnsavedChanges,
   canvasRef,
   queryClient,
   activeCanvasVersionIdRef,
@@ -83,7 +81,7 @@ export async function runPositionAutoSave({
   const focusedNoteId = getActiveNoteId();
 
   try {
-    if (isReadOnly || hasNonPositionalUnsavedChanges) {
+    if (isReadOnly) {
       return;
     }
 
