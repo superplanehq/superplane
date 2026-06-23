@@ -24,10 +24,19 @@ func NewExecutionStateContext(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 ) *ExecutionStateContext {
+	return NewExecutionStateContextWithMaxPayloadSize(tx, execution, onNewEvents, config.MaxPayloadSize())
+}
+
+func NewExecutionStateContextWithMaxPayloadSize(
+	tx *gorm.DB,
+	execution *models.CanvasNodeExecution,
+	onNewEvents func([]models.CanvasEvent),
+	maxPayloadSize int,
+) *ExecutionStateContext {
 	return &ExecutionStateContext{
 		tx:             tx,
 		execution:      execution,
-		maxPayloadSize: config.MaxPayloadSize(),
+		maxPayloadSize: maxPayloadSize,
 		onNewEvents:    onNewEvents,
 	}
 }

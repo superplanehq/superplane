@@ -1,11 +1,13 @@
 package workers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -14,6 +16,61 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
+
+func Test__ExecutionStateContextForHook__UsesRunnerPayloadLimitForRunnerNodes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNodeID := "start"
+	runnerNodeID := "run-python"
+	noopNodeID := "noop"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNodeID,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: runnerNodeID,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: runner.RunPythonComponentName}}),
+			},
+			{
+				NodeID: noopNodeID,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
+	largePayload := strings.Repeat("a", config.MaxPayloadSize()+100)
+
+	runnerExecution := support.CreateCanvasNodeExecution(t, canvas.ID, runnerNodeID, rootEvent.ID, rootEvent.ID)
+	runnerCtx := executionStateContextForHook(
+		database.Conn(),
+		runnerExecution,
+		models.NodeRef{Component: &models.ComponentRef{Name: runner.RunPythonComponentName}},
+		nil,
+	)
+	require.NoError(t, runnerCtx.Emit("default", "test.payload", []any{largePayload}))
+
+	noopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNodeID, rootEvent.ID, rootEvent.ID)
+	noopCtx := executionStateContextForHook(
+		database.Conn(),
+		noopExecution,
+		models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+		nil,
+	)
+	err := noopCtx.Emit("default", "test.payload", []any{largePayload})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "event payload too large")
+}
 
 func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	r := support.Setup(t)
