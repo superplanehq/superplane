@@ -298,12 +298,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"}: {
-			Resource:           "canvases",
-			Action:             "read",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
 		{Method: "PATCH", Pattern: "/api/v1/groups/{group_name}/users/remove"}: {
 			Resource:   "groups",
 			Action:     "update",
