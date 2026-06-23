@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
+	"github.com/superplanehq/superplane/pkg/agents/factory"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -68,7 +69,23 @@ func buildAgentService(authService authorization.Authorization) (agents.Provider
 		return provider, agents.NewService(provider, authService)
 	}
 
-	cfg := config.LoadAnthropicAgentConfig()
+	providerConfig := factory.LoadConfig()
+	if providerConfig.Provider == config.AgentProviderNative {
+		provider, err := factory.NewProvider(providerConfig)
+		if err != nil {
+			log.WithError(err).Warn("failed to initialise native agents provider")
+			return nil, nil
+		}
+		if provider == nil {
+			log.Info("Native agents disabled: missing NATIVE_AGENT_* env vars")
+			return nil, nil
+		}
+
+		log.WithField("provider", provider.Name()).Info("Native agents enabled")
+		return provider, agents.NewService(provider, authService)
+	}
+
+	cfg := providerConfig.Anthropic
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
 		return nil, nil

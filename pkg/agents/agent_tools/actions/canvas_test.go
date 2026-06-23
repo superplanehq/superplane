@@ -721,6 +721,8 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.Contains(t, unavailable, "PATCH /api/v1/canvases/{canvas_id}/versions/{version_id}/publish")
 
 	toolActions := toolAccessByAction(result.ToolActions)
+	require.Contains(t, toolActions, "get_skill")
+	assert.True(t, toolActions["get_skill"].Allowed)
 	require.Contains(t, toolActions, "create_draft")
 	assert.True(t, toolActions["create_draft"].Allowed)
 	require.Contains(t, toolActions, "update_draft")
@@ -759,6 +761,35 @@ func TestReadRuntimeAction_ParseFilters(t *testing.T) {
 	executionResults, err := parseExecutionResults([]string{"passed", "RESULT_FAILED"})
 	require.NoError(t, err)
 	assert.Equal(t, []pb.CanvasNodeExecution_Result{pb.CanvasNodeExecution_RESULT_PASSED, pb.CanvasNodeExecution_RESULT_FAILED}, executionResults)
+}
+
+func TestGetSkillActionReturnsConsoleYAMLGuidance(t *testing.T) {
+	payload, err := getSkillAction{}.Execute(context.Background(), agents.AgentSessionContext{}, Input{
+		Action: getSkillActionName,
+		Skill:  "console_yaml",
+	})
+
+	require.NoError(t, err)
+	result, ok := payload.(skillResult)
+	require.True(t, ok)
+	assert.Equal(t, getSkillActionName, result.Action)
+	assert.Equal(t, "console_yaml", result.Skill)
+	assert.Contains(t, result.Body, "kind: Console")
+	assert.Contains(t, result.Body, "metadata:")
+	assert.Contains(t, result.Body, "type: nodes")
+	assert.Contains(t, result.Body, "nodes:")
+	assert.Contains(t, result.Body, "node: start")
+	assert.Contains(t, result.Notes, "If validation says content.nodes must be an array, use nodes: [{node: \"...\"}] YAML form, not an object or string list.")
+}
+
+func TestGetSkillActionRejectsUnsupportedSkill(t *testing.T) {
+	_, err := getSkillAction{}.Execute(context.Background(), agents.AgentSessionContext{}, Input{
+		Action: getSkillActionName,
+		Skill:  "unknown",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported skill")
 }
 
 func TestReadRuntimeAction_RejectsUnknownResource(t *testing.T) {

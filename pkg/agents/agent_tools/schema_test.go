@@ -48,6 +48,7 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, actionSchema.Enum, "write_file")
 	assert.Contains(t, actionSchema.Enum, "delete_file")
 	assert.Contains(t, actionSchema.Enum, "commit_files")
+	assert.Contains(t, actionSchema.Enum, "get_skill")
 	assert.ElementsMatch(t, []string{
 		"memory",
 		"runs",
@@ -65,9 +66,12 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, schema.Properties, "content")
 	assert.Contains(t, schema.Properties, "message")
 	assert.Contains(t, schema.Properties, "query")
+	assert.Contains(t, schema.Properties, "skill")
+	assert.Equal(t, []string{"console_yaml"}, schema.Properties["skill"].Enum)
 	assert.Contains(t, schema.Properties["path"].Description, "AGENTS.md")
 	assert.Contains(t, schema.Properties["content"].Description, "write_file")
 	assert.Contains(t, schema.Properties["message"].Description, "commit_files")
+	assert.Contains(t, schema.Properties["skill"].Description, "Console YAML")
 }
 
 func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {

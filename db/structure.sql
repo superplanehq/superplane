@@ -340,6 +340,26 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: native_agent_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.native_agent_sessions (
+    provider_session_id text NOT NULL,
+    history jsonb DEFAULT '[]'::jsonb NOT NULL,
+    awaiting boolean DEFAULT false NOT NULL,
+    interrupted boolean DEFAULT false NOT NULL,
+    steps integer DEFAULT 0 NOT NULL,
+    last_tool_signature text DEFAULT ''::text NOT NULL,
+    repeated_tool_calls integer DEFAULT 0 NOT NULL,
+    pending_tool_names jsonb DEFAULT '{}'::jsonb NOT NULL,
+    compaction_failures integer DEFAULT 0 NOT NULL,
+    summary text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -887,6 +907,14 @@ ALTER TABLE ONLY public.group_metadata
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: native_agent_sessions native_agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.native_agent_sessions
+    ADD CONSTRAINT native_agent_sessions_pkey PRIMARY KEY (provider_session_id);
 
 
 --
@@ -2062,7 +2090,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260618234242	f
+20260623042312	f
 \.
 
 

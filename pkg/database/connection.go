@@ -195,6 +195,7 @@ func TruncateTables() error {
 			workflow_node_queue_items,
 			workflow_node_requests,
 			webhooks,
+			native_agent_sessions,
 			agent_sessions,
 			agent_session_messages
 		restart identity cascade;

@@ -63,7 +63,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read, create drafts, update the current SuperPlane app canvas, and manage app repository files. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft and file write actions require version_id and update that selected draft branch."
+	return "Inspect access, read, create drafts, update the current SuperPlane app canvas, fetch built-in guidance skills, and manage app repository files. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for current YAML, get_skill for focused app-building guidance such as console_yaml, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft and file write actions require version_id and update that selected draft branch."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -73,7 +73,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, update_draft to save canvas_yaml and/or console_yaml to a selected draft, and list_integrations for connected integration IDs.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, get_skill for built-in guidance such as console_yaml before complex Console edits or after validation errors, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, update_draft to save canvas_yaml and/or console_yaml to a selected draft, and list_integrations for connected integration IDs.",
 			},
 			"canvas_id": {
 				Type:        "string",
@@ -124,13 +124,18 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 				Type:        "string",
 				Description: "For list_files. Optional case-insensitive path filter, for example AGENTS.md or README.",
 			},
+			"skill": {
+				Type:        "string",
+				Enum:        []string{"console_yaml"},
+				Description: "For get_skill. Fetch focused built-in guidance before complex work or after validation errors. Use console_yaml for strict Console YAML envelope, panel schemas, layout rules, and common validation fixes.",
+			},
 			"canvas_yaml": {
 				Type:        "string",
 				Description: "For update_draft. Complete canonical live canvas.yaml content to save. Unknown fields are rejected; do not include template-only or UI-only fields such as metadata.isTemplate.",
 			},
 			"console_yaml": {
 				Type:        "string",
-				Description: "For update_draft. Complete canonical console.yaml content to save.",
+				Description: "For update_draft. Complete canonical console.yaml content to save. Strict shape: top-level apiVersion: v1, kind: Console, metadata: {name?}, spec: {panels, layout}. Unknown fields are rejected. Never use root name, panel name, layout name, or kind: Dashboard. For type: nodes panels, content.nodes must be an array of objects like [{node:\"node-id-or-name\", label?, description?, showRun?, triggerName?}], never an object or string list.",
 			},
 			"auto_layout": {
 				Type:        "object",

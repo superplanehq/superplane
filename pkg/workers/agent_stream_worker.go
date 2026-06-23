@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -339,10 +340,16 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 
 	for {
 		turnStartedAt := session.UpdatedAt
+		turnStarted := time.Now()
 		publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
 
 		streamErr := w.streamProviderTurn(parentCtx, session, publish)
 		closeOpenTools(sessionID, publish)
+		log.WithFields(log.Fields{
+			"session_id":  sessionID,
+			"provider":    w.provider.Name(),
+			"duration_ms": time.Since(turnStarted).Milliseconds(),
+		}).Info("agent stream: provider turn finished")
 
 		if streamErr != nil {
 			// Conditional on turnStartedAt so a stream that errors out
@@ -405,9 +412,22 @@ func (w *AgentStreamWorker) streamProviderTurn(
 
 	for {
 		customTools.clearRequirement()
+		streamStarted := time.Now()
+		firstEventDelay := time.Duration(-1)
 		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
+			if firstEventDelay < 0 {
+				firstEventDelay = time.Since(streamStarted)
+			}
 			return handleProviderEvent(session.ID, evt, publish, &streamErr, customTools)
 		})
+		log.WithFields(log.Fields{
+			"session_id":           session.ID,
+			"provider":             w.provider.Name(),
+			"duration_ms":          time.Since(streamStarted).Milliseconds(),
+			"time_to_first_ms":     durationMillis(firstEventDelay),
+			"custom_tools_pending": customTools.resultsRequired,
+			"err":                  err,
+		}).Debug("agent stream: provider stream returned")
 
 		if errors.Is(err, errCustomToolResultsRequired) {
 			err = nil
@@ -426,6 +446,13 @@ func (w *AgentStreamWorker) streamProviderTurn(
 			return err
 		}
 	}
+}
+
+func durationMillis(duration time.Duration) int64 {
+	if duration < 0 {
+		return -1
+	}
+	return duration.Milliseconds()
 }
 
 func handleProviderEvent(
@@ -495,23 +522,38 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 		return fmt.Errorf("provider does not support custom tool results")
 	}
 
-	results := make([]agents.CustomToolResult, 0, len(customTools.requiredIDs))
+	results := make([]agents.CustomToolResult, len(customTools.requiredIDs))
 	toolUses := map[string]agents.CustomToolUse{}
-	for _, id := range customTools.requiredIDs {
+	var wg sync.WaitGroup
+
+	for i, id := range customTools.requiredIDs {
 		toolUse, ok := customTools.pending[id]
 		if !ok {
-			results = append(results, agents.CustomToolResult{
+			results[i] = agents.CustomToolResult{
 				CustomToolUseID: id,
 				Content:         "custom tool use event not found",
 				IsError:         true,
-			})
+			}
 			continue
 		}
 		toolUses[id] = toolUse
 
-		result := w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)
-		results = append(results, result)
+		wg.Add(1)
+		go func(i int, toolUse agents.CustomToolUse) {
+			defer wg.Done()
+			started := time.Now()
+			results[i] = w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)
+			log.WithFields(log.Fields{
+				"session_id":  session.ID,
+				"provider":    w.provider.Name(),
+				"tool":        toolUse.Name,
+				"tool_use_id": toolUse.ID,
+				"duration_ms": time.Since(started).Milliseconds(),
+				"is_error":    results[i].IsError,
+			}).Info("agent stream: custom tool executed")
+		}(i, toolUse)
 	}
+	wg.Wait()
 
 	if err := sender.SendCustomToolResults(ctx, session.ProviderSessionID, results); err != nil {
 		return err

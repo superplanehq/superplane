@@ -100,6 +100,40 @@ func (e *fakeCustomToolExecutor) ExecuteCustomTool(_ context.Context, session ag
 	}
 }
 
+type blockingCustomToolExecutor struct {
+	mu      sync.Mutex
+	seen    []agents.CustomToolUse
+	release chan struct{}
+	started chan string
+}
+
+func newBlockingCustomToolExecutor() *blockingCustomToolExecutor {
+	return &blockingCustomToolExecutor{
+		release: make(chan struct{}),
+		started: make(chan string, 2),
+	}
+}
+
+func (e *blockingCustomToolExecutor) ExecuteCustomTool(_ context.Context, _ agents.AgentSessionContext, toolUse agents.CustomToolUse) agents.CustomToolResult {
+	e.mu.Lock()
+	e.seen = append(e.seen, toolUse)
+	e.mu.Unlock()
+
+	e.started <- toolUse.ID
+	<-e.release
+
+	return agents.CustomToolResult{
+		CustomToolUseID: toolUse.ID,
+		Content:         `{"tool":"` + toolUse.ID + `"}`,
+	}
+}
+
+func (e *blockingCustomToolExecutor) seenCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.seen)
+}
+
 func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.UUID) *models.AgentSession {
 	t.Helper()
 	session := &models.AgentSession{
@@ -276,6 +310,62 @@ func TestAgentStreamWorker_ExecutesCustomToolsAndResumesStream(t *testing.T) {
 	assert.Contains(t, stored[0].Content, `"ok":true`)
 	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
 	assert.Equal(t, "Done", stored[1].Content)
+}
+
+func TestAgentStreamWorker_ExecutesRequiredCustomToolsConcurrentlyAndPreservesResultOrder(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		eventBatches: [][]agents.ProviderEvent{
+			{
+				{
+					ProviderEventID: "custom-1",
+					Type:            agents.ProviderEventCustomToolUseStarted,
+					ToolName:        testCustomToolName,
+					ToolCallID:      "custom-1",
+					ToolInput:       `{"action":"read"}`,
+					CustomToolUse:   &agents.CustomToolUse{ID: "custom-1", Name: testCustomToolName, Input: `{"action":"read"}`},
+				},
+				{
+					ProviderEventID: "custom-2",
+					Type:            agents.ProviderEventCustomToolUseStarted,
+					ToolName:        testCustomToolName,
+					ToolCallID:      "custom-2",
+					ToolInput:       `{"action":"read_runtime"}`,
+					CustomToolUse:   &agents.CustomToolUse{ID: "custom-2", Name: testCustomToolName, Input: `{"action":"read_runtime"}`},
+				},
+				{Type: agents.ProviderEventCustomToolResultsRequired, CustomToolEventIDs: []string{"custom-1", "custom-2"}},
+			},
+			{
+				{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Done"},
+				{Type: agents.ProviderEventTurnCompleted},
+			},
+		},
+	}
+	executor := newBlockingCustomToolExecutor()
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", executor)
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- w.Handle(context.Background(), body)
+	}()
+
+	require.Eventually(t, func() bool {
+		return executor.seenCount() == 2
+	}, time.Second, 10*time.Millisecond, "both tools should start before either is released")
+
+	close(executor.release)
+	require.NoError(t, <-done)
+
+	require.Len(t, provider.sentResults, 2)
+	assert.Equal(t, "custom-1", provider.sentResults[0].CustomToolUseID)
+	assert.Equal(t, "custom-2", provider.sentResults[1].CustomToolUseID)
 }
 
 func TestAgentStreamWorker_SendsErrorResultWhenCustomToolExecutorMissing(t *testing.T) {

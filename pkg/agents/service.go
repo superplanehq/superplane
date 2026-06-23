@@ -73,7 +73,14 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 		}
 
 		title := sessionTitle(organizationID, canvasID)
+		started := time.Now()
 		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: title})
+		log.WithFields(log.Fields{
+			"provider":    s.provider.Name(),
+			"canvas_id":   canvasID,
+			"duration_ms": time.Since(started).Milliseconds(),
+			"err":         err,
+		}).Info("agent provider: create session finished")
 		if err != nil {
 			return fmt.Errorf("create provider session: %w", err)
 		}
@@ -245,12 +252,19 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		return false, err
 	}
 
+	started := time.Now()
 	err = s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
 		ContextPreamble: s.buildPreamble(session, ModeBuilder),
 	})
+	log.WithFields(log.Fields{
+		"provider":    s.provider.Name(),
+		"session_id":  session.ID,
+		"duration_ms": time.Since(started).Milliseconds(),
+		"err":         err,
+	}).Info("agent provider: define outcome finished")
 	return contextReplayed, err
 }
 
@@ -347,10 +361,18 @@ func (s *Service) sendMessageToProvider(ctx context.Context, session *models.Age
 		return false, err
 	}
 
+	started := time.Now()
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
 		ContextPreamble: s.buildPreamble(session, mode),
 		Images:          images,
 	})
+	log.WithFields(log.Fields{
+		"provider":    s.provider.Name(),
+		"session_id":  session.ID,
+		"mode":        mode,
+		"duration_ms": time.Since(started).Milliseconds(),
+		"err":         err,
+	}).Info("agent provider: send message finished")
 	return contextReplayed, err
 }
 

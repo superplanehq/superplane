@@ -27,6 +27,7 @@ type Input struct {
 	Content             string           `json:"content,omitempty"`
 	Message             string           `json:"message,omitempty"`
 	Query               string           `json:"query,omitempty"`
+	Skill               string           `json:"skill,omitempty"`
 }
 
 // AutoLayoutInput configures optional backend auto-layout for draft updates.
@@ -60,6 +61,14 @@ type integrationsResult struct {
 	Action       string              `json:"action"`
 	CanvasID     string              `json:"canvas_id"`
 	Integrations []integrationResult `json:"integrations"`
+}
+
+type skillResult struct {
+	Action string   `json:"action"`
+	Skill  string   `json:"skill"`
+	Title  string   `json:"title"`
+	Body   string   `json:"body"`
+	Notes  []string `json:"notes,omitempty"`
 }
 
 type runtimeReadResult struct {

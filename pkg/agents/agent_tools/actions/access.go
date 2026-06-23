@@ -97,6 +97,7 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		description string
 	}{
 		{name: accessActionName, description: "No API permission required; reports this session's token and API route access."},
+		{name: getSkillActionName, description: "No API permission required; returns focused built-in guidance for app-building tasks."},
 		{name: readActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: readRuntimeActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listFilesActionName, resource: "canvases", operation: "read", scoped: true},
@@ -111,7 +112,7 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 
 	results := make([]toolAccessResult, 0, len(actions))
 	for _, action := range actions {
-		if action.name == accessActionName {
+		if action.name == accessActionName || action.name == getSkillActionName {
 			results = append(results, toolAccessResult{Action: action.name, Allowed: true, Reason: action.description})
 			continue
 		}
