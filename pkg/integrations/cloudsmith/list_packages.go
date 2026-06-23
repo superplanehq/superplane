@@ -21,6 +21,26 @@ type ListPackagesSpec struct {
 	VulnerabilityStatus string `json:"vulnerabilityStatus" mapstructure:"vulnerabilityStatus"`
 }
 
+// TrimmedPackage holds the subset of package fields emitted in the list result.
+type TrimmedPackage struct {
+	Description    string         `json:"description"`
+	DisplayName    string         `json:"display_name"`
+	Format         string         `json:"format"`
+	IsQuarantined  bool           `json:"is_quarantined"`
+	License        string         `json:"license"`
+	PolicyViolated bool           `json:"policy_violated"`
+	Repository     string         `json:"repository"`
+	SlugPerm       string         `json:"slug_perm"`
+	StageStr       string         `json:"stage_str"`
+	StatusStr      string         `json:"status_str"`
+	Tags           map[string]any `json:"tags"`
+}
+
+// ListPackagesResult is the single payload emitted by ListPackages.Execute.
+type ListPackagesResult struct {
+	Packages []TrimmedPackage `json:"packages"`
+}
+
 func (l *ListPackages) Name() string {
 	return "cloudsmith.listPackages"
 }
@@ -52,14 +72,13 @@ func (l *ListPackages) Documentation() string {
 
 ## Output
 
-Returns a list of package objects. Each package includes:
-- **name** / **version**: Package name and version string
-- **format**: Package format (e.g., ` + "`docker`" + `, ` + "`python`" + `, ` + "`debian`" + `)
+Emits a single payload containing a ` + "`packages`" + ` array. Each entry includes:
+- **display_name** / **format**: Package display name and format
 - **status_str** / **stage_str**: Human-readable status and sync stage
-- **is_quarantined**: Whether the package is quarantined
-- **security_scan_status**: Result of the most recent security scan
-- **self_webapp_url**: URL to the package in the Cloudsmith web app
-- **uploaded_at**: ISO 8601 upload timestamp`
+- **is_quarantined** / **policy_violated**: Quarantine and policy state
+- **description** / **license**: Package description and license
+- **slug_perm** / **repository**: Permanent identifier and repository slug
+- **tags**: Package tags`
 }
 
 func (l *ListPackages) Icon() string {
@@ -180,15 +199,27 @@ func (l *ListPackages) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to list packages: %v", err)
 	}
 
-	payloads := make([]any, len(packages))
-	for i := range packages {
-		payloads[i] = &packages[i]
+	trimmed := make([]TrimmedPackage, len(packages))
+	for i, pkg := range packages {
+		trimmed[i] = TrimmedPackage{
+			Description:    pkg.Description,
+			DisplayName:    pkg.DisplayName,
+			Format:         pkg.Format,
+			IsQuarantined:  pkg.IsQuarantined,
+			License:        pkg.License,
+			PolicyViolated: pkg.PolicyViolated,
+			Repository:     pkg.Repository,
+			SlugPerm:       pkg.SlugPerm,
+			StageStr:       pkg.StageStr,
+			StatusStr:      pkg.StatusStr,
+			Tags:           pkg.Tags,
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"cloudsmith.packages.listed",
-		payloads,
+		[]any{ListPackagesResult{Packages: trimmed}},
 	)
 }
 
