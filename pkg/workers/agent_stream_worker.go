@@ -39,6 +39,19 @@ var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
+var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent) error {
+	return messages.NewAgentRunFinishedMessage(
+		session.OrganizationID.String(),
+		session.ID.String(),
+		evt.Model,
+		evt.Usage.InputTokens,
+		evt.Usage.OutputTokens,
+		evt.Usage.TotalTokens,
+		evt.Usage.CacheReadTokens,
+		evt.Usage.CacheWriteTokens,
+	).Publish()
+}
+
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider           agents.Provider
@@ -406,7 +419,7 @@ func (w *AgentStreamWorker) streamProviderTurn(
 	for {
 		customTools.clearRequirement()
 		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(session.ID, evt, publish, &streamErr, customTools)
+			return handleProviderEvent(session, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
@@ -429,35 +442,39 @@ func (w *AgentStreamWorker) streamProviderTurn(
 }
 
 func handleProviderEvent(
-	sessionID uuid.UUID,
+	session *models.AgentSession,
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
+	if evt.Type == agents.ProviderEventTurnCompleted {
+		publishAgentTokenUsage(session, evt)
+	}
+
 	// Drop late events from a turn the user has already stopped — closes
 	// the race between InterruptSession's commit and provider SSE bytes
 	// already in flight.
-	streaming, err := models.IsAgentSessionStreaming(sessionID)
+	streaming, err := models.IsAgentSessionStreaming(session.ID)
 	if err != nil {
-		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: status check failed; processing event anyway")
+		log.WithError(err).WithField("session_id", session.ID).Warn("agent stream: status check failed; processing event anyway")
 	} else if !streaming {
 		return errSessionAlreadyReset
 	}
 
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
-		return persistAssistantEvent(sessionID, evt, publish)
+		return persistAssistantEvent(session.ID, evt, publish)
 	case agents.ProviderEventToolUseStarted:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventToolUseFinished:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
 	case agents.ProviderEventCustomToolUseStarted:
 		customTools.remember(evt)
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventCustomToolResultsRequired:
 		customTools.require(evt.CustomToolEventIDs)
-		if err := customTools.resolvePersisted(sessionID); err != nil {
+		if err := customTools.resolvePersisted(session.ID); err != nil {
 			return err
 		}
 		if customTools.resultsRequired {
@@ -470,9 +487,9 @@ func handleProviderEvent(
 	case agents.ProviderEventOutcomeEvaluation:
 		publishOutcomeEvaluationEnd(evt, publish)
 	case agents.ProviderEventThreadMessageSent:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusStarted, "tool_started", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusStarted, "tool_started", publish)
 	case agents.ProviderEventThreadMessageReceived:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
 	case agents.ProviderEventSessionNotice:
 		// Ephemeral notice: no status change, no DB row, stream continues.
 		publish(messages.AgentSessionEventMessage{Event: "session_notice", Error: evt.ErrorMessage})
@@ -482,6 +499,19 @@ func handleProviderEvent(
 		*streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
 	}
 	return nil
+}
+
+func publishAgentTokenUsage(session *models.AgentSession, evt agents.ProviderEvent) {
+	if evt.Usage == nil || !evt.Usage.HasUsage() {
+		return
+	}
+
+	if err := publishAgentRunFinished(session, evt); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to publish agent token usage")
+	}
 }
 
 func (w *AgentStreamWorker) executeAndSendCustomToolResults(
