@@ -51,7 +51,9 @@ export const listPackagesMapper: ComponentBaseMapper = {
     const quarantinedCount = packages.filter((p) => p.is_quarantined).length;
     details["Quarantined"] = String(quarantinedCount);
 
-    const vulnerableCount = packages.filter((p) => p.policy_violated).length;
+    const vulnerableCount = packages.filter(
+      (p) => p.security_scan_status === "Scan Detected Vulnerabilities",
+    ).length;
     details["Vulnerable"] = String(vulnerableCount);
 
     return details;

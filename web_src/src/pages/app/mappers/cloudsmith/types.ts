@@ -156,6 +156,7 @@ export interface TrimmedPackageData {
   license?: string;
   policy_violated?: boolean;
   repository?: string;
+  security_scan_status?: string;
   slug_perm?: string;
   stage_str?: string;
   status_str?: string;
