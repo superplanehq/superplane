@@ -17,6 +17,10 @@
   - [Breaking Changes](#breaking-changes)
 - [Pull Request Description](#pull-request-description)
   - [Required Information](#required-information)
+- [PR Scope](#pr-scope)
+  - [What Makes a Well-Scoped PR](#what-makes-a-well-scoped-pr)
+  - [When a PR Is Too Large or Too Broad](#when-a-pr-is-too-large-or-too-broad)
+  - [Splitting a Large Change](#splitting-a-large-change)
 - [Review Process](#review-process)
 
 ## Overview
@@ -139,6 +143,59 @@ A good PR description helps reviewers understand your changes quickly. Include:
 - **Related issues**: Link to any related GitHub issues using `Closes #123` or `Fixes #456`
 - **Breaking changes**: If applicable, clearly document any breaking changes
 
+## PR Scope
+
+Scope matters more than raw line count: a well-scoped PR has one primary outcome, and a poorly scoped one mixes unrelated changes even when the diff is small. Focused PRs review faster, revert cleanly, and keep history easier to bisect.
+
+### What Makes a Well-Scoped PR
+
+A PR is well-scoped when:
+
+- A reviewer can restate it in **one sentence** without "and also".
+- **Every bullet** in the summary supports that same outcome.
+- The **title covers all substantive changes**, not just the first one.
+- The diff is a **single revert unit**: if something goes wrong, reverting this PR undoes one intent.
+
+Default targets (guidelines, not hard limits):
+
+- About **300 lines changed** is a good aim for most PRs.
+- About **15 files** unless the change is mechanical across many call sites.
+- **1–3 commits** with a clear story.
+
+Large diffs are fine when the change is mechanical or repetitive, such as a new integration component, an architectural swap, or removing a feature across the stack.
+
+Common patterns that work well:
+
+- **Vertical slice**: migration, API, and UI for one user-facing feature in a single PR.
+- **Integration component**: backend implementation, UI mapper, and tests for one (or a symmetric pair
+  of) component(s).
+- **Foundational stack PR**: proto, plumbing, or infrastructure that later PRs build on. Say explicitly what is intentionally unwired and which PR comes next.
+- **Consumer-first removal**: migrate UI/CLI callers first, delete the old API in a follow-up PR.
+
+### When a PR Is Too Large or Too Broad
+
+Split the PR when you have:
+
+- **Unrelated fixes** bundled together (different pages, bugs, or motivations).
+- **Refactor and feature** in the same PR, unless the refactor is a small prerequisite and you label it as such.
+- **Multiple independent user-facing features** that could ship separately.
+- **Config or provider migration plus an unrelated UI tweak** — ship the migration and the UI change in separate PRs unless they are inseparable.
+- **Cosmetic polish mixed with behavior changes** — keep polish in the same PR only when it is the same code as your change.
+
+Line count alone does not make a PR too large. A 2,000-line integration component or end-to-end feature removal can be well-scoped. A 50-line PR that fixes two unrelated things is not.
+
+### Splitting a Large Change
+
+When a change does not fit in one PR, split by **concern and dependency**, not by "whatever is left on the branch."
+
+1. **Stack by dependency.** Land prerequisites first: proto and messages, then publishers, then
+   consumers, then cleanup. Link each PR to the next in the description.
+2. **Migrate consumers before deleting APIs.** Update UI and CLI callers before removing an endpoint.
+3. **Split independent concerns onto separate branches.** Each PR should have its own motivation, not just a slice of leftover work.
+5. **Label stack PRs.** State what is incomplete, what nothing calls yet, and which PR builds on this one.
+
+Default to independent PRs off `main`. Stack PRs only when the dependency is real.
+
 ## Review Process
 
 Once you submit a pull request:
@@ -167,6 +224,6 @@ Once you submit a pull request:
 
 **Tips for a smooth review:**
 
-- Keep PRs focused and reasonably sized
+- Follow the [PR scope guidelines](#pr-scope)
 - Respond to review comments promptly
 - Don't hesitate to ask questions if something is unclear
