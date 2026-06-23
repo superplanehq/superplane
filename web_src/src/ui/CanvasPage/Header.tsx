@@ -23,7 +23,6 @@ export type HeaderMode =
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
   canvasName?: string;
-  onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -43,10 +42,6 @@ export interface HeaderProps {
     diffCounts: { added: number; updated: number; removed: number };
   };
   organizationId?: string;
-  saveIsPrimary?: boolean;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;

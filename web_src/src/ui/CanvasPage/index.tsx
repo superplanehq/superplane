@@ -166,10 +166,6 @@ export interface CanvasPageProps {
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
-  saveIsPrimary?: boolean;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -280,7 +276,6 @@ export interface CanvasPageProps {
   onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   onNodeClick?: (nodeId: string) => void;
-  onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
@@ -1391,16 +1386,10 @@ function CanvasPage(props: CanvasPageProps) {
       )}
     >
       {/* Header at the top spanning full width */}
-      <div className="relative z-30">
+      <div className="relative z-40">
         <CanvasContentHeader
-          state={state}
           canvasName={props.title ?? ""}
-          onSave={props.onSave}
           organizationId={props.organizationId}
-          saveIsPrimary={props.saveIsPrimary}
-          saveButtonHidden={props.saveButtonHidden}
-          saveDisabled={props.saveDisabled}
-          saveDisabledTooltip={props.saveDisabledTooltip}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
@@ -1913,14 +1902,8 @@ function Sidebar({
 }
 
 function CanvasContentHeader({
-  state,
   canvasName,
-  onSave,
   organizationId,
-  saveIsPrimary,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
@@ -1973,14 +1956,8 @@ function CanvasContentHeader({
   runsSidebarState,
   versionsSidebarState,
 }: {
-  state: CanvasPageState;
   canvasName: string;
-  onSave?: (nodes: CanvasNode[]) => void;
   organizationId?: string;
-  saveIsPrimary?: boolean;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -2043,24 +2020,10 @@ function CanvasContentHeader({
   runsSidebarState: CanvasRunsSidebarState;
   versionsSidebarState: CanvasVersionsSidebarState;
 }) {
-  const stateRef = useRef(state);
-  stateRef.current = state;
-
-  const handleSave = useCallback(() => {
-    if (onSave) {
-      onSave(stateRef.current.nodes);
-    }
-  }, [onSave]);
-
   return (
     <Header
       canvasName={canvasName}
-      onSave={onSave ? handleSave : undefined}
       organizationId={organizationId}
-      saveIsPrimary={saveIsPrimary}
-      saveButtonHidden={saveButtonHidden}
-      saveDisabled={saveDisabled}
-      saveDisabledTooltip={saveDisabledTooltip}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}
