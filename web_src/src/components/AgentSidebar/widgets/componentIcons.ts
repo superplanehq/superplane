@@ -27,7 +27,6 @@ export const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
   wait: "clock",
   approval: "hand",
   merge: "git-merge",
-  sendEmail: "mail",
   schedule: "calendar-clock",
   webhook: "webhook",
   start: "play",

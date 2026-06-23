@@ -1,8 +1,10 @@
 # SuperPlane
 
-SuperPlane is an **open source control plane for platform engineering**.
-It lets you define and run event-based workflows across the tools you already
-use such as Git, CI/CD, observability, incident response, infra, and notifications.
+SuperPlane is an open source automation engine for AI-driven engineering.
+
+It lets you orchestrate engineering workflows across the tools you use — such as Git, LLMs, CI/CD, observability, incident tools, and infrastructure — with durable execution, approvals, and operational UI.
+
+SuperPlane executes your processes deterministically, providing the exact guardrails both humans and AI need to safely interact with your systems.
 
 ![SuperPlane screenshot](./screenshot.png)
 
@@ -14,52 +16,55 @@ use such as Git, CI/CD, observability, incident response, infra, and notificatio
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
-breaking changes while we stabilize the core model and integrations.
-If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
-Early feedback is extremely valuable.
+SuperPlane is in **beta**. Self-host the core engine ([installation guide](https://docs.superplane.com/installation/overview/)) or use [SuperPlane Cloud](https://app.superplane.com) for managed runners and one-click app installs. Core primitives and integrations are maturing; breaking changes are possible. Report issues on [GitHub](https://github.com/superplanehq/superplane/issues/new).
 
 ## What it does
 
-- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from alerts, infrastructure events, code changes, issue updates, schedules, and webhooks.
-- **Control plane UI & CLI**: Design and manage platform engineering processes; inspect runs, manage secrets, and view history in a single place or via the CLI.
-- **Memory**: Persist and retrieve runtime data across different paths and executions of the same canvas using built-in data storage components.
-- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+SuperPlane orchestrates your existing stack into git-backed **apps** with durable execution — workflows too complex for a single script or CI job.
+
+- **Apps**: A deployable unit combining a workflow graph, custom console UI, app-scoped memory, and deterministic execution. Versioned in git (`canvas.yaml`, `console.yaml`); defines guardrails for AI agents and human operators.
+- **Event-driven orchestration**: Multi-step workflows across your Git, CI/CD, observability, incident tools, and notifications — triggered by webhooks, schedules, and tool events, with approvals, policy checks, and human-in-the-loop steps.
+- **Console dashboards**: Define your own per-app operational UI as a dynamic grid of panels. Use it to display KPIs, tables, charts, runbooks, pinned nodes, and workflow controls, backed by live data from memory, runs, and executions.
+- **Agents & operators**: Built-in per-app agent to design workflows and debug runs; CLI and [skills](https://github.com/superplanehq/skills) for external coding agents. Same RBAC on all paths.
 
 ## How it works
 
-- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
-- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
-- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI and via the CLI.
-- **Agent-friendly**: Equip your coding agents with SuperPlane's CLI and skills to autonomously trigger workflows, manage resources, and investigate executions.
+- **Canvases**: A graph of steps and their dependencies; a single canvas can express multiple workflows and run them concurrently.
+- **Components**: Each node is a trigger or action, built-in or integration-backed that performs a specific task (for example: deploy a service, open an incident, post a notification, wait for a condition, require approval, etc.).
+- **Events & triggers**: Incoming events match triggers and start runs with the event payload as input.
+- **Runs & durable execution**: Runs, run items, and payloads are tracked across restarts; failed steps can resume without custom retry logic.
+- **Memory**: App-scoped JSON storage that persists across runs.
 
 ### Example use cases
 
 A few concrete things teams build with SuperPlane:
 
+- **PR preview environments**: on pull request, provision an ephemeral environment, run tests, and post the live URL back to the PR.
 - **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
-- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
+- **Progressive delivery (10% → 50% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
 - **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
 - **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
 
 ## Quick start
 
-Run the latest demo container:
+**Local (demo container):**
 
 ```
 docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) and follow the [quick start guide](https://docs.superplane.com/get-started/quickstart/).
+Open [http://localhost:3000](http://localhost:3000).
+
+**Cloud:** Sign up at [app.superplane.com](https://app.superplane.com) ([cloud beta overview](https://superplane.com/blog/superplane-cloud-beta/)).
+
+For a guided first workflow, see the [quick start guide](https://docs.superplane.com/get-started/quickstart/).
 
 ## Supported Integrations
 
 SuperPlane integrates with the tools you already use. Each integration provides triggers (events that start workflows) and components (actions you can run).
 
-> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new) to request it.
+> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new).
 
 ### AI & LLM
 
@@ -81,7 +86,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/github/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/github.svg" alt="GitHub"/><br/>GitHub</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/gitlab/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/gitlab.svg" alt="GitLab"/><br/>GitLab</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/harness/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/harness.svg" alt="Harness"/><br/>Harness</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/octopus-deploy/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/octopus.svg" alt="Octopus Deploy"/><br/>Octopus Deploy</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/octopusdeploy/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/octopus.svg" alt="Octopus Deploy"/><br/>Octopus Deploy</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/render/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/render.svg" alt="Render"/><br/>Render</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/semaphore/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/semaphore-logo-sign-black.svg" alt="Semaphore"/><br/>Semaphore</a></td>
 </tr>
@@ -106,8 +111,10 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 <tr>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dockerhub/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/docker.svg" alt="DockerHub"/><br/>DockerHub</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/hetzner-cloud/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/hetzner.svg" alt="Hetzner Cloud"/><br/>Hetzner Cloud</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/azure/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/azure.svg" alt="Azure"/><br/>Azure</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/hetznercloud/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/hetzner.svg" alt="Hetzner Cloud"/><br/>Hetzner Cloud</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/microsoftazure/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/azure.svg" alt="Azure"/><br/>Azure</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/oraclecloudinfrastructure/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/oci.svg" alt="Oracle Cloud Infrastructure"/><br/>OCI</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/coolify/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/coolify.svg" alt="Coolify"/><br/>Coolify</a></td>
 </tr>
 </table>
 
@@ -119,6 +126,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dash0/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/dash0.svg" alt="Dash0"/><br/>Dash0</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/grafana/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/grafana.svg" alt="Grafana"/><br/>Grafana</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/honeycomb/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/honeycomb.svg" alt="Honeycomb"/><br/>Honeycomb</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/logfire/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/logfire.svg" alt="Logfire"/><br/>Logfire</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/newrelic/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/newrelic.svg" alt="New Relic"/><br/>New Relic</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/prometheus/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/prometheus.svg" alt="Prometheus"/><br/>Prometheus</a></td>
 </tr>
@@ -148,7 +156,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/sendgrid/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/sendgrid.svg" alt="SendGrid"/><br/>SendGrid</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/slack/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/slack.svg" alt="Slack"/><br/>Slack</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/smtp/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/smtp.svg" alt="SMTP"/><br/>SMTP</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/teams/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/teams.svg" alt="Microsoft Teams"/><br/>Microsoft Teams</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/microsoftteams/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/teams.svg" alt="Microsoft Teams"/><br/>Microsoft Teams</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/telegram/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/telegram.svg" alt="Telegram"/><br/>Telegram</a></td>
 </tr>
 </table>
@@ -166,18 +174,24 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 
 <table>
 <tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/cloudsmith/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/cloudsmith.svg" alt="Cloudsmith"/><br/>Cloudsmith</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/daytona/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/daytona.svg" alt="Daytona"/><br/>Daytona</a></td>
-<td align="center" width="150"><a href="https://docs.superplane.com/components/jfrog-artifactory/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/jfrog-artifactory.svg" alt="JFrog Artifactory"/><br/>JFrog Artifactory</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/jfrogartifactory/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/jfrog-artifactory.svg" alt="JFrog Artifactory"/><br/>JFrog Artifactory</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/launchdarkly/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/launchdarkly.svg" alt="LaunchDarkly"/><br/>LaunchDarkly</a></td>
 </tr>
 </table>
 
+## Security
+
+- **RBAC** and **service accounts** for API access — see [access control](https://docs.superplane.com/concepts/access-control/) and [service accounts](https://docs.superplane.com/concepts/service-accounts/)
+- **Secrets** stored encrypted — see [secrets](https://docs.superplane.com/concepts/secrets/)
+
 ## Production installation
 
-You can deploy SuperPlane on a single host or on Kubernetes:
+**Footprint:** PostgreSQL, RabbitMQ, and the SuperPlane application (bundled in the single-host Docker Compose installer). Deploy on a single Linux host or Kubernetes (GKE, EKS) with external PostgreSQL. See the [installation overview](https://docs.superplane.com/installation/overview/) for topology-specific upgrade paths.
 
-- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** — AWS EC2, GCP Compute Engine, Hetzner, DigitalOcean, Linode, or any Linux server
+- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** — GKE, EKS, or any Kubernetes cluster
 
 Installation admins can enable private network access during owner setup or later in `/admin/settings` when SuperPlane needs to reach tools inside a VPC, private Kubernetes cluster, or another closed network. Environment variables still take precedence: set `BLOCKED_HTTP_HOSTS` or `BLOCKED_PRIVATE_IP_RANGES` to override the UI-controlled policy, and set either variable to an empty value to disable that specific block list entirely.
 
@@ -196,4 +210,3 @@ Apache License 2.0. See `LICENSE`.
 
 - **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
 - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
-

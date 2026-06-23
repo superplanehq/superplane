@@ -110,6 +110,15 @@ func publishDraftVersionInTransaction(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
+		hasStaging, err := models.HasWorkflowStagingInTransaction(tx, version.ID)
+		if err != nil {
+			return err
+		}
+
+		if hasStaging {
+			return status.Error(codes.FailedPrecondition, "draft version has staged changes")
+		}
+
 		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
 		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
 			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")

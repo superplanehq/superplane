@@ -17,6 +17,12 @@ const NODE_NO_PARAMS: SuperplaneComponentsNode = {
   },
 };
 
+const NODE_ACTION: SuperplaneComponentsNode = {
+  id: "node-2",
+  name: "publish-artifact",
+  type: "TYPE_ACTION",
+};
+
 const PANEL: ConsolePanel = {
   id: "deploy",
   type: "node",
@@ -31,19 +37,23 @@ const PANEL: ConsolePanel = {
 function renderPanel({
   canRunNodes,
   onTriggerNode,
+  nodes = [NODE_NO_PARAMS],
+  panel = PANEL,
 }: {
   canRunNodes: boolean;
   onTriggerNode?: (nodeId: string, options?: ConsoleTriggerOptions) => void | Promise<void>;
+  nodes?: SuperplaneComponentsNode[];
+  panel?: ConsolePanel;
 }) {
   return render(
     <ConsoleContextProvider
       canvasId="canvas-1"
       organizationId="org-1"
-      nodes={[NODE_NO_PARAMS]}
+      nodes={nodes}
       canRunNodes={canRunNodes}
       onTriggerNode={onTriggerNode}
     >
-      <NodePanelCard panel={PANEL} readOnly onDelete={() => undefined} onChange={() => undefined} />
+      <NodePanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
     </ConsoleContextProvider>,
   );
 }
@@ -90,5 +100,35 @@ describe("NodePanelCard run flow", () => {
     expect(runButton).toBeDisabled();
     fireEvent.click(runButton);
     expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("renders the custom label override instead of the resolved node name", () => {
+    renderPanel({
+      canRunNodes: true,
+      panel: {
+        id: "deploy",
+        type: "node",
+        content: {
+          title: "Deploy",
+          node: "deploy-prod",
+          label: "Ship to prod",
+          showRun: false,
+        },
+      },
+    });
+    expect(screen.getByTestId("node-panel-name").textContent).toBe("Ship to prod");
+  });
+
+  it("does not render the Run button for non-trigger nodes even when showRun is set", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE_ACTION],
+      panel: {
+        id: "publish",
+        type: "node",
+        content: { title: "Publish", node: "publish-artifact", showRun: true },
+      },
+    });
+    expect(screen.queryByTestId("node-panel-run")).toBeNull();
   });
 });
