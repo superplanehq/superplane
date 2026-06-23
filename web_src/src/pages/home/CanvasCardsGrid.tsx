@@ -1,5 +1,5 @@
 import { Heading } from "@/components/Heading/heading";
-import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Link } from "react-router-dom";
 import { appPath } from "@/lib/appPaths";
 import { CanvasActionsMenu } from "./CanvasActionsMenu";
@@ -122,7 +122,7 @@ function CanvasCard({
 
 interface CanvasMiniMapProps {
   nodes?: SuperplaneComponentsNode[];
-  edges?: SuperplaneComponentsEdge[];
+  edges?: ComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {

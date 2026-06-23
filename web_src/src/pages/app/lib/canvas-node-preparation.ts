@@ -7,7 +7,7 @@ import {
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
   type ActionsAction,
-  type SuperplaneComponentsEdge as ComponentsEdge,
+  type ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
   type TriggersTrigger,
 } from "@/api-client";
