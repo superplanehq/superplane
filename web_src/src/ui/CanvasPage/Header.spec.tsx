@@ -58,7 +58,7 @@ const versionsSidebarState = {
 } satisfies CanvasVersionsSidebarState;
 
 function renderHeader(
-  mode: "version-live" | "version-edit",
+  mode: "version-live",
   options?: {
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
@@ -102,7 +102,7 @@ describe("Header", () => {
   });
 
   it("shows the active draft label and exit control in edit mode", () => {
-    renderHeader("version-edit", {
+    renderHeader("version-live", {
       isEditing: true,
       activeDraftBranchLabel: "Draft #1",
       onExitEditMode: vi.fn(),

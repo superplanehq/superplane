@@ -10,7 +10,7 @@ import { CanvasVersionsSidebarTrigger } from "./components/CanvasVersionsSidebar
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type HeaderMode = "default" | "version-live" | "console" | "memory" | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
@@ -214,7 +214,7 @@ function PageHeader({
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
-  const editing = props.isEditing ?? props.mode === "version-edit";
+  const editing = props.isEditing ?? false;
   const editTabTone = props.editTabTone ?? (editing ? (props.hasStagingChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
@@ -262,7 +262,12 @@ function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
 
 function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
   return (
-    mode === "version-live" || mode === "version-edit" || mode === "console" || mode === "memory" || mode === "files"
+    !mode ||
+    mode === "default" ||
+    mode === "version-live" ||
+    mode === "console" ||
+    mode === "memory" ||
+    mode === "files"
   );
 }
 

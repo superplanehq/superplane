@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "console" | "memory" | "files";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version";
 
@@ -31,7 +31,7 @@ export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined
     return true;
   }
 
-  return headerMode === "version-live" || headerMode === "version-edit";
+  return headerMode === "version-live";
 }
 
 const CONSOLE_VIEW = "console";
