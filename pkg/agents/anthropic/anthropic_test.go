@@ -805,6 +805,32 @@ func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
 }
 
+func TestStreamEvents_MapsTokenUsageOnCompletedTurn(t *testing.T) {
+	const sse = "data: {\"type\":\"session.status_idle\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_read_input_tokens\":3,\"cache_creation_input_tokens\":2}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+	assert.Equal(t, "claude-sonnet-4-5", received[0].Model)
+	require.NotNil(t, received[0].Usage)
+	assert.Equal(t, int64(10), received[0].Usage.InputTokens)
+	assert.Equal(t, int64(5), received[0].Usage.OutputTokens)
+	assert.Equal(t, int64(3), received[0].Usage.CacheReadTokens)
+	assert.Equal(t, int64(2), received[0].Usage.CacheWriteTokens)
+	assert.Equal(t, int64(20), received[0].Usage.TotalTokens)
+}
+
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
 	const sse = "data: {\"id\":\"evt_fallback\",\"type\":\"agent.tool_use\",\"name\":\"search\"}\n\n" +
 		"data: {\"type\":\"session.status_idle\"}\n\n"
