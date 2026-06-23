@@ -68,8 +68,8 @@ export function useAppDraftStagingData({
     latestDraftVersion,
     committedBaselines,
   });
-  const commitCanvasStagingMutation = useCommitCanvasStaging(organizationId, canvasId, activeCanvasVersionId);
-  const discardCanvasStagingMutation = useDiscardCanvasStaging(organizationId, canvasId, activeCanvasVersionId);
+  const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId, activeCanvasVersionId);
+  const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId, activeCanvasVersionId);
 
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
     canvasId,
@@ -81,6 +81,7 @@ export function useAppDraftStagingData({
     hasDraftGraphDiffVersusLive,
     suppressUnpublishedDraftDiscard,
     enabled: true,
+    stageActiveConsole: hasEditableVersion,
     registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration,
   });

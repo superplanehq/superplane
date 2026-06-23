@@ -136,33 +136,6 @@ var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
 	return &smtpClientAdapter{client: client}, nil
 }
 
-func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error {
-	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
-	if err != nil {
-		return err
-	}
-
-	templateData := InvitationTemplateData{
-		ToEmail:          toEmail,
-		OrganizationName: organizationName,
-		InvitationLink:   invitationLink,
-		InviterEmail:     inviterEmail,
-	}
-
-	plainTextContent, err := s.renderTemplate("invitation.txt", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render invitation plain text template: %w", err)
-	}
-
-	htmlContent, err := s.renderTemplate("invitation.html", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render invitation HTML template: %w", err)
-	}
-
-	subject := "You have been invited to join an organization on SuperPlane"
-	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
-}
-
 func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
 	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
 	if err != nil {
@@ -183,40 +156,6 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 
 	subject := "Your SuperPlane sign-in code"
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
-}
-
-func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
-	if len(bccEmails) == 0 {
-		return nil
-	}
-
-	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if title == "" {
-		title = "SuperPlane Notification"
-	}
-
-	templateData := NotificationTemplateData{
-		Title:    title,
-		Body:     body,
-		URL:      url,
-		URLLabel: urlLabel,
-	}
-
-	plainTextContent, err := s.renderTemplate("notification.txt", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render notification plain text template: %w", err)
-	}
-
-	htmlContent, err := s.renderTemplate("notification.html", templateData)
-	if err != nil {
-		return fmt.Errorf("failed to render notification HTML template: %w", err)
-	}
-
-	return s.sendEmail(settings, nil, bccEmails, title, plainTextContent, htmlContent)
 }
 
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {

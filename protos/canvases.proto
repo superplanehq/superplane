@@ -1151,18 +1151,6 @@ message RepositoryBranchUpdatedMessage {
   string pushed_by_user_id = 7;
 }
 
-message NotificationEmailRequested {
-  string organization_id = 1;
-  string title = 2;
-  string body = 3;
-  string url = 4;
-  string url_label = 5;
-  repeated string emails = 6;
-  repeated string groups = 7;
-  repeated string roles = 8;
-  google.protobuf.Timestamp timestamp = 9;
-}
-
 message Console {
   message Panel {
     string id = 1;

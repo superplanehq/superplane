@@ -1,6 +1,7 @@
 package agents_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
 	persistedID := uuid.New()
 
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string, mode string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string, _ []agentservice.MessageImage, mode string) (*models.AgentSessionMessage, error) {
 			assert.Equal(t, chatID, sid)
 			assert.Equal(t, "operator", mode)
 			return &models.AgentSessionMessage{
@@ -60,7 +61,7 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
-		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error) {
 			return nil, gorm.ErrRecordNotFound
 		},
 	}
@@ -76,7 +77,7 @@ func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
-		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error) {
 			return nil, agentservice.ErrSessionBusy
 		},
 	}
@@ -93,7 +94,7 @@ func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
 	defer r.Close()
 
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, mode string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, _ []agentservice.MessageImage, mode string) (*models.AgentSessionMessage, error) {
 			assert.Equal(t, "builder", mode)
 			return &models.AgentSessionMessage{
 				ID:        uuid.New(),
@@ -110,4 +111,77 @@ func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
 		Mode:    pb.AgentMode_MODE_BUILDER,
 	})
 	require.NoError(t, err)
+}
+
+func TestSendAgentChatMessage_ForwardsAndSerializesImages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	var forwarded []agentservice.MessageImage
+	svc := &stubService{
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, content string, images []agentservice.MessageImage, _ string) (*models.AgentSessionMessage, error) {
+			forwarded = images
+			return &models.AgentSessionMessage{
+				ID:        uuid.New(),
+				Role:      models.AgentMessageRoleUser,
+				Content:   content,
+				Images:    []models.AgentSessionImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+				CreatedAt: now(),
+			}, nil
+		},
+	}
+
+	resp, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId:  uuid.NewString(),
+		Content: "",
+		Images:  []*pb.AgentChatImage{{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: []byte("hello")}},
+	})
+	require.NoError(t, err)
+	require.Len(t, forwarded, 1)
+	assert.Equal(t, "image/png", forwarded[0].MediaType)
+	assert.Equal(t, "aGVsbG8=", forwarded[0].Data)
+	require.Len(t, resp.Message.Images, 1)
+	assert.Equal(t, pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, resp.Message.Images[0].MediaType)
+	assert.Empty(t, resp.Message.Images[0].Data)
+}
+
+func TestSendAgentChatMessage_RejectsInvalidImages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{}
+
+	cases := []struct {
+		name  string
+		image *pb.AgentChatImage
+	}{
+		{"unsupported media type", &pb.AgentChatImage{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_UNSPECIFIED, Data: []byte("hello")}},
+		{"empty data", &pb.AgentChatImage{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+				ChatId: uuid.NewString(),
+				Images: []*pb.AgentChatImage{tc.image},
+			})
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
+func TestSendAgentChatMessage_RejectsImagesOverPayloadLimit(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{}
+
+	big := bytes.Repeat([]byte{0}, 2*1024*1024)
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId: uuid.NewString(),
+		Images: []*pb.AgentChatImage{
+			{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: big},
+			{MediaType: pb.AgentChatImageMediaType_MEDIA_TYPE_PNG, Data: big},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }

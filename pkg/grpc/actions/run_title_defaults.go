@@ -33,6 +33,8 @@ var defaultRunTitleExpressions = map[string]string{
 
 	"cloudflare.onLoadBalancingHealthAlert": "{{ root().data.alert_type }}",
 	"cloudflare.onTunnelHealth":             "{{ root().data.tunnel_name }}",
+	"cloudsmith.onPackageCreated":           "{{ root().data.name }} {{ root().data.version }} ({{ root().data.format }})",
+	"cloudsmith.onSecurityScanCompleted":    "{{ root().data.name }} {{ root().data.version }} - {{ root().data.security_scan_status }}",
 	"dash0.onAlertNotification":             "{{ root().data.issue.summary }}",
 	"dash0.onSyntheticCheckNotification":    "{{ root().data.issue.summary }}",
 	"dockerhub.onImagePush":                 "{{ root().data.repository.repo_name }}:{{ root().data.push_data.tag }}",

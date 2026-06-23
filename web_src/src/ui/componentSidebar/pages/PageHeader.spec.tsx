@@ -10,7 +10,7 @@ describe("PageHeader", () => {
   it("renders a compact back row for bottom layout", () => {
     const onBackToOverview = vi.fn();
 
-    render(<PageHeader page="history" onBackToOverview={onBackToOverview} compact />);
+    render(<PageHeader onBackToOverview={onBackToOverview} compact />);
 
     const backButton = screen.getByTestId("compact-page-header-back");
     expect(backButton).toHaveTextContent("Back");
@@ -21,7 +21,7 @@ describe("PageHeader", () => {
   });
 
   it("renders the legacy back header in sidebar layout", () => {
-    render(<PageHeader page="history" onBackToOverview={vi.fn()} />);
+    render(<PageHeader onBackToOverview={vi.fn()} />);
 
     expect(screen.queryByTestId("compact-page-header-back")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
