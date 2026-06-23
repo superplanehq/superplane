@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
+import { Activity, Gauge } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -17,7 +16,7 @@ interface UsageProps {
 type LimitCard = {
   label: string;
   value: string;
-  icon: typeof Layers3;
+  icon: typeof Activity;
   description: string;
 };
 
@@ -27,21 +26,13 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
-  const { data: users, isLoading: isLoadingUsers, error: usersError } = useOrganizationUsers(organizationId);
-  const {
-    data: integrations,
-    isLoading: isLoadingIntegrations,
-    error: integrationsError,
-  } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
-  const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
-  const anyError = [error, usersError, integrationsError].find(Boolean);
 
-  useReportPageReady(!anyLoading, {
-    failed: !!anyError,
+  useReportPageReady(!isLoading, {
+    failed: !!error,
   });
 
-  if (anyLoading) {
+  if (isLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -51,13 +42,13 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (anyError) {
+  if (error) {
     return (
       <div className="pt-6">
         <Alert variant="destructive">
           <Gauge className="h-4 w-4" />
           <AlertTitle>Unable to load usage</AlertTitle>
-          <AlertDescription>{anyError instanceof Error ? anyError.message : "Unknown error"}</AlertDescription>
+          <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
         </Alert>
       </div>
     );
@@ -81,36 +72,12 @@ export function Usage({ organizationId }: UsageProps) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
 
-  const memberCount = users ? users.length : 0;
-  const integrationCount = integrations ? integrations.length : 0;
-
-  return (
-    <UsageContent
-      data={data}
-      isPreviewMode={forceUsagePage && data.enabled !== true}
-      memberCount={memberCount}
-      integrationCount={integrationCount}
-    />
-  );
+  return <UsageContent data={data} isPreviewMode={forceUsagePage && data.enabled !== true} />;
 }
 
-function UsageContent({
-  data,
-  isPreviewMode,
-  memberCount,
-  integrationCount,
-}: {
-  data: OrganizationsDescribeUsageResponse;
-  isPreviewMode: boolean;
-  memberCount: number;
-  integrationCount: number;
-}) {
-  const usageCards = useMemo(
-    () => buildLimitCards(data.limits, memberCount, integrationCount),
-    [data.limits, memberCount, integrationCount],
-  );
+function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsageResponse; isPreviewMode: boolean }) {
+  const usageCards = useMemo(() => buildLimitCards(data.limits), [data.limits]);
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
-  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   return (
     <div className="pt-6 space-y-6">
@@ -124,14 +91,7 @@ function UsageContent({
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <UsageMetricCard
-          title="Canvases"
-          value={canvasUsage.value}
-          subtitle={canvasUsage.subtitle}
-          progress={canvasUsage.progress}
-          icon={Layers3}
-        />
+      <div className="grid gap-4">
         <UsageMetricCard
           title="Event Budget"
           value={eventUsage.value}
@@ -145,7 +105,7 @@ function UsageContent({
         <div className="mb-4">
           <h2 className="text-base font-medium text-gray-900 dark:text-white">Limits</h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {usageCards.map((card) => (
             <div
               key={card.label}
@@ -199,20 +159,6 @@ function UsageMetricCard({
   );
 }
 
-function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
-  const used = data?.usage?.canvases ?? 0;
-  const limit = data?.limits?.maxCanvases;
-  const limitLabel = formatNumericLimit(limit);
-
-  return {
-    value: `${formatNumber(used)} / ${limitLabel}`,
-    subtitle: isUnlimitedNumber(limit)
-      ? "This organization can create unlimited canvases."
-      : "Active canvases tracked against the organization limit.",
-    progress: percentage(used, limit),
-  };
-}
-
 function buildBucketUsage(
   level: number,
   capacity: number | undefined,
@@ -222,9 +168,7 @@ function buildBucketUsage(
 ) {
   const displayedLevel = Math.max(0, Math.ceil(level));
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited
-    ? `${formatNumber(displayedLevel)} consumed`
-    : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+  const value = `${formatNumber(displayedLevel)} / ${isUnlimited ? "∞" : formatNumber(capacity ?? 0)}`;
 
   let subtitle = defaultSubtitle;
   if (nextDecreaseAt) {
@@ -250,34 +194,8 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   );
 }
 
-function formatCountWithLimit(count: number, limit: number | undefined) {
-  return `${formatNumber(count)} / ${formatNumericLimit(limit)}`;
-}
-
-function buildLimitCards(
-  limits: OrganizationsOrganizationLimits | undefined,
-  memberCount: number,
-  integrationCount: number,
-): LimitCard[] {
+function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
   return [
-    {
-      label: "Nodes per canvas",
-      value: formatNumericLimit(limits?.maxNodesPerCanvas),
-      icon: Layers3,
-      description: "Maximum nodes allowed on a single canvas.",
-    },
-    {
-      label: "Members",
-      value: formatCountWithLimit(memberCount, limits?.maxUsers),
-      icon: Users,
-      description: "Maximum users allowed in the organization.",
-    },
-    {
-      label: "Integrations",
-      value: formatCountWithLimit(integrationCount, limits?.maxIntegrations),
-      icon: Database,
-      description: "Maximum connected integrations for the organization.",
-    },
     {
       label: "Retention window",
       value: formatDaysLimit(limits?.retentionWindowDays),
@@ -303,18 +221,6 @@ function percentage(value: number, max: number | undefined | null) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat().format(Math.round(value * 100) / 100);
-}
-
-function formatNumericLimit(value: number | undefined) {
-  if (value === undefined) {
-    return "-";
-  }
-
-  if (isUnlimitedNumber(value)) {
-    return "∞";
-  }
-
-  return formatNumber(value);
 }
 
 function formatStringLimit(value: string | undefined) {
