@@ -240,7 +240,7 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+  canvasStateMode?: "default" | "editing" | "previewing-previous-version";
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
   showBottomStatusControls?: boolean;
@@ -381,26 +381,6 @@ export interface CanvasPageProps {
 
   /** Returns to the current live canvas version from a published history preview. */
   onSeeCurrentVersion?: () => void;
-  /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
-  awaitingApprovalBanner?: {
-    title: string;
-    description?: string;
-    onApprove: () => void | Promise<void>;
-    onReject: () => void | Promise<void>;
-    onPublish: () => void | Promise<void>;
-    onOpenVersioningTab?: () => void;
-    /** Opens the same version node diff dialog as the version sidebar compare control. */
-    onViewNodeDiff?: () => void;
-    canAct: boolean;
-    actionPending: boolean;
-    /** Label + colors for open vs ready-to-publish (matches version sidebar + diff dialog). */
-    reviewUi: {
-      label: string;
-      floatingBarBgClassName: string;
-      dotClassName: string;
-      titleClassName: string;
-    };
-  };
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -1272,7 +1252,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
-  const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
 
@@ -1494,50 +1473,22 @@ function CanvasPage(props: CanvasPageProps) {
                 </div>
               </div>
             ) : null}
-            {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+            {showPreviewFloatingBar ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-                <div
-                  className={cn(
-                    "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 pl-3 pr-1.5 py-1.5",
-                    showAwaitingFloatingBar
-                      ? cn(
-                          "rounded-md shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                          props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName,
-                        )
-                      : "rounded-full bg-gray-500",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex min-w-0 max-w-full items-center gap-1",
-                      showAwaitingFloatingBar ? "text-sm" : "shrink-0 truncate text-[13px] font-medium text-white",
-                    )}
-                  >
-                    {showAwaitingFloatingBar ? (
-                      <>
-                        <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
-                        <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
-                          {props.awaitingApprovalBanner?.reviewUi.label}
-                        </span>
-                      </>
-                    ) : (
-                      "Previewing previous version"
-                    )}
+                <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
+                  <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
+                    Previewing previous version
                   </span>
                   <Button
                     type="button"
                     variant="outline"
                     size="xs"
-                    className={cn("shrink-0", !showAwaitingFloatingBar && "border-0 shadow-none")}
+                    className="shrink-0 border-0 shadow-none"
                     onClick={() => {
-                      if (showAwaitingFloatingBar) {
-                        props.awaitingApprovalBanner?.onViewNodeDiff?.();
-                      } else {
-                        props.onSeeCurrentVersion?.();
-                      }
+                      props.onSeeCurrentVersion?.();
                     }}
                   >
-                    {showAwaitingFloatingBar ? "View details" : "See Current Version"}
+                    See Current Version
                   </Button>
                 </div>
               </div>

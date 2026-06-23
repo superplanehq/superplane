@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "versions" | "console" | "memory" | "files";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
-export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version";
 
 const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory", "files"]);
 
@@ -151,19 +151,13 @@ export function getWorkflowHeaderMode({
 
 export function getWorkflowCanvasStateMode({
   hasEditableVersion,
-  isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
 }: {
   hasEditableVersion: boolean;
-  isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }): WorkflowCanvasStateMode {
   if (hasEditableVersion) {
     return "editing";
-  }
-
-  if (isViewingPendingApprovalVersion) {
-    return "awaiting-approval";
   }
 
   if (!isViewingCurrentLiveVersion) {
@@ -180,7 +174,6 @@ export function getWorkflowViewPresentation({
   isFilesMode,
   isVersionsMode,
   hasEditableVersion,
-  isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
 }: {
   isConsoleMode: boolean;
@@ -189,7 +182,6 @@ export function getWorkflowViewPresentation({
   isFilesMode: boolean;
   isVersionsMode: boolean;
   hasEditableVersion: boolean;
-  isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
   const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode || isVersionsMode;
@@ -198,7 +190,6 @@ export function getWorkflowViewPresentation({
     headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode, isVersionsMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
-      isViewingPendingApprovalVersion,
       isViewingCurrentLiveVersion,
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
