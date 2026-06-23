@@ -44,13 +44,12 @@ func ListCanvasVersionsPaginated(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
 	}
 
-	canvas, err := findCanvas(ctx, orgUUID, canvasUUID)
-	if err != nil {
+	if err := checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID); err != nil {
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(ctx, organizationID, canvas, uuid.MustParse(userID), limit, before)
+		return listDraftCanvasVersions(ctx, organizationID, canvasUUID, uuid.MustParse(userID), limit, before)
 	}
 
 	limit = getCanvasVersionLimit(limit)
@@ -60,13 +59,13 @@ func ListCanvasVersionsPaginated(
 	var publishedCount int64
 	err = telemetry.RunSpan(ctx, "canvases.list_published_versions", func(ctx context.Context) error {
 		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-			versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
+			versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvasUUID, int(limit), beforeTime)
 			if versionsErr != nil {
 				return versionsErr
 			}
 			publishedVersions = versions
 
-			count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvas.ID)
+			count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvasUUID)
 			if countErr != nil {
 				return countErr
 			}
@@ -92,7 +91,7 @@ func ListCanvasVersionsPaginated(
 func listDraftCanvasVersions(
 	ctx context.Context,
 	organizationID string,
-	canvas *models.Canvas,
+	canvasID uuid.UUID,
 	ownerID uuid.UUID,
 	limit uint32,
 	before *timestamppb.Timestamp,
@@ -104,13 +103,13 @@ func listDraftCanvasVersions(
 	var draftCount int64
 	err := telemetry.RunSpan(ctx, "canvases.list_draft_versions", func(ctx context.Context) error {
 		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-			versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID, int(limit), beforeTime)
+			versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID, int(limit), beforeTime)
 			if versionsErr != nil {
 				return versionsErr
 			}
 			draftVersions = versions
 
-			count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvas.ID, ownerID)
+			count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID)
 			if countErr != nil {
 				return countErr
 			}

@@ -289,6 +289,7 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: first\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -297,6 +298,7 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: second\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -343,6 +345,7 @@ func TestAppAgentTool_ReadUseDraftFalseIgnoresDraftVersionID(t *testing.T) {
 		r.Organization.ID,
 		canvasRepository.CanvasYAMLRepositoryPath,
 		"draft: selected\n",
+		"",
 		&updatedBy,
 	)
 	require.NoError(t, err)
@@ -711,11 +714,11 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	accessible := apiAccessByMethod(result.Accessible)
 	unavailable := apiAccessByMethod(result.Unavailable)
 
-	assert.Contains(t, accessible, pb.Canvases_ListRuns_FullMethodName)
-	assert.Equal(t, []string{canvasID}, accessible[pb.Canvases_ListRuns_FullMethodName].Resources)
-	assert.Contains(t, accessible, pb.Canvases_CreateCanvasVersion_FullMethodName)
-	assert.Contains(t, unavailable, pb.Canvases_ListCanvases_FullMethodName)
-	assert.Contains(t, unavailable, pb.Canvases_PublishCanvasVersion_FullMethodName)
+	assert.Contains(t, accessible, "GET /api/v1/canvases/{canvas_id}/runs")
+	assert.Equal(t, []string{canvasID}, accessible["GET /api/v1/canvases/{canvas_id}/runs"].Resources)
+	assert.Contains(t, accessible, "POST /api/v1/canvases/{canvas_id}/versions")
+	assert.Contains(t, unavailable, "GET /api/v1/canvases")
+	assert.Contains(t, unavailable, "PATCH /api/v1/canvases/{canvas_id}/versions/{version_id}/publish")
 
 	toolActions := toolAccessByAction(result.ToolActions)
 	require.Contains(t, toolActions, "create_draft")

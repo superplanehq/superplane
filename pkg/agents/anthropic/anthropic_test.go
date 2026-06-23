@@ -352,6 +352,35 @@ func TestSendMessage_NoPreamble(t *testing.T) {
 	assert.Equal(t, "hi", text)
 }
 
+func TestSendMessage_IncludesImageContentBlocks(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_abc", "look at this", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.NoError(t, err)
+
+	events := capturedBody["events"].([]any)
+	content := events[0].(map[string]any)["content"].([]any)
+	require.Len(t, content, 2)
+	assert.Equal(t, "look at this", content[0].(map[string]any)["text"].(string))
+
+	imageBlock := content[1].(map[string]any)
+	assert.Equal(t, "image", imageBlock["type"].(string))
+	source := imageBlock["source"].(map[string]any)
+	assert.Equal(t, "base64", source["type"].(string))
+	assert.Equal(t, "image/png", source["media_type"].(string))
+	assert.Equal(t, "aGVsbG8=", source["data"].(string))
+}
+
 func TestSendMessage_RequiresSessionID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("server should not be hit")
@@ -508,6 +537,50 @@ func TestDeleteSession_PropagatesAPIError(t *testing.T) {
 	err := p.DeleteSession(context.Background(), "sesn_abc")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "409")
+}
+
+func TestArchiveSession_SendsCorrectRequest(t *testing.T) {
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/sessions/sesn_abc/archive", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	require.NoError(t, p.ArchiveSession(context.Background(), "sesn_abc"))
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestArchiveSession_MapsUnavailableProviderSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"message":"session has been archived"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.ArchiveSession(context.Background(), "sesn_abc")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
+}
+
+func TestToolSchemaRevision_ReturnsStableRevision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("schema revision must not call provider API")
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	first := p.ToolSchemaRevision()
+	second := p.ToolSchemaRevision()
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, first, "agent-tools-v1:")
 }
 
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {

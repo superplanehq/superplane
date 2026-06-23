@@ -282,7 +282,7 @@ func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
-	result, err := SerializeNodeQueueItems([]models.CanvasNodeQueueItem{})
+	result, err := SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{})
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }

@@ -15,6 +15,8 @@ export interface RunsTabPanelProps {
   canvasId: string;
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
+  selectedRun?: CanvasesCanvasRun | null;
+  isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
   onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
@@ -38,6 +40,8 @@ export function RunsTabPanel({
   canvasId,
   runs,
   selectedRunId,
+  selectedRun: selectedRunProp = null,
+  isSelectedRunLoading = false,
   onSelectRun,
   onNavigateRun,
   onSelectLiveCanvas,
@@ -60,7 +64,10 @@ export function RunsTabPanel({
     initialOpenDetail && selectedRunId ? "detail" : "list",
   );
 
-  const selectedRun = useMemo(() => runs.find((run) => run.id === selectedRunId) || null, [runs, selectedRunId]);
+  const selectedRun = useMemo(
+    () => selectedRunProp ?? runs.find((run) => run.id === selectedRunId) ?? null,
+    [selectedRunProp, runs, selectedRunId],
+  );
 
   const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -157,7 +164,7 @@ export function RunsTabPanel({
     onNavigateRun: handleNavigateRun,
   });
 
-  const isDetailView = sidebarView === "detail" && !!selectedRun;
+  const isDetailView = sidebarView === "detail" && (!!selectedRun || (!!selectedRunId && isSelectedRunLoading));
   const isLiveCanvasSelected = !selectedRunId;
 
   return (
@@ -211,6 +218,10 @@ export function RunsTabPanel({
                 atOlderPaginationBoundary && hasNextPage && !filterState.hasAnyFilter ? handleNavigateOlder : undefined
               }
             />
+          ) : isSelectedRunLoading ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-sm text-gray-500">
+              Loading run…
+            </div>
           ) : null}
         </div>
       </div>

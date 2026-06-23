@@ -23,7 +23,6 @@ export type HeaderMode =
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
   canvasName?: string;
-  onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
@@ -43,10 +42,6 @@ export interface HeaderProps {
     diffCounts: { added: number; updated: number; removed: number };
   };
   organizationId?: string;
-  saveIsPrimary?: boolean;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -56,6 +51,7 @@ export interface HeaderProps {
   /** Commit staged canvas.yaml/console.yaml into the draft version row. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
+  resetStagingPending?: boolean;
   /** Discard staged edits, reverting to the last committed draft. */
   onResetStaging?: () => void;
   mode?: HeaderMode;

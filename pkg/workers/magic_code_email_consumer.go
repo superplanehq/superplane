@@ -68,15 +68,26 @@ func (c *MagicCodeEmailConsumer) Stop() {
 }
 
 func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
+	start := time.Now()
+	outcome := executorOutcomeSuccess
+	reason := executorReasonNone
+	defer func() {
+		recordEmailWorkerProcessing(start, emailTypeMagicCode, outcome, reason)
+	}()
+
 	var data messages.MagicCodeRequestedMessage
 	err := json.Unmarshal(delivery.Body(), &data)
 	if err != nil {
 		log.Errorf("Error unmarshaling magic code requested message: %v", err)
+		outcome = executorOutcomeFailed
+		reason = emailWorkerReasonInvalidMessage
 		return err
 	}
 
 	if data.Email == "" || data.Code == "" {
 		log.Errorf("Invalid magic code requested message: missing fields")
+		outcome = executorOutcomeSkipped
+		reason = emailWorkerReasonInvalidMessage
 		return nil
 	}
 
@@ -89,6 +100,9 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 		if data.RedirectURL != "" {
 			magicLink += "&redirect=" + url.QueryEscape(data.RedirectURL)
 		}
+		if data.SignupIntent {
+			magicLink += "&signup=true"
+		}
 	}
 
 	readableCode := formatReadableCode(data.Code)
@@ -96,6 +110,8 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 	err = c.EmailService.SendMagicCodeEmail(data.Email, readableCode, magicLink)
 	if err != nil {
 		log.Errorf("Failed to send magic code email to %s: %v", data.Email, err)
+		outcome = executorOutcomeFailed
+		reason = emailWorkerReasonSendError
 		return err
 	}
 

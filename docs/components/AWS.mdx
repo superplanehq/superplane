@@ -65,6 +65,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Prometheus • Create Workspace" href="#prometheus-•-create-workspace" description="Create an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Delete Workspace" href="#prometheus-•-delete-workspace" description="Delete an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Get Workspace" href="#prometheus-•-get-workspace" description="Get an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Query" href="#prometheus-•-query" description="Execute a PromQL instant query against an Amazon Managed Service for Prometheus workspace" />
+  <LinkCard title="Prometheus • Query Range" href="#prometheus-•-query-range" description="Execute a PromQL range query against an Amazon Managed Service for Prometheus workspace" />
   <LinkCard title="Prometheus • Update Workspace" href="#prometheus-•-update-workspace" description="Update a Prometheus workspace alias" />
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
@@ -2649,6 +2651,117 @@ The Get Workspace component retrieves details for an Amazon Managed Service for 
   },
   "timestamp": "2026-01-01T00:05:00.000000000Z",
   "type": "aws.prometheus.workspace"
+}
+```
+
+<a id="prometheus-•-query"></a>
+
+## Prometheus • Query
+
+**Component key:** `aws.prometheus.query`
+
+The Query component executes an instant PromQL query against an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Query**: Required PromQL expression to evaluate. Example: `up`
+- **Time**: Optional evaluation timestamp in RFC3339 or Unix format
+- **Timeout**: Optional query timeout duration
+- **Query sample thresholds**: Optional warning and error thresholds for query samples processed
+
+### Output
+
+Emits one `aws.prometheus.query` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "94.39090288589495"
+        ]
+      },
+      {
+        "metric": {
+          "component": "run_promql_range_query",
+          "instance": "host.docker.internal:8000"
+        },
+        "value": [
+          1781107045,
+          "72.52482929121066"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.query"
+}
+```
+
+<a id="prometheus-•-query-range"></a>
+
+## Prometheus • Query Range
+
+**Component key:** `aws.prometheus.queryRange`
+
+The Query Range component executes a range PromQL query against an Amazon Managed Service for Prometheus workspace.
+
+### Configuration
+
+- **Region**: AWS region of the workspace
+- **Workspace**: Target workspace
+- **Query**: Required PromQL expression to evaluate. Example: `up`
+- **Start**: Required start timestamp in RFC3339 or Unix format. Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format. Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step. Example: `15s`
+- **Timeout**: Optional query timeout duration
+- **Query sample thresholds**: Optional warning and error thresholds for query samples processed
+
+### Output
+
+Emits one `aws.prometheus.queryRange` payload with the result type and results.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "component": "run_promql_query"
+        },
+        "values": [
+          [
+            1781102220,
+            "0.620012400248005"
+          ],
+          [
+            1781102250,
+            "0.5400108002160044"
+          ],
+          [
+            1781105820,
+            "0.48"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.queryRange"
 }
 ```
 

@@ -29,7 +29,7 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
 
-	_, err = findCanvas(ctx, orgUUID, canvasUUID)
+	err = checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")

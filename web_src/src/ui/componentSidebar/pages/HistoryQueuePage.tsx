@@ -15,17 +15,10 @@ interface HistoryQueuePageProps {
   openEventIds: Set<string>;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
-  onTriggerNavigate?: (event: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<CanvasesCanvasNodeExecution[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
@@ -48,11 +41,9 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   openEventIds,
   onToggleOpen,
   onEventClick,
-  onTriggerNavigate,
   getTabData,
   onCancelExecution,
   onReEmit,
-  loadExecutionChain,
   getExecutionState,
   compact = false,
   resolveRunId,
@@ -138,11 +129,9 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 isOpen={page !== "history" ? openEventIds.has(event.id) || event.isOpen : false}
                 onToggleOpen={onToggleOpen}
                 onEventClick={onEventClick}
-                onTriggerNavigate={onTriggerNavigate}
                 tabData={getTabData?.(event)}
                 onCancelExecution={onCancelExecution}
                 onReEmit={onReEmit}
-                loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
               />
             ))}

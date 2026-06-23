@@ -218,6 +218,48 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
   });
 
+  it("rejects stale run events when patching the describe-run cache", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(canvasKeys.run(testCanvasId, "run-1"), {
+      run: {
+        id: "run-1",
+        canvasId: testCanvasId,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: "2026-06-01T12:01:00.000Z",
+      },
+    });
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("run_started", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const describedRun = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(testCanvasId, "run-1"));
+    expect(describedRun?.run?.state).toBe("STATE_FINISHED");
+    expect(describedRun?.run?.result).toBe("RESULT_PASSED");
+  });
+
+  it("seeds describe-run cache when websocket events arrive before describe loads", () => {
+    const queryClient = new QueryClient();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("run_finished", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    const describedRun = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(testCanvasId, "run-1"));
+    expect(describedRun?.run?.state).toBe("STATE_FINISHED");
+    expect(describedRun?.run?.result).toBe("RESULT_PASSED");
+  });
+
   it("does not invalidate runs on initial websocket connect", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
@@ -300,7 +342,9 @@ describe("useCanvasWebsocket", () => {
     expect(stagedPredicate).toBeDefined();
     expect(stagedPredicate({ queryKey: canvasKeys.versionStagedDetail(testCanvasId, "version-1") })).toBe(true);
     expect(stagedPredicate({ queryKey: canvasKeys.consoleStaged(testCanvasId, "version-1") })).toBe(true);
-    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1", true) })).toBe(
+      true,
+    );
     expect(
       stagedPredicate({ queryKey: canvasKeys.repositoryFileContent(testCanvasId, "README.md", "version-1", true) }),
     ).toBe(true);

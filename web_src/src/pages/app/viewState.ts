@@ -88,6 +88,37 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+/** Run inspection is only valid on the canvas tab; panel views must be cleared first. */
+export function clearNonCanvasViewSearchParam(params: URLSearchParams): void {
+  const view = params.get("view") ?? "";
+  if (!isWorkflowCanvasViewParam(view)) {
+    params.delete("view");
+  }
+}
+
+export function applyRunInspectionNavigationSearchParams(
+  params: URLSearchParams,
+  options: {
+    runId: string;
+    nodeId?: string | null;
+  },
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.set("run", options.runId);
+
+  if (options.nodeId) {
+    next.set("sidebar", "1");
+    next.set("node", options.nodeId);
+  } else {
+    next.delete("sidebar");
+    next.delete("node");
+  }
+
+  clearNonCanvasViewSearchParam(next);
+  next.delete("file");
+  return next;
+}
+
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isMemoryMode,
@@ -201,24 +232,17 @@ export function getExitEditModeDisabledTooltip({
 }
 
 export function getRunActionState({
-  hasRunBlockingChanges,
   canUpdateCanvas,
   canvasDeletedRemotely,
   isViewingDraftVersion,
   isViewingCurrentLiveVersion,
 }: {
-  hasRunBlockingChanges: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   isViewingDraftVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }): { disabled: boolean; tooltip?: string } {
-  const disabled =
-    hasRunBlockingChanges ||
-    !canUpdateCanvas ||
-    canvasDeletedRemotely ||
-    isViewingDraftVersion ||
-    !isViewingCurrentLiveVersion;
+  const disabled = !canUpdateCanvas || canvasDeletedRemotely || isViewingDraftVersion || !isViewingCurrentLiveVersion;
 
   if (canvasDeletedRemotely) {
     return { disabled, tooltip: "This canvas was deleted in another session." };
@@ -234,10 +258,6 @@ export function getRunActionState({
 
   if (!canUpdateCanvas) {
     return { disabled, tooltip: "You don't have permission to emit events on this canvas." };
-  }
-
-  if (hasRunBlockingChanges) {
-    return { disabled, tooltip: "Save canvas changes before running" };
   }
 
   return { disabled, tooltip: undefined };

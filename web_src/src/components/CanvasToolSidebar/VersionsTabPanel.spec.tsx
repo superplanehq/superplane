@@ -61,20 +61,6 @@ describe("VersionsTabPanel", () => {
     expect(screen.queryByTestId("canvas-create-draft-button")).not.toBeInTheDocument();
   });
 
-  it("renders the git-backed footer with a copy clone command action", () => {
-    render(
-      <VersionsTabPanel
-        liveVersions={[]}
-        canUpdateCanvas={true}
-        canvasDeletedRemotely={false}
-        onUseVersion={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("versions-sidebar-footer")).toBeInTheDocument();
-    expect(screen.getByTestId("versions-sidebar-copy-clone-command")).toBeInTheDocument();
-  });
-
   it("selects a version when a row is clicked", () => {
     const onUseVersion = vi.fn();
 

@@ -36,6 +36,34 @@ window.SUPERPLANE_DASH0_ENVIRONMENT = "{{ .Dash0WebEnvironment }}";
 	}
 }
 
+func TestRenderIndexTemplateIncludesSignupWaitlistHubSpotConfig(t *testing.T) {
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID", "portal-1")
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_FORM_ID", "form-1")
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_REGION", "eu1")
+
+	raw := []byte(`<script>
+window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "{{ .SignupWaitlistHubSpotPortalID }}";
+window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "{{ .SignupWaitlistHubSpotFormID }}";
+window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION = "{{ .SignupWaitlistHubSpotRegion }}";
+</script>`)
+
+	rendered, err := RenderIndexTemplate(raw)
+	if err != nil {
+		t.Fatalf("RenderIndexTemplate() error = %v", err)
+	}
+
+	body := string(rendered)
+	for _, want := range []string{
+		`window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "portal-1"`,
+		`window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "form-1"`,
+		`window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION = "eu1"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected rendered template to contain %q, got %q", want, body)
+		}
+	}
+}
+
 func TestDash0WebServiceNameDefaults(t *testing.T) {
 	t.Setenv("DASH0_WEB_SERVICE_NAME", "")
 
@@ -62,7 +90,9 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	t.Setenv("SENTRY_DSN", "")
 	t.Setenv("SENTRY_ENVIRONMENT", "")
 	t.Setenv("POSTHOG_KEY", "")
-	t.Setenv("AGENT_ENABLED", "no")
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID", "portal-1")
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_FORM_ID", "form-1")
+	t.Setenv("SIGNUP_WAITLIST_HUBSPOT_REGION", "eu1")
 
 	data := newIndexTemplateDataFromEnv()
 	if data.Dash0WebOTLPEndpoint != "https://example.test:4318" {
@@ -77,7 +107,13 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 	if data.Dash0WebEnvironment != "development" {
 		t.Fatalf("Dash0WebEnvironment = %q", data.Dash0WebEnvironment)
 	}
-	if data.AgentEnabled {
-		t.Fatal("expected AgentEnabled to be false")
+	if data.SignupWaitlistHubSpotPortalID != "portal-1" {
+		t.Fatalf("SignupWaitlistHubSpotPortalID = %q", data.SignupWaitlistHubSpotPortalID)
+	}
+	if data.SignupWaitlistHubSpotFormID != "form-1" {
+		t.Fatalf("SignupWaitlistHubSpotFormID = %q", data.SignupWaitlistHubSpotFormID)
+	}
+	if data.SignupWaitlistHubSpotRegion != "eu1" {
+		t.Fatalf("SignupWaitlistHubSpotRegion = %q", data.SignupWaitlistHubSpotRegion)
 	}
 }

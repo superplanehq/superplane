@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { IntegrationResourceFieldRenderer } from "@/ui/configurationFieldRenderer/IntegrationResourceFieldRenderer";
+import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/SecretPickerFieldRenderer";
 import type { AppEntry } from "./AppDetailModal";
 import { IntegrationIcons } from "./AppDetailModal";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
@@ -31,6 +32,8 @@ interface InstallProgressPanelProps {
   app: AppEntry;
   organizationId?: string;
   canvasName?: string;
+  /** When provided, the panel renders the canvas name as an editable input. */
+  onCanvasNameChange?: (name: string) => void;
   /** When true, skips preview fetch (caller already loaded data via preloaded props). */
   skipPreviewFetch?: boolean;
   preloadedIntegrations?: string[];
@@ -42,6 +45,7 @@ export function InstallProgressPanel({
   app,
   organizationId: propOrgId,
   canvasName,
+  onCanvasNameChange,
   skipPreviewFetch,
   preloadedIntegrations,
   preloadedParams,
@@ -91,6 +95,12 @@ export function InstallProgressPanel({
   return (
     <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
       <AppInfoHeader app={app} integrations={integrations} />
+
+      {onCanvasNameChange && (
+        <div className="mb-5 border-t border-slate-100 pt-4">
+          <AppNameSection value={canvasName ?? ""} onChange={onCanvasNameChange} />
+        </div>
+      )}
 
       {hasIntegrations && (
         <div className="mb-5 border-t border-slate-100 pt-4">
@@ -236,6 +246,24 @@ function AppInfoHeader({ app, integrations }: { app: AppEntry; integrations: str
   );
 }
 
+function AppNameSection({ value, onChange }: { value: string; onChange: (name: string) => void }) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="install-app-name" className="text-xs">
+        App name
+        <span className="text-red-500 ml-0.5">*</span>
+      </Label>
+      <Input
+        id="install-app-name"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Give this app a name"
+        className="h-8 text-xs"
+      />
+    </div>
+  );
+}
+
 function RequirementsList({ requirements }: { requirements: string[] }) {
   return (
     <ul className="mt-2 space-y-0.5">
@@ -280,12 +308,21 @@ function ParamsSection({
                   type: "integration-resource",
                   placeholder: param.placeholder,
                   required: param.required,
-                  typeOptions: { resource: { type: param.resourceType } },
+                  typeOptions: { resource: { type: param.resourceType, useNameAsValue: param.useNameAsValue } },
                 }}
                 value={values[param.name]}
                 onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: normalizeResourceValue(val) }))}
                 organizationId={organizationId}
                 integrationId={integrationSelections[param.integration]?.id}
+              />
+            ) : param.type === "secret_picker" ? (
+              <SecretPickerFieldRenderer
+                id={`param-${param.name}`}
+                placeholder={param.placeholder}
+                required={param.required}
+                value={values[param.name]}
+                onChange={(val) => onChange((prev) => ({ ...prev, [param.name]: val }))}
+                organizationId={organizationId}
               />
             ) : (
               <Input

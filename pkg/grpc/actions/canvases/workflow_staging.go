@@ -174,7 +174,7 @@ func StageRepositorySpecFileOperations(
 		}
 
 		if operation.GetDelete() {
-			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, &userUUID); err != nil {
+			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, "", &userUUID); err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to stage deletion of %q: %v", normalized, err)
 			}
 			continue
@@ -185,6 +185,7 @@ func StageRepositorySpecFileOperations(
 			organizationUUID,
 			normalized,
 			string(operation.GetContent()),
+			"",
 			&userUUID,
 		); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to stage %q: %v", normalized, err)
@@ -229,6 +230,10 @@ func ReadStagedRepositoryFile(
 	_, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", false, false, err
+	}
+
+	if version.State != models.CanvasVersionStateDraft {
+		return "", false, false, nil
 	}
 
 	if err := ensureStagedReadAllowed(ctx, version); err != nil {

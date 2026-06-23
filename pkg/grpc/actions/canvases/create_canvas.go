@@ -40,6 +40,38 @@ func CreateCanvas(
 	autoLayout *pb.CanvasAutoLayout,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
+	return CreateCanvasWithSeedFiles(
+		ctx,
+		registry,
+		encryptor,
+		authService,
+		gitProvider,
+		webhookBaseURL,
+		organizationID,
+		pbCanvas,
+		autoLayout,
+		usageService,
+		nil,
+	)
+}
+
+// CreateCanvasWithSeedFiles is the variant called by the app install flow. It
+// persists the provided files alongside the canvas's pending repository row so
+// the repository provisioner can commit them as the repo's initial content. A
+// nil/empty seedFiles slice is equivalent to calling CreateCanvas.
+func CreateCanvasWithSeedFiles(
+	ctx context.Context,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	gitProvider git.Provider,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+	usageService usage.Service,
+	seedFiles []models.RepositorySeedFile,
+) (*pb.CreateCanvasResponse, error) {
 	if pbCanvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
@@ -139,13 +171,19 @@ func CreateCanvas(
 			return err
 		}
 
-		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+		repository, err := canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
 			OrganizationID: organizationID,
 			CanvasID:       canvasID,
 		}))
 
 		if err != nil {
 			return err
+		}
+
+		if len(seedFiles) > 0 {
+			if err := models.CreateRepositorySeedFilesInTransaction(tx, repository.ID, seedFiles); err != nil {
+				return err
+			}
 		}
 
 		//
@@ -211,7 +249,12 @@ func CreateCanvas(
 		}
 	}
 
-	proto, err := SerializeCanvas(&canvas, false, user)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+	}
+
+	proto, err := SerializeCanvas(&canvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -86,6 +86,7 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
   const ctx = useConsoleContext();
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
 
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
@@ -104,7 +105,7 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
           </p>
         ) : null}
       </div>
-      {entry.showRun ? <NodesPanelRunControl entry={entry} resolved={resolved} /> : null}
+      {entry.showRun && isTrigger ? <NodesPanelRunControl entry={entry} resolved={resolved} /> : null}
     </li>
   );
 }
@@ -225,6 +226,8 @@ function NodesPanelEntryRow({
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const showRunId = useId();
+  const resolved = resolveConsoleNode(ctx, entry.node);
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
 
   return (
     <div className="space-y-2 rounded border border-slate-200 p-2.5">
@@ -278,27 +281,35 @@ function NodesPanelEntryRow({
           rows={1}
         />
       </div>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={showRunId}
-          checked={Boolean(entry.showRun)}
-          onCheckedChange={(checked) => onChange({ showRun: checked === true })}
-          className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
-        />
-        <Label htmlFor={showRunId} className="text-xs text-slate-700">
-          Show a manual "Run" button (requires run permission).
-        </Label>
-      </div>
-      {entry.showRun ? (
-        <div className="space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600">Trigger template (optional)</Label>
-          <Input
-            value={entry.triggerName ?? ""}
-            onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
-            placeholder="e.g. manual"
-            className="h-8"
-          />
-        </div>
+      {isTrigger ? (
+        <>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={showRunId}
+              checked={Boolean(entry.showRun)}
+              onCheckedChange={(checked) => onChange({ showRun: checked === true })}
+              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+            />
+            <Label htmlFor={showRunId} className="text-xs text-slate-700">
+              Show a manual "Run" button (requires run permission).
+            </Label>
+          </div>
+          {entry.showRun ? (
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-medium text-slate-600">Trigger template (optional)</Label>
+              <Input
+                value={entry.triggerName ?? ""}
+                onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
+                placeholder="e.g. manual"
+                className="h-8"
+              />
+            </div>
+          ) : null}
+        </>
+      ) : entry.node && resolved ? (
+        <p className="text-[11px] text-slate-500">
+          Only trigger nodes can be run from the console. Pick the trigger that starts your flow.
+        </p>
       ) : null}
     </div>
   );
