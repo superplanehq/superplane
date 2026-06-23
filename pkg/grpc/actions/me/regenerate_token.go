@@ -24,7 +24,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 
 	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		return nil, translateMeError(err, codes.Internal, "failed to load user")
 	}
 
 	if user.IsServiceAccount() {
@@ -38,7 +38,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 
 	err = user.UpdateTokenHash(crypto.HashToken(plainToken))
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update token")
+		return nil, translateMeError(err, codes.Internal, "failed to update token")
 	}
 
 	return &pb.RegenerateTokenResponse{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -35,6 +36,41 @@ func Test_ListUserPermissions(t *testing.T) {
 		_, err := GetUser(context.Background(), r.AuthService, false)
 		assert.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	})
+
+	t.Run("missing user returns codes.NotFound", func(t *testing.T) {
+		missingCtx := metadata.NewIncomingContext(
+			context.Background(),
+			metadata.Pairs(
+				"x-organization-id", orgID,
+				"x-user-id", uuid.NewString(),
+			),
+		)
+
+		_, err := GetUser(missingCtx, r.AuthService, false)
+
+		assert.Error(t, err)
+		assert.Equal(t, codes.NotFound, status.Code(err))
+	})
+
+	t.Run("canceled context returns codes.Canceled instead of HTTP 500", func(t *testing.T) {
+		canceledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		_, err := GetUser(canceledCtx, r.AuthService, false)
+
+		assert.Error(t, err)
+		assert.Equal(t, codes.Canceled, status.Code(err))
+	})
+
+	t.Run("canceled context when loading permissions returns codes.Canceled", func(t *testing.T) {
+		canceledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		_, err := GetUser(canceledCtx, r.AuthService, true)
+
+		assert.Error(t, err)
+		assert.Equal(t, codes.Canceled, status.Code(err))
 	})
 
 	t.Run("permissions not included in response", func(t *testing.T) {

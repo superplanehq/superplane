@@ -57,7 +57,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user roles")
+		return nil, translateMeError(err, codes.Internal, "failed to get user roles")
 	}
 
 	//
@@ -91,7 +91,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user groups")
+		return nil, translateMeError(err, codes.Internal, "failed to get user groups")
 	}
 
 	userProto.Groups = groups
@@ -109,7 +109,7 @@ func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		return nil, translateMeError(err, codes.Internal, "failed to load user")
 	}
 
 	return user, nil
