@@ -70,6 +70,11 @@ describe("validatePanelContent — markdown and node", () => {
     expect(validatePanelContent("node", { node: "" })).toBeNull();
     expect(validatePanelContent("node", { node: "deploy-prod" })).toBeNull();
   });
+
+  it("accepts an optional string label on node panels", () => {
+    expect(validatePanelContent("node", { node: "deploy-prod", label: "Ship" })).toBeNull();
+    expect(validatePanelContent("node", { node: "deploy-prod", label: 42 })).toMatch(/content\.label must be a string/);
+  });
 });
 
 describe("validatePanelContent — html", () => {
