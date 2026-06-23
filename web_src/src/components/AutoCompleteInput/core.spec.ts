@@ -61,6 +61,16 @@ describe("getSuggestions", () => {
     expect(findFirstSuggestion?.example).toBe('memory.findFirst("machines", {"creator": "igor"}).sandbox_id');
   });
 
+  it("does not suggest another memory method when the prefix exactly matches one", () => {
+    const suggestions = getSuggestions("memory.find", "memory.find".length, {});
+    expect(suggestions.map((item) => item.label)).not.toContain("findFirst");
+  });
+
+  it("suggests findFirst when the memory method prefix is partial", () => {
+    const suggestions = getSuggestions("memory.findF", "memory.findF".length, {});
+    expect(suggestions.map((item) => item.label)).toContain("findFirst");
+  });
+
   it("suggests root() payload fields after dot", () => {
     const suggestions = getSuggestions("root().", "root().".length, {
       __root: { github: { ref: "main" }, user: "alice" },

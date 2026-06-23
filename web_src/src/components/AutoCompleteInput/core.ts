@@ -650,6 +650,10 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     const mp = (memberPrefix ?? "").toLowerCase();
 
     if (!isFunctionCall && extractTailPathExpression(baseExpr) === "memory") {
+      if (MEMORY_METHODS.some((m) => m.name.toLowerCase() === mp)) {
+        return [];
+      }
+
       return MEMORY_METHODS.filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
         .slice(0, limit)
         .map((m) => ({
