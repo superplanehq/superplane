@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/git/inmemory"
@@ -282,7 +283,7 @@ func Test__WebhookBodyLimit(t *testing.T) {
 		Ref:  datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: runner.RunPythonComponentName}}),
 	}
 
-	require.Equal(t, MaxRunnerWebhookSize, webhookBodyLimit([]models.CanvasNode{runnerNode}))
+	require.Equal(t, config.MaxRunnerPayloadSize(), webhookBodyLimit([]models.CanvasNode{runnerNode}))
 
 	require.Equal(t, MaxEventSize, webhookBodyLimit([]models.CanvasNode{
 		runnerNode,
@@ -315,11 +316,22 @@ func Test__HandleWebhook_AllowsLargeRunnerBrokerCallback(t *testing.T) {
 	defer r.Close()
 
 	server := createPublicServerForTest(t, r)
-	webhookID := createWebhookNodeForTest(t, r, models.CanvasNode{
+	webhookID, canvas := createWebhookNodeForTest(t, r, models.CanvasNode{
 		NodeID: "run-python",
+		Name:   "Run Python",
 		Type:   models.NodeTypeComponent,
 		Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: runner.RunPythonComponentName}}),
 	})
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "run-python", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "run-python", rootEvent.ID, rootEvent.ID)
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(
+		database.Conn(),
+		canvas.ID,
+		"run-python",
+		execution.ID,
+		"task_id",
+		"task-1",
+	))
 
 	body := []byte(fmt.Sprintf(
 		`{"task_id":"task-1","status":"succeeded","exit_code":0,"result":%q}`,
@@ -334,6 +346,16 @@ func Test__HandleWebhook_AllowsLargeRunnerBrokerCallback(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, response.Code)
 	require.NotContains(t, response.Body.String(), "Request body is too large")
+
+	outputs, err := execution.GetOutputs()
+	require.NoError(t, err)
+	require.Len(t, outputs, 1)
+	outputData, ok := outputs[0].Data.Data().(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, runner.RunPythonFinishedEventType, outputData["type"])
+	payload, ok := outputData["data"].(map[string]any)
+	require.True(t, ok)
+	require.Len(t, payload["result"], MaxEventSize)
 }
 
 func Test__HandleWebhook_RejectsLargeNormalWebhook(t *testing.T) {
@@ -341,7 +363,7 @@ func Test__HandleWebhook_RejectsLargeNormalWebhook(t *testing.T) {
 	defer r.Close()
 
 	server := createPublicServerForTest(t, r)
-	webhookID := createWebhookNodeForTest(t, r, models.CanvasNode{
+	webhookID, _ := createWebhookNodeForTest(t, r, models.CanvasNode{
 		NodeID: "webhook",
 		Type:   models.NodeTypeTrigger,
 		Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "webhook"}}),
@@ -362,7 +384,7 @@ func Test__HandleWebhook_RejectsRunnerBrokerCallbackAboveBrokerLimit(t *testing.
 	defer r.Close()
 
 	server := createPublicServerForTest(t, r)
-	webhookID := createWebhookNodeForTest(t, r, models.CanvasNode{
+	webhookID, _ := createWebhookNodeForTest(t, r, models.CanvasNode{
 		NodeID: "run-python",
 		Type:   models.NodeTypeComponent,
 		Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: runner.RunPythonComponentName}}),
@@ -371,11 +393,11 @@ func Test__HandleWebhook_RejectsRunnerBrokerCallbackAboveBrokerLimit(t *testing.
 	response := execRequest(server, requestParams{
 		method: "POST",
 		path:   "/webhooks/" + webhookID.String(),
-		body:   []byte(strings.Repeat("x", MaxRunnerWebhookSize+1)),
+		body:   []byte(strings.Repeat("x", config.MaxRunnerPayloadSize()+1)),
 	})
 
 	require.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
-	require.Contains(t, response.Body.String(), fmt.Sprintf("up to %d bytes", MaxRunnerWebhookSize))
+	require.Contains(t, response.Body.String(), fmt.Sprintf("up to %d bytes", config.MaxRunnerPayloadSize()))
 }
 
 type canvasesGatewayStubServer struct {
@@ -503,7 +525,7 @@ func createPublicServerForTest(t *testing.T, r *support.ResourceRegistry) *Serve
 	return server
 }
 
-func createWebhookNodeForTest(t *testing.T, r *support.ResourceRegistry, node models.CanvasNode) uuid.UUID {
+func createWebhookNodeForTest(t *testing.T, r *support.ResourceRegistry, node models.CanvasNode) (uuid.UUID, *models.Canvas) {
 	t.Helper()
 
 	webhookID := uuid.New()
@@ -529,7 +551,7 @@ func createWebhookNodeForTest(t *testing.T, r *support.ResourceRegistry, node mo
 		Update("webhook_id", webhookID).
 		Error)
 
-	return webhookID
+	return webhookID, canvas
 }
 
 func execRequest(server *Server, params requestParams) *httptest.ResponseRecorder {

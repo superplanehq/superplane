@@ -26,6 +26,10 @@ func MaxPayloadSize() int {
 	return intFromEnv("SUPERPLANE_MAX_PAYLOAD_SIZE", 64*1024)
 }
 
+func MaxRunnerPayloadSize() int {
+	return intFromEnv("SUPERPLANE_MAX_RUNNER_PAYLOAD_SIZE", 4*1024*1024)
+}
+
 // AnthropicAgentConfig holds the credentials and identifiers needed to talk
 // to a single Anthropic managed agent. Empty values mean managed agents are
 // disabled on this installation.
