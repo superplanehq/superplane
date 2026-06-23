@@ -70,12 +70,15 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 
 <table>
 <tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/atlascloud/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/atlascloud.svg" alt="Atlas Cloud"/><br/>Atlas Cloud</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/claude/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/claude.svg" alt="Claude"/><br/>Claude</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/cursor/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/cursor.svg" alt="Cursor"/><br/>Cursor</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/openai/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/openai.svg" alt="OpenAI"/><br/>OpenAI</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/perplexity/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/perplexity.svg" alt="Perplexity"/><br/>Perplexity</a></td>
 </tr>
 </table>
+
+> [Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=superplane) is a full-modal AI inference platform that exposes a single OpenAI-compatible API for 300+ curated LLM, image, and video models. The Atlas Cloud integration connects once and lets `atlascloud.textPrompt` reach any of those models from your canvases. See the [model list](https://www.atlascloud.ai/models/list/llm?utm_source=github&utm_medium=link&utm_campaign=superplane) and the budget-friendly [Coding Plan](https://www.atlascloud.ai/console/coding-plan?utm_source=github&utm_medium=link&utm_campaign=superplane).
 
 ### Version Control & CI/CD
 

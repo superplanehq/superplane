@@ -172,6 +172,11 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as atlascloudComponentMappers,
+  triggerRenderers as atlascloudTriggerRenderers,
+  eventStateRegistry as atlascloudEventStateRegistry,
+} from "./atlascloud/index";
+import {
   componentMappers as grafanaComponentMappers,
   customFieldRenderers as grafanaCustomFieldRenderers,
   triggerRenderers as grafanaTriggerRenderers,
@@ -331,6 +336,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   octopus: octopusComponentMappers,
   teams: teamsComponentMappers,
   openai: openaiComponentMappers,
+  atlascloud: atlascloudComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   logfire: logfireComponentMappers,
@@ -379,6 +385,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   octopus: octopusTriggerRenderers,
   teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
+  atlascloud: atlascloudTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   logfire: logfireTriggerRenderers,
@@ -423,6 +430,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
   openai: openaiEventStateRegistry,
+  atlascloud: atlascloudEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   logfire: logfireEventStateRegistry,
