@@ -23,17 +23,18 @@ type ListPackagesSpec struct {
 
 // TrimmedPackage holds the subset of package fields emitted in the list result.
 type TrimmedPackage struct {
-	Description    string         `json:"description"`
-	DisplayName    string         `json:"display_name"`
-	Format         string         `json:"format"`
-	IsQuarantined  bool           `json:"is_quarantined"`
-	License        string         `json:"license"`
-	PolicyViolated bool           `json:"policy_violated"`
-	Repository     string         `json:"repository"`
-	SlugPerm       string         `json:"slug_perm"`
-	StageStr       string         `json:"stage_str"`
-	StatusStr      string         `json:"status_str"`
-	Tags           map[string]any `json:"tags"`
+	Description        string         `json:"description"`
+	DisplayName        string         `json:"display_name"`
+	Format             string         `json:"format"`
+	IsQuarantined      bool           `json:"is_quarantined"`
+	License            string         `json:"license"`
+	PolicyViolated     bool           `json:"policy_violated"`
+	Repository         string         `json:"repository"`
+	SecurityScanStatus string         `json:"security_scan_status"`
+	SlugPerm           string         `json:"slug_perm"`
+	StageStr           string         `json:"stage_str"`
+	StatusStr          string         `json:"status_str"`
+	Tags               map[string]any `json:"tags"`
 }
 
 // ListPackagesResult is the single payload emitted by ListPackages.Execute.
@@ -202,17 +203,18 @@ func (l *ListPackages) Execute(ctx core.ExecutionContext) error {
 	trimmed := make([]TrimmedPackage, len(packages))
 	for i, pkg := range packages {
 		trimmed[i] = TrimmedPackage{
-			Description:    pkg.Description,
-			DisplayName:    pkg.DisplayName,
-			Format:         pkg.Format,
-			IsQuarantined:  pkg.IsQuarantined,
-			License:        pkg.License,
-			PolicyViolated: pkg.PolicyViolated,
-			Repository:     pkg.Repository,
-			SlugPerm:       pkg.SlugPerm,
-			StageStr:       pkg.StageStr,
-			StatusStr:      pkg.StatusStr,
-			Tags:           pkg.Tags,
+			Description:        pkg.Description,
+			DisplayName:        pkg.DisplayName,
+			Format:             pkg.Format,
+			IsQuarantined:      pkg.IsQuarantined,
+			License:            pkg.License,
+			PolicyViolated:     pkg.PolicyViolated,
+			Repository:         pkg.Repository,
+			SecurityScanStatus: pkg.SecurityScanStatus,
+			SlugPerm:           pkg.SlugPerm,
+			StageStr:           pkg.StageStr,
+			StatusStr:          pkg.StatusStr,
+			Tags:               pkg.Tags,
 		}
 	}
 

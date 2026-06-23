@@ -53,21 +53,22 @@ describe("listPackagesMapper.getExecutionDetails", () => {
     expect(details["Quarantined"]).toBe("2");
   });
 
-  it("shows vulnerable (policy_violated) package count", () => {
+  it("shows vulnerable (security_scan_status) package count", () => {
     const ctx = buildDetailsCtx({
       execution: {
         outputs: {
           default: [
             buildListPackagesOutput([
-              buildTrimmedPackage({ policy_violated: true }),
-              buildTrimmedPackage({ policy_violated: false }),
+              buildTrimmedPackage({ security_scan_status: "Scan Detected Vulnerabilities" }),
+              buildTrimmedPackage({ security_scan_status: "No Vulnerabilities Found" }),
+              buildTrimmedPackage({ security_scan_status: "Scan Detected Vulnerabilities" }),
             ]),
           ],
         },
       },
     });
     const details = listPackagesMapper.getExecutionDetails(ctx);
-    expect(details["Vulnerable"]).toBe("1");
+    expect(details["Vulnerable"]).toBe("2");
   });
 
   it("shows zero quarantined and vulnerable when all packages are clean", () => {
@@ -108,6 +109,7 @@ function buildTrimmedPackage(overrides?: Partial<TrimmedPackageData>): TrimmedPa
     is_quarantined: false,
     policy_violated: false,
     repository: "production",
+    security_scan_status: "No Vulnerabilities Found",
     slug_perm: "perm123abc",
     stage_str: "Fully Synchronised",
     status_str: "Available",
