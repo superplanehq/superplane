@@ -93,86 +93,47 @@ describe("promotePackageEventStateRegistry.getState", () => {
 
 describe("promotePackageMapper metadata", () => {
   it("shows destination repository from configuration", () => {
-    const node = buildNode({
-      configuration: {
-        sourceRepository: "acme/staging",
-        package: "perm123",
-        destinationRepository: "acme/production",
-        mode: "copy",
-      },
-      metadata: {},
-    });
-    const metadata =
-      promotePackageMapper.props({
-        nodes: [node],
-        node,
-        componentDefinition: {
-          name: "cloudsmith.promotePackage",
-          label: "Promote Package",
-          description: "",
-          icon: "copy",
-          color: "blue",
-        },
-        lastExecutions: [],
-      }).metadata ?? [];
-    const labels = metadata.map((m) => m.label);
+    const labels = getMetadataLabels({ destinationRepository: "acme/production", mode: "copy" });
     expect(labels).toContain("acme/production");
   });
 
   it("shows action label from configuration mode", () => {
-    const node = buildNode({
-      configuration: {
-        sourceRepository: "acme/staging",
-        package: "perm123",
-        destinationRepository: "acme/production",
-        mode: "move",
-      },
-      metadata: {},
-    });
-    const metadata =
-      promotePackageMapper.props({
-        nodes: [node],
-        node,
-        componentDefinition: {
-          name: "cloudsmith.promotePackage",
-          label: "Promote Package",
-          description: "",
-          icon: "copy",
-          color: "blue",
-        },
-        lastExecutions: [],
-      }).metadata ?? [];
-    const labels = metadata.map((m) => m.label);
+    const labels = getMetadataLabels({ destinationRepository: "acme/production", mode: "move" });
     expect(labels).toContain("Move");
   });
 
   it("shows Copy for copy mode", () => {
-    const node = buildNode({
-      configuration: {
-        sourceRepository: "acme/staging",
-        package: "perm123",
-        destinationRepository: "acme/production",
-        mode: "copy",
-      },
-      metadata: {},
-    });
-    const metadata =
-      promotePackageMapper.props({
-        nodes: [node],
-        node,
-        componentDefinition: {
-          name: "cloudsmith.promotePackage",
-          label: "Promote Package",
-          description: "",
-          icon: "copy",
-          color: "blue",
-        },
-        lastExecutions: [],
-      }).metadata ?? [];
-    const labels = metadata.map((m) => m.label);
+    const labels = getMetadataLabels({ destinationRepository: "acme/production", mode: "copy" });
     expect(labels).toContain("Copy");
   });
 });
+
+function getMetadataLabels(configOverrides: Record<string, string>): (string | unknown)[] {
+  const node = buildNode({
+    configuration: {
+      sourceRepository: "acme/staging",
+      package: "perm123",
+      ...configOverrides,
+    },
+    metadata: {},
+  });
+  const metadata =
+    promotePackageMapper.props({
+      nodes: [node],
+      node,
+      componentDefinition: {
+        name: "cloudsmith.promotePackage",
+        label: "Promote Package",
+        description: "",
+        icon: "copy",
+        color: "blue",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+    }).metadata ?? [];
+  return metadata.map((m) => m.label);
+}
 
 function buildPromoteOutput(data: unknown) {
   return buildPackageOutput(data, "cloudsmith.package.promoted");
