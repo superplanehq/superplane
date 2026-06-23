@@ -153,18 +153,6 @@ service Canvases {
     };
   }
 
-  rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version with a changeset";
-      description: "Update canvas version with a changeset";
-      tags: "CanvasVersion";
-    };
-  }
-
   rpc ValidateCanvasVersionChangeset(ValidateCanvasVersionChangesetRequest) returns (ValidateCanvasVersionChangesetResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
@@ -598,17 +586,6 @@ message StagingSummary {
   bool has_staging = 1;
   repeated string staged_paths = 2;
   optional string base_version_id = 3;
-}
-
-message ApplyCanvasVersionChangesetRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasChangeset changeset = 3;
-  CanvasAutoLayout auto_layout = 4;
-}
-
-message ApplyCanvasVersionChangesetResponse {
-  CanvasVersion version = 1;
 }
 
 message ValidateCanvasVersionChangesetRequest {
