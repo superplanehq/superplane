@@ -25,8 +25,6 @@ type ConfirmDeleteDraftBranchOptions = {
   setSearchParams: SetURLSearchParams;
   setActiveCanvasVersion: (value: CanvasesCanvasVersion | null) => void;
   setDraftCanvasSpec: (value: CanvasesCanvas["spec"] | null) => void;
-  setHasUnsavedChanges: (value: boolean) => void;
-  setHasNonPositionalUnsavedChanges: (value: boolean) => void;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
 };
 
@@ -48,8 +46,6 @@ export async function confirmDeleteDraftBranch({
   setSearchParams,
   setActiveCanvasVersion,
   setDraftCanvasSpec,
-  setHasUnsavedChanges,
-  setHasNonPositionalUnsavedChanges,
   setLastSavedWorkflowSnapshot,
 }: ConfirmDeleteDraftBranchOptions): Promise<void> {
   const branch = draftBranches.find((item) => draftVersionId(item) === versionId);
@@ -67,8 +63,6 @@ export async function confirmDeleteDraftBranch({
     await deleteDraftBranch(versionId);
 
     if (isActiveDraft) {
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
       exitToLive();
 
