@@ -914,13 +914,7 @@ export function AppPage() {
   ]);
 
   useEffect(() => {
-    if (
-      !organizationId ||
-      !canvasId ||
-      !activeCanvasVersionId ||
-      !loadedCanvasVersion?.spec ||
-      hasLocalSaveActivity
-    ) {
+    if (!organizationId || !canvasId || !activeCanvasVersionId || !loadedCanvasVersion?.spec || hasLocalSaveActivity) {
       return;
     }
 
@@ -949,13 +943,7 @@ export function AppPage() {
   }, [organizationId, canvasId, activeCanvasVersionId, loadedCanvasVersion, queryClient, hasLocalSaveActivity]);
 
   useEffect(() => {
-    if (
-      !remoteCanvasUpdatePending ||
-      hasLocalSaveActivity ||
-      canvasDeletedRemotely ||
-      !organizationId ||
-      !canvasId
-    ) {
+    if (!remoteCanvasUpdatePending || hasLocalSaveActivity || canvasDeletedRemotely || !organizationId || !canvasId) {
       return;
     }
 
@@ -3852,13 +3840,7 @@ export function AppPage() {
 
       handleUseVersion(versionID);
     },
-    [
-      handleUseVersion,
-      hasEditableVersion,
-      hasLocalSaveActivity,
-      effectiveLiveCanvasVersionId,
-      liveCanvasVersionId,
-    ],
+    [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
   );
 
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
