@@ -37,11 +37,7 @@
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI (requires a running `app` container from `make dev.up`):
-  - `make pb.gen` to regenerate protobuf files
-  - `make openapi.spec.gen` to generate OpenAPI spec for the API
-  - `make openapi.client.gen` to generate GoLang SDK for the API
-  - `make openapi.web.client.gen` to generate TypeScript SDK for the UI
+- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI with `make pb.gen`(requires a running `app` container from `make dev.up`)
 
 ## Coding Style & Naming Conventions
 
