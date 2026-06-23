@@ -14,7 +14,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { ListPackagesConfiguration, PackageData, RepositoryNodeMetadata } from "./types";
+import type { ListPackagesConfiguration, ListPackagesData, RepositoryNodeMetadata } from "./types";
 
 export const listPackagesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -42,18 +42,17 @@ export const listPackagesMapper: ComponentBaseMapper = {
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const firstPayload = outputs?.default?.[0];
-    const pkg = firstPayload?.data as PackageData | undefined;
-    if (!pkg) return details;
+    const result = firstPayload?.data as ListPackagesData | undefined;
+    const packages = result?.packages;
+    if (!packages) return details;
 
-    const totalCount = outputs?.default?.length;
-    if (totalCount != null) {
-      details["Packages Found"] = String(totalCount);
-    }
+    details["Packages Found"] = String(packages.length);
 
-    if (pkg.format) details["Format"] = pkg.format;
-    if (pkg.status_str) details["Status"] = pkg.status_str;
-    if (pkg.security_scan_status) details["Security Scan"] = pkg.security_scan_status;
-    if (pkg.self_webapp_url) details["Repository URL"] = pkg.self_webapp_url;
+    const quarantinedCount = packages.filter((p) => p.is_quarantined).length;
+    details["Quarantined"] = String(quarantinedCount);
+
+    const vulnerableCount = packages.filter((p) => p.policy_violated).length;
+    details["Vulnerable"] = String(vulnerableCount);
 
     return details;
   },
