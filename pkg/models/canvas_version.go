@@ -27,6 +27,11 @@ const (
 	MaterializationStatusDeleted = "deleted"
 
 	CanvasGitBranchMain = "main"
+
+	DraftBranchPrefix = "drafts/"
+
+	CanvasFileName  = "canvas.yaml"
+	ConsoleFileName = "console.yaml"
 )
 
 type CanvasVersion struct {
@@ -129,6 +134,18 @@ func FindLatestPublishedCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, err
 		return nil, err
 	}
 	return &version, nil
+}
+
+// NewDraftBranchName returns a fresh, unique draft branch name in the form
+// drafts/<random-uuid>. The branch carries no ownership information; the owner
+// is tracked on the materialized version row instead.
+func NewDraftBranchName() string {
+	return DraftBranchPrefix + uuid.New().String()
+}
+
+// IsDraftBranch reports whether a git branch is a canvas draft branch.
+func IsDraftBranch(branch string) bool {
+	return strings.HasPrefix(branch, DraftBranchPrefix)
 }
 
 func CreateDraftBranchFromLive(
@@ -544,7 +561,7 @@ func CreateDraftBranchFromLiveInTransaction(
 		}
 	}
 
-	branchName := newDraftBranchName()
+	branchName := NewDraftBranchName()
 	version := CanvasVersion{
 		ID:          uuid.New(),
 		WorkflowID:  canvasID,
@@ -676,12 +693,6 @@ func FindLiveCanvasSpecInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Node,
 	nodes := append([]Node(nil), version.Nodes...)
 	edges := append([]Edge(nil), version.Edges...)
 	return nodes, edges, nil
-}
-
-const canvasDraftBranchNamePrefix = "drafts/"
-
-func newDraftBranchName() string {
-	return canvasDraftBranchNamePrefix + uuid.New().String()
 }
 
 func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Canvas, error) {

@@ -57,6 +57,7 @@ services:
       START_EVENT_RETENTION_WORKER: "yes"
       START_USAGE_SYNC_WORKER: "yes"
       START_REPOSITORY_PROVISIONER: "yes"
+      START_REPOSITORY_MATERIALIZER: "no"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -149,7 +150,7 @@ services:
       - /tmp:/tmp
 
   supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
+    image: ghcr.io/superplanehq/supergit:${SUPERGIT_VERSION:-0.1.2}
     environment:
       SUPERGIT_ROOT: /var/lib/supergit/repos
       SUPERGIT_PORT: "8080"
