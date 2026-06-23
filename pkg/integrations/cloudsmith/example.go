@@ -27,6 +27,26 @@ func (g *GetPackage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPackageOnce, exampleOutputGetPackageBytes, &exampleOutputGetPackage)
 }
 
+//go:embed example_output_list_packages.json
+var exampleOutputListPackagesBytes []byte
+
+var exampleOutputListPackagesOnce sync.Once
+var exampleOutputListPackages map[string]any
+
+func (l *ListPackages) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputListPackagesOnce, exampleOutputListPackagesBytes, &exampleOutputListPackages)
+}
+
+//go:embed example_output_promote_package.json
+var exampleOutputPromotePackageBytes []byte
+
+var exampleOutputPromotePackageOnce sync.Once
+var exampleOutputPromotePackage map[string]any
+
+func (p *PromotePackage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputPromotePackageOnce, exampleOutputPromotePackageBytes, &exampleOutputPromotePackage)
+}
+
 //go:embed example_data_on_security_scan_completed.json
 var exampleDataOnSecurityScanCompletedBytes []byte
 

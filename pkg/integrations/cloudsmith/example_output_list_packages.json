@@ -1,0 +1,32 @@
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-app.manifest.json",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "display_name": "example-app",
+    "format": "docker",
+    "is_quarantined": false,
+    "is_sync_completed": true,
+    "is_sync_failed": false,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "policy_violated": false,
+    "repository": "example-repo",
+    "security_scan_status": "No Vulnerabilities Found",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/1.2.0/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/1.2.0/example-pkg-id",
+    "size": 54525952,
+    "size_str": "52.0 MB",
+    "slug": "example-app-abc2",
+    "slug_perm": "example-pkg-id",
+    "stage": 9,
+    "stage_str": "Fully Synchronised",
+    "status": 2,
+    "status_str": "Available",
+    "sync_progress": 100,
+    "uploaded_at": "2026-01-15T14:30:00Z",
+    "uploader": "example-user",
+    "version": "1.2.0"
+  },
+  "timestamp": "2026-01-15T14:35:00Z",
+  "type": "cloudsmith.packages.listed"
+}
