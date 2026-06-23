@@ -51,11 +51,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "delete",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}"}: {
-			Resource:   "members",
-			Action:     "delete",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/users/{user_id}"}: {
 			Resource:   "members",
 			Action:     "delete",
@@ -222,11 +217,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/integrations/{integration_id}/resources"}: {
 			Resource:   "integrations",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invitations"}: {
-			Resource:   "members",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -465,11 +455,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {
 			Resource:   "integrations",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations"}: {
-			Resource:   "members",
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
