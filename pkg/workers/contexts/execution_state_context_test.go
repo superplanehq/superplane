@@ -73,6 +73,27 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 		support.VerifyCanvasNodeEventsCount(t, canvas.ID, componentNodeID, 0)
 	})
 
+	t.Run("accepts large payload with custom max payload size", func(t *testing.T) {
+		rootData := map[string]any{"root": "event"}
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
+
+		ctx := NewExecutionStateContextWithMaxPayloadSize(
+			database.Conn(),
+			execution,
+			nil,
+			config.MaxPayloadSize()+4096,
+		)
+		largePayload := strings.Repeat("a", config.MaxPayloadSize()+100)
+
+		err := ctx.Emit("default", "test.payload", []any{largePayload})
+		require.NoError(t, err)
+
+		outputs, err := execution.GetOutputs()
+		require.NoError(t, err)
+		require.Len(t, outputs, 1)
+	})
+
 	t.Run("uses callback", func(t *testing.T) {
 		newEvents := []models.CanvasEvent{}
 		onNewEvents := func(events []models.CanvasEvent) {

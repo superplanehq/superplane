@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -321,7 +323,8 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindActionHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
+	nodeRef := node.Ref.Data()
+	hookProvider, _, err := w.registry.FindActionHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -338,7 +341,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+		ExecutionState: executionStateContextForHook(tx, execution, nodeRef, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
@@ -371,4 +374,22 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Request completed")
 	return request.Complete(tx)
+}
+
+func executionStateContextForHook(
+	tx *gorm.DB,
+	execution *models.CanvasNodeExecution,
+	nodeRef models.NodeRef,
+	onNewEvents func([]models.CanvasEvent),
+) *contexts.ExecutionStateContext {
+	if nodeRef.Component != nil && runner.IsRunnerComponent(nodeRef.Component.Name) {
+		return contexts.NewExecutionStateContextWithMaxPayloadSize(
+			tx,
+			execution,
+			onNewEvents,
+			config.MaxRunnerPayloadSize(),
+		)
+	}
+
+	return contexts.NewExecutionStateContext(tx, execution, onNewEvents)
 }

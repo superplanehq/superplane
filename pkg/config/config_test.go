@@ -39,3 +39,20 @@ func TestMaxPayloadSize(t *testing.T) {
 		assert.Equal(t, 64*1024, MaxPayloadSize())
 	})
 }
+
+func TestMaxRunnerPayloadSize(t *testing.T) {
+	t.Run("defaults to 4 MiB", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_MAX_RUNNER_PAYLOAD_SIZE", "")
+		assert.Equal(t, 4*1024*1024, MaxRunnerPayloadSize())
+	})
+
+	t.Run("reads SUPERPLANE_MAX_RUNNER_PAYLOAD_SIZE", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_MAX_RUNNER_PAYLOAD_SIZE", "1048576")
+		assert.Equal(t, 1048576, MaxRunnerPayloadSize())
+	})
+
+	t.Run("ignores invalid env values", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_MAX_RUNNER_PAYLOAD_SIZE", "not-a-number")
+		assert.Equal(t, 4*1024*1024, MaxRunnerPayloadSize())
+	})
+}
