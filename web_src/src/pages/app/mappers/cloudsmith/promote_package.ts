@@ -1,20 +1,37 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
+import { defaultStateFunction } from "../stateRegistry";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { PackageData, PackageNodeMetadata, PromotePackageConfiguration } from "./types";
+
+export const promotePackageEventStateRegistry: EventStateRegistry = {
+  stateMap: {
+    ...DEFAULT_EVENT_STATE_MAP,
+    copied: DEFAULT_EVENT_STATE_MAP.success,
+    moved: DEFAULT_EVENT_STATE_MAP.success,
+  },
+  getState: (execution) => {
+    const state = defaultStateFunction(execution);
+    if (state !== "success") return state;
+    const config = execution.configuration as PromotePackageConfiguration | undefined;
+    return config?.mode === "move" ? "moved" : "copied";
+  },
+};
 
 export const promotePackageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -74,6 +91,14 @@ function buildMetadata(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "archive", label: nodeMetadata.packageName });
   } else if (configuration?.package) {
     items.push({ icon: "archive", label: configuration.package });
+  }
+
+  if (configuration?.destinationRepository) {
+    items.push({ icon: "arrow-right", label: configuration.destinationRepository });
+  }
+
+  if (configuration?.mode) {
+    items.push({ icon: "copy", label: configuration.mode === "move" ? "Move" : "Copy" });
   }
 
   return items;
