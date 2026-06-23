@@ -46,7 +46,7 @@ type LiveLogAccessContext struct {
 	BrokerTaskID string
 }
 
-func isRunnerComponent(name string) bool {
+func IsRunnerComponent(name string) bool {
 	switch strings.TrimSpace(name) {
 	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
 		return true
@@ -85,7 +85,7 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 	}
 
 	ref := node.Ref.Data()
-	if ref.Component == nil || !isRunnerComponent(ref.Component.Name) {
+	if ref.Component == nil || !IsRunnerComponent(ref.Component.Name) {
 		return nil, ErrLiveLogNotRunner
 	}
 

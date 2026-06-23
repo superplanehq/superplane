@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -66,6 +67,9 @@ import (
 const (
 	// Event payload can be up to 64k in size
 	MaxEventSize = 64 * 1024
+
+	// Internal runner webhook callbacks can include larger runner result payloads.
+	MaxRunnerWebhookSize = 4 * 1024 * 1024
 
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
@@ -1145,7 +1149,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	if err != nil || len(nodes) == 0 {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	maxBodySize := webhookBodyLimit(nodes)
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBodySize))
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
@@ -1153,7 +1164,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(*http.MaxBytesError); ok {
 			http.Error(
 				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", maxBodySize),
 				http.StatusRequestEntityTooLarge,
 			)
 
@@ -1161,12 +1172,6 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return
-	}
-
-	nodes, err := models.FindActiveWebhookNodes(webhookID)
-	if err != nil || len(nodes) == 0 {
-		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
 
@@ -1202,6 +1207,25 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func webhookBodyLimit(nodes []models.CanvasNode) int {
+	if len(nodes) == 0 {
+		return MaxEventSize
+	}
+
+	for _, node := range nodes {
+		if node.Type != models.NodeTypeComponent {
+			return MaxEventSize
+		}
+
+		ref := node.Ref.Data()
+		if ref.Component == nil || !runner.IsRunnerComponent(ref.Component.Name) {
+			return MaxEventSize
+		}
+	}
+
+	return MaxRunnerWebhookSize
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
