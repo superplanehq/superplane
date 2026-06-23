@@ -30,6 +30,10 @@ func (m *mockInstanceClient) Post(ctx context.Context, path string, body any) ([
 	return nil, fmt.Errorf("Post not implemented")
 }
 
+func (m *mockInstanceClient) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	return nil, fmt.Errorf("Patch not implemented")
+}
+
 func (m *mockInstanceClient) Delete(ctx context.Context, path string) ([]byte, error) {
 	return nil, fmt.Errorf("Delete not implemented")
 }

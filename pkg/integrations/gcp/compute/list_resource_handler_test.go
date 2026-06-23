@@ -69,6 +69,10 @@ func (m *mockOSClient) Post(ctx context.Context, path string, body any) ([]byte,
 	return nil, errors.New("not implemented")
 }
 
+func (m *mockOSClient) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *mockOSClient) Delete(ctx context.Context, path string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
