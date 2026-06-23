@@ -64,8 +64,6 @@ export const promotePackageMapper: ComponentBaseMapper = {
     if (pkg.name) details["Package"] = pkg.name;
     if (pkg.version) details["Version"] = pkg.version;
     if (pkg.repository) details["Destination"] = pkg.repository;
-    if (pkg.status_str) details["Status"] = pkg.status_str;
-    if (pkg.self_webapp_url) details["URL"] = pkg.self_webapp_url;
 
     return details;
   },
