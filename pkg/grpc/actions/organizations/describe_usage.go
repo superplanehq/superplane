@@ -84,7 +84,9 @@ func describeUsageLimits(
 	}
 
 	if status.Code(err) != codes.NotFound {
-		log.Errorf("Error describing usage limits for organization %s: %v", orgID, err)
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to describe organization usage limits")
 		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
 	}
 
@@ -94,7 +96,9 @@ func describeUsageLimits(
 
 	response, err = usageService.DescribeOrganizationLimits(ctx, orgID)
 	if err != nil {
-		log.Errorf("Error describing usage limits after sync for organization %s: %v", orgID, err)
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to describe organization usage limits after sync")
 		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
 	}
 
@@ -112,7 +116,9 @@ func describeUsageMetrics(
 	}
 
 	if status.Code(err) != codes.NotFound {
-		log.Errorf("Error describing usage metrics for organization %s: %v", orgID, err)
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to describe organization usage metrics")
 		return nil, status.Error(codes.Internal, "failed to describe organization usage")
 	}
 
@@ -122,7 +128,9 @@ func describeUsageMetrics(
 
 	response, err = usageService.DescribeOrganizationUsage(ctx, orgID)
 	if err != nil {
-		log.Errorf("Error describing usage metrics after setup for organization %s: %v", orgID, err)
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to describe organization usage metrics after setup")
 		return nil, status.Error(codes.Internal, "failed to describe organization usage")
 	}
 
@@ -136,7 +144,9 @@ func usageSyncError(orgID string, err error) error {
 	case status.Code(err) == codes.ResourceExhausted:
 		return status.Error(codes.ResourceExhausted, "organization exceeds configured account usage limits")
 	default:
-		log.Errorf("Error syncing usage for organization %s: %v", orgID, err)
+		log.WithError(err).
+			WithField("organization_id", orgID).
+			Error("failed to set up organization usage")
 		return status.Error(codes.Internal, "failed to set up organization usage")
 	}
 }

@@ -211,6 +211,41 @@ func Test__DescribeUsage(t *testing.T) {
 		require.NotNil(t, organization.UsageLimitsSyncedAt)
 	})
 
+	t.Run("non-NotFound limits error surfaces as Internal with structured logs", func(t *testing.T) {
+		// Verifies the path the Sentry "HTTP 500 /usage" issue lands in.
+		// We must return a sanitized Internal status to the client and log
+		// the underlying error with the organization_id so Sentry/log
+		// dashboards can correlate the failure.
+		service := &fakeUsageService{
+			enabled:             true,
+			describeLimitsError: status.Error(codes.Unavailable, "usage service unavailable"),
+		}
+
+		_, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, "failed to describe organization usage limits", s.Message())
+	})
+
+	t.Run("non-NotFound usage metrics error surfaces as Internal", func(t *testing.T) {
+		service := &fakeUsageService{
+			enabled: true,
+			describeLimitsResponse: &pb.DescribeOrganizationLimitsResponse{
+				Limits: &pb.OrganizationLimits{MaxCanvases: 1},
+			},
+			describeUsageError: status.Error(codes.Unavailable, "usage service unavailable"),
+		}
+
+		_, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, "failed to describe organization usage", s.Message())
+	})
+
 	t.Run("sets up remote organization when not configured", func(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Second)
 
