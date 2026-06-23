@@ -8,7 +8,6 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   title: string;
-  onDoubleClick?: () => void;
   statusBadgeColor?: string;
   /** Expanded: omit bottom border so header visually merges with muted body (runs / edge dimming). */
   mergeWithMutedBodyBelow?: boolean;
@@ -19,7 +18,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconSlug,
   iconColor,
   title,
-  onDoubleClick,
   statusBadgeColor,
   isCompactView = false,
   mergeWithMutedBodyBelow = false,
@@ -36,7 +34,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
         (isCompactView || mergeWithMutedBodyBelow ? "" : " border-b border-slate-950/20")
       }
-      onDoubleClick={onDoubleClick}
     >
       <div className="flex w-full items-center justify-between">
         <div className="flex items-center">

@@ -4395,7 +4395,6 @@ export function AppPage() {
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     deleteDraftBranchMutation.isPending ||
-    deleteDraftBranchMutation.isPending ||
     !activeCanvasVersionId;
   const resetDraftDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -4667,8 +4666,6 @@ export function AppPage() {
           {...draftChangeIndicators}
           {...filesHeaderVersionActions}
           hasStagingChanges={isEditing && hasStagingChanges}
-          hasUncommittedDraftChanges={isEditing && hasStagingChanges}
-          readyToPublishDraftChanges={isEditing && !hasStagingChanges && hasDraftDiffVersusLive}
           editTabTone={editTabTone}
           hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
@@ -4682,8 +4679,6 @@ export function AppPage() {
           onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
           onCancelExecution={showLiveActivity ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}
