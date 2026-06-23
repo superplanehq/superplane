@@ -38,7 +38,6 @@ import {
 } from "react";
 
 import type {
-  CanvasChangesetChange,
   CanvasesCanvasRun,
   CanvasesCanvasNodeExecution,
   ActionsAction,
@@ -315,7 +314,6 @@ export interface CanvasPageProps {
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
-  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId?: string;
