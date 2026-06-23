@@ -14,7 +14,6 @@ import (
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
@@ -39,7 +38,7 @@ type CanvasPublisher struct {
 	options    CanvasPublisherOptions
 	live       *models.CanvasVersion
 	draft      *models.CanvasVersion
-	changeset  *pb.CanvasChangeset
+	changeset  *CanvasChangeset
 	finalNodes map[string]models.Node
 	renamedIDs map[string]string
 
@@ -94,7 +93,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	if err != nil {
 		return nil, err
 	}
-	if len(changeset.GetChanges()) == 0 {
+	if len(changeset.Changes) == 0 {
 		return nil, errNoChangesToPublish
 	}
 
@@ -189,21 +188,21 @@ func (p *CanvasPublisher) filterEdgesForExistingNodes(edges []models.Edge) []mod
 	return filteredEdges
 }
 
-func (p *CanvasPublisher) processChange(ctx context.Context, change *pb.CanvasChangeset_Change) error {
+func (p *CanvasPublisher) processChange(ctx context.Context, change *Change) error {
 	switch change.Type {
-	case pb.CanvasChangeset_Change_ADD_NODE:
+	case ChangeTypeAddNode:
 		return p.addNode(ctx, change)
-	case pb.CanvasChangeset_Change_DELETE_NODE:
+	case ChangeTypeDeleteNode:
 		return p.deleteNode(change)
-	case pb.CanvasChangeset_Change_UPDATE_NODE:
+	case ChangeTypeUpdateNode:
 		return p.updateNode(ctx, change)
 	}
 
 	return nil
 }
 
-func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
-	node := p.finalNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
+	node := p.finalNodes[change.Node.ID]
 	nodeID := p.ensureNewNodeID(node)
 	node.ID = nodeID
 
@@ -285,8 +284,8 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	return p.tx.Save(&newNode).Error
 }
 
-func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
-	updatedNode := p.finalNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error {
+	updatedNode := p.finalNodes[change.Node.ID]
 
 	//
 	// Widgets are not saved as workflow_nodes records in the database.
@@ -357,8 +356,8 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	return p.tx.Save(&existingNode).Error
 }
 
-func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {
-	existingNode, exists := p.allNodes[change.GetNode().GetId()]
+func (p *CanvasPublisher) deleteNode(change *Change) error {
+	existingNode, exists := p.allNodes[change.Node.ID]
 	if !exists {
 		return nil
 	}
