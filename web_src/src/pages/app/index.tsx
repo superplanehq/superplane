@@ -685,15 +685,11 @@ export function AppPage() {
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const lastRunsViewportKeyRef = useRef<string | null>(null);
 
-  // Track unsaved changes on the canvas
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const hasPendingLocalCanvasState = hasUnsavedChanges || hasLocalSaveActivity;
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
   );
@@ -835,8 +831,6 @@ export function AppPage() {
     }
 
     hasTrackedCanvasView.current = false;
-    setHasUnsavedChanges(false);
-    setHasNonPositionalUnsavedChanges(false);
     setActiveCanvasVersion(null);
     hasSyncedVersionFromURLRef.current = false;
     setLastSavedWorkflowSnapshot(null);
@@ -920,13 +914,7 @@ export function AppPage() {
   ]);
 
   useEffect(() => {
-    if (
-      !organizationId ||
-      !canvasId ||
-      !activeCanvasVersionId ||
-      !loadedCanvasVersion?.spec ||
-      hasPendingLocalCanvasState
-    ) {
+    if (!organizationId || !canvasId || !activeCanvasVersionId || !loadedCanvasVersion?.spec || hasLocalSaveActivity) {
       return;
     }
 
@@ -952,16 +940,10 @@ export function AppPage() {
     });
 
     lastAppliedVersionSnapshotRef.current = snapshotKey;
-  }, [organizationId, canvasId, activeCanvasVersionId, loadedCanvasVersion, queryClient, hasPendingLocalCanvasState]);
+  }, [organizationId, canvasId, activeCanvasVersionId, loadedCanvasVersion, queryClient, hasLocalSaveActivity]);
 
   useEffect(() => {
-    if (
-      !remoteCanvasUpdatePending ||
-      hasPendingLocalCanvasState ||
-      canvasDeletedRemotely ||
-      !organizationId ||
-      !canvasId
-    ) {
+    if (!remoteCanvasUpdatePending || hasLocalSaveActivity || canvasDeletedRemotely || !organizationId || !canvasId) {
       return;
     }
 
@@ -977,7 +959,7 @@ export function AppPage() {
     setRemoteCanvasUpdatePending(false);
   }, [
     remoteCanvasUpdatePending,
-    hasPendingLocalCanvasState,
+    hasLocalSaveActivity,
     canvasDeletedRemotely,
     organizationId,
     canvasId,
@@ -1286,15 +1268,6 @@ export function AppPage() {
       return;
     }
 
-    if (hasEditableVersion && hasUnsavedChanges) {
-      const shouldCreate = window.confirm(
-        "You have unsaved changes in the current draft. Create a new draft from live anyway?",
-      );
-      if (!shouldCreate) {
-        return;
-      }
-    }
-
     setIsCreatingDraftBranch(true);
     try {
       const session = ++draftCreationSessionRef.current;
@@ -1332,8 +1305,6 @@ export function AppPage() {
         }
         return [loadedVersion, ...current];
       });
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
       if (session !== draftCreationSessionRef.current) {
         return;
@@ -1376,8 +1347,6 @@ export function AppPage() {
     organizationId,
     canvasId,
     canUpdateCanvas,
-    hasEditableVersion,
-    hasUnsavedChanges,
     createDraftBranchMutation,
     activateBranch,
     queryClient,
@@ -1442,7 +1411,6 @@ export function AppPage() {
             canvasId,
             pendingPositionUpdatesRef,
             isReadOnly,
-            hasNonPositionalUnsavedChanges,
             canvasRef,
             queryClient,
             activeCanvasVersionIdRef,
@@ -1460,7 +1428,6 @@ export function AppPage() {
       canvasId,
       activeCanvasVersionId,
       queryClient,
-      hasNonPositionalUnsavedChanges,
       isReadOnly,
       enqueueCanvasSave,
       applyLocalWorkflowUpdate,
@@ -1509,7 +1476,7 @@ export function AppPage() {
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasPendingLocalCanvasState) {
+      if (hasLocalSaveActivity) {
         e.preventDefault();
         e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
       }
@@ -1517,7 +1484,7 @@ export function AppPage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasPendingLocalCanvasState]);
+  }, [hasLocalSaveActivity]);
 
   // Merge triggers and components from applications into the main arrays
   const allTriggers = useMemo(() => {
@@ -1939,8 +1906,6 @@ export function AppPage() {
     setDraftCanvasSpec,
     setActiveCanvasVersion,
     setLastSavedWorkflowSnapshot,
-    setHasUnsavedChanges,
-    setHasNonPositionalUnsavedChanges,
     setStagingResetNonce,
   });
 
@@ -1972,7 +1937,7 @@ export function AppPage() {
           return true;
         }
 
-        if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
+        if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
           setRemoteCanvasUpdatePending(true);
           return true;
         }
@@ -1986,7 +1951,7 @@ export function AppPage() {
         return true;
       }
 
-      if (hasPendingLocalCanvasState) {
+      if (hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
         return true;
       }
@@ -1999,15 +1964,15 @@ export function AppPage() {
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
-      hasPendingLocalCanvasState,
+      hasLocalSaveActivity,
       invalidateCanvasVersionData,
       resyncDraftToCommitted,
     ],
   );
 
   const shouldApplyCanvasUpdate = useCallback(
-    () => isViewingLiveVersion && !hasPendingLocalCanvasState && !canvasDeletedRemotely,
-    [isViewingLiveVersion, hasPendingLocalCanvasState, canvasDeletedRemotely],
+    () => isViewingLiveVersion && !hasLocalSaveActivity && !canvasDeletedRemotely,
+    [isViewingLiveVersion, hasLocalSaveActivity, canvasDeletedRemotely],
   );
 
   const handleCanvasStagingEvent = useCallback(
@@ -2025,7 +1990,7 @@ export function AppPage() {
       // Defer when this tab has its own unsaved canvas edits to avoid clobbering
       // them; the deferred-apply effect refreshes once they settle. The console
       // and files staged caches still refresh through the websocket hook.
-      if (payload.versionId === activeCanvasVersionId && hasPendingLocalCanvasState) {
+      if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
         return true;
       }
@@ -2033,7 +1998,7 @@ export function AppPage() {
       void resyncDraftToStaged(payload.versionId);
       return true;
     },
-    [canvasId, activeCanvasVersionId, hasPendingLocalCanvasState, resyncDraftToStaged],
+    [canvasId, activeCanvasVersionId, hasLocalSaveActivity, resyncDraftToStaged],
   );
 
   useCanvasWebsocket(
@@ -2265,11 +2230,6 @@ export function AppPage() {
           showSuccessToast("Canvas changes saved");
         }
         setLastSavedWorkflowSnapshot(targetWorkflow);
-
-        if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
-          setHasUnsavedChanges(false);
-          setHasNonPositionalUnsavedChanges(false);
-        }
 
         return result;
       } catch (error: any) {
@@ -2594,10 +2554,6 @@ export function AppPage() {
             return;
           }
 
-          if (hasNonPositionalUnsavedChanges) {
-            return;
-          }
-
           const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
 
           if (!latestWorkflow?.spec?.nodes) return;
@@ -2641,7 +2597,7 @@ export function AppPage() {
         },
         isReadOnly ? 2000 : 100,
       ),
-    [organizationId, canvasId, queryClient, handleSaveWorkflow, hasNonPositionalUnsavedChanges, isReadOnly],
+    [organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleAnnotationBlur = useCallback(() => {
@@ -2686,11 +2642,11 @@ export function AppPage() {
     const currentWorkflow = getCurrentWorkflowSnapshot();
 
     if (!currentWorkflow || !lastSavedWorkflowSignatureRef.current) {
-      return hasUnsavedChanges;
+      return false;
     }
 
     return getWorkflowSaveSignature(currentWorkflow) !== lastSavedWorkflowSignatureRef.current;
-  }, [getCurrentWorkflowSnapshot, hasUnsavedChanges]);
+  }, [getCurrentWorkflowSnapshot]);
 
   const waitForLocalCanvasChangesToSettle = useCallback(async () => {
     debouncedAutoSave.flush();
@@ -3040,8 +2996,6 @@ export function AppPage() {
         setLastSavedWorkflowSnapshot(
           queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null,
         );
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
       } catch (error) {
         releaseCanvasUpdatedEcho();
         releaseCanvasVersionUpdatedEcho();
@@ -3655,67 +3609,6 @@ export function AppPage() {
     ],
   );
 
-  const handleSave = useCallback(
-    async (canvasNodes: CanvasNode[]) => {
-      if (!canvas || !organizationId || !canvasId) return;
-      if (!activeCanvasVersionId) {
-        showErrorToast("Enable edit mode before saving changes");
-        return;
-      }
-
-      // Map canvas nodes back to ComponentsNode format with updated positions
-      const updatedNodes = canvas.spec?.nodes?.map((node) => {
-        const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
-        const componentType = (canvasNode?.data?.type as string) || "";
-        if (canvasNode) {
-          return {
-            ...node,
-            position: {
-              x: Math.round(canvasNode.position.x),
-              y: Math.round(canvasNode.position.y),
-            },
-            isCollapsed: (canvasNode.data[componentType] as { collapsed: boolean })?.collapsed || false,
-          };
-        }
-        return node;
-      });
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-        },
-      };
-
-      try {
-        const savingVersionID = activeCanvasVersionId || undefined;
-        const result = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
-        if (result.status !== "saved") {
-          return;
-        }
-        if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-          setActiveCanvasVersion(result.response.data.version);
-        }
-        if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-          return;
-        }
-
-        showSuccessToast("Canvas changes saved");
-        setLastSavedWorkflowSnapshot(updatedWorkflow);
-
-        if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
-          setHasUnsavedChanges(false);
-          setHasNonPositionalUnsavedChanges(false);
-        }
-      } catch (error) {
-        const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
-        showErrorToast(errorMessage);
-      }
-    },
-    [canvas, organizationId, canvasId, activeCanvasVersionId, enqueueCanvasSave, setLastSavedWorkflowSnapshot],
-  );
-
   const refreshLatestLiveCanvasData = useCallback(async () => {
     if (!organizationId || !canvasId) {
       return;
@@ -3772,8 +3665,6 @@ export function AppPage() {
       if (restoredWorkflow) {
         setLastSavedWorkflowSnapshot(restoredWorkflow);
       }
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
     },
     [canvasId, organizationId, queryClient, setLastSavedWorkflowSnapshot],
   );
@@ -3841,8 +3732,6 @@ export function AppPage() {
       }
 
       lastAppliedVersionSnapshotRef.current = "";
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
 
       const branchName = resolveBranchNameForVersion(versionID, version, draftBranches);
@@ -3933,7 +3822,7 @@ export function AppPage() {
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
-      if (hasEditableVersion && hasPendingLocalCanvasState && versionID !== activeCanvasVersionIdRef.current) {
+      if (hasEditableVersion && hasLocalSaveActivity && versionID !== activeCanvasVersionIdRef.current) {
         const shouldSwitch = window.confirm(
           "You have unsaved changes in the current draft. Switch versions and discard those unsaved changes?",
         );
@@ -3951,13 +3840,7 @@ export function AppPage() {
 
       handleUseVersion(versionID);
     },
-    [
-      handleUseVersion,
-      hasEditableVersion,
-      hasPendingLocalCanvasState,
-      effectiveLiveCanvasVersionId,
-      liveCanvasVersionId,
-    ],
+    [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
   );
 
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
@@ -3974,7 +3857,7 @@ export function AppPage() {
     isRunInspectionMode: urlViewFlags.isRunInspectionMode,
     selectableVersionsById,
     hasEditableVersion,
-    hasPendingLocalCanvasState,
+    hasLocalSaveActivity,
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
     setSuppressUnpublishedDraftDiscard,
@@ -4010,8 +3893,6 @@ export function AppPage() {
     setSearchParams,
     setActiveCanvasVersion,
     setDraftCanvasSpec,
-    setHasUnsavedChanges,
-    setHasNonPositionalUnsavedChanges,
     setLastSavedWorkflowSnapshot,
   });
 
@@ -4568,8 +4449,6 @@ export function AppPage() {
     }
 
     clearPendingAutoSaveWork();
-    setHasUnsavedChanges(false);
-    setHasNonPositionalUnsavedChanges(false);
     setRemoteCanvasUpdatePending(false);
     setLastSavedWorkflowSnapshot(null);
 
@@ -4585,7 +4464,6 @@ export function AppPage() {
     }
   };
 
-  const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
   const backToAppId = searchParams.get("appId") ?? undefined;
   const appBanner = backToAppId ? (
     <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
@@ -4624,15 +4502,6 @@ export function AppPage() {
   ].join(":");
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
-  const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
-  const saveDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
-    : !hasEditableVersion
-      ? "Enable edit mode to save changes."
-      : undefined;
-  const saveButtonHidden =
-    !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges || (!isReadOnly && isAutoSaveQueued);
-  const saveIsPrimary = hasUnsavedChanges && !isReadOnly && !isAutoSaveQueued;
   const enterEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
   const enterEditModeDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -4671,7 +4540,6 @@ export function AppPage() {
     hasEditableVersion,
   });
   const { disabled: runDisabled, tooltip: runDisabledTooltip } = getRunActionState({
-    hasRunBlockingChanges,
     ...canvasAccess,
     isViewingDraftVersion,
     isViewingCurrentLiveVersion,
@@ -4844,7 +4712,6 @@ export function AppPage() {
           configurationSaveMode={isReadOnly ? "manual" : "auto"}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
-          onSave={handleSave}
           onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
           onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
           onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
@@ -4896,10 +4763,6 @@ export function AppPage() {
           onRunNodeDetailNavigate={handleRunNodeDetailSelection}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
-          saveIsPrimary={saveIsPrimary}
-          saveButtonHidden={saveButtonHidden}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
