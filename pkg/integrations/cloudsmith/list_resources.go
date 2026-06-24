@@ -69,9 +69,12 @@ func listPackages(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 
 	resources := make([]core.IntegrationResource, 0, len(packages))
 	for _, pkg := range packages {
-		name := pkg.Slug
+		name := pkg.Name
 		if name == "" {
 			name = pkg.SlugPerm
+		}
+		if pkg.Version != "" {
+			name = fmt.Sprintf("%s %s", name, pkg.Version)
 		}
 		resources = append(resources, core.IntegrationResource{
 			Type: "package",

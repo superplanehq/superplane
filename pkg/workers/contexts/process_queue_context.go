@@ -106,11 +106,9 @@ func BuildProcessQueueContext(
 			return nil, err
 		}
 
-		orgUUID := uuid.Nil
 		orgID := ""
 		canvasName := ""
 		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-			orgUUID = workflow.OrganizationID
 			orgID = workflow.OrganizationID.String()
 			canvasName = workflow.Name
 		}
@@ -129,7 +127,6 @@ func BuildProcessQueueContext(
 			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution),
-			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
 			Files:          repoFiles,
 		}, nil
@@ -202,11 +199,9 @@ func BuildProcessQueueContext(
 			return nil, err
 		}
 
-		orgUUID := uuid.Nil
 		orgID := ""
 		canvasName := ""
 		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-			orgUUID = workflow.OrganizationID
 			orgID = workflow.OrganizationID.String()
 			canvasName = workflow.Name
 		}
@@ -225,7 +220,6 @@ func BuildProcessQueueContext(
 			ExecutionState: NewExecutionStateContext(tx, execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution),
-			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
 			Files:          repoFiles,
 		}, nil

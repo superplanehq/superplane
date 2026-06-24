@@ -6,11 +6,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -31,21 +30,21 @@ func ListCanvasVersionsPaginated(
 ) (*pb.ListCanvasVersionsResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
 	if err := checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID); err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
@@ -75,7 +74,7 @@ func ListCanvasVersionsPaginated(
 		})
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
 	protoVersions := serializeCanvasVersions(ctx, publishedVersions, organizationID)
@@ -119,7 +118,7 @@ func listDraftCanvasVersions(
 		})
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list canvas versions: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
 	protoVersions := serializeCanvasVersions(ctx, draftVersions, organizationID)

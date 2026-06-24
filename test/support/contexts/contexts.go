@@ -460,27 +460,6 @@ func (c *ExpressionContext) RunWithExtraVariables(expression string, variables m
 	return c.Output, c.Error
 }
 
-type Notification struct {
-	Title     string
-	Body      string
-	URL       string
-	URLLabel  string
-	Receivers core.NotificationReceivers
-}
-
-type NotificationContext struct {
-	Messages []Notification
-}
-
-func (c *NotificationContext) IsAvailable() bool {
-	return true
-}
-
-func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {
-	c.Messages = append(c.Messages, Notification{Title: title, Body: body, URL: url, URLLabel: urlLabel, Receivers: receivers})
-	return nil
-}
-
 type IntegrationSecretStorage struct {
 	parentContext *IntegrationContext
 }

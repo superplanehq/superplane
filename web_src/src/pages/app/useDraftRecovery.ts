@@ -14,7 +14,6 @@ import { isNotFoundError } from "./workflowPageHelpers";
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
 type SetSearchParams = ReturnType<typeof useSearchParams>[1];
-type CommitMutation = { mutateAsync: () => Promise<unknown> };
 type PublishMutation = { mutateAsync: (versionId: string) => Promise<unknown> };
 
 type UseDraftRecoveryOptions = {
@@ -30,9 +29,7 @@ type UseDraftRecoveryOptions = {
   refreshLatestLiveCanvasData: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
-  commitCanvasStagingMutation: CommitMutation;
   publishCanvasVersionMutation: PublishMutation;
-  consoleMutationGenerationRef: MutableRefObject<number>;
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
 };
 
@@ -52,9 +49,7 @@ export function useDraftRecovery({
   refreshLatestLiveCanvasData,
   cancelPendingCanvasSaves,
   ensureVersionActionDraftReady,
-  commitCanvasStagingMutation,
   publishCanvasVersionMutation,
-  consoleMutationGenerationRef,
   setIsPreparingVersionAction,
 }: UseDraftRecoveryOptions) {
   const queryClient = useQueryClient();
@@ -147,9 +142,6 @@ export function useDraftRecovery({
         return;
       }
 
-      // Flush staged edits into the committed row before promoting it to live.
-      consoleMutationGenerationRef.current += 1;
-      await commitCanvasStagingMutation.mutateAsync();
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
       await exitDraftToLive(versionIdToPublish);
       showSuccessToast("Version published");
@@ -167,10 +159,8 @@ export function useDraftRecovery({
     canvasId,
     activeCanvasVersionId,
     activeCanvasVersionIdRef,
-    ensureVersionActionDraftReady,
     queryClient,
-    consoleMutationGenerationRef,
-    commitCanvasStagingMutation,
+    ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
     setIsPreparingVersionAction,
     exitDraftToLive,

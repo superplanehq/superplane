@@ -32,7 +32,6 @@ type ActionHookContext struct {
 	Auth           AuthReader
 	Requests       RequestContext
 	Integration    IntegrationContext
-	Notifications  NotificationContext
 	Secrets        SecretsContext
 	Files          RepositoryFilesContext
 }

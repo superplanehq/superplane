@@ -3,6 +3,7 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ClipboardList, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { RubricCategory } from "./parser";
 import { IntegrationButton } from "./IntegrationButton";
@@ -274,12 +275,20 @@ function RubricModal({
   organizationId?: string;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="w-full max-w-lg max-h-[80vh] gap-0 overflow-hidden p-0 flex flex-col"
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <ClipboardList size={16} className="text-slate-600" />
-            <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+            <DialogTitle className="text-sm font-semibold text-slate-900">{title}</DialogTitle>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={16} />
@@ -302,8 +311,8 @@ function RubricModal({
             Close
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -6,15 +6,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func SetSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, keyName, value string) (*pb.SetSecretKeyResponse, error) {
 	if keyName == "" {
-		return nil, status.Error(codes.InvalidArgument, "key name is required")
+		return nil, grpcerrors.InvalidArgument(nil, "key name is required")
 	}
 
 	err := actions.ValidateUUIDs(idOrName)
@@ -25,7 +24,7 @@ func SetSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	data, err := decryptSecretData(ctx, encryptor, *secret)
@@ -45,7 +44,7 @@ func SetSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 
 	updated, err := secret.UpdateData(encrypted)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcerrors.Internal(err, "failed to set secret key")
 	}
 	updated.Data = encrypted
 

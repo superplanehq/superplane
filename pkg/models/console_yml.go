@@ -476,6 +476,9 @@ func validateNodePanelContent(panel ConsolePanel) error {
 	if _, ok := rawNode.(string); !ok {
 		return fmt.Errorf("panel %q content.node must be a string", panel.ID)
 	}
+	if err := validateOptionalString(panel.ID, "content.label", panel.Content["label"]); err != nil {
+		return err
+	}
 	if rawShowRun, ok := panel.Content["showRun"]; ok && rawShowRun != nil {
 		if _, ok := rawShowRun.(bool); !ok {
 			return fmt.Errorf("panel %q content.showRun must be a boolean", panel.ID)

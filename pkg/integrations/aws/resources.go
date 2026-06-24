@@ -37,6 +37,12 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.instance":
 		return ec2.ListInstances(ctx, resourceType)
 
+	case "ec2.loadBalancer":
+		return ec2.ListLoadBalancers(ctx, resourceType)
+
+	case "ec2.targetGroup":
+		return ec2.ListTargetGroups(ctx, resourceType)
+
 	case "ec2.image":
 		return ec2.ListImages(ctx, resourceType)
 

@@ -2,18 +2,13 @@ import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import type { HeaderProps } from "./Header";
+import { isCanvasTabHeaderMode } from "./canvasTabHeaderMode";
 
 export function SecondaryHeaderActions({
   mode,
   isEditing = false,
-  onSave,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
   hasUnpublishedDraftChanges,
   hasUnpublishedConsoleDraftChanges,
   hasUncommittedCanvasDraftChanges,
@@ -35,22 +30,14 @@ export function SecondaryHeaderActions({
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
+  resetStagingPending,
   onResetStaging,
 }: HeaderProps) {
-  const onCanvasTab = mode === "version-live" || mode === "version-edit";
+  const onCanvasTab = isCanvasTabHeaderMode(mode);
   const onConsoleTab = mode === "console";
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
-      {mode === "default" && onSave && !saveButtonHidden ? (
-        <SaveButton
-          onSave={onSave}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
-          saveIsPrimary={saveIsPrimary}
-        />
-      ) : null}
-
       <FilesHeaderActionsSlot isEditing={isEditing} mode={mode} slotId={filesHeaderActionsSlotId} />
 
       {isEditing ? (
@@ -87,6 +74,7 @@ export function SecondaryHeaderActions({
             hasStagingChanges={hasStagingChanges}
             onCommitStaging={onCommitStaging}
             commitStagingPending={commitStagingPending}
+            resetStagingPending={resetStagingPending}
             onResetStaging={onResetStaging}
           />
         </>
@@ -140,6 +128,7 @@ function EditModePublishDiscardActions({
   hasStagingChanges,
   onCommitStaging,
   commitStagingPending,
+  resetStagingPending,
   onResetStaging,
 }: Pick<
   HeaderProps,
@@ -153,13 +142,15 @@ function EditModePublishDiscardActions({
   | "hasStagingChanges"
   | "onCommitStaging"
   | "commitStagingPending"
+  | "resetStagingPending"
   | "onResetStaging"
 >) {
-  // Keep showing the staging controls while a commit is in flight even after
-  // `hasStagingChanges` optimistically flips false, so the commit button stays
-  // pending/disabled until staging settles and never flashes an enabled
-  // [Reset][Commit] (or a premature Discard/Publish).
-  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || !!commitStagingPending);
+  const stagingActionPending = !!commitStagingPending || !!resetStagingPending;
+
+  // Keep showing the staging controls while a staging action is in flight even
+  // after `hasStagingChanges` optimistically flips false, so the header never
+  // flashes enabled Reset/Commit controls or premature Discard/Publish actions.
+  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || stagingActionPending);
 
   // Staging and committed states are mutually exclusive: while there are staged
   // edits the user can only Reset/Commit them; once everything is committed they
@@ -168,9 +159,9 @@ function EditModePublishDiscardActions({
     return (
       <div className="flex items-center gap-1.5">
         {onResetStaging ? (
-          <ResetStagingButton onReset={() => onResetStaging()} disabled={!!commitStagingPending} />
+          <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionPending} />
         ) : null}
-        <CommitStagingButton onCommit={() => onCommitStaging?.()} pending={!!commitStagingPending} />
+        <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionPending} />
       </div>
     );
   }
@@ -218,7 +209,7 @@ function ResetStagingButton({ onReset, disabled }: { onReset: () => void; disabl
 // The label stays fixed (no "Committing…") so the button keeps a constant
 // width while a commit is in flight; the button is disabled instead to signal
 // the in-flight commit.
-function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pending: boolean }) {
+function CommitStagingButton({ onCommit, disabled }: { onCommit: () => void; disabled: boolean }) {
   return (
     <UIButton
       type="button"
@@ -226,7 +217,7 @@ function CommitStagingButton({ onCommit, pending }: { onCommit: () => void; pend
       size="sm"
       className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
       onClick={onCommit}
-      disabled={pending}
+      disabled={disabled}
       data-testid="canvas-commit-staging-button"
     >
       Commit
@@ -345,51 +336,6 @@ function ExitEditButton({
   }
 
   return button;
-}
-
-function SaveButton({
-  onSave,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
-}: {
-  onSave: () => void;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  saveIsPrimary?: boolean;
-}) {
-  if (saveDisabled && saveDisabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <Button
-              onClick={onSave}
-              size="sm"
-              variant={saveIsPrimary ? "default" : "outline"}
-              data-testid="save-canvas-button"
-              disabled={saveDisabled}
-            >
-              Save
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Button
-      onClick={onSave}
-      size="sm"
-      variant={saveIsPrimary ? "default" : "outline"}
-      data-testid="save-canvas-button"
-      disabled={saveDisabled}
-    >
-      Save
-    </Button>
-  );
 }
 
 function DiscardDraftButton({

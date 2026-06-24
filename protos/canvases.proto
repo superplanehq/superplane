@@ -153,30 +153,6 @@ service Canvases {
     };
   }
 
-  rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version with a changeset";
-      description: "Update canvas version with a changeset";
-      tags: "CanvasVersion";
-    };
-  }
-
-  rpc ValidateCanvasVersionChangeset(ValidateCanvasVersionChangesetRequest) returns (ValidateCanvasVersionChangesetResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Validate a canvas version changeset";
-      description: "Validate a canvas version changeset";
-      tags: "CanvasVersion";
-    };
-  }
-
   rpc DeleteCanvasVersion(DeleteCanvasVersionRequest) returns (DeleteCanvasVersionResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
@@ -600,27 +576,6 @@ message StagingSummary {
   optional string base_version_id = 3;
 }
 
-message ApplyCanvasVersionChangesetRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasChangeset changeset = 3;
-  CanvasAutoLayout auto_layout = 4;
-}
-
-message ApplyCanvasVersionChangesetResponse {
-  CanvasVersion version = 1;
-}
-
-message ValidateCanvasVersionChangesetRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasChangeset changeset = 3;
-}
-
-message ValidateCanvasVersionChangesetResponse {
-  CanvasVersion version = 1;
-}
-
 message DeleteCanvasVersionRequest {
   string canvas_id = 1;
   string version_id = 2;
@@ -1036,52 +991,6 @@ message ResolveExecutionErrorsRequest {
 message ResolveExecutionErrorsResponse {}
 
 //
-// CanvasChangeset describes a unit of change for a canvas version.
-//
-message CanvasChangeset {
-  message Change {
-    enum Type {
-      UNSPECIFIED = 0;
-      ADD_NODE = 1;
-      DELETE_NODE = 2;
-      UPDATE_NODE = 3;
-      ADD_EDGE = 4;
-      DELETE_EDGE = 5;
-    }
-
-    message Node {
-      string id = 1;
-      string name = 2;
-      string block = 3;
-      google.protobuf.Struct configuration = 4;
-      string integration_id = 5;
-      Components.Position position = 6;
-      optional bool is_collapsed = 7;
-    }
-
-    message Edge {
-      string source_id = 1;
-      string target_id = 2;
-      string channel = 3;
-    }
-
-    Type type = 1;
-
-    //
-    // Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
-    //
-    Node node = 2;
-
-    //
-    // Required for ADD_EDGE and DELETE_EDGE
-    //
-    Edge edge = 3;
-  }
-
-  repeated Change changes = 1;
-}
-
-//
 // Standalone messages
 //
 
@@ -1149,18 +1058,6 @@ message RepositoryBranchUpdatedMessage {
   string materialization_error = 5;
   google.protobuf.Timestamp timestamp = 6;
   string pushed_by_user_id = 7;
-}
-
-message NotificationEmailRequested {
-  string organization_id = 1;
-  string title = 2;
-  string body = 3;
-  string url = 4;
-  string url_label = 5;
-  repeated string emails = 6;
-  repeated string groups = 7;
-  repeated string roles = 8;
-  google.protobuf.Timestamp timestamp = 9;
 }
 
 message Console {

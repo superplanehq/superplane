@@ -11,13 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -28,14 +27,14 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		var err error
 		user, err = models.FindActiveUserByID(organizationID, userID)
 		if err != nil {
-			return nil, status.Error(codes.NotFound, "user not found")
+			return nil, grpcerrors.NotFound(err, "user not found")
 		}
 	}
 	// If user is not set (like in tests), user will be nil and that's fine
 
 	execution, err := models.FindNodeExecution(workflowID, executionID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "execution not found")
+		return nil, grpcerrors.NotFound(err, "execution not found")
 	}
 
 	memoryChanged := false
@@ -47,13 +46,13 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
 		if err != nil {
-			return status.Error(codes.NotFound, "Node not found for execution")
+			return grpcerrors.NotFound(err, "Node not found for execution")
 		}
 
 		err = cancelExecutionInTransaction(tx, authService, encryptor, organizationID, registry, execution, node, user, onMemoryChanged)
 
 		if err != nil {
-			return status.Error(codes.Internal, "It was not possible to cancel the execution")
+			return grpcerrors.Internal(err, "failed to cancel execution")
 		}
 
 		return nil
@@ -108,7 +107,6 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
 			Requests:       contexts.NewExecutionRequestContext(tx, execution),
 			Auth:           contexts.NewAuthReader(tx, orgUUID, authService, user),
-			Notifications:  contexts.NewNotificationContext(tx, orgUUID, execution.WorkflowID),
 			CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).WithChangeCallback(onMemoryChanged),
 		}
 
@@ -116,7 +114,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 			if err != nil {
 				logger.Errorf("error finding app installation: %v", err)
-				return status.Error(codes.Internal, "error building context")
+				return grpcerrors.Internal(err, "error building context")
 			}
 
 			logger = logging.WithIntegration(logger, *integration)
