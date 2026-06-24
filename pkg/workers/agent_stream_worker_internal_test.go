@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,7 +73,31 @@ func (s *fakeAgentTokenUsageService) CheckOrganizationLimits(
 
 var _ usage.Service = (*fakeAgentTokenUsageService)(nil)
 
+type fakeProviderSessionUsageRetriever struct {
+	usage *agents.TokenUsage
+	err   error
+	calls []string
+}
+
+func (r *fakeProviderSessionUsageRetriever) RetrieveSessionUsage(_ context.Context, providerSessionID string) (*agents.TokenUsage, error) {
+	r.calls = append(r.calls, providerSessionID)
+	return r.usage, r.err
+}
+
+func publishAgentTokenUsageSynchronously(t *testing.T) {
+	t.Helper()
+	originalPublisher := publishAgentTokenUsageAsync
+	publishAgentTokenUsageAsync = func(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+		publishPreparedAgentTokenUsage(ctx, usageService, session, evt)
+	}
+	t.Cleanup(func() {
+		publishAgentTokenUsageAsync = originalPublisher
+	})
+}
+
 func TestHandleProviderEvent_PublishesTurnUsageWhenSessionAlreadyReset(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -106,6 +131,7 @@ func TestHandleProviderEvent_PublishesTurnUsageWhenSessionAlreadyReset(t *testin
 	err := handleProviderEvent(
 		context.Background(),
 		nil,
+		nil,
 		session,
 		agents.ProviderEvent{
 			Type:  agents.ProviderEventTurnCompleted,
@@ -123,6 +149,8 @@ func TestHandleProviderEvent_PublishesTurnUsageWhenSessionAlreadyReset(t *testin
 }
 
 func TestHandleProviderEvent_SyncsOrganizationBeforePublishingTokenUsage(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -157,6 +185,7 @@ func TestHandleProviderEvent_SyncsOrganizationBeforePublishingTokenUsage(t *test
 	err := handleProviderEvent(
 		context.Background(),
 		usageService,
+		nil,
 		session,
 		agents.ProviderEvent{
 			Type:  agents.ProviderEventTurnCompleted,
@@ -177,7 +206,129 @@ func TestHandleProviderEvent_SyncsOrganizationBeforePublishingTokenUsage(t *test
 	assert.Equal(t, r.Account.ID.String(), usageService.setupOrganizationCalls[0][1])
 }
 
+func TestHandleProviderEvent_PublishesTurnCompletedBeforeTokenUsage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	session := &models.AgentSession{
+		OrganizationID:          r.Organization.ID,
+		UserID:                  r.User,
+		CanvasID:                canvas.ID,
+		Provider:                "test",
+		ProviderSessionID:       "upstream-session",
+		TrackedUsageInitialized: true,
+		Status:                  models.AgentSessionStatusStreaming,
+	}
+	require.NoError(t, database.Conn().Create(session).Error)
+
+	usagePublicationStarted := make(chan struct{})
+	releaseUsagePublication := make(chan struct{})
+	originalPublisher := publishAgentTokenUsageAsync
+	publishAgentTokenUsageAsync = func(context.Context, usage.Service, *models.AgentSession, agents.ProviderEvent) {
+		close(usagePublicationStarted)
+		<-releaseUsagePublication
+	}
+	t.Cleanup(func() {
+		publishAgentTokenUsageAsync = originalPublisher
+		close(releaseUsagePublication)
+	})
+
+	var published []messages.AgentSessionEventMessage
+	var streamErr error
+	done := make(chan error, 1)
+	go func() {
+		done <- handleProviderEvent(
+			context.Background(),
+			nil,
+			nil,
+			session,
+			agents.ProviderEvent{
+				Type:  agents.ProviderEventTurnCompleted,
+				Model: "claude-sonnet-4-5",
+				Usage: &agents.TokenUsage{TotalTokens: 42},
+			},
+			func(message messages.AgentSessionEventMessage) {
+				published = append(published, message)
+			},
+			&streamErr,
+			newCustomToolTurnState(),
+		)
+	}()
+
+	<-usagePublicationStarted
+	require.Len(t, published, 1)
+	assert.Equal(t, "turn_completed", published[0].Event)
+	assert.Equal(t, models.AgentSessionStatusIdle, published[0].Status)
+
+	releaseUsagePublication <- struct{}{}
+	require.NoError(t, <-done)
+	assert.NoError(t, streamErr)
+}
+
+func TestHandleProviderEvent_RetrievesUsageWhenCompletedTurnHasNoUsage(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	session := &models.AgentSession{
+		OrganizationID:          r.Organization.ID,
+		UserID:                  r.User,
+		CanvasID:                canvas.ID,
+		Provider:                "test",
+		ProviderSessionID:       "upstream-session",
+		TrackedUsageInitialized: true,
+		Status:                  models.AgentSessionStatusStreaming,
+	}
+	require.NoError(t, database.Conn().Create(session).Error)
+
+	retriever := &fakeProviderSessionUsageRetriever{
+		usage: &agents.TokenUsage{TotalTokens: 42},
+	}
+
+	published := make(chan agents.ProviderEvent, 1)
+	originalPublisher := publishAgentRunFinished
+	publishAgentRunFinished = func(_ *models.AgentSession, evt agents.ProviderEvent) error {
+		published <- evt
+		return nil
+	}
+	t.Cleanup(func() {
+		publishAgentRunFinished = originalPublisher
+	})
+
+	var streamErr error
+	err := handleProviderEvent(
+		context.Background(),
+		nil,
+		retriever,
+		session,
+		agents.ProviderEvent{
+			Type:  agents.ProviderEventTurnCompleted,
+			Model: "claude-sonnet-4-5",
+		},
+		func(messages.AgentSessionEventMessage) {},
+		&streamErr,
+		newCustomToolTurnState(),
+	)
+
+	require.NoError(t, err)
+	assert.NoError(t, streamErr)
+
+	select {
+	case evt := <-published:
+		require.NotNil(t, evt.Usage)
+		assert.Equal(t, int64(42), evt.Usage.TotalTokens)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for retrieved usage to publish")
+	}
+	assert.Equal(t, []string{"upstream-session"}, retriever.calls)
+}
+
 func TestHandleProviderEvent_PublishesOnlyNewCumulativeTokenUsage(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -219,6 +370,7 @@ func TestHandleProviderEvent_PublishesOnlyNewCumulativeTokenUsage(t *testing.T) 
 	err := handleProviderEvent(
 		context.Background(),
 		nil,
+		nil,
 		session,
 		agents.ProviderEvent{
 			Type:  agents.ProviderEventTurnCompleted,
@@ -250,6 +402,8 @@ func TestHandleProviderEvent_PublishesOnlyNewCumulativeTokenUsage(t *testing.T) 
 }
 
 func TestHandleProviderEvent_PublishesComponentTokenDeltaWhenTotalIsAlreadyTracked(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -291,6 +445,7 @@ func TestHandleProviderEvent_PublishesComponentTokenDeltaWhenTotalIsAlreadyTrack
 	err := handleProviderEvent(
 		context.Background(),
 		nil,
+		nil,
 		session,
 		agents.ProviderEvent{
 			Type:  agents.ProviderEventTurnCompleted,
@@ -314,6 +469,8 @@ func TestHandleProviderEvent_PublishesComponentTokenDeltaWhenTotalIsAlreadyTrack
 }
 
 func TestHandleProviderEvent_MarksCumulativeTokenUsageBeforePublishing(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -340,6 +497,7 @@ func TestHandleProviderEvent_MarksCumulativeTokenUsageBeforePublishing(t *testin
 	var streamErr error
 	err := handleProviderEvent(
 		context.Background(),
+		nil,
 		nil,
 		session,
 		agents.ProviderEvent{
@@ -371,6 +529,8 @@ func TestHandleProviderEvent_MarksCumulativeTokenUsageBeforePublishing(t *testin
 }
 
 func TestHandleProviderEvent_BaselinesUninitializedCumulativeTokenUsageWithoutPublishing(t *testing.T) {
+	publishAgentTokenUsageSynchronously(t)
+
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -404,6 +564,7 @@ func TestHandleProviderEvent_BaselinesUninitializedCumulativeTokenUsageWithoutPu
 	var streamErr error
 	err := handleProviderEvent(
 		context.Background(),
+		nil,
 		nil,
 		session,
 		agents.ProviderEvent{

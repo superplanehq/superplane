@@ -268,17 +268,7 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 		return fmt.Errorf("anthropic: open stream: %w", err)
 	}
 	defer body.Close()
-	return forwardSSE(ctx, body, func(event agents.ProviderEvent) error {
-		if event.Type == agents.ProviderEventTurnCompleted && event.Usage == nil {
-			usage, err := p.retrieveSessionUsage(ctx, providerSessionID)
-			if err != nil {
-				log.WithError(err).WithField("provider_session_id", providerSessionID).Warn("anthropic: failed to retrieve completed session usage")
-			} else {
-				event.Usage = usage
-			}
-		}
-		return onEvent(event)
-	})
+	return forwardSSE(ctx, body, onEvent)
 }
 
 func (p *Provider) DeleteSession(ctx context.Context, providerSessionID string) error {
@@ -323,7 +313,7 @@ func withPreamble(message, preamble string) string {
 	return preamble + "\n\n" + message
 }
 
-func (p *Provider) retrieveSessionUsage(ctx context.Context, providerSessionID string) (*agents.TokenUsage, error) {
+func (p *Provider) RetrieveSessionUsage(ctx context.Context, providerSessionID string) (*agents.TokenUsage, error) {
 	data, err := p.client.executeHTTP(ctx, http.MethodGet, "/sessions/"+url.PathEscape(providerSessionID), nil)
 	if err != nil {
 		return nil, err
