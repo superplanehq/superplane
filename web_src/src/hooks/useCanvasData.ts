@@ -249,6 +249,50 @@ export const canvasKeys = {
     [...canvasKeys.repositoryFile(canvasId, path, versionId), "content", stage ? "staged" : "committed"] as const,
 };
 
+function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
+  return [
+    canvasKeys.versionDetail(canvasId, versionId),
+    canvasKeys.versionStagedDetail(canvasId, versionId),
+    canvasKeys.versionStaging(canvasId, versionId),
+    canvasKeys.console(canvasId, versionId),
+    canvasKeys.consoleStaged(canvasId, versionId),
+  ];
+}
+
+export async function cancelCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await Promise.all(
+    canvasVersionScopedQueryKeys(canvasId, versionId).map((queryKey) => queryClient.cancelQueries({ queryKey })),
+  );
+}
+
+export async function removeCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
+  for (const queryKey of canvasVersionScopedQueryKeys(canvasId, versionId)) {
+    queryClient.removeQueries({ queryKey });
+  }
+}
+
+/** Drop a deleted draft from local cache without refetching list/detail queries. Safe on passive live-view tabs. */
+export async function pruneDeletedDraftBranchFromCache(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await removeCanvasVersionQueries(queryClient, canvasId, versionId);
+  queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
+    current.filter((branch) => branch.metadata?.id !== versionId),
+  );
+}
+
+export async function finalizeDraftBranchDeletion(
+  queryClient: QueryClient,
+  organizationId: string,
+  canvasId: string,
+  versionId: string,
+) {
+  await pruneDeletedDraftBranchFromCache(queryClient, canvasId, versionId);
+  queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+}
+
 export interface ConsolePanel {
   id: string;
   type: string;
@@ -930,10 +974,13 @@ export const useDeleteDraftBranch = (organizationId: string, canvasId: string) =
         }),
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    onMutate: async (versionId) => {
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
+        current.filter((branch) => branch.metadata?.id !== versionId),
+      );
+      await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     },
   });
