@@ -68,6 +68,28 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.getByText("+1")).toBeInTheDocument();
   });
 
+  it("keeps the commit controls pending while staging indicators still show changes", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        commitStagingPending
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
+  });
+
   it("keeps the commit controls pending while a commit settles after staging clears", () => {
     render(
       <SecondaryHeaderActions
