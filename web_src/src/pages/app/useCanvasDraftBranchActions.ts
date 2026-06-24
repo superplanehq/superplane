@@ -5,7 +5,11 @@ import type { QueryClient } from "@tanstack/react-query";
 import { showErrorToast } from "@/lib/toast";
 import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
 import { finalizeDraftBranchDeletion } from "@/hooks/useCanvasData";
-import { confirmDeleteDraftBranch } from "./confirmDeleteDraftBranch";
+import {
+  confirmDeleteDraftBranch,
+  isDeletingActiveDraft,
+  switchToLiveAfterActiveDraftDelete,
+} from "./confirmDeleteDraftBranch";
 import { resolveDraftVersionIdForBranch } from "./draftBranchVersionId";
 
 type DeleteDraftBranchMutation = {
@@ -211,6 +215,16 @@ export function useCanvasDraftBranchActions({
     });
 
     if (versionIdToDelete) {
+      const branch = draftBranches.find((item) => draftVersionId(item) === versionIdToDelete);
+      const branchName = branch ? draftBranchName(branch) : "";
+      const isActiveDraft = isDeletingActiveDraft(
+        versionIdToDelete,
+        branchName,
+        activeCanvasVersionId,
+        activeBranchMeta,
+        activeBranch,
+      );
+
       clearPendingAutoSaveWork();
 
       try {
@@ -225,23 +239,48 @@ export function useCanvasDraftBranchActions({
       }
 
       if (organizationId && canvasId) {
-        setPendingFinalizeDeletedVersionId(versionIdToDelete);
+        if (isActiveDraft) {
+          switchToLiveAfterActiveDraftDelete({
+            liveCanvasVersionId,
+            liveCanvasVersion,
+            organizationId,
+            canvasId,
+            exitToLive,
+            handleUseVersion,
+            queryClient,
+            setSearchParams,
+            setActiveCanvasVersion,
+            setDraftCanvasSpec,
+            setLastSavedWorkflowSnapshot,
+          });
+          setPendingFinalizeDeletedVersionId(versionIdToDelete);
+        } else {
+          await finalizeDraftBranchDeletion(queryClient, organizationId, canvasId, versionIdToDelete);
+        }
       }
     }
 
-    exitToLive();
     await handleCreateVersion();
   }, [
     activeBranchMeta,
     activeBranch,
+    activeCanvasVersionId,
     canvasId,
     clearPendingAutoSaveWork,
     draftBranches,
     latestDraftVersion,
     deleteDraftBranchMutation,
-    handleCreateVersion,
     exitToLive,
+    handleCreateVersion,
+    handleUseVersion,
+    liveCanvasVersion,
+    liveCanvasVersionId,
     organizationId,
+    queryClient,
+    setActiveCanvasVersion,
+    setDraftCanvasSpec,
+    setLastSavedWorkflowSnapshot,
+    setSearchParams,
   ]);
 
   return {

@@ -33,7 +33,7 @@ export type ConfirmDeleteDraftBranchResult = {
   deferFinalizeVersionId?: string;
 };
 
-function isDeletingActiveDraft(
+export function isDeletingActiveDraft(
   versionId: string,
   branchName: string,
   activeCanvasVersionId: string,
@@ -47,7 +47,7 @@ function isDeletingActiveDraft(
   );
 }
 
-function switchToLiveAfterActiveDraftDelete({
+export function switchToLiveAfterActiveDraftDelete({
   liveCanvasVersionId,
   liveCanvasVersion,
   organizationId,
