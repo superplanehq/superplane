@@ -59,6 +59,15 @@ func Test_ListUserPermissions(t *testing.T) {
 			"agents",
 		}))
 	})
+
+	t.Run("canceled context bubbles up for gateway sanitization", func(t *testing.T) {
+		canceledCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		_, err := GetUser(canceledCtx, r.AuthService, false)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
 }
 
 func getExpectedPermissions(resources []string) []*pbAuth.Permission {

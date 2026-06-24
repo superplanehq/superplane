@@ -1,10 +1,12 @@
 package grpc
 
 import (
+	"context"
 	"errors"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -15,13 +17,22 @@ const (
 	sanitizedNotFoundMessage = "resource not found"
 )
 
-func sanitizeError(err error) error {
+// SanitizeError maps handler errors to gRPC status codes at the grpc-gateway
+// boundary. Context cancellations from the incoming request are mapped to
+// client-closed / deadline-exceeded codes; everything else is sanitized for
+// clients. Handlers should return the original err and let this function
+// classify it.
+func SanitizeError(requestCtx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
 
 	if _, ok := status.FromError(err); ok {
 		return err
+	}
+
+	if ok, statusErr := grpcerrors.StatusFromContextError(requestCtx, err); ok {
+		return statusErr
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) || looksNotFound(err) {
