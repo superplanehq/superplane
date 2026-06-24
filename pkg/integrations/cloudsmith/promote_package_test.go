@@ -222,16 +222,7 @@ func Test__PromotePackage__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid destinationRepository")
 	})
 
-	t.Run("sends full owner/repo destination in copy request body", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(promotedPackageJSON)),
-				},
-			},
-		}
-
+	t.Run("cross-namespace destination returns error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"sourceRepository":      "acme/staging",
@@ -239,45 +230,13 @@ func Test__PromotePackage__Execute(t *testing.T) {
 				"destinationRepository": "other-owner/production",
 				"mode":                  PromoteModeCopy,
 			},
-			HTTP:           httpCtx,
+			HTTP:           &contexts.HTTPContext{},
 			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 
-		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 1)
-		body, err := io.ReadAll(httpCtx.Requests[0].Body)
-		require.NoError(t, err)
-		assert.Contains(t, string(body), `"destination":"other-owner/production"`)
-	})
-
-	t.Run("sends full owner/repo destination in move request body", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(promotedPackageJSON)),
-				},
-			},
-		}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"sourceRepository":      "acme/staging",
-				"package":               "perm123",
-				"destinationRepository": "other-owner/production",
-				"mode":                  PromoteModeMove,
-			},
-			HTTP:           httpCtx,
-			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
-			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 1)
-		body, err := io.ReadAll(httpCtx.Requests[0].Body)
-		require.NoError(t, err)
-		assert.Contains(t, string(body), `"destination":"other-owner/production"`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cross-namespace promotion is not supported")
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {

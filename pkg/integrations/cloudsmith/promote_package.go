@@ -183,22 +183,24 @@ func (p *PromotePackage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid destinationRepository %q: %w", spec.DestinationRepository, err)
 	}
 
+	if destOwner != owner {
+		return fmt.Errorf("cross-namespace promotion is not supported: source owner %q and destination owner %q must match", owner, destOwner)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	destination := destOwner + "/" + destRepo
-
 	var pkg *Package
 	switch spec.Mode {
 	case PromoteModeMove:
-		pkg, err = client.MovePackage(owner, sourceRepo, spec.Package, destination)
+		pkg, err = client.MovePackage(owner, sourceRepo, spec.Package, destRepo)
 		if err != nil {
 			return fmt.Errorf("failed to move package: %v", err)
 		}
 	default:
-		pkg, err = client.CopyPackage(owner, sourceRepo, spec.Package, destination)
+		pkg, err = client.CopyPackage(owner, sourceRepo, spec.Package, destRepo)
 		if err != nil {
 			return fmt.Errorf("failed to copy package: %v", err)
 		}
