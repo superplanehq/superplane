@@ -42,86 +42,159 @@ export type ProcessCanvasLifecycleEventInput = {
   consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
   consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
   invalidateCanvasVersionData: (targetCanvasId: string, targetVersionId?: string) => void;
+  pruneDeletedCanvasVersion: (targetVersionId: string) => void;
   resyncDraftToCommitted: (versionId: string) => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
 
-export function processCanvasLifecycleEvent({
+function shouldConsumeCanvasVersionUpdatedEcho({
   payload,
-  eventName,
+  consumeIgnoredCreateDraftEcho,
+  consumeIgnoredCanvasVersionUpdatedEcho,
+}: Pick<
+  ProcessCanvasLifecycleEventInput,
+  "payload" | "consumeIgnoredCreateDraftEcho" | "consumeIgnoredCanvasVersionUpdatedEcho"
+>): boolean {
+  const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId, payload.versionId);
+  const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
+  return consumedCreateDraftEcho || consumedVersionEcho;
+}
+
+function handleCanvasVersionDeletedLifecycle({
+  payload,
+  activeCanvasVersionId,
+  isEditing,
+  editSessionActive,
+  pruneDeletedCanvasVersion,
+}: Pick<
+  ProcessCanvasLifecycleEventInput,
+  "payload" | "activeCanvasVersionId" | "isEditing" | "editSessionActive" | "pruneDeletedCanvasVersion"
+>): boolean {
+  window.dispatchEvent(new CustomEvent("canvas:version-deleted", { detail: { versionId: payload.versionId } }));
+
+  if (payload.versionId) {
+    // Every tab drops the deleted draft from cache so background draft-branch
+    // queries stop fetching a version that no longer exists, even on passive live view.
+    pruneDeletedCanvasVersion(payload.versionId);
+  }
+
+  if (!payload.versionId) {
+    return editSessionActive;
+  }
+
+  return shouldReactToCanvasVersionUpdated({
+    versionId: payload.versionId,
+    activeCanvasVersionId,
+    isEditing,
+    editSessionActive,
+  });
+}
+
+function handleCanvasVersionUpdatedLifecycle({
+  payload,
   canvasId,
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
   hasLocalSaveActivity,
-  consumeIgnoredCanvasUpdatedEcho,
-  consumeIgnoredCreateDraftEcho,
-  consumeIgnoredCanvasVersionUpdatedEcho,
   invalidateCanvasVersionData,
   resyncDraftToCommitted,
-  setCanvasDeletedRemotely,
   setRemoteCanvasUpdatePending,
-}: ProcessCanvasLifecycleEventInput): boolean {
-  if (eventName === "canvas_deleted") {
-    setCanvasDeletedRemotely(true);
-    return true;
-  }
+}: Pick<
+  ProcessCanvasLifecycleEventInput,
+  | "payload"
+  | "canvasId"
+  | "activeCanvasVersionId"
+  | "isEditing"
+  | "editSessionActive"
+  | "hasLocalSaveActivity"
+  | "invalidateCanvasVersionData"
+  | "resyncDraftToCommitted"
+  | "setRemoteCanvasUpdatePending"
+>): boolean {
+  window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
 
-  if (eventName === "canvas_updated" && consumeIgnoredCanvasUpdatedEcho()) {
+  if (
+    !shouldReactToCanvasVersionUpdated({
+      versionId: payload.versionId,
+      activeCanvasVersionId,
+      isEditing,
+      editSessionActive,
+    })
+  ) {
     return false;
   }
 
-  if (eventName === "canvas_version_updated") {
-    const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId, payload.versionId);
-    const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
-    if (consumedCreateDraftEcho || consumedVersionEcho) {
-      return false;
-    }
+  if (!payload.versionId) {
+    invalidateCanvasVersionData(canvasId!);
+    return true;
+  }
+
+  if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
+    setRemoteCanvasUpdatePending(true);
+    return true;
+  }
+
+  invalidateCanvasVersionData(canvasId!, payload.versionId);
+  resyncDraftToCommitted(payload.versionId);
+  return true;
+}
+
+function handleCanvasUpdatedLifecycle({
+  canvasId,
+  activeCanvasVersionId,
+  hasLocalSaveActivity,
+  invalidateCanvasVersionData,
+  setRemoteCanvasUpdatePending,
+}: Pick<
+  ProcessCanvasLifecycleEventInput,
+  | "canvasId"
+  | "activeCanvasVersionId"
+  | "hasLocalSaveActivity"
+  | "invalidateCanvasVersionData"
+  | "setRemoteCanvasUpdatePending"
+>): boolean {
+  if (hasLocalSaveActivity) {
+    setRemoteCanvasUpdatePending(true);
+    return true;
+  }
+
+  invalidateCanvasVersionData(canvasId!, activeCanvasVersionId);
+  return true;
+}
+
+export function processCanvasLifecycleEvent(input: ProcessCanvasLifecycleEventInput): boolean {
+  const { eventName, canvasId } = input;
+
+  if (eventName === "canvas_deleted") {
+    input.setCanvasDeletedRemotely(true);
+    return true;
+  }
+
+  if (eventName === "canvas_updated" && input.consumeIgnoredCanvasUpdatedEcho()) {
+    return false;
+  }
+
+  if (eventName === "canvas_version_updated" && shouldConsumeCanvasVersionUpdatedEcho(input)) {
+    return false;
   }
 
   if (!canvasId) {
     return true;
   }
 
+  if (eventName === "canvas_version_deleted") {
+    return handleCanvasVersionDeletedLifecycle(input);
+  }
+
   if (eventName === "canvas_version_updated") {
-    window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
-
-    if (
-      !shouldReactToCanvasVersionUpdated({
-        versionId: payload.versionId,
-        activeCanvasVersionId,
-        isEditing,
-        editSessionActive,
-      })
-    ) {
-      return false;
-    }
-
-    if (!payload.versionId) {
-      invalidateCanvasVersionData(canvasId);
-      return true;
-    }
-
-    if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
-      setRemoteCanvasUpdatePending(true);
-      return true;
-    }
-
-    invalidateCanvasVersionData(canvasId, payload.versionId);
-    resyncDraftToCommitted(payload.versionId);
-    return true;
+    return handleCanvasVersionUpdatedLifecycle(input);
   }
 
   if (eventName !== "canvas_updated") {
     return true;
   }
 
-  if (hasLocalSaveActivity) {
-    setRemoteCanvasUpdatePending(true);
-    return true;
-  }
-
-  invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
-  return true;
+  return handleCanvasUpdatedLifecycle(input);
 }
