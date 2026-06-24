@@ -3439,26 +3439,28 @@ export function AppPage() {
     [canvasId, organizationId, queryClient, setLastSavedWorkflowSnapshot],
   );
 
-  const { handleCommitStaging, handleResetStaging, resetStagingPending } = useDraftStagingActions({
-    organizationId,
-    canvasId,
-    activeCanvasVersionId,
-    hasEditableVersion,
-    ensureVersionActionDraftReady,
-    commitCanvasStagingMutation,
-    discardCanvasStagingMutation,
-    draftCanvasSpecsRef,
-    setDraftCanvasSpec,
-    setActiveCanvasVersion,
-    setStagingResetNonce,
-    consoleMutationGenerationRef,
-    setIsPreparingVersionAction,
-    flushRepositoryFileStaging,
-    cancelPendingCanvasSaves,
-    onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
-    recoverIfDraftMissing,
-    registerIgnoredCanvasVersionUpdatedEcho,
-  });
+  const { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending } = useDraftStagingActions(
+    {
+      organizationId,
+      canvasId,
+      activeCanvasVersionId,
+      hasEditableVersion,
+      ensureVersionActionDraftReady,
+      commitCanvasStagingMutation,
+      discardCanvasStagingMutation,
+      draftCanvasSpecsRef,
+      setDraftCanvasSpec,
+      setActiveCanvasVersion,
+      setStagingResetNonce,
+      consoleMutationGenerationRef,
+      setIsPreparingVersionAction,
+      flushRepositoryFileStaging,
+      cancelPendingCanvasSaves,
+      onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
+      recoverIfDraftMissing,
+      registerIgnoredCanvasVersionUpdatedEcho,
+    },
+  );
 
   const activateCanvasVersionForEditing = useCallback(
     (versionID: string, version: CanvasesCanvasVersion) => {
@@ -4558,7 +4560,7 @@ export function AppPage() {
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
           onCommitStaging={handleCommitStaging}
-          commitStagingPending={commitCanvasStagingMutation.isPending}
+          commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
           onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}

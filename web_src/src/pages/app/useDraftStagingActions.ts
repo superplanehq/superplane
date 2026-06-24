@@ -11,6 +11,21 @@ import { executeResetStaging } from "./lib/reset-staging-flow";
 type CommitMutation = { mutateAsync: () => Promise<unknown> };
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
 
+async function runDraftStagingAction(
+  setActionPending: Dispatch<SetStateAction<boolean>>,
+  setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>,
+  action: () => Promise<void>,
+): Promise<void> {
+  setActionPending(true);
+  setIsPreparingVersionAction(true);
+  try {
+    await action();
+  } finally {
+    setActionPending(false);
+    setIsPreparingVersionAction(false);
+  }
+}
+
 type UseDraftStagingActionsOptions = {
   organizationId?: string;
   canvasId?: string;
@@ -54,6 +69,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     registerIgnoredCanvasVersionUpdatedEcho,
   } = options;
   const queryClient = useQueryClient();
+  const [commitStagingPending, setCommitStagingPending] = useState(false);
   const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleCommitStaging = useCallback(async () => {
@@ -61,31 +77,30 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       return;
     }
 
-    setIsPreparingVersionAction(true);
     try {
-      const committed = await executeCommitStaging({
-        organizationId,
-        canvasId,
-        activeCanvasVersionId,
-        queryClient,
-        commitCanvasStagingMutation,
-        consoleMutationGenerationRef,
-        draftCanvasSpecsRef,
-        setDraftCanvasSpec,
-        setStagingResetNonce,
-        ensureVersionActionDraftReady,
-        flushRepositoryFileStaging,
-        registerIgnoredCanvasVersionUpdatedEcho,
+      await runDraftStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
+        const committed = await executeCommitStaging({
+          organizationId,
+          canvasId,
+          activeCanvasVersionId,
+          queryClient,
+          commitCanvasStagingMutation,
+          consoleMutationGenerationRef,
+          draftCanvasSpecsRef,
+          setDraftCanvasSpec,
+          setStagingResetNonce,
+          ensureVersionActionDraftReady,
+          flushRepositoryFileStaging,
+          registerIgnoredCanvasVersionUpdatedEcho,
+        });
+        if (committed) {
+          showSuccessToast("Changes committed");
+        }
       });
-      if (committed) {
-        showSuccessToast("Changes committed");
-      }
     } catch (error) {
       if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
         showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
       }
-    } finally {
-      setIsPreparingVersionAction(false);
     }
   }, [
     activeCanvasVersionId,
@@ -110,31 +125,28 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       return;
     }
 
-    setResetStagingPending(true);
-    setIsPreparingVersionAction(true);
     try {
-      await executeResetStaging({
-        organizationId,
-        canvasId,
-        activeCanvasVersionId,
-        queryClient,
-        discardCanvasStagingMutation,
-        consoleMutationGenerationRef,
-        draftCanvasSpecsRef,
-        setDraftCanvasSpec,
-        setActiveCanvasVersion,
-        setStagingResetNonce,
-        cancelPendingCanvasSaves,
-        onCanvasDraftRestoredToCommitted,
+      await runDraftStagingAction(setResetStagingPending, setIsPreparingVersionAction, async () => {
+        await executeResetStaging({
+          organizationId,
+          canvasId,
+          activeCanvasVersionId,
+          queryClient,
+          discardCanvasStagingMutation,
+          consoleMutationGenerationRef,
+          draftCanvasSpecsRef,
+          setDraftCanvasSpec,
+          setActiveCanvasVersion,
+          setStagingResetNonce,
+          cancelPendingCanvasSaves,
+          onCanvasDraftRestoredToCommitted,
+        });
+        showSuccessToast("Reverted to last commit");
       });
-      showSuccessToast("Reverted to last commit");
     } catch (error) {
       if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
         showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
       }
-    } finally {
-      setResetStagingPending(false);
-      setIsPreparingVersionAction(false);
     }
   }, [
     activeCanvasVersionId,
@@ -154,5 +166,5 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     setStagingResetNonce,
   ]);
 
-  return { handleCommitStaging, handleResetStaging, resetStagingPending };
+  return { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending };
 }
