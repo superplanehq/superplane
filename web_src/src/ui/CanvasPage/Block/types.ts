@@ -53,14 +53,7 @@ export interface BlockInternalData {
 
 export type CanvasBlockData = BlockData & BlockInternalData;
 
-export type ComponentActionKeys =
-  | "runDisabled"
-  | "runDisabledTooltip"
-  | "onEdit"
-  | "onDuplicate"
-  | "onDeactivate"
-  | "onToggleView"
-  | "onDelete";
+export type ComponentActionKeys = "onDuplicate" | "onToggleView" | "onDelete";
 
 export interface BlockProps extends ComponentActionsProps {
   data: CanvasBlockData;

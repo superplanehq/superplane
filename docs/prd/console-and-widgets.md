@@ -126,7 +126,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
@@ -679,9 +679,9 @@ The example uses Tailwind classes for layout and color, a scoped `<style>` block
 
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button.
+Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button. The optional `label` field overrides the displayed name (falling back to the resolved canvas node name), mirroring the per-entry `label` on the Key Nodes panel.
 
-`showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+`showRun` only exposes the button, and only for **trigger nodes** (`type: TYPE_TRIGGER`). Non-trigger nodes can still be pinned for status, but the Run button is suppressed at render time and the editor hides the Show-Run / trigger-template controls when a non-trigger node is selected. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
 
 ## Multi-Node Panels
 
@@ -711,7 +711,7 @@ Per-entry fields:
 | `node` | Required. Canvas node id or name. |
 | `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
 | `description` | Optional short purpose line shown under the row name. |
-| `showRun` | When true, surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `showRun` | When true and the resolved node is a trigger (`TYPE_TRIGGER`), surface a manual "Run" button. Still gated by `canRunNodes`. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.

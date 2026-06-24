@@ -4,7 +4,6 @@ interface WorkflowViewModeActionsConfig {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
-  isVersionsMode: boolean;
   isRunInspectionMode: boolean;
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
@@ -12,7 +11,6 @@ interface WorkflowViewModeActionsConfig {
   handleExitConsoleMode: () => void;
   handleExitMemoryMode: () => void;
   handleExitFilesMode: () => void;
-  handleExitVersionsMode: () => void;
   handleClearRunInspection: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
@@ -23,7 +21,6 @@ export function useWorkflowViewModeActions({
   isConsoleMode,
   isMemoryMode,
   isFilesMode,
-  isVersionsMode,
   isRunInspectionMode,
   hasEditableVersion,
   canUpdateCanvas,
@@ -31,7 +28,6 @@ export function useWorkflowViewModeActions({
   handleExitConsoleMode,
   handleExitMemoryMode,
   handleExitFilesMode,
-  handleExitVersionsMode,
   handleClearRunInspection,
   handleToggleEditMode,
   setIsConsoleAddPanelOpen,
@@ -50,10 +46,6 @@ export function useWorkflowViewModeActions({
       handleExitFilesMode();
       return;
     }
-    if (isVersionsMode) {
-      handleExitVersionsMode();
-      return;
-    }
     if (isRunInspectionMode) {
       handleClearRunInspection();
     }
@@ -62,11 +54,9 @@ export function useWorkflowViewModeActions({
     handleExitConsoleMode,
     handleExitFilesMode,
     handleExitMemoryMode,
-    handleExitVersionsMode,
     isConsoleMode,
     isFilesMode,
     isMemoryMode,
-    isVersionsMode,
     isRunInspectionMode,
   ]);
 

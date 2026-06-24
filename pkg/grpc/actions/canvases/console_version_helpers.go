@@ -3,12 +3,10 @@ package canvases
 import (
 	"context"
 	"errors"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +14,7 @@ func resolveConsoleVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersio
 	if requestedVersionID != "" {
 		versionUUID, err := uuid.Parse(requestedVersionID)
 		if err != nil {
-			return uuid.Nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+			return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid version id")
 		}
 		return versionUUID, nil
 	}
@@ -24,7 +22,7 @@ func resolveConsoleVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersio
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return uuid.Nil, status.Error(codes.NotFound, "canvas live version not found")
+			return uuid.Nil, grpcerrors.NotFound(err, "canvas live version not found")
 		}
 		return uuid.Nil, err
 	}
@@ -44,7 +42,7 @@ func ensureConsoleVersionReadable(
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return status.Error(codes.Unauthenticated, "user not authenticated")
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 	userUUID := uuid.MustParse(userID)
 
@@ -52,5 +50,5 @@ func ensureConsoleVersionReadable(
 		return nil
 	}
 
-	return status.Error(codes.PermissionDenied, "version is not visible in current flow")
+	return grpcerrors.PermissionDenied(nil, "version is not visible in current flow")
 }

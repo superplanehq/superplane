@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
@@ -45,10 +46,10 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, s.Code())
-		assert.Contains(t, s.Message(), fmt.Sprintf("an integration with the name %s already exists", name))
+		assert.Equal(t, codes.AlreadyExists, code)
+		assert.Contains(t, msg, fmt.Sprintf("an integration with the name %s already exists", name))
 	})
 
 	t.Run("reuse integration name after deletion -> success", func(t *testing.T) {
@@ -161,10 +162,10 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "nonexistent-app", name, appConfig)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "integration nonexistent-app not found")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "integration nonexistent-app not found")
 	})
 
 	t.Run("sync fails -> integration created in error state", func(t *testing.T) {
@@ -287,10 +288,8 @@ func Test__CreateIntegration(t *testing.T) {
 			appConfig,
 		)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, s.Code())
-		assert.Equal(t, "organization integration limit exceeded", s.Message())
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
 	})

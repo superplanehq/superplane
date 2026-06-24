@@ -2,18 +2,18 @@ package organizations
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -28,12 +28,12 @@ func UpdateIntegrationProperty(
 ) (*pb.UpdateIntegrationPropertyResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid integration ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid integration ID")
 	}
 
 	integration, err := models.FindIntegration(org, id)
@@ -47,7 +47,7 @@ func UpdateIntegrationProperty(
 	}
 
 	if !property.Editable {
-		return nil, status.Errorf(codes.InvalidArgument, "property %s is not editable", propertyName)
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("property %s is not editable", propertyName))
 	}
 
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
@@ -90,7 +90,7 @@ func UpdateIntegrationProperty(
 
 	if err != nil {
 		logrus.WithError(err).Error("failed to update integration property")
-		return nil, status.Error(codes.Internal, "failed to update integration property")
+		return nil, grpcerrors.Internal(err, "failed to update integration property")
 	}
 
 	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
@@ -110,5 +110,5 @@ func findProperty(integration *models.Integration, propertyName string) (*core.I
 		}
 	}
 
-	return nil, status.Errorf(codes.NotFound, "property %s not found", propertyName)
+	return nil, grpcerrors.NotFound(gorm.ErrRecordNotFound, fmt.Sprintf("property %s not found", propertyName))
 }

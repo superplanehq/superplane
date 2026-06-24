@@ -1,0 +1,36 @@
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example resynced package payload",
+    "display_name": "example-app",
+    "filename": "example-app",
+    "format": "docker",
+    "is_quarantined": false,
+    "is_sync_completed": false,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "repository": "example-repo",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/a=amd64;xpo=linux;id=example-package-id/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-abc1",
+    "slug_perm": "example-package-id",
+    "status": 2,
+    "status_str": "Queued",
+    "summary": "",
+    "tags": {
+      "version": ["latest"]
+    },
+    "tags_immutable": {},
+    "uploaded_at": "2026-01-01T00:00:00Z",
+    "version": "example-version"
+  },
+  "timestamp": "2026-01-01T00:05:00Z",
+  "type": "cloudsmith.package.resynced"
+}

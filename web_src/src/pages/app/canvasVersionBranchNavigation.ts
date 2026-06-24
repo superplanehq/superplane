@@ -25,6 +25,9 @@ export function applyVersionSelectionSearchParams(
   options: { isCurrentLive: boolean; versionID: string; branchName: string },
 ): URLSearchParams {
   const next = new URLSearchParams(current);
+  if (next.get("view") === "versions") {
+    next.delete("view");
+  }
   if (options.isCurrentLive) {
     next.delete("version");
     next.delete("branch");

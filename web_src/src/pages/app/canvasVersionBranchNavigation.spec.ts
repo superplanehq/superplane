@@ -22,17 +22,17 @@ describe("applyVersionSelectionSearchParams", () => {
       branchName: "",
     });
 
-    expect(next.get("view")).toBe("versions");
+    expect(next.get("view")).toBeNull();
   });
 
-  it("keeps versions view when previewing a published version", () => {
+  it("clears legacy versions view when previewing a published version", () => {
     const next = applyVersionSelectionSearchParams(new URLSearchParams("view=versions"), {
       isCurrentLive: false,
       versionID: "published-version",
       branchName: "",
     });
 
-    expect(next.get("view")).toBe("versions");
+    expect(next.get("view")).toBeNull();
     expect(next.get("version")).toBe("published-version");
   });
 });

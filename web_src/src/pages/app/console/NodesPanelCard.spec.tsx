@@ -23,6 +23,12 @@ const NODE: SuperplaneComponentsNode = {
   },
 };
 
+const NODE_ACTION: SuperplaneComponentsNode = {
+  id: "node-2",
+  name: "publish-artifact",
+  type: "TYPE_ACTION",
+};
+
 const PANEL: ConsolePanel = {
   id: "key-nodes",
   type: "nodes",
@@ -42,19 +48,23 @@ const PANEL: ConsolePanel = {
 function renderPanel({
   canRunNodes,
   onTriggerNode,
+  nodes = [NODE],
+  panel = PANEL,
 }: {
   canRunNodes: boolean;
   onTriggerNode?: (nodeId: string, options?: ConsoleTriggerOptions) => void;
+  nodes?: SuperplaneComponentsNode[];
+  panel?: ConsolePanel;
 }) {
   return render(
     <ConsoleContextProvider
       canvasId="canvas-1"
       organizationId="org-1"
-      nodes={[NODE]}
+      nodes={nodes}
       canRunNodes={canRunNodes}
       onTriggerNode={onTriggerNode}
     >
-      <NodesPanelCard panel={PANEL} readOnly onDelete={() => undefined} onChange={() => undefined} />
+      <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
     </ConsoleContextProvider>,
   );
 }
@@ -92,5 +102,21 @@ describe("NodesPanelCard run flow", () => {
     expect(runButton).toBeDisabled();
     fireEvent.click(runButton);
     expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("does not render the Run button for non-trigger nodes even when showRun is set", () => {
+    renderPanel({
+      canRunNodes: true,
+      nodes: [NODE_ACTION],
+      panel: {
+        id: "key-nodes",
+        type: "nodes",
+        content: {
+          title: "Key nodes",
+          nodes: [{ node: "publish-artifact", showRun: true }],
+        },
+      },
+    });
+    expect(screen.queryByTestId("nodes-panel-row-run")).toBeNull();
   });
 });

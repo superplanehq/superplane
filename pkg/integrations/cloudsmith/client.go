@@ -238,12 +238,66 @@ type Package struct {
 	TagsImmutable map[string]any `json:"tags_immutable"`
 }
 
+// PackageTagRequest is the request body for the Cloudsmith tag endpoint.
+type PackageTagRequest struct {
+	Action      string   `json:"action,omitempty"`
+	IsImmutable bool     `json:"is_immutable,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+}
+
+func packageURL(baseURL, owner, repository, identifier string) string {
+	return fmt.Sprintf(
+		"%s/packages/%s/%s/%s/",
+		baseURL,
+		url.PathEscape(owner),
+		url.PathEscape(repository),
+		url.PathEscape(identifier),
+	)
+}
+
 // GetPackage fetches a single package identified by namespace, repository slug, and package identifier.
 func (c *Client) GetPackage(owner, repo, identifier string) (*Package, error) {
-	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
-	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	responseBody, err := c.execRequest(http.MethodGet, packageURL(c.BaseURL, owner, repo, identifier), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+func (c *Client) ResyncPackage(owner, repository, identifier string) (*Package, error) {
+	requestURL := packageURL(c.BaseURL, owner, repository, identifier) + "resync/"
+	return c.execPackageRequest(http.MethodPost, requestURL, nil)
+}
+
+func (c *Client) TagPackage(owner, repository, identifier string, request PackageTagRequest) (*Package, error) {
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %v", err)
+	}
+
+	requestURL := packageURL(c.BaseURL, owner, repository, identifier) + "tag/"
+	return c.execPackageRequest(http.MethodPost, requestURL, bytes.NewReader(body))
+}
+
+func (c *Client) DeletePackage(owner, repository, identifier string) error {
+	_, err := c.execRequest(http.MethodDelete, packageURL(c.BaseURL, owner, repository, identifier), nil)
+	return err
+}
+
+func (c *Client) execPackageRequest(method, requestURL string, body io.Reader) (*Package, error) {
+	responseBody, err := c.execRequest(method, requestURL, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(responseBody) == 0 {
+		return nil, nil
 	}
 
 	var pkg Package
@@ -391,11 +445,15 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		return fmt.Errorf("invalid repository %q: %w", repositoryID, err)
 	}
 
+	// Skip API calls when cached metadata matches and the stored name was already
+	// computed from pkg.Name+version (i.e. differs from the raw slug_perm value).
+	// A stored name equal to packageSlugPerm means the old slug format was cached.
 	var existing PackageNodeMetadata
 	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
 		existing.RepositoryID == repositoryID &&
 		existing.PackageID == packageSlugPerm &&
-		existing.PackageName != "" {
+		existing.PackageName != "" &&
+		existing.PackageName != packageSlugPerm {
 		return nil
 	}
 
@@ -432,9 +490,12 @@ func resolvePackageMetadata(ctx core.SetupContext, repositoryID, packageSlugPerm
 		return fmt.Errorf("failed to fetch package %q: %w", packageSlugPerm, err)
 	}
 
-	packageName := pkg.Slug
+	packageName := pkg.Name
 	if packageName == "" {
 		packageName = packageSlugPerm
+	}
+	if pkg.Version != "" {
+		packageName = fmt.Sprintf("%s %s", packageName, pkg.Version)
 	}
 
 	return ctx.Metadata.Set(PackageNodeMetadata{

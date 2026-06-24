@@ -46,7 +46,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasUncommittedCanvasDraftChanges
         draftVisualDiff={{
@@ -72,7 +72,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasStagingChanges={false}
         commitStagingPending
@@ -87,6 +87,55 @@ describe("SecondaryHeaderActions", () => {
 
     expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
     expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps the publish button visible while publish is pending", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges={false}
+        commitStagingPending={false}
+        publishVersionDisabled
+        publishVersionLabel="Publish"
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-publish-version-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-publish-version-button")).toHaveTextContent("Publish");
+    expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps staging controls disabled while reset settles after staging clears", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges={false}
+        commitStagingPending={false}
+        resetStagingPending
+        onCommitStaging={vi.fn()}
+        onResetStaging={vi.fn()}
+        onDiscardVersion={vi.fn()}
+        onPublishVersion={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-commit-staging-button")).toBeDisabled();
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
 });

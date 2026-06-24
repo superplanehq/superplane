@@ -197,7 +197,7 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="version-edit"
+          headerMode="version-live"
           nodes={[]}
           edges={[]}
           buildingBlocks={[]}
@@ -358,7 +358,7 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="version-edit"
+          headerMode="version-live"
           canvasStateMode="editing"
           nodes={[
             {
@@ -476,7 +476,7 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
-          headerMode="version-edit"
+          headerMode="version-live"
           canvasStateMode="editing"
           nodes={[
             {

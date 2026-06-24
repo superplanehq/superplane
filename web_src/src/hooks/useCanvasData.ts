@@ -880,10 +880,19 @@ export const ensureDraftVersionExists = async (
   return branches.some((branch) => draftVersionId(branch) === versionId);
 };
 
-export const useCreateDraftBranch = (canvasId: string) => {
+type UseCreateDraftBranchOptions = {
+  registerIgnoredCreateDraftEcho?: (targetCanvasId: string) => () => void;
+  armIgnoredCreateDraftEcho?: (targetCanvasId: string, versionId: string, release: () => void) => void;
+};
+
+export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
   const queryClient = useQueryClient();
 
   return useMutation({
+    onMutate: () => {
+      const releaseCreateDraftEcho = options?.registerIgnoredCreateDraftEcho?.(canvasId);
+      return { releaseCreateDraftEcho };
+    },
     mutationFn: async (displayName?: string) => {
       return await canvasesCreateCanvasVersion(
         withOrganizationHeader({
@@ -892,13 +901,20 @@ export const useCreateDraftBranch = (canvasId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response, _variables, context) => {
+      const versionId = response?.data?.version ? draftVersionId(response.data.version) : "";
+      if (versionId && context?.releaseCreateDraftEcho) {
+        options?.armIgnoredCreateDraftEcho?.(canvasId, versionId, context.releaseCreateDraftEcho);
+      }
       // Creating a draft does not change the live canvas, so we intentionally do
       // not invalidate canvasKeys.detail here — doing so would trigger a
       // DescribeCanvas refetch while entering/staying in edit mode.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+    },
+    onError: (_error, _variables, context) => {
+      context?.releaseCreateDraftEcho?.();
     },
   });
 };

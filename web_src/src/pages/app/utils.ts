@@ -8,14 +8,13 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
 } from "@/api-client";
-import type { CanvasEventWithExecutions } from "./lib/canvas-runs";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
 import { flattenObject } from "@/lib/utils";
 import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { createElement, Fragment, type ReactNode } from "react";
+import { createElement, Fragment } from "react";
 import { getComponentBaseMapper, getExecutionDetails, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
@@ -132,25 +131,6 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
   };
 }
 
-export function buildTriggerSidebarEvent(
-  event: CanvasEventWithExecutions,
-  triggerNode: ComponentsNode | undefined,
-): SidebarEvent | undefined {
-  if (!triggerNode || !event.id) return undefined;
-  return mapTriggerEventToSidebarEvent(
-    {
-      id: event.id,
-      canvasId: event.canvasId,
-      nodeId: event.nodeId,
-      channel: event.channel,
-      data: event.data,
-      createdAt: event.createdAt,
-      customName: event.customName,
-    },
-    triggerNode,
-  );
-}
-
 export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
@@ -198,39 +178,6 @@ export function mapExecutionsToSidebarEvents(
       triggerEventId: execution.rootEvent?.id,
     };
   });
-}
-
-export function getNextInQueueInfo(
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> | undefined,
-  nodeId: string,
-  nodes: ComponentsNode[],
-): { title: string; subtitle: string | ReactNode; receivedAt: Date } | undefined {
-  if (!nodeQueueItemsMap || !nodeQueueItemsMap[nodeId] || nodeQueueItemsMap[nodeId].length === 0) {
-    return undefined;
-  }
-
-  const queueItem = nodeQueueItemsMap[nodeId]?.at(-1);
-  if (!queueItem) {
-    return undefined;
-  }
-
-  const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(getNodeComponentName(rootTriggerNode));
-
-  const { title, subtitle } = queueItem.rootEvent
-    ? rootTriggerRenderer.getTitleAndSubtitle({
-        event: buildEventInfo(queueItem.rootEvent!),
-      })
-    : {
-        title: queueItem.id || "Execution",
-        subtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "") : "",
-      };
-
-  return {
-    title,
-    subtitle: subtitle || (queueItem.createdAt ? renderTimeAgo(new Date(queueItem.createdAt)) : ""),
-    receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : new Date(),
-  };
 }
 
 export function mapQueueItemsToSidebarEvents(

@@ -313,6 +313,22 @@ func withPreamble(message, preamble string) string {
 	return preamble + "\n\n" + message
 }
 
+func (p *Provider) RetrieveSessionUsage(ctx context.Context, providerSessionID string) (*agents.TokenUsage, error) {
+	data, err := p.client.executeHTTP(ctx, http.MethodGet, "/sessions/"+url.PathEscape(providerSessionID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var session struct {
+		Usage *anthropicUsage `json:"usage,omitempty"`
+	}
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, fmt.Errorf("decode session usage: %w", err)
+	}
+
+	return tokenUsage(session.Usage), nil
+}
+
 func forwardSSE(ctx context.Context, body io.Reader, onEvent func(agents.ProviderEvent) error) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

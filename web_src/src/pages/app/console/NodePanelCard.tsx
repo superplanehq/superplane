@@ -72,13 +72,15 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
     );
   }
   const resolved = resolveConsoleNode(ctx, content.node);
+  const displayName = content.label?.trim() || resolved?.label || content.node || "—";
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
       <div className="text-sm font-semibold text-slate-800" data-testid="node-panel-name">
-        {resolved?.label ?? content.node ?? "—"}
+        {displayName}
       </div>
-      {content.showRun ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
+      {content.showRun && isTrigger ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
       {!resolved && content.node ? (
         <p className="text-xs text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
       ) : null}
@@ -135,6 +137,8 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const showRunId = useId();
+  const resolved = resolveConsoleNode(ctx, value.node);
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -166,26 +170,42 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={showRunId}
-          checked={Boolean(value.showRun)}
-          onCheckedChange={(checked) => onChange({ ...value, showRun: checked === true })}
-          className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium text-slate-600">Label (optional)</Label>
+        <Input
+          value={value.label ?? ""}
+          onChange={(e) => onChange({ ...value, label: e.target.value || undefined })}
+          placeholder="Display name override"
         />
-        <Label htmlFor={showRunId} className="text-xs text-slate-700">
-          Show a manual "Run" button (requires run permission).
-        </Label>
       </div>
-      {value.showRun ? (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>
-          <Input
-            value={value.triggerName ?? ""}
-            onChange={(e) => onChange({ ...value, triggerName: e.target.value || undefined })}
-            placeholder="e.g. manual"
-          />
-        </div>
+      {isTrigger ? (
+        <>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={showRunId}
+              checked={Boolean(value.showRun)}
+              onCheckedChange={(checked) => onChange({ ...value, showRun: checked === true })}
+              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+            />
+            <Label htmlFor={showRunId} className="text-xs text-slate-700">
+              Show a manual "Run" button (requires run permission).
+            </Label>
+          </div>
+          {value.showRun ? (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>
+              <Input
+                value={value.triggerName ?? ""}
+                onChange={(e) => onChange({ ...value, triggerName: e.target.value || undefined })}
+                placeholder="e.g. manual"
+              />
+            </div>
+          ) : null}
+        </>
+      ) : value.node && resolved ? (
+        <p className="text-xs text-slate-500">
+          Only trigger nodes can be run from the console. Pick the trigger that starts your flow.
+        </p>
       ) : null}
     </div>
   );
@@ -195,6 +215,7 @@ function normalizeContent(raw: Record<string, unknown> | undefined): NodePanelCo
   return {
     title: typeof raw?.title === "string" ? raw.title : "",
     node: typeof raw?.node === "string" ? raw.node : "",
+    label: typeof raw?.label === "string" ? raw.label : undefined,
     showRun: typeof raw?.showRun === "boolean" ? raw.showRun : false,
     triggerName: typeof raw?.triggerName === "string" ? raw.triggerName : undefined,
   };

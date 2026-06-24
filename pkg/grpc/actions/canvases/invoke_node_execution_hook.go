@@ -12,13 +12,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func InvokeNodeExecutionHook(
@@ -34,7 +33,7 @@ func InvokeNodeExecutionHook(
 ) (*pb.InvokeNodeExecutionHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvas, err := models.FindCanvas(orgID, canvasID)
@@ -53,7 +52,7 @@ func InvokeNodeExecutionHook(
 	}
 
 	if node.Type != models.NodeTypeComponent || node.Ref.Data().Component == nil {
-		return nil, status.Error(codes.InvalidArgument, "node is not a component node")
+		return nil, grpcerrors.InvalidArgument(nil, "node is not a component node")
 	}
 
 	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
@@ -96,7 +95,7 @@ func InvokeNodeExecutionHook(
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
-			return nil, status.Error(codes.Internal, "error building context")
+			return nil, grpcerrors.Internal(err, "error building context")
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -106,7 +105,7 @@ func InvokeNodeExecutionHook(
 	actionCtx.Logger = logger
 	err = hookProvider.HandleHook(actionCtx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "action execution failed")
 	}
 
 	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {

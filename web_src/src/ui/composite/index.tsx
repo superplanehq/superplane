@@ -91,11 +91,7 @@ export const Composite: React.FC<CompositeProps> = ({
   warning,
   dimBodyBelowHeader,
   draftDiffStatus,
-  runDisabled,
-  runDisabledTooltip,
-  onEdit,
   onDuplicate,
-  onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -206,11 +202,7 @@ export const Composite: React.FC<CompositeProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
-      onEdit={onEdit}
       onDuplicate={onDuplicate}
-      onDeactivate={onDeactivate}
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}

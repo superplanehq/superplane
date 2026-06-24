@@ -70,6 +70,12 @@ var exampleOutputReleaseElasticIPBytes []byte
 //go:embed example_output_manage_elastic_ip.json
 var exampleOutputManageElasticIPBytes []byte
 
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -132,6 +138,12 @@ var exampleOutputReleaseElasticIP map[string]any
 
 var exampleOutputManageElasticIPOnce sync.Once
 var exampleOutputManageElasticIP map[string]any
+
+var exampleOutputCreateLoadBalancerOnce sync.Once
+var exampleOutputCreateLoadBalancer map[string]any
+
+var exampleOutputDeleteLoadBalancerOnce sync.Once
+var exampleOutputDeleteLoadBalancer map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -270,5 +282,21 @@ func (c *ManageElasticIP) ExampleOutput() map[string]any {
 		&exampleOutputManageElasticIPOnce,
 		exampleOutputManageElasticIPBytes,
 		&exampleOutputManageElasticIP,
+	)
+}
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateLoadBalancerOnce,
+		exampleOutputCreateLoadBalancerBytes,
+		&exampleOutputCreateLoadBalancer,
+	)
+}
+
+func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteLoadBalancerOnce,
+		exampleOutputDeleteLoadBalancerBytes,
+		&exampleOutputDeleteLoadBalancer,
 	)
 }
