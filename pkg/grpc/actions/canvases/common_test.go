@@ -17,6 +17,7 @@ import (
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const testWebhookBaseURL = "http://localhost:3000/api/v1"
@@ -123,6 +124,15 @@ func findRegisteredDraftBranchErr(canvasID uuid.UUID, branchName string) error {
 		Where("state = ?", models.CanvasVersionStateDraft).
 		First(&version).
 		Error
+}
+
+func structFromAnyMap(t *testing.T, value map[string]any) *structpb.Struct {
+	t.Helper()
+
+	result, err := structpb.NewStruct(value)
+	require.NoError(t, err)
+
+	return result
 }
 
 func TestMapCanvasNameUniqueConstraintError(t *testing.T) {

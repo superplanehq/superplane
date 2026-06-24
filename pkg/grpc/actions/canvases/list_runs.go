@@ -156,7 +156,7 @@ func SerializeCanvasRuns(runs []models.CanvasRun, rootEventsByRunID map[string]m
 
 func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, executions []models.CanvasNodeExecution) (*pb.CanvasRun, error) {
 	if rootEvent.ID == uuid.Nil {
-		return nil, grpcerrors.NotFound(err, "root event not found")
+		return nil, grpcerrors.NotFound(nil, "root event not found")
 	}
 
 	serializedRootEvent, err := SerializeCanvasEvent(rootEvent)

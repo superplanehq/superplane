@@ -26,14 +26,14 @@ func Test__GetCanvasRepository(t *testing.T) {
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), "invalid-id")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -52,7 +52,7 @@ func Test__GetCanvasRepository(t *testing.T) {
 	t.Run("head lookup fails -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
 		_, err := GetCanvasRepository(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Internal, code)
 	})

@@ -7,7 +7,6 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, startTransition, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
-  CanvasChangesetChange,
   CanvasesCanvas,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
@@ -15,12 +14,12 @@ import type {
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
   ActionsAction,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent } from "@/api-client";
+import { canvasesReemitTriggerEvent } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   renderCanvasRunsSidebarPanel,
@@ -90,7 +89,6 @@ import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
 import { resolveFilesHeaderVersionActions, useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
-import { useVersionsModeActions } from "./useVersionsModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useAgentDraftEditor } from "./useAgentDraftEditor";
@@ -104,7 +102,6 @@ import {
   isPublishedVersion,
   sortDraftVersionsDesc,
   sortPublishedVersionsDesc,
-  versionSortValue,
 } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
@@ -249,11 +246,6 @@ export function AppPage() {
     setIsConsoleYamlOpen,
     selectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
-  const { handleExitVersionsMode } = useVersionsModeActions({
-    setIsConsoleAddPanelOpen,
-    setIsConsoleYamlOpen,
-    setSearchParams,
-  });
   const preserveRunDetailNodeOnNextRunChangeRef = useRef(false);
   const clearRunDetailNodeSearch = useCallback(() => {
     setSearchParams(
@@ -283,15 +275,6 @@ export function AppPage() {
     clearRunDetailNodeSearch,
   );
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
-  // `view=versions` is a legacy URL state: the Versions tab was removed in favor
-  // of the in-edit-session sidebar, so such links would otherwise render a
-  // read-only canvas with no sidebar and no way back. Normalize the param away so
-  // the canvas loads normally with the Edit entry point available.
-  useEffect(() => {
-    if (urlViewFlags.isVersionsMode) {
-      handleExitVersionsMode();
-    }
-  }, [urlViewFlags.isVersionsMode, handleExitVersionsMode]);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -2900,119 +2883,6 @@ export function AppPage() {
     ],
   );
 
-  const handleApplyAiOperations = useCallback(
-    async (operations: CanvasChangesetChange[]) => {
-      if (!operations.length || !organizationId || !canvasId) {
-        return;
-      }
-
-      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
-      if (!versionId) {
-        throw new Error("Enable edit mode before applying AI changes.");
-      }
-
-      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
-      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
-      const autoLayoutNodeIds = Array.from(
-        new Set(
-          operations
-            .filter((operation) => operation.type === "ADD_NODE")
-            .map((operation) => operation.node?.id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-
-      try {
-        const response = await canvasesApplyCanvasVersionChangeset(
-          withOrganizationHeader({
-            path: {
-              canvasId,
-              versionId,
-            },
-            body: {
-              changeset: {
-                changes: operations,
-              },
-              ...(autoLayoutNodeIds.length > 0
-                ? {
-                    autoLayout: {
-                      algorithm: "ALGORITHM_HORIZONTAL",
-                      scope: "SCOPE_CONNECTED_COMPONENT",
-                      nodeIds: autoLayoutNodeIds,
-                    },
-                  }
-                : {}),
-            },
-          }),
-        );
-
-        const version = response.data?.version;
-        if (!version) {
-          throw new Error("Failed to apply AI changes.");
-        }
-
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), version);
-        queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          let found = false;
-          const next = current.map((item) => {
-            if (item?.metadata?.id === version.metadata?.id) {
-              found = true;
-              return version;
-            }
-            return item;
-          });
-
-          if (!found) {
-            next.unshift(version);
-          }
-
-          next.sort(
-            (left, right) =>
-              versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
-              versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
-          );
-          return next;
-        });
-
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-          if (!current || !version.spec) {
-            return current;
-          }
-
-          return {
-            ...current,
-            spec: {
-              ...current.spec,
-              ...version.spec,
-            },
-          };
-        });
-
-        setActiveCanvasVersion(version);
-        setLastSavedWorkflowSnapshot(
-          queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null,
-        );
-      } catch (error) {
-        releaseCanvasUpdatedEcho();
-        releaseCanvasVersionUpdatedEcho();
-        throw error;
-      }
-    },
-    [
-      activeCanvasVersionId,
-      canvasId,
-      organizationId,
-      queryClient,
-      registerIgnoredCanvasUpdatedEcho,
-      registerIgnoredCanvasVersionUpdatedEcho,
-      setLastSavedWorkflowSnapshot,
-    ],
-  );
-
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
@@ -3845,7 +3715,6 @@ export function AppPage() {
     getWorkflowViewPresentation({
       ...urlViewFlags,
       hasEditableVersion,
-      isViewingPendingApprovalVersion: false,
       isViewingCurrentLiveVersion,
     });
 
@@ -4158,7 +4027,6 @@ export function AppPage() {
     handleExitConsoleMode,
     handleExitMemoryMode,
     handleExitFilesMode,
-    handleExitVersionsMode,
     handleClearRunInspection,
     handleToggleEditMode,
     setIsConsoleAddPanelOpen,
@@ -4167,9 +4035,7 @@ export function AppPage() {
 
   const { handleEnterEditModeFromHeader, clearRunInspectionForEdit } = useWorkflowHeaderEditActions({
     isRunInspectionMode,
-    isVersionsMode: urlViewFlags.isVersionsMode,
     handleClearRunInspection,
-    handleExitVersionsMode,
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,
@@ -4511,7 +4377,6 @@ export function AppPage() {
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     deleteDraftBranchMutation.isPending ||
-    deleteDraftBranchMutation.isPending ||
     !activeCanvasVersionId;
   const resetDraftDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
@@ -4566,8 +4431,7 @@ export function AppPage() {
     !editSessionActive &&
     !urlViewFlags.isConsoleMode &&
     !urlViewFlags.isMemoryMode &&
-    !urlViewFlags.isFilesMode &&
-    !urlViewFlags.isVersionsMode;
+    !urlViewFlags.isFilesMode;
 
   // The versions sidebar is available only during an edit session while on the
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
@@ -4726,7 +4590,6 @@ export function AppPage() {
           isEditing={isEditing}
           activeCanvasVersionId={activeCanvasVersionId}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
-          onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
@@ -4784,8 +4647,6 @@ export function AppPage() {
           {...draftChangeIndicators}
           {...filesHeaderVersionActions}
           hasStagingChanges={isEditing && hasStagingChanges}
-          hasUncommittedDraftChanges={isEditing && hasStagingChanges}
-          readyToPublishDraftChanges={isEditing && !hasStagingChanges && hasDraftDiffVersusLive}
           editTabTone={editTabTone}
           hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
@@ -4799,8 +4660,6 @@ export function AppPage() {
           onResetStaging={handleResetStaging}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
-          runDisabled={runDisabled}
-          runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
           onCancelExecution={showLiveActivity ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}

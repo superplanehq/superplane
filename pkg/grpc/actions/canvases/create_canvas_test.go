@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpcerrors"
@@ -15,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeCanvasUsageService struct {
@@ -233,11 +235,5 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
-	require.Equal(t, "organization canvas limit exceeded", func() string {
-		_, msg, ok := grpcerrors.HandlerStatus(err)
-		if ok {
-			return msg
-		}
-		return err.Error()
-	}())
+	assert.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
 }

@@ -20,14 +20,14 @@ func Test__DescribeCanvas(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), "invalid-id")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})

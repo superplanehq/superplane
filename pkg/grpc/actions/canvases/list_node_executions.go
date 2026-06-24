@@ -240,7 +240,7 @@ func ProtoToNodeExecutionState(state pb.CanvasNodeExecution_State) (string, erro
 	case pb.CanvasNodeExecution_STATE_FINISHED:
 		return models.CanvasNodeExecutionStateFinished, nil
 	default:
-		return "", grpcerrors.InvalidArgument(state, "invalid execution state")
+		return "", grpcerrors.InvalidArgument(nil, "invalid execution state")
 	}
 }
 
@@ -251,7 +251,7 @@ func ProtoToNodeExecutionResult(result pb.CanvasNodeExecution_Result) (string, e
 	case pb.CanvasNodeExecution_RESULT_FAILED:
 		return models.CanvasNodeExecutionResultFailed, nil
 	default:
-		return "", grpcerrors.InvalidArgument(result, "invalid execution result")
+		return "", grpcerrors.InvalidArgument(nil, "invalid execution result")
 	}
 }
 

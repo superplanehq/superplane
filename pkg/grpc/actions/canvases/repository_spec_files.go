@@ -156,7 +156,7 @@ func loadRepositorySpecVersionForRead(
 		v, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
 		if loadErr != nil {
 			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
-				return grpcerrors.NotFound(err, "version not found")
+				return grpcerrors.NotFound(loadErr, "version not found")
 			}
 			return loadErr
 		}

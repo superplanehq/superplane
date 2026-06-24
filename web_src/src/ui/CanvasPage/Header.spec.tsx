@@ -58,7 +58,7 @@ const versionsSidebarState = {
 } satisfies CanvasVersionsSidebarState;
 
 function renderHeader(
-  mode: "version-live" | "version-edit" | "versions",
+  mode: "version-live",
   options?: {
     isEditing?: boolean;
     activeDraftBranchLabel?: string;
@@ -97,18 +97,12 @@ describe("Header", () => {
     expect(screen.getByTestId("canvas-edit-button")).toBeInTheDocument();
   });
 
-  it("hides enter edit actions on the versions tab", () => {
-    renderHeader("versions");
-
-    expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
-  });
-
   it("renders without crashing when canvasName is undefined", () => {
     expect(() => renderHeader("version-live", { canvasName: undefined })).not.toThrow();
   });
 
   it("shows the active draft label and exit control in edit mode", () => {
-    renderHeader("version-edit", {
+    renderHeader("version-live", {
       isEditing: true,
       activeDraftBranchLabel: "Draft #1",
       onExitEditMode: vi.fn(),

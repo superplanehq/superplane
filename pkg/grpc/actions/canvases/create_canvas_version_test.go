@@ -20,7 +20,7 @@ func TestCreateCanvasVersion(t *testing.T) {
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := CreateCanvasVersion(context.Background(), r.Organization.ID.String(), uuid.New().String(), "")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
 	})

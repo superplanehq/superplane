@@ -20,21 +20,21 @@ func TestDeleteCanvasVersion(t *testing.T) {
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(context.Background(), r.Organization.ID.String(), uuid.New().String(), uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), "invalid-id", uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, "invalid-id", uuid.New().String(), uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -42,14 +42,14 @@ func TestDeleteCanvasVersion(t *testing.T) {
 	t.Run("invalid version id -> error", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-delete-invalid-version")
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "invalid-id")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), uuid.New().String(), uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -57,7 +57,7 @@ func TestDeleteCanvasVersion(t *testing.T) {
 	t.Run("missing version -> not found", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-delete-missing")
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), canvasID, uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -73,7 +73,7 @@ func TestDeleteCanvasVersion(t *testing.T) {
 		otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
 		_, err = DeleteCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID, versionID)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.PermissionDenied, code)
 	})

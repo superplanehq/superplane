@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -94,8 +95,7 @@ func describeUsageLimits(
 
 	response, err = usageService.DescribeOrganizationLimits(ctx, orgID)
 	if err != nil {
-		log.Errorf("Error describing usage limits after sync for organization %s: %v", orgID, err)
-		return nil, grpcerrors.Internal(err, "failed to describe organization usage limits")
+		return nil, describeUsageAfterSyncError(orgID, "limits", err)
 	}
 
 	return response.Limits, nil
@@ -122,8 +122,7 @@ func describeUsageMetrics(
 
 	response, err = usageService.DescribeOrganizationUsage(ctx, orgID)
 	if err != nil {
-		log.Errorf("Error describing usage metrics after setup for organization %s: %v", orgID, err)
-		return nil, grpcerrors.Internal(err, "failed to describe organization usage")
+		return nil, describeUsageAfterSyncError(orgID, "metrics", err)
 	}
 
 	return response.Usage, nil
@@ -133,11 +132,25 @@ func usageSyncError(orgID string, err error) error {
 	switch {
 	case errors.Is(err, usage.ErrNoBillingAccountCandidate), errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.FailedPrecondition(nil, "organization has no billing account candidate")
+	case grpcerrors.Code(err) == codes.FailedPrecondition:
+		return grpcerrors.FailedPrecondition(nil, "organization usage setup failed precondition")
 	case grpcerrors.Code(err) == codes.ResourceExhausted:
 		return grpcerrors.ResourceExhausted(nil, "organization exceeds configured account usage limits")
 	default:
 		log.Errorf("Error syncing usage for organization %s: %v", orgID, err)
 		return grpcerrors.Internal(err, "failed to set up organization usage")
+	}
+}
+
+func describeUsageAfterSyncError(orgID, resource string, err error) error {
+	switch grpcerrors.Code(err) {
+	case codes.NotFound, codes.FailedPrecondition:
+		return grpcerrors.FailedPrecondition(nil, "organization usage is not configured")
+	case codes.ResourceExhausted:
+		return grpcerrors.ResourceExhausted(nil, "organization exceeds configured account usage limits")
+	default:
+		log.Errorf("Error describing usage %s after sync for organization %s: %v", resource, orgID, err)
+		return grpcerrors.Internal(err, fmt.Sprintf("failed to describe organization usage %s", resource))
 	}
 }
 

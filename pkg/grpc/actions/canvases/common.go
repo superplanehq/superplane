@@ -145,7 +145,7 @@ func publishCanvasVersionInTransaction(
 		return err
 	}
 
-	if len(changeset.GetChanges()) == 0 {
+	if len(changeset.Changes) == 0 {
 		return mapCanvasNameUniqueConstraintError(
 			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
 		)

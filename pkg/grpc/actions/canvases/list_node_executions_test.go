@@ -31,7 +31,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 			nil,
 		)
 
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})

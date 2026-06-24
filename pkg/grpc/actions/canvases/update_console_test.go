@@ -15,7 +15,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -27,7 +26,7 @@ func updateConsoleFromProto(
 ) (*models.CanvasVersion, error) {
 	modelPanels, err := deserializeConsolePanels(panels)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		return nil, grpcerrors.InvalidArgument(err, err.Error())
 	}
 	modelLayout := deserializeConsoleLayout(layout)
 	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout, false)
@@ -40,21 +39,21 @@ func Test__UpdateConsole(t *testing.T) {
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, "not-a-uuid", uuid.New().String(), "", nil, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, "bad", "", nil, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, uuid.New().String(), "", nil, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -66,7 +65,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err = updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "x", Type: "markdown", Content: strVal},
 		}, []*pb.Console_LayoutItem{{I: "x", X: 0, Y: 0, W: 1, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -76,7 +75,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "", Type: "markdown"},
 		}, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -86,7 +85,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: ""},
 		}, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -97,7 +96,7 @@ func Test__UpdateConsole(t *testing.T) {
 			{Id: "dup", Type: "markdown"},
 			{Id: "dup", Type: "markdown"},
 		}, nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -107,7 +106,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "", X: 0, Y: 0, W: 1, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -120,7 +119,7 @@ func Test__UpdateConsole(t *testing.T) {
 			{I: "p", X: 0, Y: 0, W: 1, H: 1},
 			{I: "p", X: 1, Y: 0, W: 1, H: 1},
 		})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -130,7 +129,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "other", X: 0, Y: 0, W: 1, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -140,7 +139,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 0, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -150,7 +149,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "p", X: -1, Y: 0, W: 1, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -165,7 +164,7 @@ func Test__UpdateConsole(t *testing.T) {
 			layout = append(layout, &pb.Console_LayoutItem{I: id, X: int32(i), Y: 0, W: 1, H: 1})
 		}
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", panels, layout)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -178,7 +177,7 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err = updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown", Content: content},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 1, H: 1}})
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})

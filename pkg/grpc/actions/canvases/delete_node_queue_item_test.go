@@ -21,7 +21,7 @@ func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, "invalid-uuid", "node-1", uuid.New().String())
 	require.Error(t, err)
 	assert.Nil(t, response)
-	code, msg, ok := grpcerrors.HandlerStatus(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 }
@@ -33,7 +33,7 @@ func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidItemID(t *testing.T) {
 	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, uuid.New().String(), "node-1", "bogus")
 	require.Error(t, err)
 	assert.Nil(t, response)
-	code, msg, ok := grpcerrors.HandlerStatus(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 }

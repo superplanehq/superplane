@@ -52,7 +52,7 @@ func DeleteCanvasVersion(
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return grpcerrors.NotFound(err, "version not found")
+				return grpcerrors.NotFound(findErr, "version not found")
 			}
 			return findErr
 		}

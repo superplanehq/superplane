@@ -21,7 +21,7 @@ func Test__UpdateCanvas(t *testing.T) {
 		name := "name"
 		description := "description"
 		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", &name, &description)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -34,7 +34,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			stringPointer("updated-name"),
 			stringPointer("updated-description"),
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -49,7 +49,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			stringPointer("   "),
 			stringPointer("description"),
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -96,7 +96,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			&existingCanvas.Name,
 			&targetCanvas.Description,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, code)
 	})

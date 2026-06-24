@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -32,8 +31,8 @@ func NewChangesetBuilder(currentNodes []models.Node, currentEdges []models.Edge,
 	}
 }
 
-func (b *ChangesetBuilder) Build() (*pb.CanvasChangeset, error) {
-	allChanges := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) Build() (*CanvasChangeset, error) {
+	allChanges := []*Change{}
 	allChanges = append(allChanges, b.computeDeleteNodeChanges()...)
 	changes, err := b.computeAddNodeChanges()
 	if err != nil {
@@ -50,11 +49,11 @@ func (b *ChangesetBuilder) Build() (*pb.CanvasChangeset, error) {
 	allChanges = append(allChanges, changes...)
 	allChanges = append(allChanges, b.computeDisconnectNodeChanges()...)
 	allChanges = append(allChanges, b.computeConnectNodeChanges()...)
-	return &pb.CanvasChangeset{Changes: allChanges}, nil
+	return &CanvasChangeset{Changes: allChanges}, nil
 }
 
-func (b *ChangesetBuilder) computeAddNodeChanges() ([]*pb.CanvasChangeset_Change, error) {
-	changes := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) computeAddNodeChanges() ([]*Change, error) {
+	changes := []*Change{}
 
 	//
 	// If a node exists in the proposed, but not in the current,
@@ -70,8 +69,8 @@ func (b *ChangesetBuilder) computeAddNodeChanges() ([]*pb.CanvasChangeset_Change
 			return nil, err
 		}
 
-		changes = append(changes, &pb.CanvasChangeset_Change{
-			Type: pb.CanvasChangeset_Change_ADD_NODE,
+		changes = append(changes, &Change{
+			Type: ChangeTypeAddNode,
 			Node: node,
 		})
 	}
@@ -79,8 +78,8 @@ func (b *ChangesetBuilder) computeAddNodeChanges() ([]*pb.CanvasChangeset_Change
 	return changes, nil
 }
 
-func (b *ChangesetBuilder) computeDeleteNodeChanges() []*pb.CanvasChangeset_Change {
-	changes := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) computeDeleteNodeChanges() []*Change {
+	changes := []*Change{}
 
 	//
 	// If a node exists in the current, but not in the proposed,
@@ -91,10 +90,10 @@ func (b *ChangesetBuilder) computeDeleteNodeChanges() []*pb.CanvasChangeset_Chan
 			continue
 		}
 
-		changes = append(changes, &pb.CanvasChangeset_Change{
-			Type: pb.CanvasChangeset_Change_DELETE_NODE,
-			Node: &pb.CanvasChangeset_Change_Node{
-				Id: nodeID,
+		changes = append(changes, &Change{
+			Type: ChangeTypeDeleteNode,
+			Node: &ChangeNode{
+				ID: nodeID,
 			},
 		})
 	}
@@ -102,8 +101,8 @@ func (b *ChangesetBuilder) computeDeleteNodeChanges() []*pb.CanvasChangeset_Chan
 	return changes
 }
 
-func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*pb.CanvasChangeset_Change, error) {
-	changes := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*Change, error) {
+	changes := []*Change{}
 
 	//
 	// If a node exists in both the current and the proposed,
@@ -124,8 +123,8 @@ func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*pb.CanvasChangeset_Cha
 			return nil, err
 		}
 
-		changes = append(changes, &pb.CanvasChangeset_Change{
-			Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+		changes = append(changes, &Change{
+			Type: ChangeTypeUpdateNode,
 			Node: n,
 		})
 	}
@@ -133,8 +132,8 @@ func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*pb.CanvasChangeset_Cha
 	return changes, nil
 }
 
-func (b *ChangesetBuilder) computeDisconnectNodeChanges() []*pb.CanvasChangeset_Change {
-	changes := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) computeDisconnectNodeChanges() []*Change {
+	changes := []*Change{}
 
 	//
 	// If an edge exists in the current, but not in the proposed,
@@ -145,11 +144,11 @@ func (b *ChangesetBuilder) computeDisconnectNodeChanges() []*pb.CanvasChangeset_
 			continue
 		}
 
-		changes = append(changes, &pb.CanvasChangeset_Change{
-			Type: pb.CanvasChangeset_Change_DELETE_EDGE,
-			Edge: &pb.CanvasChangeset_Change_Edge{
-				SourceId: edge.SourceID,
-				TargetId: edge.TargetID,
+		changes = append(changes, &Change{
+			Type: ChangeTypeDeleteEdge,
+			Edge: &ChangeEdge{
+				SourceID: edge.SourceID,
+				TargetID: edge.TargetID,
 				Channel:  edge.Channel,
 			},
 		})
@@ -158,8 +157,8 @@ func (b *ChangesetBuilder) computeDisconnectNodeChanges() []*pb.CanvasChangeset_
 	return changes
 }
 
-func (b *ChangesetBuilder) computeConnectNodeChanges() []*pb.CanvasChangeset_Change {
-	changes := []*pb.CanvasChangeset_Change{}
+func (b *ChangesetBuilder) computeConnectNodeChanges() []*Change {
+	changes := []*Change{}
 
 	//
 	// If an edge exists in the proposed but not in the current,
@@ -170,11 +169,11 @@ func (b *ChangesetBuilder) computeConnectNodeChanges() []*pb.CanvasChangeset_Cha
 			continue
 		}
 
-		changes = append(changes, &pb.CanvasChangeset_Change{
-			Type: pb.CanvasChangeset_Change_ADD_EDGE,
-			Edge: &pb.CanvasChangeset_Change_Edge{
-				SourceId: edge.SourceID,
-				TargetId: edge.TargetID,
+		changes = append(changes, &Change{
+			Type: ChangeTypeAddEdge,
+			Edge: &ChangeEdge{
+				SourceID: edge.SourceID,
+				TargetID: edge.TargetID,
 				Channel:  edge.Channel,
 			},
 		})
@@ -199,9 +198,9 @@ func blockNameFromNode(node models.Node) string {
 	return ""
 }
 
-func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
-	n := &pb.CanvasChangeset_Change_Node{
-		Id:          proposedNode.ID,
+func changeNodeRefForAdd(proposedNode models.Node) (*ChangeNode, error) {
+	n := &ChangeNode{
+		ID:          proposedNode.ID,
 		Name:        proposedNode.Name,
 		Block:       blockNameFromNode(proposedNode),
 		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
@@ -212,7 +211,7 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 	}
 
 	if proposedNode.IntegrationID != nil {
-		n.IntegrationId = *proposedNode.IntegrationID
+		n.IntegrationID = *proposedNode.IntegrationID
 	}
 
 	if proposedNode.Configuration != nil {
@@ -227,9 +226,9 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 	return n, nil
 }
 
-func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
-	n := &pb.CanvasChangeset_Change_Node{
-		Id:    proposedNode.ID,
+func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (*ChangeNode, error) {
+	n := &ChangeNode{
+		ID:    proposedNode.ID,
 		Name:  proposedNode.Name,
 		Block: blockNameFromNode(proposedNode),
 	}

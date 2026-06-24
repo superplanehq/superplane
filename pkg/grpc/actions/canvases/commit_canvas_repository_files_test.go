@@ -62,7 +62,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
 	})
@@ -80,7 +80,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -101,7 +101,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 				{Path: "README.md", Content: []byte("hello")},
 			},
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -144,7 +144,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

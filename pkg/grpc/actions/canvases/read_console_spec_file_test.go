@@ -21,21 +21,21 @@ func Test__ReadConsoleSpecFile(t *testing.T) {
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := ReadRepositorySpecFile(ctx, "not-a-uuid", uuid.New().String(), "", ConsoleYAMLRepositoryPath)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := ReadRepositorySpecFile(ctx, orgID, "bad-canvas", "", ConsoleYAMLRepositoryPath)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := ReadRepositorySpecFile(ctx, orgID, uuid.New().String(), "", ConsoleYAMLRepositoryPath)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

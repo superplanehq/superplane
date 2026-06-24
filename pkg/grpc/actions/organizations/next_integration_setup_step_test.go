@@ -47,7 +47,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -55,7 +55,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	t.Run("integration not found -> not found", func(t *testing.T) {
 		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

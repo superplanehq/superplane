@@ -276,7 +276,7 @@ func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := ListNodeQueueItems(context.Background(), r.Registry, "invalid-uuid", "node-1", 10, nil)
 	require.Error(t, err)
 	assert.Nil(t, response)
-	code, msg, ok := grpcerrors.HandlerStatus(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 }

@@ -46,7 +46,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasUncommittedCanvasDraftChanges
         draftVisualDiff={{
@@ -72,7 +72,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasStagingChanges={false}
         commitStagingPending
@@ -94,7 +94,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasStagingChanges={false}
         commitStagingPending={false}
@@ -118,7 +118,7 @@ describe("SecondaryHeaderActions", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
-        mode="version-edit"
+        mode="version-live"
         isEditing
         hasStagingChanges={false}
         commitStagingPending={false}

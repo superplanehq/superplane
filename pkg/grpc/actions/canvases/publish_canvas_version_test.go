@@ -26,7 +26,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
 	})
@@ -39,7 +39,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), "invalid-id", uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -52,7 +52,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), "invalid-id",
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -65,7 +65,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
@@ -105,7 +105,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.PermissionDenied, code)
 	})
@@ -318,7 +318,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, code)
 	})

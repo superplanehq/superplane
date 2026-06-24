@@ -20,7 +20,7 @@ func Test__ListEventExecutions__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := ListEventExecutions(context.Background(), r.Registry, "invalid-uuid", uuid.New().String())
 	require.Error(t, err)
 	assert.Nil(t, response)
-	code, msg, ok := grpcerrors.HandlerStatus(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 }
@@ -31,7 +31,7 @@ func Test__ListEventExecutions__ReturnsErrorForInvalidEventID(t *testing.T) {
 	response, err := ListEventExecutions(context.Background(), r.Registry, uuid.New().String(), "bogus")
 	require.Error(t, err)
 	assert.Nil(t, response)
-	code, msg, ok := grpcerrors.HandlerStatus(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, code)
 }

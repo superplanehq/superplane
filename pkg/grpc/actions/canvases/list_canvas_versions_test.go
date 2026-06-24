@@ -26,21 +26,21 @@ func TestListDraftCanvasVersions(t *testing.T) {
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), "invalid-id", 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, "invalid-id", uuid.New().String(), 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), uuid.New().String(), 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

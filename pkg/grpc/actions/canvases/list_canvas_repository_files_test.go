@@ -17,7 +17,7 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), "invalid-id")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -36,7 +36,7 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
 
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.Internal, code)
 	})
@@ -57,7 +57,7 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		otherOrg := support.CreateOrganization(t, r, r.User)
 
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, otherOrg.ID.String(), canvas.ID.String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

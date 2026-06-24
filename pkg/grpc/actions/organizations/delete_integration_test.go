@@ -151,7 +151,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err = DeleteIntegration(ctx, org2.ID.String(), integrationID)
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

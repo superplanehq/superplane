@@ -47,7 +47,7 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, grpcerrors.InvalidArgument(err, "invalid request")
+			return nil, grpcerrors.InvalidArgument(err, "name already used")
 		}
 
 		log.Errorf("failed to create secret %s: %v", spec.Metadata.Name, err)

@@ -21,14 +21,14 @@ func Test__DeleteCanvas(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, uuid.New().String())
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, "invalid-id")
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})

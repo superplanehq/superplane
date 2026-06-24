@@ -11,6 +11,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -41,10 +42,8 @@ func Test__AcceptInviteLinkWithUsage(t *testing.T) {
 
 		_, err = AcceptInviteLinkWithUsage(context.Background(), r.AuthService, service, account.ID.String(), inviteLink.Token.String())
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, code)
-		assert.Equal(t, "organization user limit exceeded", msg)
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+		assert.Equal(t, "organization user limit exceeded", status.Convert(err).Message())
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(userCount+1), service.checkOrganizationCalls[0].state.Users)
 

@@ -30,7 +30,7 @@ func Test__CreateCanvasMemoryNamespace(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		_, err := CreateCanvasMemoryNamespace(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String(), "empty-namespace", nil)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 
@@ -84,7 +84,7 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 			"",
 			nil,
 		)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 

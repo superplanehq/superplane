@@ -46,7 +46,7 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := UpdateIntegrationSecret(ctx, r.Registry, "not-a-uuid", uuid.NewString(), "token", "x")
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
@@ -68,7 +68,7 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 
 		_, err = UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id, "missing_secret", "v")
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})

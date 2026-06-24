@@ -16,6 +16,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func canvasSpecFromVersionYAML(ctx context.Context, t *testing.T, orgID, canvasID, versionID string) *pb.Canvas_Spec {
@@ -115,10 +116,8 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, code)
-		assert.Equal(t, "canvas node limit exceeded", msg)
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+		assert.Equal(t, "canvas node limit exceeded", status.Convert(err).Message())
 	})
 
 	t.Run("invalid source output channel -> error", func(t *testing.T) {
