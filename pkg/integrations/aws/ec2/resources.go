@@ -595,3 +595,81 @@ func instanceTypeResourceName(instanceType InstanceTypeInfo) string {
 
 	return fmt.Sprintf("%s (%d vCPU, %.1f GiB Memory)", instanceType.InstanceType, instanceType.VCPUs, memoryGiB)
 }
+
+func ListLoadBalancers(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	loadBalancers, err := client.ListLoadBalancers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list load balancers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+	for _, lb := range loadBalancers {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: loadBalancerResourceName(lb),
+			ID:   lb.LoadBalancerARN,
+		})
+	}
+
+	return resources, nil
+}
+
+func loadBalancerResourceName(lb LoadBalancer) string {
+	name := strings.TrimSpace(lb.Name)
+	if name == "" {
+		return lb.LoadBalancerARN
+	}
+
+	return fmt.Sprintf("%s (%s)", name, lb.Type)
+}
+
+func ListTargetGroups(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	targetGroups, err := client.ListTargetGroups()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list target groups: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(targetGroups))
+	for _, tg := range targetGroups {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: targetGroupResourceName(tg),
+			ID:   tg.TargetGroupARN,
+		})
+	}
+
+	return resources, nil
+}
+
+func targetGroupResourceName(tg TargetGroup) string {
+	name := strings.TrimSpace(tg.Name)
+	if name == "" {
+		return tg.TargetGroupARN
+	}
+	if tg.Protocol != "" && tg.Port > 0 {
+		return fmt.Sprintf("%s (%s:%d)", name, tg.Protocol, tg.Port)
+	}
+	return name
+}

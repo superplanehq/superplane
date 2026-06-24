@@ -38,7 +38,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
+  <LinkCard title="EC2 • Create Load Balancer" href="#ec2-•-create-load-balancer" description="Create an Application, Network, or Gateway Load Balancer and wait for it to become active" />
   <LinkCard title="EC2 • Delete Instance" href="#ec2-•-delete-instance" description="Terminate an EC2 instance and wait for termination" />
+  <LinkCard title="EC2 • Delete Load Balancer" href="#ec2-•-delete-load-balancer" description="Delete an Elastic Load Balancer and wait for deletion to complete" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image" href="#ec2-•-disable-image" description="Disable an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image Deprecation" href="#ec2-•-disable-image-deprecation" description="Disable deprecation for an EC2 AMI image" />
@@ -1371,6 +1373,72 @@ Emits instance details on the default output channel, including:
 }
 ```
 
+<a id="ec2-•-create-load-balancer"></a>
+
+## EC2 • Create Load Balancer
+
+**Component key:** `aws.ec2.createLoadBalancer`
+
+The Create Load Balancer component provisions an Elastic Load Balancer (ELBv2) and waits until it reaches **active** state before emitting.
+
+### Use Cases
+
+- **Traffic distribution**: Add a load balancer in front of EC2 instances or ECS services
+- **Environment provisioning**: Create load balancers as part of infrastructure workflows
+- **Blue/green deployments**: Stand up a new load balancer before switching traffic
+
+### Configuration
+
+- **Name**: Name for the load balancer (must be unique per account/region)
+- **Region**: AWS region where the load balancer will be created
+- **Type**: Load balancer type:
+  - `application` — Layer 7; routes HTTP/HTTPS traffic
+  - `network` — Layer 4; routes TCP, TLS, UDP, or TCP_UDP traffic
+  - `gateway` — Layer 3; routes traffic through third-party virtual appliances using GENEVE
+- **Scheme** (Application and Network only): `internet-facing` (public DNS) or `internal` (private VPC only). Not applicable for Gateway load balancers.
+- **Subnets**: Subnets to attach to the load balancer. Application and Network load balancers require at least two subnets in different Availability Zones; Gateway load balancers require at least one.
+- **Security Groups** (Application only): Security groups to associate with the load balancer.
+- **IP Address Type** (optional): Address family for the load balancer:
+  - `ipv4` — IPv4 only (default)
+  - `dualstack` — IPv4 and IPv6
+  - `dualstack-without-public-ipv4` — IPv6 public, IPv4 private only
+- **Listener Protocol** (optional): Protocol for the default listener. Valid values depend on the load balancer type:
+  - Application: `HTTP`, `HTTPS`
+  - Network: `TCP`, `TLS`, `UDP`, `TCP_UDP`
+  - Gateway: `GENEVE`
+- **Listener Port** (optional): Port the listener receives traffic on (1–65535). Shown when a Listener Protocol is selected.
+- **Target Group** (optional): Target group to forward listener traffic to. Shown when a Listener Protocol is selected.
+
+### Output
+
+Emits load balancer details on the default output channel, including:
+- `loadBalancerArn` — full ARN of the load balancer
+- `name` — load balancer name
+- `dnsName` — DNS name for routing traffic
+- `scheme` — `internet-facing` or `internal`
+- `type` — `application`, `network`, or `gateway`
+- `state` — should be `active`
+- `vpcId` — VPC the load balancer is associated with
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dnsName": "my-load-balancer-123456789.us-east-1.elb.amazonaws.com",
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "name": "my-load-balancer",
+    "region": "us-east-1",
+    "scheme": "internet-facing",
+    "state": "active",
+    "type": "application",
+    "vpcId": "vpc-0598c7d356eba48d7"
+  },
+  "timestamp": "2026-05-21T12:00:00Z",
+  "type": "aws.ec2.loadBalancer"
+}
+```
+
 <a id="ec2-•-delete-instance"></a>
 
 ## EC2 • Delete Instance
@@ -1405,6 +1473,44 @@ Emits a deletion payload on the default output channel:
   },
   "timestamp": "2026-05-21T12:05:00Z",
   "type": "aws.ec2.instance.deleted"
+}
+```
+
+<a id="ec2-•-delete-load-balancer"></a>
+
+## EC2 • Delete Load Balancer
+
+**Component key:** `aws.ec2.deleteLoadBalancer`
+
+The Delete Load Balancer component deletes an Elastic Load Balancer (ELBv2) and waits until AWS confirms deletion.
+
+### Use Cases
+
+- **Environment teardown**: Remove load balancers when decommissioning an environment
+- **Cost control**: Delete unused load balancers after a workflow finishes
+- **Blue/green cleanup**: Remove the old load balancer after a successful deployment
+
+### Configuration
+
+- **Region**: AWS region where the load balancer resides
+- **Load Balancer**: ARN of the load balancer to delete
+
+### Output
+
+Emits a deletion payload on the default output channel once AWS confirms the load balancer is gone:
+- `loadBalancerArn` — ARN of the deleted load balancer
+- `state` — `deleted`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "state": "deleted"
+  },
+  "timestamp": "2026-05-21T12:05:00Z",
+  "type": "aws.ec2.loadBalancer.deleted"
 }
 ```
 
