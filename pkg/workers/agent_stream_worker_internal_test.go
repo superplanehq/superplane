@@ -174,3 +174,74 @@ func TestHandleProviderEvent_SyncsOrganizationBeforePublishingTokenUsage(t *test
 	assert.Equal(t, r.Organization.ID.String(), usageService.setupOrganizationCalls[0][0])
 	assert.Equal(t, r.Account.ID.String(), usageService.setupOrganizationCalls[0][1])
 }
+
+func TestHandleProviderEvent_PublishesOnlyNewCumulativeTokenUsage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	session := &models.AgentSession{
+		OrganizationID:               r.Organization.ID,
+		UserID:                       r.User,
+		CanvasID:                     canvas.ID,
+		Provider:                     "test",
+		ProviderSessionID:            "upstream-session",
+		Status:                       models.AgentSessionStatusStreaming,
+		TrackedUsageInputTokens:      10,
+		TrackedUsageOutputTokens:     5,
+		TrackedUsageCacheReadTokens:  20,
+		TrackedUsageCacheWriteTokens: 5,
+		TrackedUsageTotalTokens:      40,
+	}
+	require.NoError(t, database.Conn().Create(session).Error)
+
+	published := 0
+	originalPublisher := publishAgentRunFinished
+	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent) error {
+		published++
+		assert.Equal(t, session.ID, gotSession.ID)
+		require.NotNil(t, evt.Usage)
+		assert.Equal(t, int64(2), evt.Usage.InputTokens)
+		assert.Equal(t, int64(3), evt.Usage.OutputTokens)
+		assert.Equal(t, int64(4), evt.Usage.CacheReadTokens)
+		assert.Equal(t, int64(6), evt.Usage.CacheWriteTokens)
+		assert.Equal(t, int64(15), evt.Usage.TotalTokens)
+		return nil
+	}
+	t.Cleanup(func() {
+		publishAgentRunFinished = originalPublisher
+	})
+
+	var streamErr error
+	err := handleProviderEvent(
+		context.Background(),
+		nil,
+		session,
+		agents.ProviderEvent{
+			Type:  agents.ProviderEventTurnCompleted,
+			Model: "claude-sonnet-4-5",
+			Usage: &agents.TokenUsage{
+				InputTokens:      12,
+				OutputTokens:     8,
+				CacheReadTokens:  24,
+				CacheWriteTokens: 11,
+				TotalTokens:      55,
+			},
+		},
+		func(messages.AgentSessionEventMessage) {},
+		&streamErr,
+		newCustomToolTurnState(),
+	)
+
+	require.NoError(t, err)
+	assert.NoError(t, streamErr)
+	assert.Equal(t, 1, published)
+
+	updated, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(12), updated.TrackedUsageInputTokens)
+	assert.Equal(t, int64(8), updated.TrackedUsageOutputTokens)
+	assert.Equal(t, int64(24), updated.TrackedUsageCacheReadTokens)
+	assert.Equal(t, int64(11), updated.TrackedUsageCacheWriteTokens)
+	assert.Equal(t, int64(55), updated.TrackedUsageTotalTokens)
+}
