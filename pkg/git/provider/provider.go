@@ -32,6 +32,7 @@ var (
 	ErrReservedPath         = errors.New("path is reserved for SuperPlane")
 	ErrInvalidCommit        = errors.New("invalid commit")
 	ErrExpectedHeadMismatch = errors.New("expected head sha does not match current branch head")
+	ErrFileNotFound         = errors.New("file not found")
 )
 
 type Provider interface {

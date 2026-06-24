@@ -101,7 +101,7 @@ func (p *Provider) GetFile(_ context.Context, repoID, path, ref string) (io.Read
 
 	content, ok := files[path]
 	if !ok {
-		return nil, provider.ErrInvalidPath
+		return nil, provider.ErrFileNotFound
 	}
 
 	return io.NopCloser(bytes.NewReader(content)), nil

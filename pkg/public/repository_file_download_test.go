@@ -119,11 +119,11 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		assert.Contains(t, response.Body.String(), "Repository not found")
 	})
 
-	t.Run("git provider error -> internal server error", func(t *testing.T) {
+	t.Run("missing file -> not found", func(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		response := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "missing.txt")
-		assert.Equal(t, http.StatusInternalServerError, response.Code)
-		assert.Contains(t, response.Body.String(), "Failed to get file")
+		assert.Equal(t, http.StatusNotFound, response.Code)
+		assert.Contains(t, response.Body.String(), "File not found")
 	})
 
 	t.Run("returns file contents", func(t *testing.T) {
