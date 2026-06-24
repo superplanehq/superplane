@@ -127,11 +127,6 @@ func ResourceExhausted(err error, message string) error {
 	return handlerErrorWithCode(err, message, codes.ResourceExhausted)
 }
 
-// Unknown wraps err as an unknown error for the grpc-gateway sanitizer.
-func Unknown(err error, message string) error {
-	return handlerErrorWithCode(err, message, codes.Unknown)
-}
-
 // HandlerStatus returns the gRPC code and client-safe message from a handler error.
 func HandlerStatus(err error) (codes.Code, string, bool) {
 	var wrapped *handlerError

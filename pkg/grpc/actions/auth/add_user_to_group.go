@@ -19,7 +19,7 @@ func AddUserToGroup(ctx context.Context, orgID, domainType, domainID, userID, us
 
 	err = authService.AddUserToGroup(domainID, domainType, user.ID.String(), groupName)
 	if err != nil {
-		return nil, grpcerrors.Unknown(err, "failed to add user to group")
+		return nil, grpcerrors.Internal(err, "failed to add user to group")
 	}
 
 	return &pbGroups.AddUserToGroupResponse{}, nil
