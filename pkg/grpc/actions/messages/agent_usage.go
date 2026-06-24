@@ -13,7 +13,7 @@ type AgentRunFinishedMessage struct {
 }
 
 func NewAgentRunFinishedMessage(
-	organizationID, chatID, model, usageID, sessionID string,
+	organizationID, chatID, model, idempotencyKey, sessionID string,
 	inputTokens, outputTokens, totalTokens, cacheReadTokens, cacheWriteTokens int64,
 ) AgentRunFinishedMessage {
 	return AgentRunFinishedMessage{
@@ -26,7 +26,7 @@ func NewAgentRunFinishedMessage(
 			TotalTokens:      totalTokens,
 			CacheReadTokens:  cacheReadTokens,
 			CacheWriteTokens: cacheWriteTokens,
-			UsageId:          usageID,
+			IdempotencyKey:   idempotencyKey,
 			SessionId:        sessionID,
 		},
 	}

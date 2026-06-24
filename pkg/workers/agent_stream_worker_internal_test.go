@@ -92,9 +92,9 @@ func publishAgentTokenUsageSynchronously(t *testing.T) {
 		usageService usage.Service,
 		session *models.AgentSession,
 		evt agents.ProviderEvent,
-		usageID string,
+		idempotencyKey string,
 	) {
-		publishPreparedAgentTokenUsage(ctx, usageService, session, evt, usageID)
+		publishPreparedAgentTokenUsage(ctx, usageService, session, evt, idempotencyKey)
 	}
 	t.Cleanup(func() {
 		publishAgentTokenUsageAsync = originalPublisher
@@ -121,12 +121,12 @@ func TestHandleProviderEvent_PublishesTurnUsageWhenSessionAlreadyReset(t *testin
 
 	published := 0
 	originalPublisher := publishAgentRunFinished
-	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, usageID string) error {
+	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 		published++
 		assert.Equal(t, session.ID, gotSession.ID)
 		assert.Equal(t, "claude-sonnet-4-5", evt.Model)
 		require.NotNil(t, evt.Usage)
-		assert.NotEmpty(t, usageID)
+		assert.NotEmpty(t, idempotencyKey)
 		assert.Equal(t, int64(42), evt.Usage.TotalTokens)
 		return nil
 	}
@@ -177,11 +177,11 @@ func TestHandleProviderEvent_SyncsOrganizationBeforePublishingTokenUsage(t *test
 
 	published := 0
 	originalPublisher := publishAgentRunFinished
-	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, usageID string) error {
+	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 		published++
 		assert.Equal(t, session.ID, gotSession.ID)
 		require.NotNil(t, evt.Usage)
-		assert.NotEmpty(t, usageID)
+		assert.NotEmpty(t, idempotencyKey)
 		assert.Equal(t, int64(42), evt.Usage.TotalTokens)
 		return nil
 	}
@@ -298,8 +298,8 @@ func TestHandleProviderEvent_RetrievesUsageWhenCompletedTurnHasNoUsage(t *testin
 
 	published := make(chan agents.ProviderEvent, 1)
 	originalPublisher := publishAgentRunFinished
-	publishAgentRunFinished = func(_ *models.AgentSession, evt agents.ProviderEvent, usageID string) error {
-		assert.NotEmpty(t, usageID)
+	publishAgentRunFinished = func(_ *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
+		assert.NotEmpty(t, idempotencyKey)
 		published <- evt
 		return nil
 	}
@@ -360,11 +360,11 @@ func TestHandleProviderEvent_PublishesOnlyNewCumulativeTokenUsage(t *testing.T) 
 
 	published := 0
 	originalPublisher := publishAgentRunFinished
-	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, usageID string) error {
+	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 		published++
 		assert.Equal(t, session.ID, gotSession.ID)
 		require.NotNil(t, evt.Usage)
-		assert.NotEmpty(t, usageID)
+		assert.NotEmpty(t, idempotencyKey)
 		assert.Equal(t, int64(2), evt.Usage.InputTokens)
 		assert.Equal(t, int64(3), evt.Usage.OutputTokens)
 		assert.Equal(t, int64(4), evt.Usage.CacheReadTokens)
@@ -436,11 +436,11 @@ func TestHandleProviderEvent_PublishesComponentTokenDeltaWhenTotalIsAlreadyTrack
 
 	published := 0
 	originalPublisher := publishAgentRunFinished
-	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, usageID string) error {
+	publishAgentRunFinished = func(gotSession *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 		published++
 		assert.Equal(t, session.ID, gotSession.ID)
 		require.NotNil(t, evt.Usage)
-		assert.NotEmpty(t, usageID)
+		assert.NotEmpty(t, idempotencyKey)
 		assert.Equal(t, int64(2), evt.Usage.InputTokens)
 		assert.Equal(t, int64(3), evt.Usage.OutputTokens)
 		assert.Equal(t, int64(4), evt.Usage.CacheReadTokens)
