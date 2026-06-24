@@ -191,7 +191,18 @@ export const useOrganizationInviteLink = (organizationId: string, enabled = true
   });
 };
 
-export const useOrganizationUsage = (organizationId: string, enabled = true) => {
+type OrganizationUsageQueryOptions = {
+  staleTime?: number;
+  gcTime?: number;
+  refetchOnMount?: boolean | "always";
+  refetchOnWindowFocus?: boolean | "always";
+};
+
+export const useOrganizationUsage = (
+  organizationId: string,
+  enabled = true,
+  options: OrganizationUsageQueryOptions = {},
+) => {
   return useQuery({
     queryKey: organizationKeys.usage(organizationId),
     queryFn: async () => {
@@ -202,9 +213,10 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
       );
       return response.data || null;
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: options.staleTime ?? 30 * 1000,
+    gcTime: options.gcTime ?? 5 * 60 * 1000,
+    refetchOnMount: options.refetchOnMount,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     enabled: !!organizationId && enabled,
   });
 };
