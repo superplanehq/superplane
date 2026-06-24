@@ -4,7 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { CanvasesCanvas } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 
-import { syncCommittedCanvasDraftState, syncCommittedConsoleCaches } from "./sync-committed-canvas-draft";
+import { refreshCachesAfterCommit } from "./sync-committed-canvas-draft";
 
 type CommitMutation = { mutateAsync: () => Promise<unknown> };
 type DraftSpec = CanvasesCanvas["spec"] | null;
@@ -51,21 +51,19 @@ export async function executeCommitStaging({
     throw error;
   }
 
+  // Commit already succeeded on the server; cache refresh and local cleanup must not fail the action.
   if (organizationId && canvasId) {
-    await syncCommittedCanvasDraftState({
+    await refreshCachesAfterCommit({
       queryClient,
       organizationId,
       canvasId,
       versionId: activeCanvasVersionId,
     });
-    await syncCommittedConsoleCaches({
-      queryClient,
-      canvasId,
-      versionId: activeCanvasVersionId,
-    });
   }
 
-  await queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId!) });
+  if (canvasId) {
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+  }
   draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
   setDraftCanvasSpec(null);
   setStagingResetNonce((nonce) => nonce + 1);

@@ -68,6 +68,40 @@ export async function syncCommittedCanvasDraftState({
   return committedVersion;
 }
 
+export async function refreshCachesAfterCommit({
+  queryClient,
+  organizationId,
+  canvasId,
+  versionId,
+}: {
+  queryClient: QueryClient;
+  organizationId: string;
+  canvasId: string;
+  versionId: string;
+}): Promise<void> {
+  try {
+    await syncCommittedCanvasDraftState({
+      queryClient,
+      organizationId,
+      canvasId,
+      versionId,
+    });
+    await syncCommittedConsoleCaches({
+      queryClient,
+      canvasId,
+      versionId,
+    });
+  } catch {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionStagedDetail(canvasId, versionId) }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) }),
+    ]);
+  }
+}
+
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
 export async function restoreCommittedCanvasDraftState({
