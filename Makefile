@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -178,6 +178,9 @@ check.models.tx.debt:
 
 check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
+
+check.grpc.actions.status:
+	bash ./scripts/verify_grpc_actions_status.sh
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh

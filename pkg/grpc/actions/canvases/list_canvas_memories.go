@@ -6,14 +6,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -21,20 +20,20 @@ import (
 func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organizationID, canvasID string) (*pb.ListCanvasMemoriesResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid canvas_id")
 	}
 
 	err = checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "canvas not found")
+			return nil, grpcerrors.NotFound(err, "canvas not found")
 		}
-		return nil, status.Error(codes.Internal, "failed to load canvas")
+		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
 	var records []models.CanvasMemory
@@ -44,12 +43,12 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return listErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to list canvas memories")
+		return nil, grpcerrors.Internal(err, "failed to list canvas memories")
 	}
 
 	items, err := serializeCanvasMemories(ctx, records)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to serialize canvas memory")
+		return nil, grpcerrors.Internal(err, "failed to serialize canvas memory")
 	}
 
 	return &pb.ListCanvasMemoriesResponse{

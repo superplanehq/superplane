@@ -10,10 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -27,22 +26,22 @@ func UpdateCanvas(
 ) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	organizationUUID := uuid.MustParse(organizationID)
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		return updateCanvasInTransaction(tx, organizationUUID, canvasID, name, description)
 	})
 	if err != nil {
-		if s, ok := status.FromError(err); ok {
-			return nil, s.Err()
+		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+			return nil, err
 		}
 		return nil, err
 	}
@@ -53,7 +52,7 @@ func UpdateCanvas(
 
 	refreshedCanvas, err := models.FindCanvas(organizationUUID, canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load updated canvas: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load updated canvas")
 	}
 
 	var user *models.User
@@ -66,12 +65,12 @@ func UpdateCanvas(
 
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), refreshedCanvas)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
 	serializedCanvas, err := SerializeCanvas(refreshedCanvas, liveVersion, user, nil)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to serialize canvas")
+		return nil, grpcerrors.Internal(err, "failed to serialize canvas")
 	}
 
 	return &pb.UpdateCanvasResponse{Canvas: serializedCanvas}, nil
@@ -172,12 +171,12 @@ func applyCanvasNameUpdate(
 
 	nextName := strings.TrimSpace(*name)
 	if nextName == "" {
-		return false, status.Error(codes.InvalidArgument, "canvas name is required")
+		return false, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 
 	nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasID, nextName)
 	if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-		return false, status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+		return false, grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
 	}
 	if nameErr != nil {
 		return false, nameErr

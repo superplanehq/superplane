@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateCanvas(t *testing.T) {
@@ -21,9 +21,9 @@ func Test__UpdateCanvas(t *testing.T) {
 		name := "name"
 		description := "description"
 		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", &name, &description)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
@@ -34,9 +34,9 @@ func Test__UpdateCanvas(t *testing.T) {
 			stringPointer("updated-name"),
 			stringPointer("updated-description"),
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("empty name -> error", func(t *testing.T) {
@@ -49,9 +49,9 @@ func Test__UpdateCanvas(t *testing.T) {
 			stringPointer("   "),
 			stringPointer("description"),
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("updates canvas metadata", func(t *testing.T) {
@@ -96,9 +96,9 @@ func Test__UpdateCanvas(t *testing.T) {
 			&existingCanvas.Name,
 			&targetCanvas.Description,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, s.Code())
+		assert.Equal(t, codes.AlreadyExists, code)
 	})
 
 }

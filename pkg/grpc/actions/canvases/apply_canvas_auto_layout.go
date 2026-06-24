@@ -6,10 +6,9 @@ import (
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ApplyCanvasAutoLayout lays out the effective staged canvas.yaml for a draft
@@ -24,7 +23,7 @@ func ApplyCanvasAutoLayout(
 	autoLayout *pb.CanvasAutoLayout,
 ) (*pb.ApplyCanvasAutoLayoutResponse, error) {
 	if autoLayout == nil {
-		return nil, status.Error(codes.InvalidArgument, "auto_layout is required")
+		return nil, grpcerrors.InvalidArgument(nil, "auto_layout is required")
 	}
 
 	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
@@ -52,7 +51,7 @@ func ApplyCanvasAutoLayout(
 
 	laidOutNodes, laidOutEdges, err := layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "failed to apply layout")
 	}
 
 	positioned := &pb.CanvasVersion{
@@ -68,7 +67,7 @@ func ApplyCanvasAutoLayout(
 
 	positionedYAML, err := canvasyaml.CanvasResourceYAML(positioned, canvas.ID.String())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize canvas: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to serialize canvas")
 	}
 
 	if _, err := models.UpsertWorkflowStagingPath(
@@ -79,7 +78,7 @@ func ApplyCanvasAutoLayout(
 		"",
 		&userUUID,
 	); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to stage canvas layout: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to stage canvas layout")
 	}
 
 	state, _, err := stagingSummaryForVersion(version.ID)

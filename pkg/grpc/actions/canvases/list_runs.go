@@ -3,17 +3,15 @@ package canvases
 import (
 	"context"
 	"fmt"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -158,7 +156,7 @@ func SerializeCanvasRuns(runs []models.CanvasRun, rootEventsByRunID map[string]m
 
 func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, executions []models.CanvasNodeExecution) (*pb.CanvasRun, error) {
 	if rootEvent.ID == uuid.Nil {
-		return nil, status.Error(codes.NotFound, "root event not found")
+		return nil, grpcerrors.NotFound(nil, "root event not found")
 	}
 
 	serializedRootEvent, err := SerializeCanvasEvent(rootEvent)
@@ -197,7 +195,7 @@ func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
 	case pb.CanvasRun_STATE_FINISHED:
 		return models.CanvasRunStateFinished, nil
 	default:
-		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run state filter: %s", state.String()))
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid run state filter: %s", state.String()))
 	}
 }
 
@@ -210,7 +208,7 @@ func ProtoRunResultToModel(result pb.CanvasRun_Result) (string, error) {
 	case pb.CanvasRun_RESULT_CANCELLED:
 		return models.CanvasRunResultCancelled, nil
 	default:
-		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run result filter: %s", result.String()))
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid run result filter: %s", result.String()))
 	}
 }
 

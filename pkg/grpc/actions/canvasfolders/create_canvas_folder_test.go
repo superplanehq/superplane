@@ -7,11 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__CreateCanvasFolder__CreatesFolder(t *testing.T) {
@@ -40,7 +40,7 @@ func Test__CreateCanvasFolder__Validation(t *testing.T) {
 		Spec: &pb.CanvasFolder_Spec{Title: "   "},
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 
 	_, err = CreateCanvasFolder(ctx, r.Organization.ID.String(), &pb.CanvasFolder{
 		Spec: &pb.CanvasFolder_Spec{
@@ -49,7 +49,7 @@ func Test__CreateCanvasFolder__Validation(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 
 	_, err = CreateCanvasFolder(ctx, r.Organization.ID.String(), &pb.CanvasFolder{
 		Spec: &pb.CanvasFolder_Spec{
@@ -57,7 +57,7 @@ func Test__CreateCanvasFolder__Validation(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
 func Test__CreateCanvasFolder__RejectsDuplicateTitles(t *testing.T) {
@@ -73,5 +73,5 @@ func Test__CreateCanvasFolder__RejectsDuplicateTitles(t *testing.T) {
 
 	_, err = CreateCanvasFolder(ctx, r.Organization.ID.String(), folder)
 	require.Error(t, err)
-	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }

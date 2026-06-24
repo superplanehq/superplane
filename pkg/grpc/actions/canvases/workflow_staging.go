@@ -3,18 +3,17 @@ package canvases
 import (
 	"context"
 	"errors"
-	"strings"
-
+	"fmt"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
+	"strings"
 )
 
 // publishStagingUpdated notifies other tabs/replicas that a draft version's
@@ -36,38 +35,38 @@ func loadOwnedDraftVersion(
 ) (*models.Canvas, *models.CanvasVersion, uuid.UUID, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, nil, uuid.Nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, nil, uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	organizationUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, nil, uuid.Nil, status.Error(codes.InvalidArgument, "invalid organization_id")
+		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, nil, uuid.Nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
-		return nil, nil, uuid.Nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, uuid.Nil, status.Error(codes.NotFound, "canvas not found")
+			return nil, nil, uuid.Nil, grpcerrors.NotFound(err, "canvas not found")
 		}
-		return nil, nil, uuid.Nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
+		return nil, nil, uuid.Nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
 	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, uuid.Nil, status.Error(codes.NotFound, "version not found")
+			return nil, nil, uuid.Nil, grpcerrors.NotFound(err, "version not found")
 		}
-		return nil, nil, uuid.Nil, status.Errorf(codes.Internal, "failed to load version: %v", err)
+		return nil, nil, uuid.Nil, grpcerrors.Internal(err, "failed to load version")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -84,7 +83,7 @@ func loadOwnedDraftVersion(
 func ensureStagedReadAllowed(ctx context.Context, version *models.CanvasVersion) error {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return status.Error(codes.Unauthenticated, "user not authenticated")
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	return ensureVersionIsOwnedRegisteredDraft(uuid.MustParse(userID), version)
@@ -136,7 +135,7 @@ func effectiveSpecYAML(
 	case ConsoleYAMLRepositoryPath:
 		return consoleYAMLFromVersion(version)
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", path))
 	}
 }
 
@@ -166,16 +165,16 @@ func StageRepositorySpecFileOperations(
 
 		normalized := normalizeRepositoryFilePath(operation.GetPath())
 		if normalized == "" {
-			return nil, status.Error(codes.InvalidArgument, "file path is required")
+			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
 		}
 		if normalized == gitprovider.ReservedSuperPlanePath ||
 			strings.HasPrefix(normalized, gitprovider.ReservedSuperPlanePath+"/") {
-			return nil, status.Errorf(codes.InvalidArgument, "path %q is reserved for SuperPlane", operation.GetPath())
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("path %q is reserved for SuperPlane", operation.GetPath()))
 		}
 
 		if operation.GetDelete() {
 			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, "", &userUUID); err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to stage deletion of %q: %v", normalized, err)
+				return nil, grpcerrors.Internal(err, "failed to stage deletion")
 			}
 			continue
 		}
@@ -188,13 +187,13 @@ func StageRepositorySpecFileOperations(
 			"",
 			&userUUID,
 		); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to stage %q: %v", normalized, err)
+			return nil, grpcerrors.Internal(err, "failed to stage")
 		}
 	}
 
 	rows, err := models.ListWorkflowStaging(version.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
 	publishStagingUpdated(canvas.ID, version.ID)
@@ -207,7 +206,7 @@ func StageRepositorySpecFileOperations(
 func stagingSummaryForVersion(versionID uuid.UUID) (*pb.StagingSummary, []models.WorkflowStaging, error) {
 	rows, err := models.ListWorkflowStaging(versionID)
 	if err != nil {
-		return nil, nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
+		return nil, nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 	return buildStagingSummary(versionID, rows), rows, nil
 }

@@ -2,25 +2,23 @@ package canvases
 
 import (
 	"context"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func ListEventExecutions(ctx context.Context, registry *registry.Registry, workflowID, eventID string) (*pb.ListEventExecutionsResponse, error) {
 	workflowUUID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	eventUUID, err := uuid.Parse(eventID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid event id")
 	}
 
 	var executions []models.CanvasNodeExecution

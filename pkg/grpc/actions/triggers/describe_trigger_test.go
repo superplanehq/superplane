@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeTrigger(t *testing.T) {
@@ -18,10 +18,10 @@ func Test__DescribeTrigger(t *testing.T) {
 
 	t.Run("trigger does not exist -> error", func(t *testing.T) {
 		_, err := DescribeTrigger(context.Background(), r.Registry, "nope")
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "trigger nope not found", s.Message())
+		assert.Equal(t, codes.NotFound, code)
+		assert.Equal(t, "trigger nope not found", msg)
 	})
 
 	t.Run("describe existing trigger", func(t *testing.T) {

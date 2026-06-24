@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestCreateCanvasVersion(t *testing.T) {
@@ -20,9 +20,9 @@ func TestCreateCanvasVersion(t *testing.T) {
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := CreateCanvasVersion(context.Background(), r.Organization.ID.String(), uuid.New().String(), "")
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("creates draft branch and version", func(t *testing.T) {

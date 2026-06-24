@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateSecret(t *testing.T) {
@@ -29,10 +29,10 @@ func Test__UpdateSecret(t *testing.T) {
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
 		_, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), "test2", &protos.Secret{})
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "secret not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "secret not found", msg)
 	})
 
 	t.Run("secret data is updated", func(t *testing.T) {

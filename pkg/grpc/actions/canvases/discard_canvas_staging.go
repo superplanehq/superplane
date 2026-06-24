@@ -3,10 +3,9 @@ package canvases
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func DiscardCanvasStaging(
@@ -22,7 +21,7 @@ func DiscardCanvasStaging(
 	}
 
 	if err := models.DiscardWorkflowStaging(version.ID, paths); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to discard staging: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to discard staging")
 	}
 
 	state, _, err := stagingSummaryForVersion(version.ID)

@@ -4,19 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
+	"sync"
+	"time"
 )
 
 const (
@@ -27,13 +25,13 @@ const (
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	_, err = models.FindCanvasNode(database.Conn(), wfID, nodeID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "canvas node not found")
+			return nil, grpcerrors.NotFound(err, "canvas node not found")
 		}
 
 		return nil, err
@@ -41,12 +39,12 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 
 	states, err := validateExecutionStates(pbStates)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcerrors.InvalidArgument(err, "invalid list node executions request")
 	}
 
 	results, err := validateExecutionResults(pbResults)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcerrors.InvalidArgument(err, "invalid request")
 	}
 
 	limit = getLimit(limit)
@@ -242,7 +240,7 @@ func ProtoToNodeExecutionState(state pb.CanvasNodeExecution_State) (string, erro
 	case pb.CanvasNodeExecution_STATE_FINISHED:
 		return models.CanvasNodeExecutionStateFinished, nil
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "invalid execution state: %v", state)
+		return "", grpcerrors.InvalidArgument(nil, "invalid execution state")
 	}
 }
 
@@ -253,7 +251,7 @@ func ProtoToNodeExecutionResult(result pb.CanvasNodeExecution_Result) (string, e
 	case pb.CanvasNodeExecution_RESULT_FAILED:
 		return models.CanvasNodeExecutionResultFailed, nil
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "invalid execution result: %v", result)
+		return "", grpcerrors.InvalidArgument(nil, "invalid execution result")
 	}
 }
 

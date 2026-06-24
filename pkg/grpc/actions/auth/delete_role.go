@@ -6,21 +6,21 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func DeleteRole(ctx context.Context, domainType, domainID, roleName string, authService authorization.Authorization) (*pb.DeleteRoleResponse, error) {
 	if roleName == "" {
-		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role name must be specified")
 	}
 
 	_, err := authService.GetRoleDefinition(ctx, roleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", roleName, err)
-		return nil, status.Error(codes.NotFound, "role not found")
+		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
 	if domainType == models.DomainTypeOrganization {
@@ -35,7 +35,7 @@ func DeleteRole(ctx context.Context, domainType, domainID, roleName string, auth
 	err = authService.DeleteCustomRole(domainID, domainType, roleName)
 	if err != nil {
 		log.Errorf("failed to delete role %s: %v", roleName, err)
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcerrors.InvalidArgument(err, "invalid role delete request")
 	}
 
 	log.Infof("deleted custom role %s from domain %s (%s)", roleName, domainID, domainType)
@@ -47,14 +47,14 @@ func reassignGroupsForDeletedRole(ctx context.Context, authService authorization
 	groups, err := authService.GetGroups(ctx, domainID, domainType)
 	if err != nil {
 		log.Errorf("failed to get groups for org %s: %v", domainID, err)
-		return status.Error(codes.Internal, "failed to get groups for org")
+		return grpcerrors.Internal(err, "failed to get groups for org")
 	}
 
 	for _, groupName := range groups {
 		groupRole, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 		if err != nil {
 			log.Errorf("failed to get role for group %s: %v", groupName, err)
-			return status.Error(codes.Internal, "failed to get group role")
+			return grpcerrors.Internal(err, "failed to get group role")
 		}
 
 		if groupRole != roleName {
@@ -64,7 +64,7 @@ func reassignGroupsForDeletedRole(ctx context.Context, authService authorization
 		err = authService.UpdateGroup(domainID, domainType, groupName, models.RoleOrgViewer, "", "")
 		if err != nil {
 			log.Errorf("failed to reassign group %s to member: %v", groupName, err)
-			return status.Error(codes.Internal, "failed to reassign group")
+			return grpcerrors.Internal(err, "failed to reassign group")
 		}
 	}
 
@@ -75,14 +75,14 @@ func removeUsersForDeletedRole(ctx context.Context, authService authorization.Au
 	userIDs, err := authService.GetOrgUsersForRole(ctx, roleName, domainID)
 	if err != nil {
 		log.Errorf("failed to get users for role %s: %v", roleName, err)
-		return status.Error(codes.Internal, "failed to get users for role")
+		return grpcerrors.Internal(err, "failed to get users for role")
 	}
 
 	for _, userID := range userIDs {
 		userRoles, err := authService.GetUserRolesForOrg(ctx, userID, domainID)
 		if err != nil {
 			log.Errorf("failed to get roles for user %s: %v", userID, err)
-			return status.Error(codes.Internal, "failed to get user roles")
+			return grpcerrors.Internal(err, "failed to get user roles")
 		}
 
 		if len(userRoles) == 1 && userRoles[0].Name == roleName {
@@ -90,19 +90,19 @@ func removeUsersForDeletedRole(ctx context.Context, authService authorization.Au
 			if err == nil {
 				continue
 			}
-			if status.Code(err) == codes.NotFound {
+			if grpcerrors.Code(err) == codes.NotFound {
 				err = authService.RemoveRole(userID, roleName, domainID, domainType)
 			}
 			if err != nil {
 				log.Errorf("failed to remove user %s for role %s: %v", userID, roleName, err)
-				return status.Error(codes.Internal, "failed to remove user for role")
+				return grpcerrors.Internal(err, "failed to remove user for role")
 			}
 			continue
 		}
 
 		if err := authService.RemoveRole(userID, roleName, domainID, domainType); err != nil {
 			log.Errorf("failed to remove role %s for user %s: %v", roleName, userID, err)
-			return status.Error(codes.Internal, "failed to remove role for user")
+			return grpcerrors.Internal(err, "failed to remove role for user")
 		}
 	}
 

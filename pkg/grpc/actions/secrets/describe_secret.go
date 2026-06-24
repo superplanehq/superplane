@@ -3,14 +3,12 @@ package secrets
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -24,7 +22,7 @@ func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, domainType,
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *secret)
