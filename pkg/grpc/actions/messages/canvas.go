@@ -9,6 +9,7 @@ const (
 	CanvasCreatedRoutingKey        = "canvas-created"
 	CanvasUpdatedRoutingKey        = "canvas-updated"
 	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
+	CanvasVersionDeletedRoutingKey = "canvas-version-deleted"
 	CanvasStagingUpdatedRoutingKey = "canvas-staging-updated"
 	CanvasDeletedRoutingKey        = "canvas-deleted"
 	CanvasMemoryUpdatedRoutingKey  = "canvas-memory-updated"
@@ -65,7 +66,7 @@ func NewCanvasMemoryUpdatedMessage(canvasID string) CanvasMessage {
 	}
 }
 
-func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVersionMessage {
+func newCanvasVersionMessage(canvasID string, versionID string) CanvasVersionMessage {
 	return CanvasVersionMessage{
 		message: &pb.CanvasVersionMessage{
 			CanvasId:  canvasID,
@@ -73,6 +74,14 @@ func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVer
 			Timestamp: timestamppb.Now(),
 		},
 	}
+}
+
+func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVersionMessage {
+	return newCanvasVersionMessage(canvasID, versionID)
+}
+
+func PublishVersionDeleted(canvasID string, versionID string) error {
+	return Publish(CanvasExchange, CanvasVersionDeletedRoutingKey, toBytes(newCanvasVersionMessage(canvasID, versionID).message))
 }
 
 func (m CanvasMessage) PublishCreated() error {
