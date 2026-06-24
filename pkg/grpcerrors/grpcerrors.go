@@ -75,6 +75,18 @@ func newHandlerError(err error, message string, code codes.Code) error {
 	}
 }
 
+func handlerErrorWithCode(err error, message string, code codes.Code) error {
+	if err == nil {
+		err = errors.New(message)
+	}
+
+	return &handlerError{
+		code:    code,
+		message: message,
+		err:     err,
+	}
+}
+
 // Internal wraps err as an internal server error for the grpc-gateway sanitizer.
 func Internal(err error, message string) error {
 	return newHandlerError(err, message, codes.Internal)
@@ -83,6 +95,41 @@ func Internal(err error, message string) error {
 // NotFound wraps err as a not-found error for the grpc-gateway sanitizer.
 func NotFound(err error, message string) error {
 	return newHandlerError(err, message, codes.NotFound)
+}
+
+// InvalidArgument wraps err as an invalid-argument error for the grpc-gateway sanitizer.
+func InvalidArgument(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.InvalidArgument)
+}
+
+// Unauthenticated wraps err as an unauthenticated error for the grpc-gateway sanitizer.
+func Unauthenticated(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.Unauthenticated)
+}
+
+// PermissionDenied wraps err as a permission-denied error for the grpc-gateway sanitizer.
+func PermissionDenied(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.PermissionDenied)
+}
+
+// AlreadyExists wraps err as an already-exists error for the grpc-gateway sanitizer.
+func AlreadyExists(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.AlreadyExists)
+}
+
+// FailedPrecondition wraps err as a failed-precondition error for the grpc-gateway sanitizer.
+func FailedPrecondition(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.FailedPrecondition)
+}
+
+// ResourceExhausted wraps err as a resource-exhausted error for the grpc-gateway sanitizer.
+func ResourceExhausted(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.ResourceExhausted)
+}
+
+// Unknown wraps err as an unknown error for the grpc-gateway sanitizer.
+func Unknown(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.Unknown)
 }
 
 // HandlerStatus returns the gRPC code and client-safe message from a handler error.
@@ -99,4 +146,17 @@ func HandlerStatus(err error) (codes.Code, string, bool) {
 func HandlerMessage(err error) (string, bool) {
 	_, message, ok := HandlerStatus(err)
 	return message, ok
+}
+
+// Code returns the gRPC code from a handler or status error.
+func Code(err error) codes.Code {
+	if err == nil {
+		return codes.OK
+	}
+
+	if code, _, ok := HandlerStatus(err); ok {
+		return code
+	}
+
+	return status.Code(err)
 }

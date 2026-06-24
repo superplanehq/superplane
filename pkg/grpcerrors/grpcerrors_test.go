@@ -78,3 +78,9 @@ func TestHandlerMessage(t *testing.T) {
 	_, ok := HandlerMessage(gorm.ErrRecordNotFound)
 	assert.False(t, ok)
 }
+
+func TestCode(t *testing.T) {
+	assert.Equal(t, codes.NotFound, Code(NotFound(gorm.ErrRecordNotFound, "user not found")))
+	assert.Equal(t, codes.Internal, Code(Internal(errors.New("db down"), "failed")))
+	assert.Equal(t, codes.PermissionDenied, Code(status.Error(codes.PermissionDenied, "nope")))
+}

@@ -6,12 +6,12 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -83,9 +83,9 @@ func describeUsageLimits(
 		return response.Limits, nil
 	}
 
-	if status.Code(err) != codes.NotFound {
+	if grpcerrors.Code(err) != codes.NotFound {
 		log.Errorf("Error describing usage limits for organization %s: %v", orgID, err)
-		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
+		return nil, grpcerrors.Internal(err, "failed to describe organization usage limits")
 	}
 
 	if err := usage.SyncOrganizationForce(ctx, usageService, orgID); err != nil {
@@ -95,7 +95,7 @@ func describeUsageLimits(
 	response, err = usageService.DescribeOrganizationLimits(ctx, orgID)
 	if err != nil {
 		log.Errorf("Error describing usage limits after sync for organization %s: %v", orgID, err)
-		return nil, status.Error(codes.Internal, "failed to describe organization usage limits")
+		return nil, grpcerrors.Internal(err, "failed to describe organization usage limits")
 	}
 
 	return response.Limits, nil
@@ -111,9 +111,9 @@ func describeUsageMetrics(
 		return response.Usage, nil
 	}
 
-	if status.Code(err) != codes.NotFound {
+	if grpcerrors.Code(err) != codes.NotFound {
 		log.Errorf("Error describing usage metrics for organization %s: %v", orgID, err)
-		return nil, status.Error(codes.Internal, "failed to describe organization usage")
+		return nil, grpcerrors.Internal(err, "failed to describe organization usage")
 	}
 
 	if err := usage.SyncOrganizationForce(ctx, usageService, orgID); err != nil {
@@ -123,7 +123,7 @@ func describeUsageMetrics(
 	response, err = usageService.DescribeOrganizationUsage(ctx, orgID)
 	if err != nil {
 		log.Errorf("Error describing usage metrics after setup for organization %s: %v", orgID, err)
-		return nil, status.Error(codes.Internal, "failed to describe organization usage")
+		return nil, grpcerrors.Internal(err, "failed to describe organization usage")
 	}
 
 	return response.Usage, nil
@@ -132,12 +132,12 @@ func describeUsageMetrics(
 func usageSyncError(orgID string, err error) error {
 	switch {
 	case errors.Is(err, usage.ErrNoBillingAccountCandidate), errors.Is(err, gorm.ErrRecordNotFound):
-		return status.Error(codes.FailedPrecondition, "organization has no billing account candidate")
-	case status.Code(err) == codes.ResourceExhausted:
-		return status.Error(codes.ResourceExhausted, "organization exceeds configured account usage limits")
+		return grpcerrors.FailedPrecondition(nil, "organization has no billing account candidate")
+	case grpcerrors.Code(err) == codes.ResourceExhausted:
+		return grpcerrors.ResourceExhausted(nil, "organization exceeds configured account usage limits")
 	default:
 		log.Errorf("Error syncing usage for organization %s: %v", orgID, err)
-		return status.Error(codes.Internal, "failed to set up organization usage")
+		return grpcerrors.Internal(err, "failed to set up organization usage")
 	}
 }
 

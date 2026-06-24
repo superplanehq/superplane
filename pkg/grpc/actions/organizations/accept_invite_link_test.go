@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -41,10 +41,10 @@ func Test__AcceptInviteLinkWithUsage(t *testing.T) {
 
 		_, err = AcceptInviteLinkWithUsage(context.Background(), r.AuthService, service, account.ID.String(), inviteLink.Token.String())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, s.Code())
-		assert.Equal(t, "organization user limit exceeded", s.Message())
+		assert.Equal(t, codes.ResourceExhausted, code)
+		assert.Equal(t, "organization user limit exceeded", msg)
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(userCount+1), service.checkOrganizationCalls[0].state.Users)
 

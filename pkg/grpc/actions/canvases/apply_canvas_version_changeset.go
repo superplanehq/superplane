@@ -11,11 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -30,16 +29,16 @@ func ApplyCanvasVersionChangeset(
 ) (*pb.ApplyCanvasVersionChangesetResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	user, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid user id")
 	}
 
 	if changeset == nil || len(changeset.Changes) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "changeset is required")
+		return nil, grpcerrors.InvalidArgument(nil, "changeset is required")
 	}
 
 	var newVersion *models.CanvasVersion
@@ -48,19 +47,19 @@ func ApplyCanvasVersionChangeset(
 		version, err := models.FindCanvasVersionForUpdateInTransaction(tx, canvasID, versionID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
+				return grpcerrors.NotFound(err, "version not found")
 			}
 
 			log.WithError(err).Errorf("failed to find canvas version - canvas=%s, version=%s", canvasID.String(), versionID.String())
-			return status.Error(codes.Internal, "failed to find canvas version")
+			return grpcerrors.Internal(err, "failed to find canvas version")
 		}
 
 		if version.OwnerID == nil || *version.OwnerID != user {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
+			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
 		}
 
 		if version.State == models.CanvasVersionStatePublished || version.State == models.CanvasVersionStateSnapshot {
-			return status.Error(codes.FailedPrecondition, "published versions are immutable")
+			return grpcerrors.FailedPrecondition(nil, "published versions are immutable")
 		}
 
 		//
@@ -69,7 +68,7 @@ func ApplyCanvasVersionChangeset(
 		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, version)
 		err = patcher.ApplyChangeset(changeset, autoLayout)
 		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
+			return grpcerrors.InvalidArgument(err, "failed to update canvas version")
 		}
 
 		now := time.Now()
@@ -78,7 +77,7 @@ func ApplyCanvasVersionChangeset(
 		err = tx.Save(newVersion).Error
 		if err != nil {
 			log.WithError(err).Errorf("failed to save canvas version - canvas=%s, version=%s", canvasID.String(), newVersion.ID.String())
-			return status.Error(codes.Internal, "failed to save canvas version")
+			return grpcerrors.Internal(err, "failed to save canvas version")
 		}
 
 		return nil

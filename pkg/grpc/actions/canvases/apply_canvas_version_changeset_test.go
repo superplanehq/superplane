@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
@@ -36,7 +36,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.Unauthenticated, status.Code(err))
+		assert.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
 	})
 
 	t.Run("returns invalid argument for invalid user id", func(t *testing.T) {
@@ -54,7 +54,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("returns invalid argument for empty changeset", func(t *testing.T) {
@@ -72,7 +72,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 		assert.Contains(t, err.Error(), "changeset is required")
 	})
 
@@ -100,7 +100,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 
 	t.Run("applies changeset and persists patched version", func(t *testing.T) {
@@ -235,7 +235,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 		assert.Contains(t, err.Error(), "graph contains a cycle")
 
 		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
