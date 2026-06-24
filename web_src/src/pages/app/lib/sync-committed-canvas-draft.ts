@@ -17,6 +17,10 @@ export async function syncCommittedConsoleCaches({
 }): Promise<void> {
   const consoleData = await fetchCanvasConsoleData(canvasId, versionId, false);
   if (!consoleData) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) }),
+    ]);
     return;
   }
 

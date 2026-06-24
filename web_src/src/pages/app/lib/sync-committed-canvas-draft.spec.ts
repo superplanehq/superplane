@@ -1,10 +1,14 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { refreshCachesAfterCommit, syncCommittedCanvasDraftState } from "./sync-committed-canvas-draft";
+import {
+  refreshCachesAfterCommit,
+  syncCommittedCanvasDraftState,
+  syncCommittedConsoleCaches,
+} from "./sync-committed-canvas-draft";
 import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
 
 vi.mock("./repository-spec-files", () => ({
@@ -17,6 +21,10 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     fetchCanvasConsoleData: vi.fn(),
   };
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 describe("syncCommittedCanvasDraftState", () => {
@@ -67,6 +75,31 @@ describe("syncCommittedCanvasDraftState", () => {
       metadata: { id: "canvas-1" },
       spec: committedVersion.spec,
     });
+  });
+});
+
+describe("syncCommittedConsoleCaches", () => {
+  it("invalidates console caches when committed console.yaml is missing or unparsable", async () => {
+    vi.mocked(fetchCanvasConsoleData).mockResolvedValue(undefined);
+
+    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const setQueryData = vi.fn();
+    const queryClient = { invalidateQueries, setQueryData } as unknown as QueryClient;
+
+    await syncCommittedConsoleCaches({
+      queryClient,
+      canvasId: "canvas-1",
+      versionId: "version-1",
+    });
+
+    expect(fetchCanvasConsoleData).toHaveBeenCalledWith("canvas-1", "version-1", false);
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: canvasKeys.console("canvas-1", "version-1"),
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: canvasKeys.consoleStaged("canvas-1", "version-1"),
+    });
+    expect(setQueryData).not.toHaveBeenCalled();
   });
 });
 
