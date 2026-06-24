@@ -79,8 +79,8 @@ func DeleteCanvasVersion(
 		return nil, grpcerrors.Internal(err, "failed to delete canvas version")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionUUID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
+	if err := messages.PublishVersionDeleted(canvas.ID.String(), versionUUID.String()); err != nil {
+		log.Errorf("failed to publish canvas version deleted RabbitMQ message: %v", err)
 	}
 
 	return &pb.DeleteCanvasVersionResponse{}, nil

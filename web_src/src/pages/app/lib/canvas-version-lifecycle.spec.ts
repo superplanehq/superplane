@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { shouldReactToCanvasVersionUpdated } from "./canvas-version-lifecycle";
+import { processCanvasLifecycleEvent, shouldReactToCanvasVersionUpdated } from "./canvas-version-lifecycle";
 
 describe("shouldReactToCanvasVersionUpdated", () => {
   it("ignores remote updates on a passive live-view tab", () => {
@@ -67,5 +67,65 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         editSessionActive: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe("processCanvasLifecycleEvent", () => {
+  it("prunes deleted draft cache on passive live-view tabs without lifecycle invalidation", () => {
+    const pruneDeletedCanvasVersion = vi.fn();
+    const resyncDraftToCommitted = vi.fn();
+    const invalidateCanvasVersionData = vi.fn();
+
+    const result = processCanvasLifecycleEvent({
+      payload: { canvasId: "canvas-1", versionId: "draft-1" },
+      eventName: "canvas_version_deleted",
+      canvasId: "canvas-1",
+      activeCanvasVersionId: "",
+      isEditing: false,
+      editSessionActive: false,
+      hasLocalSaveActivity: false,
+      consumeIgnoredCanvasUpdatedEcho: () => false,
+      consumeIgnoredCreateDraftEcho: () => false,
+      consumeIgnoredCanvasVersionUpdatedEcho: () => false,
+      invalidateCanvasVersionData,
+      pruneDeletedCanvasVersion,
+      resyncDraftToCommitted,
+      setCanvasDeletedRemotely: vi.fn(),
+      setRemoteCanvasUpdatePending: vi.fn(),
+    });
+
+    expect(result).toBe(false);
+    expect(pruneDeletedCanvasVersion).toHaveBeenCalledWith("draft-1");
+    expect(resyncDraftToCommitted).not.toHaveBeenCalled();
+    expect(invalidateCanvasVersionData).not.toHaveBeenCalled();
+  });
+
+  it("prunes deleted draft cache and allows lifecycle invalidation when versions UI is open", () => {
+    const pruneDeletedCanvasVersion = vi.fn();
+    const resyncDraftToCommitted = vi.fn();
+    const invalidateCanvasVersionData = vi.fn();
+
+    const result = processCanvasLifecycleEvent({
+      payload: { canvasId: "canvas-1", versionId: "draft-1" },
+      eventName: "canvas_version_deleted",
+      canvasId: "canvas-1",
+      activeCanvasVersionId: "",
+      isEditing: false,
+      editSessionActive: true,
+      hasLocalSaveActivity: false,
+      consumeIgnoredCanvasUpdatedEcho: () => false,
+      consumeIgnoredCreateDraftEcho: () => false,
+      consumeIgnoredCanvasVersionUpdatedEcho: () => false,
+      invalidateCanvasVersionData,
+      pruneDeletedCanvasVersion,
+      resyncDraftToCommitted,
+      setCanvasDeletedRemotely: vi.fn(),
+      setRemoteCanvasUpdatePending: vi.fn(),
+    });
+
+    expect(result).toBe(true);
+    expect(pruneDeletedCanvasVersion).toHaveBeenCalledWith("draft-1");
+    expect(resyncDraftToCommitted).not.toHaveBeenCalled();
+    expect(invalidateCanvasVersionData).not.toHaveBeenCalled();
   });
 });
