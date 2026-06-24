@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, pruneDeletedDraftBranchFromCache } from "@/hooks/useCanvasData";
 
 import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 
@@ -11,6 +11,7 @@ type UseCanvasLifecycleEventHandlersOptions = {
   activeCanvasVersionId: string;
   isEditing: boolean;
   editSessionActive: boolean;
+  isCreatingDraftBranch: boolean;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
@@ -28,6 +29,7 @@ export function useCanvasLifecycleEventHandlers({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
+  isCreatingDraftBranch,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
@@ -52,6 +54,17 @@ export function useCanvasLifecycleEventHandlers({
     [queryClient],
   );
 
+  const pruneDeletedCanvasVersion = useCallback(
+    (targetVersionId: string) => {
+      if (!canvasId) {
+        return;
+      }
+
+      void pruneDeletedDraftBranchFromCache(queryClient, canvasId, targetVersionId);
+    },
+    [canvasId, queryClient],
+  );
+
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) =>
       processCanvasLifecycleEvent({
@@ -61,11 +74,13 @@ export function useCanvasLifecycleEventHandlers({
         activeCanvasVersionId,
         isEditing,
         editSessionActive,
+        isCreatingDraftBranch,
         hasLocalSaveActivity,
         consumeIgnoredCanvasUpdatedEcho,
         consumeIgnoredCreateDraftEcho,
         consumeIgnoredCanvasVersionUpdatedEcho,
         invalidateCanvasVersionData,
+        pruneDeletedCanvasVersion,
         resyncDraftToCommitted: (versionId) => {
           void resyncDraftToCommitted(versionId);
         },
@@ -79,9 +94,11 @@ export function useCanvasLifecycleEventHandlers({
       consumeIgnoredCreateDraftEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
       editSessionActive,
+      isCreatingDraftBranch,
       hasLocalSaveActivity,
       invalidateCanvasVersionData,
       isEditing,
+      pruneDeletedCanvasVersion,
       resyncDraftToCommitted,
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
