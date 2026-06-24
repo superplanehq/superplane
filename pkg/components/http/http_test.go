@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -769,6 +771,63 @@ func TestHTTP__Execute__SerializesPayloads(t *testing.T) {
 			assert.Equal(t, SuccessOutputChannel, stateCtx.Channel)
 		})
 	}
+}
+
+func TestHTTP__Execute__PreservesJSONExpressionValueTypes(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var requestData map[string]any
+		err = json.Unmarshal(body, &requestData)
+		require.NoError(t, err)
+
+		randomSteering := requestData["random_steering"].(map[string]any)
+		poolWeights := randomSteering["pool_weights"].(map[string]any)
+		assert.Equal(t, 0.1, poolWeights["pool-id-1"])
+		assert.Equal(t, 0.9, poolWeights["pool-id-2"])
+		assert.Equal(t, true, requestData["canary"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	config, err := workercontexts.NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"previous": map[string]any{
+				"data": map[string]any{
+					"result": true,
+				},
+			},
+		}).
+		WithConfigurationFields(h.Configuration()).
+		Build(map[string]any{
+			"method":      "PATCH",
+			"url":         server.URL,
+			"contentType": "application/json",
+			"json": map[string]any{
+				"random_steering": map[string]any{
+					"pool_weights": map[string]any{
+						"pool-id-1": `{{ previous().data.result == true ? 0.1 : 0.9 }}`,
+						"pool-id-2": `{{ previous().data.result == true ? 0.9 : 0.1 }}`,
+					},
+				},
+				"canary": `{{ previous().data.result }}`,
+			},
+		})
+	require.NoError(t, err)
+
+	ctx, stateCtx, _ := createExecutionContext(config)
+	err = h.Execute(ctx)
+	require.NoError(t, err)
+
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, SuccessOutputChannel, stateCtx.Channel)
 }
 
 func TestHTTP__Execute__HeadersOverrideContentType(t *testing.T) {
