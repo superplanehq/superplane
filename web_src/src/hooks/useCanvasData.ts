@@ -880,10 +880,19 @@ export const ensureDraftVersionExists = async (
   return branches.some((branch) => draftVersionId(branch) === versionId);
 };
 
-export const useCreateDraftBranch = (canvasId: string) => {
+type UseCreateDraftBranchOptions = {
+  registerIgnoredCreateDraftEcho?: (targetCanvasId: string) => () => void;
+  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+};
+
+export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
   const queryClient = useQueryClient();
 
   return useMutation({
+    onMutate: () => {
+      const releaseCreateDraftEcho = options?.registerIgnoredCreateDraftEcho?.(canvasId);
+      return { releaseCreateDraftEcho };
+    },
     mutationFn: async (displayName?: string) => {
       return await canvasesCreateCanvasVersion(
         withOrganizationHeader({
@@ -892,13 +901,20 @@ export const useCreateDraftBranch = (canvasId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const versionId = response?.data?.version ? draftVersionId(response.data.version) : "";
+      // Register before invalidations so websocket echoes that arrive during
+      // refetch are suppressed by the lifecycle handler.
+      options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
       // Creating a draft does not change the live canvas, so we intentionally do
       // not invalidate canvasKeys.detail here — doing so would trigger a
       // DescribeCanvas refetch while entering/staying in edit mode.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+    },
+    onError: (_error, _variables, context) => {
+      context?.releaseCreateDraftEcho?.();
     },
   });
 };

@@ -8,12 +8,14 @@ type UseCanvasEchoReleaseGuardsOptions = {
   canvasSaveSessionRef: MutableRefObject<number>;
   ignoredCanvasUpdatedEchoReleasesRef: MutableRefObject<Array<CanvasEchoRelease>>;
   ignoredCanvasVersionUpdatedEchoReleasesRef: MutableRefObject<Map<string, Array<CanvasEchoRelease>>>;
+  ignoredCreateDraftEchoReleasesRef: MutableRefObject<Map<string, Array<CanvasEchoRelease>>>;
 };
 
 export function useCanvasEchoReleaseGuards({
   canvasSaveSessionRef,
   ignoredCanvasUpdatedEchoReleasesRef,
   ignoredCanvasVersionUpdatedEchoReleasesRef,
+  ignoredCreateDraftEchoReleasesRef,
 }: UseCanvasEchoReleaseGuardsOptions) {
   const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
     const saveSession = canvasSaveSessionRef.current;
@@ -92,6 +94,48 @@ export function useCanvasEchoReleaseGuards({
     return true;
   }, [ignoredCanvasUpdatedEchoReleasesRef]);
 
+  const registerIgnoredCreateDraftEcho = useCallback(
+    (targetCanvasId: string) => {
+      if (!targetCanvasId) {
+        return () => undefined;
+      }
+
+      const saveSession = canvasSaveSessionRef.current;
+      const currentReleases = ignoredCreateDraftEchoReleasesRef.current.get(targetCanvasId) || [];
+      let released = false;
+      let timeoutId = 0;
+      const release = () => {
+        if (released) {
+          return;
+        }
+
+        released = true;
+        window.clearTimeout(timeoutId);
+        const releases = ignoredCreateDraftEchoReleasesRef.current.get(targetCanvasId);
+        if (releases) {
+          const releaseIndex = releases.indexOf(release);
+          if (releaseIndex >= 0) {
+            releases.splice(releaseIndex, 1);
+          }
+          if (releases.length === 0) {
+            ignoredCreateDraftEchoReleasesRef.current.delete(targetCanvasId);
+          }
+        }
+
+        if (canvasSaveSessionRef.current !== saveSession) {
+          return;
+        }
+      };
+
+      currentReleases.push(release);
+      ignoredCreateDraftEchoReleasesRef.current.set(targetCanvasId, currentReleases);
+      timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+      return release;
+    },
+    [canvasSaveSessionRef, ignoredCreateDraftEchoReleasesRef],
+  );
+
   const consumeIgnoredCanvasVersionUpdatedEcho = useCallback(
     (versionId?: string) => {
       if (!versionId) return false;
@@ -112,10 +156,32 @@ export function useCanvasEchoReleaseGuards({
     [ignoredCanvasVersionUpdatedEchoReleasesRef],
   );
 
+  const consumeIgnoredCreateDraftEcho = useCallback(
+    (targetCanvasId?: string) => {
+      if (!targetCanvasId) return false;
+
+      const releases = ignoredCreateDraftEchoReleasesRef.current.get(targetCanvasId);
+      if (!releases) return false;
+
+      const release = releases.pop();
+      if (!release) return false;
+
+      if (releases.length === 0) {
+        ignoredCreateDraftEchoReleasesRef.current.delete(targetCanvasId);
+      }
+
+      release();
+      return true;
+    },
+    [ignoredCreateDraftEchoReleasesRef],
+  );
+
   return {
     registerIgnoredCanvasUpdatedEcho,
     registerIgnoredCanvasVersionUpdatedEcho,
+    registerIgnoredCreateDraftEcho,
     consumeIgnoredCanvasUpdatedEcho,
     consumeIgnoredCanvasVersionUpdatedEcho,
+    consumeIgnoredCreateDraftEcho,
   };
 }
