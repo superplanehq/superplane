@@ -1015,7 +1015,6 @@ export function AppPage() {
   });
   const createDraftBranchMutation = useCreateDraftBranch(canvasId!, {
     registerIgnoredCreateDraftEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
   });
   const {
     commitCanvasStagingMutation,
@@ -1912,11 +1911,12 @@ export function AppPage() {
         return false;
       }
 
-      if (
-        eventName === "canvas_version_updated" &&
-        (consumeIgnoredCreateDraftEcho(payload.canvasId) || consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId))
-      ) {
-        return false;
+      if (eventName === "canvas_version_updated") {
+        const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId);
+        const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
+        if (consumedCreateDraftEcho || consumedVersionEcho) {
+          return false;
+        }
       }
 
       if (!canvasId) {

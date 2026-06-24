@@ -58,4 +58,40 @@ describe("useCanvasEchoReleaseGuards", () => {
 
     vi.useRealTimers();
   });
+
+  it("clears both create-draft and version echoes when both were registered for one create", () => {
+    vi.useFakeTimers();
+
+    const canvasSaveSessionRef = { current: 1 };
+    const ignoredCanvasUpdatedEchoReleasesRef = { current: [] as CanvasEchoRelease[] };
+    const ignoredCanvasVersionUpdatedEchoReleasesRef = { current: new Map<string, CanvasEchoRelease[]>() };
+    const ignoredCreateDraftEchoReleasesRef = { current: new Map<string, CanvasEchoRelease[]>() };
+
+    const { result } = renderHook(() =>
+      useCanvasEchoReleaseGuards({
+        canvasSaveSessionRef,
+        ignoredCanvasUpdatedEchoReleasesRef,
+        ignoredCanvasVersionUpdatedEchoReleasesRef,
+        ignoredCreateDraftEchoReleasesRef,
+      }),
+    );
+
+    act(() => {
+      result.current.registerIgnoredCreateDraftEcho("canvas-1");
+      result.current.registerIgnoredCanvasVersionUpdatedEcho("draft-version-1");
+    });
+
+    let consumedCreateDraftEcho = false;
+    let consumedVersionEcho = false;
+    act(() => {
+      consumedCreateDraftEcho = result.current.consumeIgnoredCreateDraftEcho("canvas-1");
+      consumedVersionEcho = result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1");
+    });
+
+    expect(consumedCreateDraftEcho).toBe(true);
+    expect(consumedVersionEcho).toBe(true);
+    expect(result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1")).toBe(false);
+
+    vi.useRealTimers();
+  });
 });

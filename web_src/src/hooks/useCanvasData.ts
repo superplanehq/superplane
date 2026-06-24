@@ -882,7 +882,6 @@ export const ensureDraftVersionExists = async (
 
 type UseCreateDraftBranchOptions = {
   registerIgnoredCreateDraftEcho?: (targetCanvasId: string) => () => void;
-  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
 export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
@@ -901,11 +900,7 @@ export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftB
         }),
       );
     },
-    onSuccess: (response) => {
-      const versionId = response?.data?.version ? draftVersionId(response.data.version) : "";
-      // Register before invalidations so websocket echoes that arrive during
-      // refetch are suppressed by the lifecycle handler.
-      options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
+    onSuccess: () => {
       // Creating a draft does not change the live canvas, so we intentionally do
       // not invalidate canvasKeys.detail here — doing so would trigger a
       // DescribeCanvas refetch while entering/staying in edit mode.
