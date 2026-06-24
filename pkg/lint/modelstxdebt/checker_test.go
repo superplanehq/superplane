@@ -92,6 +92,62 @@ func Example() {
 	}
 }
 
+func TestLocationKeyIgnoresLineNumber(t *testing.T) {
+	rootDir := t.TempDir()
+	path := filepath.Join(rootDir, "example.go")
+	writeFile(t, path, `package models
+
+import "github.com/superplanehq/superplane/pkg/database"
+
+func FindWidget(id string) (*Widget, error) {
+	return FindWidgetInTransaction(database.Conn(), id)
+}
+
+func FindWidgetInTransaction(tx *gorm.DB, id string) (*Widget, error) {
+	return nil, nil
+}
+`)
+
+	first, err := modelstxdebt.Scan(rootDir)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+
+	writeFile(t, path, `package models
+
+import "github.com/superplanehq/superplane/pkg/database"
+
+// added comment shifts line numbers without changing debt
+
+func FindWidget(id string) (*Widget, error) {
+	return FindWidgetInTransaction(database.Conn(), id)
+}
+
+func FindWidgetInTransaction(tx *gorm.DB, id string) (*Widget, error) {
+	return nil, nil
+}
+`)
+
+	second, err := modelstxdebt.Scan(rootDir)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+
+	if first.InTransactionDefinitions[0].Key() != second.InTransactionDefinitions[0].Key() {
+		t.Fatalf("InTransaction key changed after line shift: %q -> %q",
+			first.InTransactionDefinitions[0].Key(),
+			second.InTransactionDefinitions[0].Key(),
+		)
+	}
+
+	if first.DatabaseConnCalls[0].Key() != second.DatabaseConnCalls[0].Key() {
+		t.Fatalf("database.Conn() key changed after line shift: %q -> %q",
+			first.DatabaseConnCalls[0].Key(),
+			second.DatabaseConnCalls[0].Key(),
+		)
+	}
+}
+
 func TestGuidanceIsDocumented(t *testing.T) {
 	if modelstxdebt.Guidance == "" {
 		t.Fatal("Guidance must not be empty")
