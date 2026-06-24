@@ -346,10 +346,11 @@ func (c *Client) ListPackagesWithFilters(owner, repo, query string) ([]Package, 
 	return all, nil
 }
 
-// CopyPackage copies a package to a destination repository (by slug) within the same namespace.
+// CopyPackage copies a package to a destination repository.
+// destination must be in "owner/repository" form and may differ from the source owner.
 // Returns the copied package in the destination.
-func (c *Client) CopyPackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
-	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+func (c *Client) CopyPackage(owner, repo, identifier, destination string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destination})
 	if err != nil {
 		return nil, fmt.Errorf("error encoding request: %v", err)
 	}
@@ -368,11 +369,12 @@ func (c *Client) CopyPackage(owner, repo, identifier, destinationRepo string) (*
 	return &pkg, nil
 }
 
-// MovePackage moves a package to a destination repository (by slug) within the same namespace.
+// MovePackage moves a package to a destination repository.
+// destination must be in "owner/repository" form and may differ from the source owner.
 // The package is removed from the source repository after a successful move.
 // Returns the moved package in the destination.
-func (c *Client) MovePackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
-	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+func (c *Client) MovePackage(owner, repo, identifier, destination string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destination})
 	if err != nil {
 		return nil, fmt.Errorf("error encoding request: %v", err)
 	}
