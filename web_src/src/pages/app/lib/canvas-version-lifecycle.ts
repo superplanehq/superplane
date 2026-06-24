@@ -3,6 +3,7 @@ export type ShouldReactToCanvasVersionUpdatedInput = {
   activeCanvasVersionId: string;
   isEditing: boolean;
   editSessionActive: boolean;
+  isCreatingDraftBranch: boolean;
 };
 
 // Other tabs on the same canvas only need version-list/detail refreshes when
@@ -14,7 +15,15 @@ export function shouldReactToCanvasVersionUpdated({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
+  isCreatingDraftBranch,
 }: ShouldReactToCanvasVersionUpdatedInput): boolean {
+  // Same-tab draft creation already refreshes version caches from the mutation
+  // response; ignore websocket echoes while that request is in flight (notably
+  // when creating another draft from the versions sidebar during an edit session).
+  if (isCreatingDraftBranch) {
+    return false;
+  }
+
   if (!versionId) {
     return editSessionActive;
   }
@@ -37,6 +46,7 @@ export type ProcessCanvasLifecycleEventInput = {
   activeCanvasVersionId: string;
   isEditing: boolean;
   editSessionActive: boolean;
+  isCreatingDraftBranch: boolean;
   hasLocalSaveActivity: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
   consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
@@ -66,10 +76,16 @@ function handleCanvasVersionDeletedLifecycle({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
+  isCreatingDraftBranch,
   pruneDeletedCanvasVersion,
 }: Pick<
   ProcessCanvasLifecycleEventInput,
-  "payload" | "activeCanvasVersionId" | "isEditing" | "editSessionActive" | "pruneDeletedCanvasVersion"
+  | "payload"
+  | "activeCanvasVersionId"
+  | "isEditing"
+  | "editSessionActive"
+  | "isCreatingDraftBranch"
+  | "pruneDeletedCanvasVersion"
 >): boolean {
   window.dispatchEvent(new CustomEvent("canvas:version-deleted", { detail: { versionId: payload.versionId } }));
 
@@ -88,6 +104,7 @@ function handleCanvasVersionDeletedLifecycle({
     activeCanvasVersionId,
     isEditing,
     editSessionActive,
+    isCreatingDraftBranch,
   });
 }
 
@@ -97,6 +114,7 @@ function handleCanvasVersionUpdatedLifecycle({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
+  isCreatingDraftBranch,
   hasLocalSaveActivity,
   invalidateCanvasVersionData,
   resyncDraftToCommitted,
@@ -108,6 +126,7 @@ function handleCanvasVersionUpdatedLifecycle({
   | "activeCanvasVersionId"
   | "isEditing"
   | "editSessionActive"
+  | "isCreatingDraftBranch"
   | "hasLocalSaveActivity"
   | "invalidateCanvasVersionData"
   | "resyncDraftToCommitted"
@@ -121,6 +140,7 @@ function handleCanvasVersionUpdatedLifecycle({
       activeCanvasVersionId,
       isEditing,
       editSessionActive,
+      isCreatingDraftBranch,
     })
   ) {
     return false;

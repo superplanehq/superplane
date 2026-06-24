@@ -1890,6 +1890,7 @@ export function AppPage() {
       activeCanvasVersionId,
       isEditing,
       editSessionActive,
+      isCreatingDraftBranch,
       hasLocalSaveActivity,
       isViewingLiveVersion,
       canvasDeletedRemotely,
