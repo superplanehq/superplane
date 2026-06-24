@@ -103,6 +103,7 @@ import {
   sortDraftVersionsDesc,
   sortPublishedVersionsDesc,
 } from "./lib/canvas-versions";
+import { shouldReactToCanvasVersionUpdated } from "./lib/canvas-version-lifecycle";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useDraftStagingActions } from "./useDraftStagingActions";
@@ -336,7 +337,6 @@ export function AppPage() {
     setSearchParams,
   });
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
-  const createDraftBranchMutation = useCreateDraftBranch(canvasId!);
   const deleteDraftBranchMutation = useDeleteDraftBranch(organizationId!, canvasId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
@@ -696,6 +696,7 @@ export function AppPage() {
   const consoleMutationGenerationRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
+  const ignoredCreateDraftEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const setLastSavedWorkflowSnapshot = useCallback((workflow: CanvasesCanvas | null) => {
     if (!workflow) {
       lastSavedWorkflowSignatureRef.current = "";
@@ -819,6 +820,7 @@ export function AppPage() {
     setLastSavedWorkflowSnapshot(null);
     ignoredCanvasUpdatedEchoReleasesRef.current = [];
     ignoredCanvasVersionUpdatedEchoReleasesRef.current.clear();
+    ignoredCreateDraftEchoReleasesRef.current.clear();
     draftCanvasSpecsRef.current.clear();
     isDrainingCanvasSaveQueueRef.current = false;
     setIsCanvasSaveInFlight(false);
@@ -1001,12 +1003,18 @@ export function AppPage() {
   const {
     registerIgnoredCanvasUpdatedEcho,
     registerIgnoredCanvasVersionUpdatedEcho,
+    registerIgnoredCreateDraftEcho,
     consumeIgnoredCanvasUpdatedEcho,
     consumeIgnoredCanvasVersionUpdatedEcho,
+    consumeIgnoredCreateDraftEcho,
   } = useCanvasEchoReleaseGuards({
     canvasSaveSessionRef,
     ignoredCanvasUpdatedEchoReleasesRef,
     ignoredCanvasVersionUpdatedEchoReleasesRef,
+    ignoredCreateDraftEchoReleasesRef,
+  });
+  const createDraftBranchMutation = useCreateDraftBranch(canvasId!, {
+    registerIgnoredCreateDraftEcho,
   });
   const {
     commitCanvasStagingMutation,
@@ -1260,8 +1268,8 @@ export function AppPage() {
       }
 
       const version = response?.data?.version;
-      const branchName = version ? draftBranchName(version) : "";
       const versionId = version ? draftVersionId(version) : "";
+      const branchName = version ? draftBranchName(version) : "";
       if (!branchName || !versionId) {
         showErrorToast("Failed to create draft branch");
         return;
@@ -1903,8 +1911,12 @@ export function AppPage() {
         return false;
       }
 
-      if (eventName === "canvas_version_updated" && consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId)) {
-        return false;
+      if (eventName === "canvas_version_updated") {
+        const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId);
+        const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
+        if (consumedCreateDraftEcho || consumedVersionEcho) {
+          return false;
+        }
       }
 
       if (!canvasId) {
@@ -1914,9 +1926,20 @@ export function AppPage() {
       if (eventName === "canvas_version_updated") {
         // Notify agent sidebar draft-actions hook
         window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
-        invalidateCanvasVersionData(canvasId);
+
+        if (
+          !shouldReactToCanvasVersionUpdated({
+            versionId: payload.versionId,
+            activeCanvasVersionId,
+            isEditing,
+            editSessionActive,
+          })
+        ) {
+          return false;
+        }
 
         if (!payload.versionId) {
+          invalidateCanvasVersionData(canvasId);
           return true;
         }
 
@@ -1946,9 +1969,12 @@ export function AppPage() {
       activeCanvasVersionId,
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
+      consumeIgnoredCreateDraftEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
+      editSessionActive,
       hasLocalSaveActivity,
       invalidateCanvasVersionData,
+      isEditing,
       resyncDraftToCommitted,
     ],
   );

@@ -880,10 +880,18 @@ export const ensureDraftVersionExists = async (
   return branches.some((branch) => draftVersionId(branch) === versionId);
 };
 
-export const useCreateDraftBranch = (canvasId: string) => {
+type UseCreateDraftBranchOptions = {
+  registerIgnoredCreateDraftEcho?: (targetCanvasId: string) => () => void;
+};
+
+export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
   const queryClient = useQueryClient();
 
   return useMutation({
+    onMutate: () => {
+      const releaseCreateDraftEcho = options?.registerIgnoredCreateDraftEcho?.(canvasId);
+      return { releaseCreateDraftEcho };
+    },
     mutationFn: async (displayName?: string) => {
       return await canvasesCreateCanvasVersion(
         withOrganizationHeader({
@@ -899,6 +907,9 @@ export const useCreateDraftBranch = (canvasId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+    },
+    onError: (_error, _variables, context) => {
+      context?.releaseCreateDraftEcho?.();
     },
   });
 };
