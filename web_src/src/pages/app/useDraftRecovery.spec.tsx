@@ -13,9 +13,13 @@ const { showSuccessToast } = vi.hoisted(() => ({
   showSuccessToast: vi.fn(),
 }));
 
-vi.mock("@/hooks/useCanvasData", () => ({
-  ensureDraftVersionExists,
-}));
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as Record<string, unknown>),
+    ensureDraftVersionExists,
+  };
+});
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
@@ -56,6 +60,8 @@ describe("useDraftRecovery", () => {
     const setIsPreparingVersionAction = vi.fn();
     const setSearchParams = vi.fn();
     const refreshLatestLiveCanvasData = vi.fn().mockResolvedValue(undefined);
+    const registerIgnoredCanvasUpdatedEcho = vi.fn(() => vi.fn());
+    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
     const activeCanvasVersionIdRef = { current: "draft-1" };
 
     const { result } = renderHook(
@@ -75,6 +81,8 @@ describe("useDraftRecovery", () => {
           ensureVersionActionDraftReady,
           publishCanvasVersionMutation,
           setIsPreparingVersionAction,
+          registerIgnoredCanvasUpdatedEcho,
+          registerIgnoredCanvasVersionUpdatedEcho,
         }),
       { wrapper: createWrapper() },
     );
@@ -87,8 +95,13 @@ describe("useDraftRecovery", () => {
       "Unable to prepare the latest version changes for publishing",
     );
     expect(ensureDraftVersionExists).toHaveBeenCalledWith(expect.any(QueryClient), "org-1", "canvas-1", "draft-1");
+    expect(registerIgnoredCanvasUpdatedEcho).toHaveBeenCalledTimes(1);
+    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("draft-1");
     expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-1");
-    expect(refreshLatestLiveCanvasData).toHaveBeenCalledTimes(1);
+    expect(refreshLatestLiveCanvasData).toHaveBeenCalledWith({
+      liveVersionId: "draft-1",
+      skipDraftBranchRefetch: true,
+    });
     expect(showSuccessToast).toHaveBeenCalledWith("Version published");
     expect(setIsPreparingVersionAction).toHaveBeenNthCalledWith(1, true);
     expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);

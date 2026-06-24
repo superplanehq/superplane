@@ -156,6 +156,7 @@ import {
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 import { useDraftRecovery } from "./useDraftRecovery";
+import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
@@ -288,7 +289,7 @@ export function AppPage() {
   // published/discarded" (session must close). Both states look identical in
   // terms of active-version state (no selected version), so we can't derive it.
   const previewingCurrentVersionRef = useRef(false);
-  const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
+  const publishCanvasVersionMutation = usePublishCanvasVersion(canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
@@ -3398,31 +3399,11 @@ export function AppPage() {
     ],
   );
 
-  const refreshLatestLiveCanvasData = useCallback(async () => {
-    if (!organizationId || !canvasId) {
-      return;
-    }
-
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.detail(organizationId, canvasId),
-        refetchType: "all",
-      }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.versionList(canvasId),
-        refetchType: "all",
-      }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.versionHistory(canvasId),
-        refetchType: "all",
-      }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.draftBranches(canvasId),
-        refetchType: "all",
-      }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId), refetchType: "all" }),
-    ]);
-  }, [organizationId, canvasId, queryClient]);
+  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
+    organizationId,
+    canvasId,
+    effectiveLiveCanvasVersionId,
+  );
 
   const cancelPendingCanvasSaves = useCallback(() => {
     canvasSaveSessionRef.current += 1;
@@ -3444,6 +3425,8 @@ export function AppPage() {
     ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
     setIsPreparingVersionAction,
+    registerIgnoredCanvasUpdatedEcho,
+    registerIgnoredCanvasVersionUpdatedEcho,
   });
 
   const handleCanvasDraftRestoredToCommitted = useCallback(
@@ -3474,6 +3457,7 @@ export function AppPage() {
     cancelPendingCanvasSaves,
     onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
     recoverIfDraftMissing,
+    registerIgnoredCanvasVersionUpdatedEcho,
   });
 
   const activateCanvasVersionForEditing = useCallback(
