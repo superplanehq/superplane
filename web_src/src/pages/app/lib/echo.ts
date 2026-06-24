@@ -159,16 +159,26 @@ export function consumeCreateDraftEcho(
     return false;
   }
 
-  const slotIndex = registration.slots.findIndex((slot) => slot.expectedVersionId === eventVersionId);
-  if (slotIndex < 0) {
-    return false;
+  const armedSlotIndex = registration.slots.findIndex((slot) => slot.expectedVersionId === eventVersionId);
+  if (armedSlotIndex >= 0) {
+    const [slot] = registration.slots.splice(armedSlotIndex, 1);
+    if (registration.slots.length === 0) {
+      echoMap.current.delete(canvasId);
+    }
+
+    slot.release();
+    return true;
   }
 
-  const [slot] = registration.slots.splice(slotIndex, 1);
-  if (registration.slots.length === 0) {
+  // The create-draft mutation registers an echo before the API returns the
+  // version id. When only one create is in flight, consume the websocket echo
+  // so tabs with the versions sidebar open do not duplicate invalidations.
+  if (registration.slots.length === 1 && !registration.slots[0].expectedVersionId) {
+    const [slot] = registration.slots.splice(0, 1);
     echoMap.current.delete(canvasId);
+    slot.release();
+    return true;
   }
 
-  slot.release();
-  return true;
+  return false;
 }

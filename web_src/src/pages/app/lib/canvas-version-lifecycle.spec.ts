@@ -10,6 +10,7 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "",
         isEditing: false,
         editSessionActive: false,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(false);
   });
@@ -21,6 +22,7 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "",
         isEditing: false,
         editSessionActive: false,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(false);
   });
@@ -32,6 +34,7 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "draft-1",
         isEditing: true,
         editSessionActive: true,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(true);
   });
@@ -43,6 +46,7 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "version-1",
         isEditing: false,
         editSessionActive: false,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(true);
   });
@@ -54,6 +58,7 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "draft-1",
         isEditing: true,
         editSessionActive: true,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(true);
   });
@@ -65,8 +70,21 @@ describe("shouldReactToCanvasVersionUpdated", () => {
         activeCanvasVersionId: "",
         isEditing: false,
         editSessionActive: true,
+        isCreatingDraftBranch: false,
       }),
     ).toBe(true);
+  });
+
+  it("ignores websocket invalidations while a draft branch is being created", () => {
+    expect(
+      shouldReactToCanvasVersionUpdated({
+        versionId: "draft-2",
+        activeCanvasVersionId: "draft-1",
+        isEditing: true,
+        editSessionActive: true,
+        isCreatingDraftBranch: true,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -83,6 +101,7 @@ describe("processCanvasLifecycleEvent", () => {
       activeCanvasVersionId: "",
       isEditing: false,
       editSessionActive: false,
+      isCreatingDraftBranch: false,
       hasLocalSaveActivity: false,
       consumeIgnoredCanvasUpdatedEcho: () => false,
       consumeIgnoredCreateDraftEcho: () => false,
@@ -112,6 +131,7 @@ describe("processCanvasLifecycleEvent", () => {
       activeCanvasVersionId: "",
       isEditing: false,
       editSessionActive: true,
+      isCreatingDraftBranch: false,
       hasLocalSaveActivity: false,
       consumeIgnoredCanvasUpdatedEcho: () => false,
       consumeIgnoredCreateDraftEcho: () => false,
@@ -125,6 +145,34 @@ describe("processCanvasLifecycleEvent", () => {
 
     expect(result).toBe(true);
     expect(pruneDeletedCanvasVersion).toHaveBeenCalledWith("draft-1");
+    expect(resyncDraftToCommitted).not.toHaveBeenCalled();
+    expect(invalidateCanvasVersionData).not.toHaveBeenCalled();
+  });
+
+  it("skips version updated invalidations while a draft branch is being created", () => {
+    const resyncDraftToCommitted = vi.fn();
+    const invalidateCanvasVersionData = vi.fn();
+
+    const result = processCanvasLifecycleEvent({
+      payload: { canvasId: "canvas-1", versionId: "draft-2" },
+      eventName: "canvas_version_updated",
+      canvasId: "canvas-1",
+      activeCanvasVersionId: "draft-1",
+      isEditing: true,
+      editSessionActive: true,
+      isCreatingDraftBranch: true,
+      hasLocalSaveActivity: false,
+      consumeIgnoredCanvasUpdatedEcho: () => false,
+      consumeIgnoredCreateDraftEcho: () => false,
+      consumeIgnoredCanvasVersionUpdatedEcho: () => false,
+      invalidateCanvasVersionData,
+      pruneDeletedCanvasVersion: vi.fn(),
+      resyncDraftToCommitted,
+      setCanvasDeletedRemotely: vi.fn(),
+      setRemoteCanvasUpdatePending: vi.fn(),
+    });
+
+    expect(result).toBe(false);
     expect(resyncDraftToCommitted).not.toHaveBeenCalled();
     expect(invalidateCanvasVersionData).not.toHaveBeenCalled();
   });
