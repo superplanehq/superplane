@@ -3,7 +3,11 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
+	"slices"
+
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -18,7 +22,6 @@ import (
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
-	"slices"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -1115,35 +1118,77 @@ func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
 }
 
 func SerializeActions(in []core.Action) []*actionpb.Action {
-	out := make([]*actionpb.Action, len(in))
-	for i, action := range in {
-		outputChannels := action.OutputChannels(nil)
-		channels := make([]*actionpb.OutputChannel, len(outputChannels))
-		for j, channel := range outputChannels {
-			channels[j] = &actionpb.OutputChannel{
-				Name: channel.Name,
-			}
+	out := make([]*actionpb.Action, 0, len(in))
+	for _, action := range in {
+		serialized, ok := serializeAction(action)
+		if !ok {
+			continue
 		}
-
-		configFields := action.Configuration()
-		configuration := make([]*configpb.Field, len(configFields))
-		for j, field := range configFields {
-			configuration[j] = ConfigurationFieldToProto(field)
-		}
-		exampleOutput, _ := structpb.NewStruct(action.ExampleOutput())
-
-		out[i] = &actionpb.Action{
-			Name:           action.Name(),
-			Label:          action.Label(),
-			Description:    action.Description(),
-			Icon:           action.Icon(),
-			Color:          action.Color(),
-			OutputChannels: channels,
-			Configuration:  configuration,
-			ExampleOutput:  exampleOutput,
-		}
+		out = append(out, serialized)
 	}
 	return out
+}
+
+// SerializeAction converts a single action into its protobuf representation.
+// It returns nil if the action panics during serialization, so that a single
+// misbehaving action does not break endpoints that enumerate the registry
+// (e.g. ListActions / DescribeAction).
+func SerializeAction(action core.Action) *actionpb.Action {
+	serialized, _ := serializeAction(action)
+	return serialized
+}
+
+func serializeAction(action core.Action) (result *actionpb.Action, ok bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			name := safeActionName(action)
+			log.Errorf("panic while serializing action %q: %v\n%s", name, r, debug.Stack())
+			result = nil
+			ok = false
+		}
+	}()
+
+	outputChannels := action.OutputChannels(nil)
+	channels := make([]*actionpb.OutputChannel, len(outputChannels))
+	for j, channel := range outputChannels {
+		channels[j] = &actionpb.OutputChannel{
+			Name: channel.Name,
+		}
+	}
+
+	configFields := action.Configuration()
+	configuration := make([]*configpb.Field, len(configFields))
+	for j, field := range configFields {
+		configuration[j] = ConfigurationFieldToProto(field)
+	}
+
+	var exampleOutput *structpb.Struct
+	if output := action.ExampleOutput(); output != nil {
+		exampleOutput, _ = structpb.NewStruct(output)
+	}
+
+	return &actionpb.Action{
+		Name:           action.Name(),
+		Label:          action.Label(),
+		Description:    action.Description(),
+		Icon:           action.Icon(),
+		Color:          action.Color(),
+		OutputChannels: channels,
+		Configuration:  configuration,
+		ExampleOutput:  exampleOutput,
+	}, true
+}
+
+func safeActionName(action core.Action) (name string) {
+	defer func() {
+		if r := recover(); r != nil {
+			name = "<unknown>"
+		}
+	}()
+	if action == nil {
+		return "<nil>"
+	}
+	return action.Name()
 }
 
 func CapabilityTypeToProto(t string) integrationpb.CapabilityDefinition_Type {
