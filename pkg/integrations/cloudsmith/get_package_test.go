@@ -106,7 +106,7 @@ func Test__GetPackage__Setup(t *testing.T) {
 		metadata, ok := metadataCtx.Metadata.(PackageNodeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "Production", metadata.RepositoryName)
-		assert.Equal(t, "my-package-1-0-0", metadata.PackageName)
+		assert.Equal(t, "my-package 1.0.0", metadata.PackageName)
 		assert.Equal(t, "perm123", metadata.PackageID)
 	})
 }
