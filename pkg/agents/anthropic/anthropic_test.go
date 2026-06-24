@@ -593,9 +593,16 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 		"data: {\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"after idle\"}]}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/sessions/sesn_abc/events/stream", r.URL.Path)
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = io.WriteString(w, sse)
+		switch r.URL.Path {
+		case "/sessions/sesn_abc/events/stream":
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, sse)
+		case "/sessions/sesn_abc":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle"}`)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
 	}))
 	defer server.Close()
 
@@ -829,6 +836,42 @@ func TestStreamEvents_MapsTokenUsageOnCompletedTurn(t *testing.T) {
 	assert.Equal(t, int64(3), received[0].Usage.CacheReadTokens)
 	assert.Equal(t, int64(2), received[0].Usage.CacheWriteTokens)
 	assert.Equal(t, int64(20), received[0].Usage.TotalTokens)
+}
+
+func TestStreamEvents_FetchesSessionUsageWhenIdleEventHasNoUsage(t *testing.T) {
+	var sessionFetched bool
+	const sse = "data: {\"type\":\"session.status_idle\",\"model\":\"claude-sonnet-4-5\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/sessions/sesn_abc/events/stream":
+			_, _ = io.WriteString(w, sse)
+		case r.Method == http.MethodGet && r.URL.Path == "/sessions/sesn_abc":
+			sessionFetched = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle","usage":{"input_tokens":6,"output_tokens":6,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":20,"ephemeral_1h_input_tokens":7}}}`)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.True(t, sessionFetched)
+	require.Len(t, received, 1)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
+	require.NotNil(t, received[0].Usage)
+	assert.Equal(t, int64(6), received[0].Usage.InputTokens)
+	assert.Equal(t, int64(6), received[0].Usage.OutputTokens)
+	assert.Equal(t, int64(3), received[0].Usage.CacheReadTokens)
+	assert.Equal(t, int64(27), received[0].Usage.CacheWriteTokens)
+	assert.Equal(t, int64(42), received[0].Usage.TotalTokens)
 }
 
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {

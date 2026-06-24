@@ -520,6 +520,19 @@ func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, ses
 		return
 	}
 
+	cumulativeUsage := agentSessionTokenUsage(evt.Usage)
+	deltaUsage, err := models.CalculateAgentSessionTokenUsageDelta(session.ID, cumulativeUsage)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to calculate agent token usage delta")
+		return
+	}
+	if !deltaUsage.HasUsage() {
+		return
+	}
+
 	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
@@ -527,22 +540,55 @@ func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, ses
 		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
 	}
 
+	if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to mark agent token usage tracked")
+		return
+	}
+
+	publishEvent := evt
+	publishEvent.Usage = providerTokenUsage(deltaUsage)
+
 	log.WithFields(log.Fields{
-		"session_id":         session.ID,
-		"organization_id":    session.OrganizationID,
-		"model":              evt.Model,
-		"input_tokens":       evt.Usage.InputTokens,
-		"output_tokens":      evt.Usage.OutputTokens,
-		"total_tokens":       evt.Usage.TotalTokens,
-		"cache_read_tokens":  evt.Usage.CacheReadTokens,
-		"cache_write_tokens": evt.Usage.CacheWriteTokens,
+		"session_id":              session.ID,
+		"organization_id":         session.OrganizationID,
+		"model":                   evt.Model,
+		"input_tokens":            deltaUsage.InputTokens,
+		"output_tokens":           deltaUsage.OutputTokens,
+		"total_tokens":            deltaUsage.TotalTokens,
+		"cache_read_tokens":       deltaUsage.CacheReadTokens,
+		"cache_write_tokens":      deltaUsage.CacheWriteTokens,
+		"cumulative_total_tokens": cumulativeUsage.TotalTokens,
 	}).Info("agent stream: publishing agent token usage")
 
-	if err := publishAgentRunFinished(session, evt); err != nil {
+	if err := publishAgentRunFinished(session, publishEvent); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
 			"organization_id": session.OrganizationID,
 		}).Warn("agent stream: failed to publish agent token usage")
+		return
+	}
+}
+
+func agentSessionTokenUsage(usage *agents.TokenUsage) models.AgentSessionTokenUsage {
+	return models.AgentSessionTokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func providerTokenUsage(usage models.AgentSessionTokenUsage) *agents.TokenUsage {
+	return &agents.TokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
 	}
 }
 
