@@ -969,7 +969,7 @@ export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftB
   });
 };
 
-export const useDeleteDraftBranch = (organizationId: string, canvasId: string) => {
+export const useDeleteDraftBranch = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
