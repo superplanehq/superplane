@@ -177,4 +177,6 @@ message AgentRunFinishedMessage {
   int64 total_tokens = 6;
   int64 cache_read_tokens = 7;
   int64 cache_write_tokens = 8;
+  string usage_id = 9;
+  string session_id = 10;
 }
