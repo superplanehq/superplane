@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"gorm.io/gorm"
 )
 
@@ -56,11 +57,21 @@ var publishAgentRunFinished = func(session *models.AgentSession, evt agents.Prov
 type AgentStreamWorker struct {
 	provider           agents.Provider
 	customToolExecutor agents.CustomToolExecutor
+	usageService       usage.Service
 	rabbitMQURL        string
 	slots              chan struct{}
 }
 
 func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customToolExecutor ...agents.CustomToolExecutor) *AgentStreamWorker {
+	return NewAgentStreamWorkerWithUsageService(provider, rabbitMQURL, nil, customToolExecutor...)
+}
+
+func NewAgentStreamWorkerWithUsageService(
+	provider agents.Provider,
+	rabbitMQURL string,
+	usageService usage.Service,
+	customToolExecutor ...agents.CustomToolExecutor,
+) *AgentStreamWorker {
 	executor := agents.CustomToolExecutor(unsupportedCustomToolExecutor{})
 	if len(customToolExecutor) > 0 && customToolExecutor[0] != nil {
 		executor = customToolExecutor[0]
@@ -68,6 +79,7 @@ func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customTo
 	return &AgentStreamWorker{
 		provider:           provider,
 		customToolExecutor: executor,
+		usageService:       usageService,
 		rabbitMQURL:        rabbitMQURL,
 		slots:              make(chan struct{}, maxConcurrentStreams),
 	}
@@ -419,7 +431,7 @@ func (w *AgentStreamWorker) streamProviderTurn(
 	for {
 		customTools.clearRequirement()
 		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(session, evt, publish, &streamErr, customTools)
+			return handleProviderEvent(ctx, w.usageService, session, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
@@ -442,6 +454,8 @@ func (w *AgentStreamWorker) streamProviderTurn(
 }
 
 func handleProviderEvent(
+	ctx context.Context,
+	usageService usage.Service,
 	session *models.AgentSession,
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
@@ -449,7 +463,7 @@ func handleProviderEvent(
 	customTools *customToolTurnState,
 ) error {
 	if evt.Type == agents.ProviderEventTurnCompleted {
-		publishAgentTokenUsage(session, evt)
+		publishAgentTokenUsage(ctx, usageService, session, evt)
 	}
 
 	// Drop late events from a turn the user has already stopped — closes
@@ -501,9 +515,16 @@ func handleProviderEvent(
 	return nil
 }
 
-func publishAgentTokenUsage(session *models.AgentSession, evt agents.ProviderEvent) {
+func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
 	if evt.Usage == nil || !evt.Usage.HasUsage() {
 		return
+	}
+
+	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
 	}
 
 	if err := publishAgentRunFinished(session, evt); err != nil {
@@ -512,6 +533,14 @@ func publishAgentTokenUsage(session *models.AgentSession, evt agents.ProviderEve
 			"organization_id": session.OrganizationID,
 		}).Warn("agent stream: failed to publish agent token usage")
 	}
+}
+
+func syncAgentTokenUsageOrganization(ctx context.Context, usageService usage.Service, organizationID string) error {
+	if usageService == nil || !usageService.Enabled() {
+		return nil
+	}
+
+	return usage.SyncOrganization(ctx, usageService, organizationID)
 }
 
 func (w *AgentStreamWorker) executeAndSendCustomToolResults(
