@@ -838,7 +838,7 @@ func TestStreamEvents_MapsTokenUsageOnCompletedTurn(t *testing.T) {
 	assert.Equal(t, int64(20), received[0].Usage.TotalTokens)
 }
 
-func TestStreamEvents_FetchesSessionUsageWhenIdleEventHasNoUsage(t *testing.T) {
+func TestStreamEvents_DoesNotFetchSessionUsageWhenIdleEventHasNoUsage(t *testing.T) {
 	var sessionFetched bool
 	const sse = "data: {\"type\":\"session.status_idle\",\"model\":\"claude-sonnet-4-5\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
 
@@ -863,15 +863,30 @@ func TestStreamEvents_FetchesSessionUsageWhenIdleEventHasNoUsage(t *testing.T) {
 		return nil
 	}))
 
-	require.True(t, sessionFetched)
+	require.False(t, sessionFetched)
 	require.Len(t, received, 1)
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[0].Type)
-	require.NotNil(t, received[0].Usage)
-	assert.Equal(t, int64(6), received[0].Usage.InputTokens)
-	assert.Equal(t, int64(6), received[0].Usage.OutputTokens)
-	assert.Equal(t, int64(3), received[0].Usage.CacheReadTokens)
-	assert.Equal(t, int64(27), received[0].Usage.CacheWriteTokens)
-	assert.Equal(t, int64(42), received[0].Usage.TotalTokens)
+	assert.Nil(t, received[0].Usage)
+}
+
+func TestRetrieveSessionUsage_MapsCompletedSessionUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/sessions/sesn_abc", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"sesn_abc","status":"idle","usage":{"input_tokens":6,"output_tokens":6,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":20,"ephemeral_1h_input_tokens":7}}}`)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	usage, err := p.RetrieveSessionUsage(context.Background(), "sesn_abc")
+	require.NoError(t, err)
+	require.NotNil(t, usage)
+	assert.Equal(t, int64(6), usage.InputTokens)
+	assert.Equal(t, int64(6), usage.OutputTokens)
+	assert.Equal(t, int64(3), usage.CacheReadTokens)
+	assert.Equal(t, int64(27), usage.CacheWriteTokens)
+	assert.Equal(t, int64(42), usage.TotalTokens)
 }
 
 func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {

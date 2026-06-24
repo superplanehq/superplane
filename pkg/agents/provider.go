@@ -191,6 +191,10 @@ type ProviderSessionArchiver interface {
 	ArchiveSession(ctx context.Context, providerSessionID string) error
 }
 
+type ProviderSessionUsageRetriever interface {
+	RetrieveSessionUsage(ctx context.Context, providerSessionID string) (*TokenUsage, error)
+}
+
 type ProviderToolSchemaRevisioner interface {
 	Name() string
 	ToolSchemaRevision() string
