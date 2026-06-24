@@ -1,11 +1,20 @@
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { fetchCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
 import { syncCommittedCanvasDraftState } from "@/pages/app/lib/sync-committed-canvas-draft";
 
 import { canvasKeys } from "./useCanvasData";
+
+function isDraftVersionStillListed(queryClient: QueryClient, canvasId: string, versionId: string) {
+  const branches = queryClient.getQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId));
+  if (!branches) {
+    return true;
+  }
+
+  return branches.some((branch) => branch.metadata?.id === versionId);
+}
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
@@ -92,6 +101,11 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
         return;
       }
 
+      if (!isDraftVersionStillListed(queryClient, canvasId, versionId)) {
+        draftCanvasSpecsRef.current.delete(versionId);
+        return;
+      }
+
       await queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
 
       if (activeCanvasVersionIdRef.current !== versionId) {
@@ -131,6 +145,11 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
   const resyncDraftToStaged = useCallback(
     async (versionId: string) => {
       if (!organizationId || !canvasId) {
+        return;
+      }
+
+      if (!isDraftVersionStillListed(queryClient, canvasId, versionId)) {
+        draftCanvasSpecsRef.current.delete(versionId);
         return;
       }
 

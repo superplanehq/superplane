@@ -1,10 +1,11 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
+import { flushSync } from "react-dom";
 import type { SetURLSearchParams } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, cancelCanvasVersionQueries, finalizeDraftBranchDeletion } from "@/hooks/useCanvasData";
 import { clearComponentSidebarSearchParams } from "./viewState";
 
 type ConfirmDeleteDraftBranchOptions = {
@@ -56,41 +57,51 @@ export async function confirmDeleteDraftBranch({
     (!!activeBranch && branchName === activeBranch);
 
   try {
-    if (isActiveDraft) {
-      clearPendingAutoSaveWork();
+    if (organizationId && canvasId) {
+      await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
     }
 
     await deleteDraftBranch(versionId);
 
     if (isActiveDraft) {
-      setLastSavedWorkflowSnapshot(null);
-      exitToLive();
+      flushSync(() => {
+        clearPendingAutoSaveWork();
+        setLastSavedWorkflowSnapshot(null);
+        exitToLive();
 
-      if (liveCanvasVersionId) {
-        handleUseVersion(liveCanvasVersionId);
-      } else {
-        setActiveCanvasVersion(null);
-        setDraftCanvasSpec(null);
-        setSearchParams((current) => {
-          const next = new URLSearchParams(current);
-          next.delete("version");
-          next.delete("branch");
-          return clearComponentSidebarSearchParams(next);
-        });
-      }
+        if (liveCanvasVersionId) {
+          handleUseVersion(liveCanvasVersionId);
+        } else {
+          setActiveCanvasVersion(null);
+          setDraftCanvasSpec(null);
+          setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            next.delete("version");
+            next.delete("branch");
+            return clearComponentSidebarSearchParams(next);
+          });
+        }
 
-      if (liveCanvasVersion?.spec && organizationId && canvasId) {
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-          if (!current) {
-            return current;
-          }
+        if (liveCanvasVersion?.spec && organizationId && canvasId) {
+          queryClient.setQueryData<CanvasesCanvas | undefined>(
+            canvasKeys.detail(organizationId, canvasId),
+            (current) => {
+              if (!current) {
+                return current;
+              }
 
-          return {
-            ...current,
-            spec: { ...current.spec, ...liveCanvasVersion.spec },
-          };
-        });
-      }
+              return {
+                ...current,
+                spec: { ...current.spec, ...liveCanvasVersion.spec },
+              };
+            },
+          );
+        }
+      });
+    }
+
+    if (organizationId && canvasId) {
+      await finalizeDraftBranchDeletion(queryClient, organizationId, canvasId, versionId);
     }
 
     showSuccessToast("Draft branch deleted");
