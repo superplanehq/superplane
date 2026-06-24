@@ -2,14 +2,22 @@ import type { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { syncCommittedCanvasDraftState } from "./sync-committed-canvas-draft";
+import { refreshCachesAfterCommit, syncCommittedCanvasDraftState } from "./sync-committed-canvas-draft";
 import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
 
 vi.mock("./repository-spec-files", () => ({
   fetchCanvasVersionWithSpec: vi.fn(),
 }));
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as Record<string, unknown>),
+    fetchCanvasConsoleData: vi.fn(),
+  };
+});
 
 describe("syncCommittedCanvasDraftState", () => {
   it("reloads committed canvas spec into staged and detail caches", async () => {
@@ -59,5 +67,31 @@ describe("syncCommittedCanvasDraftState", () => {
       metadata: { id: "canvas-1" },
       spec: committedVersion.spec,
     });
+  });
+});
+
+describe("refreshCachesAfterCommit", () => {
+  it("invalidates draft caches when post-commit sync fails", async () => {
+    vi.mocked(fetchCanvasVersionWithSpec).mockRejectedValue(new Error("network error"));
+
+    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const queryClient = { setQueryData: vi.fn(), invalidateQueries } as unknown as QueryClient;
+
+    await expect(
+      refreshCachesAfterCommit({
+        queryClient,
+        organizationId: "org-1",
+        canvasId: "canvas-1",
+        versionId: "version-1",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: canvasKeys.versionDetail("canvas-1", "version-1"),
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: canvasKeys.consoleStaged("canvas-1", "version-1"),
+    });
+    expect(fetchCanvasConsoleData).not.toHaveBeenCalled();
   });
 });
