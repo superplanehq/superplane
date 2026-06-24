@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -220,6 +221,9 @@ func (s *Server) writeRepositoryGitFile(
 
 	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path, "")
 	if fileErr != nil {
+		if errors.Is(fileErr, gitprovider.ErrFileNotFound) {
+			return errRepositoryFileNotFound
+		}
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), fileErr)
 		return errRepositoryFileReadFailed
 	}

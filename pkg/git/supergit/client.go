@@ -125,6 +125,9 @@ func (c *Client) getFile(ctx context.Context, repoID, filePath, ref string) (io.
 
 	if resp.StatusCode >= 300 {
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, provider.ErrFileNotFound
+		}
 		return nil, fmt.Errorf("supergit request failed: %s", resp.Status)
 	}
 

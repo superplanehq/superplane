@@ -2,8 +2,10 @@ package codestorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -165,6 +167,10 @@ func (p *Provider) GetFile(ctx context.Context, repoID, path, ref string) (io.Re
 	})
 
 	if err != nil {
+		var apiErr *codestorage.APIError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+			return nil, provider.ErrFileNotFound
+		}
 		return nil, err
 	}
 
