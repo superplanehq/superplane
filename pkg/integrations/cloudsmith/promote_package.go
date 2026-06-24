@@ -178,7 +178,7 @@ func (p *PromotePackage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid sourceRepository %q: %w", spec.SourceRepository, err)
 	}
 
-	_, destRepo, err := parseRepositoryID(spec.DestinationRepository)
+	destOwner, destRepo, err := parseRepositoryID(spec.DestinationRepository)
 	if err != nil {
 		return fmt.Errorf("invalid destinationRepository %q: %w", spec.DestinationRepository, err)
 	}
@@ -188,15 +188,17 @@ func (p *PromotePackage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	destination := destOwner + "/" + destRepo
+
 	var pkg *Package
 	switch spec.Mode {
 	case PromoteModeMove:
-		pkg, err = client.MovePackage(owner, sourceRepo, spec.Package, destRepo)
+		pkg, err = client.MovePackage(owner, sourceRepo, spec.Package, destination)
 		if err != nil {
 			return fmt.Errorf("failed to move package: %v", err)
 		}
 	default:
-		pkg, err = client.CopyPackage(owner, sourceRepo, spec.Package, destRepo)
+		pkg, err = client.CopyPackage(owner, sourceRepo, spec.Package, destination)
 		if err != nil {
 			return fmt.Errorf("failed to copy package: %v", err)
 		}
