@@ -25,14 +25,20 @@ const UNLIMITED_VALUE = "-1";
 export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
-  const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  // Usage can change right before the user opens this page, so force a fetch and hide stale cached data while it runs.
+  const { data, isLoading, isFetching, error } = useOrganizationUsage(organizationId, true, {
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
   const forceUsagePage = isUsagePageForced();
+  const isUsageLoading = isLoading || isFetching;
 
-  useReportPageReady(!isLoading, {
+  useReportPageReady(!isUsageLoading, {
     failed: !!error,
   });
 
-  if (isLoading) {
+  if (isUsageLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
