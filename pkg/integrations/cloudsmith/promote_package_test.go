@@ -68,6 +68,35 @@ func Test__PromotePackage__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "destinationRepository is required")
 	})
 
+	t.Run("missing mode returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"sourceRepository":      "acme/staging",
+				"package":               "perm123",
+				"destinationRepository": "acme/production",
+			},
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+		})
+
+		require.ErrorContains(t, err, "mode must be")
+	})
+
+	t.Run("invalid mode returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"sourceRepository":      "acme/staging",
+				"package":               "perm123",
+				"destinationRepository": "acme/production",
+				"mode":                  "promote",
+			},
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+		})
+
+		require.ErrorContains(t, err, "mode must be")
+	})
+
 	t.Run("valid configuration resolves package metadata", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 
@@ -76,6 +105,7 @@ func Test__PromotePackage__Setup(t *testing.T) {
 				"sourceRepository":      "acme/staging",
 				"package":               "perm123",
 				"destinationRepository": "acme/production",
+				"mode":                  PromoteModeCopy,
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

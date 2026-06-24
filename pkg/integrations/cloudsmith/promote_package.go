@@ -164,6 +164,10 @@ func (p *PromotePackage) Setup(ctx core.SetupContext) error {
 		return errors.New("destinationRepository is required")
 	}
 
+	if spec.Mode != PromoteModeCopy && spec.Mode != PromoteModeMove {
+		return fmt.Errorf("mode must be %q or %q, got %q", PromoteModeCopy, PromoteModeMove, spec.Mode)
+	}
+
 	return resolvePackageMetadata(ctx, spec.SourceRepository, spec.Package)
 }
 
