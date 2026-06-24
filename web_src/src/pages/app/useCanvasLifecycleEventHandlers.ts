@@ -15,7 +15,7 @@ type UseCanvasLifecycleEventHandlersOptions = {
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string) => boolean;
+  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
   consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
   resyncDraftToCommitted: (versionId: string) => Promise<void>;
   resyncDraftToStaged: (versionId: string) => Promise<void>;

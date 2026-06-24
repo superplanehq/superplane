@@ -39,7 +39,7 @@ export type ProcessCanvasLifecycleEventInput = {
   editSessionActive: boolean;
   hasLocalSaveActivity: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string) => boolean;
+  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
   consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
   invalidateCanvasVersionData: (targetCanvasId: string, targetVersionId?: string) => void;
   resyncDraftToCommitted: (versionId: string) => void;
@@ -73,7 +73,7 @@ export function processCanvasLifecycleEvent({
   }
 
   if (eventName === "canvas_version_updated") {
-    const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId);
+    const consumedCreateDraftEcho = consumeIgnoredCreateDraftEcho(payload.canvasId, payload.versionId);
     const consumedVersionEcho = consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId);
     if (consumedCreateDraftEcho || consumedVersionEcho) {
       return false;

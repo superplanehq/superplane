@@ -882,6 +882,7 @@ export const ensureDraftVersionExists = async (
 
 type UseCreateDraftBranchOptions = {
   registerIgnoredCreateDraftEcho?: (targetCanvasId: string) => () => void;
+  armIgnoredCreateDraftEcho?: (targetCanvasId: string, versionId: string, release: () => void) => void;
 };
 
 export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
@@ -900,7 +901,11 @@ export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftB
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response, _variables, context) => {
+      const versionId = response?.data?.version ? draftVersionId(response.data.version) : "";
+      if (versionId && context?.releaseCreateDraftEcho) {
+        options?.armIgnoredCreateDraftEcho?.(canvasId, versionId, context.releaseCreateDraftEcho);
+      }
       // Creating a draft does not change the live canvas, so we intentionally do
       // not invalidate canvasKeys.detail here — doing so would trigger a
       // DescribeCanvas refetch while entering/staying in edit mode.

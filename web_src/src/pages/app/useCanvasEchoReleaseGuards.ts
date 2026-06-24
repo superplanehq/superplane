@@ -1,21 +1,35 @@
-import { useCallback, type MutableRefObject } from "react";
+import { useCallback, useRef, type MutableRefObject } from "react";
 
-import { consumeIgnoredMapEcho, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS, registerIgnoredMapEcho } from "./lib/echo";
+import {
+  armCreateDraftEcho,
+  consumeCreateDraftEcho,
+  consumeIgnoredMapEcho,
+  type CreateDraftEchoMap,
+  LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS,
+  registerCreateDraftEcho,
+  registerIgnoredMapEcho,
+} from "./lib/echo";
 import type { CanvasEchoRelease } from "./canvasSaveTypes";
 
 type UseCanvasEchoReleaseGuardsOptions = {
   canvasSaveSessionRef: MutableRefObject<number>;
   ignoredCanvasUpdatedEchoReleasesRef: MutableRefObject<Array<CanvasEchoRelease>>;
   ignoredCanvasVersionUpdatedEchoReleasesRef: MutableRefObject<Map<string, Array<CanvasEchoRelease>>>;
-  ignoredCreateDraftEchoReleasesRef: MutableRefObject<Map<string, Array<CanvasEchoRelease>>>;
 };
 
 export function useCanvasEchoReleaseGuards({
   canvasSaveSessionRef,
   ignoredCanvasUpdatedEchoReleasesRef,
   ignoredCanvasVersionUpdatedEchoReleasesRef,
-  ignoredCreateDraftEchoReleasesRef,
 }: UseCanvasEchoReleaseGuardsOptions) {
+  const ignoredCreateDraftEchoReleasesRef = useRef<CreateDraftEchoMap>(new Map());
+
+  const resetLifecycleEchoGuards = useCallback(() => {
+    ignoredCanvasUpdatedEchoReleasesRef.current = [];
+    ignoredCanvasVersionUpdatedEchoReleasesRef.current.clear();
+    ignoredCreateDraftEchoReleasesRef.current.clear();
+  }, [ignoredCanvasUpdatedEchoReleasesRef, ignoredCanvasVersionUpdatedEchoReleasesRef]);
+
   const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
     const saveSession = canvasSaveSessionRef.current;
     let released = false;
@@ -60,9 +74,16 @@ export function useCanvasEchoReleaseGuards({
         return () => undefined;
       }
 
-      return registerIgnoredMapEcho(ignoredCreateDraftEchoReleasesRef, canvasSaveSessionRef, targetCanvasId);
+      return registerCreateDraftEcho(ignoredCreateDraftEchoReleasesRef, canvasSaveSessionRef, targetCanvasId);
     },
-    [canvasSaveSessionRef, ignoredCreateDraftEchoReleasesRef],
+    [canvasSaveSessionRef],
+  );
+
+  const armIgnoredCreateDraftEcho = useCallback(
+    (targetCanvasId: string, versionId: string, release: CanvasEchoRelease) => {
+      armCreateDraftEcho(ignoredCreateDraftEchoReleasesRef, targetCanvasId, versionId, release);
+    },
+    [],
   );
 
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
@@ -79,16 +100,19 @@ export function useCanvasEchoReleaseGuards({
   );
 
   const consumeIgnoredCreateDraftEcho = useCallback(
-    (targetCanvasId?: string) => consumeIgnoredMapEcho(ignoredCreateDraftEchoReleasesRef, targetCanvasId),
-    [ignoredCreateDraftEchoReleasesRef],
+    (targetCanvasId?: string, eventVersionId?: string) =>
+      consumeCreateDraftEcho(ignoredCreateDraftEchoReleasesRef, targetCanvasId, eventVersionId),
+    [],
   );
 
   return {
     registerIgnoredCanvasUpdatedEcho,
     registerIgnoredCanvasVersionUpdatedEcho,
     registerIgnoredCreateDraftEcho,
+    armIgnoredCreateDraftEcho,
     consumeIgnoredCanvasUpdatedEcho,
     consumeIgnoredCanvasVersionUpdatedEcho,
     consumeIgnoredCreateDraftEcho,
+    resetLifecycleEchoGuards,
   };
 }

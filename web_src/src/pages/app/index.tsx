@@ -695,7 +695,20 @@ export function AppPage() {
   const consoleMutationGenerationRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
-  const ignoredCreateDraftEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
+  const {
+    registerIgnoredCanvasUpdatedEcho,
+    registerIgnoredCanvasVersionUpdatedEcho,
+    registerIgnoredCreateDraftEcho,
+    armIgnoredCreateDraftEcho,
+    consumeIgnoredCanvasUpdatedEcho,
+    consumeIgnoredCanvasVersionUpdatedEcho,
+    consumeIgnoredCreateDraftEcho,
+    resetLifecycleEchoGuards,
+  } = useCanvasEchoReleaseGuards({
+    canvasSaveSessionRef,
+    ignoredCanvasUpdatedEchoReleasesRef,
+    ignoredCanvasVersionUpdatedEchoReleasesRef,
+  });
   const setLastSavedWorkflowSnapshot = useCallback((workflow: CanvasesCanvas | null) => {
     if (!workflow) {
       lastSavedWorkflowSignatureRef.current = "";
@@ -817,16 +830,14 @@ export function AppPage() {
     setActiveCanvasVersion(null);
     hasSyncedVersionFromURLRef.current = false;
     setLastSavedWorkflowSnapshot(null);
-    ignoredCanvasUpdatedEchoReleasesRef.current = [];
-    ignoredCanvasVersionUpdatedEchoReleasesRef.current.clear();
-    ignoredCreateDraftEchoReleasesRef.current.clear();
+    resetLifecycleEchoGuards();
     draftCanvasSpecsRef.current.clear();
     isDrainingCanvasSaveQueueRef.current = false;
     setIsCanvasSaveInFlight(false);
     setIsCanvasSaveQueued(false);
     hasInitializedStoreRef.current = null;
     pendingStoreReinitRef.current = true;
-  }, [canvasId, setLastSavedWorkflowSnapshot]);
+  }, [canvasId, resetLifecycleEchoGuards, setLastSavedWorkflowSnapshot]);
 
   useEffect(() => {
     if (hasSyncedVersionFromURLRef.current || selectableVersionsById.size === 0 || activeCanvasVersionId) {
@@ -999,21 +1010,9 @@ export function AppPage() {
     [showLiveActivity, nodeEventsMap],
   );
 
-  const {
-    registerIgnoredCanvasUpdatedEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    registerIgnoredCreateDraftEcho,
-    consumeIgnoredCanvasUpdatedEcho,
-    consumeIgnoredCanvasVersionUpdatedEcho,
-    consumeIgnoredCreateDraftEcho,
-  } = useCanvasEchoReleaseGuards({
-    canvasSaveSessionRef,
-    ignoredCanvasUpdatedEchoReleasesRef,
-    ignoredCanvasVersionUpdatedEchoReleasesRef,
-    ignoredCreateDraftEchoReleasesRef,
-  });
   const createDraftBranchMutation = useCreateDraftBranch(canvasId!, {
     registerIgnoredCreateDraftEcho,
+    armIgnoredCreateDraftEcho,
   });
   const {
     commitCanvasStagingMutation,
