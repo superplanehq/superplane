@@ -259,7 +259,12 @@ func startWorkers(
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),
 		})
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agentToolRegistry)
+		w := workers.NewAgentStreamWorkerWithUsageService(
+			agentProvider,
+			rabbitMQURL,
+			getOptionalWorkerUsageService(),
+			agentToolRegistry,
+		)
 		go w.Start(context.Background())
 	}
 
