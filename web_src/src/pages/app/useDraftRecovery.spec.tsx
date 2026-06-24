@@ -9,8 +9,16 @@ const { ensureDraftVersionExists } = vi.hoisted(() => ({
   ensureDraftVersionExists: vi.fn(),
 }));
 
+const { recoverIfDraftMissing } = vi.hoisted(() => ({
+  recoverIfDraftMissing: vi.fn(),
+}));
+
 const { showSuccessToast } = vi.hoisted(() => ({
   showSuccessToast: vi.fn(),
+}));
+
+vi.mock("./lib/draft-missing-recovery", () => ({
+  recoverIfDraftMissing,
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
@@ -141,5 +149,49 @@ describe("useDraftRecovery", () => {
     expect(publishCanvasVersionMutation.mutateAsync).not.toHaveBeenCalled();
     expect(showSuccessToast).not.toHaveBeenCalled();
     expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
+  });
+
+  it("recovers from publish failures using the version id captured after saves settle", async () => {
+    const activeCanvasVersionIdRef = { current: "draft-1" };
+    const ensureVersionActionDraftReady = vi.fn().mockImplementation(async () => {
+      activeCanvasVersionIdRef.current = "draft-2";
+      return true;
+    });
+    const publishError = new Error("not found");
+    const publishCanvasVersionMutation = { mutateAsync: vi.fn().mockRejectedValue(publishError) };
+    recoverIfDraftMissing.mockResolvedValue(true);
+
+    const { result } = renderHook(
+      () =>
+        useDraftRecovery({
+          organizationId: "org-1",
+          canvasId: "canvas-1",
+          activeCanvasVersionId: "draft-1",
+          activeCanvasVersionIdRef,
+          draftCanvasSpecsRef: { current: new Map([["draft-2", { nodes: [], edges: [] }]]) },
+          setActiveCanvasVersion: vi.fn(),
+          setDraftCanvasSpec: vi.fn(),
+          exitToLive: vi.fn(),
+          setSearchParams: vi.fn(),
+          refreshLatestLiveCanvasData: vi.fn(),
+          cancelPendingCanvasSaves: vi.fn(),
+          ensureVersionActionDraftReady,
+          publishCanvasVersionMutation,
+          setIsPreparingVersionAction: vi.fn(),
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.handlePublishVersion();
+    });
+
+    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-2");
+    expect(recoverIfDraftMissing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: publishError,
+        versionId: "draft-2",
+      }),
+    );
   });
 });

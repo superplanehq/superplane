@@ -110,7 +110,6 @@ export function useDraftRecovery({
       return;
     }
 
-    const versionIdToPublish = activeCanvasVersionIdRef.current;
     setIsPreparingVersionAction(true);
     try {
       const result = await publishDraftVersionAndExit({
@@ -125,14 +124,18 @@ export function useDraftRecovery({
         runExitDraftToLive,
         recoverFromMissingDraft,
       });
-      if (result === "published") {
+      if (result.status === "published") {
         showSuccessToast("Version published");
-      }
-    } catch (error) {
-      if (await recoverIfDraftMissing(error, versionIdToPublish)) {
         return;
       }
-      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
+      if (result.status === "failed") {
+        if (await recoverIfDraftMissing(result.error, result.versionIdToPublish)) {
+          return;
+        }
+        showErrorToast(
+          getUsageLimitToastMessage(result.error, getApiErrorMessage(result.error, "Failed to publish version")),
+        );
+      }
     } finally {
       setIsPreparingVersionAction(false);
     }

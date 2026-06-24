@@ -7,6 +7,12 @@ import type { RefreshLatestLiveCanvasDataOptions } from "../useRefreshLatestLive
 
 type PublishMutation = { mutateAsync: (versionId: string) => Promise<unknown> };
 
+export type PublishDraftVersionAndExitResult =
+  | { status: "not-ready" }
+  | { status: "missing"; versionIdToPublish: string }
+  | { status: "published"; versionIdToPublish: string }
+  | { status: "failed"; versionIdToPublish: string; error: unknown };
+
 export async function executePublishDraftVersion({
   organizationId,
   canvasId,
@@ -64,34 +70,38 @@ export async function publishDraftVersionAndExit({
   registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
   runExitDraftToLive: (versionId: string, options?: RefreshLatestLiveCanvasDataOptions) => Promise<void>;
   recoverFromMissingDraft: (versionId: string) => Promise<void>;
-}): Promise<"not-ready" | "missing" | "published"> {
+}): Promise<PublishDraftVersionAndExitResult> {
   const isReady = await ensureVersionActionDraftReady("Unable to prepare the latest version changes for publishing");
   if (!isReady) {
-    return "not-ready";
+    return { status: "not-ready" };
   }
 
   const versionIdToPublish = activeCanvasVersionIdRef.current;
   if (!versionIdToPublish) {
-    return "not-ready";
+    return { status: "not-ready" };
   }
 
-  const publishResult = await executePublishDraftVersion({
-    organizationId,
-    canvasId,
-    versionIdToPublish,
-    queryClient,
-    publishCanvasVersionMutation,
-    registerIgnoredCanvasUpdatedEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
-  });
-  if (publishResult === "missing") {
-    await recoverFromMissingDraft(versionIdToPublish);
-    return "missing";
-  }
+  try {
+    const publishResult = await executePublishDraftVersion({
+      organizationId,
+      canvasId,
+      versionIdToPublish,
+      queryClient,
+      publishCanvasVersionMutation,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
+    });
+    if (publishResult === "missing") {
+      await recoverFromMissingDraft(versionIdToPublish);
+      return { status: "missing", versionIdToPublish };
+    }
 
-  await runExitDraftToLive(versionIdToPublish, {
-    liveVersionId: versionIdToPublish,
-    skipDraftBranchRefetch: true,
-  });
-  return "published";
+    await runExitDraftToLive(versionIdToPublish, {
+      liveVersionId: versionIdToPublish,
+      skipDraftBranchRefetch: true,
+    });
+    return { status: "published", versionIdToPublish };
+  } catch (error) {
+    return { status: "failed", versionIdToPublish, error };
+  }
 }
