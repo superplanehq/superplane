@@ -336,7 +336,7 @@ export function AppPage() {
     setSearchParams,
   });
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
-  const deleteDraftBranchMutation = useDeleteDraftBranch(organizationId!, canvasId!);
+  const deleteDraftBranchMutation = useDeleteDraftBranch(canvasId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const paginatedVersions = useMemo(

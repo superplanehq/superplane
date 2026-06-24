@@ -1,9 +1,10 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 import type { QueryClient } from "@tanstack/react-query";
 import { showErrorToast } from "@/lib/toast";
 import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
+import { finalizeDraftBranchDeletion } from "@/hooks/useCanvasData";
 import { confirmDeleteDraftBranch } from "./confirmDeleteDraftBranch";
 import { resolveDraftVersionIdForBranch } from "./draftBranchVersionId";
 
@@ -58,7 +59,31 @@ export function useCanvasDraftBranchActions({
   setLastSavedWorkflowSnapshot,
 }: UseCanvasDraftBranchActionsOptions) {
   const [draftVersionToDelete, setDraftVersionToDelete] = useState<string | null>(null);
+  const [pendingFinalizeDeletedVersionId, setPendingFinalizeDeletedVersionId] = useState<string | null>(null);
   const [startEditingMenuOpen, setStartEditingMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!pendingFinalizeDeletedVersionId || !organizationId || !canvasId) {
+      return;
+    }
+
+    if (activeCanvasVersionId === pendingFinalizeDeletedVersionId) {
+      return;
+    }
+
+    const versionId = pendingFinalizeDeletedVersionId;
+    let cancelled = false;
+
+    void finalizeDraftBranchDeletion(queryClient, organizationId, canvasId, versionId).finally(() => {
+      if (!cancelled) {
+        setPendingFinalizeDeletedVersionId(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCanvasVersionId, canvasId, organizationId, pendingFinalizeDeletedVersionId, queryClient]);
 
   const handleContinueDraftBranch = useCallback(
     (branchName: string) => {
@@ -111,7 +136,7 @@ export function useCanvasDraftBranchActions({
     }
 
     try {
-      await confirmDeleteDraftBranch({
+      const result = await confirmDeleteDraftBranch({
         versionId: draftVersionToDelete,
         draftBranches,
         activeCanvasVersionId,
@@ -131,6 +156,11 @@ export function useCanvasDraftBranchActions({
         setDraftCanvasSpec,
         setLastSavedWorkflowSnapshot,
       });
+
+      if (result.deferFinalizeVersionId) {
+        setPendingFinalizeDeletedVersionId(result.deferFinalizeVersionId);
+      }
+
       setDraftVersionToDelete(null);
     } catch {
       // Error toast is handled in confirmDeleteDraftBranch.
@@ -181,6 +211,8 @@ export function useCanvasDraftBranchActions({
     });
 
     if (versionIdToDelete) {
+      clearPendingAutoSaveWork();
+
       try {
         await deleteDraftBranchMutation.mutateAsync(versionIdToDelete);
       } catch (error) {
@@ -191,6 +223,10 @@ export function useCanvasDraftBranchActions({
         showErrorToast(message);
         return;
       }
+
+      if (organizationId && canvasId) {
+        setPendingFinalizeDeletedVersionId(versionIdToDelete);
+      }
     }
 
     exitToLive();
@@ -198,11 +234,14 @@ export function useCanvasDraftBranchActions({
   }, [
     activeBranchMeta,
     activeBranch,
+    canvasId,
+    clearPendingAutoSaveWork,
     draftBranches,
     latestDraftVersion,
     deleteDraftBranchMutation,
     handleCreateVersion,
     exitToLive,
+    organizationId,
   ]);
 
   return {

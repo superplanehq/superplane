@@ -299,6 +299,27 @@ describe("useCanvasWebsocket", () => {
     });
   });
 
+  it("invalidates draft branch queries for canvas version deletions", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("canvas_version_deleted", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: canvasKeys.versionList(testCanvasId),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: canvasKeys.draftBranches(testCanvasId),
+    });
+    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+      queryKey: canvasKeys.consoleAll(testCanvasId),
+    });
+  });
+
   it("skips lifecycle invalidation when canvas_version_updated echo is consumed", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();

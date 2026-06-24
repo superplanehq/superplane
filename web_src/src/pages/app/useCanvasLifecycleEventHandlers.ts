@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, pruneDeletedDraftBranchFromCache } from "@/hooks/useCanvasData";
 
 import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 
@@ -52,6 +52,17 @@ export function useCanvasLifecycleEventHandlers({
     [queryClient],
   );
 
+  const pruneDeletedCanvasVersion = useCallback(
+    (targetVersionId: string) => {
+      if (!canvasId) {
+        return;
+      }
+
+      void pruneDeletedDraftBranchFromCache(queryClient, canvasId, targetVersionId);
+    },
+    [canvasId, queryClient],
+  );
+
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) =>
       processCanvasLifecycleEvent({
@@ -66,6 +77,7 @@ export function useCanvasLifecycleEventHandlers({
         consumeIgnoredCreateDraftEcho,
         consumeIgnoredCanvasVersionUpdatedEcho,
         invalidateCanvasVersionData,
+        pruneDeletedCanvasVersion,
         resyncDraftToCommitted: (versionId) => {
           void resyncDraftToCommitted(versionId);
         },
@@ -82,6 +94,7 @@ export function useCanvasLifecycleEventHandlers({
       hasLocalSaveActivity,
       invalidateCanvasVersionData,
       isEditing,
+      pruneDeletedCanvasVersion,
       resyncDraftToCommitted,
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
