@@ -11,6 +11,7 @@ type UseCanvasLifecycleEventHandlersOptions = {
   activeCanvasVersionId: string;
   isEditing: boolean;
   editSessionActive: boolean;
+  isCreatingDraftBranch: boolean;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
@@ -28,6 +29,7 @@ export function useCanvasLifecycleEventHandlers({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
+  isCreatingDraftBranch,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
@@ -72,6 +74,7 @@ export function useCanvasLifecycleEventHandlers({
         activeCanvasVersionId,
         isEditing,
         editSessionActive,
+        isCreatingDraftBranch,
         hasLocalSaveActivity,
         consumeIgnoredCanvasUpdatedEcho,
         consumeIgnoredCreateDraftEcho,
@@ -91,6 +94,7 @@ export function useCanvasLifecycleEventHandlers({
       consumeIgnoredCreateDraftEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
       editSessionActive,
+      isCreatingDraftBranch,
       hasLocalSaveActivity,
       invalidateCanvasVersionData,
       isEditing,

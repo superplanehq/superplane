@@ -19,6 +19,19 @@ describe("create draft echo guards", () => {
     vi.useRealTimers();
   });
 
+  it("does not consume unrelated version updates while create draft echo is unarmed", () => {
+    vi.useFakeTimers();
+
+    const echoMap = { current: new Map() as CreateDraftEchoMap };
+    const canvasSaveSessionRef = { current: 1 };
+    registerCreateDraftEcho(echoMap, canvasSaveSessionRef, "canvas-1");
+
+    expect(consumeCreateDraftEcho(echoMap, "canvas-1", "other-draft-version")).toBe(false);
+    expect(echoMap.current.get("canvas-1")?.slots).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
   it("ignores websocket events for other versions on the same canvas", () => {
     vi.useFakeTimers();
 
