@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +27,7 @@ func TestSendAgentChatMessage_RequiresContent(t *testing.T) {
 		Content: "",
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
 func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 		Content: "x",
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.NotFound, status.Code(err))
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 }
 
 func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
@@ -86,7 +86,7 @@ func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
 		Content: "x",
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }
 
 func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
@@ -164,7 +164,7 @@ func TestSendAgentChatMessage_RejectsInvalidImages(t *testing.T) {
 				Images: []*pb.AgentChatImage{tc.image},
 			})
 			require.Error(t, err)
-			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 		})
 	}
 }
@@ -183,5 +183,5 @@ func TestSendAgentChatMessage_RejectsImagesOverPayloadLimit(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }

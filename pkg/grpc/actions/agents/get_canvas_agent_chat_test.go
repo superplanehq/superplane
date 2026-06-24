@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestGetCanvasAgentChat_SerializesSession(t *testing.T) {
@@ -52,7 +52,7 @@ func TestGetCanvasAgentChat_RejectsInvalidCanvas(t *testing.T) {
 	svc := &stubService{}
 	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: "nope"})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
 func TestGetCanvasAgentChat_NotFoundWhenCanvasMissing(t *testing.T) {
@@ -62,7 +62,7 @@ func TestGetCanvasAgentChat_NotFoundWhenCanvasMissing(t *testing.T) {
 	svc := &stubService{}
 	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: uuid.NewString()})
 	require.Error(t, err)
-	assert.Equal(t, codes.NotFound, status.Code(err))
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 }
 
 func TestGetCanvasAgentChat_PermissionDenied(t *testing.T) {
@@ -77,5 +77,5 @@ func TestGetCanvasAgentChat_PermissionDenied(t *testing.T) {
 	}
 	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
 	require.Error(t, err)
-	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
 }

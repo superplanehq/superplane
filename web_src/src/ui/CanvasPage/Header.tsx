@@ -10,15 +10,7 @@ import { CanvasVersionsSidebarTrigger } from "./components/CanvasVersionsSidebar
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode =
-  | "default"
-  | "version-live"
-  | "version-edit"
-  | "runs"
-  | "versions"
-  | "console"
-  | "memory"
-  | "files";
+export type HeaderMode = "default" | "version-live" | "console" | "memory" | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
@@ -90,8 +82,6 @@ export interface HeaderProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  hasUncommittedDraftChanges?: boolean;
-  readyToPublishDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
@@ -110,7 +100,6 @@ export function Header(props: HeaderProps) {
       <PageHeader
         organizationId={props.organizationId}
         headerTitle={headerTitle}
-        mode={props.mode}
         isEditing={props.isEditing}
         isEditSessionActive={props.isEditSessionActive}
         onExitEditMode={props.onExitEditMode}
@@ -133,7 +122,6 @@ interface PageHeaderBarProps {
   organizationId?: string;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
-  mode?: HeaderMode;
   isEditing?: boolean;
   isEditSessionActive?: boolean;
   onExitEditMode?: () => void;
@@ -149,7 +137,6 @@ interface PageHeaderBarProps {
 function PageHeader({
   organizationId,
   headerTitle,
-  mode,
   isEditing = false,
   isEditSessionActive,
   onExitEditMode,
@@ -212,7 +199,7 @@ function PageHeader({
             />
           </div>
         ) : null}
-        {!inEditSession && mode !== "versions" && onEnterEditMode ? (
+        {!inEditSession && onEnterEditMode ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -227,9 +214,8 @@ function PageHeader({
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
-  const editing = props.isEditing ?? props.mode === "version-edit";
-  const editTabTone =
-    props.editTabTone ?? (editing ? (props.hasUncommittedDraftChanges ? "uncommitted" : "ready") : "neutral");
+  const editing = props.isEditing ?? false;
+  const editTabTone = props.editTabTone ?? (editing ? (props.hasStagingChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
@@ -276,9 +262,9 @@ function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
 
 function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
   return (
+    !mode ||
+    mode === "default" ||
     mode === "version-live" ||
-    mode === "version-edit" ||
-    mode === "versions" ||
     mode === "console" ||
     mode === "memory" ||
     mode === "files"
@@ -286,7 +272,7 @@ function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "versions" || mode === "console" || mode === "memory" || mode === "files") {
+  if (mode === "console" || mode === "memory" || mode === "files") {
     return mode;
   }
 

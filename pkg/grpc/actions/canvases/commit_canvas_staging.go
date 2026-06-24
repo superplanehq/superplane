@@ -3,19 +3,18 @@ package canvases
 import (
 	"bytes"
 	"context"
-	"io"
-	"strings"
-
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"io"
+	"strings"
 )
 
 // CommitCanvasStaging durably persists staged repository files for a draft
@@ -43,7 +42,7 @@ func CommitCanvasStaging(
 
 	rows, err := models.ListWorkflowStaging(version.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load staging: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
 	specOps, gitOps := stagedCommitOperations(rows)
@@ -91,12 +90,12 @@ func CommitCanvasStaging(
 	}
 
 	if err := models.DiscardWorkflowStaging(version.ID, nil); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to clear staging: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to clear staging")
 	}
 
 	committed, err := models.FindCanvasVersion(version.WorkflowID, version.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to reload version: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to reload version")
 	}
 
 	state, _, err := stagingSummaryForVersion(version.ID)
@@ -159,24 +158,24 @@ func commitStagedGitFiles(
 	gitOps []*pb.CanvasRepositoryFileOperation,
 ) error {
 	if gitProvider == nil {
-		return status.Error(codes.FailedPrecondition, "git provider is not configured")
+		return grpcerrors.FailedPrecondition(nil, "git provider is not configured")
 	}
 
 	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
 	if err != nil {
-		return status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return grpcerrors.NotFound(err, "repository not found")
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to find user: %v", err)
+		return grpcerrors.Internal(err, "failed to find user")
 	}
 
 	// Commit on top of the current branch head. Staging does not track a head
 	// SHA per file, so resolve it just before committing.
 	headSHA, err := gitProvider.Head(ctx, repository.RepoID, "")
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to resolve repository head: %v", err)
+		return grpcerrors.Internal(err, "failed to resolve repository head")
 	}
 
 	operations := make([]gitprovider.FileOperation, 0, len(gitOps))
@@ -207,7 +206,7 @@ func commitStagedGitFiles(
 		},
 	})
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+		return grpcerrors.Internal(err, "failed to commit repository files")
 	}
 
 	return nil
@@ -220,12 +219,12 @@ func snapshotGitFilesBeforeCommit(
 	gitOps []*pb.CanvasRepositoryFileOperation,
 ) ([]gitprovider.FileOperation, error) {
 	if gitProvider == nil {
-		return nil, status.Error(codes.FailedPrecondition, "git provider is not configured")
+		return nil, grpcerrors.FailedPrecondition(nil, "git provider is not configured")
 	}
 
 	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "repository not found")
 	}
 
 	revertOps := make([]gitprovider.FileOperation, 0, len(gitOps))
@@ -234,13 +233,13 @@ func snapshotGitFilesBeforeCommit(
 		if operation.GetDelete() {
 			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
 			if readErr != nil {
-				return nil, status.Errorf(codes.FailedPrecondition, "cannot snapshot %q before staged delete: %v", path, readErr)
+				return nil, grpcerrors.FailedPrecondition(nil, fmt.Sprintf("cannot snapshot %q before staged delete: %v", path, readErr))
 			}
 
 			content, readErr := io.ReadAll(reader)
 			_ = reader.Close()
 			if readErr != nil {
-				return nil, status.Errorf(codes.Internal, "failed to read %q before commit: %v", path, readErr)
+				return nil, grpcerrors.Internal(readErr, "failed to read before commit")
 			}
 
 			revertOps = append(revertOps, gitprovider.FileOperation{
@@ -263,7 +262,7 @@ func snapshotGitFilesBeforeCommit(
 		content, readErr := io.ReadAll(reader)
 		_ = reader.Close()
 		if readErr != nil {
-			return nil, status.Errorf(codes.Internal, "failed to read %q before commit: %v", path, readErr)
+			return nil, grpcerrors.Internal(readErr, "failed to read before commit")
 		}
 
 		revertOps = append(revertOps, gitprovider.FileOperation{
@@ -297,7 +296,7 @@ func revertGitFileCommit(
 		if operation.Content != nil && !operation.Delete {
 			content, err := io.ReadAll(operation.Content)
 			if err != nil {
-				return status.Errorf(codes.Internal, "failed to read revert content for %q: %v", operation.Path, err)
+				return grpcerrors.Internal(err, "failed to read revert content")
 			}
 			pbOp.Content = content
 		}

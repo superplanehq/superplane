@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // commitCanvasRepositoryFilesForTest wraps CommitCanvasRepositoryFiles with the
@@ -62,9 +62,9 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
@@ -80,9 +80,9 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("repository missing -> error", func(t *testing.T) {
@@ -101,9 +101,9 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 				{Path: "README.md", Content: []byte("hello")},
 			},
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("commit fails -> propagates error", func(t *testing.T) {
@@ -123,10 +123,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			},
 		)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
-		assert.Contains(t, s.Message(), "failed to commit repository files")
+		assert.Equal(t, codes.Internal, code)
+		assert.Contains(t, msg, "failed to commit repository files")
 	})
 
 	t.Run("canvas from different organization -> not found", func(t *testing.T) {
@@ -144,9 +144,9 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {

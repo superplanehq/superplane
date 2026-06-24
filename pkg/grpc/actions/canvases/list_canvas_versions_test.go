@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestGetCanvasVersionLimit(t *testing.T) {
@@ -26,23 +26,23 @@ func TestListDraftCanvasVersions(t *testing.T) {
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), "invalid-id", 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, "invalid-id", uuid.New().String(), 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), uuid.New().String(), 0, nil, pb.CanvasVersion_STATE_DRAFT)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("returns empty list when no drafts exist", func(t *testing.T) {

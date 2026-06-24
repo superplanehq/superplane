@@ -22,9 +22,7 @@ describe("getWorkflowViewPresentation", () => {
       isRunInspectionMode: true,
       isMemoryMode: false,
       isFilesMode: false,
-      isVersionsMode: false,
       hasEditableVersion: false,
-      isViewingPendingApprovalVersion: false,
       isViewingCurrentLiveVersion: true,
     });
 
@@ -35,9 +33,7 @@ describe("getWorkflowViewPresentation", () => {
       isRunInspectionMode: true,
       isMemoryMode: false,
       isFilesMode: false,
-      isVersionsMode: false,
       hasEditableVersion: true,
-      isViewingPendingApprovalVersion: false,
       isViewingCurrentLiveVersion: true,
     });
 

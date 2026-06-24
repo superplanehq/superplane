@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Gauge } from "lucide-react";
+import { Activity, Bot, Gauge, type LucideIcon } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -16,7 +16,7 @@ interface UsageProps {
 type LimitCard = {
   label: string;
   value: string;
-  icon: typeof Activity;
+  icon: LucideIcon;
   description: string;
 };
 
@@ -25,14 +25,20 @@ const UNLIMITED_VALUE = "-1";
 export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
-  const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  // Usage can change right before the user opens this page, so force a fetch and hide stale cached data while it runs.
+  const { data, isLoading, isFetching, error } = useOrganizationUsage(organizationId, true, {
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
   const forceUsagePage = isUsagePageForced();
+  const isUsageLoading = isLoading || isFetching;
 
-  useReportPageReady(!isLoading, {
+  useReportPageReady(!isUsageLoading, {
     failed: !!error,
   });
 
-  if (isLoading) {
+  if (isUsageLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -78,6 +84,7 @@ export function Usage({ organizationId }: UsageProps) {
 function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsageResponse; isPreviewMode: boolean }) {
   const usageCards = useMemo(() => buildLimitCards(data.limits), [data.limits]);
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
+  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
 
   return (
     <div className="pt-6 space-y-6">
@@ -91,13 +98,20 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <UsageMetricCard
           title="Event Budget"
           value={eventUsage.value}
           subtitle={eventUsage.subtitle}
           progress={eventUsage.progress}
           icon={Activity}
+        />
+        <UsageMetricCard
+          title="Agent Tokens"
+          value={agentTokenUsage.value}
+          subtitle={agentTokenUsage.subtitle}
+          progress={agentTokenUsage.progress}
+          icon={Bot}
         />
       </div>
 
@@ -138,7 +152,7 @@ function UsageMetricCard({
   value: string;
   subtitle: string;
   progress: number | null;
-  icon: typeof Gauge;
+  icon: LucideIcon;
 }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -194,6 +208,16 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   );
 }
 
+function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  return buildBucketUsage(
+    data?.usage?.agentTokenBucketLevel ?? 0,
+    data?.usage?.agentTokenBucketCapacity,
+    data?.usage?.agentTokenBucketLastUpdatedAt,
+    data?.usage?.nextAgentTokenBucketDecreaseAt,
+    "Rolling agent token usage for the current 30-day window.",
+  );
+}
+
 function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
   return [
     {
@@ -207,6 +231,12 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
       value: formatStringLimit(limits?.maxEventsPerMonth),
       icon: Gauge,
       description: "Rolling 30-day event allowance.",
+    },
+    {
+      label: "Agent tokens per month",
+      value: formatStringLimit(limits?.maxAgentTokensPerMonth),
+      icon: Bot,
+      description: "Rolling 30-day agent token allowance.",
     },
   ];
 }

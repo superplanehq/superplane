@@ -1,5 +1,5 @@
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { PackageData, RepositoryData } from "./types";
+import type { PackageData, PackageOperationResult, RepositoryData } from "./types";
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
@@ -107,5 +107,27 @@ export function buildPackageOutput(data: unknown, type = "cloudsmith.package.det
     type,
     timestamp: new Date().toISOString(),
     data,
+  };
+}
+
+export function buildPackageOperationResult(overrides?: Partial<PackageOperationResult>): PackageOperationResult {
+  return {
+    repository: "acme/production",
+    package: "pkg_123",
+    data: {
+      name: "billing-api",
+      display_name: "billing-api",
+      slug_perm: "pkg_123",
+      version: "1.2.3",
+      format: "docker",
+      status_str: "Completed",
+      self_webapp_url: "https://cloudsmith.io/~acme/repos/production/packages/detail/docker/pkg_123/",
+      tags: {
+        latest: true,
+        production: true,
+        inactive: false,
+      },
+    },
+    ...overrides,
   };
 }

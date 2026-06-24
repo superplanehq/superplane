@@ -66,7 +66,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		_, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot delete default role")
+		assert.Equal(t, "invalid role delete request", err.Error())
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {
