@@ -2,11 +2,13 @@ package me
 
 import (
 	"context"
+	"errors"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
@@ -14,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func GetUser(ctx context.Context, authService authorization.Authorization, includePermissions bool) (*pb.MeResponse, error) {
@@ -57,7 +60,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to get user roles")
 	}
 
 	//
@@ -91,7 +94,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to get user groups")
 	}
 
 	userProto.Groups = groups
@@ -109,7 +112,11 @@ func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
 		return loadErr
 	})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, grpcerrors.NotFound(err, "user not found")
+		}
+
+		return nil, grpcerrors.Internal(err, "failed to load user")
 	}
 
 	return user, nil

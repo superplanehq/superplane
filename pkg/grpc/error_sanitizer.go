@@ -17,11 +17,6 @@ const (
 	sanitizedNotFoundMessage = "resource not found"
 )
 
-// SanitizeError maps handler errors to gRPC status codes at the grpc-gateway
-// boundary. Context cancellations from the incoming request are mapped to
-// client-closed / deadline-exceeded codes; everything else is sanitized for
-// clients. Handlers should return the original err and let this function
-// classify it.
 func SanitizeError(requestCtx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -33,6 +28,10 @@ func SanitizeError(requestCtx context.Context, err error) error {
 
 	if ok, statusErr := grpcerrors.StatusFromContextError(requestCtx, err); ok {
 		return statusErr
+	}
+
+	if code, msg, ok := grpcerrors.HandlerStatus(err); ok {
+		return status.Error(code, msg)
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) || looksNotFound(err) {

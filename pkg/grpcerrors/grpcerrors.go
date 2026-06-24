@@ -46,3 +46,57 @@ func StatusFromContextError(requestCtx context.Context, err error) (ok bool, sta
 
 	return false, nil
 }
+
+// handlerError carries a client-safe message and gRPC code while preserving the
+// original error for classification (context cancel, etc.) at the gateway.
+type handlerError struct {
+	code    codes.Code
+	message string
+	err     error
+}
+
+func (e *handlerError) Error() string {
+	return e.message
+}
+
+func (e *handlerError) Unwrap() error {
+	return e.err
+}
+
+func newHandlerError(err error, message string, code codes.Code) error {
+	if err == nil {
+		return nil
+	}
+
+	return &handlerError{
+		code:    code,
+		message: message,
+		err:     err,
+	}
+}
+
+// Internal wraps err as an internal server error for the grpc-gateway sanitizer.
+func Internal(err error, message string) error {
+	return newHandlerError(err, message, codes.Internal)
+}
+
+// NotFound wraps err as a not-found error for the grpc-gateway sanitizer.
+func NotFound(err error, message string) error {
+	return newHandlerError(err, message, codes.NotFound)
+}
+
+// HandlerStatus returns the gRPC code and client-safe message from a handler error.
+func HandlerStatus(err error) (codes.Code, string, bool) {
+	var wrapped *handlerError
+	if !errors.As(err, &wrapped) {
+		return codes.OK, "", false
+	}
+
+	return wrapped.code, wrapped.message, true
+}
+
+// HandlerMessage returns the client-safe message from a handler error.
+func HandlerMessage(err error) (string, bool) {
+	_, message, ok := HandlerStatus(err)
+	return message, ok
+}

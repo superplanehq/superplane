@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/grpc/codes"
@@ -24,7 +25,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 
 	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to load user")
 	}
 
 	if user.IsServiceAccount() {
@@ -38,7 +39,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 
 	err = user.UpdateTokenHash(crypto.HashToken(plainToken))
 	if err != nil {
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to update token")
 	}
 
 	return &pb.RegenerateTokenResponse{
