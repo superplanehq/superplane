@@ -52,7 +52,7 @@ blocks:
             - make check.example.payloads
             - make check.configuration.fields
             - make check.grpc.actions.status
-#            - make check.models.tx.debt
+            - make check.models.tx.debt
             - make check.generated.artifacts
 
       epilogue:

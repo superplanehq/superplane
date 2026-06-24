@@ -47,10 +47,17 @@ type Location struct {
 	File string
 	Line int
 	Name string
+	key  string
 }
 
+// Key returns a stable identifier for baseline comparison. Line numbers are
+// intentionally omitted so edits above a call site do not churn the baseline.
 func (l Location) Key() string {
-	return fmt.Sprintf("%s:%d:%s", l.File, l.Line, l.Name)
+	if l.key != "" {
+		return l.key
+	}
+
+	return fmt.Sprintf("%s:%s", l.File, l.Name)
 }
 
 func (l Location) String() string {
@@ -123,32 +130,43 @@ func scanFile(fset *token.FileSet, path string) (Result, error) {
 	databaseIdent := databaseImportIdent(file)
 	var result Result
 
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch typed := node.(type) {
-		case *ast.FuncDecl:
-			if typed.Name == nil || !strings.HasSuffix(typed.Name.Name, "InTransaction") {
-				return true
-			}
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name == nil {
+			continue
+		}
 
+		if strings.HasSuffix(fn.Name.Name, "InTransaction") {
 			result.InTransactionDefinitions = append(result.InTransactionDefinitions, Location{
 				File: path,
-				Line: fset.Position(typed.Name.Pos()).Line,
-				Name: typed.Name.Name,
-			})
-		case *ast.CallExpr:
-			if !isDatabaseConnCall(typed, databaseIdent) {
-				return true
-			}
-
-			result.DatabaseConnCalls = append(result.DatabaseConnCalls, Location{
-				File: path,
-				Line: fset.Position(typed.Pos()).Line,
-				Name: "database.Conn()",
+				Line: fset.Position(fn.Name.Pos()).Line,
+				Name: fn.Name.Name,
+				key:  fmt.Sprintf("%s:%s", path, fn.Name.Name),
 			})
 		}
 
-		return true
-	})
+		if fn.Body == nil {
+			continue
+		}
+
+		connOrdinal := 0
+		ast.Inspect(fn.Body, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok || !isDatabaseConnCall(call, databaseIdent) {
+				return true
+			}
+
+			connOrdinal++
+			result.DatabaseConnCalls = append(result.DatabaseConnCalls, Location{
+				File: path,
+				Line: fset.Position(call.Pos()).Line,
+				Name: "database.Conn()",
+				key:  fmt.Sprintf("%s:%s:database.Conn()#%d", path, fn.Name.Name, connOrdinal),
+			})
+
+			return true
+		})
+	}
 
 	return result, nil
 }
