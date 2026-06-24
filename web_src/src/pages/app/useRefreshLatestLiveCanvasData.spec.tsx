@@ -94,8 +94,8 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
 
     const consoleInvalidations = invalidateQueries.mock.calls
-      .map(([args]) => args.queryKey)
-      .filter((key) => Array.isArray(key) && key.includes("console"));
+      .map(([args]) => args?.queryKey)
+      .filter((key): key is ReturnType<typeof canvasKeys.console> => Array.isArray(key) && key.includes("console"));
     expect(consoleInvalidations).toEqual([canvasKeys.console("canvas-1", undefined)]);
   });
 
