@@ -25,7 +25,13 @@ const UNLIMITED_VALUE = "-1";
 export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
-  const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  // Usage can change right before the user opens this page, so use an isolated no-cache query.
+  const { data, isLoading, error } = useOrganizationUsage(organizationId, true, {
+    queryKeyScope: "page",
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
   const forceUsagePage = isUsagePageForced();
 
   useReportPageReady(!isLoading, {
