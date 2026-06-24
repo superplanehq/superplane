@@ -76,14 +76,14 @@ describe("RubricWidget", () => {
   });
 
   it("renders markdown (including code blocks) inside the Full Plan modal", () => {
-    render(<RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />);
+    const { container } = render(
+      <RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
 
-    // Dialog content lives in a portal-less <div fixed>; query by role/heading.
-    const heading = screen.getByRole("heading", { name: "Test Plan" });
-    const modal = heading.closest("div.fixed") as HTMLElement;
-    expect(modal).not.toBeNull();
+    const modal = screen.getByRole("dialog", { name: "Test Plan" });
+    expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument();
 
     expect(within(modal).getByTestId("monaco-stub")).toHaveTextContent("npm test");
   });
@@ -129,9 +129,7 @@ describe("RubricWidget", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
 
-    const heading = screen.getByRole("heading", { name: "Test Plan" });
-    const modal = heading.closest("div.fixed") as HTMLElement;
-    expect(modal).not.toBeNull();
+    const modal = screen.getByRole("dialog", { name: "Test Plan" });
 
     const table = modal.querySelector("table");
     expect(table).not.toBeNull();
