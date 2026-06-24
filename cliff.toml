@@ -1,0 +1,87 @@
+# git-cliff configuration
+# Docs: https://git-cliff.org/docs/integration/github/
+
+[changelog]
+header = ""
+body = """
+{% if version %}
+## What's new since {{ previous.version | default(value="the previous release") }}
+
+<!--
+CUSTOM SUMMARY PLACEHOLDER
+
+Write the curated release summary here, for example:
+
+### Workflow and execution
+
+...
+
+### 1 new integration
+
+- ...
+
+### Improvements to existing integrations
+
+- ...
+
+### New components and capabilities
+
+- ...
+
+### Agents
+
+- ...
+
+### Breaking changes
+
+- ...
+-->
+
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+
+{% for commit in commits %}
+- {{ commit.message | upper_first }}{% if commit.github.username %} by @{{ commit.github.username }}{% endif %}
+{% endfor %}
+
+{% endfor %}
+{% if version and previous.version %}
+---
+
+**Full Changelog**: https://github.com/superplanehq/superplane/compare/{{ previous.version }}...{{ version }}
+{% endif %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+tag_pattern = "v[0-9]*"
+sort_commits = "oldest"
+
+commit_parsers = [
+  { message = "^feat", group = "New features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Improvements" },
+  { message = "^refactor", group = "Improvements" },
+  { message = "^chore", group = "Improvements" },
+  { message = "^docs", group = "Improvements" },
+  { message = "^style", group = "Improvements" },
+  { message = "^test", group = "Improvements" },
+  { message = "^ci", group = "Improvements" },
+  { message = "^build", group = "Improvements" },
+
+  # fallback for non-conventional commits
+  { message = ".*", group = "Improvements" },
+]
+
+filter_commits = false
+protect_breaking_commits = false
+
+[remote.github]
+owner = "superplanehq"
+repo = "superplane"
+token = "${GITHUB_TOKEN}"
