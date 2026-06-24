@@ -1004,9 +1004,7 @@ export const useDeleteDraftBranch = (canvasId: string) => {
   });
 };
 
-export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
+export const usePublishCanvasVersion = (canvasId: string) => {
   return useMutation({
     mutationFn: async (versionId: string) => {
       return await canvasesPublishCanvasVersion(
@@ -1015,13 +1013,6 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
           body: {},
         }),
       );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
     },
   });
 };
@@ -2053,17 +2044,16 @@ export const useCommitCanvasStaging = (canvasId: string, versionId: string) => {
       );
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.setQueryData(canvasKeys.versionStaging(canvasId, versionId), { hasStaging: false, stagedPaths: [] });
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        canvasKeys.versionStaging(canvasId, versionId),
+        data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+      );
       // Committing staged edits only changes the draft version, not the live
       // canvas, so we skip invalidating canvasKeys.detail to avoid a
-      // DescribeCanvas refetch while staying in edit mode.
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
+      // DescribeCanvas refetch while staying in edit mode. Version detail,
+      // canvas.yaml, and console caches are refreshed once from useDraftStagingActions.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, CANVAS_YAML_PATH, versionId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, CONSOLE_YAML_PATH, versionId) });
     },
   });
 };
