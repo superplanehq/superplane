@@ -5,7 +5,7 @@ import type { SetURLSearchParams } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
-import { canvasKeys, cancelCanvasVersionQueries, finalizeDraftBranchDeletion } from "@/hooks/useCanvasData";
+import { canvasKeys, finalizeDraftBranchDeletion } from "@/hooks/useCanvasData";
 import { clearComponentSidebarSearchParams } from "./viewState";
 
 type ConfirmDeleteDraftBranchOptions = {
@@ -57,10 +57,6 @@ export async function confirmDeleteDraftBranch({
     (!!activeBranch && branchName === activeBranch);
 
   try {
-    if (organizationId && canvasId) {
-      await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
-    }
-
     await deleteDraftBranch(versionId);
 
     if (isActiveDraft) {

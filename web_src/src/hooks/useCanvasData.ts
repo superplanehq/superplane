@@ -265,6 +265,12 @@ export async function cancelCanvasVersionQueries(queryClient: QueryClient, canva
   );
 }
 
+export async function invalidateCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await Promise.all(
+    canvasVersionScopedQueryKeys(canvasId, versionId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
 export async function removeCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
   await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
   for (const queryKey of canvasVersionScopedQueryKeys(canvasId, versionId)) {
@@ -975,13 +981,25 @@ export const useDeleteDraftBranch = (organizationId: string, canvasId: string) =
       );
     },
     onMutate: async (versionId) => {
+      await queryClient.cancelQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      const previousDraftBranches = queryClient.getQueryData<CanvasesCanvasVersion[]>(
+        canvasKeys.draftBranches(canvasId),
+      );
+
       queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
         current.filter((branch) => branch.metadata?.id !== versionId),
       );
       await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
+
+      return { previousDraftBranches, versionId };
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+    onError: async (_error, versionId, context) => {
+      if (context?.previousDraftBranches) {
+        queryClient.setQueryData(canvasKeys.draftBranches(canvasId), context.previousDraftBranches);
+      }
+
+      await invalidateCanvasVersionQueries(queryClient, canvasId, versionId);
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     },
   });
 };
