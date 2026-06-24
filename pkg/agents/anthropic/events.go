@@ -58,6 +58,10 @@ type anthropicUsage struct {
 	CacheCreationInputTokens int64  `json:"cache_creation_input_tokens,omitempty"`
 	ServerToolUseInputTokens int64  `json:"server_tool_use_input_tokens,omitempty"`
 	ServiceTier              string `json:"service_tier,omitempty"`
+	CacheCreation            struct {
+		Ephemeral5mInputTokens int64 `json:"ephemeral_5m_input_tokens,omitempty"`
+		Ephemeral1hInputTokens int64 `json:"ephemeral_1h_input_tokens,omitempty"`
+	} `json:"cache_creation,omitempty"`
 }
 
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
@@ -159,7 +163,7 @@ func tokenUsage(raw *anthropicUsage) *agents.TokenUsage {
 		OutputTokens:     raw.OutputTokens,
 		TotalTokens:      raw.TotalTokens,
 		CacheReadTokens:  firstNonZero(raw.CacheReadTokens, raw.CacheReadInputTokens),
-		CacheWriteTokens: firstNonZero(raw.CacheWriteTokens, raw.CacheCreationInputTokens),
+		CacheWriteTokens: cacheCreationTokens(raw),
 	}
 	if usage.TotalTokens == 0 {
 		usage.TotalTokens = usage.InputTokens + usage.OutputTokens + usage.CacheReadTokens + usage.CacheWriteTokens + raw.ServerToolUseInputTokens
@@ -168,6 +172,14 @@ func tokenUsage(raw *anthropicUsage) *agents.TokenUsage {
 		return nil
 	}
 	return usage
+}
+
+func cacheCreationTokens(raw *anthropicUsage) int64 {
+	return firstNonZero(
+		raw.CacheWriteTokens,
+		raw.CacheCreationInputTokens,
+		raw.CacheCreation.Ephemeral5mInputTokens+raw.CacheCreation.Ephemeral1hInputTokens,
+	)
 }
 
 func firstNonZero(values ...int64) int64 {
