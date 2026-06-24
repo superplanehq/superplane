@@ -57,6 +57,16 @@ export function useRefreshLatestLiveCanvasData(
         );
       }
 
+      // Live view reads console.yaml via the version-less "live" cache key while
+      // edit mode uses the draft version id; refresh both after publish/exit.
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: canvasKeys.console(canvasId, undefined),
+          exact: true,
+          refetchType: "all",
+        }),
+      );
+
       await Promise.all(invalidations);
     },
     [organizationId, canvasId, queryClient, effectiveLiveCanvasVersionId],
