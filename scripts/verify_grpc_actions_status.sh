@@ -13,5 +13,5 @@ fi
 echo "$matches" >&2
 echo >&2
 echo "pkg/grpc/actions handlers must not import google.golang.org/grpc/status." >&2
-echo "Use pkg/grpcerrors instead so errors reach the grpc-gateway sanitizer." >&2
+echo "Use github.com/superplanehq/superplane/pkg/grpc/errors instead so errors reach the grpc-gateway sanitizer." >&2
 exit 1

@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpcerrors"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 

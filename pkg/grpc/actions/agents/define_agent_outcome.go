@@ -3,7 +3,7 @@ package agents
 import (
 	"context"
 	"errors"
-	"github.com/superplanehq/superplane/pkg/grpcerrors"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
