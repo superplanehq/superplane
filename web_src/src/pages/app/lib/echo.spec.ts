@@ -3,29 +3,31 @@ import { describe, expect, it, vi } from "vitest";
 import { armCreateDraftEcho, consumeCreateDraftEcho, registerCreateDraftEcho, type CreateDraftEchoMap } from "./echo";
 
 describe("create draft echo guards", () => {
-  it("consumes in-flight create draft echoes before the version id is armed", () => {
-    vi.useFakeTimers();
-
-    const echoMap = { current: new Map() as CreateDraftEchoMap };
-    const canvasSaveSessionRef = { current: 1 };
-    registerCreateDraftEcho(echoMap, canvasSaveSessionRef, "canvas-1");
-
-    expect(consumeCreateDraftEcho(echoMap, "canvas-1", "draft-version-1")).toBe(true);
-    expect(consumeCreateDraftEcho(echoMap, "canvas-1", "draft-version-1")).toBe(false);
-
-    vi.useRealTimers();
-  });
-
-  it("consumes armed create draft echoes by version id", () => {
+  it("does not consume until the created version id is armed", () => {
     vi.useFakeTimers();
 
     const echoMap = { current: new Map() as CreateDraftEchoMap };
     const canvasSaveSessionRef = { current: 1 };
     const release = registerCreateDraftEcho(echoMap, canvasSaveSessionRef, "canvas-1");
 
+    expect(consumeCreateDraftEcho(echoMap, "canvas-1", "draft-version-1")).toBe(false);
+
     armCreateDraftEcho(echoMap, "canvas-1", "draft-version-1", release);
     expect(consumeCreateDraftEcho(echoMap, "canvas-1", "draft-version-1")).toBe(true);
     expect(consumeCreateDraftEcho(echoMap, "canvas-1", "draft-version-1")).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it("does not consume unrelated version updates while create draft echo is unarmed", () => {
+    vi.useFakeTimers();
+
+    const echoMap = { current: new Map() as CreateDraftEchoMap };
+    const canvasSaveSessionRef = { current: 1 };
+    registerCreateDraftEcho(echoMap, canvasSaveSessionRef, "canvas-1");
+
+    expect(consumeCreateDraftEcho(echoMap, "canvas-1", "other-draft-version")).toBe(false);
+    expect(echoMap.current.get("canvas-1")?.slots).toHaveLength(1);
 
     vi.useRealTimers();
   });
