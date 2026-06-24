@@ -346,7 +346,6 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),

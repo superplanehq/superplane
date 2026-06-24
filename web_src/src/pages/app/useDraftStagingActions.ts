@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -99,6 +99,7 @@ export function useDraftStagingActions({
   recoverIfDraftMissing,
 }: UseDraftStagingActionsOptions) {
   const queryClient = useQueryClient();
+  const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleCommitStaging = useCallback(async () => {
     if (!hasEditableVersion || !activeCanvasVersionId) {
@@ -149,6 +150,7 @@ export function useDraftStagingActions({
       return;
     }
 
+    setResetStagingPending(true);
     setIsPreparingVersionAction(true);
     try {
       cancelPendingCanvasSaves?.();
@@ -173,6 +175,7 @@ export function useDraftStagingActions({
       }
       showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
     } finally {
+      setResetStagingPending(false);
       setIsPreparingVersionAction(false);
     }
   }, [
@@ -193,5 +196,5 @@ export function useDraftStagingActions({
     setStagingResetNonce,
   ]);
 
-  return { handleCommitStaging, handleResetStaging };
+  return { handleCommitStaging, handleResetStaging, resetStagingPending };
 }

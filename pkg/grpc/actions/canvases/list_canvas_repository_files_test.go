@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListCanvasRepositoryFiles(t *testing.T) {
@@ -17,9 +17,9 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), "invalid-id")
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("repository missing -> returns virtual spec files", func(t *testing.T) {
@@ -36,9 +36,9 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
 
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, codes.Internal, code)
 	})
 
 	t.Run("returns repository files", func(t *testing.T) {
@@ -57,8 +57,8 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		otherOrg := support.CreateOrganization(t, r, r.User)
 
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, otherOrg.ID.String(), canvas.ID.String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 }

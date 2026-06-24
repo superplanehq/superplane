@@ -11,12 +11,14 @@ import (
 type anthropicEvent struct {
 	ID         string                  `json:"id"`
 	Type       string                  `json:"type"`
+	Model      string                  `json:"model,omitempty"`
 	Name       string                  `json:"name"`
 	ToolName   string                  `json:"tool_name,omitempty"`
 	ToolUseID  string                  `json:"tool_use_id,omitempty"`
 	Input      json.RawMessage         `json:"input,omitempty"`
 	Content    []anthropicContentBlock `json:"content"`
 	StopReason *anthropicStopReason    `json:"stop_reason,omitempty"`
+	Usage      *anthropicUsage         `json:"usage,omitempty"`
 	Error      *struct {
 		Message string `json:"message"`
 	} `json:"error"`
@@ -44,6 +46,22 @@ type anthropicContentBlock struct {
 type anthropicStopReason struct {
 	Type     string   `json:"type"`
 	EventIDs []string `json:"event_ids"`
+}
+
+type anthropicUsage struct {
+	InputTokens              int64  `json:"input_tokens,omitempty"`
+	OutputTokens             int64  `json:"output_tokens,omitempty"`
+	TotalTokens              int64  `json:"total_tokens,omitempty"`
+	CacheReadTokens          int64  `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens         int64  `json:"cache_write_tokens,omitempty"`
+	CacheReadInputTokens     int64  `json:"cache_read_input_tokens,omitempty"`
+	CacheCreationInputTokens int64  `json:"cache_creation_input_tokens,omitempty"`
+	ServerToolUseInputTokens int64  `json:"server_tool_use_input_tokens,omitempty"`
+	ServiceTier              string `json:"service_tier,omitempty"`
+	CacheCreation            struct {
+		Ephemeral5mInputTokens int64 `json:"ephemeral_5m_input_tokens,omitempty"`
+		Ephemeral1hInputTokens int64 `json:"ephemeral_1h_input_tokens,omitempty"`
+	} `json:"cache_creation,omitempty"`
 }
 
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
@@ -114,7 +132,11 @@ func customToolUseEvent(raw anthropicEvent) agents.ProviderEvent {
 
 func idleEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	if raw.StopReason == nil || raw.StopReason.Type == "" || raw.StopReason.Type == "end_turn" {
-		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
+		return agents.ProviderEvent{
+			Type:  agents.ProviderEventTurnCompleted,
+			Model: raw.Model,
+			Usage: tokenUsage(raw.Usage),
+		}, true
 	}
 
 	if raw.StopReason.Type == "requires_action" {
@@ -124,7 +146,49 @@ func idleEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		}, true
 	}
 
-	return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
+	return agents.ProviderEvent{
+		Type:  agents.ProviderEventTurnCompleted,
+		Model: raw.Model,
+		Usage: tokenUsage(raw.Usage),
+	}, true
+}
+
+func tokenUsage(raw *anthropicUsage) *agents.TokenUsage {
+	if raw == nil {
+		return nil
+	}
+
+	usage := &agents.TokenUsage{
+		InputTokens:      raw.InputTokens,
+		OutputTokens:     raw.OutputTokens,
+		TotalTokens:      raw.TotalTokens,
+		CacheReadTokens:  firstNonZero(raw.CacheReadTokens, raw.CacheReadInputTokens),
+		CacheWriteTokens: cacheCreationTokens(raw),
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.InputTokens + usage.OutputTokens + usage.CacheReadTokens + usage.CacheWriteTokens + raw.ServerToolUseInputTokens
+	}
+	if usage.TotalTokens == 0 {
+		return nil
+	}
+	return usage
+}
+
+func cacheCreationTokens(raw *anthropicUsage) int64 {
+	return firstNonZero(
+		raw.CacheWriteTokens,
+		raw.CacheCreationInputTokens,
+		raw.CacheCreation.Ephemeral5mInputTokens+raw.CacheCreation.Ephemeral1hInputTokens,
+	)
+}
+
+func firstNonZero(values ...int64) int64 {
+	for _, value := range values {
+		if value != 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {

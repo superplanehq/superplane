@@ -7,7 +7,7 @@ import type { DraftEditTabTone } from "@/pages/app/lib/draft-branch-edit-status"
 
 import { DraftChangeDots } from "./DraftChangeDots";
 
-export type CanvasMode = "version-live" | "version-edit" | "console" | "memory" | "files" | "versions";
+export type CanvasMode = "version-live" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;

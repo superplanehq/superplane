@@ -7,11 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test_AddUserToGroup(t *testing.T) {
@@ -56,18 +56,18 @@ func Test_AddUserToGroup(t *testing.T) {
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
 		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", "", groupName, r.AuthService)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "user not found", msg)
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
 		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "invalid-uuid", "", groupName, r.AuthService)
 		assert.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "user not found", msg)
 	})
 }

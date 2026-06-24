@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -88,7 +90,7 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 
 	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.AlreadyExists, status.Code(err))
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
 
 func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
@@ -108,8 +110,14 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	baseURL := "https://example.com"
 	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	require.Equal(t, "canvas name is required", status.Convert(err).Message())
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Equal(t, "canvas name is required", func() string {
+		_, msg, ok := grpcerrors.HandlerStatus(err)
+		if ok {
+			return msg
+		}
+		return err.Error()
+	}())
 }
 
 func TestCreateCanvasOnFreshOrganization(t *testing.T) {
@@ -186,8 +194,14 @@ func TestCreateCanvasRejectsInvalidEdgeChannel(t *testing.T) {
 	baseURL := "https://example.com"
 	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	require.Contains(t, status.Convert(err).Message(), `source node http-1 does not have output channel "default"`)
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Contains(t, func() string {
+		_, msg, ok := grpcerrors.HandlerStatus(err)
+		if ok {
+			return msg
+		}
+		return err.Error()
+	}(), `source node http-1 does not have output channel "default"`)
 }
 
 func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
@@ -220,6 +234,6 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	baseURL := "https://example.com"
 	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
-	require.Equal(t, codes.ResourceExhausted, status.Code(err))
-	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
+	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+	assert.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
 }

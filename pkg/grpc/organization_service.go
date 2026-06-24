@@ -62,21 +62,6 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
 }
 
-func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateInvitationWithUsage(ctx, s.authorizationService, s.usageService, orgID, req.Email)
-}
-
-func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListInvitations(ctx, orgID)
-}
-
-func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.RemoveInvitationRequest) (*pb.RemoveInvitationResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
-}
-
 func (s *OrganizationService) GetInviteLink(ctx context.Context, req *pb.GetInviteLinkRequest) (*pb.GetInviteLinkResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.GetInviteLink(orgID)
