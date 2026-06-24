@@ -7,10 +7,10 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateOrganization(t *testing.T) {
@@ -25,10 +25,10 @@ func Test__UpdateOrganization(t *testing.T) {
 
 		_, err := UpdateOrganization(context.Background(), uuid.New().String(), organization)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "organization not found", s.Message())
+		assert.Equal(t, codes.NotFound, code)
+		assert.Equal(t, "organization not found", msg)
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
@@ -54,17 +54,17 @@ func Test__UpdateOrganization(t *testing.T) {
 
 	t.Run("nil organization -> error", func(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), uuid.New().String(), nil)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "organization is required", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "organization is required", msg)
 	})
 
 	t.Run("nil organization metadata -> error", func(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), uuid.New().String(), &protos.Organization{})
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "organization metadata is required", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "organization metadata is required", msg)
 	})
 }

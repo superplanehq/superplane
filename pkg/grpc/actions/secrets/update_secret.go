@@ -2,14 +2,12 @@ package secrets
 
 import (
 	"context"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
@@ -22,24 +20,24 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	if spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing secret")
+		return nil, grpcerrors.InvalidArgument(nil, "missing secret")
 	}
 
 	if spec.Metadata == nil || spec.Metadata.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "empty secret name")
+		return nil, grpcerrors.InvalidArgument(nil, "empty secret name")
 	}
 
 	if spec.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
+		return nil, grpcerrors.InvalidArgument(nil, "missing secret spec")
 	}
 
 	provider := protoToSecretProvider(spec.Spec.Provider)
 	if provider != secret.Provider {
-		return nil, status.Error(codes.InvalidArgument, "cannot update provider")
+		return nil, grpcerrors.InvalidArgument(nil, "cannot update provider")
 	}
 
 	data, err := prepareSecretData(ctx, encryptor, spec)

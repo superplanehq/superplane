@@ -7,9 +7,8 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.GetCanvasAgentChatRequest) (*pb.GetCanvasAgentChatResponse, error) {
@@ -19,7 +18,7 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 	}
 	canvas, err := uuid.Parse(req.CanvasId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid canvas id")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid canvas id")
 	}
 	if err := ensureCanvas(org, canvas); err != nil {
 		return nil, err
@@ -28,10 +27,10 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 	session, err := svc.EnsureSession(ctx, org, user, canvas)
 	if err != nil {
 		if errors.Is(err, agents.ErrSessionForbidden) {
-			return nil, status.Error(codes.PermissionDenied, "agent chat is not allowed")
+			return nil, grpcerrors.PermissionDenied(nil, "agent chat is not allowed")
 		}
 		log.WithError(err).WithField("canvas_id", canvas).Error("failed to ensure agent chat")
-		return nil, status.Error(codes.Internal, "failed to load agent chat")
+		return nil, grpcerrors.Internal(err, "failed to load agent chat")
 	}
 	return &pb.GetCanvasAgentChatResponse{Chat: serializeChat(session)}, nil
 }

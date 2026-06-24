@@ -14,13 +14,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -69,18 +69,18 @@ func UpdateCanvasVersionWithUsage(
 ) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 	organizationUUID := uuid.MustParse(organizationID)
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
@@ -90,7 +90,7 @@ func UpdateCanvasVersionWithUsage(
 
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "failed to apply layout")
 	}
 
 	err = usage.EnsureOrganizationWithinLimits(
@@ -109,12 +109,12 @@ func UpdateCanvasVersionWithUsage(
 
 	requestedVersionID := strings.TrimSpace(versionID)
 	if requestedVersionID == "" {
-		return nil, status.Error(codes.InvalidArgument, "version id is required")
+		return nil, grpcerrors.InvalidArgument(nil, "version id is required")
 	}
 
 	versionUUID, err := uuid.Parse(requestedVersionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -124,7 +124,7 @@ func UpdateCanvasVersionWithUsage(
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, versionUUID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
+				return grpcerrors.NotFound(err, "version not found")
 			}
 			return err
 		}
@@ -137,13 +137,13 @@ func UpdateCanvasVersionWithUsage(
 
 		nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
 		if nextName == "" {
-			return status.Error(codes.InvalidArgument, "canvas name is required")
+			return grpcerrors.InvalidArgument(nil, "canvas name is required")
 		}
 
 		if version.Name != nextName {
 			findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
 			if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
-				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+				return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
 			}
 			if findErr != nil {
 				return findErr
@@ -168,11 +168,11 @@ func UpdateCanvasVersionWithUsage(
 		return nil
 	})
 	if err != nil {
-		if status.Code(err) != codes.Unknown {
+		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
 		log.WithError(err).Error("failed to update canvas version")
-		return nil, status.Error(codes.Internal, "failed to update canvas version")
+		return nil, grpcerrors.Internal(err, "failed to update canvas version")
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
@@ -184,19 +184,19 @@ func UpdateCanvasVersionWithUsage(
 
 func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
 	if version.OwnerID == nil || *version.OwnerID != userID {
-		return status.Error(codes.PermissionDenied, "version owner mismatch")
+		return grpcerrors.PermissionDenied(nil, "version owner mismatch")
 	}
 
 	if version.State == models.CanvasVersionStatePublished {
-		return status.Error(codes.FailedPrecondition, "published versions are immutable")
+		return grpcerrors.FailedPrecondition(nil, "published versions are immutable")
 	}
 
 	if version.State != models.CanvasVersionStateDraft {
-		return status.Error(codes.FailedPrecondition, "version is not your editable draft")
+		return grpcerrors.FailedPrecondition(nil, "version is not your editable draft")
 	}
 
 	if !models.IsRegisteredDraftVersion(version) {
-		return status.Error(codes.FailedPrecondition, "version is not a registered draft branch")
+		return grpcerrors.FailedPrecondition(nil, "version is not a registered draft branch")
 	}
 
 	return nil

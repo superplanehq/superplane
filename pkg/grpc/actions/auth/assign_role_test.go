@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test_AssignRole(t *testing.T) {
@@ -21,18 +21,18 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("user not authenticated -> error", func(t *testing.T) {
 		_, err := AssignRole(context.Background(), orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
-		assert.Equal(t, "user not authenticated", s.Message())
+		assert.Equal(t, codes.Unauthenticated, code)
+		assert.Equal(t, "user not authenticated", msg)
 	})
 
 	t.Run("user is not part of organization -> error", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, uuid.NewString(), "", r.AuthService)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "user not found", msg)
 	})
 
 	t.Run("assign role with user ID", func(t *testing.T) {
@@ -51,36 +51,36 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("user cannot change own role", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.PermissionDenied, s.Code())
-		assert.Equal(t, "cannot change your own role", s.Message())
+		assert.Equal(t, codes.PermissionDenied, code)
+		assert.Equal(t, "cannot change your own role", msg)
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, "", r.User.String(), "", r.AuthService)
 		assert.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid role", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "invalid role", msg)
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
 		assert.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "user not found", msg)
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", r.AuthService)
 		assert.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "user not found", msg)
 	})
 }

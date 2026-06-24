@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -31,9 +31,9 @@ func Test__ListNodeExecutions(t *testing.T) {
 			nil,
 		)
 
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("node does not exist -> 404 error", func(t *testing.T) {
@@ -74,10 +74,10 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		// Verify we get a NotFound error
 		//
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "canvas node not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "canvas node not found")
 	})
 
 	t.Run("canvas does not exist -> 404 error", func(t *testing.T) {
@@ -98,10 +98,10 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		// Verify we get a NotFound error
 		//
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "canvas node not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "canvas node not found")
 	})
 
 	t.Run("returns executions for existing node", func(t *testing.T) {

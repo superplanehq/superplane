@@ -8,11 +8,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -27,10 +27,10 @@ func Test__DeleteSecret(t *testing.T) {
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
 		_, err := DeleteSecret(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), "test2")
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "secret not found", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "secret not found", msg)
 	})
 
 	t.Run("secret is deleted", func(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -49,10 +50,10 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "version id is required")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "version id is required")
 	})
 
 	t.Run("valid draft version id -> updates draft", func(t *testing.T) {
@@ -115,10 +116,8 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, s.Code())
-		assert.Equal(t, "canvas node limit exceeded", s.Message())
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+		assert.Equal(t, "canvas node limit exceeded", status.Convert(err).Message())
 	})
 
 	t.Run("invalid source output channel -> error", func(t *testing.T) {
@@ -174,10 +173,10 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), `source node http-1 does not have output channel "default"`)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, `source node http-1 does not have output channel "default"`)
 	})
 
 	t.Run("invalid node field type -> serialized node carries error_message", func(t *testing.T) {

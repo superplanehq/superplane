@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__PublishCanvasVersion(t *testing.T) {
@@ -26,9 +26,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
@@ -39,9 +39,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), "invalid-id", uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid version id -> error", func(t *testing.T) {
@@ -52,9 +52,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), "invalid-id",
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
@@ -65,9 +65,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("published version -> error", func(t *testing.T) {
@@ -83,10 +83,10 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvasID, canvas.LiveVersionID.String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "only draft versions can be published")
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, msg, "only draft versions can be published")
 	})
 
 	t.Run("draft owned by another user -> error", func(t *testing.T) {
@@ -105,9 +105,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.PermissionDenied, s.Code())
+		assert.Equal(t, codes.PermissionDenied, code)
 	})
 
 	t.Run("draft version with staged changes -> error", func(t *testing.T) {
@@ -132,10 +132,10 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "staged changes")
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, msg, "staged changes")
 
 		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), draftVersionUUID)
 		require.NoError(t, err)
@@ -152,10 +152,10 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvasID, uuid.New().String(),
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "version not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "version not found")
 	})
 
 	t.Run("draft version -> publishes and deletes draft", func(t *testing.T) {
@@ -318,9 +318,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, s.Code())
+		assert.Equal(t, codes.AlreadyExists, code)
 	})
 
 }

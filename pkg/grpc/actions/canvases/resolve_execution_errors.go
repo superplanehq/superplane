@@ -2,20 +2,19 @@ package canvases
 
 import (
 	"context"
-	"strings"
-
+	"fmt"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"strings"
 )
 
 func ResolveExecutionErrors(ctx context.Context, workflowID uuid.UUID, executionIDs []uuid.UUID) (*pb.ResolveExecutionErrorsResponse, error) {
 	_ = ctx
 	uniqueExecutionIDs := uniqueExecutionIDs(executionIDs)
 	if len(uniqueExecutionIDs) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "execution_ids are required")
+		return nil, grpcerrors.InvalidArgument(nil, "execution_ids are required")
 	}
 
 	executions, err := models.FindNodeExecutionsByIDs(workflowID, uniqueExecutionIDs)
@@ -24,12 +23,12 @@ func ResolveExecutionErrors(ctx context.Context, workflowID uuid.UUID, execution
 	}
 
 	if len(executions) != len(uniqueExecutionIDs) {
-		return nil, status.Error(codes.NotFound, "execution not found")
+		return nil, grpcerrors.NotFound(err, "execution not found")
 	}
 
 	invalidIDs := invalidErrorResolutionIDs(executions)
 	if len(invalidIDs) > 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "executions not in error state: %s", strings.Join(invalidIDs, ", "))
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("executions not in error state: %s", strings.Join(invalidIDs, ", ")))
 	}
 
 	if err := models.ResolveExecutionErrors(workflowID, uniqueExecutionIDs); err != nil {

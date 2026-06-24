@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__DeleteOrganization(t *testing.T) {
@@ -22,10 +22,10 @@ func Test__DeleteOrganization(t *testing.T) {
 	t.Run("organization does not exist -> error", func(t *testing.T) {
 		_, err := DeleteOrganization(ctx, r.AuthService, uuid.New().String())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "organization not found", s.Message())
+		assert.Equal(t, codes.NotFound, code)
+		assert.Equal(t, "organization not found", msg)
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {

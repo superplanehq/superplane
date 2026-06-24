@@ -7,15 +7,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, name string) (*pb.UpdateSecretNameResponse, error) {
 	if name == "" {
-		return nil, status.Error(codes.InvalidArgument, "name is required")
+		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
 	err := actions.ValidateUUIDs(idOrName)
@@ -26,7 +25,7 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	if secret.Name == name {
@@ -40,9 +39,9 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 	updated, err := secret.UpdateName(name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, grpcerrors.InvalidArgument(err, "invalid secret name")
 		}
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcerrors.Internal(err, "failed to update secret name")
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *updated)

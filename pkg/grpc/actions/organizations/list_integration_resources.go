@@ -3,43 +3,42 @@ package organizations
 import (
 	"context"
 	"errors"
-
+	"fmt"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
 	}
 
 	ID, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid installation ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid installation ID")
 	}
 
 	resourceType := parameters["type"]
 	if resourceType == "" {
-		return nil, status.Error(codes.InvalidArgument, "resource type is required")
+		return nil, grpcerrors.InvalidArgument(nil, "resource type is required")
 	}
 
 	instance, err := models.FindIntegration(org, ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "integration not found")
+			return nil, grpcerrors.NotFound(err, "integration not found")
 		}
 
-		return nil, status.Error(codes.Internal, "failed to load integration")
+		return nil, grpcerrors.Internal(err, "failed to load integration")
 	}
 
 	if instance.State == models.IntegrationStateError {
@@ -47,7 +46,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 			"integration_id":   instance.ID,
 			"integration_name": instance.AppName,
 		}).Warn("integration is in error state")
-		return nil, status.Error(codes.FailedPrecondition, "integration is in error state")
+		return nil, grpcerrors.FailedPrecondition(nil, "integration is in error state")
 	}
 
 	if instance.State != models.IntegrationStateReady {
@@ -58,7 +57,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "integration %s is unavailable", instance.AppName)
+		return nil, grpcerrors.FailedPrecondition(nil, fmt.Sprintf("integration %s is unavailable", instance.AppName))
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(
@@ -84,7 +83,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
 		log.WithError(err).WithField("integration_id", instance.ID).Warn("failed to list integration resources")
-		return nil, status.Error(codes.FailedPrecondition, "failed to list integration resources")
+		return nil, grpcerrors.FailedPrecondition(nil, "failed to list integration resources")
 	}
 
 	return &pb.ListIntegrationResourcesResponse{

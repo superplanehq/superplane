@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -21,8 +22,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -45,12 +44,12 @@ func CreateIntegrationWithUsage(
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s not found", integrationName))
 	}
 
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization")
 	}
 
 	//
@@ -58,12 +57,12 @@ func CreateIntegrationWithUsage(
 	//
 	_, err = models.FindIntegrationByName(org, name)
 	if err == nil {
-		return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
+		return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
 	}
 
 	integrationCount, err := models.CountIntegrationsByOrganization(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to count integrations: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to count integrations")
 	}
 
 	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID, &usagepb.OrganizationState{
@@ -88,12 +87,12 @@ func CreateIntegrationWithUsage(
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
-			return nil, status.Error(codes.Internal, "failed to create integration")
+			return nil, grpcerrors.Internal(err, "failed to create integration")
 		}
 
 		setupProvider, err := registry.GetSetupProvider(integrationName)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get setup provider: %v", err)
+			return nil, grpcerrors.Internal(err, "failed to get setup provider")
 		}
 
 		return setupIntegration(registry, setupProvider, newIntegration)
@@ -105,13 +104,13 @@ func CreateIntegrationWithUsage(
 	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
-		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
+		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
 	}
 
 	newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, configuration)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to create integration")
-		return nil, status.Error(codes.Internal, "failed to create integration")
+		return nil, grpcerrors.Internal(err, "failed to create integration")
 	}
 
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
@@ -151,12 +150,12 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 	})
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to setup integration next setup step: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to setup integration next setup step")
 	}
 
 	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
 	return &pb.CreateIntegrationResponse{Integration: proto}, nil
@@ -196,7 +195,7 @@ func syncIntegration(
 
 	err := database.Conn().Save(newIntegration).Error
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to save integration after sync")
 	}
 
 	if syncErr != nil {
@@ -204,13 +203,13 @@ func syncIntegration(
 		newIntegration.StateDescription = syncErr.Error()
 		err = database.Conn().Save(newIntegration).Error
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
+			return nil, grpcerrors.Internal(err, "failed to save integration after sync")
 		}
 	}
 
 	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
 	return &pb.CreateIntegrationResponse{

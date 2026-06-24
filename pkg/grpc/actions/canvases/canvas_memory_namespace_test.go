@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -30,9 +30,9 @@ func Test__CreateCanvasMemoryNamespace(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		_, err := CreateCanvasMemoryNamespace(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String(), "empty-namespace", nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 
 		source, err := models.CanvasMemoryNamespaceSource(canvas.ID, "empty-namespace")
 		require.NoError(t, err)
@@ -84,9 +84,9 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 			"",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 
 		records, err := models.ListCanvasMemoriesByNamespace(canvas.ID, "durable-namespace")
 		require.NoError(t, err)

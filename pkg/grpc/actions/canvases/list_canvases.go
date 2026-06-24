@@ -7,12 +7,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -21,13 +20,13 @@ func ListCanvases(ctx context.Context, registry *registry.Registry, organization
 	canvases, err := models.ListCanvases(organizationID)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
-		return nil, status.Error(codes.Internal, "failed to list canvases")
+		return nil, grpcerrors.Internal(err, "failed to list canvases")
 	}
 
 	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), canvases)
 	if err != nil {
 		log.Errorf("failed to serialize canvases for organization %s: %v", organizationID, err)
-		return nil, status.Error(codes.Internal, "failed to serialize canvases")
+		return nil, grpcerrors.Internal(err, "failed to serialize canvases")
 	}
 
 	return &pb.ListCanvasesResponse{

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -131,10 +131,10 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "invalid-uuid", map[string]any{"key": "value"}, "")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid integration ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid integration ID")
 	})
 
 	t.Run("non-existent integration -> error", func(t *testing.T) {
@@ -143,10 +143,10 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), map[string]any{"key": "value"}, "")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "integration not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("update preserves existing configuration keys -> success", func(t *testing.T) {
@@ -241,9 +241,9 @@ func Test__UpdateIntegration(t *testing.T) {
 		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), secondIntegration.Integration.Metadata.Id, nil, firstName)
 		require.Error(t, err)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, s.Code())
-		assert.Contains(t, s.Message(), "already exists")
+		assert.Equal(t, codes.AlreadyExists, code)
+		assert.Contains(t, msg, "already exists")
 	})
 }

@@ -16,13 +16,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -73,22 +72,22 @@ func CreateCanvasWithSeedFiles(
 	seedFiles []models.RepositorySeedFile,
 ) (*pb.CreateCanvasResponse, error) {
 	if pbCanvas == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas is required")
 	}
 
 	if pbCanvas.GetMetadata() == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas metadata is required")
 	}
 
 	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
 	if name == "" {
-		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 	pbCanvas.Metadata.Name = name
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
@@ -98,13 +97,13 @@ func CreateCanvasWithSeedFiles(
 
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "failed to apply layout")
 	}
 
 	createdBy := uuid.MustParse(userID)
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to count organization canvases")
 	}
 
 	err = usage.EnsureOrganizationWithinLimits(
@@ -136,7 +135,7 @@ func CreateCanvasWithSeedFiles(
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, name)
 		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
-			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+			return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
 		}
 		if findErr != nil {
 			return findErr
@@ -251,7 +250,7 @@ func CreateCanvasWithSeedFiles(
 
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(ctx), &canvas)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas spec: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
 	proto, err := SerializeCanvas(&canvas, liveVersion, user, nil)

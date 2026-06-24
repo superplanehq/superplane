@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateCanvasFolderPosition__MovesFolderUpAndDown(t *testing.T) {
@@ -84,5 +84,5 @@ func Test__UpdateCanvasFolderPosition__RejectsMissingDirection(t *testing.T) {
 		pb.UpdateCanvasFolderPositionRequest_DIRECTION_UNSPECIFIED,
 	)
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }

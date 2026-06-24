@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__CreateSecret(t *testing.T) {
@@ -39,10 +39,10 @@ func Test__CreateSecret(t *testing.T) {
 		}
 
 		_, err := CreateSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), secret)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
-		assert.Equal(t, "user not authenticated", s.Message())
+		assert.Equal(t, codes.Unauthenticated, code)
+		assert.Equal(t, "user not authenticated", msg)
 	})
 
 	t.Run("secret is created", func(t *testing.T) {
@@ -100,9 +100,9 @@ func Test__CreateSecret(t *testing.T) {
 		// Secret with this name already exists
 		//
 		_, err = CreateSecret(ctx, encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), secret)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "name already used", s.Message())
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "name already used", msg)
 	})
 }

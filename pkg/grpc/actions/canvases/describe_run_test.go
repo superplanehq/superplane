@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeRun(t *testing.T) {
@@ -58,7 +58,7 @@ func Test__DescribeRun(t *testing.T) {
 
 		_, err := DescribeRun(context.Background(), r.Registry, canvasOne.ID, runTwo.ID.String())
 		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 
 	t.Run("invalid run id -> error", func(t *testing.T) {
@@ -66,7 +66,7 @@ func Test__DescribeRun(t *testing.T) {
 
 		_, err := DescribeRun(context.Background(), r.Registry, canvas.ID, "not-a-uuid")
 		require.Error(t, err)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("missing run -> error", func(t *testing.T) {
@@ -74,6 +74,6 @@ func Test__DescribeRun(t *testing.T) {
 
 		_, err := DescribeRun(context.Background(), r.Registry, canvas.ID, uuid.New().String())
 		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 }
