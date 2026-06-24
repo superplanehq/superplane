@@ -17,7 +17,12 @@ function renderEchoGuards() {
     }),
   );
 
-  return { ...hook, canvasSaveSessionRef, ignoredCanvasUpdatedEchoReleasesRef, ignoredCanvasVersionUpdatedEchoReleasesRef };
+  return {
+    ...hook,
+    canvasSaveSessionRef,
+    ignoredCanvasUpdatedEchoReleasesRef,
+    ignoredCanvasVersionUpdatedEchoReleasesRef,
+  };
 }
 
 describe("useCanvasEchoReleaseGuards", () => {
