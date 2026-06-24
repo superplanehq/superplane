@@ -61,6 +61,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Cloud Storage • Create Bucket" href="#cloud-storage-•-create-bucket" description="Create a Cloud Storage bucket" />
+  <LinkCard title="Cloud Storage • Delete Bucket" href="#cloud-storage-•-delete-bucket" description="Delete a Cloud Storage bucket" />
+  <LinkCard title="Cloud Storage • Get Bucket" href="#cloud-storage-•-get-bucket" description="Fetch a Cloud Storage bucket's configuration and metadata" />
   <LinkCard title="Compute • Update Image" href="#compute-•-update-image" description="Update a Google Compute Engine image: deprecate or obsolete it, and update its labels" />
   <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
@@ -87,7 +90,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances, `roles/storage.admin` to manage Cloud Storage buckets)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
@@ -2363,6 +2366,152 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="cloud-storage-•-create-bucket"></a>
+
+## Cloud Storage • Create Bucket
+
+**Component key:** `gcp.storage.createBucket`
+
+The Create Bucket component creates a new Cloud Storage bucket.
+
+### Use Cases
+
+- **Environment setup**: Provision a bucket for artifacts, backups, or static assets as part of an environment
+- **Ephemeral environments**: Create a dedicated bucket for a preview or test run
+- **Infrastructure automation**: Provision storage as part of a broader workflow
+
+### Configuration
+
+- **Name**: The globally unique bucket name (required)
+- **Location**: The location to create the bucket in — a multi-region (`US`, `EU`, `ASIA`) or a specific region (required)
+- **Storage Class**: The default storage class for objects (Standard, Nearline, Coldline, Archive)
+- **Uniform Bucket-Level Access**: Use IAM-only access control instead of per-object ACLs (recommended, default on)
+- **Object Versioning**: Keep noncurrent versions of objects when they are overwritten or deleted (optional)
+- **Labels**: Key-value labels applied to the bucket (optional)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket's `name`, `location`, `locationType`, `storageClass`, `timeCreated`, `selfLink`, and a `consoleUrl` for opening the bucket in the Cloud Console.
+
+### Important Notes
+
+- **Bucket names are globally unique across all of Cloud Storage** and must follow the [naming guidelines](https://cloud.google.com/storage/docs/buckets#naming) (3–63 characters, lowercase letters, numbers, hyphens, underscores, and dots).
+- A bucket's location is permanent and cannot be changed after creation.
+- Requires the `roles/storage.admin` IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "consoleUrl": "https://console.cloud.google.com/storage/browser/my-bucket",
+    "id": "my-bucket",
+    "location": "US",
+    "locationType": "multi-region",
+    "name": "my-bucket",
+    "projectNumber": "123456789012",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T00:00:00.000Z",
+    "uniformBucketLevelAccess": true,
+    "updated": "2025-01-01T00:00:00.000Z",
+    "versioning": false
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}
+```
+
+<a id="cloud-storage-•-delete-bucket"></a>
+
+## Cloud Storage • Delete Bucket
+
+**Component key:** `gcp.storage.deleteBucket`
+
+The Delete Bucket component permanently deletes a Cloud Storage bucket.
+
+### Use Cases
+
+- **Teardown**: Remove a bucket when decommissioning an environment
+- **Ephemeral cleanup**: Delete a preview/test bucket when it is no longer needed
+
+### Configuration
+
+- **Bucket**: The Cloud Storage bucket to delete (required)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket `name` and `deleted: true`.
+
+### Important Notes
+
+- **The bucket must be empty before it can be deleted.** Cloud Storage rejects the request if it still contains objects (including noncurrent object versions).
+- **This permanently deletes the bucket — it is irreversible.** Deleting a bucket frees its globally unique name for reuse by anyone.
+- If the bucket does not exist, the component treats the deletion as already complete (idempotent).
+- Requires the `roles/storage.admin` IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "my-bucket"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}
+```
+
+<a id="cloud-storage-•-get-bucket"></a>
+
+## Cloud Storage • Get Bucket
+
+**Component key:** `gcp.storage.getBucket`
+
+The Get Bucket component retrieves a Cloud Storage bucket's configuration and metadata.
+
+### Use Cases
+
+- **Enrichment**: Read a bucket's location or storage class to feed a downstream step
+- **Existence check**: Confirm a bucket exists before writing to it
+- **Auditing**: Capture bucket details as part of a workflow
+
+### Configuration
+
+- **Bucket**: The Cloud Storage bucket to fetch (required)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket's `name`, `location`, `locationType`, `storageClass`, `timeCreated`, `selfLink`, and a `consoleUrl` for opening the bucket in the Cloud Console.
+
+### Important Notes
+
+- Requires the `roles/storage.admin` (or `roles/storage.legacyBucketReader`) IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "consoleUrl": "https://console.cloud.google.com/storage/browser/my-bucket",
+    "id": "my-bucket",
+    "location": "US",
+    "locationType": "multi-region",
+    "name": "my-bucket",
+    "projectNumber": "123456789012",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T00:00:00.000Z",
+    "uniformBucketLevelAccess": true,
+    "updated": "2025-01-02T00:00:00.000Z",
+    "versioning": false
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
 }
 ```
 
