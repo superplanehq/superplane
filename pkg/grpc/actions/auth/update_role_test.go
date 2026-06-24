@@ -123,7 +123,7 @@ func Test_UpdateRole(t *testing.T) {
 
 		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot update default role")
+		assert.Equal(t, "failed to update role", err.Error())
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {

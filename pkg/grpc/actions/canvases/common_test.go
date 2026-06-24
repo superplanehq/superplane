@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -142,15 +142,27 @@ func TestMapCanvasNameUniqueConstraintError(t *testing.T) {
 			ConstraintName: "workflows_organization_id_name_key",
 		})
 
-		assert.Equal(t, codes.AlreadyExists, status.Code(err))
-		assert.Equal(t, canvasNameAlreadyExistsMessage, status.Convert(err).Message())
+		assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+		assert.Equal(t, canvasNameAlreadyExistsMessage, func() string {
+			_, msg, ok := grpcerrors.HandlerStatus(err)
+			if ok {
+				return msg
+			}
+			return err.Error()
+		}())
 	})
 
 	t.Run("maps model duplicate name error to already exists", func(t *testing.T) {
 		err := mapCanvasNameUniqueConstraintError(models.ErrCanvasNameAlreadyExists)
 
-		assert.Equal(t, codes.AlreadyExists, status.Code(err))
-		assert.Equal(t, canvasNameAlreadyExistsMessage, status.Convert(err).Message())
+		assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+		assert.Equal(t, canvasNameAlreadyExistsMessage, func() string {
+			_, msg, ok := grpcerrors.HandlerStatus(err)
+			if ok {
+				return msg
+			}
+			return err.Error()
+		}())
 	})
 
 	t.Run("preserves unrelated errors", func(t *testing.T) {

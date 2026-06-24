@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpcerrors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
@@ -278,8 +279,10 @@ func Test__DescribeUsage(t *testing.T) {
 		response, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
 		require.Error(t, err)
 		assert.Nil(t, response)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
-		assert.Equal(t, "organization usage setup failed precondition", status.Convert(err).Message())
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "organization usage setup failed precondition", msg)
 		assert.Len(t, service.setupAccountCalls, 1)
 		require.Len(t, service.setupOrganizationCalls, 1)
 		assert.Equal(t, r.Organization.ID.String(), service.setupOrganizationCalls[0][0])
@@ -296,8 +299,10 @@ func Test__DescribeUsage(t *testing.T) {
 		response, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
 		require.Error(t, err)
 		assert.Nil(t, response)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
-		assert.Equal(t, "organization usage is not configured", status.Convert(err).Message())
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "organization usage is not configured", msg)
 		assert.Len(t, service.setupAccountCalls, 1)
 		require.Len(t, service.setupOrganizationCalls, 1)
 		assert.Equal(t, r.Organization.ID.String(), service.setupOrganizationCalls[0][0])
