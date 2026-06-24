@@ -2,11 +2,11 @@ package actions
 
 import (
 	"encoding/json"
-	"slices"
-
+	"fmt"
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -17,9 +17,8 @@ import (
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+	"slices"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -30,7 +29,7 @@ func ValidateUUIDsArray(ids []string) error {
 	for _, id := range ids {
 		_, err := uuid.Parse(id)
 		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid UUID: %s", id)
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid UUID: %s", id))
 		}
 	}
 

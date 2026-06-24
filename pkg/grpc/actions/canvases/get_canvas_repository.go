@@ -8,10 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -19,17 +18,17 @@ import (
 func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organizationID string, id string) (*pb.GetCanvasRepositoryResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
 	repository, err := models.FindRepository(orgID, canvasID)
@@ -46,7 +45,7 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 	if repository.Status == models.RepositoryStatusReady {
 		headSha, err = gitProvider.Head(ctx, repository.RepoID, "")
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get repository head sha: %v", err)
+			return nil, grpcerrors.Internal(err, "failed to get repository head sha")
 		}
 	}
 
@@ -70,7 +69,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 	//
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		logrus.Errorf("failed to find repository for canvas %s: %v", canvas.ID, err)
-		return nil, status.Errorf(codes.Internal, "failed to find repository for canvas %s", canvas.ID)
+		return nil, grpcerrors.Internal(err, "failed to find repository for canvas")
 	}
 
 	//
@@ -78,7 +77,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 	// and let the repository provisioner worker handle the rest.
 	// This is a trick to provision repositories for existing canvases lazily.
 	//
-	err = canvas.CreatePendingRepository(gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
+	_, err = canvas.CreatePendingRepository(gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
 	}))
@@ -88,7 +87,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 	//
 	if err != nil {
 		logrus.Errorf("failed to create pending repository for canvas %s: %v", canvas.ID, err)
-		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "repository not found")
 	}
 
 	return &pb.GetCanvasRepositoryResponse{

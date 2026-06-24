@@ -119,12 +119,20 @@ func TestDefaultParamValues(t *testing.T) {
 		{Name: "repo", Default: "default-repo"},
 		{Name: "region", Placeholder: "us-east-1"},
 		{Name: "bare"},
+		// secret_picker without a default resolves to empty instead of the
+		// placeholder/param-name fallback, which are not real secret names.
+		{Name: "secret_placeholder", Type: ParamTypeSecretPicker, Placeholder: "my-secret"},
+		{Name: "secret_bare", Type: ParamTypeSecretPicker},
+		{Name: "secret_defaulted", Type: ParamTypeSecretPicker, Default: "prod-secret"},
 	}
 
 	defaults := DefaultParamValues(schema)
 	assert.Equal(t, "default-repo", defaults["repo"])
 	assert.Equal(t, "us-east-1", defaults["region"])
 	assert.Equal(t, "bare", defaults["bare"])
+	assert.Equal(t, "", defaults["secret_placeholder"])
+	assert.Equal(t, "", defaults["secret_bare"])
+	assert.Equal(t, "prod-secret", defaults["secret_defaulted"])
 }
 
 func TestFetchParams(t *testing.T) {

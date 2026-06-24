@@ -118,13 +118,8 @@ vi.mock("./SettingsTab", () => ({
 }));
 
 vi.mock("./pages", () => ({
-  ExecutionChainPage: () => <div data-testid="execution-chain-page" />,
   HistoryQueuePage: () => <div data-testid="history-queue-page" />,
   PageHeader: () => <div data-testid="page-header" />,
-}));
-
-vi.mock("@/pages/app/utils", () => ({
-  mapTriggerEventToSidebarEvent: vi.fn(),
 }));
 
 import { ComponentSidebar } from "./index";
@@ -144,8 +139,6 @@ function defaultSidebarProps(
     nodeConfiguration: {},
     nodeConfigurationFields: [],
     workflowNodes: [],
-    actions: [],
-    triggers: [],
     ...props,
   };
 }

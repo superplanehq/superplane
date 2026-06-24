@@ -45,7 +45,6 @@ func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
 		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "read"},
 		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPatch, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/files"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/discard"}, action: "update_version"},

@@ -136,7 +136,13 @@ CREATE TABLE public.agent_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     heartbeat_at timestamp with time zone,
     agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
-    context_replayed_at timestamp with time zone
+    context_replayed_at timestamp with time zone,
+    tracked_usage_input_tokens bigint DEFAULT 0 NOT NULL,
+    tracked_usage_output_tokens bigint DEFAULT 0 NOT NULL,
+    tracked_usage_cache_read_tokens bigint DEFAULT 0 NOT NULL,
+    tracked_usage_cache_write_tokens bigint DEFAULT 0 NOT NULL,
+    tracked_usage_total_tokens bigint DEFAULT 0 NOT NULL,
+    tracked_usage_initialized boolean DEFAULT true NOT NULL
 );
 
 
@@ -401,6 +407,19 @@ CREATE TABLE public.repositories (
     status character varying(64) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: repository_seed_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repository_seed_files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    repository_id uuid NOT NULL,
+    path text NOT NULL,
+    content bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -941,6 +960,22 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: repository_seed_files repository_seed_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repository_seed_files repository_seed_files_repository_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_repository_id_path_key UNIQUE (repository_id, path);
+
+
+--
 -- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1308,6 +1343,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
+
+
+--
+-- Name: idx_repository_seed_files_repository_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_files USING btree (repository_id);
 
 
 --
@@ -1739,6 +1781,14 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: repository_seed_files repository_seed_files_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_seed_files
+    ADD CONSTRAINT repository_seed_files_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id) ON DELETE CASCADE;
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2018,7 +2068,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260618203501	f
+20260624035629	f
 \.
 
 

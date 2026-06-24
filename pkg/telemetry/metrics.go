@@ -18,31 +18,44 @@ var (
 	metricsReady atomic.Bool
 
 	queueWorkerTickHistogram         metric.Float64Histogram
-	queueWorkerNodesCountHistogram   metric.Int64Histogram
+	queueWorkerNodesCountGauge       metric.Int64Gauge
 	queueWorkerNodesCounter          metric.Int64Counter
 	queueWorkerNodeDurationHistogram metric.Float64Histogram
 	queueWorkerStuckItems            metric.Int64Histogram
 
 	executorWorkerTickHistogram              metric.Float64Histogram
-	executorWorkerNodesCountHistogram        metric.Int64Histogram
+	executorWorkerNodesCountGauge            metric.Int64Gauge
 	executorWorkerExecutionsCounter          metric.Int64Counter
 	executorWorkerExecutionDurationHistogram metric.Float64Histogram
 
 	eventWorkerTickHistogram          metric.Float64Histogram
-	eventWorkerEventsCountHistogram   metric.Int64Histogram
+	eventWorkerEventsCountGauge       metric.Int64Gauge
 	eventWorkerEventsCounter          metric.Int64Counter
 	eventWorkerEventDurationHistogram metric.Float64Histogram
 
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
 
+	webhookProvisionerWorkerTickHistogram            metric.Float64Histogram
+	webhookProvisionerWorkerWebhooksCountGauge       metric.Int64Gauge
+	webhookProvisionerWorkerWebhooksCounter          metric.Int64Counter
+	webhookProvisionerWorkerWebhookDurationHistogram metric.Float64Histogram
+
+	webhookCleanupWorkerTickHistogram            metric.Float64Histogram
+	webhookCleanupWorkerWebhooksCountHistogram   metric.Int64Histogram
+	webhookCleanupWorkerWebhooksCounter          metric.Int64Counter
+	webhookCleanupWorkerWebhookDurationHistogram metric.Float64Histogram
+
 	workflowCleanupWorkerTickHistogram          metric.Float64Histogram
 	workflowCleanupWorkerCanvasesCountHistogram metric.Int64Histogram
 
 	runFinalizerTickHistogram        metric.Float64Histogram
-	runFinalizerRunsCountHistogram   metric.Int64Histogram
+	runFinalizerRunsCountGauge       metric.Int64Gauge
 	runFinalizerRunsCounter          metric.Int64Counter
 	runFinalizerRunDurationHistogram metric.Float64Histogram
+
+	emailWorkerEmailsCounter        metric.Int64Counter
+	emailWorkerEmailDurationSeconds metric.Float64Histogram
 
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
@@ -121,9 +134,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	queueWorkerNodesCountHistogram, err = meter.Int64Histogram(
+	queueWorkerNodesCountGauge, err = meter.Int64Gauge(
 		"queue_worker.tick.nodes.ready",
-		metric.WithDescription("Number of workflow nodes ready to be processed each tick"),
+		metric.WithDescription("Number of workflow nodes ready to be processed on the last queue worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -157,9 +170,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	executorWorkerNodesCountHistogram, err = meter.Int64Histogram(
+	executorWorkerNodesCountGauge, err = meter.Int64Gauge(
 		"executor_worker.tick.nodes.pending",
-		metric.WithDescription("Number of pending workflow node executions each tick"),
+		metric.WithDescription("Number of pending workflow node executions on the last executor worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -193,9 +206,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	eventWorkerEventsCountHistogram, err = meter.Int64Histogram(
+	eventWorkerEventsCountGauge, err = meter.Int64Gauge(
 		"event_worker.tick.events.pending",
-		metric.WithDescription("Number of pending workflow events each tick"),
+		metric.WithDescription("Number of pending workflow events on the last event worker tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -238,6 +251,78 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	webhookProvisionerWorkerTickHistogram, err = meter.Float64Histogram(
+		"webhook_provisioner_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each WebhookProvisioner tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookProvisionerWorkerWebhooksCountGauge, err = meter.Int64Gauge(
+		"webhook_provisioner_worker.tick.webhooks.pending",
+		metric.WithDescription("Number of pending webhooks on the last webhook provisioner tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookProvisionerWorkerWebhooksCounter, err = meter.Int64Counter(
+		"webhook_provisioner_worker.webhooks.total",
+		metric.WithDescription("WebhookProvisioner webhook processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookProvisionerWorkerWebhookDurationHistogram, err = meter.Float64Histogram(
+		"webhook_provisioner_worker.webhook.duration.seconds",
+		metric.WithDescription("Duration of WebhookProvisioner webhook processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookCleanupWorkerTickHistogram, err = meter.Float64Histogram(
+		"webhook_cleanup_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each WebhookCleanupWorker tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookCleanupWorkerWebhooksCountHistogram, err = meter.Int64Histogram(
+		"webhook_cleanup_worker.tick.webhooks.pending",
+		metric.WithDescription("Number of deleted webhooks awaiting cleanup each tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookCleanupWorkerWebhooksCounter, err = meter.Int64Counter(
+		"webhook_cleanup_worker.webhooks.total",
+		metric.WithDescription("WebhookCleanupWorker webhook processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	webhookCleanupWorkerWebhookDurationHistogram, err = meter.Float64Histogram(
+		"webhook_cleanup_worker.webhook.duration.seconds",
+		metric.WithDescription("Duration of WebhookCleanupWorker webhook processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
 	workflowCleanupWorkerTickHistogram, err = meter.Float64Histogram(
 		"workflow_cleanup_worker.tick.duration.seconds",
 		metric.WithDescription("Duration of each WorkflowCleanupWorker tick"),
@@ -265,9 +350,9 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
-	runFinalizerRunsCountHistogram, err = meter.Int64Histogram(
+	runFinalizerRunsCountGauge, err = meter.Int64Gauge(
 		"run_finalizer.tick.runs.started",
-		metric.WithDescription("Number of started workflow runs processed each sweep tick"),
+		metric.WithDescription("Number of started workflow runs on the last run finalizer sweep tick"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -286,6 +371,24 @@ func InitMetrics(ctx context.Context) error {
 	runFinalizerRunDurationHistogram, err = meter.Float64Histogram(
 		"run_finalizer.run.duration.seconds",
 		metric.WithDescription("Duration of RunFinalizer run processing"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	emailWorkerEmailsCounter, err = meter.Int64Counter(
+		"email_worker.emails.total",
+		metric.WithDescription("Email worker processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	emailWorkerEmailDurationSeconds, err = meter.Float64Histogram(
+		"email_worker.email.duration.seconds",
+		metric.WithDescription("Duration of email worker processing"),
 		metric.WithUnit("s"),
 	)
 	if err != nil {
@@ -439,7 +542,7 @@ func RecordQueueWorkerNodesCount(ctx context.Context, count int) {
 		return
 	}
 
-	queueWorkerNodesCountHistogram.Record(ctx, int64(count))
+	queueWorkerNodesCountGauge.Record(ctx, int64(count))
 }
 
 func RecordQueueWorkerNodeProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
@@ -475,7 +578,7 @@ func RecordExecutorWorkerNodesCount(ctx context.Context, count int) {
 		return
 	}
 
-	executorWorkerNodesCountHistogram.Record(ctx, int64(count))
+	executorWorkerNodesCountGauge.Record(ctx, int64(count))
 }
 
 func RecordExecutorWorkerExecution(ctx context.Context, d time.Duration, outcome, reason, component string) {
@@ -513,7 +616,7 @@ func RecordEventWorkerEventsCount(ctx context.Context, count int) {
 		return
 	}
 
-	eventWorkerEventsCountHistogram.Record(ctx, int64(count))
+	eventWorkerEventsCountGauge.Record(ctx, int64(count))
 }
 
 func RecordEventWorkerEventProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
@@ -552,6 +655,80 @@ func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
 	nodeRequestWorkerRequestsCountHistogram.Record(ctx, int64(count))
 }
 
+func RecordWebhookProvisionerWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	webhookProvisionerWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordWebhookProvisionerWorkerWebhooksCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	webhookProvisionerWorkerWebhooksCountGauge.Record(ctx, int64(count))
+}
+
+func RecordWebhookProvisionerWorkerWebhookProcessing(ctx context.Context, d time.Duration, outcome, reason, appName string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+		attribute.String("app_name", appName),
+	)
+
+	webhookProvisionerWorkerWebhooksCounter.Add(ctx, 1, attrs)
+	webhookProvisionerWorkerWebhookDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+			attribute.String("app_name", appName),
+		),
+	)
+}
+
+func RecordWebhookCleanupWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	webhookCleanupWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordWebhookCleanupWorkerWebhooksCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	webhookCleanupWorkerWebhooksCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordWebhookCleanupWorkerWebhookProcessing(ctx context.Context, d time.Duration, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	webhookCleanupWorkerWebhooksCounter.Add(ctx, 1, attrs)
+	webhookCleanupWorkerWebhookDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
 func RecordWorkflowCleanupWorkerTickDuration(ctx context.Context, d time.Duration) {
 	if !metricsReady.Load() {
 		return
@@ -581,7 +758,7 @@ func RecordRunFinalizerRunsCount(ctx context.Context, count int) {
 		return
 	}
 
-	runFinalizerRunsCountHistogram.Record(ctx, int64(count))
+	runFinalizerRunsCountGauge.Record(ctx, int64(count))
 }
 
 func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigger, outcome, reason string) {
@@ -601,6 +778,28 @@ func RecordRunFinalizerRunProcessing(ctx context.Context, d time.Duration, trigg
 		d.Seconds(),
 		metric.WithAttributes(
 			attribute.String("trigger", trigger),
+			attribute.String("outcome", outcome),
+		),
+	)
+}
+
+func RecordEmailWorkerEmailProcessing(ctx context.Context, d time.Duration, emailType, outcome, reason string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("email_type", emailType),
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	emailWorkerEmailsCounter.Add(ctx, 1, attrs)
+	emailWorkerEmailDurationSeconds.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("email_type", emailType),
 			attribute.String("outcome", outcome),
 		),
 	)

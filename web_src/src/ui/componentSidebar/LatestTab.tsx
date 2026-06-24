@@ -6,9 +6,8 @@ import { CompactSidebarEventRow } from "./CompactSidebarEventRow";
 import { SidebarEventItem } from "./SidebarEventItem";
 import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
-import type { ActionsAction, SuperplaneComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
-import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
 
 interface LatestTabProps {
   latestEvents: SidebarEvent[];
@@ -20,23 +19,14 @@ interface LatestTabProps {
   onEventClick?: (event: SidebarEvent) => void;
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
-  onSeeExecutionChain?: (eventId: string, triggerEvent?: SidebarEvent, selectedExecutionId?: string) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<unknown[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
-  workflowNodes?: SuperplaneComponentsNode[];
-  actions?: ActionsAction[];
   compact?: boolean;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
@@ -61,14 +51,11 @@ export const LatestTab = ({
   onEventClick,
   onSeeFullHistory,
   onSeeQueue,
-  onSeeExecutionChain,
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
-  loadExecutionChain,
   getExecutionState,
-  workflowNodes,
   compact = false,
   resolveRunId,
   fetchRunId,
@@ -95,24 +82,6 @@ export const LatestTab = ({
 
   const handleSeeFullHistory = () => {
     onSeeFullHistory?.();
-  };
-
-  const handleTriggerNavigate = (event: SidebarEvent) => {
-    if (event.kind === "trigger") {
-      const eventId = event.triggerEventId || event.id;
-      onSeeExecutionChain?.(eventId, event);
-    } else if (event.kind === "execution") {
-      const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
-
-      const rootEventId = event.originalExecution?.rootEvent?.id;
-      if (rootEventId && node && event.originalExecution?.rootEvent && onSeeExecutionChain) {
-        const triggerEvent = mapTriggerEventToSidebarEvent(event.originalExecution?.rootEvent, node);
-        onSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-      } else {
-        const eventId = event.triggerEventId || event.id;
-        onSeeExecutionChain?.(eventId, event, event.executionId);
-      }
-    }
   };
 
   if (compact) {
@@ -211,11 +180,9 @@ export const LatestTab = ({
                     isOpen={false}
                     onToggleOpen={onToggleOpen}
                     onEventClick={onEventClick}
-                    onTriggerNavigate={handleTriggerNavigate}
                     tabData={getTabData?.(event)}
                     onCancelExecution={onCancelExecution}
                     onReEmit={onReEmit}
-                    loadExecutionChain={loadExecutionChain}
                     getExecutionState={getExecutionState}
                   />
                 );
@@ -253,11 +220,9 @@ export const LatestTab = ({
                       isOpen={openEventIds.has(event.id) || event.isOpen}
                       onToggleOpen={onToggleOpen}
                       onEventClick={onEventClick}
-                      onTriggerNavigate={handleTriggerNavigate}
                       tabData={getTabData?.(event)}
                       onCancelQueueItem={onCancelQueueItem}
                       onReEmit={onReEmit}
-                      loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}
                     />
                   );

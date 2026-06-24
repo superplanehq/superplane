@@ -127,7 +127,7 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		startEmailConsumers(rabbitMQURL, encryptor, baseURL, authService)
+		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -259,7 +259,12 @@ func startWorkers(
 			AuthService:       authService,
 			UsageService:      getOptionalWorkerUsageService(),
 		})
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agentToolRegistry)
+		w := workers.NewAgentStreamWorkerWithUsageService(
+			agentProvider,
+			rabbitMQURL,
+			getOptionalWorkerUsageService(),
+			agentToolRegistry,
+		)
 		go w.Start(context.Background())
 	}
 
@@ -281,7 +286,7 @@ func startWorkers(
 
 }
 
-func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
+func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
 	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
 		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
 		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
@@ -294,18 +299,10 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
+	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string, authService authorization.Authorization) {
-	log.Println("Starting Invitation Email Consumer")
-	invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go invitationEmailConsumer.Start()
-
-	log.Println("Starting Notification Email Consumer")
-	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
-	go notificationEmailConsumer.Start()
-
+func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()

@@ -880,7 +880,7 @@ export const ensureDraftVersionExists = async (
   return branches.some((branch) => draftVersionId(branch) === versionId);
 };
 
-export const useCreateDraftBranch = (organizationId: string, canvasId: string) => {
+export const useCreateDraftBranch = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -893,7 +893,9 @@ export const useCreateDraftBranch = (organizationId: string, canvasId: string) =
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      // Creating a draft does not change the live canvas, so we intentionally do
+      // not invalidate canvasKeys.detail here — doing so would trigger a
+      // DescribeCanvas refetch while entering/staying in edit mode.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
@@ -1958,7 +1960,7 @@ export const useStageCanvasSpecFiles = (canvasId: string, versionId: string) => 
 
 // useCommitCanvasStaging parses staged spec files into the draft version row and
 // clears staging.
-export const useCommitCanvasStaging = (organizationId: string, canvasId: string, versionId: string) => {
+export const useCommitCanvasStaging = (canvasId: string, versionId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
@@ -1972,7 +1974,9 @@ export const useCommitCanvasStaging = (organizationId: string, canvasId: string,
     },
     onSuccess: () => {
       queryClient.setQueryData(canvasKeys.versionStaging(canvasId, versionId), { hasStaging: false, stagedPaths: [] });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      // Committing staged edits only changes the draft version, not the live
+      // canvas, so we skip invalidating canvasKeys.detail to avoid a
+      // DescribeCanvas refetch while staying in edit mode.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
@@ -1985,7 +1989,7 @@ export const useCommitCanvasStaging = (organizationId: string, canvasId: string,
 
 // useDiscardCanvasStaging deletes staging rows for a draft version. Pass paths
 // to revert specific files; omit to discard everything.
-export const useDiscardCanvasStaging = (organizationId: string, canvasId: string, versionId: string) => {
+export const useDiscardCanvasStaging = (canvasId: string, versionId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (paths?: string[]) => {
@@ -2003,7 +2007,8 @@ export const useDiscardCanvasStaging = (organizationId: string, canvasId: string
         canvasKeys.versionStaging(canvasId, versionId),
         stagingSummary ?? { hasStaging: false, stagedPaths: [] },
       );
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      // Discarding staging reverts draft files but stays in the draft, so the
+      // live canvas is unchanged; skip canvasKeys.detail to avoid DescribeCanvas.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });

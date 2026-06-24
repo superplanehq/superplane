@@ -112,6 +112,8 @@ export interface NodePanelContent {
   title?: string;
   /** Canvas node id or name. Required. */
   node: string;
+  /** Optional override for the displayed node name. Falls back to the resolved canvas node name. */
+  label?: string;
   /** When true and the viewer has run permission, render a manual-run button. */
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
@@ -327,6 +329,9 @@ function validateNodeContent(content: unknown): string | null {
   }
   if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
     return "content.title must be a string.";
+  }
+  if (obj.label !== undefined && obj.label !== null && typeof obj.label !== "string") {
+    return "content.label must be a string.";
   }
   if (obj.showRun !== undefined && typeof obj.showRun !== "boolean") {
     return "content.showRun must be a boolean.";

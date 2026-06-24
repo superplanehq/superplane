@@ -2,12 +2,10 @@ package canvasfolders
 
 import (
 	"context"
-
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func UpdateCanvasFolderPosition(
@@ -18,16 +16,16 @@ func UpdateCanvasFolderPosition(
 ) (*pb.UpdateCanvasFolderPositionResponse, error) {
 	organizationUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
 	folderID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas folder id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas folder id")
 	}
 
 	if direction == pb.UpdateCanvasFolderPositionRequest_DIRECTION_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "canvas folder move direction is required")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas folder move direction is required")
 	}
 
 	folders, err := models.MoveCanvasFolder(organizationUUID, folderID, direction.String())

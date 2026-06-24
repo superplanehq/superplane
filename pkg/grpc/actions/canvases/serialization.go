@@ -3,21 +3,19 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"strings"
 )
 
 func SerializeCanvas(
@@ -57,15 +55,15 @@ func SerializeCanvas(
 
 func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {
 	if canvas.Metadata == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "canvas metadata is required")
 	}
 
 	if canvas.Metadata.Name == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas name is required")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 
 	if canvas.Spec == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas spec is required")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "canvas spec is required")
 	}
 
 	// Allow empty canvases
@@ -79,15 +77,15 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	for i, node := range canvas.Spec.Nodes {
 		if node.Id == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("node %d: id is required", i))
 		}
 
 		if node.Name == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: name is required", node.Id)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("node %s: name is required", node.Id))
 		}
 
 		if nodeIDs[node.Id] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("node %s: duplicate node id", node.Id))
 		}
 
 		nodeIDs[node.Id] = true
@@ -120,7 +118,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: source_id and target_id are required", i))
 		}
 
 		if edge.Channel == "" {
@@ -128,19 +126,19 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 
 		if !nodeIDs[edge.SourceId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: source node %s not found", i, edge.SourceId))
 		}
 
 		if !nodeIDs[edge.TargetId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: target node %s not found", i, edge.TargetId))
 		}
 
 		if nodeTypeByID[edge.SourceId] == componentpb.Node_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: widget nodes cannot be used as source nodes", i))
 		}
 
 		if nodeTypeByID[edge.TargetId] == componentpb.Node_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: widget nodes cannot be used as target nodes", i))
 		}
 
 		if err := changesets.ValidateSourceNodeOutputChannel(
@@ -148,7 +146,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			nodesByID[edge.SourceId],
 			edge.Channel,
 		); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: %v", i, err)
+			return nil, nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("edge %d: %v", i, err))
 		}
 	}
 
@@ -172,7 +170,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	// Check for cycles in the canvas
 	//
 	if err := changesets.CheckForCycles(nodes, edges); err != nil {
-		return nil, nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, nil, grpcerrors.InvalidArgument(err, "invalid canvas graph")
 	}
 
 	return nodes, edges, nil

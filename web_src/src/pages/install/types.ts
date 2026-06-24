@@ -6,7 +6,7 @@ export interface OrganizationOption {
 export interface InstallParam {
   name: string;
   label: string;
-  type: string; // "string" or "integration-resource"
+  type: string; // "string", "integration-resource", or "secret_picker"
   placeholder?: string;
   description?: string;
   default?: string;
@@ -14,6 +14,7 @@ export interface InstallParam {
   // For type "integration-resource"
   integration?: string; // integration type name (e.g. "digitalocean")
   resourceType?: string; // resource type (e.g. "region", "size", "image")
+  useNameAsValue?: boolean; // when true, substitute the resource name instead of the ID
 }
 
 export interface InstallPreview {

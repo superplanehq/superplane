@@ -7,10 +7,9 @@ import (
 
 	"github.com/google/uuid"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -38,11 +37,11 @@ func agentModeFromProto(mode pb.AgentMode) string {
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
 	org, err = uuid.Parse(orgID)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, status.Error(codes.Internal, "invalid organization")
+		return uuid.Nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid organization")
 	}
 	user, err = uuid.Parse(userID)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, status.Error(codes.Internal, "invalid user")
+		return uuid.Nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid user")
 	}
 	return org, user, nil
 }
@@ -50,9 +49,9 @@ func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
 func ensureCanvas(orgID, canvasID uuid.UUID) error {
 	if _, err := models.FindCanvas(orgID, canvasID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return status.Error(codes.NotFound, "canvas not found")
+			return grpcerrors.NotFound(err, "canvas not found")
 		}
-		return status.Error(codes.Internal, "failed to load canvas")
+		return grpcerrors.Internal(err, "failed to load canvas")
 	}
 	return nil
 }

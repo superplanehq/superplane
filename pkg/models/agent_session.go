@@ -18,26 +18,45 @@ const (
 )
 
 type AgentSession struct {
-	ID                      uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	OrganizationID          uuid.UUID
-	UserID                  uuid.UUID
-	CanvasID                uuid.UUID
-	Provider                string
-	ProviderSessionID       string
-	AgentToolSchemaRevision string
-	Status                  string
-	LastActiveAt            *time.Time
-	HeartbeatAt             *time.Time
-	ContextReplayedAt       *time.Time
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
+	ID                           uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	OrganizationID               uuid.UUID
+	UserID                       uuid.UUID
+	CanvasID                     uuid.UUID
+	Provider                     string
+	ProviderSessionID            string
+	AgentToolSchemaRevision      string
+	TrackedUsageInputTokens      int64
+	TrackedUsageOutputTokens     int64
+	TrackedUsageCacheReadTokens  int64
+	TrackedUsageCacheWriteTokens int64
+	TrackedUsageTotalTokens      int64
+	TrackedUsageInitialized      bool `gorm:"default:true"`
+	Status                       string
+	LastActiveAt                 *time.Time
+	HeartbeatAt                  *time.Time
+	ContextReplayedAt            *time.Time
+	CreatedAt                    *time.Time
+	UpdatedAt                    *time.Time
 }
 
 func (AgentSession) TableName() string { return "agent_sessions" }
 
 var ErrAgentSessionNotFound = errors.New("agent session not found")
 
+type AgentSessionTokenUsage struct {
+	InputTokens      int64
+	OutputTokens     int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+	TotalTokens      int64
+}
+
+func (u AgentSessionTokenUsage) HasUsage() bool {
+	return u.TotalTokens > 0
+}
+
 func CreateAgentSessionInTransaction(tx *gorm.DB, session *AgentSession) error {
+	session.TrackedUsageInitialized = true
 	return tx.Create(session).Error
 }
 
@@ -168,13 +187,19 @@ func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.
 	return tx.Model(&AgentSession{}).
 		Where("id = ?", sessionID).
 		Updates(map[string]any{
-			"provider_session_id":        providerSessionID,
-			"agent_tool_schema_revision": toolSchemaRevision,
-			"status":                     status,
-			"last_active_at":             &now,
-			"updated_at":                 &now,
-			"heartbeat_at":               gorm.Expr("NULL"),
-			"context_replayed_at":        gorm.Expr("NULL"),
+			"provider_session_id":              providerSessionID,
+			"agent_tool_schema_revision":       toolSchemaRevision,
+			"tracked_usage_input_tokens":       0,
+			"tracked_usage_output_tokens":      0,
+			"tracked_usage_cache_read_tokens":  0,
+			"tracked_usage_cache_write_tokens": 0,
+			"tracked_usage_total_tokens":       0,
+			"tracked_usage_initialized":        true,
+			"status":                           status,
+			"last_active_at":                   &now,
+			"updated_at":                       &now,
+			"heartbeat_at":                     gorm.Expr("NULL"),
+			"context_replayed_at":              gorm.Expr("NULL"),
 		}).Error
 }
 
@@ -227,6 +252,38 @@ func LockAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) (*AgentSess
 	return &session, nil
 }
 
+func CalculateAgentSessionTokenUsageDelta(sessionID uuid.UUID, usage AgentSessionTokenUsage) (AgentSessionTokenUsage, bool, error) {
+	session, err := FindAgentSession(sessionID)
+	if err != nil {
+		return AgentSessionTokenUsage{}, false, err
+	}
+	if !session.TrackedUsageInitialized {
+		return AgentSessionTokenUsage{}, false, nil
+	}
+
+	return agentSessionTokenUsageDelta(session, usage), true, nil
+}
+
+func MarkAgentSessionTokenUsageTracked(sessionID uuid.UUID, usage AgentSessionTokenUsage) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		session, err := LockAgentSessionInTransaction(tx, sessionID)
+		if err != nil {
+			return err
+		}
+
+		return tx.Model(&AgentSession{}).
+			Where("id = ?", sessionID).
+			Updates(map[string]any{
+				"tracked_usage_input_tokens":       maxInt64(session.TrackedUsageInputTokens, usage.InputTokens),
+				"tracked_usage_output_tokens":      maxInt64(session.TrackedUsageOutputTokens, usage.OutputTokens),
+				"tracked_usage_cache_read_tokens":  maxInt64(session.TrackedUsageCacheReadTokens, usage.CacheReadTokens),
+				"tracked_usage_cache_write_tokens": maxInt64(session.TrackedUsageCacheWriteTokens, usage.CacheWriteTokens),
+				"tracked_usage_total_tokens":       maxInt64(session.TrackedUsageTotalTokens, usage.TotalTokens),
+				"tracked_usage_initialized":        true,
+			}).Error
+	})
+}
+
 // FailStuckStreamingSessions flags leaked streaming rows. Heartbeated rows
 // use heartbeatCutoff (tight); rows with no heartbeat yet — pre-heartbeat
 // binaries, or new turns before the worker's first tick — fall back to
@@ -260,4 +317,35 @@ func FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff time.Time) ([]Agen
 		return nil, err
 	}
 	return stuck, nil
+}
+
+func agentSessionTokenUsageDelta(session *AgentSession, usage AgentSessionTokenUsage) AgentSessionTokenUsage {
+	delta := AgentSessionTokenUsage{
+		InputTokens:      nonNegativeDelta(usage.InputTokens, session.TrackedUsageInputTokens),
+		OutputTokens:     nonNegativeDelta(usage.OutputTokens, session.TrackedUsageOutputTokens),
+		CacheReadTokens:  nonNegativeDelta(usage.CacheReadTokens, session.TrackedUsageCacheReadTokens),
+		CacheWriteTokens: nonNegativeDelta(usage.CacheWriteTokens, session.TrackedUsageCacheWriteTokens),
+		TotalTokens:      nonNegativeDelta(usage.TotalTokens, session.TrackedUsageTotalTokens),
+	}
+	if delta.TotalTokens == 0 {
+		delta.TotalTokens = delta.InputTokens + delta.OutputTokens + delta.CacheReadTokens + delta.CacheWriteTokens
+	}
+
+	return delta
+}
+
+func nonNegativeDelta(current, tracked int64) int64 {
+	if current <= tracked {
+		return 0
+	}
+
+	return current - tracked
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+
+	return b
 }

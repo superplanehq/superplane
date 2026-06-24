@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -26,7 +26,7 @@ func updateConsoleFromProto(
 ) (*models.CanvasVersion, error) {
 	modelPanels, err := deserializeConsolePanels(panels)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		return nil, grpcerrors.InvalidArgument(err, err.Error())
 	}
 	modelLayout := deserializeConsoleLayout(layout)
 	return UpdateConsole(ctx, organizationID, canvasID, versionID, modelPanels, modelLayout, false)
@@ -39,23 +39,23 @@ func Test__UpdateConsole(t *testing.T) {
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, "not-a-uuid", uuid.New().String(), "", nil, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, "bad", "", nil, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, uuid.New().String(), "", nil, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("panel content must be an object", func(t *testing.T) {
@@ -65,9 +65,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err = updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "x", Type: "markdown", Content: strVal},
 		}, []*pb.Console_LayoutItem{{I: "x", X: 0, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: panel id required", func(t *testing.T) {
@@ -75,9 +75,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "", Type: "markdown"},
 		}, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: panel type required", func(t *testing.T) {
@@ -85,9 +85,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: ""},
 		}, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: duplicate panel id", func(t *testing.T) {
@@ -96,9 +96,9 @@ func Test__UpdateConsole(t *testing.T) {
 			{Id: "dup", Type: "markdown"},
 			{Id: "dup", Type: "markdown"},
 		}, nil)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: layout i required", func(t *testing.T) {
@@ -106,9 +106,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "", X: 0, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: duplicate layout id", func(t *testing.T) {
@@ -119,9 +119,9 @@ func Test__UpdateConsole(t *testing.T) {
 			{I: "p", X: 0, Y: 0, W: 1, H: 1},
 			{I: "p", X: 1, Y: 0, W: 1, H: 1},
 		})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: layout references unknown panel", func(t *testing.T) {
@@ -129,9 +129,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "other", X: 0, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: layout w/h must be positive", func(t *testing.T) {
@@ -139,9 +139,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 0, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: layout x/y must be non-negative", func(t *testing.T) {
@@ -149,9 +149,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.Console_LayoutItem{{I: "p", X: -1, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: too many panels", func(t *testing.T) {
@@ -164,9 +164,9 @@ func Test__UpdateConsole(t *testing.T) {
 			layout = append(layout, &pb.Console_LayoutItem{I: id, X: int32(i), Y: 0, W: 1, H: 1})
 		}
 		_, err := updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", panels, layout)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("validation: panels payload too large", func(t *testing.T) {
@@ -177,9 +177,9 @@ func Test__UpdateConsole(t *testing.T) {
 		_, err = updateConsoleFromProto(ctx, orgID, canvas.ID.String(), "", []*pb.Console_Panel{
 			{Id: "p", Type: "markdown", Content: content},
 		}, []*pb.Console_LayoutItem{{I: "p", X: 0, Y: 0, W: 1, H: 1}})
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("persists and returns console", func(t *testing.T) {

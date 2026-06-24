@@ -8,14 +8,7 @@ import type {
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import {
-  findNode,
-  getRunRootEventForDisplay,
-  getStatusBadgeProps,
-  resolveNodeIconSlug,
-} from "@/pages/app/lib/canvas-runs";
-import { buildTriggerSidebarEvent } from "./utils";
+import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/app/lib/canvas-runs";
 
 function NodeIcon({
   node,
@@ -66,30 +59,20 @@ function ErrorItemRow({
     run: CanvasesCanvasRun;
     rootEventId: string;
     node: ComponentsNode | undefined;
-    triggerNode: ComponentsNode | undefined;
   };
   componentIconMap: Record<string, string>;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }) {
   const nodeName = item.node?.name || item.execution.nodeId || "Unknown";
   const { badgeColor, label } = getStatusBadgeProps("error");
-  const rootEvent = getRunRootEventForDisplay(item.run);
-  const triggerSidebarEvent = rootEvent ? buildTriggerSidebarEvent(rootEvent, item.triggerNode) : undefined;
 
   const handleSelect = () => {
-    if (onExecutionSelect && item.execution.id && item.rootEventId && item.execution.nodeId) {
+    if (onExecutionSelect && item.run.id && item.execution.nodeId) {
       onExecutionSelect({
+        runId: item.run.id,
         nodeId: item.execution.nodeId,
-        eventId: item.rootEventId,
-        executionId: item.execution.id,
-        triggerEvent: triggerSidebarEvent,
       });
     } else if (onNodeSelect && item.execution.nodeId) {
       onNodeSelect(item.execution.nodeId);
@@ -152,12 +135,7 @@ export function ErrorsConsoleContent({
   componentIconMap?: Record<string, string>;
   searchQuery: string;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }) {
   const errorItems = useMemo(() => {
@@ -167,14 +145,12 @@ export function ErrorsConsoleContent({
       run: CanvasesCanvasRun;
       rootEventId: string;
       node: ComponentsNode | undefined;
-      triggerNode: ComponentsNode | undefined;
     }[] = [];
 
     for (const run of runs) {
       const rootEventId = run.rootEvent?.id;
       if (!rootEventId) continue;
 
-      const triggerNode = nodes.find((n) => n.id === run.rootEvent?.nodeId);
       for (const exec of run.executions || []) {
         if (exec.result !== "RESULT_FAILED") continue;
         if (exec.resultReason === "RESULT_REASON_ERROR_RESOLVED") continue;
@@ -189,7 +165,7 @@ export function ErrorsConsoleContent({
           if (!searchable.includes(query)) continue;
         }
 
-        items.push({ execution: exec, run, rootEventId, node, triggerNode });
+        items.push({ execution: exec, run, rootEventId, node });
       }
     }
     return items;

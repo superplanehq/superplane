@@ -18,7 +18,6 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
-	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"

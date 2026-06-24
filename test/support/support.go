@@ -32,7 +32,6 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
-	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -512,7 +511,8 @@ func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string
 		CanvasID:       canvas.ID,
 	})
 
-	require.NoError(t, canvas.CreatePendingRepository(r.GitProvider.Name(), repoID))
+	_, err := canvas.CreatePendingRepository(r.GitProvider.Name(), repoID)
+	require.NoError(t, err)
 
 	if register {
 		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)

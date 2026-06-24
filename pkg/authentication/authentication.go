@@ -205,12 +205,6 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.acceptPendingInvitations(account)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	a.handleSuccessfulAuth(w, r, mockUser, wasCreated)
 }
 
@@ -244,55 +238,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.acceptPendingInvitations(account)
-	if err != nil {
-		log.Errorf("Error accepting pending invitations for %s: %v", gothUser.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	a.handleSuccessfulAuth(w, r, gothUser, wasCreated)
-}
-
-func (a *Handler) acceptPendingInvitations(account *models.Account) error {
-	invitations, err := account.FindPendingInvitations()
-	if err != nil {
-		log.Errorf("Error finding pending invitations for account %s: %v", account.Email, err)
-		return err
-	}
-
-	for _, invitation := range invitations {
-		err := a.acceptInvitation(invitation, account)
-		if err != nil {
-			log.Errorf("Error accepting invitation to %s for account %s: %v", invitation.OrganizationID, account.Email, err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
-		if err != nil {
-			return err
-		}
-
-		invitation.State = models.InvitationStateAccepted
-		invitation.UpdatedAt = time.Now()
-		err = tx.Save(&invitation).Error
-		if err != nil {
-			return err
-		}
-
-		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, wasCreated bool) {
@@ -390,14 +336,6 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Accept pending invitations
-	err = a.acceptPendingInvitations(account)
-	if err != nil {
-		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for password login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -482,12 +420,6 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit().Error; err != nil {
 		http.Error(w, "Failed to create account", http.StatusInternalServerError)
-		return
-	}
-
-	if err := a.acceptPendingInvitations(account); err != nil {
-		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -772,12 +704,6 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
-	if err := a.acceptPendingInvitations(account); err != nil {
-		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for magic code login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

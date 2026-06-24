@@ -2,14 +2,12 @@ package canvasfolders
 
 import (
 	"context"
-
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func UpdateCanvasFolder(
@@ -21,16 +19,16 @@ func UpdateCanvasFolder(
 ) (*pb.UpdateCanvasFolderResponse, error) {
 	organizationUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
 	folderID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas folder id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas folder id")
 	}
 
 	if folder == nil || folder.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas folder is required")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas folder is required")
 	}
 
 	updatedFolder, err := updateCanvasFolder(organizationUUID, folderID, folder, replaceMembership)
@@ -77,12 +75,12 @@ func parseCanvasFolderMembership(canvases []*pb.CanvasRef) ([]uuid.UUID, error) 
 	canvasIDs := make([]uuid.UUID, 0, len(canvases))
 	for _, canvas := range canvases {
 		if canvas == nil {
-			return nil, status.Error(codes.InvalidArgument, "canvas id is required")
+			return nil, grpcerrors.InvalidArgument(nil, "canvas id is required")
 		}
 
 		id, err := uuid.Parse(canvas.Id)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+			return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 		}
 
 		canvasIDs = append(canvasIDs, id)

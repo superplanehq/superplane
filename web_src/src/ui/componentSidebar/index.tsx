@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { cn, resolveIcon } from "@/lib/utils";
@@ -19,15 +18,12 @@ import type {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
-  ActionsAction,
-  TriggersTrigger,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
-import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
-import { mapTriggerEventToSidebarEvent } from "@/pages/app/utils";
+import { HistoryQueuePage, PageHeader } from "./pages";
 import { analytics } from "@/lib/analytics";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
@@ -109,14 +105,6 @@ interface ComponentSidebarProps {
   getHasMoreQueue?: () => boolean;
   getLoadingMoreQueue?: () => boolean;
 
-  // Execution chain lazy loading
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<any[]>;
-
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
@@ -161,20 +149,7 @@ interface ComponentSidebarProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   configurationSaveMode?: "manual" | "auto";
 
-  // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  actions?: ActionsAction[];
-  triggers?: TriggersTrigger[];
-
-  // Highlighting callback for execution chain nodes
-  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
-
-  // External request to open execution chain
-  executionChainEventId?: string | null;
-  executionChainExecutionId?: string | null;
-  executionChainTriggerEvent?: SidebarEvent | null;
-  executionChainRequestId?: number;
-  onExecutionChainHandled?: () => void;
   readOnly?: boolean;
   layout?: "sidebar" | "bottom";
   resolveRunId?: (event: SidebarEvent) => string | null;
@@ -209,7 +184,6 @@ export const ComponentSidebar = ({
   getAllQueueEvents,
   getHasMoreQueue,
   getLoadingMoreQueue,
-  loadExecutionChain,
   getExecutionState,
   showSettingsTab = false,
   hideRunsTab = false,
@@ -241,14 +215,6 @@ export const ComponentSidebar = ({
   componentPayloadLabel,
   componentDocumentationUrl,
   workflowNodes = [],
-  actions = [],
-  triggers = [],
-  onHighlightedNodesChange,
-  executionChainEventId,
-  executionChainExecutionId,
-  executionChainTriggerEvent,
-  executionChainRequestId,
-  onExecutionChainHandled,
   readOnly = false,
   layout = "sidebar",
   resolveRunId,
@@ -267,11 +233,7 @@ export const ComponentSidebar = ({
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
-  const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
-  const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
   const shouldShowRunsTab = !hideRunsTab && canvasMode === "live";
   const activeTab = useMemo(() => {
     if (shouldShowRunsTab || currentTab !== "latest") {
@@ -423,71 +385,23 @@ export const ComponentSidebar = ({
   }, []);
 
   const handleSeeQueue = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("queue");
     onSeeQueue?.();
-  }, [onSeeQueue, page]);
+  }, [onSeeQueue]);
 
   const handleSeeFullHistory = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue" | "execution-chain");
     setPage("history");
     onSeeFullHistory?.();
-  }, [onSeeFullHistory, page]);
+  }, [onSeeFullHistory]);
 
   const handleBackToOverview = useCallback(() => {
-    if (page === "execution-chain") {
-      // When coming back from execution chain, go to the previous page
-      setPage(previousPage !== "execution-chain" ? previousPage : "overview");
-      // Clear highlights when leaving execution chain
-      onHighlightedNodesChange?.(new Set());
-    } else {
-      setPage("overview");
-    }
-    setActiveExecutionChainEventId(null);
-    setActiveExecutionChainTriggerEvent(null);
-    setSelectedExecutionId(null);
-  }, [page, previousPage, onHighlightedNodesChange]);
+    setPage("overview");
+  }, []);
 
-  const handleSeeExecutionChain = useCallback(
-    (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
-      setPreviousPage(page as "overview" | "history" | "queue");
-      setActiveExecutionChainEventId(eventId);
-      setActiveExecutionChainTriggerEvent(triggerEvent || null);
-      setSelectedExecutionId(selectedExecId || null);
-      setPage("execution-chain");
-    },
-    [page],
-  );
-
-  useEffect(() => {
-    if (!executionChainEventId) {
-      return;
-    }
-
-    handleSeeExecutionChain(
-      executionChainEventId,
-      executionChainTriggerEvent || undefined,
-      executionChainExecutionId || undefined,
-    );
-  }, [
-    executionChainEventId,
-    executionChainExecutionId,
-    executionChainRequestId,
-    executionChainTriggerEvent,
-    handleSeeExecutionChain,
-  ]);
-
-  useEffect(() => {
-    if (page === "execution-chain") {
-      onExecutionChainHandled?.();
-    }
-  }, [page, onExecutionChainHandled]);
-
-  const listPage = page === "execution-chain" ? previousPage : page;
   const allEvents = React.useMemo(() => {
-    if (listPage === "overview") return [];
+    if (page === "overview") return [];
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getAllHistoryEvents?.() || [];
       case "queue":
@@ -495,12 +409,12 @@ export const ComponentSidebar = ({
       default:
         return [];
     }
-  }, [getAllHistoryEvents, getAllQueueEvents, listPage]);
+  }, [getAllHistoryEvents, getAllQueueEvents, page]);
 
   const hasMoreItems = React.useMemo(() => {
-    if (listPage === "overview") return false;
+    if (page === "overview") return false;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getHasMoreHistory?.() || false;
       case "queue":
@@ -508,12 +422,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getHasMoreHistory, getHasMoreQueue, listPage]);
+  }, [getHasMoreHistory, getHasMoreQueue, page]);
 
   const loadingMoreItems = React.useMemo(() => {
-    if (listPage === "overview") return false;
+    if (page === "overview") return false;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getLoadingMoreHistory?.() || false;
       case "queue":
@@ -521,12 +435,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getLoadingMoreHistory, getLoadingMoreQueue, listPage]);
+  }, [getLoadingMoreHistory, getLoadingMoreQueue, page]);
 
   const handleLoadMoreItems = React.useCallback(() => {
-    if (listPage === "overview") return;
+    if (page === "overview") return;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return onLoadMoreHistory?.();
       case "queue":
@@ -534,12 +448,12 @@ export const ComponentSidebar = ({
       default:
         return;
     }
-  }, [onLoadMoreHistory, onLoadMoreQueue, listPage]);
+  }, [onLoadMoreHistory, onLoadMoreQueue, page]);
 
   const showMoreCount = React.useMemo(() => {
-    if (listPage === "overview") return 0;
+    if (page === "overview") return 0;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return totalInHistoryCount - allEvents.length;
       case "queue":
@@ -547,21 +461,7 @@ export const ComponentSidebar = ({
       default:
         return 0;
     }
-  }, [allEvents, totalInHistoryCount, totalInQueueCount, listPage]);
-
-  // Clear highlights when sidebar closes or when leaving execution chain page
-  useEffect(() => {
-    if (!isOpen && onHighlightedNodesChange) {
-      onHighlightedNodesChange(new Set());
-    }
-  }, [isOpen, onHighlightedNodesChange]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      onHighlightedNodesChange?.(new Set());
-    };
-  }, [onHighlightedNodesChange]);
+  }, [allEvents, totalInHistoryCount, totalInQueueCount, page]);
 
   const isDetailView = page !== "overview";
   const appIconSrc = getHeaderIconSrc(blockName);
@@ -780,15 +680,11 @@ export const ComponentSidebar = ({
                     onEventClick={onEventClick}
                     onSeeFullHistory={handleSeeFullHistory}
                     onSeeQueue={handleSeeQueue}
-                    onSeeExecutionChain={handleSeeExecutionChain}
                     getTabData={getTabData}
                     onCancelQueueItem={onCancelQueueItem}
                     onCancelExecution={onCancelExecution}
                     onReEmit={onReEmit}
-                    loadExecutionChain={loadExecutionChain}
                     getExecutionState={getExecutionState}
-                    workflowNodes={workflowNodes}
-                    actions={actions}
                     compact={isBottomLayout}
                     resolveRunId={resolveRunId}
                     fetchRunId={fetchRunId}
@@ -855,93 +751,27 @@ export const ComponentSidebar = ({
           >
             {page !== "overview" && (
               <div className="flex flex-col flex-1 min-h-0 bg-white">
-                <PageHeader
-                  page={page as "history" | "queue" | "execution-chain"}
-                  onBackToOverview={handleBackToOverview}
-                  previousPage={previousPage}
+                <PageHeader onBackToOverview={handleBackToOverview} compact={isBottomLayout} />
+                <HistoryQueuePage
+                  page={page}
+                  events={allEvents}
+                  openEventIds={openEventIds}
+                  onToggleOpen={handleToggleOpen}
+                  onEventClick={onEventClick}
                   compact={isBottomLayout}
+                  resolveRunId={resolveRunId}
+                  fetchRunId={fetchRunId}
+                  onSelectRun={onSelectRun}
+                  onCancelQueueItem={onCancelQueueItem}
+                  getTabData={getTabData}
+                  onCancelExecution={onCancelExecution}
+                  onReEmit={onReEmit}
+                  getExecutionState={getExecutionState}
+                  hasMoreItems={hasMoreItems}
+                  loadingMoreItems={loadingMoreItems}
+                  showMoreCount={showMoreCount}
+                  onLoadMoreItems={handleLoadMoreItems}
                 />
-
-                <div className="relative flex-1 min-h-0 overflow-hidden">
-                  <div
-                    className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
-                      page === "execution-chain" ? "-translate-x-full" : "translate-x-0"
-                    } ${page === "execution-chain" ? "pointer-events-none" : "pointer-events-auto"}`}
-                  >
-                    {(page === "history" ||
-                      page === "queue" ||
-                      previousPage === "history" ||
-                      previousPage === "queue") && (
-                      <HistoryQueuePage
-                        page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
-                        events={allEvents}
-                        openEventIds={openEventIds}
-                        onToggleOpen={handleToggleOpen}
-                        onEventClick={onEventClick}
-                        compact={isBottomLayout}
-                        resolveRunId={resolveRunId}
-                        fetchRunId={fetchRunId}
-                        onSelectRun={onSelectRun}
-                        onCancelQueueItem={onCancelQueueItem}
-                        onTriggerNavigate={(event) => {
-                          if (event.kind === "trigger") {
-                            const eventId = event.triggerEventId || event.id;
-                            handleSeeExecutionChain(eventId, event);
-                          } else if (event.kind === "execution") {
-                            const node = workflowNodes?.find(
-                              (n) => n.id === event.originalExecution?.rootEvent?.nodeId,
-                            );
-
-                            const rootEventId = event.originalExecution?.rootEvent?.id;
-                            if (rootEventId && node && event.originalExecution?.rootEvent) {
-                              const triggerEvent = mapTriggerEventToSidebarEvent(
-                                event.originalExecution?.rootEvent,
-                                node,
-                              );
-                              handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-                            } else {
-                              const eventId = event.triggerEventId || event.id;
-                              handleSeeExecutionChain(eventId, event, event.executionId);
-                            }
-                          }
-                        }}
-                        getTabData={getTabData}
-                        onCancelExecution={onCancelExecution}
-                        onReEmit={onReEmit}
-                        loadExecutionChain={loadExecutionChain}
-                        getExecutionState={getExecutionState}
-                        hasMoreItems={hasMoreItems}
-                        loadingMoreItems={loadingMoreItems}
-                        showMoreCount={showMoreCount}
-                        onLoadMoreItems={handleLoadMoreItems}
-                      />
-                    )}
-                  </div>
-                  <div
-                    className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
-                      page === "execution-chain" ? "translate-x-0" : "translate-x-full"
-                    } ${page === "execution-chain" ? "pointer-events-auto" : "pointer-events-none"}`}
-                  >
-                    {page === "execution-chain" && (
-                      <ExecutionChainPage
-                        eventId={activeExecutionChainEventId}
-                        triggerEvent={activeExecutionChainTriggerEvent || undefined}
-                        selectedExecutionId={selectedExecutionId}
-                        loadExecutionChain={loadExecutionChain}
-                        openEventIds={openEventIds}
-                        onToggleOpen={handleToggleOpen}
-                        getExecutionState={getExecutionState}
-                        getTabData={getTabData}
-                        onEventClick={onEventClick}
-                        workflowNodes={workflowNodes}
-                        actions={actions}
-                        triggers={triggers}
-                        onHighlightedNodesChange={onHighlightedNodesChange}
-                        organizationId={domainId}
-                      />
-                    )}
-                  </div>
-                </div>
               </div>
             )}
           </div>

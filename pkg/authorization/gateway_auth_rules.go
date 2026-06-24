@@ -51,11 +51,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "delete",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}"}: {
-			Resource:   "members",
-			Action:     "delete",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/users/{user_id}"}: {
 			Resource:   "members",
 			Action:     "delete",
@@ -225,11 +220,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invitations"}: {
-			Resource:   "members",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invite-link"}: {
 			Resource:   "members",
 			Action:     "create",
@@ -302,21 +292,9 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
 		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"}: {
 			Resource:           "canvases",
 			Action:             "publish",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"}: {
-			Resource:           "canvases",
-			Action:             "read",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
@@ -465,11 +443,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {
 			Resource:   "integrations",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations"}: {
-			Resource:   "members",
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
