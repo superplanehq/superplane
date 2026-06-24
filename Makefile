@@ -180,7 +180,7 @@ check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
 
 check.grpc.actions.status:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_grpc_actions_status.go"
+	bash ./scripts/verify_grpc_actions_status.sh
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
