@@ -32,8 +32,6 @@ type UseCanvasDraftBranchActionsOptions = {
   setSearchParams: SetURLSearchParams;
   setActiveCanvasVersion: (value: CanvasesCanvasVersion | null) => void;
   setDraftCanvasSpec: (value: CanvasesCanvas["spec"] | null) => void;
-  setHasUnsavedChanges: (value: boolean) => void;
-  setHasNonPositionalUnsavedChanges: (value: boolean) => void;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
 };
 
@@ -57,8 +55,6 @@ export function useCanvasDraftBranchActions({
   setSearchParams,
   setActiveCanvasVersion,
   setDraftCanvasSpec,
-  setHasUnsavedChanges,
-  setHasNonPositionalUnsavedChanges,
   setLastSavedWorkflowSnapshot,
 }: UseCanvasDraftBranchActionsOptions) {
   const [draftVersionToDelete, setDraftVersionToDelete] = useState<string | null>(null);
@@ -133,8 +129,6 @@ export function useCanvasDraftBranchActions({
         setSearchParams,
         setActiveCanvasVersion,
         setDraftCanvasSpec,
-        setHasUnsavedChanges,
-        setHasNonPositionalUnsavedChanges,
         setLastSavedWorkflowSnapshot,
       });
       setDraftVersionToDelete(null);
@@ -160,8 +154,6 @@ export function useCanvasDraftBranchActions({
     setLastSavedWorkflowSnapshot,
     setActiveCanvasVersion,
     setDraftCanvasSpec,
-    setHasUnsavedChanges,
-    setHasNonPositionalUnsavedChanges,
   ]);
 
   const requestDeleteActiveDraft = useCallback(() => {

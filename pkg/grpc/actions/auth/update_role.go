@@ -6,20 +6,19 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func UpdateRole(ctx context.Context, domainType string, domainID string, roleName string, roleSpec *pb.Role_Spec, authService authorization.Authorization) (*pb.UpdateRoleResponse, error) {
 	if roleName == "" {
-		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role name must be specified")
 	}
 
 	_, err := authService.GetRoleDefinition(ctx, roleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", roleName, err)
-		return nil, status.Error(codes.NotFound, "role not found")
+		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
 	permissions := []*authorization.Permission{}
@@ -35,7 +34,7 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 
 	for _, permission := range permissions {
 		if !authService.IsValidPermission(domainType, permission) {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid permission: %s %s", permission.Resource, permission.Action))
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid permission: %s %s", permission.Resource, permission.Action))
 		}
 	}
 
@@ -60,7 +59,7 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 		inheritedRoleDef, err := authService.GetRoleDefinition(ctx, roleSpec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", roleSpec.InheritedRole.Metadata.Name, err)
-			return nil, status.Error(codes.InvalidArgument, "inherited role not found")
+			return nil, grpcerrors.InvalidArgument(nil, "inherited role not found")
 		}
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
@@ -68,7 +67,7 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 	err = authService.UpdateCustomRole(domainID, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", roleName, err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcerrors.Internal(err, "failed to update role")
 	}
 
 	log.Infof("updated custom role %s in domain %s (%s)", roleName, domainID, domainType)

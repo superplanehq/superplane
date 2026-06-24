@@ -1,13 +1,11 @@
 package canvases
 
 import (
-	"strings"
-
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"strings"
 )
 
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
@@ -25,12 +23,12 @@ func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
 func canvasFromYAMLText(text string) (*pb.Canvas, error) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return nil, status.Error(codes.InvalidArgument, "canvas_yaml is empty")
+		return nil, grpcerrors.InvalidArgument(nil, "canvas_yaml is empty")
 	}
 
 	canvas, err := canvasyaml.ParseCanvasResource([]byte(trimmed))
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas_yaml: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas_yaml")
 	}
 
 	return canvas, nil
@@ -39,16 +37,16 @@ func canvasFromYAMLText(text string) (*pb.Canvas, error) {
 func consolePanelsLayoutFromYAMLText(text string) ([]models.ConsolePanel, []models.ConsoleLayoutItem, error) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "console_yaml is empty")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "console_yaml is empty")
 	}
 
 	doc, err := models.ConsoleFromYML([]byte(trimmed))
 	if err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "invalid console_yaml: %v", err)
+		return nil, nil, grpcerrors.InvalidArgument(err, "invalid console_yaml")
 	}
 
 	if err := doc.Validate(); err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "invalid console_yaml: %v", err)
+		return nil, nil, grpcerrors.InvalidArgument(err, "invalid console_yaml")
 	}
 
 	return doc.Spec.Panels, doc.Spec.Layout, nil

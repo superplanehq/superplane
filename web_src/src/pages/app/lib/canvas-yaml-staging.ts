@@ -1,14 +1,12 @@
 import * as yaml from "js-yaml";
 import type { CanvasesCanvas } from "@/api-client";
-import type {
-  SuperplaneComponentsEdge as ComponentsEdge,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 
 type ParsedCanvasYaml = {
   apiVersion?: string;
   kind?: string;
   metadata?: {
+    id?: string;
     name?: string;
     description?: string;
   };
@@ -18,7 +16,16 @@ type ParsedCanvasYaml = {
   };
 };
 
-export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | null {
+export type ParsedCanvasYamlMetadata = {
+  id?: string;
+  name?: string;
+  description?: string;
+};
+
+// loadCanvasYamlDocument parses and validates that the text is a Canvas YAML
+// document, returning the parsed object or null. Shared by the spec and metadata
+// readers to keep their individual complexity low.
+function loadCanvasYamlDocument(text: string): ParsedCanvasYaml | null {
   const trimmed = text.trim();
   if (!trimmed) {
     return null;
@@ -36,6 +43,32 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
   }
 
   if (parsed.kind && parsed.kind !== "Canvas") {
+    return null;
+  }
+
+  return parsed;
+}
+
+// parseCanvasYamlMetadata extracts the canvas-level metadata (id/name/description)
+// from a canvas.yaml document. Used so edit mode can source the canvas name from
+// the repository file instead of the DescribeCanvas response.
+export function parseCanvasYamlMetadata(text: string): ParsedCanvasYamlMetadata | null {
+  const parsed = loadCanvasYamlDocument(text);
+  const metadata = parsed?.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  return {
+    ...(typeof metadata.id === "string" ? { id: metadata.id } : {}),
+    ...(typeof metadata.name === "string" ? { name: metadata.name } : {}),
+    ...(typeof metadata.description === "string" ? { description: metadata.description } : {}),
+  };
+}
+
+export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | null {
+  const parsed = loadCanvasYamlDocument(text);
+  if (!parsed) {
     return null;
   }
 

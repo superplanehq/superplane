@@ -8,26 +8,25 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountRequest, authService authorization.Authorization) (*pb.CreateServiceAccountResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
 	if !orgIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	if req.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "name is required")
+		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
 	validRoles := map[string]bool{
@@ -36,21 +35,21 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	}
 
 	if req.Role == "" {
-		return nil, status.Error(codes.InvalidArgument, "role is required")
+		return nil, grpcerrors.InvalidArgument(nil, "role is required")
 	}
 
 	if !validRoles[req.Role] {
-		return nil, status.Error(codes.InvalidArgument, "invalid role for service account; must be org_admin or org_viewer")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for service account; must be org_admin or org_viewer")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
 	}
 
 	createdByUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid user ID")
 	}
 
 	var description *string
@@ -60,7 +59,7 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 
 	plainToken, err := crypto.Base64String(64)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to generate token")
+		return nil, grpcerrors.Internal(err, "failed to generate token")
 	}
 
 	var sa *models.User
@@ -83,12 +82,12 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	})
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create service account: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to create service account")
 	}
 
 	creator, err := creatorUserForServiceAccount(orgID, sa)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create service account: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to create service account")
 	}
 
 	return &pb.CreateServiceAccountResponse{

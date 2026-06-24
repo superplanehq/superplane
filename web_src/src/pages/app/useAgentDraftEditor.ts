@@ -29,7 +29,7 @@ type UseAgentDraftEditorArgs = {
   isRunInspectionMode: boolean;
   selectableVersionsById: Map<string, CanvasesCanvasVersion>;
   hasEditableVersion: boolean;
-  hasPendingLocalCanvasState: boolean;
+  hasLocalSaveActivity: boolean;
   activeCanvasVersionIdRef: { current: string };
   activateCanvasVersionForEditing: (versionId: string, version: CanvasesCanvasVersion) => boolean;
   setSuppressUnpublishedDraftDiscard: (value: boolean) => void;
@@ -164,7 +164,7 @@ export function useAgentDraftEditor({
   isRunInspectionMode,
   selectableVersionsById,
   hasEditableVersion,
-  hasPendingLocalCanvasState,
+  hasLocalSaveActivity,
   activeCanvasVersionIdRef,
   activateCanvasVersionForEditing,
   setSuppressUnpublishedDraftDiscard,
@@ -208,7 +208,7 @@ export function useAgentDraftEditor({
         return "opened";
       }
 
-      if (hasEditableVersion && hasPendingLocalCanvasState && activeCanvasVersionIdRef.current !== versionId) {
+      if (hasEditableVersion && hasLocalSaveActivity && activeCanvasVersionIdRef.current !== versionId) {
         if (source === "auto") {
           return "skipped";
         }
@@ -241,7 +241,7 @@ export function useAgentDraftEditor({
       activeCanvasVersionIdRef,
       handleMissingDraft,
       hasEditableVersion,
-      hasPendingLocalCanvasState,
+      hasLocalSaveActivity,
       headerMode,
       isRunInspectionMode,
       loadAgentDraftVersion,

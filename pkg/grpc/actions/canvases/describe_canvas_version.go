@@ -6,40 +6,39 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID string, versionID string) (*pb.DescribeCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "version not found")
+			return nil, grpcerrors.NotFound(err, "version not found")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to load version: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load version")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -55,7 +54,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	if !canAccess {
-		return nil, status.Error(codes.PermissionDenied, "version is not visible in current flow")
+		return nil, grpcerrors.PermissionDenied(nil, "version is not visible in current flow")
 	}
 
 	state, _, err := stagingSummaryForVersion(version.ID)

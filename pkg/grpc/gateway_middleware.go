@@ -32,5 +32,5 @@ func SanitizedGatewayErrorHandler(
 	r *http.Request,
 	err error,
 ) {
-	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, sanitizeError(err))
+	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, SanitizeError(r.Context(), err))
 }

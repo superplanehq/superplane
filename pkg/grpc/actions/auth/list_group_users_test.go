@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test_ListGroupUsers(t *testing.T) {
@@ -62,6 +62,6 @@ func Test_ListGroupUsers(t *testing.T) {
 	t.Run("missing group returns not found instead of internal", func(t *testing.T) {
 		_, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "missing-group", r.AuthService)
 		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 }

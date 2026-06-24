@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-
+	"fmt"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -26,26 +25,26 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 	}
 	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid chat id")
 	}
 	images, err := parseChatImages(req.Images)
 	if err != nil {
 		return nil, err
 	}
 	if req.Content == "" && len(images) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "content or an image is required")
+		return nil, grpcerrors.InvalidArgument(nil, "content or an image is required")
 	}
 
 	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, images, agentModeFromProto(req.Mode))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "agent chat not found")
+			return nil, grpcerrors.NotFound(err, "agent chat not found")
 		}
 		if errors.Is(err, agentservice.ErrSessionBusy) {
-			return nil, status.Error(codes.FailedPrecondition, "agent is still processing the previous turn")
+			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the previous turn")
 		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
-		return nil, status.Error(codes.Internal, "failed to send agent chat message")
+		return nil, grpcerrors.Internal(err, "failed to send agent chat message")
 	}
 	return &pb.SendAgentChatMessageResponse{Message: serializeMessage(persisted)}, nil
 }
@@ -55,7 +54,7 @@ func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, 
 		return nil, nil
 	}
 	if len(images) > maxChatImages {
-		return nil, status.Errorf(codes.InvalidArgument, "at most %d images are allowed per message", maxChatImages)
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("at most %d images are allowed per message", maxChatImages))
 	}
 
 	out := make([]agentservice.MessageImage, 0, len(images))
@@ -63,14 +62,14 @@ func parseChatImages(images []*pb.AgentChatImage) ([]agentservice.MessageImage, 
 	for _, image := range images {
 		mediaType, ok := chatImageMediaTypeToContentType(image.MediaType)
 		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "unsupported image media type: %s", image.MediaType)
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported image media type: %s", image.MediaType))
 		}
 		if len(image.Data) == 0 {
-			return nil, status.Error(codes.InvalidArgument, "image data is empty")
+			return nil, grpcerrors.InvalidArgument(nil, "image data is empty")
 		}
 		total += len(image.Data)
 		if total > maxChatImagePayloadBytes {
-			return nil, status.Errorf(codes.InvalidArgument, "images exceed the %d byte limit per message", maxChatImagePayloadBytes)
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("images exceed the %d byte limit per message", maxChatImagePayloadBytes))
 		}
 		out = append(out, agentservice.MessageImage{
 			MediaType: mediaType,

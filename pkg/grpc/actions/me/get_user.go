@@ -2,29 +2,30 @@ package me
 
 import (
 	"context"
+	"errors"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func GetUser(ctx context.Context, authService authorization.Authorization, includePermissions bool) (*pb.MeResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
 	if !orgIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	user, err := loadUser(ctx, orgID, userID)
@@ -57,7 +58,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user roles")
+		return nil, grpcerrors.Internal(err, "failed to get user roles")
 	}
 
 	//
@@ -91,7 +92,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get user groups")
+		return nil, grpcerrors.Internal(err, "failed to get user groups")
 	}
 
 	userProto.Groups = groups
@@ -109,7 +110,11 @@ func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
 		return loadErr
 	})
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "user not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, grpcerrors.NotFound(err, "user not found")
+		}
+
+		return nil, grpcerrors.Internal(err, "failed to load user")
 	}
 
 	return user, nil

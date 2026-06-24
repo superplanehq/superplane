@@ -6,11 +6,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -24,7 +23,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "organization not found")
+			return nil, grpcerrors.NotFound(err, "organization not found")
 		}
 
 		log.Errorf("Error describing organization %s: %v", orgID, err)
