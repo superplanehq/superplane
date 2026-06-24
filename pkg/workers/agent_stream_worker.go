@@ -29,6 +29,7 @@ const (
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
 	streamHeartbeatInterval    = 30 * time.Second
+	agentTokenUsagePublishWait = 30 * time.Second
 	stuckHeartbeatGrace        = 5 * time.Minute
 	// Must stay above agentStreamTimeout so long-but-healthy turns
 	// without a heartbeat yet aren't force-failed mid-flight.
@@ -51,6 +52,14 @@ var publishAgentRunFinished = func(session *models.AgentSession, evt agents.Prov
 		evt.Usage.CacheReadTokens,
 		evt.Usage.CacheWriteTokens,
 	).Publish()
+}
+
+var publishAgentTokenUsageAsync = func(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+		publishPreparedAgentTokenUsage(publishCtx, usageService, session, evt)
+	}()
 }
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
@@ -427,11 +436,12 @@ func (w *AgentStreamWorker) streamProviderTurn(
 
 	var streamErr error
 	customTools := newCustomToolTurnState()
+	usageRetriever, _ := w.provider.(agents.ProviderSessionUsageRetriever)
 
 	for {
 		customTools.clearRequirement()
 		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(ctx, w.usageService, session, evt, publish, &streamErr, customTools)
+			return handleProviderEvent(ctx, w.usageService, usageRetriever, session, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
@@ -456,16 +466,13 @@ func (w *AgentStreamWorker) streamProviderTurn(
 func handleProviderEvent(
 	ctx context.Context,
 	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
 	session *models.AgentSession,
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
 	streamErr *error,
 	customTools *customToolTurnState,
 ) error {
-	if evt.Type == agents.ProviderEventTurnCompleted {
-		publishAgentTokenUsage(ctx, usageService, session, evt)
-	}
-
 	// Drop late events from a turn the user has already stopped — closes
 	// the race between InterruptSession's commit and provider SSE bytes
 	// already in flight.
@@ -473,6 +480,9 @@ func handleProviderEvent(
 	if err != nil {
 		log.WithError(err).WithField("session_id", session.ID).Warn("agent stream: status check failed; processing event anyway")
 	} else if !streaming {
+		if evt.Type == agents.ProviderEventTurnCompleted {
+			publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		}
 		return errSessionAlreadyReset
 	}
 
@@ -496,6 +506,7 @@ func handleProviderEvent(
 		}
 	case agents.ProviderEventTurnCompleted:
 		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
+		publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
 	case agents.ProviderEventOutcomeEvaluationStart:
 		publishOutcomeEvaluationStart(evt, publish)
 	case agents.ProviderEventOutcomeEvaluation:
@@ -515,8 +526,19 @@ func handleProviderEvent(
 	return nil
 }
 
-func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
-	if evt.Usage == nil || !evt.Usage.HasUsage() {
+func publishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if evt.Usage == nil {
+		retrieveAndPublishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		return
+	}
+
+	if !evt.Usage.HasUsage() {
 		return
 	}
 
@@ -542,13 +564,6 @@ func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, ses
 		return
 	}
 
-	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"session_id":      session.ID,
-			"organization_id": session.OrganizationID,
-		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
-	}
-
 	if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
@@ -559,20 +574,59 @@ func publishAgentTokenUsage(ctx context.Context, usageService usage.Service, ses
 
 	publishEvent := evt
 	publishEvent.Usage = providerTokenUsage(deltaUsage)
+	publishAgentTokenUsageAsync(ctx, usageService, session, publishEvent)
+}
+
+func retrieveAndPublishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if usageRetriever == nil {
+		return
+	}
+
+	go func() {
+		retrieveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+
+		usage, err := usageRetriever.RetrieveSessionUsage(retrieveCtx, session.ProviderSessionID)
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"session_id":          session.ID,
+				"organization_id":     session.OrganizationID,
+				"provider_session_id": session.ProviderSessionID,
+			}).Warn("agent stream: failed to retrieve completed session usage")
+			return
+		}
+
+		evt.Usage = usage
+		publishAgentTokenUsage(retrieveCtx, usageService, nil, session, evt)
+	}()
+}
+
+func publishPreparedAgentTokenUsage(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
+	}
 
 	log.WithFields(log.Fields{
-		"session_id":              session.ID,
-		"organization_id":         session.OrganizationID,
-		"model":                   evt.Model,
-		"input_tokens":            deltaUsage.InputTokens,
-		"output_tokens":           deltaUsage.OutputTokens,
-		"total_tokens":            deltaUsage.TotalTokens,
-		"cache_read_tokens":       deltaUsage.CacheReadTokens,
-		"cache_write_tokens":      deltaUsage.CacheWriteTokens,
-		"cumulative_total_tokens": cumulativeUsage.TotalTokens,
+		"session_id":         session.ID,
+		"organization_id":    session.OrganizationID,
+		"model":              evt.Model,
+		"input_tokens":       evt.Usage.InputTokens,
+		"output_tokens":      evt.Usage.OutputTokens,
+		"total_tokens":       evt.Usage.TotalTokens,
+		"cache_read_tokens":  evt.Usage.CacheReadTokens,
+		"cache_write_tokens": evt.Usage.CacheWriteTokens,
 	}).Info("agent stream: publishing agent token usage")
 
-	if err := publishAgentRunFinished(session, publishEvent); err != nil {
+	if err := publishAgentRunFinished(session, evt); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
 			"organization_id": session.OrganizationID,
