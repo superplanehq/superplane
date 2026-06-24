@@ -6,11 +6,11 @@ import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { ensureDraftVersionExists } from "@/hooks/useCanvasData";
 
-import { clearPublishedDraftVersion } from "./lib/draft-spec-cache";
-import { clearComponentSidebarSearchParams } from "./viewState";
-import { isNotFoundError } from "./workflowPageHelpers";
+import { recoverIfDraftMissing as resolveMissingDraftRecovery } from "./lib/draft-missing-recovery";
+import { exitDraftToLive } from "./lib/exit-draft-to-live";
+import { publishDraftVersionAndExit } from "./lib/publish-draft-flow";
+import type { RefreshLatestLiveCanvasDataOptions } from "./useRefreshLatestLiveCanvasData";
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
 type SetSearchParams = ReturnType<typeof useSearchParams>[1];
@@ -26,16 +26,15 @@ type UseDraftRecoveryOptions = {
   setDraftCanvasSpec: Dispatch<SetStateAction<DraftSpec>>;
   exitToLive: () => void;
   setSearchParams: SetSearchParams;
-  refreshLatestLiveCanvasData: () => Promise<void>;
+  refreshLatestLiveCanvasData: (options?: RefreshLatestLiveCanvasDataOptions) => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
   publishCanvasVersionMutation: PublishMutation;
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>;
+  registerIgnoredCanvasUpdatedEcho?: () => () => void;
+  registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
 };
 
-// Owns the draft publish + exit-to-live + recovery lifecycle, guarding publish
-// against a draft that was deleted out from under it so a stale id can't strand
-// the UI on a "version not found" error.
 export function useDraftRecovery({
   organizationId,
   canvasId,
@@ -51,29 +50,32 @@ export function useDraftRecovery({
   ensureVersionActionDraftReady,
   publishCanvasVersionMutation,
   setIsPreparingVersionAction,
+  registerIgnoredCanvasUpdatedEcho,
+  registerIgnoredCanvasVersionUpdatedEcho,
 }: UseDraftRecoveryOptions) {
   const queryClient = useQueryClient();
 
-  // Shared by publish-success and missing-draft recovery so both end identically.
-  const exitDraftToLive = useCallback(
-    async (versionId: string) => {
-      activeCanvasVersionIdRef.current = "";
-      if (versionId) {
-        clearPublishedDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionId);
-      }
-      exitToLive();
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        next.delete("branch");
-        return clearComponentSidebarSearchParams(next);
-      });
-      await refreshLatestLiveCanvasData();
-    },
+  const runExitDraftToLive = useCallback(
+    (versionId: string, options?: RefreshLatestLiveCanvasDataOptions) =>
+      exitDraftToLive({
+        versionId,
+        options,
+        activeCanvasVersionIdRef,
+        draftCanvasSpecsRef,
+        setActiveCanvasVersion,
+        setDraftCanvasSpec,
+        canvasId,
+        queryClient,
+        exitToLive,
+        setSearchParams,
+        refreshLatestLiveCanvasData,
+      }),
     [
       activeCanvasVersionIdRef,
+      canvasId,
       draftCanvasSpecsRef,
       exitToLive,
+      queryClient,
       refreshLatestLiveCanvasData,
       setActiveCanvasVersion,
       setDraftCanvasSpec,
@@ -81,36 +83,25 @@ export function useDraftRecovery({
     ],
   );
 
-  // Recoverable state, not a fatal error: return to live with an info toast.
   const recoverFromMissingDraft = useCallback(
     async (versionId: string, message = "This draft no longer exists. Returned to the live canvas.") => {
       cancelPendingCanvasSaves?.();
-      await exitDraftToLive(versionId);
-      // Informational, not a hard failure — the user was cleanly returned to live.
+      await runExitDraftToLive(versionId);
       showInfoToast(message);
     },
-    [cancelPendingCanvasSaves, exitDraftToLive],
+    [cancelPendingCanvasSaves, runExitDraftToLive],
   );
 
-  // A NOT_FOUND can also come from unrelated resources (e.g. repository not
-  // found) while the draft still exists, so only recover once the draft itself
-  // is confirmed gone. Returns whether the error was handled as a missing draft.
   const recoverIfDraftMissing = useCallback(
-    async (error: unknown, versionId: string): Promise<boolean> => {
-      if (!isNotFoundError(error) || !organizationId || !canvasId || !versionId) {
-        return false;
-      }
-      // On a failed existence check, treat the draft as present so the caller
-      // surfaces its normal error instead of an unhandled rejection.
-      const draftExists = await ensureDraftVersionExists(queryClient, organizationId, canvasId, versionId).catch(
-        () => true,
-      );
-      if (draftExists) {
-        return false;
-      }
-      await recoverFromMissingDraft(versionId);
-      return true;
-    },
+    (error: unknown, versionId: string) =>
+      resolveMissingDraftRecovery({
+        error,
+        versionId,
+        organizationId,
+        canvasId,
+        queryClient,
+        recoverFromMissingDraft,
+      }),
     [organizationId, canvasId, queryClient, recoverFromMissingDraft],
   );
 
@@ -119,38 +110,32 @@ export function useDraftRecovery({
       return;
     }
 
-    let versionIdToPublish = "";
     setIsPreparingVersionAction(true);
     try {
-      const isReady = await ensureVersionActionDraftReady(
-        "Unable to prepare the latest version changes for publishing",
-      );
-      if (!isReady) {
+      const result = await publishDraftVersionAndExit({
+        organizationId,
+        canvasId,
+        activeCanvasVersionIdRef,
+        queryClient,
+        ensureVersionActionDraftReady,
+        publishCanvasVersionMutation,
+        registerIgnoredCanvasUpdatedEcho,
+        registerIgnoredCanvasVersionUpdatedEcho,
+        runExitDraftToLive,
+        recoverFromMissingDraft,
+      });
+      if (result.status === "published") {
+        showSuccessToast("Version published");
         return;
       }
-
-      // Read the ref only after prepare settles — the user may have left draft
-      // mode while saves were still being flushed.
-      versionIdToPublish = activeCanvasVersionIdRef.current;
-      if (!versionIdToPublish) {
-        return;
+      if (result.status === "failed") {
+        if (await recoverIfDraftMissing(result.error, result.versionIdToPublish)) {
+          return;
+        }
+        showErrorToast(
+          getUsageLimitToastMessage(result.error, getApiErrorMessage(result.error, "Failed to publish version")),
+        );
       }
-
-      const draftExists = await ensureDraftVersionExists(queryClient, organizationId, canvasId, versionIdToPublish);
-      if (!draftExists) {
-        await recoverFromMissingDraft(versionIdToPublish);
-        return;
-      }
-
-      await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
-      await exitDraftToLive(versionIdToPublish);
-      showSuccessToast("Version published");
-    } catch (error) {
-      // The draft can be deleted between the pre-check and the mutation.
-      if (await recoverIfDraftMissing(error, versionIdToPublish)) {
-        return;
-      }
-      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
     } finally {
       setIsPreparingVersionAction(false);
     }
@@ -163,7 +148,9 @@ export function useDraftRecovery({
     ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
     setIsPreparingVersionAction,
-    exitDraftToLive,
+    registerIgnoredCanvasUpdatedEcho,
+    registerIgnoredCanvasVersionUpdatedEcho,
+    runExitDraftToLive,
     recoverFromMissingDraft,
     recoverIfDraftMissing,
   ]);
