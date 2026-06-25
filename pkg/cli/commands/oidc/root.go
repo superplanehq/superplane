@@ -19,37 +19,16 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var token string
 	var apiURL string
-	var orgID string
-	var canvasID string
-	var nodeID string
-	var component string
-	var projectID string
-	var pipelineFile string
-	var ref string
-	var commitSha string
+	var expectedClaims []string
 
 	verifyCmd.Flags().StringVar(&token, "token", "", "OIDC token to verify (default: SUPERPLANE_OIDC_TOKEN env var)")
-	verifyCmd.Flags().StringVar(&apiURL, "url", "", "SuperPlane API URL (default: configured context URL)")
-	verifyCmd.Flags().StringVar(&orgID, "org-id", "", "expected organization ID")
-	verifyCmd.Flags().StringVar(&canvasID, "canvas-id", "", "expected canvas ID")
-	verifyCmd.Flags().StringVar(&nodeID, "node-id", "", "expected node ID")
-	verifyCmd.Flags().StringVar(&component, "component", "", "expected component name")
-	verifyCmd.Flags().StringVar(&projectID, "project-id", "", "expected Semaphore project ID")
-	verifyCmd.Flags().StringVar(&pipelineFile, "pipeline-file", "", "expected Semaphore pipeline file")
-	verifyCmd.Flags().StringVar(&ref, "ref", "", "expected git ref")
-	verifyCmd.Flags().StringVar(&commitSha, "commit-sha", "", "expected commit SHA")
+	verifyCmd.Flags().StringVar(&apiURL, "url", "", "SuperPlane API URL (default: configured context URL, or https://app.superplane.com)")
+	verifyCmd.Flags().StringArrayVar(&expectedClaims, "claim", nil, "expected claim key=value (repeatable)")
 
 	core.Bind(verifyCmd, &verifyCommand{
-		token:        &token,
-		apiURL:       &apiURL,
-		orgID:        &orgID,
-		canvasID:     &canvasID,
-		nodeID:       &nodeID,
-		component:    &component,
-		projectID:    &projectID,
-		pipelineFile: &pipelineFile,
-		ref:          &ref,
-		commitSha:    &commitSha,
+		token:          &token,
+		apiURL:         &apiURL,
+		expectedClaims: &expectedClaims,
 	}, options)
 
 	root.AddCommand(verifyCmd)

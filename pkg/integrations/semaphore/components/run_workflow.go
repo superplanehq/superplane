@@ -102,22 +102,30 @@ func (r *RunWorkflow) Documentation() string {
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
 
-## CI Authorization
+## Injected Parameters
 
-When SuperPlane triggers a Semaphore workflow, it automatically injects these workflow parameters:
+SuperPlane automatically adds these workflow parameters when triggering Semaphore:
 
 - ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
 - ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
-- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: A signed OIDC token proving this workflow was triggered by a specific SuperPlane canvas node
+- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: A signed OIDC token attesting this workflow was triggered by a specific SuperPlane canvas node
 
-In protected Semaphore jobs (production deploys, artifact uploads), verify the token before running any steps:
+## Verifying Triggers in CI
+
+In protected Semaphore jobs (production deploys, artifact uploads), verify ` + "`SUPERPLANE_OIDC_TOKEN`" + ` before running any steps. Check every claim your policy depends on — ` + "`pipeline_file`" + ` alone only proves which pipeline SuperPlane intended to run, not which organization, commit, or canvas node triggered it:
 
 ` + "```bash" + `
 superplane oidc verify \
-  --pipeline-file ".semaphore/production/deploy.yml"
+  --claim org_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim pipeline_file=.semaphore/production/deploy.yml \
+  --claim node_id=deploy-production
 ` + "```" + `
 
-The command reads ` + "`SUPERPLANE_OIDC_TOKEN`" + ` from the environment and calls your SuperPlane instance to verify the signature. Pass expected claim values (pipeline file, node ID, commit SHA, etc.) to enforce authorization in CI — SuperPlane attests what was triggered; your pipeline decides what it accepts. Exit code 0 means the token is valid and matches your expectations; any other exit code aborts the job.
+Expected claim values must be pinned in your pipeline — hardcoded literals or Semaphore project env vars — not taken from parameters SuperPlane injects at trigger time.
+
+Set **Commit SHA** on the component when you need the token to bind to a specific revision; otherwise pin ` + "`ref`" + ` and still compare ` + "`commit_sha`" + ` against ` + "`$SEMAPHORE_GIT_SHA`" + ` in CI so the job runs the code SuperPlane attested.
+
+The command reads the token from the environment, fetches JWKS from your SuperPlane instance, and verifies the signature locally. Pass expected claims with ` + "`--claim key=value`" + ` (repeatable) to enforce your policy — SuperPlane attests what was triggered; your pipeline decides what it accepts. Exit code 0 means the token is valid and matches your expectations; any other exit code aborts the job.
 
 ## Output Channels
 

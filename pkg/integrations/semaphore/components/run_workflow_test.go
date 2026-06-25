@@ -17,10 +17,6 @@ func (p *testOIDCProvider) Sign(subject string, duration time.Duration, audience
 	return "test-token", nil
 }
 
-func (p *testOIDCProvider) Validate(tokenString string) (map[string]any, error) {
-	return map[string]any{}, nil
-}
-
 func (p *testOIDCProvider) PublicJWKs() []oidc.PublicJWK {
 	return nil
 }
@@ -29,10 +25,6 @@ type failingOIDCProvider struct{}
 
 func (p *failingOIDCProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
 	return "", fmt.Errorf("signing unavailable")
-}
-
-func (p *failingOIDCProvider) Validate(tokenString string) (map[string]any, error) {
-	return nil, fmt.Errorf("not implemented")
 }
 
 func (p *failingOIDCProvider) PublicJWKs() []oidc.PublicJWK {

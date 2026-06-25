@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	spoidc "github.com/superplanehq/superplane/pkg/oidc"
 )
 
 type discoveryDocument struct {
@@ -15,10 +17,10 @@ type discoveryDocument struct {
 }
 
 type jwksDocument struct {
-	Keys []PublicJWK `json:"keys"`
+	Keys []spoidc.PublicJWK `json:"keys"`
 }
 
-func ValidateRemote(client *http.Client, token, baseURL string) (map[string]any, error) {
+func validateRemote(client *http.Client, token, baseURL string) (map[string]any, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -43,7 +45,7 @@ func ValidateRemote(client *http.Client, token, baseURL string) (map[string]any,
 		return nil, err
 	}
 
-	return ValidateToken(token, discovery.Issuer, publicKeys)
+	return validateToken(token, discovery.Issuer, publicKeys)
 }
 
 func fetchDiscoveryDocument(client *http.Client, discoveryURL string) (discoveryDocument, error) {
@@ -95,5 +97,5 @@ func fetchPublicKeys(client *http.Client, jwksURL string) (map[string]*rsa.Publi
 		return nil, fmt.Errorf("parse JWKS: %w", err)
 	}
 
-	return PublicKeysFromJWKs(document.Keys)
+	return publicKeysFromJWKs(document.Keys)
 }
