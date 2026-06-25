@@ -186,6 +186,62 @@ func Test__UpdateFirewall__Execute(t *testing.T) {
 		assert.Empty(t, patchBody["targetTags"])
 	})
 
+	t.Run("source service accounts and logging are patched on an ingress rule", func(t *testing.T) {
+		var patchBody map[string]any
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				patchBody = body.(map[string]any)
+				return opDone("op"), nil
+			},
+			getFunc: firewallExecGet("op", firewallGetJSON("allow-http", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"firewall":              "allow-http",
+				"sourceServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
+				"logging":               "ENABLED",
+				"logMetadata":           "INCLUDE_ALL_METADATA",
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, []string{"sa@my-project.iam.gserviceaccount.com"}, patchBody["sourceServiceAccounts"])
+		logCfg := patchBody["logConfig"].(map[string]any)
+		assert.Equal(t, true, logCfg["enable"])
+		assert.Equal(t, "INCLUDE_ALL_METADATA", logCfg["metadata"])
+	})
+
+	t.Run("source tags rejected on an egress rule", func(t *testing.T) {
+		var patched bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				patched = true
+				return opDone("op"), nil
+			},
+			getFunc: firewallExecGet("op", firewallGetJSON("deny-egress", "EGRESS", "deny")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"firewall":   "deny-egress",
+				"sourceTags": []string{"web"},
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, patched)
+		assert.Contains(t, state.FailureMessage, "source tags apply only to INGRESS")
+	})
+
 	t.Run("nothing to update -> fails without patching", func(t *testing.T) {
 		var patched bool
 		mc := &mockFirewallClient{

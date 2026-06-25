@@ -18,6 +18,10 @@ const (
 
 	FirewallActionAllow = "allow"
 	FirewallActionDeny  = "deny"
+
+	// Firewall Rules Logging metadata options (logConfig.metadata).
+	FirewallLogMetadataIncludeAll = "INCLUDE_ALL_METADATA"
+	FirewallLogMetadataExcludeAll = "EXCLUDE_ALL_METADATA"
 )
 
 // FirewallRuleSpec is one protocol/ports entry of a firewall rule, configured as
@@ -40,21 +44,30 @@ type firewallRule struct {
 	Ports      []string `json:"ports,omitempty"`
 }
 
+// firewallLogConfig mirrors a firewall rule's logConfig (Firewall Rules Logging).
+type firewallLogConfig struct {
+	Enable   bool   `json:"enable"`
+	Metadata string `json:"metadata,omitempty"`
+}
+
 type firewallGetResp struct {
-	Name              string         `json:"name"`
-	SelfLink          string         `json:"selfLink"`
-	Network           string         `json:"network"`
-	Direction         string         `json:"direction"`
-	Priority          int64          `json:"priority"`
-	Description       string         `json:"description"`
-	Disabled          bool           `json:"disabled"`
-	Allowed           []firewallRule `json:"allowed"`
-	Denied            []firewallRule `json:"denied"`
-	SourceRanges      []string       `json:"sourceRanges"`
-	DestinationRanges []string       `json:"destinationRanges"`
-	SourceTags        []string       `json:"sourceTags"`
-	TargetTags        []string       `json:"targetTags"`
-	CreationTimestamp string         `json:"creationTimestamp"`
+	Name                  string             `json:"name"`
+	SelfLink              string             `json:"selfLink"`
+	Network               string             `json:"network"`
+	Direction             string             `json:"direction"`
+	Priority              int64              `json:"priority"`
+	Description           string             `json:"description"`
+	Disabled              bool               `json:"disabled"`
+	Allowed               []firewallRule     `json:"allowed"`
+	Denied                []firewallRule     `json:"denied"`
+	SourceRanges          []string           `json:"sourceRanges"`
+	DestinationRanges     []string           `json:"destinationRanges"`
+	SourceTags            []string           `json:"sourceTags"`
+	TargetTags            []string           `json:"targetTags"`
+	SourceServiceAccounts []string           `json:"sourceServiceAccounts"`
+	TargetServiceAccounts []string           `json:"targetServiceAccounts"`
+	LogConfig             *firewallLogConfig `json:"logConfig"`
+	CreationTimestamp     string             `json:"creationTimestamp"`
 }
 
 // parseFirewallPath extracts (project, name) from a firewall rule value. Compute
@@ -154,6 +167,18 @@ func FirewallPayloadFromGetResponse(body []byte, project string) (map[string]any
 	if len(fw.TargetTags) > 0 {
 		payload["targetTags"] = fw.TargetTags
 	}
+	if len(fw.SourceServiceAccounts) > 0 {
+		payload["sourceServiceAccounts"] = fw.SourceServiceAccounts
+	}
+	if len(fw.TargetServiceAccounts) > 0 {
+		payload["targetServiceAccounts"] = fw.TargetServiceAccounts
+	}
+	if fw.LogConfig != nil {
+		payload["loggingEnabled"] = fw.LogConfig.Enable
+		if fw.LogConfig.Enable && fw.LogConfig.Metadata != "" {
+			payload["logMetadata"] = fw.LogConfig.Metadata
+		}
+	}
 	return payload, nil
 }
 
@@ -166,6 +191,31 @@ func validateFirewallPriority(priority *int) error {
 	}
 	if *priority < 0 || *priority > 65535 {
 		return fmt.Errorf("invalid priority %d: must be between 0 and 65535", *priority)
+	}
+	return nil
+}
+
+// normalizeFirewallLogMetadata validates the Firewall Rules Logging metadata
+// option, defaulting to INCLUDE_ALL_METADATA.
+func normalizeFirewallLogMetadata(metadata string) (string, error) {
+	switch strings.ToUpper(strings.TrimSpace(metadata)) {
+	case "", FirewallLogMetadataIncludeAll:
+		return FirewallLogMetadataIncludeAll, nil
+	case FirewallLogMetadataExcludeAll:
+		return FirewallLogMetadataExcludeAll, nil
+	default:
+		return "", fmt.Errorf("invalid log metadata %q: must be INCLUDE_ALL_METADATA or EXCLUDE_ALL_METADATA", metadata)
+	}
+}
+
+// validateFirewallTargetsAndSources enforces a Compute Engine constraint: a
+// single firewall rule filters by network tags OR by service accounts, never a
+// mix of the two. Catching it here gives a clearer error than the API's.
+func validateFirewallTargetsAndSources(sourceTags, targetTags, sourceServiceAccounts, targetServiceAccounts []string) error {
+	usesTags := len(sourceTags) > 0 || len(targetTags) > 0
+	usesServiceAccounts := len(sourceServiceAccounts) > 0 || len(targetServiceAccounts) > 0
+	if usesTags && usesServiceAccounts {
+		return errors.New("a firewall rule cannot combine network tags and service accounts; use one or the other for both source and target filters")
 	}
 	return nil
 }
@@ -222,6 +272,33 @@ func splitFirewallPorts(value string) []string {
 	for _, p := range parts {
 		if t := strings.TrimSpace(p); t != "" {
 			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// providedList returns the trimmed contents of an optional (togglable) list
+// field, or nil when the field was not toggled on (a nil pointer).
+func providedList(p *[]string) []string {
+	if p == nil {
+		return nil
+	}
+	return trimList(*p)
+}
+
+// mergeDedup concatenates already-trimmed string lists, dropping duplicates and
+// preserving order. Used to combine the service-account dropdown selections
+// with any custom (cross-project) entries.
+func mergeDedup(lists ...[]string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0)
+	for _, list := range lists {
+		for _, v := range list {
+			if _, ok := seen[v]; ok {
+				continue
+			}
+			seen[v] = struct{}{}
+			out = append(out, v)
 		}
 	}
 	return out

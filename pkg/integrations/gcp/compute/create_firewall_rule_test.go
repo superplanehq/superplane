@@ -22,6 +22,7 @@ type mockFirewallClient struct {
 	postFunc   func(ctx context.Context, path string, body any) ([]byte, error)
 	patchFunc  func(ctx context.Context, path string, body any) ([]byte, error)
 	deleteFunc func(ctx context.Context, path string) ([]byte, error)
+	getURLFunc func(ctx context.Context, fullURL string) ([]byte, error)
 }
 
 func (m *mockFirewallClient) Get(ctx context.Context, path string) ([]byte, error) {
@@ -53,6 +54,9 @@ func (m *mockFirewallClient) Delete(ctx context.Context, path string) ([]byte, e
 }
 
 func (m *mockFirewallClient) GetURL(ctx context.Context, fullURL string) ([]byte, error) {
+	if m.getURLFunc != nil {
+		return m.getURLFunc(ctx, fullURL)
+	}
 	return nil, fmt.Errorf("unexpected GetURL(%s)", fullURL)
 }
 
@@ -363,5 +367,132 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, state.Passed)
 		assert.Contains(t, state.FailureMessage, "create firewall rule operation response")
+	})
+
+	t.Run("target service accounts and logging are sent in the body", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				postBody = body.(map[string]any)
+				return opDone("op-create"), nil
+			},
+			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-sa", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                  "allow-sa",
+				"network":               "default",
+				"direction":             "INGRESS",
+				"action":                "allow",
+				"rules":                 []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"targetServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
+				"enableLogging":         true,
+				"logMetadata":           "EXCLUDE_ALL_METADATA",
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, []string{"sa@my-project.iam.gserviceaccount.com"}, postBody["targetServiceAccounts"])
+		assert.NotContains(t, postBody, "targetTags")
+		logCfg := postBody["logConfig"].(map[string]any)
+		assert.Equal(t, true, logCfg["enable"])
+		assert.Equal(t, "EXCLUDE_ALL_METADATA", logCfg["metadata"])
+	})
+
+	t.Run("mixing network tags and service accounts -> fails before API call", func(t *testing.T) {
+		var called bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				called = true
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                  "mix",
+				"network":               "default",
+				"rules":                 []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"targetTags":            []string{"web"},
+				"targetServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, called)
+		assert.Contains(t, state.FailureMessage, "cannot combine network tags and service accounts")
+	})
+
+	t.Run("dropdown and custom service accounts are merged (deduped) in the body", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				postBody = body.(map[string]any)
+				return opDone("op-create"), nil
+			},
+			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-sa", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                        "allow-sa",
+				"network":                     "default",
+				"direction":                   "INGRESS",
+				"action":                      "allow",
+				"rules":                       []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"targetServiceAccounts":       []string{"a@my-project.iam.gserviceaccount.com"},
+				"targetServiceAccountsCustom": []string{"b@other-project.iam.gserviceaccount.com", "a@my-project.iam.gserviceaccount.com"},
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, []string{
+			"a@my-project.iam.gserviceaccount.com",
+			"b@other-project.iam.gserviceaccount.com",
+		}, postBody["targetServiceAccounts"])
+	})
+
+	t.Run("non-service-account email in custom field -> fails before API call", func(t *testing.T) {
+		var called bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				called = true
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                        "bad-sa",
+				"network":                     "default",
+				"rules":                       []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"targetServiceAccountsCustom": []string{"someone@example.com"},
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, called)
+		assert.Contains(t, state.FailureMessage, "not a service account email")
 	})
 }

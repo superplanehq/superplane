@@ -26,13 +26,20 @@ const (
 type UpdateFirewall struct{}
 
 type UpdateFirewallSpec struct {
-	Firewall     string             `mapstructure:"firewall"`
-	EnabledState string             `mapstructure:"enabledState"`
-	Priority     *int               `mapstructure:"priority"`
-	Rules        []FirewallRuleSpec `mapstructure:"rules"`
-	Ranges       []string           `mapstructure:"ranges"`
-	TargetTags   *[]string          `mapstructure:"targetTags"`
-	Description  *string            `mapstructure:"description"`
+	Firewall              string             `mapstructure:"firewall"`
+	EnabledState          string             `mapstructure:"enabledState"`
+	Priority              *int               `mapstructure:"priority"`
+	Rules                 []FirewallRuleSpec `mapstructure:"rules"`
+	Ranges                []string           `mapstructure:"ranges"`
+	TargetTags                  *[]string `mapstructure:"targetTags"`
+	SourceTags                  *[]string `mapstructure:"sourceTags"`
+	TargetServiceAccounts       *[]string `mapstructure:"targetServiceAccounts"`
+	SourceServiceAccounts       *[]string `mapstructure:"sourceServiceAccounts"`
+	TargetServiceAccountsCustom *[]string `mapstructure:"targetServiceAccountsCustom"`
+	SourceServiceAccountsCustom *[]string `mapstructure:"sourceServiceAccountsCustom"`
+	Logging                     string    `mapstructure:"logging"`
+	LogMetadata           string             `mapstructure:"logMetadata"`
+	Description           *string            `mapstructure:"description"`
 }
 
 func (u *UpdateFirewall) Name() string {
@@ -64,18 +71,23 @@ func (u *UpdateFirewall) Documentation() string {
 - **Priority**: New priority (0-65535); lower numbers take precedence
 - **Protocols & ports**: Replace the rule's protocols/ports. The rule keeps its existing action (allow or deny)
 - **Ranges**: Replace the rule's CIDR ranges. Applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed)
-- **Target tags**: Replace the rule's target tags
+- **Target tags / Target service accounts**: Replace the VMs the rule applies to
+- **Source tags / Source service accounts**: Replace the rule's source filters (INGRESS rules only)
+- **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
 - **Description**: Replace the rule's description
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects an update that would mix them.
 
 ## Output
 
-Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target tags, disabled, creationTimestamp, and a console link.
+Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
 
 ## Important Notes
 
 - A rule's **network** and **direction** are fixed at creation and cannot be changed; this component cannot switch an allow rule to a deny rule.
 - You must change at least one field.
 - Requires the ` + "`roles/compute.securityAdmin`" + ` IAM role (or ` + "`roles/compute.admin`" + `).
+- The **service-account dropdowns** additionally require ` + "`iam.serviceAccounts.list`" + ` (e.g. ` + "`roles/iam.serviceAccountViewer`" + `); without it, use the custom field to enter emails directly. Cross-project and non-existent service accounts aren't validated by GCP, so prefer the dropdown.
 - The component waits for the underlying global operation to complete before emitting.`
 }
 
@@ -189,6 +201,100 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "targetServiceAccounts",
+			Label:       "Target service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Replace the rule's target service accounts. Cannot be combined with network tags.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+		},
+		{
+			Name:        "targetServiceAccountsCustom",
+			Label:       "Target service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Additional target service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+		},
+		{
+			Name:        "sourceTags",
+			Label:       "Source tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Replace the rule's source tags (INGRESS rules only).",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+		},
+		{
+			Name:        "sourceServiceAccounts",
+			Label:       "Source service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Replace the rule's source service accounts (INGRESS rules only). Cannot be combined with network tags.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+		},
+		{
+			Name:        "sourceServiceAccountsCustom",
+			Label:       "Source service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Additional source service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above. INGRESS rules only.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+		},
+		{
+			Name:        "logging",
+			Label:       "Logs",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallEnabledNoChange,
+			Description: "Leave Firewall Rules Logging unchanged, or turn it on/off.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "No change", Value: FirewallEnabledNoChange},
+				{Label: "Enabled", Value: FirewallEnabledEnabled},
+				{Label: "Disabled", Value: FirewallEnabledDisabled},
+			}}},
+		},
+		{
+			Name:        "logMetadata",
+			Label:       "Log metadata",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallLogMetadataIncludeAll,
+			Description: "Whether firewall logs include metadata. Only applies when logging is being enabled.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "Include all metadata", Value: FirewallLogMetadataIncludeAll},
+				{Label: "Exclude all metadata", Value: FirewallLogMetadataExcludeAll},
+			}}},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "logging", Values: []string{FirewallEnabledEnabled}},
+			},
+		},
+		{
 			Name:        "description",
 			Label:       "Description",
 			Type:        configuration.FieldTypeString,
@@ -211,6 +317,12 @@ func (u *UpdateFirewall) Setup(ctx core.SetupContext) error {
 	if err := validateFirewallEnabledState(spec.EnabledState); err != nil {
 		return err
 	}
+	if err := validateFirewallEnabledState(spec.Logging); err != nil {
+		return err
+	}
+	if _, err := normalizeFirewallLogMetadata(spec.LogMetadata); err != nil {
+		return err
+	}
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return err
 	}
@@ -218,6 +330,17 @@ func (u *UpdateFirewall) Setup(ctx core.SetupContext) error {
 		if _, err := buildFirewallRules(spec.Rules); err != nil {
 			return err
 		}
+	}
+	sourceServiceAccounts := mergeDedup(providedList(spec.SourceServiceAccounts), providedList(spec.SourceServiceAccountsCustom))
+	targetServiceAccounts := mergeDedup(providedList(spec.TargetServiceAccounts), providedList(spec.TargetServiceAccountsCustom))
+	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+		return err
+	}
+	if err := validateFirewallTargetsAndSources(
+		providedList(spec.SourceTags), providedList(spec.TargetTags),
+		sourceServiceAccounts, targetServiceAccounts,
+	); err != nil {
+		return err
 	}
 	return resolveFirewallNodeMetadata(ctx, spec.Firewall)
 }
@@ -238,6 +361,20 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if err := validateFirewallEnabledState(spec.EnabledState); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallEnabledState(spec.Logging); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	mergedSourceServiceAccounts := mergeDedup(providedList(spec.SourceServiceAccounts), providedList(spec.SourceServiceAccountsCustom))
+	mergedTargetServiceAccounts := mergeDedup(providedList(spec.TargetServiceAccounts), providedList(spec.TargetServiceAccountsCustom))
+	if err := validateServiceAccountEmails(mergeDedup(mergedSourceServiceAccounts, mergedTargetServiceAccounts)); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallTargetsAndSources(
+		providedList(spec.SourceTags), providedList(spec.TargetTags),
+		mergedSourceServiceAccounts, mergedTargetServiceAccounts,
+	); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -314,6 +451,36 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 	// the network. A nil pointer means the field is toggled off — leave it alone.
 	if spec.TargetTags != nil {
 		patch["targetTags"] = trimList(*spec.TargetTags)
+	}
+	// Target service accounts are patched when either the dropdown or the custom
+	// field is toggled on; the value is the merge of both.
+	if spec.TargetServiceAccounts != nil || spec.TargetServiceAccountsCustom != nil {
+		patch["targetServiceAccounts"] = mergedTargetServiceAccounts
+	}
+	// Source tags / service accounts only exist on INGRESS rules; reject them on
+	// an EGRESS rule rather than letting the API return a less obvious error.
+	if spec.SourceTags != nil {
+		if strings.EqualFold(current.Direction, FirewallDirectionEgress) {
+			return ctx.ExecutionState.Fail("error", "source tags apply only to INGRESS firewall rules")
+		}
+		patch["sourceTags"] = trimList(*spec.SourceTags)
+	}
+	if spec.SourceServiceAccounts != nil || spec.SourceServiceAccountsCustom != nil {
+		if strings.EqualFold(current.Direction, FirewallDirectionEgress) {
+			return ctx.ExecutionState.Fail("error", "source service accounts apply only to INGRESS firewall rules")
+		}
+		patch["sourceServiceAccounts"] = mergedSourceServiceAccounts
+	}
+
+	switch strings.TrimSpace(spec.Logging) {
+	case FirewallEnabledEnabled:
+		metadata, err := normalizeFirewallLogMetadata(spec.LogMetadata)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", err.Error())
+		}
+		patch["logConfig"] = map[string]any{"enable": true, "metadata": metadata}
+	case FirewallEnabledDisabled:
+		patch["logConfig"] = map[string]any{"enable": false}
 	}
 
 	if spec.Description != nil {

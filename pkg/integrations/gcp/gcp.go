@@ -989,6 +989,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListForwardingRuleResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeServiceAccount:
+		return compute.ListServiceAccountResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:
 		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:

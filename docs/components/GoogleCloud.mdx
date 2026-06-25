@@ -1135,17 +1135,24 @@ The Create Firewall Rule component creates a VPC firewall rule that controls tra
 - **Source ranges** (INGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`)
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`)
 - **Target tags**: Optionally limit the rule to VMs with these network tags; leave empty to apply to all VMs in the network
+- **Target service accounts**: Optionally limit the rule to VMs running as these service accounts (alternative to target tags). Picked from a dropdown of the project's service accounts; a separate custom field accepts cross-project emails not in the list
+- **Source tags / Source service accounts** (INGRESS): Optionally match traffic from VMs with these network tags or service accounts
 - **Description**: Optional human-readable description
 - **Disabled**: Create the rule in a disabled state
+- **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects a rule that mixes them.
 
 ### Output
 
-Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target tags, disabled, creationTimestamp, and a console link.
+Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
 
 ### Important Notes
 
 - Firewall rules are **global** resources; the network and rule live at the project level.
 - Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`) on the project; without it the dropdown can't list accounts — use the custom field to enter emails directly.
+- GCP does **not** verify that a service account exists when creating the rule, so a wrong or non-existent email produces a rule that silently matches nothing. The dropdown avoids this; the custom field is format-checked.
 - The component waits for the underlying global operation to complete before emitting.
 
 ### Example Output
@@ -1167,6 +1174,7 @@ Emits the created firewall rule: name, selfLink, network, direction, priority, a
     "direction": "INGRESS",
     "disabled": false,
     "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "loggingEnabled": false,
     "name": "allow-http",
     "network": "default",
     "priority": 1000,
@@ -1509,18 +1517,23 @@ The Update Firewall Rule component changes an existing VPC firewall rule. Toggle
 - **Priority**: New priority (0-65535); lower numbers take precedence
 - **Protocols & ports**: Replace the rule's protocols/ports. The rule keeps its existing action (allow or deny)
 - **Ranges**: Replace the rule's CIDR ranges. Applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed)
-- **Target tags**: Replace the rule's target tags
+- **Target tags / Target service accounts**: Replace the VMs the rule applies to
+- **Source tags / Source service accounts**: Replace the rule's source filters (INGRESS rules only)
+- **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
 - **Description**: Replace the rule's description
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects an update that would mix them.
 
 ### Output
 
-Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target tags, disabled, creationTimestamp, and a console link.
+Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
 
 ### Important Notes
 
 - A rule's **network** and **direction** are fixed at creation and cannot be changed; this component cannot switch an allow rule to a deny rule.
 - You must change at least one field.
 - Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`); without it, use the custom field to enter emails directly. Cross-project and non-existent service accounts aren't validated by GCP, so prefer the dropdown.
 - The component waits for the underlying global operation to complete before emitting.
 
 ### Example Output
@@ -1543,6 +1556,8 @@ Emits the updated firewall rule: name, selfLink, network, direction, priority, a
     "direction": "INGRESS",
     "disabled": true,
     "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "logMetadata": "INCLUDE_ALL_METADATA",
+    "loggingEnabled": true,
     "name": "allow-http",
     "network": "default",
     "priority": 900,

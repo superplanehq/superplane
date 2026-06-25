@@ -16,17 +16,26 @@ import (
 type CreateFirewall struct{}
 
 type CreateFirewallSpec struct {
-	Name              string             `mapstructure:"name"`
-	Network           string             `mapstructure:"network"`
-	Direction         string             `mapstructure:"direction"`
-	Action            string             `mapstructure:"action"`
-	Priority          *int               `mapstructure:"priority"`
-	Rules             []FirewallRuleSpec `mapstructure:"rules"`
-	SourceRanges      []string           `mapstructure:"sourceRanges"`
-	DestinationRanges []string           `mapstructure:"destinationRanges"`
-	TargetTags        []string           `mapstructure:"targetTags"`
-	Description       string             `mapstructure:"description"`
-	Disabled          bool               `mapstructure:"disabled"`
+	Name                  string             `mapstructure:"name"`
+	Network               string             `mapstructure:"network"`
+	Direction             string             `mapstructure:"direction"`
+	Action                string             `mapstructure:"action"`
+	Priority              *int               `mapstructure:"priority"`
+	Rules                 []FirewallRuleSpec `mapstructure:"rules"`
+	SourceRanges          []string           `mapstructure:"sourceRanges"`
+	DestinationRanges     []string           `mapstructure:"destinationRanges"`
+	SourceTags            []string           `mapstructure:"sourceTags"`
+	TargetTags            []string           `mapstructure:"targetTags"`
+	SourceServiceAccounts []string           `mapstructure:"sourceServiceAccounts"`
+	TargetServiceAccounts []string           `mapstructure:"targetServiceAccounts"`
+	// *Custom hold free-text service-account emails (e.g. cross-project ones not
+	// listed by the dropdown). They are merged with the dropdown selections.
+	SourceServiceAccountsCustom []string `mapstructure:"sourceServiceAccountsCustom"`
+	TargetServiceAccountsCustom []string `mapstructure:"targetServiceAccountsCustom"`
+	Description                 string   `mapstructure:"description"`
+	Disabled              bool               `mapstructure:"disabled"`
+	EnableLogging         bool               `mapstructure:"enableLogging"`
+	LogMetadata           string             `mapstructure:"logMetadata"`
 }
 
 func (c *CreateFirewall) Name() string {
@@ -61,17 +70,24 @@ func (c *CreateFirewall) Documentation() string {
 - **Source ranges** (INGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
 - **Target tags**: Optionally limit the rule to VMs with these network tags; leave empty to apply to all VMs in the network
+- **Target service accounts**: Optionally limit the rule to VMs running as these service accounts (alternative to target tags). Picked from a dropdown of the project's service accounts; a separate custom field accepts cross-project emails not in the list
+- **Source tags / Source service accounts** (INGRESS): Optionally match traffic from VMs with these network tags or service accounts
 - **Description**: Optional human-readable description
 - **Disabled**: Create the rule in a disabled state
+- **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects a rule that mixes them.
 
 ## Output
 
-Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target tags, disabled, creationTimestamp, and a console link.
+Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
 
 ## Important Notes
 
 - Firewall rules are **global** resources; the network and rule live at the project level.
 - Requires the ` + "`roles/compute.securityAdmin`" + ` IAM role (or ` + "`roles/compute.admin`" + `).
+- The **service-account dropdowns** additionally require ` + "`iam.serviceAccounts.list`" + ` (e.g. ` + "`roles/iam.serviceAccountViewer`" + `) on the project; without it the dropdown can't list accounts — use the custom field to enter emails directly.
+- GCP does **not** verify that a service account exists when creating the rule, so a wrong or non-existent email produces a rule that silently matches nothing. The dropdown avoids this; the custom field is format-checked.
 - The component waits for the underlying global operation to complete before emitting.`
 }
 
@@ -224,6 +240,81 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "targetServiceAccounts",
+			Label:       "Target service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Limit the rule to VMs running as these service accounts. Cannot be combined with network tags.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+		},
+		{
+			Name:        "targetServiceAccountsCustom",
+			Label:       "Target service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Additional target service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+		},
+		{
+			Name:        "sourceTags",
+			Label:       "Source tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Apply the rule to traffic from VMs with these network tags (INGRESS only).",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+			},
+		},
+		{
+			Name:        "sourceServiceAccounts",
+			Label:       "Source service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Apply the rule to traffic from VMs running as these service accounts (INGRESS only). Cannot be combined with network tags.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+			},
+		},
+		{
+			Name:        "sourceServiceAccountsCustom",
+			Label:       "Source service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Additional source service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above. INGRESS only.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+			},
+		},
+		{
 			Name:        "description",
 			Label:       "Description",
 			Type:        configuration.FieldTypeString,
@@ -237,6 +328,29 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			Required:    false,
 			Default:     false,
 			Description: "Create the rule in a disabled state.",
+		},
+		{
+			Name:        "enableLogging",
+			Label:       "Logs",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Turn on Firewall Rules Logging for this rule. Logging can generate a large volume of logs and increase Cloud Logging costs.",
+		},
+		{
+			Name:        "logMetadata",
+			Label:       "Log metadata",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallLogMetadataIncludeAll,
+			Description: "Whether firewall logs include metadata. Only applies when logging is enabled.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "Include all metadata", Value: FirewallLogMetadataIncludeAll},
+				{Label: "Exclude all metadata", Value: FirewallLogMetadataExcludeAll},
+			}}},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "enableLogging", Values: []string{"true"}},
+			},
 		},
 	}
 }
@@ -262,6 +376,20 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	if _, err := buildFirewallRules(spec.Rules); err != nil {
+		return err
+	}
+	if _, err := normalizeFirewallLogMetadata(spec.LogMetadata); err != nil {
+		return err
+	}
+	sourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+	targetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+		return err
+	}
+	if err := validateFirewallTargetsAndSources(
+		trimList(spec.SourceTags), trimList(spec.TargetTags),
+		sourceServiceAccounts, targetServiceAccounts,
+	); err != nil {
 		return err
 	}
 	return ctx.Metadata.Set(FirewallNodeMetadata{FirewallName: strings.TrimSpace(spec.Name)})
@@ -295,6 +423,17 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
+	sourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+	targetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallTargetsAndSources(
+		trimList(spec.SourceTags), trimList(spec.TargetTags),
+		sourceServiceAccounts, targetServiceAccounts,
+	); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
 
 	client, err := getClient(ctx)
 	if err != nil {
@@ -325,12 +464,28 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 		if ranges := trimList(spec.SourceRanges); len(ranges) > 0 {
 			body["sourceRanges"] = ranges
 		}
+		if tags := trimList(spec.SourceTags); len(tags) > 0 {
+			body["sourceTags"] = tags
+		}
+		if len(sourceServiceAccounts) > 0 {
+			body["sourceServiceAccounts"] = sourceServiceAccounts
+		}
 	}
 	if tags := trimList(spec.TargetTags); len(tags) > 0 {
 		body["targetTags"] = tags
 	}
+	if len(targetServiceAccounts) > 0 {
+		body["targetServiceAccounts"] = targetServiceAccounts
+	}
 	if desc := strings.TrimSpace(spec.Description); desc != "" {
 		body["description"] = desc
+	}
+	if spec.EnableLogging {
+		metadata, err := normalizeFirewallLogMetadata(spec.LogMetadata)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", err.Error())
+		}
+		body["logConfig"] = map[string]any{"enable": true, "metadata": metadata}
 	}
 
 	respBody, err := client.Post(callCtx, fmt.Sprintf("projects/%s/global/firewalls", project), body)
