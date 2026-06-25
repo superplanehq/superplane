@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
-	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 const PayloadType = "semaphore.workflow.finished"
@@ -118,7 +117,7 @@ superplane oidc verify \
   --pipeline-file ".semaphore/production/deploy.yml"
 ` + "```" + `
 
-The command reads ` + "`SUPERPLANE_OIDC_TOKEN`" + ` from the environment, calls your SuperPlane instance to verify the signature, and confirms the canvas node is authorized to trigger this workflow. Exit code 0 means the token is valid; any other exit code aborts the job.
+The command reads ` + "`SUPERPLANE_OIDC_TOKEN`" + ` from the environment and calls your SuperPlane instance to verify the signature. Pass expected claim values (pipeline file, node ID, commit SHA, etc.) to enforce authorization in CI — SuperPlane attests what was triggered; your pipeline decides what it accepts. Exit code 0 means the token is valid and matches your expectations; any other exit code aborts the job.
 
 ## Output Channels
 
@@ -578,27 +577,12 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 		return nil, fmt.Errorf("OIDC provider is not configured")
 	}
 
-	projectID := ""
-	if metadata.Project != nil {
-		projectID = metadata.Project.ID
-	}
-
-	token, err := oidc.SignExecutionToken(ctx.OIDC, oidc.ExecutionTokenInput{
-		OrganizationID: ctx.OrganizationID,
-		CanvasID:       ctx.WorkflowID,
-		NodeID:         ctx.NodeID,
-		ExecutionID:    ctx.ID.String(),
-		Component:      r.Name(),
-		ProjectID:      projectID,
-		PipelineFile:   spec.PipelineFile,
-		Ref:            spec.Ref,
-		CommitSha:      spec.CommitSha,
-	})
+	token, err := r.signOIDCToken(ctx, spec, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign OIDC execution token: %w", err)
 	}
 
-	parameters["SUPERPLANE_OIDC_TOKEN"] = token
+	parameters[oidcTokenParameterName] = token
 
 	return parameters, nil
 }

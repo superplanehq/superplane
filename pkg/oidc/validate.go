@@ -43,16 +43,3 @@ func (s *RSAProvider) Validate(tokenString string) (map[string]any, error) {
 
 	return map[string]any(claims), nil
 }
-
-func ValidateExecutionToken(provider Provider, tokenString string) (ExecutionTokenClaims, error) {
-	if provider == nil {
-		return ExecutionTokenClaims{}, fmt.Errorf("OIDC provider is not configured")
-	}
-
-	rawClaims, err := provider.Validate(tokenString)
-	if err != nil {
-		return ExecutionTokenClaims{}, err
-	}
-
-	return ParseExecutionTokenClaims(rawClaims)
-}
