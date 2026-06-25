@@ -33,6 +33,10 @@ func (m *mockImageClient) Post(ctx context.Context, path string, body any) ([]by
 	return nil, fmt.Errorf("Post not implemented")
 }
 
+func (m *mockImageClient) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	return nil, fmt.Errorf("Patch not implemented")
+}
+
 func (m *mockImageClient) Delete(ctx context.Context, path string) ([]byte, error) {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, path)
