@@ -92,7 +92,7 @@ func TestRunPythonExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, []string{"pip install requests", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, []string{"pip install requests\necho ready"}, req.SetupCommands)
 }
 
 func TestValidateRunPythonSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {

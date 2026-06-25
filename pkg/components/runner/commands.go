@@ -29,6 +29,15 @@ func normalizeCommands(commands string) []string {
 	return out
 }
 
+func normalizeSetupCommands(commands string) []string {
+	commands = strings.TrimSpace(commands)
+	if commands == "" {
+		return nil
+	}
+
+	return []string{commands}
+}
+
 func validateCommands(commands string) error {
 	lines := normalizeCommands(commands)
 	if len(lines) == 0 {

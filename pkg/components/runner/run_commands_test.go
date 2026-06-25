@@ -31,6 +31,29 @@ func TestNormalizeCommands(t *testing.T) {
 	}
 }
 
+func TestNormalizeSetupCommandsPreservesMultilineScript(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y awscli
+fi
+
+echo ready
+`
+	want := []string{`if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y awscli
+fi
+
+echo ready`}
+
+	assert.Equal(t, want, normalizeSetupCommands(input))
+	assert.Empty(t, normalizeSetupCommands(""))
+	assert.Empty(t, normalizeSetupCommands("\n \n"))
+}
+
 func TestValidateEnvironment(t *testing.T) {
 	t.Parallel()
 

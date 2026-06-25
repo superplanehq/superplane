@@ -106,7 +106,7 @@ func TestRunJSExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, []string{"npm ci", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, []string{"npm ci\necho ready"}, req.SetupCommands)
 }
 
 func TestValidateRunJSSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {
