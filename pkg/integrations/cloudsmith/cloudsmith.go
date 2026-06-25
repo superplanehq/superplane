@@ -78,6 +78,9 @@ func (c *Cloudsmith) Actions() []core.Action {
 		&DeletePackage{},
 		&ListPackages{},
 		&PromotePackage{},
+		&ScanPackage{},
+		&QuarantinePackage{},
+		&GetPackageVulnerabilities{},
 	}
 }
 
