@@ -6,27 +6,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMatchExpectedClaims(t *testing.T) {
+func TestParseExpectedClaims(t *testing.T) {
 	t.Parallel()
 
-	cmd := &verifyCommand{
-		pipelineFile: strPtr(".semaphore/deploy.yml"),
-		nodeID:       strPtr("deploy"),
-	}
+	expected, err := parseExpectedClaims([]string{
+		"pipeline_file=.semaphore/deploy.yml",
+		"node_id=deploy",
+	})
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"pipeline_file": ".semaphore/deploy.yml",
+		"node_id":       "deploy",
+	}, expected)
+
+	_, err = parseExpectedClaims([]string{"invalid"})
+	require.Error(t, err)
+}
+
+func TestMatchExpectedClaims(t *testing.T) {
+	t.Parallel()
 
 	err := matchExpectedClaims(map[string]any{
 		"pipeline_file": ".semaphore/deploy.yml",
 		"node_id":       "deploy",
-	}, cmd)
+	}, map[string]string{
+		"pipeline_file": ".semaphore/deploy.yml",
+		"node_id":       "deploy",
+	})
 	require.NoError(t, err)
 
-	cmd.canvasID = strPtr("expected-canvas")
 	err = matchExpectedClaims(map[string]any{
 		"canvas_id": "other-canvas",
-	}, cmd)
+	}, map[string]string{
+		"canvas_id": "expected-canvas",
+	})
 	require.Error(t, err)
-}
-
-func strPtr(value string) *string {
-	return &value
 }

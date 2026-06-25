@@ -11,32 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	spoidc "github.com/superplanehq/superplane/pkg/oidc"
 )
-
-func TestPublicKeysFromJWKsRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	provider, err := NewProviderFromKeyDir("http://superplane.test", filepath.Join("..", "..", "test", "fixtures", "oidc-keys"))
-	require.NoError(t, err)
-
-	publicKeys, err := PublicKeysFromJWKs(provider.PublicJWKs())
-	require.NoError(t, err)
-
-	token, err := provider.Sign("execution:test", time.Hour, "superplane-ci", map[string]any{
-		"org_id": uuid.NewString(),
-	})
-	require.NoError(t, err)
-
-	claims, err := ValidateToken(token, "http://superplane.test", publicKeys)
-	require.NoError(t, err)
-	require.NotEmpty(t, claims["org_id"])
-}
 
 func TestValidateRemote(t *testing.T) {
 	t.Parallel()
 
 	issuer := "http://superplane.test"
-	provider, err := NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "test", "fixtures", "oidc-keys"))
+	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
 	require.NoError(t, err)
 
 	var server *httptest.Server
@@ -67,7 +49,7 @@ func TestValidateRemote(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	claims, err := ValidateRemote(server.Client(), token, server.URL)
+	claims, err := validateRemote(server.Client(), token, server.URL)
 	require.NoError(t, err)
 	require.Equal(t, canvasID, claims["canvas_id"])
 	require.Equal(t, ".semaphore/deploy.yml", claims["pipeline_file"])
@@ -77,7 +59,7 @@ func TestValidateRemoteRejectsInvalidToken(t *testing.T) {
 	t.Parallel()
 
 	issuer := "http://superplane.test"
-	provider, err := NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "test", "fixtures", "oidc-keys"))
+	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
 	require.NoError(t, err)
 
 	var server *httptest.Server
@@ -93,7 +75,7 @@ func TestValidateRemoteRejectsInvalidToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err = ValidateRemote(server.Client(), "not-a-token", server.URL)
+	_, err = validateRemote(server.Client(), "not-a-token", server.URL)
 	require.Error(t, err)
 }
 
