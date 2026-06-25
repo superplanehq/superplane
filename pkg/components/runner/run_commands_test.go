@@ -31,6 +31,79 @@ func TestNormalizeCommands(t *testing.T) {
 	}
 }
 
+func TestNormalizeCommandsPreservesShellBlocks(t *testing.T) {
+	t.Parallel()
+
+	input := `
+echo before
+if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  for package in curl unzip; do
+    apt-get install -y "$package"
+  done
+fi
+echo ready
+`
+	want := []string{
+		"echo before",
+		`if ! command -v aws >/dev/null 2>&1; then
+apt-get update
+for package in curl unzip; do
+apt-get install -y "$package"
+done
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresQuotedShellClosers(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  echo "; fi"
+  echo "}"
+fi
+echo ready
+`
+	want := []string{
+		`if true; then
+echo "; fi"
+echo "}"
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
+func TestNormalizeCommandsIgnoresHeredocBodyShellWords(t *testing.T) {
+	t.Parallel()
+
+	input := `
+if true; then
+  cat <<'EOF'
+fi
+done
+EOF
+fi
+echo ready
+`
+	want := []string{
+		`if true; then
+cat <<'EOF'
+fi
+done
+EOF
+fi`,
+		"echo ready",
+	}
+
+	assert.Equal(t, want, normalizeCommands(input))
+}
+
 func TestValidateEnvironment(t *testing.T) {
 	t.Parallel()
 
