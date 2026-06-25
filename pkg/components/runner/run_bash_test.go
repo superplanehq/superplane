@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -52,6 +53,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, RunModeBash, req.RunMode)
+	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Contains(t, req.Script, "jq")
 	assert.Contains(t, req.Script, "SUPERPLANE_PAYLOAD_FILE")
 	assert.Contains(t, req.Script, "SUPERPLANE_RESULT_FILE")
