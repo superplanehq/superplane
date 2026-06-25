@@ -5,10 +5,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -19,15 +18,15 @@ func GetInviteLink(orgID string) (*pb.GetInviteLinkResponse, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			orgUUID, parseErr := uuid.Parse(orgID)
 			if parseErr != nil {
-				return nil, status.Error(codes.InvalidArgument, "invalid organization id")
+				return nil, grpcerrors.InvalidArgument(nil, "invalid organization id")
 			}
 
 			inviteLink, err = models.CreateInviteLink(orgUUID)
 			if err != nil {
-				return nil, status.Error(codes.Internal, "failed to create invite link")
+				return nil, grpcerrors.Internal(err, "failed to create invite link")
 			}
 		} else {
-			return nil, status.Error(codes.Internal, "failed to fetch invite link")
+			return nil, grpcerrors.Internal(err, "failed to fetch invite link")
 		}
 	}
 
@@ -39,13 +38,13 @@ func GetInviteLink(orgID string) (*pb.GetInviteLinkResponse, error) {
 func UpdateInviteLink(orgID string, enabled bool) (*pb.UpdateInviteLinkResponse, error) {
 	inviteLink, err := models.FindInviteLinkByOrganizationID(orgID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "invite link not found")
+		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
 
 	inviteLink.Enabled = enabled
 	inviteLink.UpdatedAt = time.Now()
 	if err := models.SaveInviteLink(inviteLink); err != nil {
-		return nil, status.Error(codes.Internal, "failed to update invite link")
+		return nil, grpcerrors.Internal(err, "failed to update invite link")
 	}
 
 	return &pb.UpdateInviteLinkResponse{
@@ -56,13 +55,13 @@ func UpdateInviteLink(orgID string, enabled bool) (*pb.UpdateInviteLinkResponse,
 func ResetInviteLink(orgID string) (*pb.ResetInviteLinkResponse, error) {
 	inviteLink, err := models.FindInviteLinkByOrganizationID(orgID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "invite link not found")
+		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
 
 	inviteLink.Token = uuid.New()
 	inviteLink.UpdatedAt = time.Now()
 	if err := models.SaveInviteLink(inviteLink); err != nil {
-		return nil, status.Error(codes.Internal, "failed to reset invite link")
+		return nil, grpcerrors.Internal(err, "failed to reset invite link")
 	}
 
 	return &pb.ResetInviteLinkResponse{

@@ -13,6 +13,7 @@ import (
 const (
 	CanvasUpdatedEvent        = "canvas_updated"
 	CanvasVersionUpdatedEvent = "canvas_version_updated"
+	CanvasVersionDeletedEvent = "canvas_version_deleted"
 	CanvasStagingUpdatedEvent = "staging_updated"
 	CanvasDeletedEvent        = "canvas_deleted"
 	CanvasMemoryUpdatedEvent  = "memory_updated"
@@ -43,6 +44,10 @@ func HandleCanvasMemoryUpdated(messageBody []byte, wsHub *ws.Hub) error {
 
 func HandleCanvasVersionUpdated(messageBody []byte, wsHub *ws.Hub) error {
 	return handleCanvasVersion(messageBody, wsHub, CanvasVersionUpdatedEvent)
+}
+
+func HandleCanvasVersionDeleted(messageBody []byte, wsHub *ws.Hub) error {
+	return handleCanvasVersion(messageBody, wsHub, CanvasVersionDeletedEvent)
 }
 
 func HandleCanvasStagingUpdated(messageBody []byte, wsHub *ws.Hub) error {

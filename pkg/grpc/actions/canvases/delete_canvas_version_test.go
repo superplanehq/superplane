@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestDeleteCanvasVersion(t *testing.T) {
@@ -20,46 +20,46 @@ func TestDeleteCanvasVersion(t *testing.T) {
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(context.Background(), r.Organization.ID.String(), uuid.New().String(), uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), "invalid-id", uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, "invalid-id", uuid.New().String(), uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid version id -> error", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-delete-invalid-version")
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), canvasID, "invalid-id")
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), uuid.New().String(), uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("missing version -> not found", func(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "draft-branch-delete-missing")
 		_, err := DeleteCanvasVersion(ctx, r.Organization.ID.String(), canvasID, uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("draft owned by another user -> error", func(t *testing.T) {
@@ -73,9 +73,9 @@ func TestDeleteCanvasVersion(t *testing.T) {
 		otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
 		_, err = DeleteCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID, versionID)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.PermissionDenied, s.Code())
+		assert.Equal(t, codes.PermissionDenied, code)
 	})
 
 	t.Run("deletes draft branch and version", func(t *testing.T) {

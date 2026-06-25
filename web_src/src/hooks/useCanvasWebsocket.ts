@@ -35,6 +35,7 @@ type RepositoryBranchUpdatedPayload = {
 type CanvasLifecycleEventName =
   | "canvas_updated"
   | "canvas_version_updated"
+  | "canvas_version_deleted"
   | "canvas_deleted"
   | "repository_branch_updated";
 
@@ -120,6 +121,10 @@ export function useCanvasWebsocket(
         return;
       }
 
+      if (eventName === "canvas_version_deleted" && !canvasMessage.versionId) {
+        return;
+      }
+
       const shouldInvalidateLifecycleQueries =
         onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, eventName) !== false;
       if (!shouldInvalidateLifecycleQueries) {
@@ -142,6 +147,11 @@ export function useCanvasWebsocket(
 
       if (eventName === "canvas_version_updated") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
+        return;
+      }
+
+      if (eventName === "canvas_version_deleted") {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
         return;
       }
 
@@ -206,6 +216,7 @@ export function useCanvasWebsocket(
       const isCanvasLifecycleEvent =
         data.event === "canvas_updated" ||
         data.event === "canvas_version_updated" ||
+        data.event === "canvas_version_deleted" ||
         data.event === "canvas_deleted" ||
         data.event === "repository_branch_updated";
       // Staging events fire while editing a draft (not the live version), so they
@@ -277,6 +288,7 @@ export function useCanvasWebsocket(
         }
         case "canvas_updated":
         case "canvas_version_updated":
+        case "canvas_version_deleted":
         case "canvas_deleted":
         case "repository_branch_updated":
           handleCanvasLifecycleEvent(data.event as CanvasLifecycleEventName, payload);

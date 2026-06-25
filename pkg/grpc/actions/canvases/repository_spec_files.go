@@ -3,20 +3,20 @@ package canvases
 import (
 	"context"
 	"errors"
-	"sort"
-	"strings"
-
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
+	"sort"
+	"strings"
 )
 
 const (
@@ -95,7 +95,7 @@ func readRepositorySpecFile(
 
 	normalized := normalizeRepositoryFilePath(path)
 	if normalized != CanvasYAMLRepositoryPath && normalized != ConsoleYAMLRepositoryPath {
-		return "", status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", path)
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", path))
 	}
 
 	if stage {
@@ -130,20 +130,20 @@ func loadRepositorySpecVersionForRead(
 ) (*models.Canvas, *models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "invalid organization_id")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
+		return nil, nil, grpcerrors.InvalidArgument(nil, "invalid canvas_id")
 	}
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, status.Error(codes.NotFound, "canvas not found")
+			return nil, nil, grpcerrors.NotFound(err, "canvas not found")
 		}
-		return nil, nil, status.Error(codes.Internal, "failed to load canvas")
+		return nil, nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
 	var version *models.CanvasVersion
@@ -156,7 +156,7 @@ func loadRepositorySpecVersionForRead(
 		v, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
 		if loadErr != nil {
 			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
+				return grpcerrors.NotFound(loadErr, "version not found")
 			}
 			return loadErr
 		}
@@ -169,10 +169,10 @@ func loadRepositorySpecVersionForRead(
 		return nil
 	})
 	if err != nil {
-		if status.Code(err) != codes.Unknown {
+		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, nil, err
 		}
-		return nil, nil, status.Error(codes.Internal, "failed to load version")
+		return nil, nil, grpcerrors.Internal(err, "failed to load version")
 	}
 
 	return canvas, version, nil
@@ -199,7 +199,7 @@ func ApplyRepositorySpecFileOperations(
 	operations []*pb.CanvasRepositoryFileOperation,
 ) error {
 	if strings.TrimSpace(versionID) == "" {
-		return status.Error(codes.InvalidArgument, "version_id is required for canvas.yaml and console.yaml updates")
+		return grpcerrors.InvalidArgument(nil, "version_id is required for canvas.yaml and console.yaml updates")
 	}
 
 	for _, operation := range operations {
@@ -207,7 +207,7 @@ func ApplyRepositorySpecFileOperations(
 			continue
 		}
 		if operation.GetDelete() {
-			return status.Errorf(codes.InvalidArgument, "%q cannot be deleted", operation.GetPath())
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
 		}
 
 		normalized := normalizeRepositoryFilePath(operation.GetPath())
@@ -248,7 +248,7 @@ func ApplyRepositorySpecFileOperations(
 				return err
 			}
 		default:
-			return status.Errorf(codes.InvalidArgument, "unsupported repository spec file %q", operation.GetPath())
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}
 	}
 

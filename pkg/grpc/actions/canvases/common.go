@@ -6,11 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -123,7 +122,7 @@ func mapCanvasNameUniqueConstraintError(err error) error {
 
 	err = models.MapCanvasNameUniqueConstraintError(err)
 	if errors.Is(err, models.ErrCanvasNameAlreadyExists) {
-		return status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
+		return grpcerrors.AlreadyExists(err, canvasNameAlreadyExistsMessage)
 	}
 
 	return err
@@ -146,7 +145,7 @@ func publishCanvasVersionInTransaction(
 		return err
 	}
 
-	if len(changeset.GetChanges()) == 0 {
+	if len(changeset.Changes) == 0 {
 		return mapCanvasNameUniqueConstraintError(
 			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
 		)

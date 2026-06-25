@@ -11,12 +11,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -38,25 +37,25 @@ func CommitCanvasRepositoryFiles(
 ) (*pb.CommitCanvasRepositoryFilesResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
 	_, err = models.FindCanvas(orgID, canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+			return nil, grpcerrors.NotFound(err, "canvas not found")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to load canvas: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
 	resolvedAutoLayout := resolveCommitCanvasAutoLayout(autoLayout != nil, autoLayout)
@@ -115,12 +114,12 @@ func commitGitFileOperations(
 ) (string, error) {
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
-		return "", status.Errorf(codes.NotFound, "repository not found: %v", err)
+		return "", grpcerrors.NotFound(err, "repository not found")
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
 	if err != nil {
-		return "", status.Errorf(codes.Internal, "failed to find user: %v", err)
+		return "", grpcerrors.Internal(err, "failed to find user")
 	}
 
 	gitOperations := make([]git.FileOperation, 0, len(gitOps))
@@ -151,7 +150,7 @@ func commitGitFileOperations(
 		},
 	})
 	if err != nil {
-		return "", status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+		return "", grpcerrors.Internal(err, "failed to commit repository files")
 	}
 
 	return newCommitSha, nil

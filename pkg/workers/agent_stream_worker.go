@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"gorm.io/gorm"
 )
 
@@ -28,6 +29,7 @@ const (
 	maxLockedStreamReschedules = 10
 	agentStreamService         = "superplane.agent-stream-worker"
 	streamHeartbeatInterval    = 30 * time.Second
+	agentTokenUsagePublishWait = 30 * time.Second
 	stuckHeartbeatGrace        = 5 * time.Minute
 	// Must stay above agentStreamTimeout so long-but-healthy turns
 	// without a heartbeat yet aren't force-failed mid-flight.
@@ -39,15 +41,46 @@ var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
+var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent) error {
+	return messages.NewAgentRunFinishedMessage(
+		session.OrganizationID.String(),
+		session.ID.String(),
+		evt.Model,
+		evt.Usage.InputTokens,
+		evt.Usage.OutputTokens,
+		evt.Usage.TotalTokens,
+		evt.Usage.CacheReadTokens,
+		evt.Usage.CacheWriteTokens,
+	).Publish()
+}
+
+var publishAgentTokenUsageAsync = func(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+		publishPreparedAgentTokenUsage(publishCtx, usageService, session, evt)
+	}()
+}
+
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider           agents.Provider
 	customToolExecutor agents.CustomToolExecutor
+	usageService       usage.Service
 	rabbitMQURL        string
 	slots              chan struct{}
 }
 
 func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customToolExecutor ...agents.CustomToolExecutor) *AgentStreamWorker {
+	return NewAgentStreamWorkerWithUsageService(provider, rabbitMQURL, nil, customToolExecutor...)
+}
+
+func NewAgentStreamWorkerWithUsageService(
+	provider agents.Provider,
+	rabbitMQURL string,
+	usageService usage.Service,
+	customToolExecutor ...agents.CustomToolExecutor,
+) *AgentStreamWorker {
 	executor := agents.CustomToolExecutor(unsupportedCustomToolExecutor{})
 	if len(customToolExecutor) > 0 && customToolExecutor[0] != nil {
 		executor = customToolExecutor[0]
@@ -55,6 +88,7 @@ func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, customTo
 	return &AgentStreamWorker{
 		provider:           provider,
 		customToolExecutor: executor,
+		usageService:       usageService,
 		rabbitMQURL:        rabbitMQURL,
 		slots:              make(chan struct{}, maxConcurrentStreams),
 	}
@@ -402,11 +436,12 @@ func (w *AgentStreamWorker) streamProviderTurn(
 
 	var streamErr error
 	customTools := newCustomToolTurnState()
+	usageRetriever, _ := w.provider.(agents.ProviderSessionUsageRetriever)
 
 	for {
 		customTools.clearRequirement()
 		err := w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-			return handleProviderEvent(session.ID, evt, publish, &streamErr, customTools)
+			return handleProviderEvent(ctx, w.usageService, usageRetriever, session, evt, publish, &streamErr, customTools)
 		})
 
 		if errors.Is(err, errCustomToolResultsRequired) {
@@ -429,7 +464,10 @@ func (w *AgentStreamWorker) streamProviderTurn(
 }
 
 func handleProviderEvent(
-	sessionID uuid.UUID,
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
 	evt agents.ProviderEvent,
 	publish func(messages.AgentSessionEventMessage),
 	streamErr *error,
@@ -438,26 +476,29 @@ func handleProviderEvent(
 	// Drop late events from a turn the user has already stopped — closes
 	// the race between InterruptSession's commit and provider SSE bytes
 	// already in flight.
-	streaming, err := models.IsAgentSessionStreaming(sessionID)
+	streaming, err := models.IsAgentSessionStreaming(session.ID)
 	if err != nil {
-		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: status check failed; processing event anyway")
+		log.WithError(err).WithField("session_id", session.ID).Warn("agent stream: status check failed; processing event anyway")
 	} else if !streaming {
+		if evt.Type == agents.ProviderEventTurnCompleted {
+			publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		}
 		return errSessionAlreadyReset
 	}
 
 	switch evt.Type {
 	case agents.ProviderEventAssistantMessage:
-		return persistAssistantEvent(sessionID, evt, publish)
+		return persistAssistantEvent(session.ID, evt, publish)
 	case agents.ProviderEventToolUseStarted:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventToolUseFinished:
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
 	case agents.ProviderEventCustomToolUseStarted:
 		customTools.remember(evt)
-		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+		return persistToolEvent(session.ID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
 	case agents.ProviderEventCustomToolResultsRequired:
 		customTools.require(evt.CustomToolEventIDs)
-		if err := customTools.resolvePersisted(sessionID); err != nil {
+		if err := customTools.resolvePersisted(session.ID); err != nil {
 			return err
 		}
 		if customTools.resultsRequired {
@@ -465,14 +506,15 @@ func handleProviderEvent(
 		}
 	case agents.ProviderEventTurnCompleted:
 		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
+		publishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
 	case agents.ProviderEventOutcomeEvaluationStart:
 		publishOutcomeEvaluationStart(evt, publish)
 	case agents.ProviderEventOutcomeEvaluation:
 		publishOutcomeEvaluationEnd(evt, publish)
 	case agents.ProviderEventThreadMessageSent:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusStarted, "tool_started", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusStarted, "tool_started", publish)
 	case agents.ProviderEventThreadMessageReceived:
-		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+		return persistSubagentEvent(session.ID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
 	case agents.ProviderEventSessionNotice:
 		// Ephemeral notice: no status change, no DB row, stream continues.
 		publish(messages.AgentSessionEventMessage{Event: "session_notice", Error: evt.ErrorMessage})
@@ -482,6 +524,143 @@ func handleProviderEvent(
 		*streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
 	}
 	return nil
+}
+
+func publishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if evt.Usage == nil {
+		retrieveAndPublishAgentTokenUsage(ctx, usageService, usageRetriever, session, evt)
+		return
+	}
+
+	if !evt.Usage.HasUsage() {
+		return
+	}
+
+	cumulativeUsage := agentSessionTokenUsage(evt.Usage)
+	deltaUsage, initialized, err := models.CalculateAgentSessionTokenUsageDelta(session.ID, cumulativeUsage)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to calculate agent token usage delta")
+		return
+	}
+	if !initialized {
+		if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"session_id":      session.ID,
+				"organization_id": session.OrganizationID,
+			}).Warn("agent stream: failed to initialize agent token usage watermark")
+		}
+		return
+	}
+	if !deltaUsage.HasUsage() {
+		return
+	}
+
+	if err := models.MarkAgentSessionTokenUsageTracked(session.ID, cumulativeUsage); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to mark agent token usage tracked")
+		return
+	}
+
+	publishEvent := evt
+	publishEvent.Usage = providerTokenUsage(deltaUsage)
+	publishAgentTokenUsageAsync(ctx, usageService, session, publishEvent)
+}
+
+func retrieveAndPublishAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	usageRetriever agents.ProviderSessionUsageRetriever,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+) {
+	if usageRetriever == nil {
+		return
+	}
+
+	go func() {
+		retrieveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
+		defer cancel()
+
+		usage, err := usageRetriever.RetrieveSessionUsage(retrieveCtx, session.ProviderSessionID)
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"session_id":          session.ID,
+				"organization_id":     session.OrganizationID,
+				"provider_session_id": session.ProviderSessionID,
+			}).Warn("agent stream: failed to retrieve completed session usage")
+			return
+		}
+
+		evt.Usage = usage
+		publishAgentTokenUsage(retrieveCtx, usageService, nil, session, evt)
+	}()
+}
+
+func publishPreparedAgentTokenUsage(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to sync organization before publishing agent token usage")
+	}
+
+	log.WithFields(log.Fields{
+		"session_id":         session.ID,
+		"organization_id":    session.OrganizationID,
+		"model":              evt.Model,
+		"input_tokens":       evt.Usage.InputTokens,
+		"output_tokens":      evt.Usage.OutputTokens,
+		"total_tokens":       evt.Usage.TotalTokens,
+		"cache_read_tokens":  evt.Usage.CacheReadTokens,
+		"cache_write_tokens": evt.Usage.CacheWriteTokens,
+	}).Info("agent stream: publishing agent token usage")
+
+	if err := publishAgentRunFinished(session, evt); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"session_id":      session.ID,
+			"organization_id": session.OrganizationID,
+		}).Warn("agent stream: failed to publish agent token usage")
+		return
+	}
+}
+
+func agentSessionTokenUsage(usage *agents.TokenUsage) models.AgentSessionTokenUsage {
+	return models.AgentSessionTokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func providerTokenUsage(usage models.AgentSessionTokenUsage) *agents.TokenUsage {
+	return &agents.TokenUsage{
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CacheReadTokens,
+		CacheWriteTokens: usage.CacheWriteTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func syncAgentTokenUsageOrganization(ctx context.Context, usageService usage.Service, organizationID string) error {
+	if usageService == nil || !usageService.Enabled() {
+		return nil
+	}
+
+	return usage.SyncOrganization(ctx, usageService, organizationID)
 }
 
 func (w *AgentStreamWorker) executeAndSendCustomToolResults(

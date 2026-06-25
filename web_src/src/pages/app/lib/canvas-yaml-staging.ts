@@ -1,9 +1,6 @@
 import * as yaml from "js-yaml";
 import type { CanvasesCanvas } from "@/api-client";
-import type {
-  SuperplaneComponentsEdge as ComponentsEdge,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 
 type ParsedCanvasYaml = {
   apiVersion?: string;

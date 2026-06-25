@@ -299,6 +299,54 @@ describe("useCanvasWebsocket", () => {
     });
   });
 
+  it("invalidates draft branch queries for canvas version deletions", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("canvas_version_deleted", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: canvasKeys.versionList(testCanvasId),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: canvasKeys.draftBranches(testCanvasId),
+    });
+    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+      queryKey: canvasKeys.consoleAll(testCanvasId),
+    });
+  });
+
+  it("skips lifecycle invalidation when canvas_version_updated echo is consumed", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const onCanvasLifecycleEvent = vi.fn().mockReturnValue(false);
+
+    renderHook(
+      () =>
+        useCanvasWebsocket(testCanvasId, testOrganizationId, undefined, undefined, undefined, onCanvasLifecycleEvent),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
+    emitWebsocketMessage("canvas_version_updated", {
+      canvasId: testCanvasId,
+      versionId: "version-1",
+    });
+
+    expect(onCanvasLifecycleEvent).toHaveBeenCalledWith(
+      { canvasId: testCanvasId, versionId: "version-1" },
+      "canvas_version_updated",
+    );
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionList(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
+  });
+
   it("invalidates staged caches for staging_updated events", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();

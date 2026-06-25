@@ -55,6 +55,14 @@ import {
   CLOUDSQL_FETCHED_STATE_REGISTRY,
   CLOUDSQL_DELETED_STATE_REGISTRY,
 } from "./cloudsql_mapper";
+import {
+  createBucketMapper,
+  getBucketMapper,
+  deleteBucketMapper,
+  STORAGE_CREATED_STATE_REGISTRY,
+  STORAGE_FETCHED_STATE_REGISTRY,
+  STORAGE_DELETED_STATE_REGISTRY,
+} from "./storage_mapper";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: computeBaseMapper,
@@ -103,6 +111,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "cloudsql.createInstance": createInstanceMapper,
   "cloudsql.getInstance": getInstanceMapper,
   "cloudsql.deleteInstance": deleteInstanceMapper,
+  "storage.createBucket": createBucketMapper,
+  "storage.getBucket": getBucketMapper,
+  "storage.deleteBucket": deleteBucketMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -161,6 +172,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "cloudsql.createInstance": CLOUDSQL_CREATED_STATE_REGISTRY,
   "cloudsql.getInstance": CLOUDSQL_FETCHED_STATE_REGISTRY,
   "cloudsql.deleteInstance": CLOUDSQL_DELETED_STATE_REGISTRY,
+  "storage.createBucket": STORAGE_CREATED_STATE_REGISTRY,
+  "storage.getBucket": STORAGE_FETCHED_STATE_REGISTRY,
+  "storage.deleteBucket": STORAGE_DELETED_STATE_REGISTRY,
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

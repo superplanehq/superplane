@@ -30,6 +30,7 @@ type ProviderEvent struct {
 	ProviderEventID string
 	Type            ProviderEventType
 	Text            string
+	Model           string
 	ToolName        string
 	ToolCallID      string
 	// ToolInput is a human-readable rendering of the tool's invocation
@@ -43,6 +44,20 @@ type ProviderEvent struct {
 	// Multi-agent thread fields
 	AgentName string
 	ThreadID  string
+
+	Usage *TokenUsage
+}
+
+type TokenUsage struct {
+	InputTokens      int64
+	OutputTokens     int64
+	TotalTokens      int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+}
+
+func (u TokenUsage) HasUsage() bool {
+	return u.TotalTokens > 0
 }
 
 type CustomToolUse struct {
@@ -174,6 +189,10 @@ type ProviderSessionCleaner interface {
 type ProviderSessionArchiver interface {
 	Name() string
 	ArchiveSession(ctx context.Context, providerSessionID string) error
+}
+
+type ProviderSessionUsageRetriever interface {
+	RetrieveSessionUsage(ctx context.Context, providerSessionID string) (*TokenUsage, error)
 }
 
 type ProviderToolSchemaRevisioner interface {

@@ -16,8 +16,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Delete Package" href="#delete-package" description="Delete a package from a Cloudsmith repository" />
   <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
+  <LinkCard title="Resync Package" href="#resync-package" description="Schedule a Cloudsmith package for resynchronization" />
+  <LinkCard title="Tag Package" href="#tag-package" description="Add, replace, clear, or remove tags for a Cloudsmith package" />
 </CardGrid>
 
 ## Instructions
@@ -126,6 +129,36 @@ Emits the package's identity (**namespace**, **repository**, **name**, **version
   },
   "timestamp": "2026-06-18T14:17:58Z",
   "type": "cloudsmith.package.securityScanned"
+}
+```
+
+<a id="delete-package"></a>
+
+## Delete Package
+
+**Component key:** `cloudsmith.deletePackage`
+
+The Delete Package component deletes a package from a Cloudsmith repository.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+
+### Output
+
+Emits the deleted package identifier on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "package": "example-package-id",
+    "repository": "example-owner/example-repo"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "cloudsmith.package.deleted"
 }
 ```
 
@@ -294,6 +327,132 @@ Returns the repository object including:
   },
   "timestamp": "2026-03-12T21:13:32.946693411Z",
   "type": "cloudsmith.repository.fetched"
+}
+```
+
+<a id="resync-package"></a>
+
+## Resync Package
+
+**Component key:** `cloudsmith.resyncPackage`
+
+The Resync Package component schedules a Cloudsmith package for resynchronization.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+
+### Output
+
+Emits the package returned by Cloudsmith on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example resynced package payload",
+    "display_name": "example-app",
+    "filename": "example-app",
+    "format": "docker",
+    "is_quarantined": false,
+    "is_sync_completed": false,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "repository": "example-repo",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/a=amd64;xpo=linux;id=example-package-id/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-abc1",
+    "slug_perm": "example-package-id",
+    "status": 2,
+    "status_str": "Queued",
+    "summary": "",
+    "tags": {
+      "version": [
+        "latest"
+      ]
+    },
+    "tags_immutable": {},
+    "uploaded_at": "2026-01-01T00:00:00Z",
+    "version": "example-version"
+  },
+  "timestamp": "2026-01-01T00:05:00Z",
+  "type": "cloudsmith.package.resynced"
+}
+```
+
+<a id="tag-package"></a>
+
+## Tag Package
+
+**Component key:** `cloudsmith.tagPackage`
+
+The Tag Package component updates tags for a Cloudsmith package.
+
+### Configuration
+
+- **Repository**: The repository that contains the package.
+- **Package Identifier**: The Cloudsmith package identifier (`slug_perm`).
+- **Action**: `Add`, `Clear`, `Replace`, or `Remove`.
+- **Tags**: Tags to apply. Not required when the action is `Clear`.
+- **Immutable**: Marks newly created tags immutable when supported by Cloudsmith.
+
+### Output
+
+Emits the updated package returned by Cloudsmith on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/example-package-id.manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example tagged package payload",
+    "display_name": "example-app",
+    "filename": "example-app",
+    "format": "docker",
+    "is_quarantined": false,
+    "is_sync_completed": true,
+    "name": "example-app",
+    "namespace": "example-owner",
+    "repository": "example-repo",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/example-package-id/",
+    "self_webapp_url": "https://app.cloudsmith.com/example-owner/r/example-repo/docker/example-app/example-version/example-package-id",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-abc1",
+    "slug_perm": "example-package-id",
+    "status": 4,
+    "status_str": "Completed",
+    "summary": "",
+    "tags": {
+      "info": [
+        "example"
+      ],
+      "version": [
+        "latest"
+      ]
+    },
+    "tags_immutable": {},
+    "uploaded_at": "2026-01-01T00:00:00Z",
+    "version": "example-version"
+  },
+  "timestamp": "2026-06-19T10:21:49.411256712Z",
+  "type": "cloudsmith.package.tagged"
 }
 ```
 

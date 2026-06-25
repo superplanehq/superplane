@@ -34,14 +34,15 @@ describe("useWorkflowViewSearchParams", () => {
     expect(next.get("run")).toBe("run-42");
   });
 
-  it("derives versions mode from the view param on the same render", () => {
+  it("migrates legacy versions view params", async () => {
     const setSearchParams = vi.fn();
-    const { result } = renderHook(() =>
-      useWorkflowViewSearchParams(makeSearchParams({ view: "versions" }), setSearchParams),
-    );
+    renderHook(() => useWorkflowViewSearchParams(makeSearchParams({ view: "versions" }), setSearchParams));
 
-    expect(result.current.isVersionsMode).toBe(true);
-    expect(setSearchParams).not.toHaveBeenCalled();
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const next = setSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+
+    expect(next.get("view")).toBeNull();
   });
 
   it("migrates conflicting non-canvas views when run inspection is requested", async () => {
