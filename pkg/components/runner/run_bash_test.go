@@ -72,11 +72,17 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	}
 
 	component := &RunBash{}
+	setupCommands := `if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y awscli
+fi
+echo ready`
+
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type":          testRunnerMachineType,
 			"enable_setup_commands": true,
-			"setup_commands":        "apt-get update\necho ready",
+			"setup_commands":        setupCommands,
 			"script":                `echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`,
 		},
 		HTTP:           httpContext,
@@ -94,7 +100,10 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, []string{"apt-get update", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, []string{`if ! command -v aws >/dev/null 2>&1; then
+apt-get update
+apt-get install -y awscli
+fi`, "echo ready"}, req.SetupCommands)
 }
 
 func TestValidateRunBashSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {
