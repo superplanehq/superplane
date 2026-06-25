@@ -23,9 +23,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.1}"
 
+# shellcheck source=../lib/image-build-prerequisites.sh
+source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
+
 cd "${REPO_ROOT}"
 
-if [ ! -f "pkg/protos/me/me.pb.go" ] || [ ! -f "pkg/protos/me/me.pb.gw.go" ]; then
+require_release_image_build_prerequisites
+
+if generated_protobuf_missing; then
   echo "Generating protobuf files"
   make dev.up
   make pb.gen.models
