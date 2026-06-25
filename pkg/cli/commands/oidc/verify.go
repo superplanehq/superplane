@@ -1,8 +1,6 @@
 package oidc
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	spoidc "github.com/superplanehq/superplane/pkg/oidc"
 )
 
 type verifyCommand struct {
@@ -23,16 +22,6 @@ type verifyCommand struct {
 	pipelineFile *string
 	ref          *string
 	commitSha    *string
-}
-
-type verifyRequest struct {
-	Token string `json:"token"`
-}
-
-type verifyResponse struct {
-	Valid  bool           `json:"valid"`
-	Claims map[string]any `json:"claims"`
-	Error  string         `json:"error"`
 }
 
 func (c *verifyCommand) Execute(ctx core.CommandContext) error {
@@ -54,38 +43,17 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 		apiURL = "http://localhost:8000"
 	}
 
-	requestBody, err := json.Marshal(verifyRequest{Token: token})
+	claims, err := spoidc.ValidateRemote(http.DefaultClient, token, apiURL)
 	if err != nil {
-		return err
-	}
-
-	endpoint := apiURL + "/api/v1/oidc/verify"
-	response, err := http.Post(endpoint, "application/json", bytes.NewReader(requestBody))
-	if err != nil {
-		return fmt.Errorf("verify request failed: %w", err)
-	}
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read verify response: %w", err)
-	}
-
-	var result verifyResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return fmt.Errorf("failed to parse verify response: %w", err)
-	}
-
-	if !result.Valid {
 		return fmt.Errorf("token verification failed")
 	}
 
-	if err := matchExpectedClaims(result.Claims, c); err != nil {
+	if err := matchExpectedClaims(claims, c); err != nil {
 		return err
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(result.Claims)
+		return ctx.Renderer.Render(claims)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -98,7 +66,7 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 			"org_id", "canvas_id", "node_id", "execution_id", "component",
 			"project_id", "pipeline_file", "ref", "commit_sha",
 		} {
-			value := claimString(result.Claims, key)
+			value := claimString(claims, key)
 			if value == "" {
 				continue
 			}

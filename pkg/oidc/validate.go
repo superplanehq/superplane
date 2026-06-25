@@ -1,12 +1,17 @@
 package oidc
 
 import (
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
 func (s *RSAProvider) Validate(tokenString string) (map[string]any, error) {
+	return ValidateToken(tokenString, s.issuer, s.publicKeys)
+}
+
+func ValidateToken(tokenString, issuer string, publicKeys map[string]*rsa.PublicKey) (map[string]any, error) {
 	parser := jwt.Parser{
 		ValidMethods: []string{jwt.SigningMethodRS256.Alg()},
 	}
@@ -17,7 +22,7 @@ func (s *RSAProvider) Validate(tokenString string) (map[string]any, error) {
 			return nil, fmt.Errorf("token is missing kid header")
 		}
 
-		publicKey, ok := s.publicKeys[kid]
+		publicKey, ok := publicKeys[kid]
 		if !ok {
 			return nil, fmt.Errorf("unknown signing key")
 		}
@@ -37,7 +42,7 @@ func (s *RSAProvider) Validate(tokenString string) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
-	if issuer, _ := claims["iss"].(string); issuer != s.issuer {
+	if claimIssuer, _ := claims["iss"].(string); claimIssuer != issuer {
 		return nil, fmt.Errorf("invalid token issuer")
 	}
 
