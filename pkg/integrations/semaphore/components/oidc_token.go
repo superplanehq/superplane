@@ -4,22 +4,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/ciauth"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const oidcTokenParameterName = "SUPERPLANE_OIDC_TOKEN"
 
 const (
+	semaphoreOIDCTokenAudience = "superplane-ci"
+	semaphoreOIDCTokenDuration = time.Hour
+
+	semaphoreClaimOrgID        = "org_id"
+	semaphoreClaimCanvasID     = "canvas_id"
+	semaphoreClaimNodeID       = "node_id"
+	semaphoreClaimExecutionID  = "execution_id"
+	semaphoreClaimComponent    = "component"
 	semaphoreClaimProjectID    = "project_id"
 	semaphoreClaimPipelineFile = "pipeline_file"
 	semaphoreClaimRef          = "ref"
 	semaphoreClaimCommitSha    = "commit_sha"
-)
-
-const (
-	semaphoreOIDCTokenAudience = ciauth.ExecutionTokenAudience
-	semaphoreOIDCTokenDuration = time.Hour
 )
 
 func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (string, error) {
@@ -28,11 +30,11 @@ func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowS
 	}
 
 	claims := map[string]any{
-		ciauth.ClaimOrgID:       ctx.OrganizationID,
-		ciauth.ClaimCanvasID:    ctx.WorkflowID,
-		ciauth.ClaimNodeID:      ctx.NodeID,
-		ciauth.ClaimExecutionID: ctx.ID.String(),
-		ciauth.ClaimComponent:   r.Name(),
+		semaphoreClaimOrgID:       ctx.OrganizationID,
+		semaphoreClaimCanvasID:    ctx.WorkflowID,
+		semaphoreClaimNodeID:      ctx.NodeID,
+		semaphoreClaimExecutionID: ctx.ID.String(),
+		semaphoreClaimComponent:   r.Name(),
 	}
 
 	if metadata.Project != nil && metadata.Project.ID != "" {

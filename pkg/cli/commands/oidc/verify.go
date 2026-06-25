@@ -26,35 +26,13 @@ type verifyCommand struct {
 }
 
 type verifyRequest struct {
-	Token    string                 `json:"token"`
-	Expected *verifyExpectedRequest `json:"expected,omitempty"`
-}
-
-type verifyExpectedRequest struct {
-	OrgID        string `json:"org_id,omitempty"`
-	CanvasID     string `json:"canvas_id,omitempty"`
-	NodeID       string `json:"node_id,omitempty"`
-	Component    string `json:"component,omitempty"`
-	ProjectID    string `json:"project_id,omitempty"`
-	PipelineFile string `json:"pipeline_file,omitempty"`
-	Ref          string `json:"ref,omitempty"`
-	CommitSha    string `json:"commit_sha,omitempty"`
+	Token string `json:"token"`
 }
 
 type verifyResponse struct {
-	Valid  bool `json:"valid"`
-	Claims struct {
-		OrgID        string `json:"org_id"`
-		CanvasID     string `json:"canvas_id"`
-		NodeID       string `json:"node_id"`
-		ExecutionID  string `json:"execution_id"`
-		Component    string `json:"component"`
-		ProjectID    string `json:"project_id"`
-		PipelineFile string `json:"pipeline_file"`
-		Ref          string `json:"ref"`
-		CommitSha    string `json:"commit_sha"`
-	} `json:"claims"`
-	Error string `json:"error"`
+	Valid  bool           `json:"valid"`
+	Claims map[string]any `json:"claims"`
+	Error  string         `json:"error"`
 }
 
 func (c *verifyCommand) Execute(ctx core.CommandContext) error {
@@ -76,11 +54,7 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 		apiURL = "http://localhost:8000"
 	}
 
-	expected := buildVerifyExpected(c)
-	requestBody, err := json.Marshal(verifyRequest{
-		Token:    token,
-		Expected: expected,
-	})
+	requestBody, err := json.Marshal(verifyRequest{Token: token})
 	if err != nil {
 		return err
 	}
@@ -106,6 +80,10 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("token verification failed")
 	}
 
+	if err := matchExpectedClaims(result.Claims, c); err != nil {
+		return err
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(result.Claims)
 	}
@@ -116,63 +94,65 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 
-		_, err = fmt.Fprintf(stdout, "Organization: %s\n", result.Claims.OrgID)
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprintf(stdout, "Canvas: %s\n", result.Claims.CanvasID)
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprintf(stdout, "Node: %s\n", result.Claims.NodeID)
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprintf(stdout, "Execution: %s\n", result.Claims.ExecutionID)
-		if err != nil {
-			return err
-		}
-		if result.Claims.Component != "" {
-			_, err = fmt.Fprintf(stdout, "Component: %s\n", result.Claims.Component)
+		for _, key := range []string{
+			"org_id", "canvas_id", "node_id", "execution_id", "component",
+			"project_id", "pipeline_file", "ref", "commit_sha",
+		} {
+			value := claimString(result.Claims, key)
+			if value == "" {
+				continue
+			}
+			_, err = fmt.Fprintf(stdout, "%s: %s\n", key, value)
 			if err != nil {
 				return err
 			}
 		}
-		if result.Claims.PipelineFile != "" {
-			_, err = fmt.Fprintf(stdout, "Pipeline file: %s\n", result.Claims.PipelineFile)
-			if err != nil {
-				return err
-			}
-		}
-		if result.Claims.CommitSha != "" {
-			_, err = fmt.Fprintf(stdout, "Commit SHA: %s\n", result.Claims.CommitSha)
-		}
-		return err
+
+		return nil
 	})
 }
 
-func buildVerifyExpected(c *verifyCommand) *verifyExpectedRequest {
-	expected := &verifyExpectedRequest{
-		OrgID:        strings.TrimSpace(*c.orgID),
-		CanvasID:     strings.TrimSpace(*c.canvasID),
-		NodeID:       strings.TrimSpace(*c.nodeID),
-		Component:    strings.TrimSpace(*c.component),
-		ProjectID:    strings.TrimSpace(*c.projectID),
-		PipelineFile: strings.TrimSpace(*c.pipelineFile),
-		Ref:          strings.TrimSpace(*c.ref),
-		CommitSha:    strings.TrimSpace(*c.commitSha),
+func matchExpectedClaims(claims map[string]any, c *verifyCommand) error {
+	checks := map[string]string{
+		"org_id":        flagValue(c.orgID),
+		"canvas_id":     flagValue(c.canvasID),
+		"node_id":       flagValue(c.nodeID),
+		"component":     flagValue(c.component),
+		"project_id":    flagValue(c.projectID),
+		"pipeline_file": flagValue(c.pipelineFile),
+		"ref":           flagValue(c.ref),
+		"commit_sha":    flagValue(c.commitSha),
 	}
 
-	if expected.OrgID == "" &&
-		expected.CanvasID == "" &&
-		expected.NodeID == "" &&
-		expected.Component == "" &&
-		expected.ProjectID == "" &&
-		expected.PipelineFile == "" &&
-		expected.Ref == "" &&
-		expected.CommitSha == "" {
-		return nil
+	for key, expected := range checks {
+		if expected == "" {
+			continue
+		}
+		if claimString(claims, key) != expected {
+			return fmt.Errorf("token verification failed")
+		}
 	}
 
-	return expected
+	return nil
+}
+
+func flagValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func claimString(claims map[string]any, key string) string {
+	value, ok := claims[key]
+	if !ok || value == nil {
+		return ""
+	}
+
+	switch typed := value.(type) {
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
 }
