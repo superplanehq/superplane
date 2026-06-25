@@ -135,6 +135,16 @@ func (c *Client) PostURL(ctx context.Context, fullURL string, body any) ([]byte,
 	return c.ExecRequest(ctx, http.MethodPost, fullURL, bodyReader)
 }
 
+func (c *Client) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	path = strings.TrimPrefix(path, "/")
+	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
+	bodyReader, err := marshalRequestBody(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.ExecRequest(ctx, http.MethodPatch, url, bodyReader)
+}
+
 func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {
 	path = strings.TrimPrefix(path, "/")
 	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
