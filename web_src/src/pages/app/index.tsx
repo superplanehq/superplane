@@ -32,7 +32,6 @@ import {
   useCanvas,
   useCanvasMemoryEntries,
   useCanvasVersion,
-  useCanvasVersions,
   useCreateCanvasMemoryNamespace,
   useCreateDraftBranch,
   useDeleteDraftBranch,
@@ -99,6 +98,7 @@ import { activateDraftVersion } from "./lib/draft-spec-cache";
 import {
   isDraftVersion,
   isPublishedVersion,
+  liveCanvasVersionFromDescribe,
   sortDraftVersionsDesc,
   sortPublishedVersionsDesc,
 } from "./lib/canvas-versions";
@@ -338,17 +338,17 @@ export function AppPage() {
   });
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
   const deleteDraftBranchMutation = useDeleteDraftBranch(canvasId!);
-  const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
     [canvasLiveVersionsQuery.data?.pages],
   );
+  const liveVersionFromDescribe = useMemo(() => liveCanvasVersionFromDescribe(liveCanvas), [liveCanvas]);
   const liveCanvasVersion = useMemo(() => {
     const publishedVersions = paginatedVersions.filter(isPublishedVersion);
     if (publishedVersions.length > 0) return publishedVersions[0];
-    return canvasVersions.filter(isPublishedVersion)[0];
-  }, [paginatedVersions, canvasVersions]);
+    return liveVersionFromDescribe;
+  }, [paginatedVersions, liveVersionFromDescribe]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
@@ -356,14 +356,16 @@ export function AppPage() {
       if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-    canvasVersions.forEach(addVersion);
+    if (liveVersionFromDescribe) {
+      addVersion(liveVersionFromDescribe);
+    }
     paginatedVersions.forEach(addVersion);
     draftVersionsFromBranches.forEach(addVersion);
     return Array.from(versionMap.values()).filter((version) => {
       if (isPublishedVersion(version)) return true;
       return version.metadata?.owner?.id === currentUserId;
     });
-  }, [canvasVersions, paginatedVersions, currentUserId, draftVersionsFromBranches]);
+  }, [liveVersionFromDescribe, paginatedVersions, currentUserId, draftVersionsFromBranches]);
   const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
@@ -377,19 +379,7 @@ export function AppPage() {
   const draftVersions = useMemo(() => sortDraftVersionsDesc(draftVersionsFromBranches), [draftVersionsFromBranches]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
-  const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
-  const effectiveLiveCanvasVersionId = useMemo(() => {
-    if (liveCanvasVersionId) {
-      return liveCanvasVersionId;
-    }
-
-    const fromPaginated = paginatedVersions.find(isPublishedVersion)?.metadata?.id;
-    if (fromPaginated) {
-      return fromPaginated;
-    }
-
-    return canvasVersions.find(isPublishedVersion)?.metadata?.id;
-  }, [liveCanvasVersionId, paginatedVersions, canvasVersions]);
+  const liveCanvasVersionId = liveCanvas?.metadata?.versionId ?? liveCanvasVersion?.metadata?.id;
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
   const {
     data: loadedCanvasVersion,
@@ -400,9 +390,7 @@ export function AppPage() {
   const latestDraftVersion = draftVersions[0];
   const isViewingDraftVersion = !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion);
   const isViewingCurrentLiveVersion =
-    !selectedCanvasVersion ||
-    (!!effectiveLiveCanvasVersionId && selectedCanvasVersion.metadata?.id === effectiveLiveCanvasVersionId) ||
-    selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
+    !selectedCanvasVersion || (!!liveCanvasVersionId && selectedCanvasVersion.metadata?.id === liveCanvasVersionId);
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
   // Events/runs are only surfaced in the normal live workflow context. While an
   // edit session shows the versions sidebar (including when previewing the
@@ -864,9 +852,7 @@ export function AppPage() {
     const isPublished = isPublishedVersion(requestedVersion);
     const isOwnedDraft = !isPublished && requestedVersion.metadata?.owner?.id === currentUserId;
     const requestedVersionId = requestedVersion.metadata?.id || "";
-    const isCurrentLive =
-      (!!effectiveLiveCanvasVersionId && requestedVersionId === effectiveLiveCanvasVersionId) ||
-      requestedVersionId === liveCanvasVersionId;
+    const isCurrentLive = !!liveCanvasVersionId && requestedVersionId === liveCanvasVersionId;
     if (!isOwnedDraft && !isPublished) {
       hasSyncedVersionFromURLRef.current = true;
       return;
@@ -902,7 +888,6 @@ export function AppPage() {
     searchParams,
     currentUserId,
     liveCanvasVersionId,
-    effectiveLiveCanvasVersionId,
     setSearchParams,
     queryClient,
     organizationId,
@@ -943,7 +928,8 @@ export function AppPage() {
       return;
     }
 
-    queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     if (isViewingLiveVersion) {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
@@ -3399,11 +3385,7 @@ export function AppPage() {
     ],
   );
 
-  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
-    organizationId,
-    canvasId,
-    effectiveLiveCanvasVersionId,
-  );
+  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(organizationId, canvasId, liveCanvasVersionId);
 
   const cancelPendingCanvasSaves = useCallback(() => {
     canvasSaveSessionRef.current += 1;
@@ -3471,9 +3453,7 @@ export function AppPage() {
       const isPublished = isPublishedVersion(version);
       const isOwnedDraft = !isPublished && version.metadata?.owner?.id === currentUserId;
       const versionId = version.metadata?.id || "";
-      const isCurrentLive =
-        (!!effectiveLiveCanvasVersionId && versionId === effectiveLiveCanvasVersionId) ||
-        (!!liveCanvasVersionId && versionId === liveCanvasVersionId);
+      const isCurrentLive = !!liveCanvasVersionId && versionId === liveCanvasVersionId;
       if (!isOwnedDraft && !isPublished) {
         showErrorToast("You can only use your edit version or published live history");
         return false;
@@ -3550,7 +3530,6 @@ export function AppPage() {
       organizationId,
       canvasId,
       currentUserId,
-      effectiveLiveCanvasVersionId,
       liveCanvasVersionId,
       liveCanvasVersion,
       liveCanvas,
@@ -3584,14 +3563,14 @@ export function AppPage() {
   );
 
   const handleSeeCurrentVersion = useCallback(() => {
-    if (!effectiveLiveCanvasVersionId) {
+    if (!liveCanvasVersionId) {
       showErrorToast("No live version available");
       return;
     }
     // Deliberate preview of the current version keeps the edit session open.
     previewingCurrentVersionRef.current = true;
-    handleUseVersion(effectiveLiveCanvasVersionId);
-  }, [effectiveLiveCanvasVersionId, handleUseVersion]);
+    handleUseVersion(liveCanvasVersionId);
+  }, [liveCanvasVersionId, handleUseVersion]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
@@ -3607,13 +3586,11 @@ export function AppPage() {
       // Track when the user deliberately selects the current/live version from
       // the sidebar so the edit session stays open (vs. internal navigation back
       // to live after publish/discard, which must close it).
-      previewingCurrentVersionRef.current =
-        (!!effectiveLiveCanvasVersionId && versionID === effectiveLiveCanvasVersionId) ||
-        (!!liveCanvasVersionId && versionID === liveCanvasVersionId);
+      previewingCurrentVersionRef.current = !!liveCanvasVersionId && versionID === liveCanvasVersionId;
 
       handleUseVersion(versionID);
     },
-    [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
+    [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, liveCanvasVersionId],
   );
 
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
@@ -3726,13 +3703,13 @@ export function AppPage() {
     }
 
     if (hasEditableVersion) {
-      if (!effectiveLiveCanvasVersionId) {
+      if (!liveCanvasVersionId) {
         showErrorToast("No live version available");
         return;
       }
       setEditSessionActive(false);
       exitToLive();
-      handleUseVersion(effectiveLiveCanvasVersionId);
+      handleUseVersion(liveCanvasVersionId);
       return;
     }
 
@@ -3751,7 +3728,7 @@ export function AppPage() {
     canvasId,
     canUpdateCanvas,
     hasEditableVersion,
-    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     draftBranches,
     startEditingDefaultDraft,
     handleUseVersion,
@@ -3953,12 +3930,12 @@ export function AppPage() {
   const handleExitEditSession = useCallback(() => {
     setEditSessionActive(false);
     clearRunInspectionForEdit();
-    if (effectiveLiveCanvasVersionId) {
-      handleUseVersion(effectiveLiveCanvasVersionId);
+    if (liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId);
     } else {
       exitToLive();
     }
-  }, [clearRunInspectionForEdit, effectiveLiveCanvasVersionId, handleUseVersion, exitToLive]);
+  }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion, exitToLive]);
 
   const handleCreateDraftBranchFromSidebar = useCallback(async () => {
     clearRunInspectionForEdit();
@@ -4221,7 +4198,8 @@ export function AppPage() {
     setRemoteCanvasUpdatePending(false);
     setLastSavedWorkflowSnapshot(null);
 
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     if (isViewingLiveVersion) {
       await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
@@ -4371,7 +4349,7 @@ export function AppPage() {
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
-    liveCanvasVersionId: effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
     liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -86,6 +86,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.NotNil(t, response.Canvas.Metadata.CreatedAt)
 		assert.NotNil(t, response.Canvas.Metadata.UpdatedAt)
 		assert.NotNil(t, response.Canvas.Metadata.CreatedBy)
+		assert.NotEmpty(t, response.Canvas.Metadata.VersionId)
 
 		//
 		// Verify spec structure

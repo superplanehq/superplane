@@ -48,14 +48,6 @@ export async function syncCommittedCanvasDraftState({
   queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), committedVersion);
   queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), committedVersion);
 
-  queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-    if (!current) {
-      return current;
-    }
-
-    return current.map((item) => (item.metadata?.id === versionId ? { ...item, spec: committedVersion.spec } : item));
-  });
-
   if (committedVersion.spec) {
     queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
       if (!current) {

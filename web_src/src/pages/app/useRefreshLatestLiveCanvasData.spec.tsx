@@ -44,7 +44,6 @@ describe("useRefreshLatestLiveCanvasData", () => {
     });
 
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.versionList("canvas-1"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.draftBranches("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "live-version-1"), { exact: true });
@@ -111,7 +110,6 @@ describe("useRefreshLatestLiveCanvasData", () => {
     });
 
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.versionList("canvas-1"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "published-version"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });

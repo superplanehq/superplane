@@ -45,7 +45,7 @@ export function useCanvasLifecycleEventHandlers({
 
   const invalidateCanvasVersionData = useCallback(
     (targetCanvasId: string, targetVersionId?: string) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(targetCanvasId) });
       if (targetVersionId) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });

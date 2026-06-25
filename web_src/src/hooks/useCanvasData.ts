@@ -180,7 +180,6 @@ export const canvasKeys = {
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
-  versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
@@ -294,7 +293,6 @@ export async function finalizeDraftBranchDeletion(
 ) {
   await pruneDeletedDraftBranchFromCache(queryClient, canvasId, versionId);
   queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
   queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
   queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
 }
@@ -399,22 +397,6 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   });
 };
 
-export const useCanvasVersions = (organizationId: string, canvasId: string) => {
-  return useQuery({
-    queryKey: canvasKeys.versionList(canvasId),
-    queryFn: async () => {
-      const response = await canvasesListCanvasVersions(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: { limit: 1 },
-        }),
-      );
-      return response.data?.versions || [];
-    },
-    enabled: !!organizationId && !!canvasId,
-  });
-};
-
 export const useInfiniteCanvasLiveVersions = (
   organizationId: string,
   canvasId: string,
@@ -502,13 +484,6 @@ type PositionedNode = SuperplaneComponentsNode & {
   position: ComponentsPosition;
 };
 
-const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
-  if (!raw) return 0;
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? 0 : parsed;
-};
-
 export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
@@ -580,7 +555,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const updatedCanvas = response?.data?.canvas;
@@ -936,8 +910,6 @@ type UseCreateDraftBranchOptions = {
 };
 
 export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftBranchOptions) => {
-  const queryClient = useQueryClient();
-
   return useMutation({
     onMutate: () => {
       const releaseCreateDraftEcho = options?.registerIgnoredCreateDraftEcho?.(canvasId);
@@ -958,10 +930,9 @@ export const useCreateDraftBranch = (canvasId: string, options?: UseCreateDraftB
       }
       // Creating a draft does not change the live canvas, so we intentionally do
       // not invalidate canvasKeys.detail here — doing so would trigger a
-      // DescribeCanvas refetch while entering/staying in edit mode.
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      // DescribeCanvas refetch while entering/staying in edit mode. Draft
+      // branches are seeded locally in handleCreateVersion; other tabs refresh
+      // via websocket handlers.
     },
     onError: (_error, _variables, context) => {
       context?.releaseCreateDraftEcho?.();
@@ -1073,7 +1044,6 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       }
 
       if (!version) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
         return;
       }
@@ -1084,28 +1054,6 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         // committed `versionDetail` used by the draft branch list.
         queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, variables.versionId), version);
       }
-
-      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        let found = false;
-        const next = current.map((item) => {
-          if (item?.metadata?.id === version.metadata?.id) {
-            found = true;
-            return version;
-          }
-          return item;
-        });
-
-        if (!found) {
-          next.unshift(version);
-        }
-
-        next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
-        return next;
-      });
 
       if (!variables.preserveLocalCanvasState) {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {

@@ -3,9 +3,41 @@ import {
   formatVersionLabel,
   formatVersionLabelWithTimestamp,
   formatVersionTimestamp,
+  liveCanvasVersionFromDescribe,
   sortDraftVersionsDesc,
   versionSortValue,
 } from "./canvas-versions";
+
+describe("liveCanvasVersionFromDescribe", () => {
+  it("builds a published version view from describe canvas metadata and spec", () => {
+    expect(
+      liveCanvasVersionFromDescribe({
+        metadata: {
+          id: "canvas-1",
+          versionId: "live-version-1",
+        },
+        spec: {
+          nodes: [{ id: "node-1" }],
+        },
+      }),
+    ).toEqual({
+      metadata: {
+        id: "live-version-1",
+        canvasId: "canvas-1",
+        state: "STATE_PUBLISHED",
+      },
+      spec: {
+        nodes: [{ id: "node-1" }],
+      },
+    });
+  });
+
+  it("returns undefined when live version id or spec is missing", () => {
+    expect(liveCanvasVersionFromDescribe({ metadata: { versionId: "live-version-1" } })).toBeUndefined();
+    expect(liveCanvasVersionFromDescribe({ metadata: { id: "canvas-1" }, spec: { nodes: [] } })).toBeUndefined();
+    expect(liveCanvasVersionFromDescribe(undefined)).toBeUndefined();
+  });
+});
 
 describe("formatVersionTimestamp", () => {
   it("formats the first available timestamp", () => {

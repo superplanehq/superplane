@@ -55,7 +55,6 @@ describe("syncCommittedCanvasDraftState", () => {
       committedVersion,
     );
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "version-1"), committedVersion);
-    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionList("canvas-1"), expect.any(Function));
     expect(setQueryData).toHaveBeenCalledWith(canvasKeys.detail("org-1", "canvas-1"), expect.any(Function));
 
     const detailKey = JSON.stringify(canvasKeys.detail("org-1", "canvas-1"));

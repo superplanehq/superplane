@@ -133,11 +133,12 @@ export function useCanvasWebsocket(
 
       if (eventName === "canvas_deleted") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
         return;
       }
 
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       if (eventName === "repository_branch_updated") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });

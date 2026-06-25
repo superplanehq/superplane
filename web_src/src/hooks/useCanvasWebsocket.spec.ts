@@ -292,7 +292,7 @@ describe("useCanvasWebsocket", () => {
     });
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList(testCanvasId),
+      queryKey: canvasKeys.versionHistory(testCanvasId),
     });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
       queryKey: canvasKeys.consoleAll(testCanvasId),
@@ -310,7 +310,7 @@ describe("useCanvasWebsocket", () => {
     });
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList(testCanvasId),
+      queryKey: canvasKeys.versionHistory(testCanvasId),
     });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
       queryKey: canvasKeys.draftBranches(testCanvasId),
@@ -343,7 +343,7 @@ describe("useCanvasWebsocket", () => {
       { canvasId: testCanvasId, versionId: "version-1" },
       "canvas_version_updated",
     );
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionList(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionHistory(testCanvasId))).toHaveLength(0);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
   });
 

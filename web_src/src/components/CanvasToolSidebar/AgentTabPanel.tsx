@@ -17,7 +17,8 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
-import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvasVersion, useInfiniteCanvasRuns, useListDraftBranches } from "@/hooks/useCanvasData";
+import { sortDraftVersionsDesc } from "@/pages/app/lib/canvas-versions";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -439,15 +440,15 @@ function ComposerWithCanvasData({
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
-  const { data: versions } = useCanvasVersions(organizationId, canvasId);
-  const latestVersion = versions?.[0];
-  const isDraft = latestVersion?.metadata?.state === "STATE_DRAFT";
-  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.metadata?.id ?? "", isDraft);
+  const { data: draftBranches = [] } = useListDraftBranches(organizationId, canvasId);
+  const latestDraft = sortDraftVersionsDesc(draftBranches)[0];
+  const latestDraftId = latestDraft?.metadata?.id ?? "";
+  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestDraftId, !!latestDraftId);
 
-  // Use draft nodes if a draft exists, otherwise fall back to published
+  // Use draft nodes when a draft exists, otherwise fall back to published canvas spec.
   const nodes = useMemo(
-    () => (isDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
-    [isDraft, draftVersion, canvas],
+    () => (latestDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
+    [latestDraft, draftVersion, canvas],
   );
 
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);

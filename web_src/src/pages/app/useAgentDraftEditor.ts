@@ -53,9 +53,6 @@ function useLoadAgentDraftVersion(
       queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
         current.filter((branch) => draftVersionId(branch) !== versionId),
       );
-      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) =>
-        current.filter((version) => version.metadata?.id !== versionId),
-      );
     },
     [canvasId, queryClient],
   );
@@ -79,12 +76,6 @@ function useLoadAgentDraftVersion(
         }
 
         queryClient.setQueryData<CanvasesCanvasVersion>(canvasKeys.versionDetail(canvasId, versionId), loadedVersion);
-        queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) => {
-          if (current.some((version) => version.metadata?.id === versionId)) {
-            return current;
-          }
-          return [loadedVersion, ...current];
-        });
 
         if (isDraftVersion(loadedVersion)) {
           queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) => {

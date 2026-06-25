@@ -661,6 +661,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     string folder_id = 8;
+    string version_id = 9;
   }
 
   message Spec {

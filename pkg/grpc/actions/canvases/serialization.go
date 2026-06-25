@@ -3,19 +3,20 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"strings"
 )
 
 func SerializeCanvas(
@@ -44,6 +45,7 @@ func SerializeCanvas(
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			FolderId:       canvasFolderID,
+			VersionId:      liveVersion.ID.String(),
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(liveVersion.Nodes),

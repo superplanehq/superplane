@@ -11,7 +11,7 @@ export type RefreshLatestLiveCanvasDataOptions = {
 export function useRefreshLatestLiveCanvasData(
   organizationId: string | undefined,
   canvasId: string | undefined,
-  effectiveLiveCanvasVersionId: string | undefined,
+  liveCanvasVersionId: string | undefined,
 ) {
   const queryClient = useQueryClient();
 
@@ -21,15 +21,10 @@ export function useRefreshLatestLiveCanvasData(
         return;
       }
 
-      const liveVersionId = options?.liveVersionId ?? effectiveLiveCanvasVersionId;
+      const liveVersionId = options?.liveVersionId ?? liveCanvasVersionId;
       const invalidations: Array<Promise<unknown>> = [
         queryClient.invalidateQueries({
           queryKey: canvasKeys.detail(organizationId, canvasId),
-          refetchType: "all",
-        }),
-        queryClient.invalidateQueries({
-          queryKey: canvasKeys.versionList(canvasId),
-          exact: true,
           refetchType: "all",
         }),
         queryClient.invalidateQueries({
@@ -69,6 +64,6 @@ export function useRefreshLatestLiveCanvasData(
 
       await Promise.all(invalidations);
     },
-    [organizationId, canvasId, queryClient, effectiveLiveCanvasVersionId],
+    [organizationId, canvasId, queryClient, liveCanvasVersionId],
   );
 }
