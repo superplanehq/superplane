@@ -5,8 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/ciauth"
 )
 
 const verifyOIDCTokenFailedMessage = "token verification failed"
@@ -62,7 +61,7 @@ func (s *Server) handleVerifyOIDCToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := oidc.ValidateExecutionToken(s.oidcProvider, request.Token)
+	claims, err := ciauth.ValidateToken(s.oidcProvider, request.Token)
 	if err != nil {
 		logOIDCVerificationFailure("token validation failed", err)
 		respondVerifyOIDCTokenError(w, http.StatusUnauthorized, verifyOIDCTokenFailedMessage)
@@ -70,43 +69,55 @@ func (s *Server) handleVerifyOIDCToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if request.Expected != nil {
-		expected := oidc.ExecutionTokenExpected{
-			OrgID:        request.Expected.OrgID,
-			CanvasID:     request.Expected.CanvasID,
-			NodeID:       request.Expected.NodeID,
-			Component:    request.Expected.Component,
-			ProjectID:    request.Expected.ProjectID,
-			PipelineFile: request.Expected.PipelineFile,
-			Ref:          request.Expected.Ref,
-			CommitSha:    request.Expected.CommitSha,
-		}
-		if err := expected.Matches(claims); err != nil {
+		if err := toExecutionTokenExpected(*request.Expected).Matches(claims); err != nil {
 			logOIDCVerificationFailure("expected claim mismatch", err)
 			respondVerifyOIDCTokenError(w, http.StatusForbidden, verifyOIDCTokenFailedMessage)
 			return
 		}
 	}
 
-	if err := authorizeExecutionToken(database.Conn(), claims); err != nil {
-		logOIDCVerificationFailure("authorization failed", err)
-		respondVerifyOIDCTokenError(w, http.StatusForbidden, verifyOIDCTokenFailedMessage)
-		return
+	respondJSON(w, verifyOIDCTokenResponse{
+		Valid:  true,
+		Claims: toVerifyOIDCTokenResponseClaims(claims),
+	})
+}
+
+func toExecutionTokenExpected(expected verifyOIDCTokenExpectedClaims) ciauth.ExecutionTokenExpected {
+	additional := map[string]string{}
+	if expected.ProjectID != "" {
+		additional["project_id"] = expected.ProjectID
+	}
+	if expected.PipelineFile != "" {
+		additional["pipeline_file"] = expected.PipelineFile
+	}
+	if expected.Ref != "" {
+		additional["ref"] = expected.Ref
+	}
+	if expected.CommitSha != "" {
+		additional["commit_sha"] = expected.CommitSha
 	}
 
-	respondJSON(w, verifyOIDCTokenResponse{
-		Valid: true,
-		Claims: &verifyOIDCTokenResponseClaims{
-			OrgID:        claims.OrgID,
-			CanvasID:     claims.CanvasID,
-			NodeID:       claims.NodeID,
-			ExecutionID:  claims.ExecutionID,
-			Component:    claims.Component,
-			ProjectID:    claims.ProjectID,
-			PipelineFile: claims.PipelineFile,
-			Ref:          claims.Ref,
-			CommitSha:    claims.CommitSha,
-		},
-	})
+	return ciauth.ExecutionTokenExpected{
+		OrgID:      expected.OrgID,
+		CanvasID:   expected.CanvasID,
+		NodeID:     expected.NodeID,
+		Component:  expected.Component,
+		Additional: additional,
+	}
+}
+
+func toVerifyOIDCTokenResponseClaims(claims ciauth.ExecutionTokenClaims) *verifyOIDCTokenResponseClaims {
+	return &verifyOIDCTokenResponseClaims{
+		OrgID:        claims.OrgID,
+		CanvasID:     claims.CanvasID,
+		NodeID:       claims.NodeID,
+		ExecutionID:  claims.ExecutionID,
+		Component:    claims.Component,
+		ProjectID:    claims.Additional["project_id"],
+		PipelineFile: claims.Additional["pipeline_file"],
+		Ref:          claims.Additional["ref"],
+		CommitSha:    claims.Additional["commit_sha"],
+	}
 }
 
 func logOIDCVerificationFailure(reason string, err error) {
