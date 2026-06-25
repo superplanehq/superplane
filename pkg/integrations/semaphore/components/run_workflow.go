@@ -102,6 +102,31 @@ func (r *RunWorkflow) Documentation() string {
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
 
+## Injected Parameters
+
+SuperPlane automatically adds these workflow parameters when triggering Semaphore:
+
+- ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
+- ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
+- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: A signed OIDC token attesting this workflow was triggered by a specific SuperPlane canvas node
+
+## Verifying Triggers in CI
+
+In protected Semaphore jobs (production deploys, artifact uploads), verify ` + "`SUPERPLANE_OIDC_TOKEN`" + ` before running any steps. Check every claim your policy depends on — ` + "`pipeline_file`" + ` alone only proves which pipeline SuperPlane intended to run, not which organization, commit, or canvas node triggered it:
+
+` + "```bash" + `
+superplane oidc verify \
+  --claim org_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim pipeline_file=.semaphore/production/deploy.yml \
+  --claim node_id=deploy-production
+` + "```" + `
+
+Expected claim values must be pinned in your pipeline — hardcoded literals or Semaphore project env vars — not taken from parameters SuperPlane injects at trigger time.
+
+Set **Commit SHA** on the component when you need the token to bind to a specific revision; otherwise pin ` + "`ref`" + ` and still compare ` + "`commit_sha`" + ` against ` + "`$SEMAPHORE_GIT_SHA`" + ` in CI so the job runs the code SuperPlane attested.
+
+The command reads the token from the environment, fetches JWKS from your SuperPlane instance, and verifies the signature locally. Pass expected claims with ` + "`--claim key=value`" + ` (repeatable) to enforce your policy — SuperPlane attests what was triggered; your pipeline decides what it accepts. Exit code 0 means the token is valid and matches your expectations; any other exit code aborts the job.
+
 ## Output Channels
 
 - **Passed**: Emitted when pipeline completes successfully
@@ -272,11 +297,16 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	parameters, err := r.buildParameters(ctx, spec, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to build workflow parameters: %w", err)
+	}
+
 	params := map[string]any{
 		"project_id":    metadata.Project.ID,
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
-		"parameters":    r.buildParameters(ctx, spec.Parameters),
+		"parameters":    parameters,
 	}
 
 	if spec.CommitSha != "" {
@@ -542,16 +572,27 @@ func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]any {
+func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (map[string]any, error) {
 	parameters := make(map[string]any)
-	for _, param := range params {
+	for _, param := range spec.Parameters {
 		parameters[param.Name] = param.Value
 	}
 
-	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
+	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID.String()
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
-	return parameters
+	if ctx.OIDC == nil {
+		return nil, fmt.Errorf("OIDC provider is not configured")
+	}
+
+	token, err := r.signOIDCToken(ctx, spec, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign OIDC execution token: %w", err)
+	}
+
+	parameters[oidcTokenParameterName] = token
+
+	return parameters, nil
 }
 
 func (r *RunWorkflow) Cleanup(ctx core.SetupContext) error {
