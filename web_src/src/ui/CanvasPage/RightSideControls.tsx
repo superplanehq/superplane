@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Code2, FileCode, FilePlus, Plus } from "lucide-react";
+import { FileCode, FilePlus, Plus } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
@@ -15,7 +15,6 @@ export type RightSideControlsProps = {
 
   onSidebarOpen?: () => void;
   onAddNote?: () => void | Promise<void>;
-  onYamlOpen?: () => void;
   onConsoleAddPanel?: () => void;
   onConsoleOpenYaml?: () => void;
   consoleYamlReadOnly?: boolean;
@@ -41,7 +40,6 @@ function EditModeButtons({
   consoleEditControls,
   onSidebarOpen,
   onAddNote,
-  onYamlOpen,
   onConsoleAddPanel,
   onConsoleOpenYaml,
   consoleYamlReadOnly,
@@ -81,15 +79,6 @@ function EditModeButtons({
           testId="canvas-add-component-button"
           icon={<Plus className="h-3.5 w-3.5" />}
         />
-        {onYamlOpen ? (
-          <ControlButton
-            tooltip="View, copy, download, or import this canvas as YAML"
-            onClick={onYamlOpen}
-            testId="canvas-yaml-button"
-            ariaLabel="View / Import YAML"
-            icon={<FileCode className="h-3.5 w-3.5" />}
-          />
-        ) : null}
         <ControlButton
           tooltip="Add Note"
           onClick={() => onAddNote?.()}
@@ -114,14 +103,6 @@ function EditModeButtons({
         testId="add-note-button"
         icon={<FilePlus className="h-3.5 w-3.5" />}
       />
-      {onYamlOpen ? (
-        <ControlButton
-          tooltip="YAML"
-          onClick={onYamlOpen}
-          testId="open-yaml-modal-button"
-          icon={<Code2 className="h-3.5 w-3.5" />}
-        />
-      ) : null}
     </>
   );
 }
