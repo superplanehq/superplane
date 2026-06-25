@@ -33,9 +33,9 @@ type CreateFirewallSpec struct {
 	SourceServiceAccountsCustom []string `mapstructure:"sourceServiceAccountsCustom"`
 	TargetServiceAccountsCustom []string `mapstructure:"targetServiceAccountsCustom"`
 	Description                 string   `mapstructure:"description"`
-	Disabled              bool               `mapstructure:"disabled"`
-	EnableLogging         bool               `mapstructure:"enableLogging"`
-	LogMetadata           string             `mapstructure:"logMetadata"`
+	Disabled                    bool     `mapstructure:"disabled"`
+	EnableLogging               bool     `mapstructure:"enableLogging"`
+	LogMetadata                 string   `mapstructure:"logMetadata"`
 }
 
 func (c *CreateFirewall) Name() string {

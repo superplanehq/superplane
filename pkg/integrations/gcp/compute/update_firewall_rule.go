@@ -26,20 +26,20 @@ const (
 type UpdateFirewall struct{}
 
 type UpdateFirewallSpec struct {
-	Firewall              string             `mapstructure:"firewall"`
-	EnabledState          string             `mapstructure:"enabledState"`
-	Priority              *int               `mapstructure:"priority"`
-	Rules                 []FirewallRuleSpec `mapstructure:"rules"`
-	Ranges                []string           `mapstructure:"ranges"`
-	TargetTags                  *[]string `mapstructure:"targetTags"`
-	SourceTags                  *[]string `mapstructure:"sourceTags"`
-	TargetServiceAccounts       *[]string `mapstructure:"targetServiceAccounts"`
-	SourceServiceAccounts       *[]string `mapstructure:"sourceServiceAccounts"`
-	TargetServiceAccountsCustom *[]string `mapstructure:"targetServiceAccountsCustom"`
-	SourceServiceAccountsCustom *[]string `mapstructure:"sourceServiceAccountsCustom"`
-	Logging                     string    `mapstructure:"logging"`
-	LogMetadata           string             `mapstructure:"logMetadata"`
-	Description           *string            `mapstructure:"description"`
+	Firewall                    string             `mapstructure:"firewall"`
+	EnabledState                string             `mapstructure:"enabledState"`
+	Priority                    *int               `mapstructure:"priority"`
+	Rules                       []FirewallRuleSpec `mapstructure:"rules"`
+	Ranges                      []string           `mapstructure:"ranges"`
+	TargetTags                  *[]string          `mapstructure:"targetTags"`
+	SourceTags                  *[]string          `mapstructure:"sourceTags"`
+	TargetServiceAccounts       *[]string          `mapstructure:"targetServiceAccounts"`
+	SourceServiceAccounts       *[]string          `mapstructure:"sourceServiceAccounts"`
+	TargetServiceAccountsCustom *[]string          `mapstructure:"targetServiceAccountsCustom"`
+	SourceServiceAccountsCustom *[]string          `mapstructure:"sourceServiceAccountsCustom"`
+	Logging                     string             `mapstructure:"logging"`
+	LogMetadata                 string             `mapstructure:"logMetadata"`
+	Description                 *string            `mapstructure:"description"`
 }
 
 func (u *UpdateFirewall) Name() string {
