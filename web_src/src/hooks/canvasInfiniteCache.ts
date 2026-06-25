@@ -190,9 +190,12 @@ export function executionToRef(execution: CanvasesCanvasNodeExecution): Canvases
   };
 }
 
-function shouldAcceptExecutionRefUpdate(
-  existing: CanvasesCanvasNodeExecutionRef,
-  incoming: CanvasesCanvasNodeExecutionRef,
+// Execution events can arrive out of order, so only accept an update that is at
+// least as recent as what we have — otherwise a finished node gets stuck
+// "running" until reload.
+export function shouldAcceptExecutionUpdate(
+  existing: { state?: string; updatedAt?: string },
+  incoming: { state?: string; updatedAt?: string },
 ): boolean {
   const existingUpdatedAt = parseTimestamp(existing.updatedAt);
   const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
@@ -208,6 +211,13 @@ function shouldAcceptExecutionRefUpdate(
   const existingState = EXECUTION_STATE_ORDER[existing.state ?? "STATE_UNKNOWN"] ?? 0;
   const incomingState = EXECUTION_STATE_ORDER[incoming.state ?? "STATE_UNKNOWN"] ?? 0;
   return incomingState >= existingState;
+}
+
+function shouldAcceptExecutionRefUpdate(
+  existing: CanvasesCanvasNodeExecutionRef,
+  incoming: CanvasesCanvasNodeExecutionRef,
+): boolean {
+  return shouldAcceptExecutionUpdate(existing, incoming);
 }
 
 export function upsertExecutionRef(
