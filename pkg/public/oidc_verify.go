@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
+
+const verifyOIDCTokenFailedMessage = "token verification failed"
 
 type verifyOIDCTokenRequest struct {
 	Token    string                         `json:"token"`
@@ -61,7 +64,8 @@ func (s *Server) handleVerifyOIDCToken(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := oidc.ValidateExecutionToken(s.oidcProvider, request.Token)
 	if err != nil {
-		respondVerifyOIDCTokenError(w, http.StatusUnauthorized, err.Error())
+		logOIDCVerificationFailure("token validation failed", err)
+		respondVerifyOIDCTokenError(w, http.StatusUnauthorized, verifyOIDCTokenFailedMessage)
 		return
 	}
 
@@ -77,13 +81,15 @@ func (s *Server) handleVerifyOIDCToken(w http.ResponseWriter, r *http.Request) {
 			CommitSha:    request.Expected.CommitSha,
 		}
 		if err := expected.Matches(claims); err != nil {
-			respondVerifyOIDCTokenError(w, http.StatusForbidden, err.Error())
+			logOIDCVerificationFailure("expected claim mismatch", err)
+			respondVerifyOIDCTokenError(w, http.StatusForbidden, verifyOIDCTokenFailedMessage)
 			return
 		}
 	}
 
 	if err := authorizeExecutionToken(database.Conn(), claims); err != nil {
-		respondVerifyOIDCTokenError(w, http.StatusForbidden, err.Error())
+		logOIDCVerificationFailure("authorization failed", err)
+		respondVerifyOIDCTokenError(w, http.StatusForbidden, verifyOIDCTokenFailedMessage)
 		return
 	}
 
@@ -101,6 +107,10 @@ func (s *Server) handleVerifyOIDCToken(w http.ResponseWriter, r *http.Request) {
 			CommitSha:    claims.CommitSha,
 		},
 	})
+}
+
+func logOIDCVerificationFailure(reason string, err error) {
+	log.WithError(err).Warn("OIDC execution token verification failed: " + reason)
 }
 
 func respondVerifyOIDCTokenError(w http.ResponseWriter, status int, message string) {

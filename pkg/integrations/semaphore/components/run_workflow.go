@@ -290,11 +290,16 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	parameters, err := r.buildParameters(ctx, spec, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to build workflow parameters: %w", err)
+	}
+
 	params := map[string]any{
 		"project_id":    metadata.Project.ID,
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
-		"parameters":    r.buildParameters(ctx, spec, metadata),
+		"parameters":    parameters,
 	}
 
 	if spec.CommitSha != "" {
@@ -560,7 +565,7 @@ func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) map[string]any {
+func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (map[string]any, error) {
 	parameters := make(map[string]any)
 	for _, param := range spec.Parameters {
 		parameters[param.Name] = param.Value
@@ -569,31 +574,33 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID.String()
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
-	if ctx.OIDC != nil {
-		projectID := ""
-		if metadata.Project != nil {
-			projectID = metadata.Project.ID
-		}
-
-		token, err := oidc.SignExecutionToken(ctx.OIDC, oidc.ExecutionTokenInput{
-			OrganizationID: ctx.OrganizationID,
-			CanvasID:       ctx.WorkflowID,
-			NodeID:         ctx.NodeID,
-			ExecutionID:    ctx.ID.String(),
-			Component:      r.Name(),
-			ProjectID:      projectID,
-			PipelineFile:   spec.PipelineFile,
-			Ref:            spec.Ref,
-			CommitSha:      spec.CommitSha,
-		})
-		if err != nil {
-			ctx.Logger.Warnf("failed to sign OIDC execution token: %v", err)
-		} else {
-			parameters["SUPERPLANE_OIDC_TOKEN"] = token
-		}
+	if ctx.OIDC == nil {
+		return nil, fmt.Errorf("OIDC provider is not configured")
 	}
 
-	return parameters
+	projectID := ""
+	if metadata.Project != nil {
+		projectID = metadata.Project.ID
+	}
+
+	token, err := oidc.SignExecutionToken(ctx.OIDC, oidc.ExecutionTokenInput{
+		OrganizationID: ctx.OrganizationID,
+		CanvasID:       ctx.WorkflowID,
+		NodeID:         ctx.NodeID,
+		ExecutionID:    ctx.ID.String(),
+		Component:      r.Name(),
+		ProjectID:      projectID,
+		PipelineFile:   spec.PipelineFile,
+		Ref:            spec.Ref,
+		CommitSha:      spec.CommitSha,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign OIDC execution token: %w", err)
+	}
+
+	parameters["SUPERPLANE_OIDC_TOKEN"] = token
+
+	return parameters, nil
 }
 
 func (r *RunWorkflow) Cleanup(ctx core.SetupContext) error {
