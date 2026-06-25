@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.compute.svg";
+import firewallIcon from "@/assets/icons/integrations/gcp.firewall.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
 import { firewallLastSegment, type FirewallNodeMetadata } from "./firewall_helpers";
@@ -37,7 +37,7 @@ function baseProps(context: ComponentBaseContext, metadata: MetadataItem[]): Com
   const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
   const componentName = context.componentDefinition.name ?? "gcp";
   return {
-    iconSrc: gcpIcon,
+    iconSrc: firewallIcon,
     iconSlug: context.componentDefinition?.icon ?? "shield",
     collapsedBackground: "bg-white",
     collapsed: context.node.isCollapsed,
