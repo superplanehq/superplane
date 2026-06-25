@@ -865,7 +865,8 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 			return fmt.Errorf("node %s: %w", nodeRef, err)
 		}
 		if !ok {
-			return fmt.Errorf("node %s has no outputs", nodeRef)
+			messageChain[nodeRef] = nil
+			continue
 		}
 
 		messageChain[nodeRef] = normalizeExpressionValue(event.Data.Data())
@@ -940,7 +941,30 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 		}
 	}
 
-	step, payload, err := b.resolveFromExecutions(depth, step, hasInput)
+	if !hasInput {
+		incomingPayload, ok, err := b.incomingEventPayload()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			step++
+			if step >= depth {
+				return incomingPayload, nil
+			}
+		}
+	}
+
+	if depth == 1 && step == 0 {
+		latestPayload, ok, err := b.latestUpstreamOutputPayload()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return latestPayload, nil
+		}
+	}
+
+	step, payload, err := b.resolveFromExecutions(depth, step, step > 0)
 	if err != nil {
 		return nil, err
 	}
@@ -949,6 +973,99 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 	}
 
 	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) incomingEventPayload() (any, bool, error) {
+	if b.incomingEventID == nil {
+		return nil, false, nil
+	}
+
+	event, err := models.FindCanvasEventInTransaction(b.tx, *b.incomingEventID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return b.payloadFromEvent(*event), true, nil
+}
+
+func (b *NodeConfigurationBuilder) latestUpstreamOutputPayload() (any, bool, error) {
+	if b.nodeID == "" || b.rootEventID == nil {
+		return nil, false, nil
+	}
+
+	upstreamNodeIDs, err := b.listUpstreamNodeIDs()
+	if err != nil {
+		return nil, false, err
+	}
+	if len(upstreamNodeIDs) == 0 {
+		return nil, false, nil
+	}
+
+	var executions []models.CanvasNodeExecution
+	err = b.tx.
+		Where("workflow_id = ? AND root_event_id = ? AND node_id IN ?", b.workflowID, *b.rootEventID, upstreamNodeIDs).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, false, err
+	}
+	if len(executions) == 0 {
+		return nil, false, nil
+	}
+
+	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDsFromExecutions(executions))
+	if err != nil {
+		return nil, false, err
+	}
+	latest, ok := latestCanvasEvent(events)
+	if !ok {
+		return nil, false, nil
+	}
+
+	return b.payloadFromEvent(latest), true, nil
+}
+
+func latestCanvasEvent(events []models.CanvasEvent) (models.CanvasEvent, bool) {
+	var latest models.CanvasEvent
+	found := false
+	for _, event := range events {
+		if !found || canvasEventAfter(event, latest) {
+			latest = event
+			found = true
+		}
+	}
+
+	return latest, found
+}
+
+func canvasEventAfter(left models.CanvasEvent, right models.CanvasEvent) bool {
+	if left.CreatedAt == nil && right.CreatedAt == nil {
+		return left.ID.String() > right.ID.String()
+	}
+	if left.CreatedAt == nil {
+		return false
+	}
+	if right.CreatedAt == nil {
+		return true
+	}
+	if left.CreatedAt.Equal(*right.CreatedAt) {
+		return left.ID.String() > right.ID.String()
+	}
+	return left.CreatedAt.After(*right.CreatedAt)
+}
+
+func (b *NodeConfigurationBuilder) payloadFromEvent(event models.CanvasEvent) any {
+	payload := normalizeExpressionValue(event.Data.Data())
+	if event.ExecutionID == nil {
+		return payload
+	}
+
+	execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *event.ExecutionID)
+	if err != nil || execution == nil {
+		return payload
+	}
+
+	return injectConfig(payload, execution.Configuration.Data())
 }
 
 func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any) any {
@@ -964,7 +1081,7 @@ func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any
 	return injectConfig(payload, execution.Configuration.Data())
 }
 
-func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
+func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasCurrentPayload bool) (int, any, error) {
 	if b.previousExecutionID == nil {
 		return step, nil, nil
 	}
@@ -978,7 +1095,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 	}
 
 	startIndex := 0
-	if hasInput {
+	if hasCurrentPayload {
 		startIndex = 1
 	}
 
