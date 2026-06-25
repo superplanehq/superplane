@@ -190,13 +190,9 @@ export function executionToRef(execution: CanvasesCanvasNodeExecution): Canvases
   };
 }
 
-// Execution state only ever moves forward (pending -> started -> finished), but
-// the backend broadcasts each transition through an independent consumer (since
-// the dedicated executions exchange landed), so the websocket can deliver them
-// out of order. A late "created"/"started" event must never overwrite a newer
-// state we already applied, otherwise a finished node gets stuck showing
-// "running" until the page is reloaded. Accept an update only when it is at
-// least as recent as what we have.
+// Execution events can arrive out of order, so only accept an update that is at
+// least as recent as what we have — otherwise a finished node gets stuck
+// "running" until reload.
 export function shouldAcceptExecutionUpdate(
   existing: { state?: string; updatedAt?: string },
   incoming: { state?: string; updatedAt?: string },
