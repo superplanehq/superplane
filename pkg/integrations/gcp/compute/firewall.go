@@ -22,6 +22,18 @@ const (
 	// Firewall Rules Logging metadata options (logConfig.metadata).
 	FirewallLogMetadataIncludeAll = "INCLUDE_ALL_METADATA"
 	FirewallLogMetadataExcludeAll = "EXCLUDE_ALL_METADATA"
+
+	// Target type — which instances a rule applies to. Mirrors the GCP Console
+	// "Targets" dropdown: all instances, instances with target tags, or instances
+	// running as target service accounts (mutually exclusive).
+	FirewallTargetAll = "all"
+	// Source filter type (INGRESS) — how incoming traffic is matched. Mirrors the
+	// Console "Source filter" dropdown: IP ranges, source tags, or source service
+	// accounts (mutually exclusive).
+	FirewallSourceRanges = "ranges"
+	// Shared tag/service-account selectors for both target type and source filter.
+	FirewallFilterTags            = "tags"
+	FirewallFilterServiceAccounts = "serviceAccounts"
 )
 
 // FirewallRuleSpec is one protocol/ports entry of a firewall rule, configured as
@@ -206,6 +218,33 @@ func normalizeFirewallLogMetadata(metadata string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid log metadata %q: must be INCLUDE_ALL_METADATA or EXCLUDE_ALL_METADATA", metadata)
 	}
+}
+
+// resolveFirewallTargeting keeps only the tag/service-account lists that match
+// the selected target type and source-filter type. The "Targets" and "Source
+// filter" dropdowns make the choice mutually exclusive in the form, so this
+// ensures the dropdown selection — not a stale hidden input — decides what the
+// rule targets. The service-account lists passed in should already be merged
+// (dropdown selections + custom entries); source filters only apply to INGRESS.
+func resolveFirewallTargeting(
+	targetType, sourceFilterType string, ingress bool,
+	targetTags, targetServiceAccounts, sourceTags, sourceServiceAccounts []string,
+) (effTargetTags, effTargetSAs, effSourceTags, effSourceSAs []string) {
+	switch strings.TrimSpace(targetType) {
+	case FirewallFilterTags:
+		effTargetTags = targetTags
+	case FirewallFilterServiceAccounts:
+		effTargetSAs = targetServiceAccounts
+	}
+	if ingress {
+		switch strings.TrimSpace(sourceFilterType) {
+		case FirewallFilterTags:
+			effSourceTags = sourceTags
+		case FirewallFilterServiceAccounts:
+			effSourceSAs = sourceServiceAccounts
+		}
+	}
+	return
 }
 
 // validateFirewallTargetsAndSources enforces a Compute Engine constraint: a

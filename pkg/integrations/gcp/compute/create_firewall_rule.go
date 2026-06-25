@@ -20,6 +20,8 @@ type CreateFirewallSpec struct {
 	Network               string             `mapstructure:"network"`
 	Direction             string             `mapstructure:"direction"`
 	Action                string             `mapstructure:"action"`
+	TargetType            string             `mapstructure:"targetType"`
+	SourceFilterType      string             `mapstructure:"sourceFilterType"`
 	Priority              *int               `mapstructure:"priority"`
 	Rules                 []FirewallRuleSpec `mapstructure:"rules"`
 	SourceRanges          []string           `mapstructure:"sourceRanges"`
@@ -67,16 +69,14 @@ func (c *CreateFirewall) Documentation() string {
 - **Action**: ` + "`allow`" + ` (default) or ` + "`deny`" + ` the matched traffic
 - **Priority**: 0–65535; lower numbers win (default 1000)
 - **Protocols & ports**: One or more protocol/ports entries (e.g. ` + "`tcp`" + ` with ports ` + "`80, 443`" + `). Leave ports empty to match all ports for that protocol; use ` + "`all`" + ` to match every protocol
-- **Source ranges** (INGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
+- **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
+- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, ` + "`0.0.0.0/0`" + `), *Source tags*, or *Service accounts*. Choosing one reveals its input
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
-- **Target tags**: Optionally limit the rule to VMs with these network tags; leave empty to apply to all VMs in the network
-- **Target service accounts**: Optionally limit the rule to VMs running as these service accounts (alternative to target tags). Picked from a dropdown of the project's service accounts; a separate custom field accepts cross-project emails not in the list
-- **Source tags / Source service accounts** (INGRESS): Optionally match traffic from VMs with these network tags or service accounts
 - **Description**: Optional human-readable description
 - **Disabled**: Create the rule in a disabled state
 - **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects a rule that mixes them.
+> The Targets and Source filter dropdowns make tags and service accounts mutually exclusive within each, mirroring the GCP Console. A rule still can't mix tags on one side with service accounts on the other (e.g. target tags + source service accounts) — the component rejects that.
 
 ## Output
 
@@ -192,6 +192,81 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "targetType",
+			Label:       "Targets",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallTargetAll,
+			Description: "Which instances the rule applies to.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "All instances in the network", Value: FirewallTargetAll},
+				{Label: "Specified target tags", Value: FirewallFilterTags},
+				{Label: "Specified service accounts", Value: FirewallFilterServiceAccounts},
+			}}},
+		},
+		{
+			Name:        "targetTags",
+			Label:       "Target tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Limit the rule to VMs with these network tags.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterTags}},
+			},
+		},
+		{
+			Name:        "targetServiceAccounts",
+			Label:       "Target service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Limit the rule to VMs running as these service accounts.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterServiceAccounts}},
+			},
+		},
+		{
+			Name:        "targetServiceAccountsCustom",
+			Label:       "Target service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Additional target service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterServiceAccounts}},
+			},
+		},
+		{
+			Name:        "sourceFilterType",
+			Label:       "Source filter",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallSourceRanges,
+			Description: "How incoming traffic is matched.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "IP ranges", Value: FirewallSourceRanges},
+				{Label: "Source tags", Value: FirewallFilterTags},
+				{Label: "Service accounts", Value: FirewallFilterServiceAccounts},
+			}}},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+			},
+		},
+		{
 			Name:        "sourceRanges",
 			Label:       "Source ranges",
 			Type:        configuration.FieldTypeList,
@@ -206,6 +281,56 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+				{Field: "sourceFilterType", Values: []string{FirewallSourceRanges}},
+			},
+		},
+		{
+			Name:        "sourceTags",
+			Label:       "Source tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Match traffic from VMs with these network tags.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+				{Field: "sourceFilterType", Values: []string{FirewallFilterTags}},
+			},
+		},
+		{
+			Name:        "sourceServiceAccounts",
+			Label:       "Source service accounts",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Match traffic from VMs running as these service accounts.",
+			Placeholder: "Select service accounts",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+				{Field: "sourceFilterType", Values: []string{FirewallFilterServiceAccounts}},
+			},
+		},
+		{
+			Name:        "sourceServiceAccountsCustom",
+			Label:       "Source service accounts (custom / cross-project)",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Additional source service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:      "Service account email",
+					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "direction", Values: []string{FirewallDirectionIngress}},
+				{Field: "sourceFilterType", Values: []string{FirewallFilterServiceAccounts}},
 			},
 		},
 		{
@@ -223,95 +348,6 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "direction", Values: []string{FirewallDirectionEgress}},
-			},
-		},
-		{
-			Name:        "targetTags",
-			Label:       "Target tags",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Description: "Limit the rule to VMs with these network tags. Leave empty to apply to all VMs in the network.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel:      "Tag",
-					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
-				},
-			},
-		},
-		{
-			Name:        "targetServiceAccounts",
-			Label:       "Target service accounts",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Togglable:   true,
-			Description: "Limit the rule to VMs running as these service accounts. Cannot be combined with network tags.",
-			Placeholder: "Select service accounts",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
-			},
-		},
-		{
-			Name:        "targetServiceAccountsCustom",
-			Label:       "Target service accounts (custom / cross-project)",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Description: "Additional target service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel:      "Service account email",
-					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
-				},
-			},
-		},
-		{
-			Name:        "sourceTags",
-			Label:       "Source tags",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Description: "Apply the rule to traffic from VMs with these network tags (INGRESS only).",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel:      "Tag",
-					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
-				},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "direction", Values: []string{FirewallDirectionIngress}},
-			},
-		},
-		{
-			Name:        "sourceServiceAccounts",
-			Label:       "Source service accounts",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Togglable:   true,
-			Description: "Apply the rule to traffic from VMs running as these service accounts (INGRESS only). Cannot be combined with network tags.",
-			Placeholder: "Select service accounts",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "direction", Values: []string{FirewallDirectionIngress}},
-			},
-		},
-		{
-			Name:        "sourceServiceAccountsCustom",
-			Label:       "Source service accounts (custom / cross-project)",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Description: "Additional source service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above. INGRESS only.",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel:      "Service account email",
-					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
-				},
-			},
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "direction", Values: []string{FirewallDirectionIngress}},
 			},
 		},
 		{
@@ -366,7 +402,8 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.Network) == "" {
 		return errors.New("network is required")
 	}
-	if _, err := normalizeFirewallDirection(spec.Direction); err != nil {
+	dir, err := normalizeFirewallDirection(spec.Direction)
+	if err != nil {
 		return err
 	}
 	if _, err := normalizeFirewallAction(spec.Action); err != nil {
@@ -381,15 +418,16 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 	if _, err := normalizeFirewallLogMetadata(spec.LogMetadata); err != nil {
 		return err
 	}
-	sourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
-	targetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
-	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+	mergedTargetSAs := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	mergedSourceSAs := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+	effTargetTags, effTargetSAs, effSourceTags, effSourceSAs := resolveFirewallTargeting(
+		spec.TargetType, spec.SourceFilterType, dir == FirewallDirectionIngress,
+		trimList(spec.TargetTags), mergedTargetSAs, trimList(spec.SourceTags), mergedSourceSAs,
+	)
+	if err := validateServiceAccountEmails(mergeDedup(effSourceSAs, effTargetSAs)); err != nil {
 		return err
 	}
-	if err := validateFirewallTargetsAndSources(
-		trimList(spec.SourceTags), trimList(spec.TargetTags),
-		sourceServiceAccounts, targetServiceAccounts,
-	); err != nil {
+	if err := validateFirewallTargetsAndSources(effSourceTags, effTargetTags, effSourceSAs, effTargetSAs); err != nil {
 		return err
 	}
 	return ctx.Metadata.Set(FirewallNodeMetadata{FirewallName: strings.TrimSpace(spec.Name)})
@@ -423,15 +461,16 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
-	sourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
-	targetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
-	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+	mergedTargetSAs := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	mergedSourceSAs := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+	targetTags, targetSAs, sourceTags, sourceSAs := resolveFirewallTargeting(
+		spec.TargetType, spec.SourceFilterType, direction == FirewallDirectionIngress,
+		trimList(spec.TargetTags), mergedTargetSAs, trimList(spec.SourceTags), mergedSourceSAs,
+	)
+	if err := validateServiceAccountEmails(mergeDedup(sourceSAs, targetSAs)); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
-	if err := validateFirewallTargetsAndSources(
-		trimList(spec.SourceTags), trimList(spec.TargetTags),
-		sourceServiceAccounts, targetServiceAccounts,
-	); err != nil {
+	if err := validateFirewallTargetsAndSources(sourceTags, targetTags, sourceSAs, targetSAs); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -456,26 +495,33 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 	} else {
 		body["denied"] = rules
 	}
+	// Source filter: EGRESS uses destination ranges; INGRESS uses the selected
+	// source filter (ranges, tags, or service accounts).
 	if direction == FirewallDirectionEgress {
 		if ranges := trimList(spec.DestinationRanges); len(ranges) > 0 {
 			body["destinationRanges"] = ranges
 		}
 	} else {
-		if ranges := trimList(spec.SourceRanges); len(ranges) > 0 {
-			body["sourceRanges"] = ranges
-		}
-		if tags := trimList(spec.SourceTags); len(tags) > 0 {
-			body["sourceTags"] = tags
-		}
-		if len(sourceServiceAccounts) > 0 {
-			body["sourceServiceAccounts"] = sourceServiceAccounts
+		switch strings.TrimSpace(spec.SourceFilterType) {
+		case FirewallFilterTags:
+			if len(sourceTags) > 0 {
+				body["sourceTags"] = sourceTags
+			}
+		case FirewallFilterServiceAccounts:
+			if len(sourceSAs) > 0 {
+				body["sourceServiceAccounts"] = sourceSAs
+			}
+		default: // IP ranges
+			if ranges := trimList(spec.SourceRanges); len(ranges) > 0 {
+				body["sourceRanges"] = ranges
+			}
 		}
 	}
-	if tags := trimList(spec.TargetTags); len(tags) > 0 {
-		body["targetTags"] = tags
+	if len(targetTags) > 0 {
+		body["targetTags"] = targetTags
 	}
-	if len(targetServiceAccounts) > 0 {
-		body["targetServiceAccounts"] = targetServiceAccounts
+	if len(targetSAs) > 0 {
+		body["targetServiceAccounts"] = targetSAs
 	}
 	if desc := strings.TrimSpace(spec.Description); desc != "" {
 		body["description"] = desc

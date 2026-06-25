@@ -1135,16 +1135,14 @@ The Create Firewall Rule component creates a VPC firewall rule that controls tra
 - **Action**: `allow` (default) or `deny` the matched traffic
 - **Priority**: 0–65535; lower numbers win (default 1000)
 - **Protocols & ports**: One or more protocol/ports entries (e.g. `tcp` with ports `80, 443`). Leave ports empty to match all ports for that protocol; use `all` to match every protocol
-- **Source ranges** (INGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`)
+- **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
+- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, `0.0.0.0/0`), *Source tags*, or *Service accounts*. Choosing one reveals its input
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`)
-- **Target tags**: Optionally limit the rule to VMs with these network tags; leave empty to apply to all VMs in the network
-- **Target service accounts**: Optionally limit the rule to VMs running as these service accounts (alternative to target tags). Picked from a dropdown of the project's service accounts; a separate custom field accepts cross-project emails not in the list
-- **Source tags / Source service accounts** (INGRESS): Optionally match traffic from VMs with these network tags or service accounts
 - **Description**: Optional human-readable description
 - **Disabled**: Create the rule in a disabled state
 - **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects a rule that mixes them.
+> The Targets and Source filter dropdowns make tags and service accounts mutually exclusive within each, mirroring the GCP Console. A rule still can't mix tags on one side with service accounts on the other (e.g. target tags + source service accounts) — the component rejects that.
 
 ### Output
 
