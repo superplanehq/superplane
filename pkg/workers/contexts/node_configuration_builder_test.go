@@ -394,6 +394,161 @@ func Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage(t *testing.
 	assert.Equal(t, true, done)
 }
 
+func Test_NodeConfigurationBuilder_ReferencedUpstreamNodeWithNoOutputsResolvesToNil(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+
+	// The sibling execution exists in the same run but has not emitted an event yet.
+	support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildAEvent.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"build-a": map[string]any{"status": "succeeded"}})
+
+	missing, err := builder.ResolveExpression(`$["Build B"] == nil`)
+	require.NoError(t, err)
+	assert.Equal(t, true, missing)
+}
+
+func Test_NodeConfigurationBuilder_PreviousFallsBackToLatestUpstreamOutput(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+	buildBExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+	buildBEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-b",
+		"failed",
+		&buildBExecution.ID,
+		map[string]any{"status": "failed"},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildBEvent.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	status, err := builder.ResolveExpression(`previous().status`)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", status)
+}
+
+func Test_NodeConfigurationBuilder_PreviousPrefersCurrentInputOverLatestUpstreamOutput(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+	buildBExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+	support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-b",
+		"failed",
+		&buildBExecution.ID,
+		map[string]any{"status": "failed"},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildAEvent.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"build-a": map[string]any{"status": "succeeded"}})
+
+	status, err := builder.ResolveExpression(`previous().status`)
+	require.NoError(t, err)
+	assert.Equal(t, "succeeded", status)
+}
+
 func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
