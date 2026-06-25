@@ -37,7 +37,7 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 		apiURL = defaultAPIURL
 	}
 
-	claims, err := validateRemote(http.DefaultClient, token, apiURL)
+	claims, err := validateRemote(ctx.Context, http.DefaultClient, token, apiURL)
 	if err != nil {
 		return fmt.Errorf("token verification failed")
 	}
