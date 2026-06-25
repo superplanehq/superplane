@@ -345,8 +345,10 @@ export function AppPage() {
   );
   const liveVersionFromDescribe = useMemo(() => liveCanvasVersionFromDescribe(liveCanvas), [liveCanvas]);
   const liveCanvasVersion = useMemo(() => {
-    const publishedVersions = paginatedVersions.filter(isPublishedVersion);
-    if (publishedVersions.length > 0) return publishedVersions[0];
+    const publishedFromHistory = paginatedVersions.find(isPublishedVersion);
+    if (publishedFromHistory) {
+      return publishedFromHistory;
+    }
     return liveVersionFromDescribe;
   }, [paginatedVersions, liveVersionFromDescribe]);
   const visibleCanvasVersions = useMemo(() => {
@@ -356,16 +358,13 @@ export function AppPage() {
       if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-    if (liveVersionFromDescribe) {
-      addVersion(liveVersionFromDescribe);
-    }
     paginatedVersions.forEach(addVersion);
     draftVersionsFromBranches.forEach(addVersion);
     return Array.from(versionMap.values()).filter((version) => {
       if (isPublishedVersion(version)) return true;
       return version.metadata?.owner?.id === currentUserId;
     });
-  }, [liveVersionFromDescribe, paginatedVersions, currentUserId, draftVersionsFromBranches]);
+  }, [paginatedVersions, currentUserId, draftVersionsFromBranches]);
   const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
