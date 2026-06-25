@@ -73,6 +73,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Route 53 • Create DNS Record" href="#route-53-•-create-dns-record" description="Create a DNS record in an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Delete DNS Record" href="#route-53-•-delete-dns-record" description="Delete a DNS record from an AWS Route 53 hosted zone" />
   <LinkCard title="Route 53 • Upsert DNS Record" href="#route-53-•-upsert-dns-record" description="Create or update a DNS record in an AWS Route 53 hosted zone" />
+  <LinkCard title="S3 • Create Bucket" href="#s3-•-create-bucket" description="Create a new S3 bucket" />
+  <LinkCard title="S3 • Delete Bucket" href="#s3-•-delete-bucket" description="Delete an S3 bucket" />
+  <LinkCard title="S3 • Get Bucket" href="#s3-•-get-bucket" description="Get metadata for an S3 bucket" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
   <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
   <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
@@ -3018,6 +3021,98 @@ The Upsert DNS Record component creates or updates a DNS record in an AWS Route 
   },
   "timestamp": "2026-01-28T10:30:00.000Z",
   "type": "aws.route53.change"
+}
+```
+
+<a id="s3-•-create-bucket"></a>
+
+## S3 • Create Bucket
+
+**Component key:** `aws.s3.createBucket`
+
+The Create Bucket component creates a new AWS S3 bucket.
+
+### Configuration
+
+- **Region**: AWS region where the bucket will be created
+- **Bucket Name**: Globally unique name for the new bucket (3-63 characters, lowercase)
+
+### Output
+
+Emits the created bucket's name, region, and ARN on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "arn": "arn:aws:s3:::my-example-bucket",
+    "bucketName": "my-example-bucket",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.s3.bucket"
+}
+```
+
+<a id="s3-•-delete-bucket"></a>
+
+## S3 • Delete Bucket
+
+**Component key:** `aws.s3.deleteBucket`
+
+The Delete Bucket component deletes an AWS S3 bucket. The bucket must be empty.
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket to delete
+
+### Output
+
+Emits the deleted bucket's name and a deletion confirmation on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucketName": "my-example-bucket",
+    "deleted": true
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.s3.bucket.deleted"
+}
+```
+
+<a id="s3-•-get-bucket"></a>
+
+## S3 • Get Bucket
+
+**Component key:** `aws.s3.getBucket`
+
+The Get Bucket component retrieves metadata for an AWS S3 bucket.
+
+### Configuration
+
+- **Region**: AWS region of the S3 bucket
+- **Bucket**: Target S3 bucket
+
+### Output
+
+Emits the bucket's name, resolved region, and ARN on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "arn": "arn:aws:s3:::my-example-bucket",
+    "bucketName": "my-example-bucket",
+    "region": "eu-west-1"
+  },
+  "timestamp": "2026-02-11T12:00:00Z",
+  "type": "aws.s3.bucket"
 }
 ```
 

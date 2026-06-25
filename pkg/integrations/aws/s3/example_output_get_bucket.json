@@ -1,0 +1,9 @@
+{
+  "type": "aws.s3.bucket",
+  "timestamp": "2026-02-11T12:00:00Z",
+  "data": {
+    "bucketName": "my-example-bucket",
+    "region": "eu-west-1",
+    "arn": "arn:aws:s3:::my-example-bucket"
+  }
+}
