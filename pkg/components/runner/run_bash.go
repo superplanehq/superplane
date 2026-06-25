@@ -325,7 +325,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	var setupCommands []string
 	if spec.EnableSetupCommands {
-		setupCommands = normalizeCommands(spec.SetupCommands)
+		setupCommands = normalizeSetupCommands(spec.SetupCommands)
 	}
 
 	params := CreateTaskParams{
