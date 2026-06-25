@@ -611,6 +611,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/oidc/verify", s.handleVerifyOIDCToken).Methods("POST")
 
 	//
 	// Webhook endpoints for triggers
