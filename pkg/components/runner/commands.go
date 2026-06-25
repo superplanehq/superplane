@@ -19,13 +19,35 @@ var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`
 func normalizeCommands(commands string) []string {
 	lines := strings.Split(commands, "\n")
 	out := make([]string, 0, len(lines))
+	block := make([]string, 0)
+	blockDepth := 0
+
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 		if l == "" {
 			continue
 		}
-		out = append(out, l)
+
+		openBlocks := shellBlockOpeners(l)
+		closeBlocks := shellBlockClosers(l)
+		if blockDepth == 0 && openBlocks == 0 {
+			out = append(out, l)
+			continue
+		}
+
+		block = append(block, l)
+		blockDepth += openBlocks
+		blockDepth -= min(closeBlocks, blockDepth)
+		if blockDepth == 0 {
+			out = append(out, strings.Join(block, "\n"))
+			block = block[:0]
+		}
 	}
+
+	if len(block) > 0 {
+		out = append(out, strings.Join(block, "\n"))
+	}
+
 	return out
 }
 
@@ -35,6 +57,48 @@ func validateCommands(commands string) error {
 		return errors.New("at least one command is required")
 	}
 	return nil
+}
+
+func shellBlockOpeners(line string) int {
+	switch firstShellWord(line) {
+	case "if", "case", "for", "select", "while", "until":
+		return 1
+	}
+
+	if strings.HasSuffix(line, "{") {
+		return 1
+	}
+
+	return 0
+}
+
+func shellBlockClosers(line string) int {
+	switch firstShellWord(line) {
+	case "fi", "done", "esac", "}":
+		return 1
+	}
+
+	for _, closer := range []string{"fi", "done", "esac", "}"} {
+		if strings.Contains(line, "; "+closer) || strings.Contains(line, ";"+closer) {
+			return 1
+		}
+	}
+
+	return 0
+}
+
+func firstShellWord(line string) string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return strings.Trim(fields[0], ";")
 }
 
 func validateEnvironment(environment []EnvironmentVariable) error {
