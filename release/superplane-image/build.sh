@@ -19,11 +19,24 @@ ARCH="$2"
 IMAGE_REPO="${STANDARD_IMAGE_REPO:-ghcr.io/superplanehq/superplane}"
 DEV_BASE_IMAGE_REPO="${DEV_BASE_IMAGE_REPO:-ghcr.io/superplanehq/superplane-dev-base}"
 
-if [ ! -f "pkg/protos/me/me.pb.go" ] || [ ! -f "pkg/protos/me/me.pb.gw.go" ]; then
-  echo "Generating protobuf files"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+# shellcheck source=../lib/image-build-prerequisites.sh
+source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
+
+cd "${REPO_ROOT}"
+
+require_release_image_build_prerequisites
+
+if generated_release_build_inputs_missing; then
+  echo "Generating release build artifacts"
   make dev.up
   make pb.gen.models
   make pb.gen.gateway
+  make openapi.spec.gen
+  make dev.setup.npm
+  make openapi.web.client.gen
 fi
 
 echo "Building SuperPlane image (${IMAGE_REPO})"
