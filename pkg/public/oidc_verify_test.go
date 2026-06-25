@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -106,6 +107,58 @@ func TestHandleVerifyOIDCTokenRejectsInvalidToken(t *testing.T) {
 	})
 
 	require.Equal(t, http.StatusUnauthorized, response.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+	require.Equal(t, false, payload["valid"])
+	require.Equal(t, verifyOIDCTokenFailedMessage, payload["error"])
+}
+
+func TestHandleVerifyOIDCTokenRejectsUnauthorizedWithGenericError(t *testing.T) {
+	r := support.Setup(t)
+	issuer := "http://superplane.test"
+	provider, err := oidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "test", "fixtures", "oidc-keys"))
+	require.NoError(t, err)
+
+	canvas, nodes := createSemaphoreDeployCanvas(t, r)
+	node := nodes[0]
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node.NodeID, "default", nil, map[string]any{})
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node.NodeID, event.ID, event.ID)
+
+	token, err := oidc.SignExecutionToken(provider, oidc.ExecutionTokenInput{
+		OrganizationID: r.Organization.ID.String(),
+		CanvasID:       canvas.ID.String(),
+		NodeID:         node.NodeID,
+		ExecutionID:    execution.ID.String(),
+		Component:      "semaphore.runWorkflow",
+		ProjectID:      "project-123",
+		PipelineFile:   ".semaphore/deploy.yml",
+	})
+	require.NoError(t, err)
+
+	server := newVerifyTestServer(t, provider, issuer)
+
+	body, err := json.Marshal(map[string]any{
+		"token": token,
+		"expected": map[string]any{
+			"canvas_id": uuid.NewString(),
+		},
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      "POST",
+		path:        "/api/v1/oidc/verify",
+		body:        body,
+		contentType: "application/json",
+	})
+
+	require.Equal(t, http.StatusForbidden, response.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+	require.Equal(t, false, payload["valid"])
+	require.Equal(t, verifyOIDCTokenFailedMessage, payload["error"])
 }
 
 func createSemaphoreDeployCanvas(t *testing.T, r *support.ResourceRegistry) (*models.Canvas, []models.CanvasNode) {

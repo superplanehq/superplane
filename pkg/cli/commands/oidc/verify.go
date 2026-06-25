@@ -103,9 +103,6 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !result.Valid {
-		if result.Error != "" {
-			return fmt.Errorf("token verification failed: %s", result.Error)
-		}
 		return fmt.Errorf("token verification failed")
 	}
 
