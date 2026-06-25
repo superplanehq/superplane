@@ -90,6 +90,17 @@ func firewallGetJSON(name, direction, action string) []byte {
 	return b
 }
 
+// firewallGetJSONNoTags is firewallGetJSON without targetTags, for tests that
+// add service accounts (a firewall rule cannot mix network tags and service
+// accounts, so an SA-based rule must not already carry tags).
+func firewallGetJSONNoTags(name, direction, action string) []byte {
+	var m map[string]any
+	_ = json.Unmarshal(firewallGetJSON(name, direction, action), &m)
+	delete(m, "targetTags")
+	b, _ := json.Marshal(m)
+	return b
+}
+
 // firewallExecGet returns a getFunc that answers operation polls with a DONE
 // operation and firewall reads with the given firewall body.
 func firewallExecGet(opName string, fwBody []byte) func(ctx context.Context, path string) ([]byte, error) {

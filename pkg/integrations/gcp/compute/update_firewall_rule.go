@@ -76,7 +76,7 @@ func (u *UpdateFirewall) Documentation() string {
 - **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
 - **Description**: Replace the rule's description
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both — the component rejects an update that would mix them.
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Because an unchanged targeting field keeps its current value, switching a rule from one to the other means setting the new field **and** clearing the old one in the same update — the component rejects an update whose result would mix them.
 
 ## Output
 
@@ -371,12 +371,6 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 	if err := validateServiceAccountEmails(mergeDedup(mergedSourceServiceAccounts, mergedTargetServiceAccounts)); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
-	if err := validateFirewallTargetsAndSources(
-		providedList(spec.SourceTags), providedList(spec.TargetTags),
-		mergedSourceServiceAccounts, mergedTargetServiceAccounts,
-	); err != nil {
-		return ctx.ExecutionState.Fail("error", err.Error())
-	}
 
 	urlProject, name, err := parseFirewallPath(spec.Firewall)
 	if err != nil {
@@ -406,6 +400,34 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 	var current firewallGetResp
 	if err := json.Unmarshal(body, &current); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse firewall rule: %v", err))
+	}
+
+	// Validate the rule's *resulting* targeting won't mix network tags and service
+	// accounts. firewalls.patch is a merge: a targeting field this update doesn't
+	// set keeps its current value, so switching from tags to service accounts (or
+	// the reverse) must also clear the other field. Fall back to the current rule
+	// for any field the update leaves untouched.
+	resultingTargetTags := current.TargetTags
+	if spec.TargetTags != nil {
+		resultingTargetTags = trimList(*spec.TargetTags)
+	}
+	resultingSourceTags := current.SourceTags
+	if spec.SourceTags != nil {
+		resultingSourceTags = trimList(*spec.SourceTags)
+	}
+	resultingTargetServiceAccounts := current.TargetServiceAccounts
+	if spec.TargetServiceAccounts != nil || spec.TargetServiceAccountsCustom != nil {
+		resultingTargetServiceAccounts = mergedTargetServiceAccounts
+	}
+	resultingSourceServiceAccounts := current.SourceServiceAccounts
+	if spec.SourceServiceAccounts != nil || spec.SourceServiceAccountsCustom != nil {
+		resultingSourceServiceAccounts = mergedSourceServiceAccounts
+	}
+	if err := validateFirewallTargetsAndSources(
+		resultingSourceTags, resultingTargetTags,
+		resultingSourceServiceAccounts, resultingTargetServiceAccounts,
+	); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("%v — also clear the opposite targeting field in this update to switch", err))
 	}
 
 	patch := map[string]any{}

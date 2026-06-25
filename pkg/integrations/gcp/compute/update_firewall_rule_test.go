@@ -194,7 +194,8 @@ func Test__UpdateFirewall__Execute(t *testing.T) {
 				patchBody = body.(map[string]any)
 				return opDone("op"), nil
 			},
-			getFunc: firewallExecGet("op", firewallGetJSON("allow-http", "INGRESS", "allow")),
+			// A rule without tags, so adding service accounts doesn't mix the two.
+			getFunc: firewallExecGet("op", firewallGetJSONNoTags("allow-http", "INGRESS", "allow")),
 		}
 		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
 
@@ -214,6 +215,61 @@ func Test__UpdateFirewall__Execute(t *testing.T) {
 		logCfg := patchBody["logConfig"].(map[string]any)
 		assert.Equal(t, true, logCfg["enable"])
 		assert.Equal(t, "INCLUDE_ALL_METADATA", logCfg["metadata"])
+	})
+
+	t.Run("adding service accounts to a tag-based rule fails (would mix tags + SAs)", func(t *testing.T) {
+		var patched bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				patched = true
+				return opDone("op"), nil
+			},
+			// Current rule already has targetTags ["web"].
+			getFunc: firewallExecGet("op", firewallGetJSON("allow-http", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"firewall":              "allow-http",
+				"targetServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, patched)
+		assert.Contains(t, state.FailureMessage, "cannot combine network tags and service accounts")
+	})
+
+	t.Run("switching tags to service accounts succeeds when the tags are cleared", func(t *testing.T) {
+		var patchBody map[string]any
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			patchFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				patchBody = body.(map[string]any)
+				return opDone("op"), nil
+			},
+			getFunc: firewallExecGet("op", firewallGetJSON("allow-http", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"firewall":              "allow-http",
+				"targetServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
+				"targetTags":            []string{}, // explicitly clear the existing tags
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, []string{"sa@my-project.iam.gserviceaccount.com"}, patchBody["targetServiceAccounts"])
+		require.Contains(t, patchBody, "targetTags")
+		assert.Empty(t, patchBody["targetTags"])
 	})
 
 	t.Run("source tags rejected on an egress rule", func(t *testing.T) {
