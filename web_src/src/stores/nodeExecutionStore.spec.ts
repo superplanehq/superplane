@@ -27,10 +27,7 @@ describe("nodeExecutionStore.updateNodeExecution", () => {
 
     // Late "started" event for the same execution (older updatedAt) must not
     // downgrade the node back to a running state.
-    store.updateNodeExecution(
-      nodeId,
-      execution({ state: "STATE_STARTED", updatedAt: "2026-06-01T12:00:00.000Z" }),
-    );
+    store.updateNodeExecution(nodeId, execution({ state: "STATE_STARTED", updatedAt: "2026-06-01T12:00:00.000Z" }));
 
     const data = useNodeExecutionStore.getState().getNodeData(nodeId);
     expect(data.executions).toHaveLength(1);
@@ -40,10 +37,7 @@ describe("nodeExecutionStore.updateNodeExecution", () => {
   it("applies a newer state update", () => {
     const store = useNodeExecutionStore.getState();
 
-    store.updateNodeExecution(
-      nodeId,
-      execution({ state: "STATE_STARTED", updatedAt: "2026-06-01T12:00:00.000Z" }),
-    );
+    store.updateNodeExecution(nodeId, execution({ state: "STATE_STARTED", updatedAt: "2026-06-01T12:00:00.000Z" }));
     store.updateNodeExecution(
       nodeId,
       execution({ state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: "2026-06-01T12:00:01.000Z" }),
