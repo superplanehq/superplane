@@ -74,6 +74,9 @@ func (c *Cloudsmith) Actions() []core.Action {
 		&ResyncPackage{},
 		&TagPackage{},
 		&DeletePackage{},
+		&ScanPackage{},
+		&QuarantinePackage{},
+		&GetPackageVulnerabilities{},
 	}
 }
 
