@@ -6,6 +6,7 @@ import (
 
 type Provider interface {
 	Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error)
+	Validate(tokenString string) (map[string]any, error)
 	PublicJWKs() []PublicJWK
 }
 
