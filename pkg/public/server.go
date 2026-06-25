@@ -1175,9 +1175,6 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		newEvents = append(newEvents, events...)
 	}
 
-	// Async actions (e.g. the runner) finalize their execution from inside the
-	// webhook handler, so we must broadcast the resulting execution state change
-	// ourselves - otherwise the node stays "running" in the UI until reload.
 	touchedExecutions := map[uuid.UUID]uuid.UUID{}
 	recordExecution := func(workflowID, executionID uuid.UUID) {
 		touchedExecutions[executionID] = workflowID
