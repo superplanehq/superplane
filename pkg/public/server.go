@@ -1175,10 +1175,18 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		newEvents = append(newEvents, events...)
 	}
 
+	// Async actions (e.g. the runner) finalize their execution from inside the
+	// webhook handler, so we must broadcast the resulting execution state change
+	// ourselves - otherwise the node stays "running" in the UI until reload.
+	touchedExecutions := map[uuid.UUID]uuid.UUID{}
+	recordExecution := func(workflowID, executionID uuid.UUID) {
+		touchedExecutions[executionID] = workflowID
+	}
+
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
@@ -1193,6 +1201,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	for executionID, workflowID := range touchedExecutions {
+		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
+			log.Errorf("error publishing execution state for %s: %v", executionID, err)
+		}
+	}
+
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1204,12 +1218,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, headers, node, onNewEvents, recordExecution)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
@@ -1247,7 +1261,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1283,6 +1297,10 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
 				return nil, err
+			}
+
+			if recordExecution != nil {
+				recordExecution(execution.WorkflowID, execution.ID)
 			}
 
 			return &core.ExecutionContext{
