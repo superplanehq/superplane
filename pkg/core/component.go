@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 var (
@@ -44,6 +45,7 @@ type ExecutionContext struct {
 	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
+	OIDC           oidc.Provider
 }
 
 type ExpressionContext interface {

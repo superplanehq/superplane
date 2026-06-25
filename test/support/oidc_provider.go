@@ -26,3 +26,15 @@ func (p *TestOIDCProvider) PublicJWKs() []oidc.PublicJWK {
 func (p *TestOIDCProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
 	return "test", nil
 }
+
+func (p *TestOIDCProvider) Validate(tokenString string) (map[string]any, error) {
+	return map[string]any{
+		"sub":          "execution:test",
+		"aud":          "superplane-ci",
+		"org_id":       "org-test",
+		"canvas_id":    "canvas-test",
+		"node_id":      "node-test",
+		"execution_id": "exec-test",
+		"component":    "semaphore.runWorkflow",
+	}, nil
+}
