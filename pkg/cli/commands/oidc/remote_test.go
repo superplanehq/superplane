@@ -17,20 +17,16 @@ import (
 func TestValidateRemote(t *testing.T) {
 	t.Parallel()
 
-	issuer := "http://superplane.test"
-	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
-	require.NoError(t, err)
-
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			respondJSON(w, discoveryDocument{
-				Issuer:  issuer,
-				JWKSURI: server.URL + "/.well-known/jwks.json",
+			respondJSON(w, map[string]any{
+				"issuer":   server.URL,
+				"jwks_uri": server.URL + "/.well-known/jwks.json",
 			})
 		case "/.well-known/jwks.json":
-			respondJSON(w, jwksDocument{Keys: provider.PublicJWKs()})
+			respondJSON(w, map[string]any{"keys": providerPublicJWKs(t, server.URL)})
 		default:
 			http.NotFound(w, r)
 		}
@@ -38,18 +34,12 @@ func TestValidateRemote(t *testing.T) {
 	defer server.Close()
 
 	canvasID := uuid.NewString()
-	token, err := provider.Sign(
-		fmt.Sprintf("execution:%s", uuid.NewString()),
-		time.Hour,
-		"superplane-ci",
-		map[string]any{
-			"canvas_id":     canvasID,
-			"pipeline_file": ".semaphore/deploy.yml",
-		},
-	)
-	require.NoError(t, err)
+	token := signTestExecutionToken(t, server.URL, map[string]any{
+		"canvas_id":     canvasID,
+		"pipeline_file": ".semaphore/deploy.yml",
+	})
 
-	claims, err := validateRemote(server.Client(), token, server.URL)
+	claims, err := validateRemote(t.Context(), server.Client(), token, server.URL)
 	require.NoError(t, err)
 	require.Equal(t, canvasID, claims["canvas_id"])
 	require.Equal(t, ".semaphore/deploy.yml", claims["pipeline_file"])
@@ -58,25 +48,48 @@ func TestValidateRemote(t *testing.T) {
 func TestValidateRemoteRejectsInvalidToken(t *testing.T) {
 	t.Parallel()
 
-	issuer := "http://superplane.test"
-	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
-	require.NoError(t, err)
-
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			respondJSON(w, discoveryDocument{Issuer: issuer, JWKSURI: server.URL + "/.well-known/jwks.json"})
+			respondJSON(w, map[string]any{
+				"issuer":   server.URL,
+				"jwks_uri": server.URL + "/.well-known/jwks.json",
+			})
 		case "/.well-known/jwks.json":
-			respondJSON(w, jwksDocument{Keys: provider.PublicJWKs()})
+			respondJSON(w, map[string]any{"keys": providerPublicJWKs(t, server.URL)})
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
 
-	_, err = validateRemote(server.Client(), "not-a-token", server.URL)
+	_, err := validateRemote(t.Context(), server.Client(), "not-a-token", server.URL)
 	require.Error(t, err)
+}
+
+func providerPublicJWKs(t *testing.T, issuer string) []spoidc.PublicJWK {
+	t.Helper()
+
+	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
+	require.NoError(t, err)
+	return provider.PublicJWKs()
+}
+
+func signTestExecutionToken(t *testing.T, issuer string, claims map[string]any) string {
+	t.Helper()
+
+	provider, err := spoidc.NewProviderFromKeyDir(issuer, filepath.Join("..", "..", "..", "..", "test", "fixtures", "oidc-keys"))
+	require.NoError(t, err)
+
+	token, err := provider.Sign(
+		fmt.Sprintf("execution:%s", uuid.NewString()),
+		time.Hour,
+		executionTokenAudience,
+		claims,
+	)
+	require.NoError(t, err)
+	return token
 }
 
 func respondJSON(w http.ResponseWriter, payload any) {

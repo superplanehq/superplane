@@ -1,28 +1,24 @@
 package oidc
 
 import (
-	"crypto/rsa"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	spoidc "github.com/superplanehq/superplane/pkg/oidc"
+	gooidc "github.com/coreos/go-oidc/v3/oidc"
 )
 
-type discoveryDocument struct {
-	Issuer  string `json:"issuer"`
-	JWKSURI string `json:"jwks_uri"`
-}
+const executionTokenAudience = "semaphore"
 
-type jwksDocument struct {
-	Keys []spoidc.PublicJWK `json:"keys"`
-}
-
-func validateRemote(client *http.Client, token, baseURL string) (map[string]any, error) {
-	if client == nil {
-		client = http.DefaultClient
+func validateRemote(ctx context.Context, client *http.Client, token, baseURL string) (map[string]any, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if client != nil {
+		ctx = gooidc.ClientContext(ctx, client)
 	}
 
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
@@ -30,72 +26,74 @@ func validateRemote(client *http.Client, token, baseURL string) (map[string]any,
 		return nil, fmt.Errorf("base URL is required")
 	}
 
-	discovery, err := fetchDiscoveryDocument(client, baseURL+"/.well-known/openid-configuration")
+	issuer, err := fetchIssuer(ctx, client, baseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	jwksURL := strings.TrimSpace(discovery.JWKSURI)
-	if jwksURL == "" {
-		jwksURL = baseURL + "/.well-known/jwks.json"
-	}
-
-	publicKeys, err := fetchPublicKeys(client, jwksURL)
+	provider, err := gooidc.NewProvider(ctx, issuer)
 	if err != nil {
 		return nil, err
 	}
 
-	return validateToken(token, discovery.Issuer, publicKeys)
+	verifier := provider.Verifier(&gooidc.Config{
+		ClientID: executionTokenAudience,
+	})
+
+	idToken, err := verifier.Verify(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	claims := map[string]any{}
+	if err := idToken.Claims(&claims); err != nil {
+		return nil, err
+	}
+
+	return claims, nil
 }
 
-func fetchDiscoveryDocument(client *http.Client, discoveryURL string) (discoveryDocument, error) {
-	response, err := client.Get(discoveryURL)
+func fetchIssuer(ctx context.Context, client *http.Client, baseURL string) (string, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		baseURL+"/.well-known/openid-configuration",
+		nil,
+	)
 	if err != nil {
-		return discoveryDocument{}, fmt.Errorf("fetch OIDC discovery document: %w", err)
+		return "", err
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("fetch OIDC discovery document: %w", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return discoveryDocument{}, fmt.Errorf("fetch OIDC discovery document: unexpected status %s", response.Status)
+		return "", fmt.Errorf("fetch OIDC discovery document: unexpected status %s", response.Status)
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return discoveryDocument{}, fmt.Errorf("read OIDC discovery document: %w", err)
+		return "", fmt.Errorf("read OIDC discovery document: %w", err)
 	}
 
-	var document discoveryDocument
+	var document struct {
+		Issuer string `json:"issuer"`
+	}
 	if err := json.Unmarshal(body, &document); err != nil {
-		return discoveryDocument{}, fmt.Errorf("parse OIDC discovery document: %w", err)
+		return "", fmt.Errorf("parse OIDC discovery document: %w", err)
 	}
 
-	if strings.TrimSpace(document.Issuer) == "" {
-		return discoveryDocument{}, fmt.Errorf("OIDC discovery document is missing issuer")
+	issuer := strings.TrimSpace(document.Issuer)
+	if issuer == "" {
+		return "", fmt.Errorf("OIDC discovery document is missing issuer")
 	}
 
-	return document, nil
-}
-
-func fetchPublicKeys(client *http.Client, jwksURL string) (map[string]*rsa.PublicKey, error) {
-	response, err := client.Get(jwksURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch JWKS: %w", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch JWKS: unexpected status %s", response.Status)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read JWKS: %w", err)
-	}
-
-	var document jwksDocument
-	if err := json.Unmarshal(body, &document); err != nil {
-		return nil, fmt.Errorf("parse JWKS: %w", err)
-	}
-
-	return publicKeysFromJWKs(document.Keys)
+	return issuer, nil
 }

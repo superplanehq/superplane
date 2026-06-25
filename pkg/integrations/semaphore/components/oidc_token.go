@@ -10,7 +10,7 @@ import (
 const oidcTokenParameterName = "SUPERPLANE_OIDC_TOKEN"
 
 const (
-	semaphoreOIDCTokenAudience = "superplane-ci"
+	semaphoreOIDCTokenAudience = "semaphore"
 	semaphoreOIDCTokenDuration = time.Hour
 
 	semaphoreClaimOrgID        = "org_id"
