@@ -42,10 +42,18 @@ export function DraftActionsWidget({
       const response = await run();
       if (response.ok) {
         onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
+        return;
       }
+      // The draft can disappear out from under us (e.g. another tab already
+      // discarded it, or the agent's last publish removed it). Treat 404 as
+      // an idempotent success so the action bar dismisses without surfacing
+      // a Sentry-noisy "version not found" error.
+      if (response.status === 404) {
+        onDismiss?.();
+        return;
+      }
+      const text = await response.text();
+      console.error(`${action} failed:`, response.status, text);
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
     } finally {
