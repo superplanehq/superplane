@@ -133,6 +133,32 @@ export const Running: Story = {
   },
 };
 
+export const TriggerWithActions: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      id: "trigger-event-1",
+      kind: "trigger",
+      state: "success" as const,
+      title: "On push",
+      subtitle: "GitHub webhook",
+    },
+    index: 0,
+    variant: "latest",
+    isOpen: false,
+    onReEmit: (nodeId: string, eventId: string) => console.log("Re-emit", nodeId, eventId),
+    getExecutionState: () => ({
+      map: DEFAULT_EVENT_STATE_MAP,
+      state: "success" as const,
+    }),
+  },
+};
+
 export const WaitingLatest: Story = {
   render: (args) => (
     <ComponentWrapper>

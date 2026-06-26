@@ -12,7 +12,7 @@ interface SidebarEventActionsMenuProps {
   eventState: ChildEventsState;
   onReEmit?: () => void;
   kind: "queue" | "execution" | "trigger";
-  onOpenChange?: (open: boolean) => void;
+  triggerVariant?: "icon" | "labeled";
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
@@ -23,13 +23,15 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   eventState,
   onReEmit,
   kind,
-  onOpenChange,
+  triggerVariant = "icon",
 }) => {
   const isWaiting = eventState === "waiting";
   const isQueued = eventState === "queued";
   const isRunning = eventState === "running";
 
-  const showCancel = (kind === "queue" && isQueued) || (kind === "execution" && (isRunning || isWaiting));
+  const showQueueCancel = kind === "queue" && isQueued && !!onCancelQueueItem;
+  const showExecutionCancel = kind === "execution" && (isRunning || isWaiting) && !!executionId && !!onCancelExecution;
+  const showCancel = showQueueCancel || showExecutionCancel;
   const showReEmit = kind === "trigger" && !!onReEmit;
   const showDropdown = showCancel || showReEmit;
 
@@ -71,14 +73,20 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   if (!showDropdown) return null;
 
   return (
-    <DropdownMenu onOpenChange={onOpenChange}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="h-6 w-6 flex items-center justify-center rounded text-gray-500"
+          className={
+            triggerVariant === "labeled"
+              ? "inline-flex h-7 items-center gap-1 rounded border border-slate-900/15 bg-white/90 px-2 text-[11px] font-medium text-gray-700 hover:bg-white"
+              : "h-6 w-6 flex items-center justify-center rounded border border-slate-900/15 bg-white/90 text-gray-600 hover:bg-white"
+          }
           aria-label="Open actions"
           onClick={(e) => e.stopPropagation()}
+          data-testid="sidebar-event-actions-trigger"
         >
           <EllipsisVertical size={16} />
+          {triggerVariant === "labeled" ? <span>Actions</span> : null}
         </button>
       </DropdownMenuTrigger>
 

@@ -74,4 +74,19 @@ describe("CompactSidebarEventRow", () => {
       expect(onSelectRun).toHaveBeenCalledWith("run-from-api");
     });
   });
+
+  it("keeps the actions trigger visible without hovering", () => {
+    renderRow({
+      event: {
+        ...event,
+        id: "trigger-1",
+        kind: "trigger",
+        executionId: undefined,
+      },
+      onReEmit: vi.fn(),
+      onSelectRun: undefined,
+    });
+
+    expect(screen.getByTestId("sidebar-event-actions-trigger")).toBeInTheDocument();
+  });
 });

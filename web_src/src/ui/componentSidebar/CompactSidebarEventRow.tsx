@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useRef, type MouseEvent } from "react";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSidebarRowLayout";
@@ -39,8 +39,6 @@ export function CompactSidebarEventRow({
   getExecutionState,
 }: CompactSidebarEventRowProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const isResolvingRef = useRef(false);
 
   const eventStateStyle = useMemo(() => {
@@ -66,8 +64,12 @@ export function CompactSidebarEventRow({
   const isWaiting = event.state === "waiting";
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
-  const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
-  const showReEmit = event.kind === "trigger";
+  const eventKind = event.kind || "execution";
+  const showQueueCancel = eventKind === "queue" && isQueued && !!onCancelQueueItem;
+  const showExecutionCancel =
+    eventKind === "execution" && (isRunning || isWaiting) && !!event.executionId && !!onCancelExecution;
+  const showCancel = showQueueCancel || showExecutionCancel;
+  const showReEmit = eventKind === "trigger" && !!onReEmit;
   const showActionsMenu = showCancel || showReEmit;
   const isSelectable = Boolean(onSelectRun && isRunNavigableEvent(event) && (runId || fetchRunId));
   const runHref = organizationId && appId && runId ? appPath(organizationId, appId, `?run=${runId}`) : null;
@@ -117,8 +119,6 @@ export function CompactSidebarEventRow({
         "group relative w-full transition-colors",
         isSelectable ? "cursor-pointer hover:bg-gray-50" : "cursor-default",
       )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {isSelectable ? (
         runHref ? (
@@ -150,20 +150,19 @@ export function CompactSidebarEventRow({
         />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{event.title}</span>
       </span>
-      {showActionsMenu && (isHovered || isDropdownOpen) ? (
-        <div className="relative z-10 shrink-0" onClick={(clickEvent) => clickEvent.stopPropagation()}>
+      {showActionsMenu ? (
+        <div className="relative z-20 shrink-0" onClick={(clickEvent) => clickEvent.stopPropagation()}>
           <SidebarEventActionsMenu
             eventId={event.id}
             executionId={event.executionId}
             onCancelQueueItem={onCancelQueueItem}
             onCancelExecution={onCancelExecution}
             eventState={event.state}
-            kind={event.kind || "execution"}
+            kind={eventKind}
             onReEmit={() => {
-              if (["queue", "execution"].includes(event.kind || "")) return;
+              if (["queue", "execution"].includes(eventKind)) return;
               onReEmit?.(event.nodeId || "", event.id);
             }}
-            onOpenChange={setIsDropdownOpen}
           />
         </div>
       ) : null}

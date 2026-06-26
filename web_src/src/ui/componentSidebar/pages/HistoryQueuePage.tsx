@@ -130,6 +130,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 onToggleOpen={onToggleOpen}
                 onEventClick={onEventClick}
                 tabData={getTabData?.(event)}
+                onCancelQueueItem={page === "queue" ? onCancelQueueItem : undefined}
                 onCancelExecution={onCancelExecution}
                 onReEmit={onReEmit}
                 getExecutionState={getExecutionState}
