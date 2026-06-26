@@ -1011,3 +1011,233 @@ func TestHTTP__CalculateNextRetryDelay(t *testing.T) {
 	assert.Equal(t, 5*time.Second, h.calculateNextRetryDelay(RetryStrategyFixed, 2, 5))
 	assert.Equal(t, 20*time.Second, h.calculateNextRetryDelay(RetryStrategyExponential, 2, 5))
 }
+
+type mapSecretsContext struct {
+	values map[string]map[string]string
+	err    error
+}
+
+func (m *mapSecretsContext) GetKey(name, key string) ([]byte, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	secret, ok := m.values[name]
+	if !ok {
+		return nil, core.ErrSecretKeyNotFound
+	}
+	value, ok := secret[key]
+	if !ok {
+		return nil, core.ErrSecretKeyNotFound
+	}
+	return []byte(value), nil
+}
+
+func TestHTTP__Execute__ResolvesSecretInURL(t *testing.T) {
+	h := &HTTP{}
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	originalURL := server.URL + "/api/{{ secrets.api.token }}/resource"
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    originalURL,
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"api": {"token": "abc123"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "/api/abc123/resource", gotPath)
+	storedConfig := ctx.Configuration.(map[string]any)
+	assert.Equal(t, originalURL, storedConfig["url"], "stored configuration must keep the masked secret placeholder")
+}
+
+func TestHTTP__Execute__ResolvesSecretInQueryParam(t *testing.T) {
+	h := &HTTP{}
+	var gotToken string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotToken = r.URL.Query().Get("token")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	queryParams := []map[string]any{
+		{"key": "token", "value": "prefix-{{ secrets.api.token }}-suffix"},
+	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "GET",
+		"url":         server.URL,
+		"queryParams": queryParams,
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"api": {"token": "xyz"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "prefix-xyz-suffix", gotToken)
+	storedConfig := ctx.Configuration.(map[string]any)
+	storedParams := storedConfig["queryParams"].([]map[string]any)
+	assert.Equal(t, "prefix-{{ secrets.api.token }}-suffix", storedParams[0]["value"], "stored query param must keep the masked secret placeholder")
+}
+
+func TestHTTP__Execute__ResolvesSecretInJSONBody(t *testing.T) {
+	h := &HTTP{}
+	var requestData map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(body, &requestData))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	jsonPayload := map[string]any{
+		"token": "{{ secrets.api.token }}",
+		"nested": map[string]any{
+			"password": "Bearer {{ secrets.auth.password }}",
+			"list":     []any{"{{ secrets.auth.password }}", "plain"},
+		},
+	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/json",
+		"json":        jsonPayload,
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{
+			"api":  {"token": "tok-1"},
+			"auth": {"password": "pwd-1"},
+		},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "tok-1", requestData["token"])
+	nested := requestData["nested"].(map[string]any)
+	assert.Equal(t, "Bearer pwd-1", nested["password"])
+	assert.Equal(t, []any{"pwd-1", "plain"}, nested["list"])
+
+	storedConfig := ctx.Configuration.(map[string]any)
+	storedJSON := storedConfig["json"].(map[string]any)
+	assert.Equal(t, "{{ secrets.api.token }}", storedJSON["token"], "stored JSON must keep the masked secret placeholder")
+}
+
+func TestHTTP__Execute__ResolvesSecretInFormData(t *testing.T) {
+	h := &HTTP{}
+	var gotPassword string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, r.ParseForm())
+		gotPassword = r.PostForm.Get("password")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/x-www-form-urlencoded",
+		"formData": []map[string]any{
+			{"key": "username", "value": "deploy"},
+			{"key": "password", "value": "{{ secrets.auth.password }}"},
+		},
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"auth": {"password": "pwd-99"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "pwd-99", gotPassword)
+}
+
+func TestHTTP__Execute__ResolvesSecretInTextBody(t *testing.T) {
+	h := &HTTP{}
+	var gotBody string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		gotBody = string(body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "text/plain",
+		"text":        "token={{ secrets.api.token }}",
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"api": {"token": "tok"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "token=tok", gotBody)
+}
+
+func TestHTTP__Execute__ResolvesSecretInXMLBody(t *testing.T) {
+	h := &HTTP{}
+	var gotBody string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		gotBody = string(body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":      "POST",
+		"url":         server.URL,
+		"contentType": "application/xml",
+		"xml":         "<auth><token>{{ secrets.api.token }}</token></auth>",
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"api": {"token": "tok"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "<auth><token>tok</token></auth>", gotBody)
+}
+
+func TestHTTP__Execute__MissingSecretEmitsFailure(t *testing.T) {
+	h := &HTTP{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL + "/{{ secrets.missing.key }}",
+	})
+	ctx.Secrets = &mapSecretsContext{values: map[string]map[string]string{}}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	errStr := responsePayload(t, stateCtx)["error"].(string)
+	assert.Contains(t, errStr, "resolve secrets")
+	assert.Contains(t, errStr, "missing")
+}
