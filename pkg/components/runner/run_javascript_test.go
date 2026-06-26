@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -66,6 +67,7 @@ func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, RunModeJavaScript, req.RunMode)
+	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Contains(t, req.Script, "function main()")
 	assert.NotContains(t, string(body), `"commands"`)
 	assert.Empty(t, req.SetupCommands)

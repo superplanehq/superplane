@@ -46,16 +46,8 @@ export const analytics = {
     });
   },
 
-  yamlExport: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
-  },
-
   integrationRequested: (organizationId: string) => {
     posthog.capture("request_integration_clicked", { organization_id: organizationId });
-  },
-
-  yamlImport: () => {
-    posthog.capture("canvas:yaml_import", {});
   },
 
   nodeAdd: (nodeType: string, integration: string | undefined, nodeRef: string | undefined, organizationId: string) => {
