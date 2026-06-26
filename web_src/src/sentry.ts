@@ -14,10 +14,23 @@ if (typeof window !== "undefined") {
   environment = sentryWindow.SUPERPLANE_SENTRY_ENVIRONMENT;
 }
 
+// Console messages emitted by the Dash0 web SDK when it cannot deliver its own
+// telemetry. We capture browser warnings in Sentry, but these particular ones
+// describe failures of our observability stack itself (not application bugs),
+// so reporting them creates a noisy feedback loop where a single bad telemetry
+// request can fan out into many Sentry warnings.
+const dash0TelemetryNoisePatterns: RegExp[] = [
+  /Failed to send telemetry to /,
+  /Error sending telemetry to /,
+  /Unable to send telemetry, fetch is not defined/,
+  /Failed to transmit (logs|spans)/,
+];
+
 if (dsn) {
   Sentry.init({
     dsn,
     environment,
+    ignoreErrors: dash0TelemetryNoisePatterns,
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
