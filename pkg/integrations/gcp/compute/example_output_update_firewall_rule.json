@@ -1,0 +1,25 @@
+{
+  "type": "gcp.compute.firewallRule.updated",
+  "data": {
+    "name": "allow-http",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/firewalls/allow-http",
+    "network": "default",
+    "direction": "INGRESS",
+    "priority": 900,
+    "action": "ALLOW",
+    "allowed": [
+      {
+        "IPProtocol": "tcp",
+        "ports": ["80", "443", "8080"]
+      }
+    ],
+    "sourceRanges": ["10.0.0.0/8"],
+    "targetTags": ["web"],
+    "disabled": true,
+    "loggingEnabled": true,
+    "logMetadata": "INCLUDE_ALL_METADATA",
+    "creationTimestamp": "2026-06-23T12:00:00.000-07:00",
+    "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project"
+  },
+  "timestamp": "2026-06-23T12:00:00Z"
+}
