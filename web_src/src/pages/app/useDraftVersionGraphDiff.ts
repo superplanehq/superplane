@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { useCanvasVersion } from "@/hooks/useCanvasData";
 
 import { hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
@@ -14,7 +14,7 @@ type UseDraftVersionGraphDiffOptions = {
   isEditing: boolean;
   activeCanvasVersionId: string;
   liveCanvasVersionId: string;
-  liveCanvasVersion: CanvasesCanvasVersion | undefined;
+  liveCanvas?: CanvasesCanvas | null;
   draftVersionsFromBranches: CanvasesCanvasVersion[];
   selectedCanvasVersion: CanvasesCanvasVersion | null;
   latestDraftVersion: CanvasesCanvasVersion | undefined;
@@ -27,7 +27,7 @@ export function useDraftVersionGraphDiff({
   isEditing,
   activeCanvasVersionId,
   liveCanvasVersionId,
-  liveCanvasVersion,
+  liveCanvas,
   draftVersionsFromBranches,
   selectedCanvasVersion,
   latestDraftVersion,
@@ -40,7 +40,11 @@ export function useDraftVersionGraphDiff({
     !!organizationId && !!canvasId && !!liveCanvasVersionId,
     false,
   );
-  const liveVersionForGraphDiff = liveCanvasVersionWithYamlSpec ?? liveCanvasVersion;
+  const liveVersionForGraphDiff =
+    liveCanvasVersionWithYamlSpec ??
+    (liveCanvas?.spec && liveCanvasVersionId
+      ? ({ metadata: { id: liveCanvasVersionId }, spec: liveCanvas.spec } satisfies CanvasesCanvasVersion)
+      : undefined);
   const draftVersionForGraphDiff = useMemo(() => {
     const versionShell =
       draftVersionsFromBranches.find((draft) => draft.metadata?.id === activeCanvasVersionId) ??

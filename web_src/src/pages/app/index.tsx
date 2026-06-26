@@ -98,7 +98,6 @@ import { activateDraftVersion } from "./lib/draft-spec-cache";
 import {
   isDraftVersion,
   isPublishedVersion,
-  liveCanvasVersionFromDescribe,
   sortDraftVersionsDesc,
   sortPublishedVersionsDesc,
 } from "./lib/canvas-versions";
@@ -168,7 +167,6 @@ function updateCanvasDetailForSelectedVersion({
   canvasId,
   isCurrentLive,
   version,
-  liveCanvasVersion,
   liveCanvas,
 }: {
   queryClient: QueryClient;
@@ -176,7 +174,6 @@ function updateCanvasDetailForSelectedVersion({
   canvasId: string;
   isCurrentLive: boolean;
   version: CanvasesCanvasVersion;
-  liveCanvasVersion?: CanvasesCanvasVersion;
   liveCanvas?: CanvasesCanvas | null;
 }) {
   queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -185,7 +182,7 @@ function updateCanvasDetailForSelectedVersion({
     }
 
     if (isCurrentLive) {
-      return { ...current, spec: liveCanvasVersion?.spec || liveCanvas?.spec };
+      return { ...current, spec: liveCanvas?.spec };
     }
 
     if (!version.spec) {
@@ -343,14 +340,8 @@ export function AppPage() {
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
     [canvasLiveVersionsQuery.data?.pages],
   );
-  const liveVersionFromDescribe = useMemo(() => liveCanvasVersionFromDescribe(liveCanvas), [liveCanvas]);
-  const liveCanvasVersion = useMemo(() => {
-    const publishedFromHistory = paginatedVersions.find(isPublishedVersion);
-    if (publishedFromHistory) {
-      return publishedFromHistory;
-    }
-    return liveVersionFromDescribe;
-  }, [paginatedVersions, liveVersionFromDescribe]);
+  const liveCanvasVersionId =
+    liveCanvas?.metadata?.versionId ?? paginatedVersions.find(isPublishedVersion)?.metadata?.id;
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
@@ -378,7 +369,6 @@ export function AppPage() {
   const draftVersions = useMemo(() => sortDraftVersionsDesc(draftVersionsFromBranches), [draftVersionsFromBranches]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
-  const liveCanvasVersionId = liveCanvas?.metadata?.versionId ?? liveCanvasVersion?.metadata?.id;
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
   const {
     data: loadedCanvasVersion,
@@ -426,7 +416,7 @@ export function AppPage() {
         incomingSpec: liveCanvas.spec,
         draftSpec: draftCanvasSpec,
         selectedDraftVersionSpec: selectedCanvasVersion?.spec,
-        liveVersionSpec: liveCanvasVersion?.spec,
+        liveVersionSpec: liveCanvas?.spec,
       })
     ) {
       return;
@@ -444,7 +434,7 @@ export function AppPage() {
     isViewingDraftVersion,
     activeCanvasVersionId,
     liveCanvas?.spec,
-    liveCanvasVersion?.spec,
+    liveCanvas?.spec,
     selectedCanvasVersion?.spec,
     draftCanvasSpec,
   ]);
@@ -1024,7 +1014,7 @@ export function AppPage() {
     canvasId: canvasId!,
     activeCanvasVersionId,
     liveCanvasVersionId,
-    liveCanvasVersion,
+    liveCanvas,
     latestDraftVersion,
     isEditing,
     hasEditableVersion,
@@ -1610,7 +1600,7 @@ export function AppPage() {
   const draftVisualDiff = useDraftVisualDiff({
     isViewingDraftVersion,
     canvas,
-    liveCanvasVersion,
+    liveCanvas,
     latestDraftVersion,
     selectedCanvasVersion,
     preparedNodes,
@@ -3509,7 +3499,6 @@ export function AppPage() {
         canvasId,
         isCurrentLive,
         version,
-        liveCanvasVersion,
         liveCanvas,
       });
 
@@ -3530,7 +3519,6 @@ export function AppPage() {
       canvasId,
       currentUserId,
       liveCanvasVersionId,
-      liveCanvasVersion,
       liveCanvas,
       queryClient,
       setSearchParams,
@@ -3628,7 +3616,7 @@ export function AppPage() {
     activeBranchMeta,
     activeBranch,
     liveCanvasVersionId,
-    liveCanvasVersion,
+    liveCanvas,
     organizationId,
     canvasId,
     latestDraftVersion,
@@ -4139,7 +4127,7 @@ export function AppPage() {
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
-    liveCanvasVersion,
+    liveCanvas,
     draftCanvasVersion: latestDraftVersion,
     draftCanvas: canvas,
     draftNodes: nodes,
@@ -4349,7 +4337,6 @@ export function AppPage() {
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
     liveCanvasVersionId,
-    liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,
     canUpdateCanvas,

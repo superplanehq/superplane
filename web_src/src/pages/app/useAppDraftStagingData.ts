@@ -11,7 +11,7 @@ type UseAppDraftStagingDataOptions = {
   canvasId: string;
   activeCanvasVersionId: string;
   liveCanvasVersionId: string | undefined;
-  liveCanvasVersion: CanvasesCanvasVersion | undefined;
+  liveCanvas?: CanvasesCanvas | null;
   latestDraftVersion: CanvasesCanvasVersion | undefined;
   isEditing: boolean;
   hasEditableVersion: boolean;
@@ -31,7 +31,7 @@ export function useAppDraftStagingData({
   canvasId,
   activeCanvasVersionId,
   liveCanvasVersionId,
-  liveCanvasVersion,
+  liveCanvas,
   latestDraftVersion,
   isEditing,
   hasEditableVersion,
@@ -62,7 +62,7 @@ export function useAppDraftStagingData({
     isEditing,
     activeCanvasVersionId,
     liveCanvasVersionId: liveCanvasVersionId || "",
-    liveCanvasVersion,
+    liveCanvas,
     draftVersionsFromBranches,
     selectedCanvasVersion,
     latestDraftVersion,

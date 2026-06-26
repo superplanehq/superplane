@@ -14,7 +14,6 @@ import { VersionRow } from "./VersionsTabPanelRow";
 export interface VersionsTabPanelProps {
   scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
-  liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
   canUpdateCanvas: boolean;
@@ -45,7 +44,6 @@ type VersionRowItem = {
 export function VersionsTabPanel({
   scrollPersistenceKey,
   liveCanvasVersionId,
-  liveCanvasVersion,
   selectedCanvasVersion,
   liveVersions,
   canUpdateCanvas,
@@ -65,7 +63,6 @@ export function VersionsTabPanel({
 }: VersionsTabPanelProps) {
   const { hasNoVersions, liveItems } = useVersionsPanelData({
     liveCanvasVersionId,
-    liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,
     loadMoreLiveVersionsDisabled,
@@ -116,7 +113,6 @@ export function VersionsTabPanel({
 
 function useVersionsPanelData({
   liveCanvasVersionId,
-  liveCanvasVersion,
   selectedCanvasVersion,
   liveVersions,
   loadMoreLiveVersionsDisabled,
@@ -124,7 +120,6 @@ function useVersionsPanelData({
 }: Pick<
   VersionsTabPanelProps,
   | "liveCanvasVersionId"
-  | "liveCanvasVersion"
   | "selectedCanvasVersion"
   | "liveVersions"
   | "loadMoreLiveVersionsDisabled"
@@ -138,7 +133,7 @@ function useVersionsPanelData({
     onLoadMoreLiveVersions,
     selectedVersionId,
   });
-  const hasNoVersions = liveVersions.length === 0 && !liveCanvasVersion;
+  const hasNoVersions = liveVersions.length === 0 && !liveCanvasVersionId;
 
   return {
     hasNoVersions,

@@ -24,7 +24,7 @@ type UseCanvasDraftBranchActionsOptions = {
   activeBranchMeta: CanvasesCanvasVersion | null;
   activeBranch: string | null;
   liveCanvasVersionId?: string;
-  liveCanvasVersion?: CanvasesCanvasVersion;
+  liveCanvas?: CanvasesCanvas | null;
   organizationId?: string;
   canvasId?: string;
   latestDraftVersion?: CanvasesCanvasVersion;
@@ -47,7 +47,7 @@ export function useCanvasDraftBranchActions({
   activeBranchMeta,
   activeBranch,
   liveCanvasVersionId,
-  liveCanvasVersion,
+  liveCanvas,
   organizationId,
   canvasId,
   latestDraftVersion,
@@ -147,7 +147,7 @@ export function useCanvasDraftBranchActions({
         activeBranchMeta,
         activeBranch,
         liveCanvasVersionId,
-        liveCanvasVersion,
+        liveCanvas,
         organizationId,
         canvasId,
         clearPendingAutoSaveWork,
@@ -180,7 +180,7 @@ export function useCanvasDraftBranchActions({
     exitToLive,
     liveCanvasVersionId,
     handleUseVersion,
-    liveCanvasVersion,
+    liveCanvas,
     queryClient,
     organizationId,
     canvasId,
@@ -242,7 +242,7 @@ export function useCanvasDraftBranchActions({
         if (isActiveDraft) {
           switchToLiveAfterActiveDraftDelete({
             liveCanvasVersionId,
-            liveCanvasVersion,
+            liveCanvas,
             organizationId,
             canvasId,
             exitToLive,
@@ -273,7 +273,7 @@ export function useCanvasDraftBranchActions({
     exitToLive,
     handleCreateVersion,
     handleUseVersion,
-    liveCanvasVersion,
+    liveCanvas,
     liveCanvasVersionId,
     organizationId,
     queryClient,

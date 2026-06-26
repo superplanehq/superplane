@@ -15,7 +15,7 @@ import { prepareNode } from "./workflowPageHelpers";
 type UseDraftVisualDiffArgs = {
   isViewingDraftVersion: boolean;
   canvas: CanvasesCanvas | null | undefined;
-  liveCanvasVersion?: CanvasesCanvasVersion;
+  liveCanvas?: CanvasesCanvas | null;
   latestDraftVersion?: CanvasesCanvasVersion;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   preparedNodes: CanvasNode[];
@@ -51,9 +51,9 @@ function applyNodeStatuses(nodes: CanvasNode[], statusMap: Record<string, string
 
 function buildEdgeDiffSets(
   preparedEdges: CanvasEdge[],
-  liveCanvasVersion?: CanvasesCanvasVersion,
+  liveCanvas?: CanvasesCanvas | null,
 ): { liveEdgeSet: Set<string>; draftEdgeSet: Set<string>; liveEdges: Array<Record<string, unknown>> } | null {
-  const liveEdges = (liveCanvasVersion?.spec?.edges ?? []) as Array<Record<string, unknown>>;
+  const liveEdges = (liveCanvas?.spec?.edges ?? []) as Array<Record<string, unknown>>;
   if (liveEdges.length === 0 && preparedEdges.length === 0) return null;
   const liveEdgeSet = new Set(
     liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
@@ -64,9 +64,9 @@ function buildEdgeDiffSets(
 
 function countEdgeDiffs(
   preparedEdges: CanvasEdge[],
-  liveCanvasVersion?: CanvasesCanvasVersion,
+  liveCanvas?: CanvasesCanvas | null,
 ): { addedEdges: number; removedEdges: number } {
-  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvas);
   if (!sets) return { addedEdges: 0, removedEdges: 0 };
   let addedEdges = 0;
   let removedEdges = 0;
@@ -81,8 +81,8 @@ function countEdgeDiffs(
   return { addedEdges, removedEdges };
 }
 
-function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: CanvasesCanvasVersion) {
-  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvas?: CanvasesCanvas | null) {
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvas);
   if (!sets) return preparedEdges;
 
   const styledEdges = preparedEdges.map((edge) => {
@@ -116,7 +116,7 @@ export type DraftVisualDiffResult = ReturnType<typeof useDraftVisualDiff>;
 export function useDraftVisualDiff({
   isViewingDraftVersion,
   canvas,
-  liveCanvasVersion,
+  liveCanvas,
   latestDraftVersion,
   selectedCanvasVersion,
   preparedNodes,
@@ -128,6 +128,10 @@ export function useDraftVisualDiff({
 }: UseDraftVisualDiffArgs) {
   const { visualDiffEnabled: enabled, toggleVisualDiff } = useVisualDiffToggle();
   const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
+  const liveVersionForDiff = useMemo(
+    () => (liveCanvas?.spec ? ({ spec: liveCanvas.spec } as CanvasesCanvasVersion) : undefined),
+    [liveCanvas?.spec],
+  );
   const draftDiffResult = useMemo(() => {
     if (!isViewingDraftVersion || !canvas?.spec) {
       return undefined;
@@ -138,8 +142,8 @@ export function useDraftVisualDiff({
       spec: canvas.spec,
     } as CanvasesCanvasVersion;
 
-    return buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
-  }, [canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
+    return buildDraftDiffMap(liveVersionForDiff, draftVersionForDiff);
+  }, [canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveVersionForDiff, selectedCanvasVersion]);
 
   const nodes = useMemo(() => {
     const nodesWithStatuses = enabled ? applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap) : preparedNodes;
@@ -147,14 +151,14 @@ export function useDraftVisualDiff({
       !enabled ||
       !showDeletedNodes ||
       !draftDiffResult?.removedNodes.length ||
-      !liveCanvasVersion?.spec?.nodes ||
+      !liveCanvas?.spec?.nodes ||
       !canvasId
     ) {
       return nodesWithStatuses;
     }
 
-    const liveNodes = liveCanvasVersion.spec.nodes as ComponentsNode[];
-    const liveEdges = liveCanvasVersion.spec.edges as ComponentsEdge[] | undefined;
+    const liveNodes = liveCanvas.spec.nodes as ComponentsNode[];
+    const liveEdges = liveCanvas.spec.edges as ComponentsEdge[] | undefined;
     const ghostNodes = draftDiffResult.removedNodes.map((removedNode) => {
       const prepared = prepareNode(
         liveNodes,
@@ -190,7 +194,7 @@ export function useDraftVisualDiff({
     draftDiffResult?.removedNodes,
     draftDiffResult?.statusMap,
     enabled,
-    liveCanvasVersion?.spec,
+    liveCanvas?.spec?.nodes,
     preparedNodes,
     queryClient,
     showDeletedNodes,
@@ -201,8 +205,8 @@ export function useDraftVisualDiff({
       return preparedEdges;
     }
 
-    return buildEdgesWithDiff(preparedEdges, liveCanvasVersion);
-  }, [enabled, isViewingDraftVersion, showEdgeDiff, liveCanvasVersion, preparedEdges]);
+    return buildEdgesWithDiff(preparedEdges, liveCanvas);
+  }, [enabled, isViewingDraftVersion, showEdgeDiff, liveCanvas, preparedEdges]);
 
   const diffCounts = useMemo(() => {
     let added = 0;
@@ -216,12 +220,12 @@ export function useDraftVisualDiff({
       removed = draftDiffResult.removedNodes?.length || 0;
     }
 
-    const { addedEdges, removedEdges } = countEdgeDiffs(preparedEdges, liveCanvasVersion);
+    const { addedEdges, removedEdges } = countEdgeDiffs(preparedEdges, liveCanvas);
     added += addedEdges;
     removed += removedEdges;
 
     return { added, updated, removed };
-  }, [draftDiffResult, preparedEdges, liveCanvasVersion]);
+  }, [draftDiffResult, preparedEdges, liveCanvas]);
 
   return {
     nodes,

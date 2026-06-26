@@ -14,7 +14,7 @@ type ConfirmDeleteDraftBranchOptions = {
   activeBranchMeta: CanvasesCanvasVersion | null;
   activeBranch: string | null;
   liveCanvasVersionId?: string;
-  liveCanvasVersion?: CanvasesCanvasVersion;
+  liveCanvas?: CanvasesCanvas | null;
   organizationId?: string;
   canvasId?: string;
   clearPendingAutoSaveWork: () => void;
@@ -49,7 +49,7 @@ export function isDeletingActiveDraft(
 
 export function switchToLiveAfterActiveDraftDelete({
   liveCanvasVersionId,
-  liveCanvasVersion,
+  liveCanvas,
   organizationId,
   canvasId,
   exitToLive,
@@ -62,7 +62,7 @@ export function switchToLiveAfterActiveDraftDelete({
 }: Pick<
   ConfirmDeleteDraftBranchOptions,
   | "liveCanvasVersionId"
-  | "liveCanvasVersion"
+  | "liveCanvas"
   | "organizationId"
   | "canvasId"
   | "exitToLive"
@@ -89,7 +89,7 @@ export function switchToLiveAfterActiveDraftDelete({
     });
   }
 
-  if (liveCanvasVersion?.spec && organizationId && canvasId) {
+  if (liveCanvas?.spec && organizationId && canvasId) {
     queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
       if (!current) {
         return current;
@@ -97,7 +97,7 @@ export function switchToLiveAfterActiveDraftDelete({
 
       return {
         ...current,
-        spec: { ...current.spec, ...liveCanvasVersion.spec },
+        spec: { ...current.spec, ...liveCanvas.spec },
       };
     });
   }
@@ -110,7 +110,7 @@ export async function confirmDeleteDraftBranch({
   activeBranchMeta,
   activeBranch,
   liveCanvasVersionId,
-  liveCanvasVersion,
+  liveCanvas,
   organizationId,
   canvasId,
   clearPendingAutoSaveWork,
@@ -143,7 +143,7 @@ export async function confirmDeleteDraftBranch({
     if (isActiveDraft) {
       switchToLiveAfterActiveDraftDelete({
         liveCanvasVersionId,
-        liveCanvasVersion,
+        liveCanvas,
         organizationId,
         canvasId,
         exitToLive,

@@ -21,7 +21,6 @@ type NodeYamlDiffPayload = {
 type UseCanvasYamlDiffModalParams = {
   hasUnpublishedDraftChanges: boolean;
   liveCanvas?: CanvasesCanvas;
-  liveCanvasVersion?: CanvasesCanvasVersion;
   draftCanvasVersion?: CanvasesCanvasVersion;
   draftCanvas?: CanvasesCanvas | null;
   draftNodes: CanvasNode[];
@@ -29,8 +28,8 @@ type UseCanvasYamlDiffModalParams = {
   buildYamlExportPayload: (workflow?: CanvasesCanvas | null, overrideNodes?: CanvasNode[]) => YamlExportPayload | null;
 };
 
-function findSpecNode(version: CanvasesCanvasVersion | undefined, nodeId: string) {
-  const nodes = (version?.spec?.nodes || []) as Array<Record<string, unknown>>;
+function findSpecNode(liveCanvas: CanvasesCanvas | undefined, nodeId: string) {
+  const nodes = (liveCanvas?.spec?.nodes || []) as Array<Record<string, unknown>>;
   return nodes.find((node) => String(node.id) === nodeId);
 }
 
@@ -98,21 +97,21 @@ function buildNodeYamlDiffPayload({
   draftCanvas,
   draftCanvasVersion,
   draftNodes,
-  liveCanvasVersion,
+  liveCanvas,
   nodeId,
 }: {
   activeCanvasVersionId: string;
   draftCanvas?: CanvasesCanvas | null;
   draftCanvasVersion?: CanvasesCanvasVersion;
   draftNodes: CanvasNode[];
-  liveCanvasVersion?: CanvasesCanvasVersion;
+  liveCanvas?: CanvasesCanvas;
   nodeId: string | null;
 }): NodeYamlDiffPayload | null {
   if (!nodeId) {
     return null;
   }
 
-  const liveNode = findSpecNode(liveCanvasVersion, nodeId);
+  const liveNode = findSpecNode(liveCanvas, nodeId);
   const draftSpecNodes = getDraftSpecNodes({ activeCanvasVersionId, draftCanvas, draftCanvasVersion });
   const draftNode = (draftSpecNodes as Array<Record<string, unknown>>).find((node) => String(node.id) === nodeId);
 
@@ -136,7 +135,6 @@ function buildNodeYamlDiffPayload({
 export function useCanvasYamlDiffModal({
   hasUnpublishedDraftChanges,
   liveCanvas,
-  liveCanvasVersion,
   draftCanvasVersion,
   draftCanvas,
   draftNodes,
@@ -150,14 +148,11 @@ export function useCanvasYamlDiffModal({
   const [open, setOpen] = useState(false);
   const [nodeDiffId, setNodeDiffId] = useState<string | null>(null);
   const payload = useMemo(() => {
-    if (!hasUnpublishedDraftChanges || !liveCanvas || !liveCanvasVersion?.spec || !draftCanvasVersion?.spec) {
+    if (!hasUnpublishedDraftChanges || !liveCanvas?.spec || !draftCanvasVersion?.spec) {
       return null;
     }
 
-    const livePayload = buildYamlExportPayload({
-      ...liveCanvas,
-      spec: liveCanvasVersion.spec,
-    });
+    const livePayload = buildYamlExportPayload(liveCanvas);
     const useCurrentDraftCanvas =
       !!draftCanvas && !!activeCanvasVersionId && draftCanvasVersion.metadata?.id === activeCanvasVersionId;
     const draftPayload = useCurrentDraftCanvas
@@ -185,7 +180,6 @@ export function useCanvasYamlDiffModal({
     draftNodes,
     hasUnpublishedDraftChanges,
     liveCanvas,
-    liveCanvasVersion?.spec,
   ]);
 
   const nodePayload = useMemo(
@@ -195,10 +189,10 @@ export function useCanvasYamlDiffModal({
         draftCanvas,
         draftCanvasVersion,
         draftNodes,
-        liveCanvasVersion,
+        liveCanvas,
         nodeId: nodeDiffId,
       }),
-    [activeCanvasVersionId, draftCanvas, draftCanvasVersion, draftNodes, liveCanvasVersion, nodeDiffId],
+    [activeCanvasVersionId, draftCanvas, draftCanvasVersion, draftNodes, liveCanvas, nodeDiffId],
   );
 
   const onShowDiff = useCallback(() => setOpen(true), []);

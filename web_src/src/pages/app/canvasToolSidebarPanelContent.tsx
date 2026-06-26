@@ -39,7 +39,6 @@ export interface CanvasVersionsSidebarPanelConfig {
   isOpen: boolean;
   scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
-  liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
   canUpdateCanvas: boolean;

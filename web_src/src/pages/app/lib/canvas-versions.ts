@@ -1,22 +1,4 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-
-export function liveCanvasVersionFromDescribe(
-  canvas: CanvasesCanvas | null | undefined,
-): CanvasesCanvasVersion | undefined {
-  const versionId = canvas?.metadata?.versionId;
-  if (!versionId || !canvas?.spec) {
-    return undefined;
-  }
-
-  return {
-    metadata: {
-      id: versionId,
-      canvasId: canvas.metadata?.id,
-      state: "STATE_PUBLISHED",
-    },
-    spec: canvas.spec,
-  };
-}
+import type { CanvasesCanvasVersion } from "@/api-client";
 
 export function isPublishedVersion(version: CanvasesCanvasVersion): boolean {
   return version.metadata?.state === "STATE_PUBLISHED";
