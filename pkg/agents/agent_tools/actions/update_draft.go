@@ -221,14 +221,8 @@ func requestedDraftVersionID(input Input) (uuid.UUID, error) {
 }
 
 func resolveCustomToolAutoLayout(input *AutoLayoutInput, hasCanvasUpdate bool) *pb.CanvasAutoLayout {
-	if input == nil {
-		if !hasCanvasUpdate {
-			return nil
-		}
-		return &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
-		}
+	if input == nil || !hasCanvasUpdate {
+		return nil
 	}
 
 	layout := &pb.CanvasAutoLayout{

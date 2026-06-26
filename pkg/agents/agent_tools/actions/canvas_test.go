@@ -21,13 +21,8 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestResolveCustomToolAutoLayout_DefaultsGraphUpdatesToFullCanvas(t *testing.T) {
-	layout := resolveCustomToolAutoLayout(nil, true)
-
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
-	assert.Empty(t, layout.NodeIds)
+func TestResolveCustomToolAutoLayout_SkipsDefaultCanvasLayout(t *testing.T) {
+	assert.Nil(t, resolveCustomToolAutoLayout(nil, true))
 }
 
 func TestResolveCustomToolAutoLayout_SkipsConsoleOnlyUpdates(t *testing.T) {

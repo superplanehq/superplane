@@ -20,7 +20,7 @@ When building or modifying apps:
 3. Use `read_file` for app repository files. Use `write_file` or `delete_file` with the exact `version_id` returned by `read`, `create_draft`, or the previous update to stage normal file changes. Use `commit_files` only when the user asks you to commit staged repository file work. Use `update_draft`, not `write_file`, for `canvas.yaml` and `console.yaml`.
 4. Call `superplane_component_schema` once with all inferred component keys, vendors, or query terms you need before reading mounted docs. Treat the result as your schema cache for the turn.
 5. Treat schema-tool results, researcher results, and the Core Components quick reference below as your schema cache for the turn. Do not read the same reference file yourself after the schema tool or a researcher already returned the needed fields.
-6. Apply the draft update with `update_draft` and the exact `version_id` returned by `read`, `create_draft`, or the previous `update_draft`, then verify once. `superplane_app.update_draft` auto-layouts graph changes by default; do not spend extra tool calls calculating manual node positions unless the user asked for a specific layout.
+6. Apply the draft update with `update_draft` and the exact `version_id` returned by `read`, `create_draft`, or the previous `update_draft`, then verify once. `superplane_app.update_draft` does not auto-layout unless you provide `auto_layout`; omit `auto_layout` unless the user asked to rearrange the graph.
 
 Use `superplane_app` action `access` when you need to know what the current session can do. It reports the intersection of the session's permissions and the backend authorization interceptor, including which canvas-scoped actions are allowed for the current app. Do this when a permission boundary is unclear before attempting an operation.
 
@@ -312,7 +312,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 3. **Wait for user** — user clicks "Start Building" or says yes
 4. **Use cached schemas** — by approval time you should already have the YAML/component fields from `superplane_component_schema`, researchers, or the quick reference. Do not read reference files again unless validation returns an unfamiliar field/channel error.
 5. **Build** — construct the canvas YAML, and the Console YAML when needed
-6. **Apply** — if `read` returned live/no `version_id`, call `superplane_app` action `create_draft`; then call `superplane_app` action `update_draft` with the selected draft `version_id`, `canvas_yaml` (and `console_yaml` for Console changes); graph updates auto-layout by default
+6. **Apply** — if `read` returned live/no `version_id`, call `superplane_app` action `create_draft`; then call `superplane_app` action `update_draft` with the selected draft `version_id`, `canvas_yaml` (and `console_yaml` for Console changes); omit `auto_layout` unless the user asked to rearrange the graph
 7. **Verify** — after updates, read the same draft back with `superplane_app` action `read` and that `version_id`
 8. **Output** — :::draft-actions with version ID and summary using node chips
 
