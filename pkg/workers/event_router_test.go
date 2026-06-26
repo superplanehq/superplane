@@ -14,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
@@ -204,6 +206,59 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	assert.False(t, runConsumer.HasReceivedMessage())
 }
 
+func Test__EventRouter_ProcessExecutionEventUsesRunVersionEdges(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	trigger := "trigger-1"
+	node1 := "component-1"
+	node2 := "component-2"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{NodeID: node1, Type: models.NodeTypeComponent},
+			{NodeID: node2, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: node1, Channel: "default"},
+			{SourceID: node1, TargetID: node2, Channel: "default"},
+		},
+	)
+
+	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
+	require.NoError(t, err)
+	require.NoError(t, triggerEvent.Routed())
+
+	publishCanvasVersionWithEdges(t, canvas.ID, []models.Edge{
+		{SourceID: trigger, TargetID: node1, Channel: "default"},
+	})
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(canvas.ID, node1, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	err = router.LockAndProcessEvent(logger, events[0], time.Now())
+	require.NoError(t, err)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, node2, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+	assert.Equal(t, run.ID, queueItems[0].RunID)
+}
+
 func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 
@@ -256,4 +311,36 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
 	assert.NotNil(t, updatedRun.FinishedAt)
+}
+
+func publishCanvasVersionWithEdges(t *testing.T, canvasID uuid.UUID, edges []models.Edge) {
+	t.Helper()
+
+	tx := database.Conn()
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasID)
+	require.NoError(t, err)
+
+	now := time.Now()
+	versionID := uuid.New()
+	version := models.CanvasVersion{
+		ID:          versionID,
+		WorkflowID:  canvasID,
+		State:       models.CanvasVersionStatePublished,
+		PublishedAt: &now,
+		Nodes:       liveVersion.Nodes,
+		Edges:       datatypes.NewJSONSlice(edges),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+
+	require.NoError(t, tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&models.Canvas{}).
+			Where("id = ?", canvasID).
+			Update("live_version_id", versionID).
+			Error
+	}))
 }

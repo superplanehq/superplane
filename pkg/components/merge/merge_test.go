@@ -182,6 +182,21 @@ func Test_Merge_WaitsForDistinctSources(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_WaitsForRunVersionSourcesWhenLiveCanvasChanges(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+
+	steps.CreateWorkflow()
+	steps.CreateEvents()
+	steps.CreateQueueItems()
+	steps.PublishLiveVersionWithoutProcess2MergeEdge()
+
+	m := &Merge{}
+
+	steps.ProcessFirstEvent(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionPending()
+}
+
 type MergeTestSteps struct {
 	t  *testing.T
 	Tx *gorm.DB
@@ -406,6 +421,41 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 func (s *MergeTestSteps) SetMergeConfiguration(cfg map[string]any) {
 	s.MergeNode.Configuration = datatypes.NewJSONType(cfg)
 	require.NoError(s.t, s.Tx.Save(s.MergeNode).Error)
+}
+
+func (s *MergeTestSteps) PublishLiveVersionWithoutProcess2MergeEdge() {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	nodes := []models.Node{
+		{ID: s.StartNode.NodeID, Name: s.StartNode.Name, Type: s.StartNode.Type, Ref: s.StartNode.Ref.Data()},
+		{ID: s.ProcessNode1.NodeID, Name: s.ProcessNode1.Name, Type: s.ProcessNode1.Type, Ref: s.ProcessNode1.Ref.Data()},
+		{ID: s.ProcessNode2.NodeID, Name: s.ProcessNode2.Name, Type: s.ProcessNode2.Type, Ref: s.ProcessNode2.Ref.Data()},
+		{ID: s.MergeNode.NodeID, Name: s.MergeNode.Name, Type: s.MergeNode.Type, Ref: s.MergeNode.Ref.Data()},
+	}
+	edges := []models.Edge{
+		{SourceID: s.StartNode.NodeID, TargetID: s.ProcessNode1.NodeID, Channel: "default"},
+		{SourceID: s.StartNode.NodeID, TargetID: s.ProcessNode2.NodeID, Channel: "default"},
+		{SourceID: s.ProcessNode1.NodeID, TargetID: s.MergeNode.NodeID, Channel: "default"},
+	}
+
+	require.NoError(s.t, s.Tx.Transaction(func(tx *gorm.DB) error {
+		version := models.CanvasVersion{
+			ID:          liveVersionID,
+			WorkflowID:  s.Wf.ID,
+			State:       models.CanvasVersionStatePublished,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice(nodes),
+			Edges:       datatypes.NewJSONSlice(edges),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+
+		s.Wf.LiveVersionID = &liveVersionID
+		return tx.Model(s.Wf).Update("live_version_id", liveVersionID).Error
+	}))
 }
 
 func (s *MergeTestSteps) CreateEvents() {
