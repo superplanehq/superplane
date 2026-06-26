@@ -254,6 +254,13 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return match
 		}
 
+		// Secret references ({{ secrets.NAME.KEY }}) are deferred to the
+		// component that consumes the configuration so the secret value is
+		// never persisted in the stored execution configuration or logs.
+		if configuration.IsSecretReference(matches[1]) {
+			return match
+		}
+
 		value, e := b.ResolveExpression(matches[1])
 		if e != nil {
 			err = e
