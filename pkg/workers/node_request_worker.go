@@ -337,17 +337,28 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
+	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
+	if err != nil {
+		return fmt.Errorf("input event not found: %w", err)
+	}
+
 	//
 	// Build a runtime-mode configuration builder so secrets() placeholders
 	// (left intact by the deferred queue build) are resolved fresh on every
 	// hook invocation - including HTTP retries that re-enter via the
 	// retryRequest hook with the stored execution configuration.
 	//
+	// The incoming event payload is supplied via WithInput so placeholders
+	// that were fully deferred at queue time (because they mix secrets() with
+	// $ node references in a single block) still resolve their $ references
+	// correctly when the hook runs.
+	//
 	secretResolver := contexts.NewRuntimeSecretResolver(tx, w.encryptor, models.DomainTypeOrganization, workflow.OrganizationID)
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
 		WithIncomingEventID(&execution.EventID).
+		WithInput(map[string]any{inputEvent.NodeID: inputEvent.Data.Data()}).
 		WithSecretResolver(secretResolver)
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
