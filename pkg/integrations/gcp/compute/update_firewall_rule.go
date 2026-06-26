@@ -64,7 +64,7 @@ func (u *UpdateFirewall) Description() string {
 }
 
 func (u *UpdateFirewall) Documentation() string {
-	return `The Update Firewall Rule component changes an existing VPC firewall rule. For priority, protocols/ports, ranges, and description, toggle on only the fields you want to change; everything else is left untouched. **Targets** and **Source filter** are dropdowns that default to **"No change."**
+	return `The Update Firewall Rule component changes an existing VPC firewall rule. **Toggle on only the fields you want to change; everything left off is untouched.** Enabled state, protocols and ports, targets, source filter, and logs are dropdowns you toggle on and then pick a value.
 
 ## Use Cases
 
@@ -76,16 +76,16 @@ func (u *UpdateFirewall) Documentation() string {
 ## Configuration
 
 - **Firewall rule**: The firewall rule to update (required)
-- **Enabled state**: Leave unchanged, enable, or disable the rule
-- **Priority**: New priority (0-65535); lower numbers take precedence
-- **Protocols and ports**: "No change", "Specified protocols and ports" (replace with a list), or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
-- **Ranges**: Replace the rule's CIDR ranges. Independent of the **Source filter** dropdown; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). ` + "`sourceRanges`" + ` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
-- **Targets**: "No change" (leave current targets), "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both.
-- **Source filter (INGRESS only)**: "No change" (leave source tags/service accounts), "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Choosing anything but "No change" on an EGRESS rule is rejected.
-- **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
-- **Description**: Replace the rule's description
+- **Enabled state** (toggle): enable or disable the rule
+- **Priority** (toggle): new priority (0-65535); lower numbers take precedence
+- **Protocols and ports** (toggle): "Specified protocols and ports" (replace with a list) or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges** (toggle): Replace the rule's CIDR ranges. Independent of the **Source filter**; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). ` + "`sourceRanges`" + ` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets** (toggle): "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both. A specified tags/service-accounts selection with an empty list is rejected (it would silently broaden the rule to all instances).
+- **Source filter (INGRESS only, toggle)**: "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Toggling this on for an EGRESS rule is rejected.
+- **Logs** (toggle): turn Firewall Rules Logging on or off (with optional metadata)
+- **Description** (toggle): Replace the rule's description
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is now a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
 
 ## Output
 
@@ -130,10 +130,10 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Enabled state",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Default:     FirewallEnabledNoChange,
-			Description: "Leave the rule's enabled state unchanged, or enable/disable it.",
+			Togglable:   true,
+			Default:     FirewallEnabledEnabled,
+			Description: "Toggle on to enable or disable the rule; leave off to keep its current state.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "No change", Value: FirewallEnabledNoChange},
 				{Label: "Enabled", Value: FirewallEnabledEnabled},
 				{Label: "Disabled", Value: FirewallEnabledDisabled},
 			}}},
@@ -151,10 +151,10 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Protocols and ports",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Default:     FirewallTargetingNoChange,
-			Description: "Leave the rule's protocols/ports unchanged, replace them with a specified list, or match all protocols and ports.",
+			Togglable:   true,
+			Default:     FirewallProtocolsSpecified,
+			Description: "Toggle on to change the rule's protocols/ports; leave off to keep them. Replace them with a specified list, or match all protocols and ports.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "No change", Value: FirewallTargetingNoChange},
 				{Label: "Specified protocols and ports", Value: FirewallProtocolsSpecified},
 				{Label: "All protocols and ports", Value: FirewallProtocolsAll},
 			}}},
@@ -218,10 +218,10 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Targets",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Default:     FirewallTargetingNoChange,
-			Description: "Change which instances the rule applies to. \"No change\" leaves the current targets untouched. Switching to tags or service accounts clears the other automatically (a rule cannot use both).",
+			Togglable:   true,
+			Default:     FirewallTargetAll,
+			Description: "Toggle on to change which instances the rule applies to; leave off to keep the current targets. Switching to tags or service accounts clears the other automatically (a rule cannot use both).",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "No change", Value: FirewallTargetingNoChange},
 				{Label: "All instances in the network", Value: FirewallTargetAll},
 				{Label: "Specified target tags", Value: FirewallFilterTags},
 				{Label: "Specified service accounts", Value: FirewallFilterServiceAccounts},
@@ -278,10 +278,10 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Source filter",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Default:     FirewallTargetingNoChange,
-			Description: "Change how incoming traffic is matched — INGRESS rules only. \"No change\" leaves source tags/service accounts untouched; \"IP ranges only\" clears them (CIDR ranges are edited in the Source / destination ranges field above). Choosing any value other than \"No change\" on an EGRESS rule is rejected.",
+			Togglable:   true,
+			Default:     FirewallSourceRanges,
+			Description: "Toggle on to change how incoming traffic is matched (INGRESS rules only); leave off to keep source tags/service accounts as-is. \"IP ranges only\" clears source tags/service accounts (CIDR ranges are edited in the Source / destination ranges field above). Toggling this on for an EGRESS rule is rejected.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "No change", Value: FirewallTargetingNoChange},
 				{Label: "IP ranges only", Value: FirewallSourceRanges},
 				{Label: "Source tags", Value: FirewallFilterTags},
 				{Label: "Source service accounts", Value: FirewallFilterServiceAccounts},
@@ -338,10 +338,10 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Logs",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Default:     FirewallEnabledNoChange,
-			Description: "Leave Firewall Rules Logging unchanged, or turn it on/off.",
+			Togglable:   true,
+			Default:     FirewallEnabledEnabled,
+			Description: "Toggle on to turn Firewall Rules Logging on or off; leave off to keep the current setting.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "No change", Value: FirewallEnabledNoChange},
 				{Label: "Enabled", Value: FirewallEnabledEnabled},
 				{Label: "Disabled", Value: FirewallEnabledDisabled},
 			}}},
@@ -418,6 +418,9 @@ func (u *UpdateFirewall) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	if err := validateFirewallTargetsAndSources(effST, effTT, effSSA, effTSA); err != nil {
+		return err
+	}
+	if err := validateFirewallFilterSelections(spec.TargetType, spec.SourceFilterType, true, effTT, effTSA, effST, effSSA); err != nil {
 		return err
 	}
 	return resolveFirewallNodeMetadata(ctx, spec.Firewall)

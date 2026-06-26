@@ -1502,7 +1502,7 @@ Returns the instance state after the operation:
 
 **Component key:** `gcp.compute.updateFirewallRule`
 
-The Update Firewall Rule component changes an existing VPC firewall rule. For priority, protocols/ports, ranges, and description, toggle on only the fields you want to change; everything else is left untouched. **Targets** and **Source filter** are dropdowns that default to **"No change."**
+The Update Firewall Rule component changes an existing VPC firewall rule. **Toggle on only the fields you want to change; everything left off is untouched.** Enabled state, protocols and ports, targets, source filter, and logs are dropdowns you toggle on and then pick a value.
 
 ### Use Cases
 
@@ -1514,16 +1514,16 @@ The Update Firewall Rule component changes an existing VPC firewall rule. For pr
 ### Configuration
 
 - **Firewall rule**: The firewall rule to update (required)
-- **Enabled state**: Leave unchanged, enable, or disable the rule
-- **Priority**: New priority (0-65535); lower numbers take precedence
-- **Protocols and ports**: "No change", "Specified protocols and ports" (replace with a list), or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
-- **Ranges**: Replace the rule's CIDR ranges. Independent of the **Source filter** dropdown; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). `sourceRanges` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
-- **Targets**: "No change" (leave current targets), "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both.
-- **Source filter (INGRESS only)**: "No change" (leave source tags/service accounts), "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Choosing anything but "No change" on an EGRESS rule is rejected.
-- **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
-- **Description**: Replace the rule's description
+- **Enabled state** (toggle): enable or disable the rule
+- **Priority** (toggle): new priority (0-65535); lower numbers take precedence
+- **Protocols and ports** (toggle): "Specified protocols and ports" (replace with a list) or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges** (toggle): Replace the rule's CIDR ranges. Independent of the **Source filter**; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). `sourceRanges` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets** (toggle): "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both. A specified tags/service-accounts selection with an empty list is rejected (it would silently broaden the rule to all instances).
+- **Source filter (INGRESS only, toggle)**: "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Toggling this on for an EGRESS rule is rejected.
+- **Logs** (toggle): turn Firewall Rules Logging on or off (with optional metadata)
+- **Description** (toggle): Replace the rule's description
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is now a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
 
 ### Output
 

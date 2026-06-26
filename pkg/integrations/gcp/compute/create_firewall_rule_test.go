@@ -610,4 +610,34 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		assert.Equal(t, "all", allowed[0]["IPProtocol"])
 		assert.NotContains(t, allowed[0], "ports")
 	})
+
+	t.Run("specified target tags with an empty list -> fails before API call", func(t *testing.T) {
+		var called bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				called = true
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":       "scoped",
+				"network":    "default",
+				"direction":  "INGRESS",
+				"action":     "allow",
+				"rules":      []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"targetType": "tags",
+				"targetTags": []string{}, // selected "tags" but provided none
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, called)
+		assert.Contains(t, state.FailureMessage, "no target tags were provided")
+	})
 }

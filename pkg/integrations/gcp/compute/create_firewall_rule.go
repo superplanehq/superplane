@@ -451,6 +451,9 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 	if err := validateFirewallTargetsAndSources(effSourceTags, effTargetTags, effSourceSAs, effTargetSAs); err != nil {
 		return err
 	}
+	if err := validateFirewallFilterSelections(spec.TargetType, spec.SourceFilterType, dir == FirewallDirectionIngress, effTargetTags, effTargetSAs, effSourceTags, effSourceSAs); err != nil {
+		return err
+	}
 	return ctx.Metadata.Set(FirewallNodeMetadata{FirewallName: strings.TrimSpace(spec.Name)})
 }
 
@@ -497,6 +500,9 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 	if err := validateFirewallTargetsAndSources(sourceTags, targetTags, sourceSAs, targetSAs); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallFilterSelections(spec.TargetType, spec.SourceFilterType, direction == FirewallDirectionIngress, targetTags, targetSAs, sourceTags, sourceSAs); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 

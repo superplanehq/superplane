@@ -259,6 +259,39 @@ func resolveFirewallTargeting(
 	return
 }
 
+// validateFirewallFilterSelections rejects a "specified tags / service accounts"
+// selection whose list is empty. GCP silently treats a tag/SA filter with no
+// values as "all instances" / "all sources", which contradicts the explicit
+// selection in the form. The lists passed in are the resolved effective values.
+func validateFirewallFilterSelections(
+	targetType, sourceFilterType string, ingress bool,
+	targetTags, targetServiceAccounts, sourceTags, sourceServiceAccounts []string,
+) error {
+	switch strings.TrimSpace(targetType) {
+	case FirewallFilterTags:
+		if len(targetTags) == 0 {
+			return errors.New(`"Specified target tags" is selected but no target tags were provided`)
+		}
+	case FirewallFilterServiceAccounts:
+		if len(targetServiceAccounts) == 0 {
+			return errors.New(`"Specified service accounts" is selected but no target service accounts were provided`)
+		}
+	}
+	if ingress {
+		switch strings.TrimSpace(sourceFilterType) {
+		case FirewallFilterTags:
+			if len(sourceTags) == 0 {
+				return errors.New(`"Source tags" is selected but no source tags were provided`)
+			}
+		case FirewallFilterServiceAccounts:
+			if len(sourceServiceAccounts) == 0 {
+				return errors.New(`"Source service accounts" is selected but no source service accounts were provided`)
+			}
+		}
+	}
+	return nil
+}
+
 // validateFirewallTargetsAndSources enforces a Compute Engine constraint: a
 // single firewall rule filters by network tags OR by service accounts, never a
 // mix of the two. Catching it here gives a clearer error than the API's.
