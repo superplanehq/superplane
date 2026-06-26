@@ -530,7 +530,6 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
-- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Examples
 
@@ -584,7 +583,6 @@ The For Each component reads an array from the upstream payload and emits one do
 - **$**: The run context data
 - **root()**: Access root event data
 - **previous()**: Access previous node outputs
-- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Example Output
 
@@ -685,18 +683,12 @@ and status without downloading the full response payload.
   - **Plain Text**: Raw text content
   - **XML**: XML formatted content
 
-### Inline Secrets
+### Secrets in expressions
 
-The URL, query-param values, header values, form-data values, and the body (JSON
-string values, plain text, XML) accept inline organization-secret references
-using the form:
-
-`{{ secrets.SECRET_NAME.KEY_NAME }}`
-
-Secrets are resolved at request time and the resolved value never appears in the
-stored execution configuration or logs. Secret names and keys containing a
-literal `.` cannot be used inline; configure those through the Authorization
-section (Bearer token / Basic Auth password / custom header value) instead.
+Every text field in this component accepts standard expression placeholders
+`{{ ... }}`. Use `secrets("name").key` inside an expression to inject an
+organization secret value (for example: `{{ secrets("api").token }}`). Secrets are
+resolved at execution time and are not stored back into the saved configuration.
 
 ### Response Handling
 
@@ -758,7 +750,6 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
-- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Examples
 
@@ -830,7 +821,6 @@ The until expression has access to:
 - **$**: The run context data, including outputs from the latest iteration
 - **root()**: Access root event data
 - **previous()**: Access previous node outputs
-- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Example Output
 
