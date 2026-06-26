@@ -15,6 +15,7 @@ import {
   nodeQueueItemsQueryOptions,
   nodeEventsQueryOptions,
 } from "@/hooks/useCanvasData";
+import { shouldAcceptExecutionUpdate } from "@/hooks/canvasInfiniteCache";
 
 interface NodeExecutionData {
   executions: CanvasesCanvasNodeExecution[];
@@ -251,6 +252,13 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       const newData = new Map(state.data);
       const existing = newData.get(nodeId) || emptyNodeData;
       const existingIndex = existing.executions.findIndex((e) => e.id === execution.id);
+
+      // Ignore stale out-of-order updates so a finished node isn't downgraded
+      // back to running.
+      if (existingIndex >= 0 && !shouldAcceptExecutionUpdate(existing.executions[existingIndex], execution)) {
+        return state;
+      }
+
       const updatedExecutions =
         existingIndex >= 0
           ? existing.executions.map((e, i) => (i === existingIndex ? execution : e))

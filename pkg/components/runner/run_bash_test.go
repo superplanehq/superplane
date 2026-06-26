@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -52,6 +53,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, RunModeBash, req.RunMode)
+	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Contains(t, req.Script, "jq")
 	assert.Contains(t, req.Script, "SUPERPLANE_PAYLOAD_FILE")
 	assert.Contains(t, req.Script, "SUPERPLANE_RESULT_FILE")
@@ -72,11 +74,17 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	}
 
 	component := &RunBash{}
+	setupCommands := `if ! command -v aws >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y awscli
+fi
+echo ready`
+
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type":          testRunnerMachineType,
 			"enable_setup_commands": true,
-			"setup_commands":        "apt-get update\necho ready",
+			"setup_commands":        setupCommands,
 			"script":                `echo '{"ok":true}' > "$SUPERPLANE_RESULT_FILE"`,
 		},
 		HTTP:           httpContext,
@@ -94,7 +102,10 @@ func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, []string{"apt-get update", "echo ready"}, req.SetupCommands)
+	assert.Equal(t, []string{`if ! command -v aws >/dev/null 2>&1; then
+apt-get update
+apt-get install -y awscli
+fi`, "echo ready"}, req.SetupCommands)
 }
 
 func TestValidateRunBashSpecRequiresSetupCommandsWhenEnabled(t *testing.T) {

@@ -166,3 +166,12 @@ func requireIpamPoolID(value string) (string, error) {
 
 	return poolID, nil
 }
+
+func requireLoadBalancerARN(value string) (string, error) {
+	arn := strings.TrimSpace(value)
+	if arn == "" {
+		return "", fmt.Errorf("load balancer ARN is required")
+	}
+
+	return arn, nil
+}

@@ -39,7 +39,7 @@ type UseDraftActionsResult = {
  * Manages the lifecycle of the draft-actions bar:
  * - Scans messages for the latest :::draft-actions segment
  * - Verifies the version is still a draft via API
- * - Listens to canvas:version-updated websocket events
+ * - Listens to canvas:version-updated and canvas:version-deleted websocket events
  * - Sends system notifications to agent on publish/discard
  */
 export function useDraftActions({
@@ -193,7 +193,7 @@ function useCanvasVersionUpdates({
   handleVersionDiscarded,
 }: UseCanvasVersionUpdatesArgs): void {
   useEffect(() => {
-    const listener = (event: Event) => {
+    const onVersionUpdated = (event: Event) => {
       void processVersionUpdate({
         event,
         canvasId,
@@ -205,8 +205,21 @@ function useCanvasVersionUpdates({
       });
     };
 
-    window.addEventListener("canvas:version-updated", listener);
-    return () => window.removeEventListener("canvas:version-updated", listener);
+    const onVersionDeleted = (event: Event) => {
+      const versionId = getVersionIdFromEvent(event);
+      if (!versionId || dismissedVersionIds.has(versionId)) {
+        return;
+      }
+
+      void handleVersionDiscarded(versionId);
+    };
+
+    window.addEventListener("canvas:version-updated", onVersionUpdated);
+    window.addEventListener("canvas:version-deleted", onVersionDeleted);
+    return () => {
+      window.removeEventListener("canvas:version-updated", onVersionUpdated);
+      window.removeEventListener("canvas:version-deleted", onVersionDeleted);
+    };
   }, [canvasId, dismissVersion, dismissedVersionIds, handleVersionDiscarded, handleVersionPublished, organizationId]);
 }
 
@@ -223,7 +236,7 @@ async function processVersionUpdate({
   handleVersionPublished,
   handleVersionDiscarded,
 }: ProcessVersionUpdateArgs): Promise<void> {
-  const versionId = getUpdatedVersionId(event);
+  const versionId = getVersionIdFromEvent(event);
   if (!versionId || dismissedVersionIds.has(versionId)) return;
 
   try {
@@ -290,7 +303,7 @@ function addDismissedVersionId(current: Set<string>, versionId: string): Set<str
   return next;
 }
 
-function getUpdatedVersionId(event: Event): string | null {
+function getVersionIdFromEvent(event: Event): string | null {
   const detail = (event as CustomEvent<{ versionId?: string }>).detail;
   return detail?.versionId ?? null;
 }

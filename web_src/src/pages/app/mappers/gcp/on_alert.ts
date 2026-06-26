@@ -3,7 +3,7 @@ import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 
 interface AlertEventData {
   state?: string;
@@ -79,7 +79,7 @@ export const onAlertTriggerRenderer: TriggerRenderer = {
     }
     return {
       title: node.name || definition.label || "On Alert",
-      iconSrc: gcpIcon,
+      iconSrc: gcpMonitoringIcon,
       iconSlug: definition.icon || "bell",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(definition.color ?? "blue"),
