@@ -683,6 +683,13 @@ and status without downloading the full response payload.
   - **Plain Text**: Raw text content
   - **XML**: XML formatted content
 
+### Secrets in expressions
+
+Every text field in this component accepts standard expression placeholders
+`{{ ... }}`. Use `secrets("name").key` inside an expression to inject an
+organization secret value (for example: `{{ secrets("api").token }}`). Secrets are
+resolved at execution time and are not stored back into the saved configuration.
+
 ### Response Handling
 
 The component emits the response with:
