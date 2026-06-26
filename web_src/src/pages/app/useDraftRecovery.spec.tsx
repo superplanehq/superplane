@@ -17,6 +17,10 @@ const { showSuccessToast } = vi.hoisted(() => ({
   showSuccessToast: vi.fn(),
 }));
 
+const { showInfoToast } = vi.hoisted(() => ({
+  showInfoToast: vi.fn(),
+}));
+
 vi.mock("./lib/draft-missing-recovery", () => ({
   recoverIfDraftMissing,
 }));
@@ -31,7 +35,7 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
-  showInfoToast: vi.fn(),
+  showInfoToast,
   showSuccessToast,
 }));
 
@@ -110,7 +114,7 @@ describe("useDraftRecovery", () => {
       liveVersionId: "draft-1",
       skipDraftBranchRefetch: true,
     });
-    expect(showSuccessToast).toHaveBeenCalledWith("Version published");
+    expect(showSuccessToast).toHaveBeenCalledWith("Version published", { id: "canvas-version-action" });
     expect(setIsPreparingVersionAction).toHaveBeenNthCalledWith(1, true);
     expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
   });
@@ -147,6 +151,44 @@ describe("useDraftRecovery", () => {
     });
 
     expect(publishCanvasVersionMutation.mutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
+    expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
+  });
+
+  it("consolidates missing-draft publish feedback into the version action toast", async () => {
+    ensureDraftVersionExists.mockResolvedValue(false);
+    const ensureVersionActionDraftReady = vi.fn().mockResolvedValue(true);
+    const publishCanvasVersionMutation = { mutateAsync: vi.fn().mockResolvedValue({}) };
+    const setIsPreparingVersionAction = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useDraftRecovery({
+          organizationId: "org-1",
+          canvasId: "canvas-1",
+          activeCanvasVersionId: "draft-1",
+          activeCanvasVersionIdRef: { current: "draft-1" },
+          draftCanvasSpecsRef: { current: new Map([["draft-1", { nodes: [], edges: [] }]]) },
+          setActiveCanvasVersion: vi.fn(),
+          setDraftCanvasSpec: vi.fn(),
+          exitToLive: vi.fn(),
+          setSearchParams: vi.fn(),
+          refreshLatestLiveCanvasData: vi.fn().mockResolvedValue(undefined),
+          cancelPendingCanvasSaves: vi.fn(),
+          ensureVersionActionDraftReady,
+          publishCanvasVersionMutation,
+          setIsPreparingVersionAction,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.handlePublishVersion();
+    });
+
+    expect(showInfoToast).toHaveBeenCalledWith("This draft no longer exists. Returned to the live canvas.", {
+      id: "canvas-version-action",
+    });
     expect(showSuccessToast).not.toHaveBeenCalled();
     expect(setIsPreparingVersionAction).toHaveBeenLastCalledWith(false);
   });

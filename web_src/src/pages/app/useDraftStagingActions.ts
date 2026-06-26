@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { executeResetStaging } from "./lib/reset-staging-flow";
+import { VERSION_ACTION_TOAST_ID } from "./lib/version-action-toast";
 
 type CommitMutation = { mutateAsync: () => Promise<unknown> };
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
@@ -94,12 +95,12 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
           registerIgnoredCanvasVersionUpdatedEcho,
         });
         if (committed) {
-          showSuccessToast("Changes committed");
+          showSuccessToast("Changes committed", { id: VERSION_ACTION_TOAST_ID });
         }
       });
     } catch (error) {
       if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
-        showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+        showErrorToast(getApiErrorMessage(error, "Failed to commit changes"), { id: VERSION_ACTION_TOAST_ID });
       }
     }
   }, [
@@ -141,11 +142,11 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
           cancelPendingCanvasSaves,
           onCanvasDraftRestoredToCommitted,
         });
-        showSuccessToast("Reverted to last commit");
+        showSuccessToast("Reverted to last commit", { id: VERSION_ACTION_TOAST_ID });
       });
     } catch (error) {
       if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
-        showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
+        showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"), { id: VERSION_ACTION_TOAST_ID });
       }
     }
   }, [

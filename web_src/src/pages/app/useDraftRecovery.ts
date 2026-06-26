@@ -10,6 +10,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { recoverIfDraftMissing as resolveMissingDraftRecovery } from "./lib/draft-missing-recovery";
 import { exitDraftToLive } from "./lib/exit-draft-to-live";
 import { publishDraftVersionAndExit } from "./lib/publish-draft-flow";
+import { VERSION_ACTION_TOAST_ID } from "./lib/version-action-toast";
 import type { RefreshLatestLiveCanvasDataOptions } from "./useRefreshLatestLiveCanvasData";
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
@@ -87,7 +88,7 @@ export function useDraftRecovery({
     async (versionId: string, message = "This draft no longer exists. Returned to the live canvas.") => {
       cancelPendingCanvasSaves?.();
       await runExitDraftToLive(versionId);
-      showInfoToast(message);
+      showInfoToast(message, { id: VERSION_ACTION_TOAST_ID });
     },
     [cancelPendingCanvasSaves, runExitDraftToLive],
   );
@@ -125,7 +126,7 @@ export function useDraftRecovery({
         recoverFromMissingDraft,
       });
       if (result.status === "published") {
-        showSuccessToast("Version published");
+        showSuccessToast("Version published", { id: VERSION_ACTION_TOAST_ID });
         return;
       }
       if (result.status === "failed") {
@@ -134,6 +135,7 @@ export function useDraftRecovery({
         }
         showErrorToast(
           getUsageLimitToastMessage(result.error, getApiErrorMessage(result.error, "Failed to publish version")),
+          { id: VERSION_ACTION_TOAST_ID },
         );
       }
     } finally {
