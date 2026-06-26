@@ -162,6 +162,18 @@ and status without downloading the full response payload.
   - **Plain Text**: Raw text content
   - **XML**: XML formatted content
 
+## Inline Secrets
+
+The URL, query-param values, form-data values, and the body (JSON string values,
+plain text, XML) accept inline organization-secret references using the form:
+
+` + "`" + `{{ secrets.SECRET_NAME.KEY_NAME }}` + "`" + `
+
+Secrets are resolved at request time and the resolved value never appears in the
+stored execution configuration or logs. Secret names and keys containing a
+literal ` + "`" + `.` + "`" + ` cannot be used inline; configure those through the Authorization
+section (Bearer token / Basic Auth password / custom header value) instead.
+
 ## Response Handling
 
 The component emits the response with:
@@ -324,6 +336,108 @@ func resolveAuthorizationSecret(secrets core.SecretsContext, name string, ref co
 	}
 
 	return value, nil
+}
+
+// resolveSpecSecrets returns a copy of spec with every {{ secrets.NAME.KEY }}
+// placeholder in the URL, query-param values, form-data values, and the body
+// (json/text/xml) replaced by the corresponding organization secret value.
+// The input spec is not mutated and its pointer fields (slices, body payload)
+// are reallocated when resolution actually occurs, so callers can safely reuse
+// the original spec (for example, between retries) without leaking resolved
+// values back into the persisted execution configuration.
+func resolveSpecSecrets(secrets core.SecretsContext, spec Spec) (Spec, error) {
+	if secrets == nil {
+		return spec, nil
+	}
+
+	resolved := spec
+
+	if spec.URL != "" {
+		url, err := configuration.ResolveSecretReferences(spec.URL, secrets.GetKey)
+		if err != nil {
+			return Spec{}, fmt.Errorf("url: %w", err)
+		}
+		resolved.URL = url
+	}
+
+	if spec.QueryParams != nil {
+		params := make([]KeyValue, len(*spec.QueryParams))
+		for i, p := range *spec.QueryParams {
+			value, err := configuration.ResolveSecretReferences(p.Value, secrets.GetKey)
+			if err != nil {
+				return Spec{}, fmt.Errorf("queryParams[%d]: %w", i, err)
+			}
+			params[i] = KeyValue{Key: p.Key, Value: value}
+		}
+		resolved.QueryParams = &params
+	}
+
+	if spec.FormData != nil {
+		formData := make([]KeyValue, len(*spec.FormData))
+		for i, kv := range *spec.FormData {
+			value, err := configuration.ResolveSecretReferences(kv.Value, secrets.GetKey)
+			if err != nil {
+				return Spec{}, fmt.Errorf("formData[%d]: %w", i, err)
+			}
+			formData[i] = KeyValue{Key: kv.Key, Value: value}
+		}
+		resolved.FormData = &formData
+	}
+
+	if spec.Text != nil {
+		text, err := configuration.ResolveSecretReferences(*spec.Text, secrets.GetKey)
+		if err != nil {
+			return Spec{}, fmt.Errorf("text: %w", err)
+		}
+		resolved.Text = &text
+	}
+
+	if spec.XML != nil {
+		xml, err := configuration.ResolveSecretReferences(*spec.XML, secrets.GetKey)
+		if err != nil {
+			return Spec{}, fmt.Errorf("xml: %w", err)
+		}
+		resolved.XML = &xml
+	}
+
+	if spec.JSON != nil {
+		payload, err := resolveJSONSecrets(secrets, *spec.JSON)
+		if err != nil {
+			return Spec{}, fmt.Errorf("json: %w", err)
+		}
+		resolved.JSON = &payload
+	}
+
+	return resolved, nil
+}
+
+func resolveJSONSecrets(secrets core.SecretsContext, value any) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return configuration.ResolveSecretReferences(v, secrets.GetKey)
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, child := range v {
+			resolved, err := resolveJSONSecrets(secrets, child)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", key, err)
+			}
+			out[key] = resolved
+		}
+		return out, nil
+	case []any:
+		out := make([]any, len(v))
+		for i, child := range v {
+			resolved, err := resolveJSONSecrets(secrets, child)
+			if err != nil {
+				return nil, fmt.Errorf("[%d]: %w", i, err)
+			}
+			out[i] = resolved
+		}
+		return out, nil
+	default:
+		return value, nil
+	}
 }
 
 func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
@@ -836,9 +950,18 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 }
 
 func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
+	// Preserve the masked URL (still containing any {{ secrets.NAME.KEY }}
+	// placeholders) for logging, so resolved secret values never reach logs.
+	maskedURL := spec.URL
+
+	resolvedSpec, err := resolveSpecSecrets(secrets, spec)
+	if err != nil {
+		return nil, fmt.Errorf("resolve secrets: %w", err)
+	}
+	spec = resolvedSpec
+
 	var body io.Reader
 	var contentType string
-	var err error
 	if spec.ContentType != nil && (spec.Method == "POST" || spec.Method == "PUT" || spec.Method == "PATCH") {
 		body, contentType, err = e.serializePayload(spec)
 		if err != nil {
@@ -884,7 +1007,7 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 		return nil, err
 	}
 
-	logger.Infof("[%s] %s", spec.Method, spec.URL)
+	logger.Infof("[%s] %s", spec.Method, maskedURL)
 	resp, err := httpCtx.Do(req)
 	if err != nil {
 		if reqCtx.Err() == context.DeadlineExceeded {
