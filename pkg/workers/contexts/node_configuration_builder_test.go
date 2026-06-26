@@ -1202,6 +1202,36 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_KnownNodeWithoutExecutionResolvesNil(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	node1 := "node-1"
+	node2 := "node-2"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
+			{NodeID: node2, Name: node2, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&execution1.ID).
+		WithInput(map[string]any{})
+
+	result, err := builder.ResolveExpression(`$["node-2"] == nil ? "missing" : "present"`)
+
+	require.NoError(t, err)
+	assert.Equal(t, "missing", result)
+}
+
 func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

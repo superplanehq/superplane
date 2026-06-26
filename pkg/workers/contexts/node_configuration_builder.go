@@ -840,7 +840,8 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	for nodeRef, nodeID := range chainRefs {
 		execution, ok := executionByNode[nodeID]
 		if !ok {
-			return fmt.Errorf("node %s not found in execution chain", nodeRef)
+			messageChain[nodeRef] = nil
+			continue
 		}
 		executionIDs = append(executionIDs, execution.ID)
 		executionIDByRef[nodeRef] = execution.ID
