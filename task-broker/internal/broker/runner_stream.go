@@ -88,6 +88,10 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 		lease = 5 * time.Minute
 	}
 	s.recordRunnerConnectedSpinup(r.Context(), fleetID, hello.LaunchRequestedAt)
+	if s.RunnerDrain != nil {
+		unregister := s.RunnerDrain.Register(runnerID, fleetID, conn)
+		defer unregister()
+	}
 
 	notifyCh := s.TaskNotify.Register()
 	defer s.TaskNotify.Unregister(notifyCh)
@@ -97,12 +101,34 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	for {
+		if s.RunnerDrain != nil && s.RunnerDrain.IsDraining(runnerID) {
+			if s.Log != nil {
+				s.Log.Info("runner_stream_drained",
+					slog.String("runner_id", runnerID),
+					slog.String("fleet_id", fleetID))
+			}
+			return
+		}
+		if s.RunnerDrain != nil && !s.RunnerDrain.TryStartClaim(runnerID) {
+			if s.Log != nil {
+				s.Log.Info("runner_stream_drained",
+					slog.String("runner_id", runnerID),
+					slog.String("fleet_id", fleetID))
+			}
+			return
+		}
 		task, err := s.Store.ClaimTask(ctx, runnerID, fleetID, lease)
 		if err != nil {
+			if s.RunnerDrain != nil {
+				s.RunnerDrain.FinishClaim(runnerID, "")
+			}
 			_ = writeWSError(writeMu, conn, http.StatusInternalServerError, "could not claim task")
 			return
 		}
 		if task != nil {
+			if s.RunnerDrain != nil {
+				s.RunnerDrain.FinishClaim(runnerID, task.ID)
+			}
 			s.recordTaskStartLatency(ctx, task)
 			if s.Log != nil {
 				s.Log.Info("task_claimed",
@@ -112,13 +138,22 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 				)
 			}
 			if err := s.runnerStreamOneTask(conn, ctx, task, runnerID, writeMu); err != nil {
+				if s.RunnerDrain != nil {
+					s.RunnerDrain.CompleteTask(runnerID, task.ID)
+				}
 				return
+			}
+			if s.RunnerDrain != nil {
+				s.RunnerDrain.CompleteTask(runnerID, task.ID)
 			}
 			if hello.OneShot {
 				return
 			}
 			_ = conn.SetReadDeadline(time.Now().Add(runnerStreamReadIdle))
 			continue
+		}
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.FinishClaim(runnerID, "")
 		}
 
 		select {

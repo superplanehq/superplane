@@ -60,6 +60,91 @@ func TestFleetTaskCounts_BadInput(t *testing.T) {
 	}
 }
 
+func TestDrainRunners_OK(t *testing.T) {
+	var gotMethod, gotPath, gotAuth string
+	var gotBody api.DrainRunnersRequest
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(api.DrainRunnersResponse{
+			Runners: []api.DrainRunnerStatus{
+				{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
+				{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
+			},
+		})
+	}))
+	defer ts.Close()
+
+	c := New(ts.URL, "tok")
+	out, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
+		FleetID:   "fleet-a",
+		RunnerIDs: []string{"i-idle", "i-busy"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v1/runners/drain" {
+		t.Fatalf("method/path: %s %q", gotMethod, gotPath)
+	}
+	if gotAuth != "Bearer tok" {
+		t.Fatalf("auth: %q", gotAuth)
+	}
+	if gotBody.FleetID != "fleet-a" || len(gotBody.RunnerIDs) != 2 {
+		t.Fatalf("body: %#v", gotBody)
+	}
+	if len(out.Runners) != 2 {
+		t.Fatalf("runners: %#v", out)
+	}
+	if out.Runners[0].RunnerID != "i-idle" || out.Runners[0].State != api.DrainRunnerStateDrained {
+		t.Fatalf("first runner: %#v", out.Runners[0])
+	}
+	if out.Runners[1].RunnerID != "i-busy" || out.Runners[1].State != api.DrainRunnerStateBusy || out.Runners[1].ActiveTaskID != "task-1" {
+		t.Fatalf("second runner: %#v", out.Runners[1])
+	}
+}
+
+func TestDrainRunners_NonOK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":"runner drain unavailable"}`))
+	}))
+	defer ts.Close()
+
+	c := New(ts.URL, "tok")
+	if _, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
+		FleetID:   "fleet-a",
+		RunnerIDs: []string{"i-idle"},
+	}); err == nil {
+		t.Fatal("expected error for non-2xx drain response")
+	}
+}
+
+func TestDrainRunners_BadInput(t *testing.T) {
+	c := New("http://example", "tok")
+	if _, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
+		RunnerIDs: []string{"i-idle"},
+	}); err == nil {
+		t.Fatal("expected error for empty fleet id")
+	}
+	if _, err := c.DrainRunners(context.Background(), api.DrainRunnersRequest{
+		FleetID: "fleet-a",
+	}); err == nil {
+		t.Fatal("expected error for empty runner ids")
+	}
+	empty := New("", "tok")
+	if _, err := empty.DrainRunners(context.Background(), api.DrainRunnersRequest{
+		FleetID:   "fleet-a",
+		RunnerIDs: []string{"i-idle"},
+	}); err == nil {
+		t.Fatal("expected error for empty base url")
+	}
+}
+
 func TestRegisterFleet_OK(t *testing.T) {
 	var gotMethod, gotPath, gotAuth string
 	var gotBody api.RegisterFleetRequest

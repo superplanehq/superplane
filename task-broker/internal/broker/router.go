@@ -18,6 +18,10 @@ type RouterOptions struct {
 
 // NewRouter builds chi routes for task-broker.
 func NewRouter(s *Server, opt RouterOptions) http.Handler {
+	if s.RunnerDrain == nil {
+		s.RunnerDrain = NewRunnerDrainHub()
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -55,6 +59,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/tasks/{id}", s.getTask)
 			r.Post("/tasks/{id}/cancel", s.cancelTask)
 			r.Post("/tasks/{id}/complete", s.completeTask)
+			r.Post("/runners/drain", s.drainRunners)
 			r.Get("/runners/stream", s.runnerStream)
 		})
 	})

@@ -31,6 +31,7 @@ import (
 
 type TaskCountsClient interface {
 	FleetTaskCounts(ctx context.Context, fleetID string) (api.FleetTaskCountsResponse, error)
+	DrainRunners(ctx context.Context, req api.DrainRunnersRequest) (api.DrainRunnersResponse, error)
 }
 
 // Launcher calls EC2 RunInstances with a deterministic cloud-init user-data starter.

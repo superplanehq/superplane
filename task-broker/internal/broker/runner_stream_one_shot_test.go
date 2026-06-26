@@ -1,7 +1,10 @@
 package broker
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
@@ -122,6 +125,49 @@ func TestOneShotRunnerReceivesExactlyOneTask(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, queued, "second task should remain queued, not claimed by the one-shot runner")
+}
+
+func TestDrainedRunnerDoesNotReceiveQueuedTask(t *testing.T) {
+	ts, st := oneShotBrokerSetup(t)
+	ctx := context.Background()
+
+	queueTask(t, ctx, st, "fleet-1", "echo task-1")
+
+	body, err := json.Marshal(api.DrainRunnersRequest{
+		FleetID:   "fleet-1",
+		RunnerIDs: []string{"i-drained"},
+	})
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/runners/drain", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var drainResp api.DrainRunnersResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&drainResp))
+	require.Len(t, drainResp.Runners, 1)
+	require.Equal(t, api.DrainRunnerStateDrained, drainResp.Runners[0].State)
+
+	conn := dialWS(t, ts)
+	require.NoError(t, conn.WriteJSON(wsrunner.Hello{
+		Type:         wsrunner.TypeHello,
+		RunnerID:     "i-drained",
+		FleetID:      "fleet-1",
+		LeaseSeconds: 300,
+	}))
+
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_, _, err = conn.ReadMessage()
+	require.Error(t, err, "drained runner should be disconnected before receiving a task")
+
+	tasks, err := st.ListActiveTasks(ctx)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	require.Equal(t, models.StatusQueued, tasks[0].Status)
+	require.Empty(t, tasks[0].RunnerID)
 }
 
 // TestMultiShotRunnerReceivesMultipleTasks verifies that a normal (non-one-shot) runner

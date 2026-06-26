@@ -5,21 +5,32 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/superplane/runner/shared/api"
 )
 
 type fakeBrokerClient struct {
-	counts api.FleetTaskCountsResponse
-	err    error
-	calls  int
-	gotID  string
+	counts       api.FleetTaskCountsResponse
+	err          error
+	drain        api.DrainRunnersResponse
+	drainErr     error
+	calls        int
+	drainCalls   int
+	gotID        string
+	drainRequest api.DrainRunnersRequest
 }
 
 func (f *fakeBrokerClient) FleetTaskCounts(_ context.Context, fleetID string) (api.FleetTaskCountsResponse, error) {
 	f.calls++
 	f.gotID = fleetID
 	return f.counts, f.err
+}
+
+func (f *fakeBrokerClient) DrainRunners(_ context.Context, req api.DrainRunnersRequest) (api.DrainRunnersResponse, error) {
+	f.drainCalls++
+	f.drainRequest = req
+	return f.drain, f.drainErr
 }
 
 func TestDesiredWant_HeadroomOff_UsesHotInstanceCount(t *testing.T) {
@@ -56,6 +67,68 @@ func TestDesiredWant_BrokerOK_QueuedPlusClaimedPlusHeadroom(t *testing.T) {
 	}
 	if fake.calls != 1 || fake.gotID != "fleet-a" {
 		t.Fatalf("broker call: calls=%d id=%q", fake.calls, fake.gotID)
+	}
+}
+
+func TestDesiredCapacity_BrokerOK_IncludesClaimedRunnerIDs(t *testing.T) {
+	fake := &fakeBrokerClient{counts: api.FleetTaskCountsResponse{
+		Queued:           2,
+		Claimed:          1,
+		ClaimedRunnerIDs: []string{"i-active"},
+	}}
+	l := &Launcher{
+		Config:       Config{Headroom: 1, RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got := l.desiredCapacity(context.Background())
+
+	if got.want != 4 {
+		t.Fatalf("want 4 (2 queued + 1 claimed + 1 headroom), got %d", got.want)
+	}
+	if len(got.claimedRunnerIDs) != 1 || got.claimedRunnerIDs[0] != "i-active" {
+		t.Fatalf("claimed runner ids: %#v", got.claimedRunnerIDs)
+	}
+}
+
+func TestDesiredCapacity_HeadroomOff_UsesHotCountWithClaimedRunnerIDs(t *testing.T) {
+	fake := &fakeBrokerClient{counts: api.FleetTaskCountsResponse{
+		Queued:           10,
+		Claimed:          4,
+		ClaimedRunnerIDs: []string{"i-active"},
+	}}
+	l := &Launcher{
+		Config:       Config{HotInstanceCount: 2, Headroom: 0, RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got := l.desiredCapacity(context.Background())
+
+	if got.want != 2 {
+		t.Fatalf("want hot count 2, got %d", got.want)
+	}
+	if !got.claimedRunnerIDsReliable {
+		t.Fatal("expected claimed runner ids to be reliable")
+	}
+	if len(got.claimedRunnerIDs) != 1 || got.claimedRunnerIDs[0] != "i-active" {
+		t.Fatalf("claimed runner ids: %#v", got.claimedRunnerIDs)
+	}
+}
+
+func TestDesiredCapacity_BrokerError_DisablesScaleDownProtection(t *testing.T) {
+	fake := &fakeBrokerClient{err: errors.New("boom")}
+	l := &Launcher{
+		Config:       Config{HotInstanceCount: 2, Headroom: 5, RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got := l.desiredCapacity(context.Background())
+
+	if got.want != 2 {
+		t.Fatalf("want fallback hot count 2, got %d", got.want)
+	}
+	if got.claimedRunnerIDsReliable {
+		t.Fatal("claimed runner ids should not be reliable after broker error")
 	}
 }
 
@@ -122,5 +195,74 @@ func TestTickAll_EmptyLauncherSliceIsNoOp(t *testing.T) {
 	tickAll(context.Background(), nil, []*Launcher{}, spy)
 	if called != 0 {
 		t.Errorf("expected 0 ticks, got %d", called)
+	}
+}
+
+func TestSelectExcessRunnerIDs_SkipsClaimedRunnersThenUsesOldestFirst(t *testing.T) {
+	base := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	instances := []managedInstance{
+		{id: "i-old-active", launchUTC: base},
+		{id: "i-old-idle", launchUTC: base.Add(1 * time.Minute)},
+		{id: "i-new-idle", launchUTC: base.Add(2 * time.Minute)},
+	}
+
+	got := selectExcessRunnerIDs(instances, []string{"i-old-active"}, 2)
+
+	if len(got) != 2 || got[0] != "i-old-idle" || got[1] != "i-new-idle" {
+		t.Fatalf("selected ids: got %#v want [i-old-idle i-new-idle]", got)
+	}
+}
+
+func TestSelectExcessRunnerIDs_LeavesCapacityWhenOnlyClaimedRunnersRemain(t *testing.T) {
+	base := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	instances := []managedInstance{
+		{id: "i-active-1", launchUTC: base},
+		{id: "i-active-2", launchUTC: base.Add(1 * time.Minute)},
+	}
+
+	got := selectExcessRunnerIDs(instances, []string{"i-active-1", "i-active-2"}, 1)
+
+	if len(got) != 0 {
+		t.Fatalf("selected ids: got %#v want none", got)
+	}
+}
+
+func TestDrainTerminationCandidates_ReturnsOnlyBrokerDrainedRunners(t *testing.T) {
+	fake := &fakeBrokerClient{drain: api.DrainRunnersResponse{
+		Runners: []api.DrainRunnerStatus{
+			{RunnerID: "i-idle", State: api.DrainRunnerStateDrained},
+			{RunnerID: "i-busy", State: api.DrainRunnerStateBusy, ActiveTaskID: "task-1"},
+		},
+	}}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	got, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle", "i-busy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != 1 || got[0] != "i-idle" {
+		t.Fatalf("drained ids: got %#v want [i-idle]", got)
+	}
+	if fake.drainCalls != 1 {
+		t.Fatalf("drain calls = %d, want 1", fake.drainCalls)
+	}
+	if fake.drainRequest.FleetID != "fleet-a" || len(fake.drainRequest.RunnerIDs) != 2 {
+		t.Fatalf("drain request: %#v", fake.drainRequest)
+	}
+}
+
+func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T) {
+	fake := &fakeBrokerClient{drainErr: errors.New("broker down")}
+	l := &Launcher{
+		Config:       Config{RunnerFleetID: "fleet-a"},
+		BrokerClient: fake,
+	}
+
+	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}); err == nil {
+		t.Fatal("expected drain error")
 	}
 }

@@ -173,6 +173,49 @@ func TestPostgresStoreCountTasksByFleet(t *testing.T) {
 	}
 }
 
+func TestPostgresStoreClaimedRunnerIDsByFleet(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	create := func(id, fleetID string, status models.TaskStatus, runnerID string) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    fleetID,
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  now,
+			RunnerID:   runnerID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("claimed-1", "fleet-a", models.StatusClaimed, "i-aaa")
+	create("claimed-2", "fleet-a", models.StatusClaimed, "i-bbb")
+	create("claimed-same-runner", "fleet-a", models.StatusClaimed, "i-aaa")
+	create("claimed-empty-runner", "fleet-a", models.StatusClaimed, "")
+	create("queued", "fleet-a", models.StatusQueued, "i-queued")
+	create("other-fleet", "fleet-b", models.StatusClaimed, "i-other")
+	create("done", "fleet-a", models.StatusSucceeded, "i-done")
+
+	got, err := st.ClaimedRunnerIDsByFleet(ctx, "fleet-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != "i-aaa" || got[1] != "i-bbb" {
+		t.Fatalf("claimed runner ids: got %#v want [i-aaa i-bbb]", got)
+	}
+
+	if _, err := st.ClaimedRunnerIDsByFleet(ctx, ""); err == nil {
+		t.Fatalf("expected error for empty fleet id")
+	}
+}
+
 func TestPostgresStoreListActiveTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
