@@ -23,6 +23,7 @@ type CreateFirewallSpec struct {
 	TargetType            string             `mapstructure:"targetType"`
 	SourceFilterType      string             `mapstructure:"sourceFilterType"`
 	Priority              *int               `mapstructure:"priority"`
+	ProtocolsAndPorts     string             `mapstructure:"protocolsAndPorts"`
 	Rules                 []FirewallRuleSpec `mapstructure:"rules"`
 	SourceRanges          []string           `mapstructure:"sourceRanges"`
 	DestinationRanges     []string           `mapstructure:"destinationRanges"`
@@ -68,7 +69,7 @@ func (c *CreateFirewall) Documentation() string {
 - **Direction**: ` + "`INGRESS`" + ` (incoming, default) or ` + "`EGRESS`" + ` (outgoing)
 - **Action**: ` + "`allow`" + ` (default) or ` + "`deny`" + ` the matched traffic
 - **Priority**: 0–65535; lower numbers win (default 1000)
-- **Protocols & ports**: One or more protocol/ports entries (e.g. ` + "`tcp`" + ` with ports ` + "`80, 443`" + `). Leave ports empty to match all ports for that protocol; use ` + "`all`" + ` to match every protocol
+- **Protocols and ports**: *Specified protocols and ports* (default) lists protocol/ports entries (e.g. ` + "`tcp`" + ` with ports ` + "`80, 443`" + `; leave ports empty to match all ports of that protocol). *All protocols and ports* matches every protocol/port and hides the list
 - **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
 - **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, ` + "`0.0.0.0/0`" + `), *Source tags*, or *Service accounts*. Choosing one reveals its input
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
@@ -157,12 +158,30 @@ func (c *CreateFirewall) Configuration() []configuration.Field {
 			Description: "Rule priority (0-65535). Lower numbers take precedence.",
 		},
 		{
+			Name:        "protocolsAndPorts",
+			Label:       "Protocols and ports",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallProtocolsSpecified,
+			Description: "Match a specific list of protocols/ports, or all protocols and ports.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "Specified protocols and ports", Value: FirewallProtocolsSpecified},
+				{Label: "All protocols and ports", Value: FirewallProtocolsAll},
+			}}},
+		},
+		{
 			Name:        "rules",
 			Label:       "Protocols & ports",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
+			Required:    false,
 			Description: "Protocols (and optional ports) the rule matches. Leave ports empty to match all ports; use protocol \"all\" to match every protocol.",
 			Default:     []map[string]any{{"protocol": "tcp", "ports": ""}},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "protocolsAndPorts", Values: []string{FirewallProtocolsSpecified}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "protocolsAndPorts", Values: []string{FirewallProtocolsSpecified}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Protocol",
@@ -412,8 +431,10 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return err
 	}
-	if _, err := buildFirewallRules(spec.Rules); err != nil {
-		return err
+	if !strings.EqualFold(strings.TrimSpace(spec.ProtocolsAndPorts), FirewallProtocolsAll) {
+		if _, err := buildFirewallRules(spec.Rules); err != nil {
+			return err
+		}
 	}
 	if _, err := normalizeFirewallLogMetadata(spec.LogMetadata); err != nil {
 		return err
@@ -454,9 +475,14 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
-	rules, err := buildFirewallRules(spec.Rules)
-	if err != nil {
-		return ctx.ExecutionState.Fail("error", err.Error())
+	var rules []map[string]any
+	if strings.EqualFold(strings.TrimSpace(spec.ProtocolsAndPorts), FirewallProtocolsAll) {
+		rules = allProtocolsRule()
+	} else {
+		rules, err = buildFirewallRules(spec.Rules)
+		if err != nil {
+			return ctx.ExecutionState.Fail("error", err.Error())
+		}
 	}
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())

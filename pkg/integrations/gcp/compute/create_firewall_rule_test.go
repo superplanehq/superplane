@@ -577,4 +577,37 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		assert.NotContains(t, postBody, "targetTags")
 		assert.NotContains(t, postBody, "targetServiceAccounts")
 	})
+
+	t.Run("protocolsAndPorts=all sends the match-everything rule (no rules list)", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				postBody = body.(map[string]any)
+				return opDone("op-create"), nil
+			},
+			getFunc: firewallExecGet("op-create", firewallGetJSON("allow-all-proto", "INGRESS", "allow")),
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":              "allow-all-proto",
+				"network":           "default",
+				"direction":         "INGRESS",
+				"action":            "allow",
+				"protocolsAndPorts": "all",
+				// no rules list provided
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		allowed := postBody["allowed"].([]map[string]any)
+		require.Len(t, allowed, 1)
+		assert.Equal(t, "all", allowed[0]["IPProtocol"])
+		assert.NotContains(t, allowed[0], "ports")
+	})
 }

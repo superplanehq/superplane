@@ -42,7 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Compute • Delete Load Balancer" href="#compute-•-delete-load-balancer" description="Delete a regional external passthrough Network Load Balancer and its backend service and health check" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
-  <LinkCard title="Compute • Update Firewall Rule" href="#compute-•-update-firewall-rule" description="Update a VPC firewall rule: its protocols and ports, ranges, priority, target tags, description, or enabled state" />
+  <LinkCard title="Compute • Update Firewall Rule" href="#compute-•-update-firewall-rule" description="Update a VPC firewall rule: its protocols and ports, ranges, priority, targets and source filters, description, or enabled state" />
   <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
   <LinkCard title="Compute • Delete Image" href="#compute-•-delete-image" description="Permanently delete a Google Compute Engine custom image" />
@@ -1134,7 +1134,7 @@ The Create Firewall Rule component creates a VPC firewall rule that controls tra
 - **Direction**: `INGRESS` (incoming, default) or `EGRESS` (outgoing)
 - **Action**: `allow` (default) or `deny` the matched traffic
 - **Priority**: 0–65535; lower numbers win (default 1000)
-- **Protocols & ports**: One or more protocol/ports entries (e.g. `tcp` with ports `80, 443`). Leave ports empty to match all ports for that protocol; use `all` to match every protocol
+- **Protocols and ports**: *Specified protocols and ports* (default) lists protocol/ports entries (e.g. `tcp` with ports `80, 443`; leave ports empty to match all ports of that protocol). *All protocols and ports* matches every protocol/port and hides the list
 - **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
 - **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, `0.0.0.0/0`), *Source tags*, or *Service accounts*. Choosing one reveals its input
 - **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`)
@@ -1502,12 +1502,12 @@ Returns the instance state after the operation:
 
 **Component key:** `gcp.compute.updateFirewallRule`
 
-The Update Firewall Rule component changes an existing VPC firewall rule. Toggle on only the fields you want to change; everything else is left untouched.
+The Update Firewall Rule component changes an existing VPC firewall rule. For priority, protocols/ports, ranges, and description, toggle on only the fields you want to change; everything else is left untouched. **Targets** and **Source filter** are dropdowns that default to **"No change."**
 
 ### Use Cases
 
 - **Adjust access**: Change the allowed/denied protocols and ports
-- **Widen or narrow scope**: Update the source/destination CIDR ranges or target tags
+- **Widen or narrow scope**: Update the source/destination CIDR ranges or the targets
 - **Re-prioritize**: Change the rule's priority
 - **Pause a rule**: Disable a rule without deleting it, then re-enable it later
 
@@ -1516,14 +1516,14 @@ The Update Firewall Rule component changes an existing VPC firewall rule. Toggle
 - **Firewall rule**: The firewall rule to update (required)
 - **Enabled state**: Leave unchanged, enable, or disable the rule
 - **Priority**: New priority (0-65535); lower numbers take precedence
-- **Protocols & ports**: Replace the rule's protocols/ports. The rule keeps its existing action (allow or deny)
-- **Ranges**: Replace the rule's CIDR ranges. Applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed)
-- **Target tags / Target service accounts**: Replace the VMs the rule applies to
-- **Source tags / Source service accounts**: Replace the rule's source filters (INGRESS rules only)
+- **Protocols and ports**: "No change", "Specified protocols and ports" (replace with a list), or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges**: Replace the rule's CIDR ranges. Independent of the **Source filter** dropdown; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). `sourceRanges` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets**: "No change" (leave current targets), "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both.
+- **Source filter (INGRESS only)**: "No change" (leave source tags/service accounts), "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Choosing anything but "No change" on an EGRESS rule is rejected.
 - **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
 - **Description**: Replace the rule's description
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both. Because an unchanged targeting field keeps its current value, switching a rule from one to the other means setting the new field **and** clearing the old one in the same update — the component rejects an update whose result would mix them.
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is now a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
 
 ### Output
 

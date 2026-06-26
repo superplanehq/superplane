@@ -34,7 +34,19 @@ const (
 	// Shared tag/service-account selectors for both target type and source filter.
 	FirewallFilterTags            = "tags"
 	FirewallFilterServiceAccounts = "serviceAccounts"
+
+	// Protocols & ports mode — mirrors the GCP Console radio: match a specific
+	// list of protocols/ports, or all of them.
+	FirewallProtocolsSpecified = "specified"
+	FirewallProtocolsAll       = "all"
 )
+
+// allProtocolsRule is the single allowed/denied entry that matches every
+// protocol and port (the "all protocols and ports" mode). The Compute API
+// represents "all" as a protocol named "all" with no ports.
+func allProtocolsRule() []map[string]any {
+	return []map[string]any{{"IPProtocol": "all"}}
+}
 
 // FirewallRuleSpec is one protocol/ports entry of a firewall rule, configured as
 // a list item. It maps to a single element of the Compute Engine `allowed` or
@@ -314,15 +326,6 @@ func splitFirewallPorts(value string) []string {
 		}
 	}
 	return out
-}
-
-// providedList returns the trimmed contents of an optional (togglable) list
-// field, or nil when the field was not toggled on (a nil pointer).
-func providedList(p *[]string) []string {
-	if p == nil {
-		return nil
-	}
-	return trimList(*p)
 }
 
 // mergeDedup concatenates already-trimmed string lists, dropping duplicates and

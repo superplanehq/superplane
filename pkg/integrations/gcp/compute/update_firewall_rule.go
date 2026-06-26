@@ -21,6 +21,12 @@ const (
 	FirewallEnabledNoChange = "NO_CHANGE"
 	FirewallEnabledEnabled  = "ENABLED"
 	FirewallEnabledDisabled = "DISABLED"
+
+	// FirewallTargetingNoChange is the "leave this side's targeting untouched"
+	// sentinel for the targetType / sourceFilterType selects. It shares the same
+	// wire value as FirewallEnabledNoChange because empty select option values are
+	// forbidden by the frontend Radix select.
+	FirewallTargetingNoChange = "NO_CHANGE"
 )
 
 type UpdateFirewall struct{}
@@ -29,14 +35,17 @@ type UpdateFirewallSpec struct {
 	Firewall                    string             `mapstructure:"firewall"`
 	EnabledState                string             `mapstructure:"enabledState"`
 	Priority                    *int               `mapstructure:"priority"`
+	ProtocolsAndPorts           string             `mapstructure:"protocolsAndPorts"`
 	Rules                       []FirewallRuleSpec `mapstructure:"rules"`
 	Ranges                      []string           `mapstructure:"ranges"`
-	TargetTags                  *[]string          `mapstructure:"targetTags"`
-	SourceTags                  *[]string          `mapstructure:"sourceTags"`
-	TargetServiceAccounts       *[]string          `mapstructure:"targetServiceAccounts"`
-	SourceServiceAccounts       *[]string          `mapstructure:"sourceServiceAccounts"`
-	TargetServiceAccountsCustom *[]string          `mapstructure:"targetServiceAccountsCustom"`
-	SourceServiceAccountsCustom *[]string          `mapstructure:"sourceServiceAccountsCustom"`
+	TargetType                  string             `mapstructure:"targetType"`
+	TargetTags                  []string           `mapstructure:"targetTags"`
+	TargetServiceAccounts       []string           `mapstructure:"targetServiceAccounts"`
+	TargetServiceAccountsCustom []string           `mapstructure:"targetServiceAccountsCustom"`
+	SourceFilterType            string             `mapstructure:"sourceFilterType"`
+	SourceTags                  []string           `mapstructure:"sourceTags"`
+	SourceServiceAccounts       []string           `mapstructure:"sourceServiceAccounts"`
+	SourceServiceAccountsCustom []string           `mapstructure:"sourceServiceAccountsCustom"`
 	Logging                     string             `mapstructure:"logging"`
 	LogMetadata                 string             `mapstructure:"logMetadata"`
 	Description                 *string            `mapstructure:"description"`
@@ -51,16 +60,16 @@ func (u *UpdateFirewall) Label() string {
 }
 
 func (u *UpdateFirewall) Description() string {
-	return "Update a VPC firewall rule: its protocols and ports, ranges, priority, target tags, description, or enabled state"
+	return "Update a VPC firewall rule: its protocols and ports, ranges, priority, targets and source filters, description, or enabled state"
 }
 
 func (u *UpdateFirewall) Documentation() string {
-	return `The Update Firewall Rule component changes an existing VPC firewall rule. Toggle on only the fields you want to change; everything else is left untouched.
+	return `The Update Firewall Rule component changes an existing VPC firewall rule. For priority, protocols/ports, ranges, and description, toggle on only the fields you want to change; everything else is left untouched. **Targets** and **Source filter** are dropdowns that default to **"No change."**
 
 ## Use Cases
 
 - **Adjust access**: Change the allowed/denied protocols and ports
-- **Widen or narrow scope**: Update the source/destination CIDR ranges or target tags
+- **Widen or narrow scope**: Update the source/destination CIDR ranges or the targets
 - **Re-prioritize**: Change the rule's priority
 - **Pause a rule**: Disable a rule without deleting it, then re-enable it later
 
@@ -69,14 +78,14 @@ func (u *UpdateFirewall) Documentation() string {
 - **Firewall rule**: The firewall rule to update (required)
 - **Enabled state**: Leave unchanged, enable, or disable the rule
 - **Priority**: New priority (0-65535); lower numbers take precedence
-- **Protocols & ports**: Replace the rule's protocols/ports. The rule keeps its existing action (allow or deny)
-- **Ranges**: Replace the rule's CIDR ranges. Applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed)
-- **Target tags / Target service accounts**: Replace the VMs the rule applies to
-- **Source tags / Source service accounts**: Replace the rule's source filters (INGRESS rules only)
+- **Protocols and ports**: "No change", "Specified protocols and ports" (replace with a list), or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges**: Replace the rule's CIDR ranges. Independent of the **Source filter** dropdown; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). ` + "`sourceRanges`" + ` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets**: "No change" (leave current targets), "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both.
+- **Source filter (INGRESS only)**: "No change" (leave source tags/service accounts), "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Choosing anything but "No change" on an EGRESS rule is rejected.
 - **Logs**: Leave Firewall Rules Logging unchanged, or turn it on/off (with optional metadata)
 - **Description**: Replace the rule's description
 
-> A firewall rule filters by **network tags** or by **service accounts**, never both. Because an unchanged targeting field keeps its current value, switching a rule from one to the other means setting the new field **and** clearing the old one in the same update — the component rejects an update whose result would mix them.
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is now a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
 
 ## Output
 
@@ -138,12 +147,30 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Description: "New rule priority (0-65535). Lower numbers take precedence.",
 		},
 		{
+			Name:        "protocolsAndPorts",
+			Label:       "Protocols and ports",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallTargetingNoChange,
+			Description: "Leave the rule's protocols/ports unchanged, replace them with a specified list, or match all protocols and ports.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "No change", Value: FirewallTargetingNoChange},
+				{Label: "Specified protocols and ports", Value: FirewallProtocolsSpecified},
+				{Label: "All protocols and ports", Value: FirewallProtocolsAll},
+			}}},
+		},
+		{
 			Name:        "rules",
 			Label:       "Protocols & ports",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Togglable:   true,
 			Description: "Replace the rule's protocols/ports. Leave ports empty to match all ports; use protocol \"all\" to match every protocol. The rule keeps its existing allow/deny action.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "protocolsAndPorts", Values: []string{FirewallProtocolsSpecified}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "protocolsAndPorts", Values: []string{FirewallProtocolsSpecified}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Protocol",
@@ -187,11 +214,24 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "targetType",
+			Label:       "Targets",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallTargetingNoChange,
+			Description: "Change which instances the rule applies to. \"No change\" leaves the current targets untouched. Switching to tags or service accounts clears the other automatically (a rule cannot use both).",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "No change", Value: FirewallTargetingNoChange},
+				{Label: "All instances in the network", Value: FirewallTargetAll},
+				{Label: "Specified target tags", Value: FirewallFilterTags},
+				{Label: "Specified service accounts", Value: FirewallFilterServiceAccounts},
+			}}},
+		},
+		{
 			Name:        "targetTags",
 			Label:       "Target tags",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Togglable:   true,
 			Description: "Replace the rule's target tags (the VMs it applies to).",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -199,17 +239,22 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
 				},
 			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterTags}},
+			},
 		},
 		{
 			Name:        "targetServiceAccounts",
 			Label:       "Target service accounts",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Togglable:   true,
 			Description: "Replace the rule's target service accounts. Cannot be combined with network tags.",
 			Placeholder: "Select service accounts",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterServiceAccounts}},
 			},
 		},
 		{
@@ -217,7 +262,6 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Target service accounts (custom / cross-project)",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Togglable:   true,
 			Description: "Additional target service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -225,13 +269,29 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
 				},
 			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "targetType", Values: []string{FirewallFilterServiceAccounts}},
+			},
+		},
+		{
+			Name:        "sourceFilterType",
+			Label:       "Source filter",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     FirewallTargetingNoChange,
+			Description: "Change how incoming traffic is matched — INGRESS rules only. \"No change\" leaves source tags/service accounts untouched; \"IP ranges only\" clears them (CIDR ranges are edited in the Source / destination ranges field above). Choosing any value other than \"No change\" on an EGRESS rule is rejected.",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				{Label: "No change", Value: FirewallTargetingNoChange},
+				{Label: "IP ranges only", Value: FirewallSourceRanges},
+				{Label: "Source tags", Value: FirewallFilterTags},
+				{Label: "Source service accounts", Value: FirewallFilterServiceAccounts},
+			}}},
 		},
 		{
 			Name:        "sourceTags",
 			Label:       "Source tags",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Togglable:   true,
 			Description: "Replace the rule's source tags (INGRESS rules only).",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -239,17 +299,22 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
 				},
 			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "sourceFilterType", Values: []string{FirewallFilterTags}},
+			},
 		},
 		{
 			Name:        "sourceServiceAccounts",
 			Label:       "Source service accounts",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Togglable:   true,
 			Description: "Replace the rule's source service accounts (INGRESS rules only). Cannot be combined with network tags.",
 			Placeholder: "Select service accounts",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeServiceAccount, Multi: true},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "sourceFilterType", Values: []string{FirewallFilterServiceAccounts}},
 			},
 		},
 		{
@@ -257,13 +322,15 @@ func (u *UpdateFirewall) Configuration() []configuration.Field {
 			Label:       "Source service accounts (custom / cross-project)",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Togglable:   true,
 			Description: "Additional source service-account emails not shown in the dropdown (e.g. from another project). Merged with the selections above. INGRESS rules only.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel:      "Service account email",
 					ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeString},
 				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "sourceFilterType", Values: []string{FirewallFilterServiceAccounts}},
 			},
 		},
 		{
@@ -326,23 +393,54 @@ func (u *UpdateFirewall) Setup(ctx core.SetupContext) error {
 	if err := validateFirewallPriority(spec.Priority); err != nil {
 		return err
 	}
-	if len(spec.Rules) > 0 {
+	if strings.EqualFold(strings.TrimSpace(spec.ProtocolsAndPorts), FirewallProtocolsSpecified) {
 		if _, err := buildFirewallRules(spec.Rules); err != nil {
 			return err
 		}
 	}
-	sourceServiceAccounts := mergeDedup(providedList(spec.SourceServiceAccounts), providedList(spec.SourceServiceAccountsCustom))
-	targetServiceAccounts := mergeDedup(providedList(spec.TargetServiceAccounts), providedList(spec.TargetServiceAccountsCustom))
-	if err := validateServiceAccountEmails(mergeDedup(sourceServiceAccounts, targetServiceAccounts)); err != nil {
+	if err := validateFirewallTargetType(spec.TargetType); err != nil {
 		return err
 	}
-	if err := validateFirewallTargetsAndSources(
-		providedList(spec.SourceTags), providedList(spec.TargetTags),
-		sourceServiceAccounts, targetServiceAccounts,
-	); err != nil {
+	if err := validateFirewallSourceFilterType(spec.SourceFilterType); err != nil {
+		return err
+	}
+	mergedTargetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	mergedSourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+	// Source filters only apply to INGRESS; the rule's direction is unknown at
+	// Setup (no GetFirewall), so assume INGRESS here. EGRESS misuse is rejected at
+	// Execute once the current rule's direction is known.
+	effTT, effTSA, effST, effSSA := resolveFirewallTargeting(
+		spec.TargetType, spec.SourceFilterType, true,
+		trimList(spec.TargetTags), mergedTargetServiceAccounts,
+		trimList(spec.SourceTags), mergedSourceServiceAccounts,
+	)
+	if err := validateServiceAccountEmails(mergeDedup(effSSA, effTSA)); err != nil {
+		return err
+	}
+	if err := validateFirewallTargetsAndSources(effST, effTT, effSSA, effTSA); err != nil {
 		return err
 	}
 	return resolveFirewallNodeMetadata(ctx, spec.Firewall)
+}
+
+// validateFirewallTargetType validates the "Targets" select value.
+func validateFirewallTargetType(targetType string) error {
+	switch strings.TrimSpace(targetType) {
+	case "", FirewallTargetingNoChange, FirewallTargetAll, FirewallFilterTags, FirewallFilterServiceAccounts:
+		return nil
+	default:
+		return fmt.Errorf("invalid target type %q", targetType)
+	}
+}
+
+// validateFirewallSourceFilterType validates the "Source filter" select value.
+func validateFirewallSourceFilterType(sourceFilterType string) error {
+	switch strings.TrimSpace(sourceFilterType) {
+	case "", FirewallTargetingNoChange, FirewallSourceRanges, FirewallFilterTags, FirewallFilterServiceAccounts:
+		return nil
+	default:
+		return fmt.Errorf("invalid source filter type %q", sourceFilterType)
+	}
 }
 
 func validateFirewallEnabledState(state string) error {
@@ -366,9 +464,10 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 	if err := validateFirewallEnabledState(spec.Logging); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
-	mergedSourceServiceAccounts := mergeDedup(providedList(spec.SourceServiceAccounts), providedList(spec.SourceServiceAccountsCustom))
-	mergedTargetServiceAccounts := mergeDedup(providedList(spec.TargetServiceAccounts), providedList(spec.TargetServiceAccountsCustom))
-	if err := validateServiceAccountEmails(mergeDedup(mergedSourceServiceAccounts, mergedTargetServiceAccounts)); err != nil {
+	if err := validateFirewallTargetType(spec.TargetType); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallSourceFilterType(spec.SourceFilterType); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
@@ -402,35 +501,95 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse firewall rule: %v", err))
 	}
 
-	// Validate the rule's *resulting* targeting won't mix network tags and service
-	// accounts. firewalls.patch is a merge: a targeting field this update doesn't
-	// set keeps its current value, so switching from tags to service accounts (or
-	// the reverse) must also clear the other field. Fall back to the current rule
-	// for any field the update leaves untouched.
-	resultingTargetTags := current.TargetTags
-	if spec.TargetTags != nil {
-		resultingTargetTags = trimList(*spec.TargetTags)
-	}
-	resultingSourceTags := current.SourceTags
-	if spec.SourceTags != nil {
-		resultingSourceTags = trimList(*spec.SourceTags)
-	}
-	resultingTargetServiceAccounts := current.TargetServiceAccounts
-	if spec.TargetServiceAccounts != nil || spec.TargetServiceAccountsCustom != nil {
-		resultingTargetServiceAccounts = mergedTargetServiceAccounts
-	}
-	resultingSourceServiceAccounts := current.SourceServiceAccounts
-	if spec.SourceServiceAccounts != nil || spec.SourceServiceAccountsCustom != nil {
-		resultingSourceServiceAccounts = mergedSourceServiceAccounts
-	}
-	if err := validateFirewallTargetsAndSources(
-		resultingSourceTags, resultingTargetTags,
-		resultingSourceServiceAccounts, resultingTargetServiceAccounts,
-	); err != nil {
-		return ctx.ExecutionState.Fail("error", fmt.Sprintf("%v — also clear the opposite targeting field in this update to switch", err))
+	patch := map[string]any{}
+
+	egress := strings.EqualFold(current.Direction, FirewallDirectionEgress)
+
+	mergedTargetServiceAccounts := mergeDedup(trimList(spec.TargetServiceAccounts), trimList(spec.TargetServiceAccountsCustom))
+	mergedSourceServiceAccounts := mergeDedup(trimList(spec.SourceServiceAccounts), trimList(spec.SourceServiceAccountsCustom))
+
+	// ---- Targets ---- (applies to both INGRESS and EGRESS). The dropdown picks
+	// one kind; the opposite field is cleared so the patch/merge can't leave a
+	// stale filter (a rule cannot mix network tags and service accounts).
+	var writtenTargetSAs []string
+	switch strings.TrimSpace(spec.TargetType) {
+	case "", FirewallTargetingNoChange:
+		// leave both target fields untouched
+	case FirewallTargetAll:
+		patch["targetTags"] = []string{}
+		patch["targetServiceAccounts"] = []string{}
+	case FirewallFilterTags:
+		tags := trimList(spec.TargetTags)
+		if len(tags) == 0 {
+			return ctx.ExecutionState.Fail("error", `select at least one target tag, or choose "All instances in the network"`)
+		}
+		patch["targetTags"] = tags
+		patch["targetServiceAccounts"] = []string{}
+	case FirewallFilterServiceAccounts:
+		if len(mergedTargetServiceAccounts) == 0 {
+			return ctx.ExecutionState.Fail("error", `select at least one target service account, or choose "All instances in the network"`)
+		}
+		writtenTargetSAs = mergedTargetServiceAccounts
+		patch["targetServiceAccounts"] = mergedTargetServiceAccounts
+		patch["targetTags"] = []string{}
+	default:
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("invalid target type %q", spec.TargetType))
 	}
 
-	patch := map[string]any{}
+	// ---- Source filter ---- (INGRESS only).
+	var writtenSourceSAs []string
+	if sel := strings.TrimSpace(spec.SourceFilterType); sel != "" && sel != FirewallTargetingNoChange {
+		if egress {
+			return ctx.ExecutionState.Fail("error", "source filters apply only to INGRESS firewall rules; this rule is EGRESS")
+		}
+		switch sel {
+		case FirewallSourceRanges:
+			// "IP ranges only": drop tag/SA matching. The ranges field is independent.
+			patch["sourceTags"] = []string{}
+			patch["sourceServiceAccounts"] = []string{}
+		case FirewallFilterTags:
+			tags := trimList(spec.SourceTags)
+			if len(tags) == 0 {
+				return ctx.ExecutionState.Fail("error", `select at least one source tag, or choose "IP ranges only"`)
+			}
+			patch["sourceTags"] = tags
+			patch["sourceServiceAccounts"] = []string{}
+		case FirewallFilterServiceAccounts:
+			if len(mergedSourceServiceAccounts) == 0 {
+				return ctx.ExecutionState.Fail("error", `select at least one source service account, or choose "IP ranges only"`)
+			}
+			writtenSourceSAs = mergedSourceServiceAccounts
+			patch["sourceServiceAccounts"] = mergedSourceServiceAccounts
+			patch["sourceTags"] = []string{}
+		default:
+			return ctx.ExecutionState.Fail("error", fmt.Sprintf("invalid source filter type %q", spec.SourceFilterType))
+		}
+	}
+
+	// SA email format — validate only the lists actually written to the patch.
+	if err := validateServiceAccountEmails(mergeDedup(writtenTargetSAs, writtenSourceSAs)); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+
+	// Validate the rule's *resulting* targeting won't mix network tags and service
+	// accounts. firewalls.patch is a merge: a targeting field this update doesn't
+	// set keeps its current value, so derive each resulting list from the patch
+	// when written, else fall back to the current rule.
+	resolved := func(key string, cur []string) []string {
+		if v, ok := patch[key]; ok {
+			return v.([]string) // only this code writes these keys; always []string
+		}
+		return cur
+	}
+	if err := validateFirewallTargetsAndSources(
+		resolved("sourceTags", current.SourceTags),
+		resolved("targetTags", current.TargetTags),
+		resolved("sourceServiceAccounts", current.SourceServiceAccounts),
+		resolved("targetServiceAccounts", current.TargetServiceAccounts),
+	); err != nil {
+		return ctx.ExecutionState.Fail("error",
+			fmt.Sprintf("%v — set both Targets and Source filter to the same kind (tags or service accounts)", err))
+	}
 
 	switch strings.TrimSpace(spec.EnabledState) {
 	case FirewallEnabledEnabled:
@@ -446,13 +605,21 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 		patch["priority"] = *spec.Priority
 	}
 
-	if len(spec.Rules) > 0 {
+	// Protocols & ports: "all" sends the match-everything rule; "specified" builds
+	// from the list; "no change" leaves them untouched. A rule keeps its existing
+	// allow/deny action — patch whichever array it already uses.
+	switch strings.TrimSpace(spec.ProtocolsAndPorts) {
+	case FirewallProtocolsAll:
+		if len(current.Denied) > 0 {
+			patch["denied"] = allProtocolsRule()
+		} else {
+			patch["allowed"] = allProtocolsRule()
+		}
+	case FirewallProtocolsSpecified:
 		rules, err := buildFirewallRules(spec.Rules)
 		if err != nil {
 			return ctx.ExecutionState.Fail("error", err.Error())
 		}
-		// A rule keeps its action; patch whichever array it already uses. Default
-		// to `allowed` for a rule with neither populated (shouldn't happen).
 		if len(current.Denied) > 0 {
 			patch["denied"] = rules
 		} else {
@@ -466,32 +633,6 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 		} else {
 			patch["sourceRanges"] = ranges
 		}
-	}
-
-	// targetTags is sent whenever the field is toggled on (non-nil), even when
-	// empty: an empty list clears the rule's tags so it applies to every VM in
-	// the network. A nil pointer means the field is toggled off — leave it alone.
-	if spec.TargetTags != nil {
-		patch["targetTags"] = trimList(*spec.TargetTags)
-	}
-	// Target service accounts are patched when either the dropdown or the custom
-	// field is toggled on; the value is the merge of both.
-	if spec.TargetServiceAccounts != nil || spec.TargetServiceAccountsCustom != nil {
-		patch["targetServiceAccounts"] = mergedTargetServiceAccounts
-	}
-	// Source tags / service accounts only exist on INGRESS rules; reject them on
-	// an EGRESS rule rather than letting the API return a less obvious error.
-	if spec.SourceTags != nil {
-		if strings.EqualFold(current.Direction, FirewallDirectionEgress) {
-			return ctx.ExecutionState.Fail("error", "source tags apply only to INGRESS firewall rules")
-		}
-		patch["sourceTags"] = trimList(*spec.SourceTags)
-	}
-	if spec.SourceServiceAccounts != nil || spec.SourceServiceAccountsCustom != nil {
-		if strings.EqualFold(current.Direction, FirewallDirectionEgress) {
-			return ctx.ExecutionState.Fail("error", "source service accounts apply only to INGRESS firewall rules")
-		}
-		patch["sourceServiceAccounts"] = mergedSourceServiceAccounts
 	}
 
 	switch strings.TrimSpace(spec.Logging) {
