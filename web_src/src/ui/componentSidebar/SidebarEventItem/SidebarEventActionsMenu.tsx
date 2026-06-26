@@ -74,11 +74,12 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
-          className="h-6 w-6 flex items-center justify-center rounded text-gray-500"
-          aria-label="Open actions"
+          className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-800"
+          aria-label="Run actions"
           onClick={(e) => e.stopPropagation()}
         >
-          <EllipsisVertical size={16} />
+          <span>Actions</span>
+          <EllipsisVertical size={12} />
         </button>
       </DropdownMenuTrigger>
 

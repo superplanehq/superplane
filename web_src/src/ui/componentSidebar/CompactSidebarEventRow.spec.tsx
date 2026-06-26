@@ -17,13 +17,21 @@ const event = {
   receivedAt: new Date("2026-02-06T15:28:05Z"),
 } satisfies SidebarEvent;
 
+const actionableExecutionEvent = {
+  ...event,
+  id: "execution-actionable",
+  state: "running",
+} satisfies SidebarEvent;
+
 function renderRow(props: Partial<ComponentProps<typeof CompactSidebarEventRow>> = {}) {
+  const { event: eventProp = event, ...rest } = props;
+
   return render(
     <MemoryRouter initialEntries={["/org-1/apps/app-1"]}>
       <Routes>
         <Route
           path="/:organizationId/apps/:appId"
-          element={<CompactSidebarEventRow event={event} onSelectRun={vi.fn()} {...props} />}
+          element={<CompactSidebarEventRow event={eventProp} onSelectRun={vi.fn()} {...rest} />}
         />
       </Routes>
     </MemoryRouter>,
@@ -73,5 +81,29 @@ describe("CompactSidebarEventRow", () => {
       expect(fetchRunId).toHaveBeenCalledWith(event);
       expect(onSelectRun).toHaveBeenCalledWith("run-from-api");
     });
+  });
+
+  it("shows a run actions trigger without requiring hover", () => {
+    renderRow({
+      event: actionableExecutionEvent,
+      onCancelExecution: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "Run actions" })).toBeInTheDocument();
+  });
+
+  it("cancels an execution from the run actions menu", async () => {
+    const user = userEvent.setup();
+    const onCancelExecution = vi.fn();
+
+    renderRow({
+      event: actionableExecutionEvent,
+      onCancelExecution,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Run actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Cancel" }));
+
+    expect(onCancelExecution).toHaveBeenCalledWith("execution-1");
   });
 });
