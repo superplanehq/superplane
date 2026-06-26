@@ -39,8 +39,7 @@ export function CompactSidebarEventRow({
   getExecutionState,
 }: CompactSidebarEventRowProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsDropdownOpen] = useState(false);
   const isResolvingRef = useRef(false);
 
   const eventStateStyle = useMemo(() => {
@@ -66,9 +65,11 @@ export function CompactSidebarEventRow({
   const isWaiting = event.state === "waiting";
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
-  const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
-  const showReEmit = event.kind === "trigger";
-  const showActionsMenu = showCancel || showReEmit;
+  const canCancelQueueItem = event.kind === "queue" && isQueued && !!onCancelQueueItem;
+  const canCancelExecution =
+    event.kind === "execution" && (isRunning || isWaiting) && !!onCancelExecution && !!event.executionId;
+  const canReEmit = event.kind === "trigger" && !!onReEmit;
+  const showActionsMenu = canCancelQueueItem || canCancelExecution || canReEmit;
   const isSelectable = Boolean(onSelectRun && isRunNavigableEvent(event) && (runId || fetchRunId));
   const runHref = organizationId && appId && runId ? appPath(organizationId, appId, `?run=${runId}`) : null;
 
@@ -117,8 +118,6 @@ export function CompactSidebarEventRow({
         "group relative w-full transition-colors",
         isSelectable ? "cursor-pointer hover:bg-gray-50" : "cursor-default",
       )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {isSelectable ? (
         runHref ? (
@@ -150,8 +149,8 @@ export function CompactSidebarEventRow({
         />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{event.title}</span>
       </span>
-      {showActionsMenu && (isHovered || isDropdownOpen) ? (
-        <div className="relative z-10 shrink-0" onClick={(clickEvent) => clickEvent.stopPropagation()}>
+      {showActionsMenu ? (
+        <div className="relative z-20 shrink-0" onClick={(clickEvent) => clickEvent.stopPropagation()}>
           <SidebarEventActionsMenu
             eventId={event.id}
             executionId={event.executionId}

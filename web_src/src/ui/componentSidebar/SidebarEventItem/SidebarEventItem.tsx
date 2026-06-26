@@ -60,8 +60,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsDropdownOpen] = useState(false);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -116,9 +115,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
 
-  const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
-  const showReEmit = event.kind === "trigger";
-  const showActionsMenu = showCancel || showReEmit;
+  const canCancelQueueItem = event.kind === "queue" && isQueued && !!onCancelQueueItem;
+  const canCancelExecution =
+    event.kind === "execution" && (isRunning || isWaiting) && !!onCancelExecution && !!event.executionId;
+  const canReEmit = event.kind === "trigger" && !!onReEmit;
+  const showActionsMenu = canCancelQueueItem || canCancelExecution || canReEmit;
 
   return (
     <div
@@ -135,8 +136,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         onToggleOpen(event.id);
         onEventClick?.(event);
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* First row: Badge and subtitle */}
       <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
@@ -153,22 +152,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
 
       {/* Second row: Event ID and title with actions */}
-      <div className="flex items-center mt-1 gap-2">
+      <div className="flex items-center justify-between mt-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
           {event.triggerEventId && (
             <span className="text-[13px] text-gray-950/50 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
           )}
           <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
         </div>
-      </div>
-
-      {/* Hover overlay with dropdown menu */}
-      {showActionsMenu && (isHovered || isDropdownOpen) && (
-        <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
-          <div
-            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
-            onClick={(e) => e.stopPropagation()}
-          >
+        {showActionsMenu ? (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
             <SidebarEventActionsMenu
               eventId={event.id}
               executionId={event.executionId}
@@ -183,8 +175,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               onOpenChange={setIsDropdownOpen}
             />
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
         <div

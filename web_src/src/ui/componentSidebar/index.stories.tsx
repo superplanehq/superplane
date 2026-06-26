@@ -32,14 +32,19 @@ const mockLatestEvents = [
     state: "success" as const,
     isOpen: false,
     receivedAt: new Date(),
+    kind: "trigger" as const,
+    nodeId: "node_trigger_1",
   },
   {
     id: "event-2",
     title: "Pull request merged",
     subtitle: "3h",
-    state: "discarded" as const,
+    state: "running" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 30),
+    kind: "execution" as const,
+    nodeId: "node_exec_1",
+    executionId: "execution-123",
     values: {
       Author: "Pedro Forestileao",
       Commit: "feat: update component sidebar",
@@ -55,9 +60,10 @@ const mockNextInQueueEvents = [
     id: "queue-1",
     title: "Deploy to staging",
     subtitle: "5m",
-    state: "waiting" as const,
+    state: "queued" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 5),
+    kind: "queue" as const,
   },
   {
     id: "queue-2",
@@ -66,6 +72,7 @@ const mockNextInQueueEvents = [
     state: "waiting" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 10),
+    kind: "queue" as const,
   },
 ];
 
@@ -226,6 +233,9 @@ export const Default: Story = {
     nodeName: "Listen to code changes",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -280,6 +290,9 @@ export const WithInteractiveEvents: Story = {
     nodeName: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -342,6 +355,9 @@ export const WithDifferentIcon: Story = {
     nodeName: "Database Changes",
     iconSlug: "database",
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -412,6 +428,9 @@ export const ExtendedMetadata: Story = {
     nodeName: "Enterprise Application Monitoring",
     iconSlug: "eye",
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -441,6 +460,9 @@ export const ZeroState: Story = {
     nodeName: "Empty Component",
     iconSlug: "circle-dashed",
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -470,6 +492,9 @@ export const WithActionsDropdown: Story = {
     nodeName: "Component with All Actions",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
   },
 };
 
@@ -552,6 +577,9 @@ export const WithFullHistory: Story = {
     nodeName: "Full History Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -596,5 +624,8 @@ export const HistoryCountDemo: Story = {
     nodeName: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
+    onCancelQueueItem: (id: string) => console.log("Cancel queue item", id),
+    onCancelExecution: (executionId: string) => console.log("Cancel execution", executionId),
+    onReEmit: (nodeId: string, eventOrExecutionId: string) => console.log("Re-emit", { nodeId, eventOrExecutionId }),
   },
 };

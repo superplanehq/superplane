@@ -29,7 +29,9 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const isQueued = eventState === "queued";
   const isRunning = eventState === "running";
 
-  const showCancel = (kind === "queue" && isQueued) || (kind === "execution" && (isRunning || isWaiting));
+  const canCancelQueueItem = kind === "queue" && isQueued && !!onCancelQueueItem;
+  const canCancelExecution = kind === "execution" && (isRunning || isWaiting) && !!onCancelExecution && !!executionId;
+  const showCancel = canCancelQueueItem || canCancelExecution;
   const showReEmit = kind === "trigger" && !!onReEmit;
   const showDropdown = showCancel || showReEmit;
 
@@ -45,14 +47,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     (e: React.MouseEvent) => {
       e.stopPropagation();
 
-      if (!executionId) {
-        console.warn("No executionId provided for cancel action");
-        return;
-      }
-
-      if (onCancelExecution) {
-        onCancelExecution(executionId);
-      }
+      if (!executionId || !onCancelExecution) return;
+      onCancelExecution(executionId);
     },
     [onCancelExecution, executionId],
   );
@@ -61,9 +57,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     (e: React.MouseEvent) => {
       e.stopPropagation();
 
-      if (onCancelQueueItem) {
-        onCancelQueueItem(eventId);
-      }
+      if (!onCancelQueueItem) return;
+      onCancelQueueItem(eventId);
     },
     [onCancelQueueItem, eventId],
   );
@@ -74,7 +69,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
-          className="h-6 w-6 flex items-center justify-center rounded text-gray-500"
+          className="flex h-6 w-6 items-center justify-center rounded border border-slate-950/10 bg-white/70 text-gray-600 shadow-xs hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20"
           aria-label="Open actions"
           onClick={(e) => e.stopPropagation()}
         >
@@ -85,7 +80,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[11rem]">
         {showCancel && (
           <DropdownMenuItem
-            onClick={kind === "queue" ? handleCancelQueueItem : handleCancelExecution}
+            onClick={canCancelQueueItem ? handleCancelQueueItem : handleCancelExecution}
             className="gap-2"
             data-testid="cancel-queue-item"
           >
