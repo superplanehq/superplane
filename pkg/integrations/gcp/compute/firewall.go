@@ -292,6 +292,27 @@ func validateFirewallFilterSelections(
 	return nil
 }
 
+// validateFirewallRangesNotEmpty rejects an empty CIDR list when ranges are the
+// active filter. GCP silently defaults an omitted sourceRanges / destinationRanges
+// to 0.0.0.0/0 (the entire internet) — the opposite of a scoped rule — so an
+// explicitly-cleared range list must fail rather than quietly widen the rule.
+func validateFirewallRangesNotEmpty(ingress bool, sourceFilterType string, sourceRanges, destinationRanges []string) error {
+	if !ingress {
+		if len(destinationRanges) == 0 {
+			return errors.New("destination ranges are required: add at least one CIDR (use 0.0.0.0/0 to match all)")
+		}
+		return nil
+	}
+	// On INGRESS, ranges are the source filter only when tags/service accounts
+	// aren't selected (empty source-filter type defaults to ranges).
+	if t := strings.TrimSpace(sourceFilterType); t == "" || t == FirewallSourceRanges {
+		if len(sourceRanges) == 0 {
+			return errors.New("source ranges are required: add at least one CIDR (use 0.0.0.0/0 to match all)")
+		}
+	}
+	return nil
+}
+
 // validateFirewallTargetsAndSources enforces a Compute Engine constraint: a
 // single firewall rule filters by network tags OR by service accounts, never a
 // mix of the two. Catching it here gives a clearer error than the API's.

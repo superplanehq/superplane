@@ -71,8 +71,8 @@ func (c *CreateFirewall) Documentation() string {
 - **Priority**: 0–65535; lower numbers win (default 1000)
 - **Protocols and ports**: *Specified protocols and ports* (default) lists protocol/ports entries (e.g. ` + "`tcp`" + ` with ports ` + "`80, 443`" + `; leave ports empty to match all ports of that protocol). *All protocols and ports* matches every protocol/port and hides the list
 - **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
-- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, ` + "`0.0.0.0/0`" + `), *Source tags*, or *Service accounts*. Choosing one reveals its input
-- **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `)
+- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, ` + "`0.0.0.0/0`" + `), *Source tags*, or *Service accounts*. Choosing one reveals its input. With *IP ranges*, at least one CIDR is required (use ` + "`0.0.0.0/0`" + ` to match all) — an empty list is rejected because GCP would otherwise silently widen the rule to ` + "`0.0.0.0/0`" + `.
+- **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default ` + "`0.0.0.0/0`" + `); at least one is required for the same reason.
 - **Description**: Optional human-readable description
 - **Disabled**: Create the rule in a disabled state
 - **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
@@ -454,6 +454,9 @@ func (c *CreateFirewall) Setup(ctx core.SetupContext) error {
 	if err := validateFirewallFilterSelections(spec.TargetType, spec.SourceFilterType, dir == FirewallDirectionIngress, effTargetTags, effTargetSAs, effSourceTags, effSourceSAs); err != nil {
 		return err
 	}
+	if err := validateFirewallRangesNotEmpty(dir == FirewallDirectionIngress, spec.SourceFilterType, trimList(spec.SourceRanges), trimList(spec.DestinationRanges)); err != nil {
+		return err
+	}
 	return ctx.Metadata.Set(FirewallNodeMetadata{FirewallName: strings.TrimSpace(spec.Name)})
 }
 
@@ -503,6 +506,9 @@ func (c *CreateFirewall) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 	if err := validateFirewallFilterSelections(spec.TargetType, spec.SourceFilterType, direction == FirewallDirectionIngress, targetTags, targetSAs, sourceTags, sourceSAs); err != nil {
+		return ctx.ExecutionState.Fail("error", err.Error())
+	}
+	if err := validateFirewallRangesNotEmpty(direction == FirewallDirectionIngress, spec.SourceFilterType, trimList(spec.SourceRanges), trimList(spec.DestinationRanges)); err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 

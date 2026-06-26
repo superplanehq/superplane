@@ -155,9 +155,10 @@ func Test__CreateFirewall__Setup(t *testing.T) {
 		meta := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":    "allow-http",
-				"network": "default",
-				"rules":   []map[string]any{{"protocol": "tcp", "ports": "80,443"}},
+				"name":         "allow-http",
+				"network":      "default",
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "80,443"}},
+				"sourceRanges": []string{"0.0.0.0/0"},
 			},
 			Metadata: meta,
 		})
@@ -235,10 +236,11 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"name":    "deny-ssh",
-				"network": "default",
-				"action":  "deny",
-				"rules":   []map[string]any{{"protocol": "tcp", "ports": "22"}},
+				"name":         "deny-ssh",
+				"network":      "default",
+				"action":       "deny",
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "22"}},
+				"sourceRanges": []string{"0.0.0.0/0"},
 			},
 			ExecutionState: state,
 		})
@@ -292,10 +294,11 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"name":     "top-prio",
-				"network":  "default",
-				"priority": 0,
-				"rules":    []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"name":         "top-prio",
+				"network":      "default",
+				"priority":     0,
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"sourceRanges": []string{"0.0.0.0/0"},
 			},
 			ExecutionState: state,
 		})
@@ -369,9 +372,10 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"name":    "allow-http",
-				"network": "default",
-				"rules":   []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"name":         "allow-http",
+				"network":      "default",
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"sourceRanges": []string{"0.0.0.0/0"},
 			},
 			ExecutionState: state,
 		})
@@ -400,6 +404,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				"direction":             "INGRESS",
 				"action":                "allow",
 				"rules":                 []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"sourceRanges":          []string{"0.0.0.0/0"},
 				"targetType":            "serviceAccounts",
 				"targetServiceAccounts": []string{"sa@my-project.iam.gserviceaccount.com"},
 				"enableLogging":         true,
@@ -469,6 +474,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				"direction":                   "INGRESS",
 				"action":                      "allow",
 				"rules":                       []map[string]any{{"protocol": "tcp", "ports": "443"}},
+				"sourceRanges":                []string{"0.0.0.0/0"},
 				"targetType":                  "serviceAccounts",
 				"targetServiceAccounts":       []string{"a@my-project.iam.gserviceaccount.com"},
 				"targetServiceAccountsCustom": []string{"b@other-project.iam.gserviceaccount.com", "a@my-project.iam.gserviceaccount.com"},
@@ -561,13 +567,14 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"name":       "allow-all",
-				"network":    "default",
-				"direction":  "INGRESS",
-				"action":     "allow",
-				"rules":      []map[string]any{{"protocol": "tcp", "ports": "80"}},
-				"targetType": "all",
-				"targetTags": []string{"web"}, // stale hidden value, must be ignored
+				"name":         "allow-all",
+				"network":      "default",
+				"direction":    "INGRESS",
+				"action":       "allow",
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"sourceRanges": []string{"0.0.0.0/0"},
+				"targetType":   "all",
+				"targetTags":   []string{"web"}, // stale hidden value, must be ignored
 			},
 			ExecutionState: state,
 		})
@@ -598,6 +605,7 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 				"direction":         "INGRESS",
 				"action":            "allow",
 				"protocolsAndPorts": "all",
+				"sourceRanges":      []string{"0.0.0.0/0"},
 				// no rules list provided
 			},
 			ExecutionState: state,
@@ -639,5 +647,34 @@ func Test__CreateFirewall__Execute(t *testing.T) {
 		assert.False(t, state.Passed)
 		assert.False(t, called)
 		assert.Contains(t, state.FailureMessage, "no target tags were provided")
+	})
+
+	t.Run("empty source ranges with IP-ranges filter -> fails before API call", func(t *testing.T) {
+		var called bool
+		mc := &mockFirewallClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				called = true
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":         "wide-open",
+				"network":      "default",
+				"direction":    "INGRESS",
+				"action":       "allow",
+				"rules":        []map[string]any{{"protocol": "tcp", "ports": "80"}},
+				"sourceRanges": []string{}, // IP ranges is the filter but the list was cleared
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, called)
+		assert.Contains(t, state.FailureMessage, "source ranges are required")
 	})
 }
