@@ -262,9 +262,8 @@ UPDATE tasks SET
 	result_json = NULL,
 	error_message = NULL,
 	cancel_requested = false,
-	environment_json = NULL,
 	infra_retry_count = infra_retry_count + 1
-WHERE id = ? AND runner_id = ? AND status = ? AND infra_retry_count < ?
+WHERE id = ? AND runner_id = ? AND status = ? AND cancel_requested = false AND infra_retry_count < ?
 RETURNING id`,
 		string(models.StatusQueued), req.ID, req.RunnerID, string(models.StatusClaimed), maxInfraRetries,
 	).Scan(&rows).Error

@@ -314,6 +314,27 @@ func TestCompleteTaskRequeuesRunnerInfraFailureOnce(t *testing.T) {
 		t.Fatalf("expected terminal fields cleared, got exit=%v error=%q result=%q",
 			result.Task.ExitCode, result.Task.ErrorMessage, result.Task.ResultJSON)
 	}
+	if len(result.Task.Environment) != 1 ||
+		result.Task.Environment[0].Name != "BASE_URL" ||
+		result.Task.Environment[0].Value != "http://example.test" {
+		t.Fatalf("expected environment preserved on requeue, got %#v", result.Task.Environment)
+	}
+
+	retried, err := st.ClaimTask(ctx, "runner-2", "fleet-retry", 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retried == nil {
+		t.Fatal("expected retried task to be claimed")
+	}
+	if retried.ID != taskID {
+		t.Fatalf("retried task ID: got %s want %s", retried.ID, taskID)
+	}
+	if len(retried.Environment) != 1 ||
+		retried.Environment[0].Name != "BASE_URL" ||
+		retried.Environment[0].Value != "http://example.test" {
+		t.Fatalf("expected environment preserved on retried claim, got %#v", retried.Environment)
+	}
 }
 
 func TestCompleteTaskDoesNotRequeueRunnerInfraFailureTwice(t *testing.T) {
@@ -397,6 +418,41 @@ func TestCompleteTaskDoesNotRequeueCanceledInfraFailure(t *testing.T) {
 	}
 }
 
+func TestCompleteTaskDoesNotRequeueCancelRequestedInfraFailure(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	_, outcome, err := st.RequestCancelTask(ctx, taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome != taskstore.CancelOutcomeCancelRequested {
+		t.Fatalf("cancel outcome: got %s want %s", outcome, taskstore.CancelOutcomeCancelRequested)
+	}
+
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     "runner-1",
+		ExitCode:     1,
+		ErrorMessage: "context canceled",
+		FailureKind:  api.FailureKindRunnerInfra,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
+	}
+	if result.Task.Status != models.StatusFailed {
+		t.Fatalf("status: got %s want failed", result.Task.Status)
+	}
+	if result.Task.InfraRetryCount != 0 {
+		t.Fatalf("infra retry count: got %d want 0", result.Task.InfraRetryCount)
+	}
+}
+
 func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
 	t.Helper()
 	taskID := uuid.NewString()
@@ -408,6 +464,7 @@ func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.Postgres
 		CreatedAt:       now,
 		WebhookURL:      "https://example.com/hook",
 		Commands:        []string{"echo hi"},
+		Environment:     []models.EnvironmentVariable{{Name: "BASE_URL", Value: "http://example.test"}},
 		InfraRetryCount: infraRetryCount,
 	}); err != nil {
 		t.Fatal(err)
