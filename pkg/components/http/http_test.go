@@ -1090,6 +1090,37 @@ func TestHTTP__Execute__ResolvesSecretInQueryParam(t *testing.T) {
 	assert.Equal(t, "prefix-{{ secrets.api.token }}-suffix", storedParams[0]["value"], "stored query param must keep the masked secret placeholder")
 }
 
+func TestHTTP__Execute__ResolvesSecretInHeader(t *testing.T) {
+	h := &HTTP{}
+	var gotHeader string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("X-Api-Key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	headers := []map[string]any{
+		{"name": "X-Api-Key", "value": "prefix-{{ secrets.api.token }}-suffix"},
+	}
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method":  "GET",
+		"url":     server.URL,
+		"headers": headers,
+	})
+	ctx.Secrets = &mapSecretsContext{
+		values: map[string]map[string]string{"api": {"token": "xyz"}},
+	}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "prefix-xyz-suffix", gotHeader)
+	storedConfig := ctx.Configuration.(map[string]any)
+	storedHeaders := storedConfig["headers"].([]map[string]any)
+	assert.Equal(t, "prefix-{{ secrets.api.token }}-suffix", storedHeaders[0]["value"], "stored header must keep the masked secret placeholder")
+}
+
 func TestHTTP__Execute__ResolvesSecretInJSONBody(t *testing.T) {
 	h := &HTTP{}
 	var requestData map[string]any

@@ -164,8 +164,9 @@ and status without downloading the full response payload.
 
 ## Inline Secrets
 
-The URL, query-param values, form-data values, and the body (JSON string values,
-plain text, XML) accept inline organization-secret references using the form:
+The URL, query-param values, header values, form-data values, and the body (JSON
+string values, plain text, XML) accept inline organization-secret references
+using the form:
 
 ` + "`" + `{{ secrets.SECRET_NAME.KEY_NAME }}` + "`" + `
 
@@ -339,8 +340,9 @@ func resolveAuthorizationSecret(secrets core.SecretsContext, name string, ref co
 }
 
 // resolveSpecSecrets returns a copy of spec with every {{ secrets.NAME.KEY }}
-// placeholder in the URL, query-param values, form-data values, and the body
-// (json/text/xml) replaced by the corresponding organization secret value.
+// placeholder in the URL, query-param values, header values, form-data values,
+// and the body (json/text/xml) replaced by the corresponding organization
+// secret value.
 // The input spec is not mutated and its pointer fields (slices, body payload)
 // are reallocated when resolution actually occurs, so callers can safely reuse
 // the original spec (for example, between retries) without leaking resolved
@@ -370,6 +372,18 @@ func resolveSpecSecrets(secrets core.SecretsContext, spec Spec) (Spec, error) {
 			params[i] = KeyValue{Key: p.Key, Value: value}
 		}
 		resolved.QueryParams = &params
+	}
+
+	if spec.Headers != nil {
+		headers := make([]Header, len(*spec.Headers))
+		for i, h := range *spec.Headers {
+			value, err := configuration.ResolveSecretReferences(h.Value, secrets.GetKey)
+			if err != nil {
+				return Spec{}, fmt.Errorf("headers[%d]: %w", i, err)
+			}
+			headers[i] = Header{Name: h.Name, Value: value}
+		}
+		resolved.Headers = &headers
 	}
 
 	if spec.FormData != nil {
