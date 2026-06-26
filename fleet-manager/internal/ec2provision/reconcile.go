@@ -150,59 +150,79 @@ func (l *Launcher) reconcile(ctx context.Context, want int, claimedRunnerIDs []s
 	}
 	l.observeInstanceSpinup(ctx, instances)
 
-	switch {
-	case have < want:
-		delta := want - have
-		for delta > 0 {
-			n := delta
-			if n > maxLaunch {
-				n = maxLaunch
-			}
-			_, err := l.Launch(ctx, n)
-			if err != nil {
-				return fmt.Errorf("launch: %w", err)
-			}
-			delta -= n
+	if have == want {
+		return nil
+	}
+	if have < want {
+		return l.launchAdditional(ctx, want-have)
+	}
+	return l.scaleDownExcess(ctx, instances, have, want, claimedRunnerIDs, scaleDownSafe)
+}
+
+func (l *Launcher) launchAdditional(ctx context.Context, delta int) error {
+	for delta > 0 {
+		count := delta
+		if count > maxLaunch {
+			count = maxLaunch
 		}
-	case have > want:
-		if !scaleDownSafe {
-			if l.Log != nil {
-				l.Log.Warn("ec2 scale-down skipped: claimed runner ids unavailable",
-					slog.Int("have", have),
-					slog.Int("want", want),
-					slog.String("fleet_id", l.Config.RunnerFleetID))
-			}
-			return nil
+		if _, err := l.Launch(ctx, count); err != nil {
+			return fmt.Errorf("launch: %w", err)
 		}
-		// Scale down by terminating *oldest* instances first. Terminating the newest first
-		// tended to kill VMs that had just booted and claimed work → PTY/read EIO and flaky tasks.
-		remove := have - want
-		ids := selectExcessRunnerIDs(instances, claimedRunnerIDs, remove)
-		if len(ids) == 0 {
-			return nil
-		}
-		ids, err = l.drainTerminationCandidates(ctx, ids)
-		if err != nil {
-			return fmt.Errorf("drain runners: %w", err)
-		}
-		if len(ids) == 0 {
-			if l.Log != nil {
-				l.Log.Info("ec2 scale-down skipped: selected runners are busy",
-					slog.Int("have", have),
-					slog.Int("want", want),
-					slog.String("fleet_id", l.Config.RunnerFleetID))
-			}
-			return nil
-		}
-		_, err := l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: ids})
-		if err != nil {
-			return fmt.Errorf("terminate instances: %w", err)
-		}
-		if l.Log != nil {
-			l.Log.Info("ec2 terminating excess runners", slog.Int("count", len(ids)), slog.Any("instance_ids", ids))
-		}
+		delta -= count
 	}
 	return nil
+}
+
+func (l *Launcher) scaleDownExcess(ctx context.Context, instances []managedInstance, have, want int, claimedRunnerIDs []string, scaleDownSafe bool) error {
+	if !scaleDownSafe {
+		l.logUnsafeScaleDownSkipped(have, want)
+		return nil
+	}
+
+	// Scale down by terminating *oldest* safe instances first. Terminating the newest
+	// first tended to kill VMs that had just booted and claimed work.
+	remove := have - want
+	ids := selectExcessRunnerIDs(instances, claimedRunnerIDs, remove)
+	if len(ids) == 0 {
+		return nil
+	}
+
+	drainedIDs, err := l.drainTerminationCandidates(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("drain runners: %w", err)
+	}
+	if len(drainedIDs) == 0 {
+		l.logBusyScaleDownSkipped(have, want)
+		return nil
+	}
+
+	if _, err := l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: drainedIDs}); err != nil {
+		return fmt.Errorf("terminate instances: %w", err)
+	}
+	if l.Log != nil {
+		l.Log.Info("ec2 terminating excess runners", slog.Int("count", len(drainedIDs)), slog.Any("instance_ids", drainedIDs))
+	}
+	return nil
+}
+
+func (l *Launcher) logUnsafeScaleDownSkipped(have, want int) {
+	if l.Log == nil {
+		return
+	}
+	l.Log.Warn("ec2 scale-down skipped: claimed runner ids unavailable",
+		slog.Int("have", have),
+		slog.Int("want", want),
+		slog.String("fleet_id", l.Config.RunnerFleetID))
+}
+
+func (l *Launcher) logBusyScaleDownSkipped(have, want int) {
+	if l.Log == nil {
+		return
+	}
+	l.Log.Info("ec2 scale-down skipped: selected runners are busy",
+		slog.Int("have", have),
+		slog.Int("want", want),
+		slog.String("fleet_id", l.Config.RunnerFleetID))
 }
 
 func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string) ([]string, error) {

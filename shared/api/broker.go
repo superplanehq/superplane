@@ -39,15 +39,17 @@ type DrainRunnersRequest struct {
 	RunnerIDs []string `json:"runner_ids"`
 }
 
+type DrainRunnerState string
+
 const (
-	DrainRunnerStateDrained = "drained"
-	DrainRunnerStateBusy    = "busy"
+	DrainRunnerStateDrained DrainRunnerState = "drained"
+	DrainRunnerStateBusy    DrainRunnerState = "busy"
 )
 
 type DrainRunnerStatus struct {
-	RunnerID     string `json:"runner_id"`
-	State        string `json:"state"`
-	ActiveTaskID string `json:"active_task_id,omitempty"`
+	RunnerID     string           `json:"runner_id"`
+	State        DrainRunnerState `json:"state"`
+	ActiveTaskID string           `json:"active_task_id,omitempty"`
 }
 
 type DrainRunnersResponse struct {

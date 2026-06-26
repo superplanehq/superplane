@@ -8,13 +8,12 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-const runnerDrainClaiming = "__claiming__"
-
 type runnerDrainEntry struct {
-	fleetID      string
-	conn         *websocket.Conn
-	activeTaskID string
-	draining     bool
+	fleetID         string
+	conn            *websocket.Conn
+	activeTaskID    string
+	claimInProgress bool
+	draining        bool
 }
 
 // RunnerDrainHub tracks runner streams selected for EC2 termination.
@@ -47,6 +46,7 @@ func (h *RunnerDrainHub) Register(runnerID, fleetID string, conn *websocket.Conn
 		if cur := h.byRunner[runnerID]; cur == entry {
 			cur.conn = nil
 			cur.activeTaskID = ""
+			cur.claimInProgress = false
 		}
 		h.mu.Unlock()
 	}
@@ -68,7 +68,8 @@ func (h *RunnerDrainHub) TryStartClaim(runnerID string) bool {
 	if entry == nil {
 		entry = h.entryLocked(runnerID)
 	}
-	entry.activeTaskID = runnerDrainClaiming
+	entry.activeTaskID = ""
+	entry.claimInProgress = true
 	return true
 }
 
@@ -81,6 +82,7 @@ func (h *RunnerDrainHub) FinishClaim(runnerID, taskID string) {
 	h.mu.Lock()
 	if entry := h.byRunner[runnerID]; entry != nil {
 		entry.activeTaskID = taskID
+		entry.claimInProgress = false
 	}
 	h.mu.Unlock()
 }
@@ -93,9 +95,10 @@ func (h *RunnerDrainHub) CompleteTask(runnerID, taskID string) {
 	}
 	h.mu.Lock()
 	if entry := h.byRunner[runnerID]; entry != nil {
-		if taskID == "" || entry.activeTaskID == taskID || entry.activeTaskID == runnerDrainClaiming {
+		if taskID == "" || entry.activeTaskID == taskID {
 			entry.activeTaskID = ""
 		}
+		entry.claimInProgress = false
 	}
 	h.mu.Unlock()
 }
@@ -122,31 +125,10 @@ func (h *RunnerDrainHub) Drain(fleetID string, runnerIDs []string) []api.DrainRu
 	out := make([]api.DrainRunnerStatus, 0, len(ids))
 	h.mu.Lock()
 	for _, runnerID := range ids {
-		entry := h.entryLocked(runnerID)
-		if entry.fleetID == "" {
-			entry.fleetID = fleetID
-		}
-		status := api.DrainRunnerStatus{RunnerID: runnerID}
-		if entry.fleetID != fleetID {
-			status.State = api.DrainRunnerStateBusy
-			out = append(out, status)
-			continue
-		}
-
-		entry.draining = true
-		if entry.activeTaskID != "" {
-			status.State = api.DrainRunnerStateBusy
-			if entry.activeTaskID != runnerDrainClaiming {
-				status.ActiveTaskID = entry.activeTaskID
-			}
-			out = append(out, status)
-			continue
-		}
-
-		status.State = api.DrainRunnerStateDrained
+		status, idleConn := h.drainRunnerLocked(fleetID, runnerID)
 		out = append(out, status)
-		if entry.conn != nil {
-			closeIdle = append(closeIdle, entry.conn)
+		if idleConn != nil {
+			closeIdle = append(closeIdle, idleConn)
 		}
 	}
 	h.mu.Unlock()
@@ -155,6 +137,38 @@ func (h *RunnerDrainHub) Drain(fleetID string, runnerIDs []string) []api.DrainRu
 		_ = conn.Close()
 	}
 	return out
+}
+
+func (h *RunnerDrainHub) drainRunnerLocked(fleetID, runnerID string) (api.DrainRunnerStatus, *websocket.Conn) {
+	entry := h.entryLocked(runnerID)
+	if entry.fleetID == "" {
+		entry.fleetID = fleetID
+	}
+	if entry.fleetID != fleetID {
+		return busyDrainStatus(runnerID, ""), nil
+	}
+
+	entry.draining = true
+	if entry.isBusy() {
+		return busyDrainStatus(runnerID, entry.activeTaskID), nil
+	}
+
+	return api.DrainRunnerStatus{
+		RunnerID: runnerID,
+		State:    api.DrainRunnerStateDrained,
+	}, entry.conn
+}
+
+func (e *runnerDrainEntry) isBusy() bool {
+	return e.claimInProgress || e.activeTaskID != ""
+}
+
+func busyDrainStatus(runnerID, activeTaskID string) api.DrainRunnerStatus {
+	return api.DrainRunnerStatus{
+		RunnerID:     runnerID,
+		State:        api.DrainRunnerStateBusy,
+		ActiveTaskID: activeTaskID,
+	}
 }
 
 func (h *RunnerDrainHub) entryLocked(runnerID string) *runnerDrainEntry {
@@ -166,7 +180,7 @@ func (h *RunnerDrainHub) entryLocked(runnerID string) *runnerDrainEntry {
 	return entry
 }
 
-func drainStatuses(ids []string, state string) []api.DrainRunnerStatus {
+func drainStatuses(ids []string, state api.DrainRunnerState) []api.DrainRunnerStatus {
 	out := make([]api.DrainRunnerStatus, 0, len(ids))
 	for _, id := range ids {
 		out = append(out, api.DrainRunnerStatus{RunnerID: id, State: state})
