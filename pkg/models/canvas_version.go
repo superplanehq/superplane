@@ -673,9 +673,24 @@ func FindLiveCanvasSpecInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Node,
 		return nil, nil, err
 	}
 
+	nodes, edges := canvasVersionSpec(version)
+	return nodes, edges, nil
+}
+
+func FindCanvasVersionSpecInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) ([]Node, []Edge, error) {
+	version, err := FindCanvasVersionInTransaction(tx, workflowID, versionID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodes, edges := canvasVersionSpec(version)
+	return nodes, edges, nil
+}
+
+func canvasVersionSpec(version *CanvasVersion) ([]Node, []Edge) {
 	nodes := append([]Node(nil), version.Nodes...)
 	edges := append([]Edge(nil), version.Edges...)
-	return nodes, edges, nil
+	return nodes, edges
 }
 
 const canvasDraftBranchNamePrefix = "drafts/"

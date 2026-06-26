@@ -243,13 +243,8 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, uuid.Nil, err
 	}
 
-	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
-	if err != nil {
-		return nil, uuid.Nil, err
-	}
-
 	if event.ExecutionID == nil {
-		return w.processRootEvent(tx, canvas, liveEdges, event)
+		return w.processRootEvent(tx, canvas, event)
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
@@ -257,7 +252,12 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, uuid.Nil, err
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
+	_, edges, err := findRunCanvasSpecInTransaction(tx, canvas.ID, execution.RunID)
+	if err != nil {
+		return nil, uuid.Nil, err
+	}
+
+	queueItems, err := w.processExecutionEvent(tx, logger, canvas, edges, execution, event)
 	return queueItems, execution.RunID, err
 }
 
@@ -272,10 +272,29 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func findRunCanvasSpecInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) ([]models.Node, []models.Edge, error) {
+	run, err := models.FindCanvasRunInTransaction(tx, workflowID, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return models.FindCanvasVersionSpecInTransaction(tx, workflowID, run.VersionID)
+}
+
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
+
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
+	if err != nil {
+		return nil, uuid.Nil, err
+	}
+
+	_, edges, err := models.FindCanvasVersionSpecInTransaction(tx, canvas.ID, run.VersionID)
+	if err != nil {
+		return nil, uuid.Nil, err
+	}
 
 	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	if len(outgoingEdges) == 0 {
@@ -283,12 +302,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 			return nil, uuid.Nil, err
 		}
 
-		return nil, event.RunID, nil
-	}
-
-	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
-	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, run.ID, nil
 	}
 
 	var queueItems []models.CanvasNodeQueueItem

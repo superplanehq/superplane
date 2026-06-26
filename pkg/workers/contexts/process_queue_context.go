@@ -169,17 +169,18 @@ func BuildProcessQueueContext(
 	}
 
 	ctx.DistinctIncomingSources = func() ([]core.Node, error) {
-		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+		run, err := findQueueItemRunInTransaction(tx, queueItem)
 		if err != nil {
 			return nil, err
 		}
-		_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, wf.ID)
+
+		_, edges, err := models.FindCanvasVersionSpecInTransaction(tx, node.WorkflowID, run.VersionID)
 		if err != nil {
 			return nil, err
 		}
 
 		sources := []core.Node{}
-		for _, edge := range liveEdges {
+		for _, edge := range edges {
 			if edge.TargetID == node.NodeID {
 				sources = append(sources, core.Node{
 					ID: edge.SourceID,
@@ -234,6 +235,14 @@ func BuildProcessQueueContext(
 	}
 
 	return ctx, nil
+}
+
+func findQueueItemRunInTransaction(tx *gorm.DB, queueItem *models.CanvasNodeQueueItem) (*models.CanvasRun, error) {
+	if queueItem.RunID != uuid.Nil {
+		return models.FindCanvasRunInTransaction(tx, queueItem.WorkflowID, queueItem.RunID)
+	}
+
+	return models.FindCanvasRunByRootEventInTransaction(tx, queueItem.RootEventID)
 }
 
 func uniqueSourceNodes(nodes []core.Node) []core.Node {
