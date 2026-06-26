@@ -115,6 +115,12 @@ func validateString(fieldPath string, field configuration.Field, value string, k
 	extraEnv := expressionValidationExtraEnv(fieldPath)
 	for _, match := range matches {
 		body := match[2 : len(match)-2]
+		// Secret references ({{ secrets.NAME.KEY }}) are resolved later by
+		// the component that consumes them and intentionally fall outside
+		// the expression engine. Skip them so save-time validation passes.
+		if configuration.IsSecretReference(body) {
+			continue
+		}
 		if err := ValidateExpressionWithExtraEnv(body, knownNodeNames, extraEnv); err != nil {
 			errs = append(errs, ExpressionError{
 				FieldPath:  fieldPath,

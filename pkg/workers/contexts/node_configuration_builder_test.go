@@ -1895,3 +1895,41 @@ func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "b", result["item"])
 }
+
+func Test_NodeConfigurationBuilder_SecretReferencesArePreserved(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEventData := map[string]any{"user": "alice"}
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: rootEventData})
+
+	result, err := builder.Build(map[string]any{
+		"plain":  "{{ secrets.api.token }}",
+		"inline": "Bearer {{ secrets.svc.key }} for {{ $[\"" + triggerNode + "\"].user }}",
+		"only":   "{{ $[\"" + triggerNode + "\"].user }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "{{ secrets.api.token }}", result["plain"])
+	assert.Equal(t, "Bearer {{ secrets.svc.key }} for alice", result["inline"])
+	assert.Equal(t, "alice", result["only"])
+}
