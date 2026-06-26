@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ConfigurationField } from "@/api-client";
@@ -49,6 +50,29 @@ function stubRowRects() {
 }
 
 describe("ListFieldRenderer", () => {
+  it("does not warn about switching between controlled and uncontrolled when adding the first item", () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    function Wrapper() {
+      const [value, setValue] = React.useState<unknown[] | undefined>(undefined);
+      return (
+        <ListFieldRenderer field={parameterListField()} value={value} onChange={(v) => setValue(v as unknown[])} />
+      );
+    }
+
+    render(<Wrapper />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Parameter/i }));
+
+    const controlledWarnings = consoleWarn.mock.calls.filter((call) => {
+      const formatted = call.map((arg) => (typeof arg === "string" ? arg : "")).join(" ");
+      return formatted.includes("controlled") || formatted.includes("uncontrolled");
+    });
+    expect(controlledWarnings).toEqual([]);
+
+    consoleWarn.mockRestore();
+  });
+
   it("reorders items immediately as the cursor crosses rows and commits on mouseup", () => {
     const onChange = vi.fn();
     const value = [
