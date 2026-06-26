@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -32,6 +33,7 @@ func (e *ConfigurationBuildError) Unwrap() error {
 
 func BuildProcessQueueContext(
 	httpCtx core.HTTPContext,
+	encryptor crypto.Encryptor,
 	tx *gorm.DB,
 	node *models.CanvasNode,
 	queueItem *models.CanvasNodeQueueItem,
@@ -40,6 +42,11 @@ func BuildProcessQueueContext(
 	repoFiles core.RepositoryFilesContext,
 ) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
+	if err != nil {
+		return nil, err
+	}
+
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +72,21 @@ func BuildProcessQueueContext(
 		}
 	}
 
+	//
+	// The Expressions context evaluates bare expressions (e.g. Merge's
+	// stopIfExpression, Loop's untilExpression) immediately during queue
+	// processing to decide control flow. Those results are never persisted,
+	// so we give this builder a runtime secret resolver - canvas validation
+	// allows secrets() in these fields, and without a resolver evaluation
+	// would fail with "secrets() is not available in this context".
+	//
+	secretResolver := NewRuntimeSecretResolver(tx, encryptor, models.DomainTypeOrganization, workflow.OrganizationID)
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithIncomingEventID(&event.ID).
-		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+		WithInput(map[string]any{event.NodeID: event.Data.Data()}).
+		WithSecretResolver(secretResolver)
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
 	}

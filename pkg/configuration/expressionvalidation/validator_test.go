@@ -54,6 +54,9 @@ func TestValidateExpression_Valid(t *testing.T) {
 		{name: "date builtin", raw: `date('2026-01-01')`},
 		{name: "type conversion", raw: `int($['Build'].count) + 1`, knownNames: []string{"Build"}},
 		{name: "standalone dollar", raw: `$`},
+		{name: "secrets call", raw: `secrets('api').token`},
+		{name: "secrets in concat", raw: `'Bearer ' + secrets('api').token`},
+		{name: "secrets dashed name", raw: `secrets('my-api').token`},
 	})
 }
 
@@ -86,6 +89,9 @@ func TestValidateExpression_BadArity(t *testing.T) {
 		{name: "memory.find no args", raw: `memory.find()`, wantErr: "memory.find() requires a namespace and matches"},
 		{name: "memory.findFirst no args", raw: `memory.findFirst()`, wantErr: "memory.findFirst() requires a namespace and matches"},
 		{name: "memory.find too many", raw: `memory.find('ns', {}, 'extra')`, wantErr: "memory.find() requires a namespace and matches"},
+		{name: "secrets no args", raw: `secrets()`, wantErr: "secrets() takes exactly one argument"},
+		{name: "secrets too many", raw: `secrets('a', 'b')`, wantErr: "secrets() takes exactly one argument"},
+		{name: "secrets int argument", raw: `secrets(1)`, wantErr: "secrets() argument must be a string"},
 	})
 }
 
