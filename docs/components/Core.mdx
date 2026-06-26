@@ -685,13 +685,16 @@ and status without downloading the full response payload.
 
 ### Inline Secrets
 
-The URL, query-param values, header values, form-data values, and the body (JSON string values, plain text, XML) accept inline organization-secret references using the form:
+The URL, query-param values, header values, form-data values, and the body (JSON
+string values, plain text, XML) accept inline organization-secret references
+using the form:
 
-```
-{{ secrets.SECRET_NAME.KEY_NAME }}
-```
+`{{ secrets.SECRET_NAME.KEY_NAME }}`
 
-Secrets are resolved at request time and the resolved value never appears in the stored execution configuration or logs. Secret names and keys containing a literal `.` cannot be used inline; configure those through the Authorization section (Bearer token / Basic Auth password / custom header value) instead.
+Secrets are resolved at request time and the resolved value never appears in the
+stored execution configuration or logs. Secret names and keys containing a
+literal `.` cannot be used inline; configure those through the Authorization
+section (Bearer token / Basic Auth password / custom header value) instead.
 
 ### Response Handling
 
