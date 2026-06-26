@@ -221,14 +221,14 @@ func TestValidateNodeExpressions_NestedPaths(t *testing.T) {
 		assertOneError(t, errs, "extra.unknown", "unknown node reference 'Missing'")
 	})
 
-	t.Run("secret references are skipped", func(t *testing.T) {
+	t.Run("secrets() calls validate as ordinary expressions", func(t *testing.T) {
 		fields := []configuration.Field{
 			{Name: "url", Type: configuration.FieldTypeString},
 			{Name: "text", Type: configuration.FieldTypeText},
 		}
 		errs := validateNodeExpressions("n1", "HTTP", map[string]any{
-			"url":  "https://api.example.com/?token={{ secrets.api.token }}",
-			"text": "Bearer {{ secrets.svc.key }} for {{ $['Build'].user }}",
+			"url":  `https://api.example.com/?token={{ secrets("api").token }}`,
+			"text": `Bearer {{ secrets("svc").key }} for {{ $['Build'].user }}`,
 		}, fields, knownSet("Build"))
 		if len(errs) != 0 {
 			t.Fatalf("expected no errors, got %+v", errs)

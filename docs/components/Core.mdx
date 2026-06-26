@@ -530,6 +530,7 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
+- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Examples
 
@@ -583,6 +584,7 @@ The For Each component reads an array from the upstream payload and emits one do
 - **$**: The run context data
 - **root()**: Access root event data
 - **previous()**: Access previous node outputs
+- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Example Output
 
@@ -756,6 +758,7 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
+- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Examples
 
@@ -827,6 +830,7 @@ The until expression has access to:
 - **$**: The run context data, including outputs from the latest iteration
 - **root()**: Access root event data
 - **previous()**: Access previous node outputs
+- **secrets(name)**: Access an organization secret's keys as a map (resolved at execution time, never persisted to stored configuration). Example: `secrets("api").token`.
 
 ### Example Output
 

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
@@ -31,6 +33,7 @@ type NodeConfigurationBuilder struct {
 	input               any
 	expressionVariables map[string]any
 	configurationFields []configuration.Field
+	secretResolver      SecretResolver
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -79,6 +82,16 @@ func (b *NodeConfigurationBuilder) WithExpressionVariables(variables map[string]
 
 func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuration.Field) *NodeConfigurationBuilder {
 	b.configurationFields = fields
+	return b
+}
+
+// WithSecretResolver switches the builder to runtime mode for secrets: when
+// resolver is non-nil, secrets() placeholders are evaluated and every other
+// placeholder is left untouched. When the resolver is nil (the default), the
+// behaviour is the opposite: secrets() placeholders are deferred so the
+// secret values never reach the stored configuration.
+func (b *NodeConfigurationBuilder) WithSecretResolver(resolver SecretResolver) *NodeConfigurationBuilder {
+	b.secretResolver = resolver
 	return b
 }
 
@@ -247,6 +260,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	}
 
 	var err error
+	deferred := b.secretResolver == nil
 
 	result := expressionRegex.ReplaceAllStringFunc(expression, func(match string) string {
 		matches := expressionRegex.FindStringSubmatch(match)
@@ -254,10 +268,14 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return match
 		}
 
-		// Secret references ({{ secrets.NAME.KEY }}) are deferred to the
-		// component that consumes the configuration so the secret value is
-		// never persisted in the stored execution configuration or logs.
-		if configuration.IsSecretReference(matches[1]) {
+		//
+		// Without a SecretResolver (the deferred / queue phase), placeholders
+		// that call secrets() are left untouched so the secret value never
+		// reaches the stored configuration or any log of it. With a
+		// resolver (the runtime phase, and one-shot resolutions such as
+		// trigger hooks), every placeholder is evaluated normally.
+		//
+		if deferred && expressionInjectsSecret(matches[1]) {
 			return match
 		}
 
@@ -277,6 +295,38 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	return result, nil
 }
 
+// expressionInjectsSecret returns true when the expression body contains a
+// call to the secrets() function. Used by ResolveTemplateExpressions to gate
+// deferred vs runtime resolution; treats unparsable expressions as
+// non-secret so the existing expression error surfaces naturally during
+// evaluation.
+func expressionInjectsSecret(body string) bool {
+	tree, err := parser.Parse(body)
+	if err != nil {
+		return false
+	}
+	collector := &secretsCallCollector{}
+	ast.Walk(&tree.Node, collector)
+	return collector.found
+}
+
+type secretsCallCollector struct {
+	found bool
+}
+
+func (c *secretsCallCollector) Visit(node *ast.Node) {
+	if c.found {
+		return
+	}
+	call, ok := (*node).(*ast.CallNode)
+	if !ok {
+		return
+	}
+	if id, ok := call.Callee.(*ast.IdentifierNode); ok && id.Value == "secrets" {
+		c.found = true
+	}
+}
+
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	return b.ResolveExpressionWithExtraVariables(expression, b.expressionVariables)
 }
@@ -284,7 +334,7 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 // ResolveExpressionWithExtraVariables evaluates an expression with extra
 // variables merged into the eval environment. Provided keys cannot override
 // built-ins; we reject any attempt to shadow reserved names so that `$`,
-// `memory`, `config`, `root`, and `previous` stay deterministic.
+// `memory`, `config`, `root`, `previous`, and `secrets` stay deterministic.
 func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expression string, variables map[string]any) (any, error) {
 	referencedNodes, err := expressionvalidation.ParseReferencedNodes(expression)
 	if err != nil {
@@ -335,6 +385,19 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			}
 
 			return b.resolvePreviousPayload(depth)
+		}),
+		expr.Function("secrets", func(params ...any) (any, error) {
+			if len(params) != 1 {
+				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
+			}
+			name, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("secrets() argument must be a string")
+			}
+			if b.secretResolver == nil {
+				return nil, fmt.Errorf("secrets() is not available in this context")
+			}
+			return b.secretResolver.Resolve(name)
 		}),
 	}
 
@@ -889,6 +952,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"config":   {},
 	"root":     {},
 	"previous": {},
+	"secrets":  {},
 	"ctx":      {},
 }
 

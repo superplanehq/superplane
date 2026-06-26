@@ -1896,7 +1896,7 @@ func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
 	assert.Equal(t, "b", result["item"])
 }
 
-func Test_NodeConfigurationBuilder_SecretReferencesArePreserved(t *testing.T) {
+func Test_NodeConfigurationBuilder_SecretCallsAreDeferredWithoutResolver(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -1924,12 +1924,12 @@ func Test_NodeConfigurationBuilder_SecretReferencesArePreserved(t *testing.T) {
 		WithInput(map[string]any{triggerNode: rootEventData})
 
 	result, err := builder.Build(map[string]any{
-		"plain":  "{{ secrets.api.token }}",
-		"inline": "Bearer {{ secrets.svc.key }} for {{ $[\"" + triggerNode + "\"].user }}",
-		"only":   "{{ $[\"" + triggerNode + "\"].user }}",
+		"plain":  `{{ secrets("api").token }}`,
+		"inline": `Bearer {{ secrets("svc").key }} for {{ $["` + triggerNode + `"].user }}`,
+		"only":   `{{ $["` + triggerNode + `"].user }}`,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "{{ secrets.api.token }}", result["plain"])
-	assert.Equal(t, "Bearer {{ secrets.svc.key }} for alice", result["inline"])
+	assert.Equal(t, `{{ secrets("api").token }}`, result["plain"])
+	assert.Equal(t, `Bearer {{ secrets("svc").key }} for alice`, result["inline"])
 	assert.Equal(t, "alice", result["only"])
 }
