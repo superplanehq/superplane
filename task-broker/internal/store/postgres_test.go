@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
+	taskstore "github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
@@ -277,4 +279,145 @@ func TestUnclaimTask(t *testing.T) {
 	if got2.Status != models.StatusClaimed {
 		t.Fatalf("wrong-runner unclaim should be no-op, got %s", got2.Status)
 	}
+}
+
+func TestCompleteTaskRequeuesRunnerInfraFailureOnce(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     "runner-1",
+		ExitCode:     1,
+		ErrorMessage: "context canceled",
+		FailureKind:  api.FailureKindRunnerInfra,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeRequeued {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeRequeued)
+	}
+	if result.Task.Status != models.StatusQueued {
+		t.Fatalf("status: got %s want queued", result.Task.Status)
+	}
+	if result.Task.InfraRetryCount != 1 {
+		t.Fatalf("infra retry count: got %d want 1", result.Task.InfraRetryCount)
+	}
+	if result.Task.RunnerID != "" || result.Task.ClaimedAt != nil || result.Task.LeaseUntil != nil {
+		t.Fatalf("expected claim fields cleared, got runner=%q claimed=%v lease=%v",
+			result.Task.RunnerID, result.Task.ClaimedAt, result.Task.LeaseUntil)
+	}
+	if result.Task.ErrorMessage != "" || result.Task.ResultJSON != "" || result.Task.ExitCode != nil {
+		t.Fatalf("expected terminal fields cleared, got exit=%v error=%q result=%q",
+			result.Task.ExitCode, result.Task.ErrorMessage, result.Task.ResultJSON)
+	}
+}
+
+func TestCompleteTaskDoesNotRequeueRunnerInfraFailureTwice(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 1)
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     "runner-1",
+		ExitCode:     1,
+		ErrorMessage: "context canceled",
+		FailureKind:  api.FailureKindRunnerInfra,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
+	}
+	if result.Task.Status != models.StatusFailed {
+		t.Fatalf("status: got %s want failed", result.Task.Status)
+	}
+	if result.Task.InfraRetryCount != 1 {
+		t.Fatalf("infra retry count changed: got %d want 1", result.Task.InfraRetryCount)
+	}
+}
+
+func TestCompleteTaskDoesNotRequeueNormalFailure(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     "runner-1",
+		ExitCode:     1,
+		ErrorMessage: "script failed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
+	}
+	if result.Task.Status != models.StatusFailed {
+		t.Fatalf("status: got %s want failed", result.Task.Status)
+	}
+	if result.Task.InfraRetryCount != 0 {
+		t.Fatalf("infra retry count: got %d want 0", result.Task.InfraRetryCount)
+	}
+}
+
+func TestCompleteTaskDoesNotRequeueCanceledInfraFailure(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	taskID := createClaimedTask(t, ctx, st, "runner-1", 0)
+	result, err := st.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     "runner-1",
+		ExitCode:     130,
+		ErrorMessage: "context canceled",
+		FailureKind:  api.FailureKindRunnerInfra,
+		Canceled:     true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != taskstore.CompleteTaskOutcomeTerminal {
+		t.Fatalf("outcome: got %s want %s", result.Outcome, taskstore.CompleteTaskOutcomeTerminal)
+	}
+	if result.Task.Status != models.StatusCanceled {
+		t.Fatalf("status: got %s want canceled", result.Task.Status)
+	}
+	if result.Task.InfraRetryCount != 0 {
+		t.Fatalf("infra retry count: got %d want 0", result.Task.InfraRetryCount)
+	}
+}
+
+func createClaimedTask(t *testing.T, ctx context.Context, st *taskstore.PostgresStore, runnerID string, infraRetryCount int) string {
+	t.Helper()
+	taskID := uuid.NewString()
+	now := time.Now().UTC()
+	if err := st.CreateTask(ctx, &models.Task{
+		ID:              taskID,
+		FleetID:         "fleet-retry",
+		Status:          models.StatusQueued,
+		CreatedAt:       now,
+		WebhookURL:      "https://example.com/hook",
+		Commands:        []string{"echo hi"},
+		InfraRetryCount: infraRetryCount,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	claimed, err := st.ClaimTask(ctx, runnerID, "fleet-retry", 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claimed == nil {
+		t.Fatal("expected task to be claimed")
+	}
+	return taskID
 }

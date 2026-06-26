@@ -54,6 +54,8 @@ type Task struct {
 	// ResultJSON is optional structured JSON from the runner (SUPERPLANE_RESULT_FILE).
 	ResultJSON   string
 	ErrorMessage string
+	// InfraRetryCount counts automatic retries after runner infrastructure failures.
+	InfraRetryCount int
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
 }

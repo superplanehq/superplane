@@ -65,6 +65,21 @@ type Agent struct {
 	Config Config
 }
 
+type taskExecutionResult struct {
+	ExitCode     int
+	RunErr       error
+	UserCanceled bool
+	FailureKind  string
+	Result       json.RawMessage
+}
+
+func (r taskExecutionResult) errorMessage() string {
+	if r.RunErr == nil {
+		return ""
+	}
+	return r.RunErr.Error()
+}
+
 // Run blocks until ctx is cancelled, processing tasks in a loop.
 func (a *Agent) Run(ctx context.Context) error {
 	if a.HTTP == nil {
@@ -96,12 +111,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		exit, _, runErr, userCanceled, result := a.execute(ctx, base, task, nil)
-		errMsg := ""
-		if runErr != nil {
-			errMsg = runErr.Error()
-		}
-		completeErr := a.complete(ctx, base, task.ID, exit, errMsg, userCanceled, result)
+		execution := a.execute(ctx, base, task, nil)
+		completeErr := a.complete(ctx, base, task.ID, execution)
 		if a.Config.ExitAfterEachTask {
 			if completeErr != nil && a.Config.Log != nil {
 				a.Config.Log.Warn("task_broker_http",
@@ -166,13 +177,14 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 	return out.Task, nil
 }
 
-func (a *Agent) complete(ctx context.Context, base, id string, exit int, errMsg string, canceled bool, result json.RawMessage) error {
+func (a *Agent) complete(ctx context.Context, base, id string, execution taskExecutionResult) error {
 	payload := api.CompleteTaskRequest{
-		RunnerID: a.Config.RunnerID,
-		ExitCode: exit,
-		Error:    errMsg,
-		Canceled: canceled,
-		Result:   result,
+		RunnerID:    a.Config.RunnerID,
+		ExitCode:    execution.ExitCode,
+		Error:       execution.errorMessage(),
+		FailureKind: execution.FailureKind,
+		Canceled:    execution.UserCanceled,
+		Result:      execution.Result,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -266,10 +278,10 @@ func (a *Agent) getTaskStatus(ctx context.Context, base, id string) (*api.TaskSt
 	return &out, nil
 }
 
-func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload, wsPushCancel <-chan struct{}) (int, string, error, bool, json.RawMessage) {
+func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload, wsPushCancel <-chan struct{}) taskExecutionResult {
 	ex, err := a.executorFor(task)
 	if err != nil {
-		return 1, "", err, false, nil
+		return taskExecutionResult{ExitCode: 1, RunErr: err}
 	}
 
 	resultPath := filepath.Join(os.TempDir(), "superplane-result-"+task.ID+".json")
@@ -350,16 +362,34 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 		defer cwClose()
 	}
 
-	exit, out, runErr := ex.Execute(execCtx, task, live, resultPath)
+	exit, _, runErr := ex.Execute(execCtx, task, live, resultPath)
 	result := readTaskResultFile(resultPath, a.Config.MaxOutputBytes, a.Config.Log)
 
 	if stoppedByCancel.Load() {
-		return exit, out, runErr, true, result
+		return taskExecutionResult{ExitCode: exit, RunErr: runErr, UserCanceled: true, Result: result}
 	}
 	if errors.Is(execCtx.Err(), context.DeadlineExceeded) || errors.Is(runErr, context.DeadlineExceeded) {
-		return 124, out, errors.New("execution timed out"), false, result
+		return taskExecutionResult{ExitCode: 124, RunErr: errors.New("execution timed out"), Result: result}
 	}
-	return exit, out, runErr, false, result
+	return taskExecutionResult{
+		ExitCode:    exit,
+		RunErr:      runErr,
+		FailureKind: runnerFailureKind(ctx, execCtx, runErr),
+		Result:      result,
+	}
+}
+
+func runnerFailureKind(parentCtx, execCtx context.Context, runErr error) string {
+	if runErr == nil {
+		return ""
+	}
+	if errors.Is(runErr, context.DeadlineExceeded) || errors.Is(execCtx.Err(), context.DeadlineExceeded) {
+		return ""
+	}
+	if errors.Is(parentCtx.Err(), context.Canceled) || errors.Is(execCtx.Err(), context.Canceled) && errors.Is(runErr, context.Canceled) {
+		return api.FailureKindRunnerInfra
+	}
+	return ""
 }
 
 func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {

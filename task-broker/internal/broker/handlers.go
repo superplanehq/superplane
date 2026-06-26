@@ -416,15 +416,40 @@ func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*models.Task, error) {
+func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*taskstore.CompleteTaskResult, error) {
 	resultJSON := ""
 	if len(req.Result) > 0 {
 		resultJSON = string(req.Result)
 	}
-	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, resultJSON, req.Error, req.Canceled)
+	result, err := s.Store.CompleteTask(ctx, taskstore.CompleteTaskRequest{
+		ID:           taskID,
+		RunnerID:     runnerID,
+		ExitCode:     req.ExitCode,
+		ResultJSON:   resultJSON,
+		ErrorMessage: req.Error,
+		Canceled:     req.Canceled,
+		FailureKind:  req.FailureKind,
+	})
 	if err != nil {
 		return nil, err
 	}
+	task := result.Task
+	if result.Outcome == taskstore.CompleteTaskOutcomeRequeued {
+		s.recordTaskUnclaimed(ctx, task.FleetID)
+		if s.TaskNotify != nil {
+			s.TaskNotify.Notify()
+		}
+		if s.Log != nil {
+			s.Log.Info("task_requeued_after_runner_infra_failure",
+				slog.String("task_id", taskID),
+				slog.String("runner_id", runnerID),
+				slog.String("fleet_id", task.FleetID),
+				slog.Int("infra_retry_count", task.InfraRetryCount),
+			)
+		}
+		return result, nil
+	}
+
 	s.recordTaskCompleted(ctx, task)
 	if s.Log != nil {
 		outcome := "succeeded"
@@ -442,7 +467,7 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 		)
 	}
 	go s.DeliverWebhook(task)
-	return task, nil
+	return result, nil
 }
 
 func (s *Server) DeliverWebhook(task *models.Task) {

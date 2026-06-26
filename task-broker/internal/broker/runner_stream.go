@@ -214,11 +214,12 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		}
 
 		req := api.CompleteTaskRequest{
-			RunnerID: compRunnerID,
-			ExitCode: comp.ExitCode,
-			Error:    comp.Error,
-			Canceled: comp.Canceled,
-			Result:   comp.Result,
+			RunnerID:    compRunnerID,
+			ExitCode:    comp.ExitCode,
+			Error:       comp.Error,
+			FailureKind: comp.FailureKind,
+			Canceled:    comp.Canceled,
+			Result:      comp.Result,
 		}
 		_, cerr := s.completeTaskCore(ctx, task.ID, compRunnerID, req)
 		if cerr != nil {

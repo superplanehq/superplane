@@ -48,13 +48,14 @@ type Cancel struct {
 
 // Complete is client -> server to finish a claimed task.
 type Complete struct {
-	Type     string          `json:"type"`
-	TaskID   string          `json:"task_id"`
-	RunnerID string          `json:"runner_id"`
-	ExitCode int             `json:"exit_code"`
-	Error    string          `json:"error,omitempty"`
-	Canceled bool            `json:"canceled,omitempty"`
-	Result   json.RawMessage `json:"result,omitempty"`
+	Type        string          `json:"type"`
+	TaskID      string          `json:"task_id"`
+	RunnerID    string          `json:"runner_id"`
+	ExitCode    int             `json:"exit_code"`
+	Error       string          `json:"error,omitempty"`
+	FailureKind string          `json:"failure_kind,omitempty"`
+	Canceled    bool            `json:"canceled,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
 }
 
 // Ack is server -> client after successful complete (HTTP 204 equivalent).

@@ -90,11 +90,17 @@ type CompleteTaskRequest struct {
 	RunnerID string `json:"runner_id"`
 	ExitCode int    `json:"exit_code"`
 	Error    string `json:"error,omitempty"`
+	// FailureKind identifies runner/infrastructure failures separately from user command failures.
+	FailureKind string `json:"failure_kind,omitempty"`
 	// Result is optional JSON read by the runner from SUPERPLANE_RESULT_FILE after execution.
 	Result json.RawMessage `json:"result,omitempty"`
 	// Canceled when true means the runner stopped the task due to caller cancel (terminal status canceled).
 	Canceled bool `json:"canceled,omitempty"`
 }
+
+const (
+	FailureKindRunnerInfra = "runner_infra"
+)
 
 // TaskPayloadFrom maps models.Task to TaskPayload.
 func TaskPayloadFrom(t *models.Task) *TaskPayload {

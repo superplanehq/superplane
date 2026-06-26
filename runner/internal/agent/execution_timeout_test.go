@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,5 +31,39 @@ func TestExecutionWallDuration_defaultAndCap(t *testing.T) {
 	task3 := &api.TaskPayload{ExecutionTimeoutSeconds: &v30}
 	if got := executionWallDuration(cfg, task3); got != 30*time.Second {
 		t.Fatalf("under cap: got %v want 30s", got)
+	}
+}
+
+func TestRunnerFailureKindParentCancellationIsRunnerInfra(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	cancelParent()
+	execCtx, cancelExec := context.WithCancel(context.Background())
+	cancelExec()
+
+	got := runnerFailureKind(parent, execCtx, context.Canceled)
+	if got != api.FailureKindRunnerInfra {
+		t.Fatalf("failure kind: got %q want %q", got, api.FailureKindRunnerInfra)
+	}
+}
+
+func TestRunnerFailureKindTimeoutIsNotRunnerInfra(t *testing.T) {
+	parent := context.Background()
+	execCtx, cancelExec := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancelExec()
+	<-execCtx.Done()
+
+	got := runnerFailureKind(parent, execCtx, context.DeadlineExceeded)
+	if got != "" {
+		t.Fatalf("failure kind: got %q want empty", got)
+	}
+}
+
+func TestRunnerFailureKindScriptFailureIsNotRunnerInfra(t *testing.T) {
+	parent := context.Background()
+	execCtx := context.Background()
+
+	got := runnerFailureKind(parent, execCtx, errors.New("script failed"))
+	if got != "" {
+		t.Fatalf("failure kind: got %q want empty", got)
 	}
 }
