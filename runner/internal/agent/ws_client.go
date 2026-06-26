@@ -158,25 +158,22 @@ func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
 		wg.Add(1)
 		go wsCtrlReadDuringExecute(readCtx, conn, task.ID, pushCh, &wg, &writeMu)
 
-		exit, _, runErr, userCanceled, result := a.execute(ctx, a.fleetBase(), task, pushCh)
+		execution := a.execute(ctx, a.fleetBase(), task, pushCh)
 
 		readStop()
 		_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond))
 		wg.Wait()
 		_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
 
-		errMsg := ""
-		if runErr != nil {
-			errMsg = runErr.Error()
-		}
 		comp := wsrunner.Complete{
-			Type:     wsrunner.TypeComplete,
-			TaskID:   task.ID,
-			RunnerID: a.Config.RunnerID,
-			ExitCode: exit,
-			Error:    errMsg,
-			Canceled: userCanceled,
-			Result:   result,
+			Type:        wsrunner.TypeComplete,
+			TaskID:      task.ID,
+			RunnerID:    a.Config.RunnerID,
+			ExitCode:    execution.ExitCode,
+			Error:       execution.errorMessage(),
+			FailureKind: execution.FailureKind,
+			Canceled:    execution.UserCanceled,
+			Result:      execution.Result,
 		}
 		writeMu.Lock()
 		_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))

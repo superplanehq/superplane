@@ -26,5 +26,6 @@ type Task struct {
 	Output                  string     `gorm:""`
 	ResultJSON              string     `gorm:""`
 	ErrorMessage            string     `gorm:""`
+	InfraRetryCount         int        `gorm:"not null;default:0"`
 	CancelRequested         bool       `gorm:"not null;default:false"`
 }

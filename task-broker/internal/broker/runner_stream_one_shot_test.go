@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/wsrunner"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
@@ -162,4 +163,51 @@ func TestMultiShotRunnerReceivesMultipleTasks(t *testing.T) {
 		require.Equal(t, wsrunner.TypeAck, ack.Type)
 	}
 	require.Equal(t, int32(2), received.Load(), "multi-shot runner should handle both tasks")
+}
+
+func TestInfraFailureRequeueWakesWaitingWebSocketRunner(t *testing.T) {
+	ts, st := oneShotBrokerSetup(t)
+	ctx := context.Background()
+
+	queueTask(t, ctx, st, "fleet-1", "echo task-1")
+
+	first := dialWS(t, ts)
+	require.NoError(t, first.WriteJSON(wsrunner.Hello{
+		Type:         wsrunner.TypeHello,
+		RunnerID:     "i-first",
+		FleetID:      "fleet-1",
+		LeaseSeconds: 300,
+		OneShot:      true,
+	}))
+	first.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var firstTask wsrunner.Task
+	require.NoError(t, first.ReadJSON(&firstTask))
+	require.NotNil(t, firstTask.Task)
+
+	second := dialWS(t, ts)
+	require.NoError(t, second.WriteJSON(wsrunner.Hello{
+		Type:         wsrunner.TypeHello,
+		RunnerID:     "i-second",
+		FleetID:      "fleet-1",
+		LeaseSeconds: 300,
+		OneShot:      true,
+	}))
+
+	require.NoError(t, first.WriteJSON(wsrunner.Complete{
+		Type:        wsrunner.TypeComplete,
+		TaskID:      firstTask.Task.ID,
+		RunnerID:    "i-first",
+		ExitCode:    1,
+		Error:       "context canceled",
+		FailureKind: api.FailureKindRunnerInfra,
+	}))
+	first.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var ack wsrunner.Ack
+	require.NoError(t, first.ReadJSON(&ack))
+	require.Equal(t, wsrunner.TypeAck, ack.Type)
+
+	second.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var retriedTask wsrunner.Task
+	require.NoError(t, second.ReadJSON(&retriedTask))
+	require.Equal(t, firstTask.Task.ID, retriedTask.Task.ID)
 }

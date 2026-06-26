@@ -145,6 +145,7 @@ const (
 	msgCanceledQueued    = "canceled before execution"
 	msgCanceledLeaseReap = "canceled (lease expired while stop pending)"
 	exitCanceled         = 130
+	maxInfraRetries      = 1
 )
 
 func (s *PostgresStore) RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error) {
@@ -200,11 +201,21 @@ UPDATE tasks SET cancel_requested = true WHERE id = ? AND status = ?`,
 	return nil, "", fmt.Errorf("cancel: task %s in unexpected state %s", id, t.Status)
 }
 
-func (s *PostgresStore) CompleteTask(ctx context.Context, id, runnerID string, exitCode int, resultJSON, errMsg string, canceled bool) (*models.Task, error) {
+func (s *PostgresStore) CompleteTask(ctx context.Context, req CompleteTaskRequest) (*CompleteTaskResult, error) {
+	if isRetryableInfraFailure(req) {
+		requeued, err := s.requeueInfraFailure(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		if requeued != nil {
+			return &CompleteTaskResult{Task: requeued, Outcome: CompleteTaskOutcomeRequeued}, nil
+		}
+	}
+
 	final := models.StatusSucceeded
-	if canceled {
+	if req.Canceled {
 		final = models.StatusCanceled
-	} else if exitCode != 0 || errMsg != "" {
+	} else if req.ExitCode != 0 || req.ErrorMessage != "" {
 		final = models.StatusFailed
 	}
 	res := s.db.WithContext(ctx).Exec(`
@@ -217,16 +228,53 @@ UPDATE tasks SET
 	cancel_requested = false,
 	environment_json = NULL
 WHERE id = ? AND runner_id = ? AND status = ?`,
-		string(final), exitCode, nullIfEmpty(resultJSON), nullIfEmpty(errMsg),
-		id, runnerID, string(models.StatusClaimed),
+		string(final), req.ExitCode, nullIfEmpty(req.ResultJSON), nullIfEmpty(req.ErrorMessage),
+		req.ID, req.RunnerID, string(models.StatusClaimed),
 	)
 	if res.Error != nil {
 		return nil, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return nil, fmt.Errorf("task not found, wrong runner, or not claimed: %s", id)
+		return nil, fmt.Errorf("task not found, wrong runner, or not claimed: %s", req.ID)
 	}
-	return s.GetTask(ctx, id)
+	task, err := s.GetTask(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &CompleteTaskResult{Task: task, Outcome: CompleteTaskOutcomeTerminal}, nil
+}
+
+func isRetryableInfraFailure(req CompleteTaskRequest) bool {
+	return strings.TrimSpace(req.FailureKind) == api.FailureKindRunnerInfra && !req.Canceled
+}
+
+func (s *PostgresStore) requeueInfraFailure(ctx context.Context, req CompleteTaskRequest) (*models.Task, error) {
+	type idRow struct{ ID string }
+	var rows []idRow
+	err := s.db.WithContext(ctx).Raw(`
+UPDATE tasks SET
+	status = ?,
+	claimed_at = NULL,
+	lease_until = NULL,
+	runner_id = NULL,
+	exit_code = NULL,
+	output = '',
+	result_json = NULL,
+	error_message = NULL,
+	cancel_requested = false,
+	environment_json = NULL,
+	infra_retry_count = infra_retry_count + 1
+WHERE id = ? AND runner_id = ? AND status = ? AND infra_retry_count < ?
+RETURNING id`,
+		string(models.StatusQueued), req.ID, req.RunnerID, string(models.StatusClaimed), maxInfraRetries,
+	).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return s.GetTask(ctx, rows[0].ID)
 }
 
 func nullIfEmpty(s string) *string {
