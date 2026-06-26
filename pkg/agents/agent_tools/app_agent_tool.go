@@ -134,7 +134,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"auto_layout": {
 				Type:        "object",
-				Description: "Optional auto-layout settings for canvas_yaml updates. If omitted for a canvas_yaml update, the backend applies horizontal full-canvas auto-layout by default. Omit this for console-only updates.",
+				Description: "Optional auto-layout settings for canvas_yaml updates. If omitted, update_draft stages the YAML without auto-layout. Set this only when the user explicitly wants the graph rearranged.",
 				Properties: map[string]agents.CustomToolInputSchema{
 					"scope": {
 						Type: "string",
