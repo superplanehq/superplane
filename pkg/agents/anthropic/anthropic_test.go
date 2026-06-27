@@ -793,6 +793,47 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 	assert.Equal(t, "after pause", received[2].Text)
 }
 
+func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *testing.T) {
+	canvasYAML := strings.Repeat("x", 70*1024)
+	input := map[string]any{
+		"action":      "update_draft",
+		"version_id":  "draft-version",
+		"canvas_yaml": canvasYAML,
+	}
+	event := map[string]any{
+		"id":    "evt_custom",
+		"type":  "agent.custom_tool_use",
+		"name":  "superplane_app",
+		"input": input,
+	}
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	require.Greater(t, len(payload), 64*1024)
+
+	sse := "data: " + string(payload) + "\n\n" +
+		"data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"requires_action\",\"event_ids\":[\"evt_custom\"]}}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
+	require.NotNil(t, received[0].CustomToolUse)
+	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
+	assert.Contains(t, received[0].CustomToolUse.Input, canvasYAML)
+	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
+}
+
 func TestStreamEvents_EndTurnStopReasonCompletesTurn(t *testing.T) {
 	const sse = "data: {\"type\":\"session.status_idle\",\"stop_reason\":{\"type\":\"end_turn\"}}\n\n"
 
