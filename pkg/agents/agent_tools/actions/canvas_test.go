@@ -12,9 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -44,6 +47,89 @@ func TestResolveCustomToolAutoLayout_PreservesExplicitSettings(t *testing.T) {
 	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
 	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
 	assert.Equal(t, []string{"node-1"}, layout.NodeIds)
+}
+
+func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *testing.T) {
+	changeset := requireDraftChangeset(t, []PatchOperation{
+		{
+			Op: "add_node",
+			Node: &PatchNode{
+				ID:        "new-node",
+				Name:      "New node",
+				Component: "noop",
+			},
+		},
+		{
+			Op:   "delete_node",
+			Node: &PatchNode{ID: "deleted-node"},
+		},
+	})
+
+	layout := resolvePatchDraftAutoLayout(
+		nil,
+		changeset,
+		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
+		[]models.Node{{ID: "new-node"}, {ID: "kept-node"}},
+	)
+
+	require.NotNil(t, layout)
+	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
+	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
+	assert.Equal(t, []string{"kept-node", "new-node"}, layout.NodeIds)
+}
+
+func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
+	layout := resolvePatchDraftAutoLayout(
+		&AutoLayoutInput{Scope: "full_canvas"},
+		nil,
+		nil,
+		nil,
+	)
+
+	require.NotNil(t, layout)
+	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
+	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
+	assert.Empty(t, layout.NodeIds)
+}
+
+func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
+	changeset := requireDraftChangeset(t, []PatchOperation{
+		{
+			Op: "add_node",
+			Node: &PatchNode{
+				ID:        "new-node",
+				Name:      "New node",
+				Component: "noop",
+			},
+		},
+	})
+
+	layout := resolvePatchDraftAutoLayout(
+		&AutoLayoutInput{},
+		changeset,
+		nil,
+		[]models.Node{{ID: "new-node"}},
+	)
+
+	require.NotNil(t, layout)
+	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
+	assert.Equal(t, []string{"new-node"}, layout.NodeIds)
+}
+
+func TestResolveTargetDraftVersion_UsesActionSpecificMissingVersionMessage(t *testing.T) {
+	_, err := resolveTargetDraftVersion(uuid.New(), uuid.New(), Input{Action: "patch_draft"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version_id is required for patch_draft")
+	assert.Contains(t, err.Error(), "previous patch_draft/update_draft")
+}
+
+func requireDraftChangeset(t *testing.T, operations []PatchOperation) *changesets.CanvasChangeset {
+	t.Helper()
+
+	changeset, err := buildDraftChangeset(operations)
+	require.NoError(t, err)
+	return changeset
 }
 
 func TestSummarizeNodes_UsesYamlComponentFieldName(t *testing.T) {
@@ -78,6 +164,161 @@ func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, version)
 	assert.Contains(t, err.Error(), "load live canvas version summary")
+}
+
+func TestAppAgentTool_PatchDraftStagesSmallGraphEdits(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "patch_draft",
+		VersionID: draft.ID.String(),
+		PatchOperations: []PatchOperation{
+			{
+				Op: "add_node",
+				Node: &PatchNode{
+					ID:        "first-node",
+					Name:      "First",
+					Component: "noop",
+					Position:  &PatchPosition{X: 10, Y: 20},
+				},
+			},
+			{
+				Op: "add_node",
+				Node: &PatchNode{
+					ID:        "second-node",
+					Name:      "Second",
+					Component: "noop",
+				},
+			},
+			{
+				Op: "add_edge",
+				Edge: &PatchEdge{
+					SourceID: "first-node",
+					TargetID: "second-node",
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	update, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Equal(t, "patch_draft", update.Action)
+	assert.Equal(t, draft.ID.String(), update.VersionID)
+	assert.Equal(t, 2, update.Summary.NodeCount)
+	assert.Equal(t, 1, update.Summary.EdgeCount)
+
+	described, err := canvasRepository.DescribeCanvasVersion(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		update.VersionID,
+	)
+	require.NoError(t, err)
+	assert.True(t, described.GetStagingSummary().GetHasStaging())
+	assert.Contains(t, described.GetStagingSummary().GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
+
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		update.VersionID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	require.NoError(t, err)
+	require.Len(t, patched.GetSpec().GetNodes(), 2)
+	require.Len(t, patched.GetSpec().GetEdges(), 1)
+	assert.Equal(t, "first-node", patched.GetSpec().GetNodes()[0].GetId())
+	assert.Equal(t, "second-node", patched.GetSpec().GetNodes()[1].GetId())
+	assert.Equal(t, "default", patched.GetSpec().GetEdges()[0].GetChannel())
+}
+
+func TestAppAgentTool_PatchDraftAddsIntegrationBackedNode(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+	integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
+		{Name: "github.createIssue", State: core.IntegrationCapabilityStateEnabled},
+	})
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "patch_draft",
+		VersionID: draft.ID.String(),
+		PatchOperations: []PatchOperation{
+			{
+				Op: "add_node",
+				Node: &PatchNode{
+					ID:            "create-issue",
+					Name:          "Create issue",
+					Component:     "github.createIssue",
+					IntegrationID: integration.ID.String(),
+					Configuration: map[string]any{
+						"repository": "superplanehq/superplane",
+						"title":      "Generated issue",
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	update, ok := result.(updateResult)
+	require.True(t, ok)
+	assert.Empty(t, update.NodeIssues)
+
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
+		ctx,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		update.VersionID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+	)
+	require.NoError(t, err)
+
+	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	require.NoError(t, err)
+	require.Len(t, patched.GetSpec().GetNodes(), 1)
+	node := patched.GetSpec().GetNodes()[0]
+	assert.Equal(t, "github.createIssue", node.GetComponent())
+	require.NotNil(t, node.GetIntegration())
+	assert.Equal(t, integration.ID.String(), *node.GetIntegration().Id)
 }
 
 func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
@@ -682,7 +923,7 @@ func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "use update_draft")
+	assert.Contains(t, err.Error(), "use patch_draft or update_draft")
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
@@ -725,6 +966,8 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.True(t, toolActions["create_draft"].Allowed)
 	require.Contains(t, toolActions, "update_draft")
 	assert.True(t, toolActions["update_draft"].Allowed)
+	require.Contains(t, toolActions, "patch_draft")
+	assert.True(t, toolActions["patch_draft"].Allowed)
 	require.Contains(t, toolActions, "read_runtime")
 	assert.True(t, toolActions["read_runtime"].Allowed)
 	require.Contains(t, toolActions, "list_files")
