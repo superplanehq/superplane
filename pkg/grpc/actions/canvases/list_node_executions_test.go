@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -160,6 +161,70 @@ func Test__ListNodeExecutions(t *testing.T) {
 		require.NotNil(t, response.Executions[0].RootEvent)
 		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
 	})
+}
+
+func Test__SerializeNodeExecutions__MissingRootEventResolvesNil(t *testing.T) {
+	now := time.Now()
+	execution := models.CanvasNodeExecution{
+		ID:          uuid.New(),
+		WorkflowID:  uuid.New(),
+		NodeID:      "node-1",
+		RootEventID: uuid.New(),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+
+	serialized, err := SerializeNodeExecutions(
+		[]models.CanvasNodeExecution{execution},
+		&NodeExecutionResources{
+			rootEventsByID:            map[string]models.CanvasEvent{},
+			outputEventsByExecutionID: map[string][]models.CanvasEvent{},
+			cancelledByUsersByID:      map[uuid.UUID]models.User{},
+		},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, serialized, 1)
+	assert.Equal(t, execution.ID.String(), serialized[0].Id)
+	assert.Nil(t, serialized[0].RootEvent)
+}
+
+func Test__SerializeNodeExecutions__NonMapRootEventDataResolvesEmpty(t *testing.T) {
+	now := time.Now()
+	rootEventID := uuid.New()
+	rootEvent := models.CanvasEvent{
+		ID:         rootEventID,
+		WorkflowID: uuid.New(),
+		NodeID:     "node-1",
+		Channel:    "default",
+		Data:       models.NewJSONValue(nil),
+		CreatedAt:  &now,
+	}
+
+	execution := models.CanvasNodeExecution{
+		ID:          uuid.New(),
+		WorkflowID:  rootEvent.WorkflowID,
+		NodeID:      "node-1",
+		RootEventID: rootEventID,
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+	}
+
+	serialized, err := SerializeNodeExecutions(
+		[]models.CanvasNodeExecution{execution},
+		&NodeExecutionResources{
+			rootEventsByID:            map[string]models.CanvasEvent{rootEventID.String(): rootEvent},
+			outputEventsByExecutionID: map[string][]models.CanvasEvent{},
+			cancelledByUsersByID:      map[uuid.UUID]models.User{},
+		},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, serialized, 1)
+	require.NotNil(t, serialized[0].RootEvent)
+	assert.Equal(t, rootEventID.String(), serialized[0].RootEvent.Id)
+	require.NotNil(t, serialized[0].RootEvent.Data)
+	assert.Empty(t, serialized[0].RootEvent.Data.AsMap())
 }
 
 func SerializeThosandNodeExecutions(b *testing.B) {

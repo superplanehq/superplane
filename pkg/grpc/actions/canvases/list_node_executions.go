@@ -374,14 +374,26 @@ func cancelledByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef 
 }
 
 func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents map[string]models.CanvasEvent) (*pb.CanvasEvent, error) {
+	//
+	// Root events can be removed independently from their executions
+	// (for example by the retention worker, which deletes a root event chain in
+	// a transaction that runs concurrently with API reads). Treat the missing
+	// root event as nil so the endpoint keeps returning the remaining executions
+	// instead of failing with a 500.
+	//
 	rootEvent, ok := rootEvents[execution.RootEventID.String()]
 	if !ok {
-		return nil, fmt.Errorf("root event not found for execution %s", execution.ID.String())
+		return nil, nil
 	}
 
-	data, ok := rootEvent.Data.Data().(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("event data is not a map[string]any")
+	//
+	// Event data is expected to be a JSON object, but defend against any
+	// non-object value (e.g. JSON null/array/string) ending up persisted by
+	// falling back to an empty object instead of erroring the whole response.
+	//
+	data, _ := rootEvent.Data.Data().(map[string]any)
+	if data == nil {
+		data = map[string]any{}
 	}
 
 	s, err := newStructpbStruct(data)
