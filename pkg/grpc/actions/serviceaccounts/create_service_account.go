@@ -8,7 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	"gorm.io/gorm"
@@ -85,7 +85,8 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to create service account")
 	}
 
-	creator, err := creatorUserForServiceAccount(orgID, sa)
+	db := database.DB(ctx)
+	creator, err := creatorUserForServiceAccount(db, orgID, sa)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create service account")
 	}
