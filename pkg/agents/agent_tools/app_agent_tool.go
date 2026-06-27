@@ -63,7 +63,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read, create drafts, update the current SuperPlane app canvas, and manage app repository files. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, list_integrations for connected integration IDs, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft and file write actions require version_id and update that selected draft branch."
+	return "Inspect access, read, create drafts, update the current SuperPlane app canvas, and manage app repository files. This is the only way to reach the app; there is no command line or HTTP API to call. Use access to check the current session's interceptor-backed permissions, read for canvas YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, list_integrations for connected integration IDs, list_resources for integration-backed resource values, and update_draft to save draft graph or Console changes. The tool is bound to the current agent session's canvas and will reject attempts to access any other canvas. It never publishes drafts; update_draft and file write actions require version_id and update that selected draft branch."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -73,7 +73,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, update_draft to save canvas_yaml and/or console_yaml to a selected draft, and list_integrations for connected integration IDs.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, update_draft to save canvas_yaml and/or console_yaml to a selected draft, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
 			},
 			"canvas_id": {
 				Type:        "string",
@@ -102,6 +102,18 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"include_integrations": {
 				Type:        "boolean",
 				Description: "For read. Include connected integration IDs, names, vendors, and state.",
+			},
+			"integration_id": {
+				Type:        "string",
+				Description: "For list_resources. Connected integration ID returned by list_integrations or read with include_integrations.",
+			},
+			"resource_type": {
+				Type:        "string",
+				Description: "For list_resources. Integration resource type to list, for example repository, model, project, workflow, service, or application. Use the resource type requested by the component schema field.",
+			},
+			"parameters": {
+				Type:        "object",
+				Description: "For list_resources. Optional provider-specific string parameters. The backend also receives resource_type as parameter type.",
 			},
 			"path": {
 				Type:        "string",
@@ -169,7 +181,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"limit": {
 				Type:        "integer",
-				Description: "For read_runtime paginated resources. Backend defaults apply when omitted.",
+				Description: "For read_runtime paginated resources and list_resources. Backend defaults apply when omitted; list_resources caps results to keep responses concise.",
 			},
 			"before": {
 				Type:        "string",
