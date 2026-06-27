@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, looksLikeBrowserNetworkError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,21 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  describe("looksLikeBrowserNetworkError", () => {
+    it("matches the generic network failure messages emitted by browsers", () => {
+      expect(looksLikeBrowserNetworkError("Failed to fetch")).toBe(true);
+      expect(looksLikeBrowserNetworkError("  failed to fetch  ")).toBe(true);
+      expect(looksLikeBrowserNetworkError("Load failed")).toBe(true);
+      expect(looksLikeBrowserNetworkError("Network request failed")).toBe(true);
+      expect(looksLikeBrowserNetworkError("NetworkError when attempting to fetch resource.")).toBe(true);
+    });
+
+    it("returns false for actionable error messages", () => {
+      expect(looksLikeBrowserNetworkError("")).toBe(false);
+      expect(looksLikeBrowserNetworkError("account organization limit exceeded")).toBe(false);
+      expect(looksLikeBrowserNetworkError("Unauthorized")).toBe(false);
+    });
   });
 });
