@@ -38,17 +38,17 @@ func InvokeNodeExecutionHook(
 
 	canvas, err := models.FindCanvas(orgID, canvasID)
 	if err != nil {
-		return nil, fmt.Errorf("canvas not found: %w", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	execution, err := models.FindNodeExecution(canvas.ID, executionID)
 	if err != nil {
-		return nil, fmt.Errorf("execution not found: %w", err)
+		return nil, grpcerrors.NotFound(err, "execution not found")
 	}
 
 	node, err := canvas.FindNode(execution.NodeID)
 	if err != nil {
-		return nil, fmt.Errorf("node not found: %w", err)
+		return nil, grpcerrors.NotFound(err, "node not found")
 	}
 
 	if node.Type != models.NodeTypeComponent || node.Ref.Data().Component == nil {
@@ -57,20 +57,20 @@ func InvokeNodeExecutionHook(
 
 	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
 	if err != nil {
-		return nil, fmt.Errorf("hook not found: %w", err)
+		return nil, grpcerrors.NotFound(err, "hook not found")
 	}
 
 	if hookDef.Type != core.HookTypeUser {
-		return nil, fmt.Errorf("hook '%s' cannot be invoked", hookName)
+		return nil, grpcerrors.PermissionDenied(nil, fmt.Sprintf("hook '%s' cannot be invoked by user", hookName))
 	}
 
 	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
-		return nil, fmt.Errorf("hook parameters validation failed: %w", err)
+		return nil, grpcerrors.InvalidArgument(err, "hook parameter validation failed")
 	}
 
 	user, err := models.FindActiveUserByID(orgID.String(), userID)
 	if err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+		return nil, grpcerrors.NotFound(err, "user not found")
 	}
 
 	newEvents := []models.CanvasEvent{}
