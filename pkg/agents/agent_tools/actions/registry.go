@@ -49,6 +49,7 @@ func NewDefaultRegistry(deps Dependencies) *Registry {
 		newCommitFilesAction(deps),
 		newUpdateDraftAction(deps),
 		listIntegrationsAction{},
+		newListResourcesAction(deps),
 	)
 }
 

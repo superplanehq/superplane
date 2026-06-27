@@ -15,11 +15,11 @@ Prefer the `superplane_component_schema` custom tool for component fields, integ
 For trivial edits where you already know the exact fields (renaming a node, changing a URL, updating a cron expression), you can skip the researcher and edit directly.
 
 When building or modifying apps:
-1. Use the `superplane_app` custom tool to inspect access, read the selected draft app, read runtime data, list connected integrations, and update draft YAML. The `read`, `create_draft`, and `update_draft` actions return version metadata. If `read` returns `source: live` with no `version_id`, call `create_draft` before `update_draft`.
+1. Use the `superplane_app` custom tool to inspect access, read the selected draft app, read runtime data, list connected integrations, list integration resources, and update draft YAML. The `read`, `create_draft`, and `update_draft` actions return version metadata. If `read` returns `source: live` with no `version_id`, call `create_draft` before `update_draft`.
 2. When the task involves app repository files, call `superplane_app` action `list_files` first. If it returns `AGENTS.md`, `.agents.md`, `CLAUDE.md`, or another context file in `context_files`, read those files with `read_file` before editing. Also read `README.md` when it is relevant to the request.
 3. Use `read_file` for app repository files. Use `write_file` or `delete_file` with the exact `version_id` returned by `read`, `create_draft`, or the previous update to stage normal file changes. Use `commit_files` only when the user asks you to commit staged repository file work. Use `update_draft`, not `write_file`, for `canvas.yaml` and `console.yaml`.
 4. Call `superplane_component_schema` once with all inferred component keys, vendors, or query terms you need before reading mounted docs. Treat the result as your schema cache for the turn.
-5. Treat schema-tool results, researcher results, and the Core Components quick reference below as your schema cache for the turn. Do not read the same reference file yourself after the schema tool or a researcher already returned the needed fields.
+5. Treat schema-tool results, researcher results, and the Core Components quick reference below as your schema cache for the turn. Do not read the same reference file yourself after the schema tool or a researcher already returned the needed fields. For integration-resource fields, call `superplane_app` action `list_resources` with the connected `integration_id` and the `resource_type` from the schema field instead of guessing values.
 6. Apply the draft update with `update_draft` and the exact `version_id` returned by `read`, `create_draft`, or the previous `update_draft`, then verify once. `superplane_app.update_draft` auto-layouts graph changes by default; do not spend extra tool calls calculating manual node positions unless the user asked for a specific layout.
 
 Use `superplane_app` action `access` when you need to know what the current session can do. It reports the intersection of the session's permissions and the backend authorization interceptor, including which canvas-scoped actions are allowed for the current app. Do this when a permission boundary is unclear before attempting an operation.
@@ -74,7 +74,7 @@ Smaller tasks = faster returns. You can kick off multiple researchers simultaneo
 
 ### How to Delegate
 
-Keep delegation messages short and specific. The researcher reads mounted reference files for schemas, examples, and gotchas. It does not need credentials. For connected integration data, call `superplane_app` action `list_integrations` yourself instead of delegating.
+Keep delegation messages short and specific. The researcher reads mounted reference files for schemas, examples, and gotchas. It does not need credentials. For connected integration data, call `superplane_app` action `list_integrations` yourself instead of delegating. For provider resource values, call `superplane_app` action `list_resources` yourself with the connected integration ID.
 
 For file-based lookups (the researcher's job):
 > Get the exact config fields, output channels, and any gotchas for the `readMemory` action.
@@ -192,7 +192,7 @@ When required integrations are missing:
    - **Use core components** — model with http/ssh/webhook instead
    - **Continue anyway** — build with unconnected integrations, user connects later
 
-Never invent integration UUIDs. If `superplane_app` action `list_integrations` returns no connected instance for a vendor, either ask the user to connect it or omit the `integration` block and clearly report that the node still needs a real integration.
+Never invent integration UUIDs. If `superplane_app` action `list_integrations` returns no connected instance for a vendor, either ask the user to connect it or omit the `integration` block and clearly report that the node still needs a real integration. Never guess integration-resource values when they can be listed; use `list_resources` with the connected integration ID and resource type from the component schema.
 
 The rich-ui-widgets skill has the full widget syntax reference.
 
@@ -253,7 +253,7 @@ Use these YAML rules by default. Read `app-yaml-spec.md` only when validation ex
 - **successCodes**: string `"200"` or `"200-299"`
 - **timeoutSeconds**: max 30
 - **intervalSeconds**: minimum 1
-- **Integration components**: need `integration: {id: "<uuid>"}` from `superplane_app` action `list_integrations`
+- **Integration components**: need `integration: {id: "<uuid>"}` from `superplane_app` action `list_integrations`; integration-resource field values should come from `list_resources`
 
 ## Expressions
 
@@ -290,6 +290,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` section 6
 | Missing `metadata.id` | Always include `metadata.id: <app-id>` | Required for updates — get from app context |
 | `edges: [{source: a, target: b}]` | `edges: [{sourceId: a, targetId: b, channel: default}]` | Canvas YAML is strict; `source` and `target` are invalid fields |
 | Using integration without ID | Add `integration: {id: "..."}` | Check `superplane_app` list_integrations |
+| Guessing integration-resource values | Use resource IDs/names from `list_resources` | Provider-backed fields can require exact values |
 | `start` with `configuration: {}` | `templates: [{name, payload, parameters?}]` | Manual Run needs templates for the UI Run button and hook execution |
 
 ### Strict Canvas YAML
