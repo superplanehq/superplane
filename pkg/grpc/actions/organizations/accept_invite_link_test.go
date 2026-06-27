@@ -22,7 +22,7 @@ func Test__AcceptInviteLinkWithUsage(t *testing.T) {
 	t.Run("usage limit violation blocks joining organization", func(t *testing.T) {
 		account, err := models.CreateAccount(support.RandomName("account")+"@example.com", support.RandomName("user"))
 		require.NoError(t, err)
-		inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(context.Background()), r.Organization.ID.String())
+		inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(t.Context()), r.Organization.ID.String())
 		require.NoError(t, err)
 		userCount, err := models.CountActiveHumanUsersByOrganization(r.Organization.ID.String())
 		require.NoError(t, err)
@@ -53,7 +53,7 @@ func Test__AcceptInviteLinkWithUsage(t *testing.T) {
 	})
 
 	t.Run("already member bypasses usage check", func(t *testing.T) {
-		inviteLink, err := models.FindInviteLinkByOrganizationID(database.Conn(), r.Organization.ID.String())
+		inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(t.Context()), r.Organization.ID.String())
 		require.NoError(t, err)
 
 		service := &fakeUsageService{

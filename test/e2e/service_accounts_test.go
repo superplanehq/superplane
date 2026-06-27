@@ -187,7 +187,7 @@ func (s *serviceAccountSteps) dismissTokenModal() {
 
 func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, expectedRole string) {
 	orgID := s.session.OrgID.String()
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.Conn(), orgID)
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), orgID)
 	require.NoError(s.t, err)
 
 	var found *models.User
@@ -280,7 +280,7 @@ func (s *serviceAccountSteps) submitEdit() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountNameInDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.Conn(), s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {
@@ -299,7 +299,7 @@ func (s *serviceAccountSteps) clickDeleteOnDetail() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountDeletedFromDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.Conn(), s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {
