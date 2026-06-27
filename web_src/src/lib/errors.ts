@@ -93,3 +93,38 @@ function looksLikeBrowserNetworkError(value: string): boolean {
     normalized.includes("networkerror when attempting to fetch resource")
   );
 }
+
+/**
+ * Recognizes `ReferenceError` messages whose missing identifier is short
+ * enough to be a Vite/esbuild minified symbol (e.g. `Z`, `oU`, `Gy`, `vl`).
+ *
+ * The production bundle ships as a single ES module: every top-level
+ * binding is hoisted in the same lexical scope, so a "real" missing
+ * reference to one of those minified symbols would crash the first render
+ * for every user. In practice these reports come from third-party scripts
+ * — Safari/iOS content blockers, accessibility overlays, page-rewriting
+ * extensions — that inject or rewrite code in the page and evaluate
+ * expressions outside the bundle's module scope.
+ *
+ * Real bugs in our source surface with descriptive identifier names
+ * (the unminified symbol survives in the runtime error message), so the
+ * heuristic only matches 1–3 character identifiers.
+ *
+ * Covers both engine phrasings, with or without the `ReferenceError: `
+ * prefix:
+ *   - Safari / WebKit:           `Can't find variable: Z`
+ *   - Chrome / V8 and Firefox:   `Z is not defined`
+ */
+export function looksLikeMinifiedReferenceError(value: string): boolean {
+  const normalized = value.trim();
+
+  return MINIFIED_SAFARI_REFERENCE_ERROR.test(normalized) || MINIFIED_V8_REFERENCE_ERROR.test(normalized);
+}
+
+const MINIFIED_IDENTIFIER = String.raw`[A-Za-z_$][A-Za-z0-9_$]{0,2}`;
+const MINIFIED_SAFARI_REFERENCE_ERROR = new RegExp(
+  String.raw`^(?:ReferenceError:\s+)?Can't find variable:\s+${MINIFIED_IDENTIFIER}$`,
+);
+const MINIFIED_V8_REFERENCE_ERROR = new RegExp(
+  String.raw`^(?:ReferenceError:\s+)?${MINIFIED_IDENTIFIER} is not defined$`,
+);

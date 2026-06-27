@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, looksLikeMinifiedReferenceError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,32 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+});
+
+describe("looksLikeMinifiedReferenceError", () => {
+  it("matches Safari/WebKit messages with 1–3 character identifiers", () => {
+    expect(looksLikeMinifiedReferenceError("Can't find variable: Z")).toBe(true);
+    expect(looksLikeMinifiedReferenceError("Can't find variable: oU")).toBe(true);
+    expect(looksLikeMinifiedReferenceError("Can't find variable: Gy")).toBe(true);
+    expect(looksLikeMinifiedReferenceError("ReferenceError: Can't find variable: vl")).toBe(true);
+  });
+
+  it("matches V8/Firefox messages with 1–3 character identifiers", () => {
+    expect(looksLikeMinifiedReferenceError("Z is not defined")).toBe(true);
+    expect(looksLikeMinifiedReferenceError("oU is not defined")).toBe(true);
+    expect(looksLikeMinifiedReferenceError("ReferenceError: Gy is not defined")).toBe(true);
+  });
+
+  it("ignores descriptive identifier names", () => {
+    expect(looksLikeMinifiedReferenceError("Can't find variable: useExecutionState")).toBe(false);
+    expect(looksLikeMinifiedReferenceError("dispatchSetState is not defined")).toBe(false);
+    expect(looksLikeMinifiedReferenceError("ReferenceError: requestUpdateLane is not defined")).toBe(false);
+  });
+
+  it("ignores unrelated error shapes", () => {
+    expect(looksLikeMinifiedReferenceError("TypeError: undefined is not an object")).toBe(false);
+    expect(looksLikeMinifiedReferenceError("SyntaxError: Unexpected token")).toBe(false);
+    expect(looksLikeMinifiedReferenceError("")).toBe(false);
   });
 });
