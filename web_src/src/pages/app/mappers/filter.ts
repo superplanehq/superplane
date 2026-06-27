@@ -77,9 +77,9 @@ type FilterConfiguration = {
 export const filterMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const componentName = context.componentDefinition.name || "filter";
-    const configuration = context.node.configuration as FilterConfiguration;
+    const configuration = context.node.configuration as FilterConfiguration | undefined;
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const specs = configuration.expression
+    const specs = configuration?.expression
       ? [
           {
             title: "Expression",
@@ -111,10 +111,10 @@ export const filterMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const configuration = context.execution.configuration as FilterConfiguration;
+    const configuration = context.execution.configuration as FilterConfiguration | undefined;
     const details: Record<string, any> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
-      Expression: configuration.expression,
+      Expression: configuration?.expression ?? "",
     };
 
     return details;

@@ -81,9 +81,9 @@ type IfConfiguration = {
 export const ifMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const componentName = context.componentDefinition.name || "if";
-    const configuration = context.node.configuration as IfConfiguration;
+    const configuration = context.node.configuration as IfConfiguration | undefined;
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const specs = configuration.expression
+    const specs = configuration?.expression
       ? [
           {
             title: "Expression",
@@ -115,10 +115,10 @@ export const ifMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const configuration = context.execution.configuration as IfConfiguration;
+    const configuration = context.execution.configuration as IfConfiguration | undefined;
     const details: Record<string, any> = {
       "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
-      Expression: configuration.expression,
+      Expression: configuration?.expression ?? "",
     };
 
     return details;
