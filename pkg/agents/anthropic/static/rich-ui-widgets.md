@@ -61,7 +61,7 @@ message: Draft ready — added health check nodes
 :::
 ```
 
-`versionId` is the same value as the draft id (`version_id`) returned by `superplane_app` action `update_draft` — a draft's id *is* a version id. Use it as the `versionId` in this block.
+`versionId` is the same value as the draft id (`version_id`) returned by `superplane_app` action `patch_draft` or `update_draft` — a draft's id *is* a version id. Use it as the `versionId` in this block.
 ## Chart
 
 **When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.
