@@ -153,9 +153,22 @@ func resolveTargetDraftVersion(canvasID, userID uuid.UUID, input Input) (*models
 		return nil, err
 	}
 	if requested == uuid.Nil {
-		return nil, fmt.Errorf("version_id is required for update_draft; pass the version_id returned by read, create_draft, or the previous update_draft; if read returned live with no version_id, call create_draft first")
+		return nil, draftVersionRequiredError(input.Action)
 	}
 	return validatedOwnedDraftVersion(canvasID, userID, requested)
+}
+
+func draftVersionRequiredError(action string) error {
+	switch strings.TrimSpace(action) {
+	case patchDraftActionName:
+		return fmt.Errorf("version_id is required for patch_draft; pass the version_id returned by read, create_draft, or the previous patch_draft/update_draft; if read returned live with no version_id, call create_draft first")
+	case updateDraftActionName:
+		return fmt.Errorf("version_id is required for update_draft; pass the version_id returned by read, create_draft, or the previous update_draft/patch_draft; if read returned live with no version_id, call create_draft first")
+	case "":
+		return fmt.Errorf("version_id is required; pass the version_id returned by read, create_draft, or the previous draft update; if read returned live with no version_id, call create_draft first")
+	default:
+		return fmt.Errorf("version_id is required for %s; pass the version_id returned by read, create_draft, or the previous draft update; if read returned live with no version_id, call create_draft first", strings.TrimSpace(action))
+	}
 }
 
 func resolveReadableDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
