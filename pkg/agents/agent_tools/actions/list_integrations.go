@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -17,15 +18,17 @@ func (listIntegrationsAction) Name() string {
 	return listIntegrationsActionName
 }
 
-func (listIntegrationsAction) Execute(_ context.Context, session agents.AgentSessionContext, _ Input) (any, error) {
+func (listIntegrationsAction) Execute(ctx context.Context, session agents.AgentSessionContext, _ Input) (any, error) {
 	orgID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
 		return integrationsResult{}, fmt.Errorf("invalid session organization id: %w", err)
 	}
-	integrations, err := listConnectedIntegrations(orgID)
+
+	integrations, err := listConnectedIntegrations(ctx, orgID)
 	if err != nil {
 		return integrationsResult{}, err
 	}
+
 	return integrationsResult{
 		Action:       "list_integrations",
 		CanvasID:     session.CanvasID,
@@ -33,8 +36,9 @@ func (listIntegrationsAction) Execute(_ context.Context, session agents.AgentSes
 	}, nil
 }
 
-func listConnectedIntegrations(orgID uuid.UUID) ([]integrationResult, error) {
-	integrations, err := models.ListIntegrations(orgID)
+func listConnectedIntegrations(ctx context.Context, orgID uuid.UUID) ([]integrationResult, error) {
+	db := database.DB(ctx)
+	integrations, err := models.ListIntegrations(db, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list integrations: %w", err)
 	}

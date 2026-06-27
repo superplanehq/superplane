@@ -49,7 +49,8 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to update service account")
 	}
 
-	creator, err := creatorUserForServiceAccount(orgID, user)
+	db := database.DB(ctx)
+	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update service account")
 	}
