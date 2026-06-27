@@ -153,13 +153,13 @@ func FindUnscopedUserByID(id string) (*User, error) {
 	return &user, err
 }
 
-func FindUsersByIDs(ids []string) ([]User, error) {
+func FindUsersByIDs(db *gorm.DB, ids []string) ([]User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	var users []User
-	err := database.Conn().
+	err := db.
 		Where("id IN ?", ids).
 		Find(&users).Error
 
@@ -475,14 +475,18 @@ type UserAccountProvider struct {
 	UserID string
 }
 
-func FindUserAccountProviders(users []User) ([]UserAccountProvider, error) {
+func FindUserAccountProviders(db *gorm.DB, users []User) ([]UserAccountProvider, error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
+
 	userIDs := make([]string, len(users))
 	for i, user := range users {
 		userIDs[i] = user.ID.String()
 	}
 
 	var accountProviders []UserAccountProvider
-	err := database.Conn().
+	err := db.
 		Table("users").
 		Select("users.id as user_id, account_providers.*").
 		Joins("inner join accounts on accounts.id = users.account_id").

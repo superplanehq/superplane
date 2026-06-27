@@ -86,9 +86,9 @@ func FindRoleMetadata(roleName, domainType, domainID string) (*RoleMetadata, err
 	return &metadata, nil
 }
 
-func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, error) {
+func FindGroupMetadata(db *gorm.DB, groupName, domainType, domainID string) (*GroupMetadata, error) {
 	var metadata GroupMetadata
-	err := database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
+	err := db.Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
 	if err != nil {
 		return nil, err
 	}

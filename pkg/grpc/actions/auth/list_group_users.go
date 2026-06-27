@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,6 +17,8 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 	if groupName == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "group name must be specified")
 	}
+
+	db := database.DB(ctx)
 
 	role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 	if err != nil {
@@ -29,18 +32,18 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 		return nil, grpcerrors.Internal(err, "failed to get group users")
 	}
 
-	users, err := models.FindUsersByIDs(userIDs)
+	users, err := models.FindUsersByIDs(db, userIDs)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to fetch group users")
 	}
 
-	accountProviders, err := models.FindUserAccountProviders(users)
+	accountProviders, err := models.FindUserAccountProviders(db, users)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to fetch account providers")
 	}
 
 	protoUsers := usersToProto(users, accountProviders)
-	groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+	groupMetadata, err := models.FindGroupMetadata(db, groupName, domainType, domainID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "group not found")
 	}

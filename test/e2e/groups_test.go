@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -49,7 +50,7 @@ func (s *GroupsSteps) fillInCreateGroupForm(name string) {
 func (s *GroupsSteps) assertGroupSavedInDB(displayName string) {
 	groupName := normalizeGroupName(displayName)
 
-	metadata, err := models.FindGroupMetadata(groupName, models.DomainTypeOrganization, s.session.OrgID.String())
+	metadata, err := models.FindGroupMetadata(database.Conn(), groupName, models.DomainTypeOrganization, s.session.OrgID.String())
 	require.NoError(s.t, err)
 	require.Equal(s.t, displayName, metadata.DisplayName)
 }

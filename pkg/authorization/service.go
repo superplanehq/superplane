@@ -260,12 +260,13 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to get current group role: %w", err)
 	}
 
-	currentGroupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+	tx := database.Conn().Begin()
+	currentGroupMetadata, err := models.FindGroupMetadata(tx, groupName, domainType, domainID)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to get current group metadata: %w", err)
 	}
 
-	tx := database.Conn().Begin()
 	err = models.UpsertGroupMetadataInTransaction(
 		tx,
 		groupName,

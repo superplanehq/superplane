@@ -68,7 +68,7 @@ func (c *AuthReader) GetRole(name string) (*core.RoleRef, error) {
 }
 
 func (c *AuthReader) GetGroup(name string) (*core.GroupRef, error) {
-	groupMetadata, err := models.FindGroupMetadata(name, models.DomainTypeOrganization, c.orgID.String())
+	groupMetadata, err := models.FindGroupMetadata(c.tx, name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting group metadata: %v", err)
 	}

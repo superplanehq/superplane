@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,7 +22,7 @@ func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, 
 		return nil, grpcerrors.NotFound(err, "group not found")
 	}
 
-	groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+	groupMetadata, err := models.FindGroupMetadata(database.DB(ctx), groupName, domainType, domainID)
 	var displayName, description string
 	var createdAt, updatedAt *timestamppb.Timestamp
 	if err == nil {

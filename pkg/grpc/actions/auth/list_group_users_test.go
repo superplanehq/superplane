@@ -64,4 +64,13 @@ func Test_ListGroupUsers(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
+
+	t.Run("canceled context surfaces as canceled instead of internal", func(t *testing.T) {
+		canceledCtx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := ListGroupUsers(canceledCtx, models.DomainTypeOrganization, orgID, "test-group", r.AuthService)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
 }

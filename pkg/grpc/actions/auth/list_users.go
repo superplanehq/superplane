@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -28,7 +29,7 @@ func ListUsers(
 		return nil, grpcerrors.Internal(err, "failed to fetch users")
 	}
 
-	accountProviders, err := models.FindUserAccountProviders(users)
+	accountProviders, err := models.FindUserAccountProviders(database.DB(ctx), users)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to fetch account providers")
 	}

@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -24,7 +25,7 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 
 	var displayName string
 	var description string
-	groupModelMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+	groupModelMetadata, err := models.FindGroupMetadata(database.DB(ctx), groupName, domainType, domainID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get group metadata")
 	}

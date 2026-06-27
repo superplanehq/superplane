@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,6 +18,7 @@ func ListGroups(ctx context.Context, domainType string, domainID string, authSer
 		return nil, grpcerrors.Internal(err, "failed to get groups")
 	}
 
+	db := database.DB(ctx)
 	groups := make([]*pb.Group, len(groupNames))
 	for i, groupName := range groupNames {
 		role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
@@ -29,7 +31,7 @@ func ListGroups(ctx context.Context, domainType string, domainID string, authSer
 			return nil, grpcerrors.Internal(err, "failed to get group members count")
 		}
 
-		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+		groupMetadata, err := models.FindGroupMetadata(db, groupName, domainType, domainID)
 		var createdAt, updatedAt *timestamppb.Timestamp
 		var displayName, description string
 		if err == nil {

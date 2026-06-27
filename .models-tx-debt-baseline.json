@@ -1,6 +1,6 @@
 {
   "maxAllowedInTransactionDefinitions": 185,
-  "maxAllowedDatabaseConnCalls": 209,
+  "maxAllowedDatabaseConnCalls": 206,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -351,7 +351,6 @@
     "pkg/models/role_metadata.go:Create:database.Conn()#1",
     "pkg/models/role_metadata.go:Update:database.Conn()#1",
     "pkg/models/role_metadata.go:FindRoleMetadata:database.Conn()#1",
-    "pkg/models/role_metadata.go:FindGroupMetadata:database.Conn()#1",
     "pkg/models/role_metadata.go:UpsertRoleMetadata:database.Conn()#1",
     "pkg/models/role_metadata.go:UpsertGroupMetadata:database.Conn()#1",
     "pkg/models/role_metadata.go:DeleteRoleMetadata:database.Conn()#1",
@@ -369,7 +368,6 @@
     "pkg/models/user.go:UpdateTokenHash:database.Conn()#1",
     "pkg/models/user.go:CreateUser:database.Conn()#1",
     "pkg/models/user.go:FindUnscopedUserByID:database.Conn()#1",
-    "pkg/models/user.go:FindUsersByIDs:database.Conn()#1",
     "pkg/models/user.go:FindHumanUsersByIDs:database.Conn()#1",
     "pkg/models/user.go:FindMaybeDeletedUserByID:database.Conn()#1",
     "pkg/models/user.go:ListAllActiveUsersInOrganization:database.Conn()#1",
@@ -385,7 +383,6 @@
     "pkg/models/user.go:CountOrganizationsByBillingAccount:database.Conn()#1",
     "pkg/models/user.go:FindAnyUserByEmail:database.Conn()#1",
     "pkg/models/user.go:FindFirstHumanUserByOrganization:database.Conn()#1",
-    "pkg/models/user.go:FindUserAccountProviders:database.Conn()#1",
     "pkg/models/webhook.go:FindWebhook:database.Conn()#1",
     "pkg/models/webhook.go:FindWebhookNodes:database.Conn()#1",
     "pkg/models/webhook.go:FindActiveWebhookNodes:database.Conn()#1",
@@ -399,5 +396,5 @@
     "pkg/models/workflow_staging.go:HasWorkflowStaging:database.Conn()#1",
     "pkg/models/workflow_staging.go:FindWorkflowStagingPath:database.Conn()#1"
   ],
-  "updatedAt": "2026-06-27T13:08:33Z"
+  "updatedAt": "2026-06-27T16:08:33Z"
 }
