@@ -22,5 +22,6 @@ func TestDefaultAgentPromptGuidesRepositoryFileContextDiscovery(t *testing.T) {
 	assert.Contains(t, prompt, "read_file")
 	assert.Contains(t, prompt, "write_file")
 	assert.Contains(t, prompt, "commit_files")
-	assert.Contains(t, prompt, "Use `update_draft`, not `write_file`, for `canvas.yaml` and `console.yaml`")
+	assert.Contains(t, prompt, "Use `patch_draft` or `update_draft`, not `write_file`, for `canvas.yaml`")
+	assert.Contains(t, prompt, "use `update_draft`, not `write_file`, for `console.yaml`")
 }
