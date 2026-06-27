@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import type { CanvasesCanvasRun } from "@/api-client";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -27,20 +27,41 @@ export function useInFlightTriggers(
   const enabled = Boolean(canvasId) && triggerNodeIds.length > 0;
   const query = useInfiniteCanvasRuns(canvasId ?? "", { states: ["STATE_STARTED"] }, enabled);
 
+  // Re-using the previous Set when its content is unchanged keeps the
+  // reference stable across renders. Downstream effects (e.g. the submission
+  // lock in WidgetTableActionLock) depend on `inFlight` as a `useEffect` dep,
+  // and recomputing a fresh Set on every render makes those effects fire on
+  // every render, multiplying state-update work for tables with row actions.
+  const inFlightRef = useRef<Set<string>>(new Set());
+
   const inFlight = useMemo(() => {
-    const out = new Set<string>();
-    if (!query.data) return out;
-    const watched = new Set(triggerNodeIds);
-    for (const page of query.data.pages ?? []) {
-      const runs: CanvasesCanvasRun[] = page?.runs ?? [];
-      for (const run of runs) {
-        if (run.state !== "STATE_STARTED") continue;
-        const nodeId = run.rootEvent?.nodeId;
-        if (nodeId && watched.has(nodeId)) out.add(nodeId);
+    const next = new Set<string>();
+    if (query.data) {
+      const watched = new Set(triggerNodeIds);
+      for (const page of query.data.pages ?? []) {
+        const runs: CanvasesCanvasRun[] = page?.runs ?? [];
+        for (const run of runs) {
+          if (run.state !== "STATE_STARTED") continue;
+          const nodeId = run.rootEvent?.nodeId;
+          if (nodeId && watched.has(nodeId)) next.add(nodeId);
+        }
       }
     }
-    return out;
+    if (areSetsEqual(inFlightRef.current, next)) {
+      return inFlightRef.current;
+    }
+    inFlightRef.current = next;
+    return next;
   }, [query.data, triggerNodeIds]);
 
   return { inFlight, isLoading: enabled && query.isLoading };
+}
+
+function areSetsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
 }
