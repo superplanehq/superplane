@@ -8,7 +8,7 @@ export function Message({ lastExecution }: { lastExecution: ExecutionInfo | null
     return null;
   }
 
-  const metadata = lastExecution?.metadata as Record<string, unknown>;
+  const metadata = (lastExecution.metadata as Record<string, unknown> | null | undefined) ?? {};
   const message = (metadata["message"] as string | undefined) || "Empty message";
   const color = (metadata["color"] as string | undefined) || "gray";
 
