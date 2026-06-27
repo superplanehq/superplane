@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, looksLikeMinifiedReferenceError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,34 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  describe("looksLikeMinifiedReferenceError", () => {
+    it("matches Safari-style ReferenceError messages for minified identifiers", () => {
+      expect(looksLikeMinifiedReferenceError("Can't find variable: Gy")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("ReferenceError: Can't find variable: vl")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("  Can't find variable: a  ")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("Can't find variable: $1")).toBe(true);
+    });
+
+    it("matches V8 / Firefox style ReferenceError messages for minified identifiers", () => {
+      expect(looksLikeMinifiedReferenceError("Gy is not defined")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("ReferenceError: vl is not defined")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("_a is not defined")).toBe(true);
+    });
+
+    it("ignores ReferenceError messages that look like real source identifiers", () => {
+      // 4+ char identifiers indicate either a real bug in our source or a
+      // global like `gtag` / `posthog` that we want to know about.
+      expect(looksLikeMinifiedReferenceError("Can't find variable: posthog")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("posthog is not defined")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("Can't find variable: ResizeObserver")).toBe(false);
+    });
+
+    it("ignores unrelated error messages", () => {
+      expect(looksLikeMinifiedReferenceError("Failed to fetch")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("Cannot read properties of undefined (reading 'foo')")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("")).toBe(false);
+    });
   });
 });
