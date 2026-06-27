@@ -93,3 +93,31 @@ function looksLikeBrowserNetworkError(value: string): boolean {
     normalized.includes("networkerror when attempting to fetch resource")
   );
 }
+
+/**
+ * Recognizes `ReferenceError` messages whose missing identifier is short
+ * enough to be a Vite/esbuild minified symbol (e.g. `oU`, `Gy`, `vl`).
+ *
+ * Our production bundle ships as a single ES module: every top-level
+ * binding is hoisted in the same lexical scope, so a "real" missing
+ * reference to one of those minified symbols would crash the first render
+ * for every user. In practice these reports come from third-party scripts
+ * — Safari/iOS content blockers, accessibility overlays, and similar
+ * browser extensions — that inject or rewrite code in the page and end up
+ * evaluating expressions outside the bundle's module scope.
+ *
+ * Real bugs in our source surface with descriptive identifier names
+ * (because the unminified symbol survives in the runtime error message),
+ * so the heuristic only matches 1–3 character identifiers.
+ */
+export function looksLikeMinifiedReferenceError(value: string): boolean {
+  const normalized = value.trim();
+
+  return MINIFIED_SAFARI_REFERENCE_ERROR.test(normalized) || MINIFIED_V8_REFERENCE_ERROR.test(normalized);
+}
+
+// Safari / WebKit: "Can't find variable: oU"
+const MINIFIED_SAFARI_REFERENCE_ERROR = /^(?:ReferenceError:\s+)?Can't find variable:\s+[A-Za-z_$][A-Za-z0-9_$]{0,2}$/;
+
+// Chrome / V8 and Firefox: "oU is not defined" (optionally prefixed with "ReferenceError: ")
+const MINIFIED_V8_REFERENCE_ERROR = /^(?:ReferenceError:\s+)?[A-Za-z_$][A-Za-z0-9_$]{0,2} is not defined$/;

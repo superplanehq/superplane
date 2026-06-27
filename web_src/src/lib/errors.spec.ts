@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, looksLikeMinifiedReferenceError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,35 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  describe("looksLikeMinifiedReferenceError", () => {
+    it("matches Safari ReferenceErrors for short minified identifiers", () => {
+      expect(looksLikeMinifiedReferenceError("Can't find variable: oU")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("Can't find variable: Gy")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("Can't find variable: a")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("ReferenceError: Can't find variable: oU")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("  Can't find variable: oU  ")).toBe(true);
+    });
+
+    it("matches V8 / Firefox ReferenceErrors for short minified identifiers", () => {
+      expect(looksLikeMinifiedReferenceError("oU is not defined")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("ReferenceError: vl is not defined")).toBe(true);
+      expect(looksLikeMinifiedReferenceError("$ is not defined")).toBe(true);
+    });
+
+    it("does not match descriptive identifier names that likely indicate real bugs", () => {
+      expect(looksLikeMinifiedReferenceError("Can't find variable: getCanvasDashboard")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("Can't find variable: userId")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("loader is not defined")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("ReferenceError: window.something is not defined")).toBe(false);
+    });
+
+    it("does not match unrelated error messages", () => {
+      expect(looksLikeMinifiedReferenceError("")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("TypeError: undefined is not an object")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("Failed to fetch")).toBe(false);
+      expect(looksLikeMinifiedReferenceError("Can't find variable")).toBe(false);
+    });
   });
 });

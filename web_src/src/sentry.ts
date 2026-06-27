@@ -1,4 +1,6 @@
 import * as Sentry from "@sentry/react";
+import type { ErrorEvent, EventHint } from "@sentry/react";
+import { looksLikeMinifiedReferenceError } from "@/lib/errors";
 
 interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_DSN?: string;
@@ -34,6 +36,57 @@ if (dsn) {
         onunhandledrejection: true,
       }),
     ],
+    beforeSend: filterNonActionableErrors,
+  });
+}
+
+/**
+ * Drops Sentry events whose root cause is not actionable from our side —
+ * currently `ReferenceError`s about short minified bundle identifiers that
+ * get raised when a browser extension or content blocker corrupts our
+ * bundle's lexical scope.
+ *
+ * See `looksLikeMinifiedReferenceError` in `@/lib/errors` for the rationale.
+ */
+export function filterNonActionableErrors(event: ErrorEvent, hint: EventHint): ErrorEvent | null {
+  if (isMinifiedReferenceError(event, hint)) {
+    return null;
+  }
+
+  return event;
+}
+
+function isMinifiedReferenceError(event: ErrorEvent, hint: EventHint): boolean {
+  return hintMatchesMinifiedReferenceError(hint) || eventMatchesMinifiedReferenceError(event);
+}
+
+function hintMatchesMinifiedReferenceError(hint: EventHint): boolean {
+  const original = hint.originalException;
+
+  if (original instanceof Error) {
+    return looksLikeMinifiedReferenceError(original.message);
+  }
+
+  if (typeof original === "string") {
+    return looksLikeMinifiedReferenceError(original);
+  }
+
+  return false;
+}
+
+function eventMatchesMinifiedReferenceError(event: ErrorEvent): boolean {
+  const exceptions = event.exception?.values;
+  if (!exceptions || exceptions.length === 0) {
+    return false;
+  }
+
+  return exceptions.some((exception) => {
+    if (exception.type && exception.type !== "ReferenceError") {
+      return false;
+    }
+
+    const value = exception.value;
+    return typeof value === "string" && looksLikeMinifiedReferenceError(value);
   });
 }
 
