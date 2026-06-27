@@ -22,46 +22,46 @@ func NewGroupsService(authService authorization.Authorization) *GroupsService {
 }
 
 func (s *GroupsService) CreateGroup(ctx context.Context, req *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.CreateGroup(ctx, domainType, domainID, req.Group, s.authService)
 }
 
 func (s *GroupsService) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (*pb.AddUserToGroupResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	orgID := authorization.OrganizationIDFromContext(ctx)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.AddUserToGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (*pb.RemoveUserFromGroupResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	orgID := authorization.OrganizationIDFromContext(ctx)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.RemoveUserFromGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) ListGroups(ctx context.Context, req *pb.ListGroupsRequest) (*pb.ListGroupsResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.ListGroups(ctx, domainType, domainID, s.authService)
 }
 
 func (s *GroupsService) DescribeGroup(ctx context.Context, req *pb.DescribeGroupRequest) (*pb.DescribeGroupResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.DescribeGroup(ctx, domainType, domainID, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) ListGroupUsers(ctx context.Context, req *pb.ListGroupUsersRequest) (*pb.ListGroupUsersResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.ListGroupUsers(ctx, domainType, domainID, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest) (*pb.UpdateGroupResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 
 	if req.Group == nil {
 		return nil, status.Error(codes.InvalidArgument, "group must be specified")
@@ -71,7 +71,7 @@ func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequ
 }
 
 func (s *GroupsService) DeleteGroup(ctx context.Context, req *pb.DeleteGroupRequest) (*pb.DeleteGroupResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.DeleteGroup(ctx, domainType, domainID, req.GroupName, s.authService)
 }

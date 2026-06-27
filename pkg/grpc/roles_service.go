@@ -22,33 +22,33 @@ func NewRoleService(authService authorization.Authorization) *RoleService {
 }
 
 func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest) (*pb.AssignRoleResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	orgID := authorization.OrganizationIDFromContext(ctx)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.AssignRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
 }
 
 func (s *RoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (*pb.ListRolesResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.ListRoles(ctx, domainType, domainID, s.authService)
 }
 
 func (s *RoleService) DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest) (*pb.DescribeRoleResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.DescribeRole(ctx, domainType, domainID, req.RoleName, s.authService)
 }
 
 func (s *RoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.CreateRole(ctx, domainType, domainID, req.Role, s.authService)
 }
 
 func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 
 	if req.Role == nil {
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
@@ -58,7 +58,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest)
 }
 
 func (s *RoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	domainType := authorization.DomainTypeFromContext(ctx)
+	domainID := authorization.DomainIDFromContext(ctx)
 	return auth.DeleteRole(ctx, domainType, domainID, req.RoleName, s.authService)
 }
