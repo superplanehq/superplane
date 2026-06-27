@@ -340,7 +340,7 @@ func requestedWritableFilePath(rawPath string) (string, error) {
 		return "", fmt.Errorf("invalid file path %q: %w", rawPath, err)
 	}
 	if canvasRepository.IsRepositorySpecFilePath(path) {
-		return "", fmt.Errorf("use update_draft for %s", path)
+		return "", fmt.Errorf("use patch_draft or update_draft for %s", path)
 	}
 	return path, nil
 }
