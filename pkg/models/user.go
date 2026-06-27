@@ -115,14 +115,10 @@ func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description
 	return user, nil
 }
 
-func FindServiceAccountsByOrganization(orgID string) ([]User, error) {
-	return FindServiceAccountsByOrganizationInTransaction(database.Conn(), orgID)
-}
-
-func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) ([]User, error) {
+func FindServiceAccountsByOrganization(db *gorm.DB, orgID string) ([]User, error) {
 	var users []User
 
-	err := tx.
+	err := db.
 		Where("organization_id = ?", orgID).
 		Where("type = ?", UserTypeServiceAccount).
 		Find(&users).
@@ -131,17 +127,13 @@ func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) (
 	return users, err
 }
 
-func FindUsersByIDsInOrganization(orgID string, ids []string) ([]User, error) {
-	return FindUsersByIDsInOrganizationInTransaction(database.Conn(), orgID, ids)
-}
-
-func FindUsersByIDsInOrganizationInTransaction(tx *gorm.DB, orgID string, ids []string) ([]User, error) {
+func FindUsersByIDsInOrganization(db *gorm.DB, orgID string, ids []string) ([]User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	var users []User
-	err := tx.Unscoped().
+	err := db.Unscoped().
 		Where("organization_id = ?", orgID).
 		Where("id IN ?", ids).
 		Find(&users).

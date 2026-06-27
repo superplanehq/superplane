@@ -176,7 +176,7 @@ func (s *magicCodeSteps) clickMagicCodeToggle() {
 }
 
 func (s *magicCodeSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(s.session.OrgID.String())
+	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
 	if err == nil {
 		return inviteLink.Token.String()
 	}
