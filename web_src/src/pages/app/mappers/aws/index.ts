@@ -9,6 +9,7 @@ import { scanImageMapper } from "./ecr/scan_image";
 import { onPackageVersionTriggerRenderer } from "./codeartifact/on_package_version";
 import { getPackageVersionMapper } from "./codeartifact/get_package_version";
 import { createQueueMapper, deleteQueueMapper, getQueueMapper, purgeQueueMapper, sendMessageMapper } from "./sqs";
+import { createBucketMapper, deleteBucketMapper, getBucketMapper } from "./s3";
 import { createRepositoryMapper } from "./codeartifact/create_repository";
 import { copyPackageVersionsMapper } from "./codeartifact/copy_package_versions";
 import { deletePackageVersionsMapper } from "./codeartifact/delete_package_versions";
@@ -100,6 +101,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sqs.sendMessage": sendMessageMapper,
   "sqs.deleteQueue": deleteQueueMapper,
   "sqs.purgeQueue": purgeQueueMapper,
+  "s3.createBucket": createBucketMapper,
+  "s3.getBucket": getBucketMapper,
+  "s3.deleteBucket": deleteBucketMapper,
   "codeArtifact.updatePackageVersionsStatus": updatePackageVersionsStatusMapper,
   "route53.createRecord": createRecordMapper,
   "route53.upsertRecord": upsertRecordMapper,
@@ -174,6 +178,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sqs.sendMessage": buildActionStateRegistry("sent"),
   "sqs.deleteQueue": buildActionStateRegistry("deleted"),
   "sqs.purgeQueue": buildActionStateRegistry("purged"),
+  "s3.createBucket": buildActionStateRegistry("created"),
+  "s3.getBucket": buildActionStateRegistry("retrieved"),
+  "s3.deleteBucket": buildActionStateRegistry("deleted"),
   "codeArtifact.updatePackageVersionsStatus": buildActionStateRegistry("updated"),
   "route53.createRecord": buildActionStateRegistry("created"),
   "route53.upsertRecord": buildActionStateRegistry("upserted"),
