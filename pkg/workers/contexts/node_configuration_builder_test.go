@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -112,6 +113,78 @@ func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testi
 
 	require.NoError(t, err)
 	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldPreservesWholeTemplateTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"enabled": true,
+				"poolID":  "pool-a",
+				"weight":  json.Number("0.1"),
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+			{Name: "name", Type: configuration.FieldTypeString},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": map[string]any{
+			"enabled": "{{ previous().enabled }}",
+			"label":   "pool-{{ previous().poolID }}",
+			"nested": map[string]any{
+				"weight": "{{ previous().weight }}",
+			},
+			"weights": []any{"{{ previous().weight }}"},
+		},
+		"name": "{{ previous().weight }}",
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+	assert.Equal(t, "pool-pool-a", payload["label"])
+
+	nested := payload["nested"].(map[string]any)
+	assert.Equal(t, 0.1, nested["weight"])
+
+	weights := payload["weights"].([]any)
+	assert.Equal(t, 0.1, weights[0])
+
+	assert.Equal(t, "0.1", result["name"])
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldResolvesRawJSONTemplateString(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"canary": true,
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": `{
+			"pool_weights": {
+				"pool-a": {{ previous().canary ? 0.1 : 0.9 }},
+				"pool-b": {{ previous().canary ? 0.9 : 0.1 }}
+			},
+			"enabled": {{ previous().canary }}
+		}`,
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+
+	poolWeights := payload["pool_weights"].(map[string]any)
+	assert.Equal(t, json.Number("0.1"), poolWeights["pool-a"])
+	assert.Equal(t, json.Number("0.9"), poolWeights["pool-b"])
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {
