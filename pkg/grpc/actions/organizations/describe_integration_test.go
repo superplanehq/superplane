@@ -85,13 +85,17 @@ func Test__DescribeIntegration(t *testing.T) {
 		assert.Contains(t, msg, "invalid integration ID")
 	})
 
-	t.Run("non-existent integration -> error", func(t *testing.T) {
+	t.Run("non-existent integration -> not found", func(t *testing.T) {
 		//
 		// Try to describe a non-existent integration
 		//
 		fakeIntegrationID := uuid.NewString()
 		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), fakeIntegrationID)
 		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("integration from different organization -> error", func(t *testing.T) {
@@ -127,6 +131,10 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err = DescribeIntegration(ctx, r.Registry, org2.ID.String(), integrationID)
 		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("describe integration with configuration -> configuration returned", func(t *testing.T) {
