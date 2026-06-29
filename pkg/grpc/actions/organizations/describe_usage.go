@@ -26,12 +26,7 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 	}
 
 	readStartedAt := time.Now()
-	var limits *usagepb.OrganizationLimits
-	err := telemetry.RunSpan(ctx, "usage.load_limits", func(ctx context.Context) error {
-		var loadErr error
-		limits, loadErr = describeUsageLimits(ctx, usageService, orgID)
-		return loadErr
-	})
+	limits, err := loadUsageLimits(ctx, usageService, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +35,7 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		log.Warnf("Failed to persist usage limits cache for organization %s: %v", orgID, err)
 	}
 
-	var orgUsage *usagepb.OrganizationUsage
-	err = telemetry.RunSpan(ctx, "usage.load_metrics", func(ctx context.Context) error {
-		var loadErr error
-		orgUsage, loadErr = describeUsageMetrics(ctx, usageService, orgID)
-		return loadErr
-	})
+	orgUsage, err := loadUsageMetrics(ctx, usageService, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -56,13 +46,29 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 
 	go usage.ReconcileCanvasCount(orgID, orgUsage.GetCanvases())
 
-	var response *pb.DescribeUsageResponse
-	_ = telemetry.RunSpan(ctx, "usage.build_response", func(ctx context.Context) error {
-		response = buildDescribeUsageResponse(limits, orgUsage)
-		return nil
-	})
+	return describeUsageResponse(ctx, limits, orgUsage), nil
+}
 
-	return response, nil
+func loadUsageLimits(ctx context.Context, usageService usage.Service, orgID string) (limits *usagepb.OrganizationLimits, err error) {
+	ctx, done := telemetry.Span(ctx, "usage.load_limits")
+	defer done(&err)
+
+	return describeUsageLimits(ctx, usageService, orgID)
+}
+
+func loadUsageMetrics(ctx context.Context, usageService usage.Service, orgID string) (orgUsage *usagepb.OrganizationUsage, err error) {
+	ctx, done := telemetry.Span(ctx, "usage.load_metrics")
+	defer done(&err)
+
+	return describeUsageMetrics(ctx, usageService, orgID)
+}
+
+func describeUsageResponse(ctx context.Context, limits *usagepb.OrganizationLimits, orgUsage *usagepb.OrganizationUsage) *pb.DescribeUsageResponse {
+	var err error
+	ctx, done := telemetry.Span(ctx, "usage.build_response")
+	defer done(&err)
+
+	return buildDescribeUsageResponse(limits, orgUsage)
 }
 
 func buildDescribeUsageResponse(limits *usagepb.OrganizationLimits, orgUsage *usagepb.OrganizationUsage) *pb.DescribeUsageResponse {

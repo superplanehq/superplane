@@ -13,7 +13,12 @@
     "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
     "subnetId": "subnet-0abc1234567890def",
     "vpcId": "vpc-0abc1234567890def",
-    "region": "us-east-1"
+    "availabilityZone": "us-east-1a",
+    "region": "us-east-1",
+    "tags": [
+      { "key": "Name", "value": "ephemeral-builder" },
+      { "key": "purpose", "value": "release-canary" }
+    ]
   },
   "timestamp": "2026-05-21T12:01:00Z",
   "type": "aws.ec2.instance"

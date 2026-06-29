@@ -216,6 +216,21 @@ func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode
 	return &node, nil
 }
 
+func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+	err := tx.Unscoped().
+		Where("workflow_id = ?", canvasID).
+		Where("node_id = ?", nodeID).
+		First(&node).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
 func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := tx.

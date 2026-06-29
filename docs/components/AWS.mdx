@@ -1333,26 +1333,49 @@ The Create Instance component launches a new Amazon EC2 instance and waits until
 - **Image**: Public AMI for the selected operating system. These are filtered to only show currently available images in the selected region for the chosen OS family
 - **Instance Type**: EC2 instance type from the current generation catalog
 - **Subnet**: VPC subnet for the primary network interface
-- **Firewall**: Create a launch security group (like the AWS launch wizard) or use an existing one
+- **Firewall**: Create a launch security group (like the AWS launch wizard) or use one or more existing security groups
+- **IAM Instance Profile** (optional): IAM instance profile name or ARN attached to the launched instance
 - **Allow SSH/HTTP/HTTPS from the internet**: Ingress rules when creating a new security group
-- **Configure Root Volume** (optional): Override the AMI root volume size and type
+- **Configure Root Volume** (optional): Override the AMI root volume device name, size, type, IOPS, delete-on-termination, and encryption settings
+- **Additional Block Devices** (optional): Extra EBS volumes attached at launch
 - **Key Pair** (optional): EC2 key pair for SSH access. These are filtered to show only key pairs available in the selected region
 - **User Data** (optional): Shell script or cloud-init payload executed at launch
 - **Associate Public IP Address**: Assign a public IPv4 address when the subnet supports it
+- **Tags** (optional): Additional tags applied to both instance and volume resources. The `Name` tag is set from the Name field
+- **Wait For Running Timeout**: Maximum time to wait for the instance to reach running state
+- **Wait For Status Checks**: Also wait for EC2 instance and system status checks to pass
 
 ### Output
 
-Emits instance details on the default output channel, including:
+Emits instance details on the created output channel, including:
 - `instanceId` — EC2 instance ID
 - `state` — should be `running`
 - `publicIpAddress` / `privateIpAddress` — network addresses when available
 - `publicDnsName` / `privateDnsName` — DNS names when available
+- `name` — the Name tag value
+- `availabilityZone` — EC2 availability zone
+- `tags` — instance tags as key/value pairs
+
+### runnerBash Migration
+
+| `aws ec2 run-instances` flag | `aws.ec2.createInstance` field |
+|---|---|
+| `--image-id` | `image` |
+| `--instance-type` | `instanceType` |
+| `--subnet-id` | `subnet` |
+| `--security-group-ids` | `securityGroup` |
+| `--iam-instance-profile Name=...` | `iamInstanceProfile` |
+| `--associate-public-ip-address` | `associatePublicIpAddress` |
+| `--user-data file://...` | `userData` |
+| `--block-device-mappings` | `configureRootVolume` and `additionalBlockDevices` |
+| `--tag-specifications` | `name` and `tags` |
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "availabilityZone": "us-east-1a",
     "imageId": "ami-07f0e4f3e9c123abc",
     "instanceId": "i-0abc1234567890def",
     "instanceType": "t3.micro",
@@ -1366,6 +1389,16 @@ Emits instance details on the default output channel, including:
     "region": "us-east-1",
     "state": "running",
     "subnetId": "subnet-0abc1234567890def",
+    "tags": [
+      {
+        "key": "Name",
+        "value": "ephemeral-builder"
+      },
+      {
+        "key": "purpose",
+        "value": "release-canary"
+      }
+    ],
     "vpcId": "vpc-0abc1234567890def"
   },
   "timestamp": "2026-05-21T12:01:00Z",
