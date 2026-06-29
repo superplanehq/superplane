@@ -2104,7 +2104,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260417035041	f
+20260629120000	f
 \.
 
 
