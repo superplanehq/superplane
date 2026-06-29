@@ -99,6 +99,7 @@ type CreateInstanceExecutionMetadata struct {
 	InstanceID        string `json:"instanceId" mapstructure:"instanceId"`
 	PollErrors        int    `json:"pollErrors" mapstructure:"pollErrors"`
 	PollAttempts      int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	StatusPollErrors  int    `json:"statusPollErrors" mapstructure:"statusPollErrors"`
 	StartedAtUnix     int64  `json:"startedAtUnix" mapstructure:"startedAtUnix"`
 	LastObservedState string `json:"lastObservedState,omitempty" mapstructure:"lastObservedState"`
 }
@@ -753,7 +754,7 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 
 	now := time.Now()
 	if metadata.StartedAtUnix == 0 {
-		metadata.StartedAtUnix = now.Unix()
+		metadata.StartedAtUnix = inferCreateInstanceStartedAt(metadata, now).Unix()
 	}
 
 	config, err := decodeCreateInstanceConfiguration(ctx.Configuration)
@@ -801,17 +802,21 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 		if config.WaitForStatusChecks {
 			status, err := client.DescribeInstanceStatus(instance.InstanceID)
 			if err != nil {
-				metadata.PollErrors++
+				metadata.StatusPollErrors++
 				if err := ctx.Metadata.Set(metadata); err != nil {
 					return err
 				}
-				if metadata.PollErrors >= maxInstancePollErrors {
+				if metadata.StatusPollErrors >= maxInstancePollErrors {
 					return emitCreateInstanceFailure(
 						ctx.ExecutionState,
 						createInstanceFailurePayload(fmt.Errorf("giving up waiting for status checks on instance %s after %d consecutive errors: %w", instance.InstanceID, maxInstancePollErrors, err), instance.InstanceID, instance.State),
 					)
 				}
 				return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
+			}
+			metadata.StatusPollErrors = 0
+			if err := ctx.Metadata.Set(metadata); err != nil {
+				return err
 			}
 			if !status.OK() {
 				if createInstanceTimedOut(metadata, config.WaitForRunningTimeoutSeconds, now) {
@@ -1260,6 +1265,15 @@ func newCreateInstanceExecutionMetadata(instanceID string, now time.Time) Create
 		InstanceID:    instanceID,
 		StartedAtUnix: now.Unix(),
 	}
+}
+
+func inferCreateInstanceStartedAt(metadata CreateInstanceExecutionMetadata, now time.Time) time.Time {
+	pollAttempts := metadata.PollAttempts
+	if pollAttempts < 1 {
+		pollAttempts = 1
+	}
+
+	return now.Add(-time.Duration(pollAttempts) * instancePollInterval)
 }
 
 func createInstanceTimedOut(metadata CreateInstanceExecutionMetadata, timeoutSeconds int, now time.Time) bool {

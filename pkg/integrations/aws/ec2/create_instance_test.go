@@ -666,7 +666,55 @@ func Test__CreateInstance__PollWaitsForStatusChecks(t *testing.T) {
 		assert.Equal(t, "poll", requests.Action)
 		stored, ok := metadata.Get().(CreateInstanceExecutionMetadata)
 		require.True(t, ok)
-		assert.Equal(t, 1, stored.PollErrors)
+		assert.Equal(t, 1, stored.StatusPollErrors)
+		assert.Equal(t, 0, stored.PollErrors)
+	})
+
+	t.Run("repeated status check API errors -> emits failed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				runningInstanceResponse(),
+				{
+					StatusCode: http.StatusServiceUnavailable,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>ServiceUnavailable</Code>
+									<Message>try again</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"region":              "us-east-1",
+				"waitForStatusChecks": true,
+			},
+			HTTP:        httpContext,
+			Integration: awsIntegrationContext(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: CreateInstanceExecutionMetadata{
+					InstanceID:       "i-abc123",
+					StartedAtUnix:    time.Now().Unix(),
+					StatusPollErrors: maxInstancePollErrors - 1,
+				},
+			},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceFailed, executionState.Channel)
+		payload := emittedPayloadData(t, executionState)
+		assert.Contains(t, payload["error"], "giving up waiting for status checks")
 	})
 
 	t.Run("status checks not passed before timeout -> emits failed", func(t *testing.T) {
@@ -814,6 +862,57 @@ func Test__CreateInstance__PollDoesNotTimeoutBeforeElapsedDeadline(t *testing.T)
 	require.NoError(t, err)
 	assert.False(t, executionState.Passed)
 	assert.Equal(t, "poll", requests.Action)
+}
+
+func Test__CreateInstance__PollInfersElapsedDeadlineForLegacyMetadata(t *testing.T) {
+	component := &CreateInstance{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`
+					<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+						<reservationSet>
+							<item>
+								<instancesSet>
+									<item>
+										<instanceId>i-abc123</instanceId>
+										<instanceState><name>pending</name></instanceState>
+									</item>
+								</instancesSet>
+							</item>
+						</reservationSet>
+					</DescribeInstancesResponse>
+				`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name: "poll",
+		Configuration: map[string]any{
+			"region":                       "us-east-1",
+			"waitForRunningTimeoutSeconds": 1,
+			"associatePublicIpAddress":     true,
+		},
+		HTTP:        httpContext,
+		Integration: awsIntegrationContext(),
+		Metadata: &contexts.MetadataContext{
+			Metadata: CreateInstanceExecutionMetadata{
+				InstanceID:   "i-abc123",
+				PollAttempts: 1,
+			},
+		},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, createInstanceFailed, executionState.Channel)
+	payload := emittedPayloadData(t, executionState)
+	assert.Contains(t, payload["error"], "timed out waiting for instance i-abc123")
 }
 
 func Test__CreateInstance__PollTimeoutEmitsFailed(t *testing.T) {
