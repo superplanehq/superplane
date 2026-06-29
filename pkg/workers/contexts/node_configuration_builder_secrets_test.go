@@ -111,6 +111,31 @@ func TestNodeConfigurationBuilder_RuntimePhase_MissingKeyReturnsEmptyString(t *t
 	assert.Equal(t, "prefix--suffix", out["value"])
 }
 
+func TestNodeConfigurationBuilder_RuntimePhase_WholeSecretMapIsRejected(t *testing.T) {
+	//
+	// Selecting no key (secrets("api") instead of secrets("api").token) would
+	// otherwise stringify the whole decrypted map and leak every key/value.
+	// It must be rejected, and the error must not contain any secret value.
+	//
+	resolver := &fakeSecretResolver{
+		values: map[string]map[string]string{"api": {"token": "supersecret", "key": "anotherone"}},
+	}
+
+	for _, expression := range []string{
+		`{{ secrets("api") }}`,
+		`prefix-{{ secrets("api") }}-suffix`,
+		`{{ secrets("api") }} and {{ secrets("api").token }}`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			_, err := newSecretsBuilder(resolver).Build(map[string]any{"value": expression})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "secrets() must select a specific key")
+			assert.NotContains(t, err.Error(), "supersecret")
+			assert.NotContains(t, err.Error(), "anotherone")
+		})
+	}
+}
+
 func TestNodeConfigurationBuilder_NoResolver_SecretsCallErrors(t *testing.T) {
 	//
 	// If a placeholder containing secrets() somehow reaches a builder with no

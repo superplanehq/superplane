@@ -39,5 +39,6 @@ Secrets resolved this way:
 
 - Are looked up at execution time, so each run picks up the latest value of the secret.
 - Are never written back into the saved component configuration. Only the expression `secrets("api").token` is persisted; the actual token only exists in memory during execution.
+- Must select a specific key. Embedding the whole secret (`secrets("api")` without a key) is rejected so the entire decrypted secret cannot leak into a URL, header, payload, or log.
 
 If a referenced secret or key does not exist at execution time, the run fails with an error identifying the missing secret.

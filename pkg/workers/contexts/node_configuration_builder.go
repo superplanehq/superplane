@@ -268,6 +268,8 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return match
 		}
 
+		injectsSecret := expressionInjectsSecret(matches[1])
+
 		//
 		// Without a SecretResolver (the deferred / queue phase), placeholders
 		// that call secrets() are left untouched so the secret value never
@@ -275,7 +277,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 		// resolver (the runtime phase, and one-shot resolutions such as
 		// trigger hooks), every placeholder is evaluated normally.
 		//
-		if deferred && expressionInjectsSecret(matches[1]) {
+		if deferred && injectsSecret {
 			return match
 		}
 
@@ -283,6 +285,20 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 		if e != nil {
 			err = e
 			return ""
+		}
+
+		//
+		// Guard against bulk secret exposure: an expression that calls
+		// secrets() must select a specific key (e.g. secrets("api").token).
+		// If it resolves to the secret map itself, generic string conversion
+		// would embed every decrypted key and value into the output (URL,
+		// header, payload, log, ...). Reject it instead of formatting it.
+		//
+		if injectsSecret {
+			if _, isMap := asAnyMap(value); isMap {
+				err = fmt.Errorf("secrets() must select a specific key (for example secrets(\"name\").key); embedding the entire secret is not allowed")
+				return ""
+			}
 		}
 
 		return formatTemplateValue(value)
