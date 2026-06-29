@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/integrations/structuredoutput"
 )
 
 const MessagePayloadType = "claude.message"
@@ -24,15 +26,25 @@ type TextPromptSpec struct {
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
 	Files         []string `json:"files"`
+	OutputFields  any      `json:"outputFields"`
 }
 
 type MessagePayload struct {
 	ID         string                 `json:"id"`
 	Model      string                 `json:"model"`
 	Text       string                 `json:"text"`
+	Parsed     any                    `json:"parsed,omitempty"`
 	Usage      *MessageUsage          `json:"usage,omitempty"`
 	StopReason string                 `json:"stopReason,omitempty"`
 	Response   *CreateMessageResponse `json:"response"`
+}
+
+// TextPromptNodeMetadata is node-level metadata surfaced in the UI so the
+// configured model and options are visible on the node without opening it.
+type TextPromptNodeMetadata struct {
+	Model            string `json:"model" mapstructure:"model"`
+	MaxTokens        int    `json:"maxTokens" mapstructure:"maxTokens"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
 func (c *TextPrompt) Name() string {
@@ -63,6 +75,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
+- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and Claude returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema is built for you.
 
 ## Output
 
@@ -71,6 +84,7 @@ Returns a payload containing:
 - **usage**: Input and output token counts.
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
+- **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
 
 ## Notes
 
@@ -154,6 +168,11 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 				},
 			},
 		},
+		structuredoutput.ConfigField(
+			"outputFields",
+			"Structured Output",
+			"Define the fields Claude should return. The response is constrained to a JSON object with these fields (available on the `parsed` output). Supports nested objects and lists.",
+		),
 	}
 }
 
@@ -196,6 +215,26 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	fields, err := structuredoutput.Decode(spec.OutputFields)
+	if err != nil {
+		return err
+	}
+	if err := structuredoutput.Validate(fields); err != nil {
+		return err
+	}
+
+	if ctx.Metadata != nil {
+		maxTokens := spec.MaxTokens
+		if maxTokens == 0 {
+			maxTokens = 4096
+		}
+		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
+			Model:            spec.Model,
+			MaxTokens:        maxTokens,
+			StructuredOutput: len(fields) > 0,
+		})
+	}
+
 	return nil
 }
 
@@ -217,6 +256,11 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 	if spec.MaxTokens < 1 {
 		return fmt.Errorf("maxTokens must be at least 1")
+	}
+
+	fields, err := structuredoutput.Decode(spec.OutputFields)
+	if err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -246,6 +290,12 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		req.System = spec.SystemMessage
 	}
 
+	if len(fields) > 0 {
+		req.OutputConfig = &OutputConfig{
+			Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.BuildSchema(fields, false)},
+		}
+	}
+
 	response, err := client.CreateMessage(req)
 	if err != nil {
 		return err
@@ -260,6 +310,16 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		Usage:      &response.Usage,
 		StopReason: response.StopReason,
 		Response:   response,
+	}
+
+	// When a schema is configured, parse the model's JSON text into a structured
+	// object. Only trust the output on a normal completion (end_turn); a refusal
+	// or truncation (max_tokens) may not conform to the schema.
+	if len(fields) > 0 && response.StopReason == "end_turn" && text != "" {
+		var parsed any
+		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+			payload.Parsed = parsed
+		}
 	}
 
 	return ctx.ExecutionState.Emit(

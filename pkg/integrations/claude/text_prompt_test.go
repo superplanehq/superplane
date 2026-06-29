@@ -26,6 +26,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
 		"temperature":   {false, string(configuration.FieldTypeNumber)},
 		"files":         {false, string(configuration.FieldTypeList)},
+		"outputFields":  {false, string(configuration.FieldTypeList)},
 	}
 
 	for _, field := range config {
@@ -70,6 +71,60 @@ func TestTextPrompt_Setup(t *testing.T) {
 			name: "Missing Prompt",
 			config: map[string]interface{}{
 				"model": "claude-3-opus",
+			},
+			expectError: true,
+		},
+		{
+			name: "Valid output fields",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputFields": []any{
+					map[string]any{"name": "sentiment", "type": "string", "required": true},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Field missing name",
+			config: map[string]interface{}{
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputFields": []any{map[string]any{"type": "string"}},
+			},
+			expectError: true,
+		},
+		{
+			name: "Object field without sub-fields",
+			config: map[string]interface{}{
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputFields": []any{map[string]any{"name": "addr", "type": "object"}},
+			},
+			expectError: true,
+		},
+		{
+			name: "Nested object field valid",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputFields": []any{
+					map[string]any{"name": "addr", "type": "object", "fields": []any{
+						map[string]any{"name": "city", "type": "string"},
+					}},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Duplicate field name",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputFields": []any{
+					map[string]any{"name": "a", "type": "string"},
+					map[string]any{"name": "a", "type": "number"},
+				},
 			},
 			expectError: true,
 		},
@@ -233,11 +288,94 @@ func TestTextPrompt_Execute(t *testing.T) {
 	}
 }
 
-func TestExtractMessageText(t *testing.T) {
-	// This function is unexported, but accessible within the package_test if package is same
-	// If the test file is package claude_test, we can't access it.
-	// Assuming package claude per user instruction.
+func TestTextPrompt_StructuredOutput(t *testing.T) {
+	c := &TextPrompt{}
 
+	outputFields := []any{
+		map[string]any{"name": "sentiment", "type": "string", "required": true},
+	}
+
+	run := func(t *testing.T, responseBody string) (MessagePayload, []byte) {
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(bytes.NewBufferString(responseBody))},
+			},
+		}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"model":        "claude-3-test",
+				"prompt":       "classify",
+				"outputFields": outputFields,
+			},
+			ExecutionState: execState,
+			HTTP:           httpCtx,
+			Integration:    integrationCtx,
+		}
+		if err := c.Execute(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		wrapped, ok := execState.Payloads[0].(map[string]any)
+		if !ok {
+			t.Fatal("emitted payload wrapper is not map[string]any")
+		}
+		payload, ok := wrapped["data"].(MessagePayload)
+		if !ok {
+			t.Fatal("emitted payload data is not MessagePayload")
+		}
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		return payload, body
+	}
+
+	t.Run("parses JSON output and sends output_config", func(t *testing.T) {
+		payload, body := run(t, `{
+			"id": "msg_1",
+			"model": "claude-3-test",
+			"content": [{"type": "text", "text": "{\"sentiment\":\"positive\"}"}],
+			"stop_reason": "end_turn",
+			"usage": {"input_tokens": 1, "output_tokens": 1}
+		}`)
+
+		var sent CreateMessageRequest
+		if err := json.Unmarshal(body, &sent); err != nil {
+			t.Fatalf("failed to unmarshal sent body: %v", err)
+		}
+		if sent.OutputConfig == nil || sent.OutputConfig.Format == nil || sent.OutputConfig.Format.Type != "json_schema" {
+			t.Fatalf("expected output_config.format.type=json_schema in request, got %+v", sent.OutputConfig)
+		}
+		parsed, ok := payload.Parsed.(map[string]any)
+		if !ok {
+			t.Fatalf("expected Parsed to be an object, got %T", payload.Parsed)
+		}
+		if parsed["sentiment"] != "positive" {
+			t.Errorf("expected sentiment=positive, got %v", parsed["sentiment"])
+		}
+		if payload.Text != `{"sentiment":"positive"}` {
+			t.Errorf("expected raw text preserved, got %q", payload.Text)
+		}
+	})
+
+	t.Run("refusal leaves Parsed nil but keeps text", func(t *testing.T) {
+		payload, _ := run(t, `{
+			"id": "msg_2",
+			"model": "claude-3-test",
+			"content": [{"type": "text", "text": "I can't help with that."}],
+			"stop_reason": "refusal",
+			"usage": {"input_tokens": 1, "output_tokens": 1}
+		}`)
+		if payload.Parsed != nil {
+			t.Errorf("expected Parsed nil on refusal, got %v", payload.Parsed)
+		}
+		if payload.Text != "I can't help with that." {
+			t.Errorf("expected refusal text preserved, got %q", payload.Text)
+		}
+	})
+}
+
+func TestExtractMessageText(t *testing.T) {
 	tests := []struct {
 		name     string
 		response *CreateMessageResponse
@@ -286,5 +424,39 @@ func TestExtractMessageText(t *testing.T) {
 				t.Errorf("expected '%s', got '%s'", tt.expected, got)
 			}
 		})
+	}
+}
+
+func TestTextPrompt_NodeMetadata(t *testing.T) {
+	c := &TextPrompt{}
+	md := &contexts.MetadataContext{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"model":     "claude-3-test",
+			"prompt":    "hi",
+			"maxTokens": 500,
+			"outputFields": []any{
+				map[string]any{"name": "x", "type": "string", "required": true},
+			},
+		},
+		Metadata: md,
+	}
+
+	if err := c.Setup(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	meta, ok := md.Metadata.(TextPromptNodeMetadata)
+	if !ok {
+		t.Fatalf("expected TextPromptNodeMetadata, got %T", md.Metadata)
+	}
+	if meta.Model != "claude-3-test" {
+		t.Errorf("expected model claude-3-test, got %q", meta.Model)
+	}
+	if meta.MaxTokens != 500 {
+		t.Errorf("expected maxTokens 500, got %d", meta.MaxTokens)
+	}
+	if !meta.StructuredOutput {
+		t.Error("expected structuredOutput true")
 	}
 }
