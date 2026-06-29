@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -54,25 +55,7 @@ func ListCanvasVersionsPaginated(
 	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
 
-	var publishedVersions []models.CanvasVersion
-	var publishedCount int64
-	err = telemetry.RunSpan(ctx, "canvases.list_published_versions", func(ctx context.Context) error {
-		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-			versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvasUUID, int(limit), beforeTime)
-			if versionsErr != nil {
-				return versionsErr
-			}
-			publishedVersions = versions
-
-			count, countErr := models.CountPublishedCanvasVersionsInTransaction(tx, canvasUUID)
-			if countErr != nil {
-				return countErr
-			}
-			publishedCount = count
-
-			return nil
-		})
-	})
+	publishedVersions, publishedCount, err := listPublishedCanvasVersions(ctx, canvasUUID, int(limit), beforeTime)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
@@ -98,25 +81,7 @@ func listDraftCanvasVersions(
 	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
 
-	var draftVersions []models.CanvasVersion
-	var draftCount int64
-	err := telemetry.RunSpan(ctx, "canvases.list_draft_versions", func(ctx context.Context) error {
-		return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-			versions, versionsErr := models.ListDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID, int(limit), beforeTime)
-			if versionsErr != nil {
-				return versionsErr
-			}
-			draftVersions = versions
-
-			count, countErr := models.CountDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID)
-			if countErr != nil {
-				return countErr
-			}
-			draftCount = count
-
-			return nil
-		})
-	})
+	draftVersions, draftCount, err := listDraftCanvasVersionsInTransaction(ctx, canvasID, ownerID, int(limit), beforeTime)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
@@ -167,4 +132,40 @@ func getLastDraftCanvasVersionTimestamp(versions []models.CanvasVersion) *timest
 	}
 
 	return timestamppb.New(*lastVersion.UpdatedAt)
+}
+
+func listPublishedCanvasVersions(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.list_published_versions")
+	defer done(&err)
+
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		versions, txErr = models.ListPublishedCanvasVersionsInTransaction(tx, canvasUUID, limit, beforeTime)
+		if txErr != nil {
+			return txErr
+		}
+
+		count, txErr = models.CountPublishedCanvasVersionsInTransaction(tx, canvasUUID)
+		return txErr
+	})
+
+	return versions, count, err
+}
+
+func listDraftCanvasVersionsInTransaction(ctx context.Context, canvasID, ownerID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.list_draft_versions")
+	defer done(&err)
+
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		versions, txErr = models.ListDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID, limit, beforeTime)
+		if txErr != nil {
+			return txErr
+		}
+
+		count, txErr = models.CountDraftBranchesForCanvasInTransaction(tx, canvasID, ownerID)
+		return txErr
+	})
+
+	return versions, count, err
 }

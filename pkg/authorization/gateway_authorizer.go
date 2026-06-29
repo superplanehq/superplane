@@ -6,7 +6,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -51,12 +50,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
 
-	var allowed bool
-	err := telemetry.RunSpan(ctx, "auth.check_permission", func(ctx context.Context) error {
-		var checkErr error
-		allowed, checkErr = checkOrganizationPermission(ctx, a.auth, userID, organizationID, rule.Resource, rule.Action)
-		return checkErr
-	})
+	allowed, err := checkOrganizationPermission(ctx, a.auth, userID, organizationID, rule.Resource, rule.Action)
 	if err != nil {
 		return nil, err
 	}

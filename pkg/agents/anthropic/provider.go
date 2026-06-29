@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -209,10 +210,38 @@ func (p *Provider) SendCustomToolResults(ctx context.Context, providerSessionID 
 	}
 
 	body := map[string]any{"events": events}
+	fields := customToolResultsRequestLogFields(providerSessionID, results)
+	log.WithFields(fields).Info("anthropic: sending custom tool results")
+	startedAt := time.Now()
 	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		fields["elapsed_ms"] = time.Since(startedAt).Milliseconds()
+		log.WithError(err).WithFields(fields).Warn("anthropic: failed to send custom tool results")
 		return fmt.Errorf("anthropic: send custom tool results: %w", err)
 	}
+	fields["elapsed_ms"] = time.Since(startedAt).Milliseconds()
+	log.WithFields(fields).Info("anthropic: sent custom tool results")
 	return nil
+}
+
+func customToolResultsRequestLogFields(providerSessionID string, results []agents.CustomToolResult) log.Fields {
+	errorCount := 0
+	contentBytes := 0
+	resultIDs := make([]string, 0, len(results))
+	for _, result := range results {
+		contentBytes += len(result.Content)
+		resultIDs = append(resultIDs, result.CustomToolUseID)
+		if result.IsError {
+			errorCount++
+		}
+	}
+
+	return log.Fields{
+		"provider_session_id":       providerSessionID,
+		"custom_tool_result_count":  len(results),
+		"custom_tool_result_ids":    resultIDs,
+		"custom_tool_error_count":   errorCount,
+		"custom_tool_content_bytes": contentBytes,
+	}
 }
 
 func isSessionAwaitingToolResults(err error) bool {
