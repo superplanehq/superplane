@@ -1,0 +1,44 @@
+---
+title: "Expressions"
+sidebar:
+  order: 2
+---
+
+SuperPlane components evaluate expressions to compute dynamic field values, route events, and reference data from other nodes in the canvas.
+
+## Where expressions are evaluated
+
+Any text or expression field on a component accepts the standard `{{ ... }}` placeholder syntax. At execution time, every placeholder is replaced with the value of the expression inside. The same expression body (without the surrounding braces) is also used wherever a component asks for an expression directly (for example the Filter or If condition).
+
+```
+https://api.example.com/repos/{{ $['GitHub PR'].data.repository }}
+```
+
+## Expression environment
+
+Inside an expression you have access to:
+
+- `$` — the run context. Use `$['Node Name'].data.foo` to read fields emitted by an upstream node. The literal `$` alone resolves to the full run context map.
+- `root()` — the event that started the current run.
+- `previous()` — the payload from the immediate predecessor that emitted into the current node. Optionally pass an integer depth (`previous(2)`) to walk further upstream.
+- `secrets("name")` — an organization secret, returned as a map of its keys. See [Secrets in expressions](#secrets-in-expressions) below.
+
+Standard helpers such as `date`, `duration`, `now`, `timezone`, and `int` are also available.
+
+## Secrets in expressions
+
+Use `secrets("name").key` inside any expression to inject the value of an organization secret. For example:
+
+```
+{{ secrets("api").token }}
+```
+
+resolves to the value stored under the `token` key of the `api` secret.
+
+Secrets resolved this way:
+
+- Are looked up at execution time, so each run picks up the latest value of the secret.
+- Are never written back into the saved component configuration. Only the expression `secrets("api").token` is persisted; the actual token only exists in memory during execution.
+- Must select a specific key. Embedding the whole secret (`secrets("api")` without a key) is rejected so the entire decrypted secret cannot leak into a URL, header, payload, or log.
+
+If a referenced secret or key does not exist at execution time, the run fails with an error identifying the missing secret.

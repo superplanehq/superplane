@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -27,6 +28,7 @@ import (
 )
 
 type NodeQueueWorker struct {
+	encryptor   crypto.Encryptor
 	registry    *registry.Registry
 	gitProvider gitprovider.Provider
 	semaphore   *semaphore.Weighted
@@ -37,7 +39,7 @@ type NodeQueueWorker struct {
 	executionFinishedConsumer *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
+func NewNodeQueueWorker(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
 	logger := log.WithFields(log.Fields{"worker": "NodeQueueWorker"})
 
 	queueItemConsumer := tackle.NewConsumer()
@@ -47,6 +49,7 @@ func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Pro
 	executionFinishedConsumer.SetLogger(logging.NewTackleLogger(logger))
 
 	return &NodeQueueWorker{
+		encryptor:                 encryptor,
 		registry:                  registry,
 		gitProvider:               gitProvider,
 		rabbitMQURL:               rabbitMQURL,
@@ -327,7 +330,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 
 	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents, repoFiles)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), w.encryptor, tx, node, queueItem, configFields, onNewEvents, repoFiles)
 	if err != nil {
 
 		//
