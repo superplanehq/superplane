@@ -196,28 +196,26 @@ func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *m
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, span := telemetry.StartSpan(r.Context(), "auth.organization_auth")
+			defer span.End()
 
 			//
 			// If the authorization header is used,
 			// we expect a user API token.
 			//
 			if r.Header.Get("Authorization") != "" {
-				var user *models.User
-				var scopedClaims *jwt.ScopedTokenClaims
-				err := telemetry.RunSpan(r.Context(), "auth.authenticate_by_token", func(ctx context.Context) error {
-					var authErr error
-					user, scopedClaims, authErr = authenticateUserByToken(ctx, r, jwtSigner)
-					return authErr
-				})
+				user, scopedClaims, err := authenticateUserByToken(ctx, r, jwtSigner)
+
 				if err != nil {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 
-				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				ctx = context.WithValue(ctx, UserContextKey, user)
 				if scopedClaims != nil {
 					ctx = context.WithValue(ctx, ScopedTokenClaimsContextKey, scopedClaims)
 				}
+
 				r = r.WithContext(ctx)
 				next.ServeHTTP(w, r)
 				return
@@ -227,13 +225,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			var user *models.User
-			var impersonationInfo *ImpersonationInfo
-			err := telemetry.RunSpan(r.Context(), "auth.authenticate_by_cookie", func(ctx context.Context) error {
-				var authErr error
-				user, impersonationInfo, authErr = authenticateUserByCookie(ctx, jwtSigner, r)
-				return authErr
-			})
+			user, impersonationInfo, err := authenticateUserByCookie(ctx, jwtSigner, r)
 			if err != nil {
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
@@ -244,7 +236,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), UserContextKey, user)
+			ctx = context.WithValue(ctx, UserContextKey, user)
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
 			}
@@ -260,6 +252,9 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 }
 
 func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
+	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_token")
+	defer span.End()
+
 	token, err := getBearerToken(r)
 	if err != nil {
 		return nil, nil, err
@@ -326,6 +321,9 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 }
 
 func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_cookie")
+	defer span.End()
+
 	// If a valid impersonation session exists, commit to it — never fall
 	// through to the admin's own identity. This prevents silently showing
 	// admin data when the impersonated user isn't in the requested org.
