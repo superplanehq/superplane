@@ -68,7 +68,10 @@ export function ColumnRow({
         />
         <Select
           value={col.format ?? "__none__"}
-          onValueChange={(v) => onChange({ format: v === "__none__" ? undefined : (v as WidgetColumnFormat) })}
+          onValueChange={(v) => {
+            const format = v === "__none__" ? undefined : (v as WidgetColumnFormat);
+            onChange({ format, ...(format === "link" ? {} : { href: undefined }) });
+          }}
         >
           <SelectTrigger className="col-span-4 h-8">
             <SelectValue placeholder="Format" />

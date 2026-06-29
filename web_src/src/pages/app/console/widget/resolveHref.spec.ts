@@ -43,4 +43,14 @@ describe("resolveHref", () => {
   it("renders missing legacy {field} placeholders as empty strings", () => {
     expect(resolveHref("https://x/{missing}/end", {})).toBe("https://x//end");
   });
+
+  it("does not re-interpolate literal braces produced by a {{ }} expression", () => {
+    expect(resolveHref("{{ fullUrl }}", { fullUrl: "https://x/{token}/end", token: "leaked" })).toBe(
+      "https://x/{token}/end",
+    );
+  });
+
+  it("still interpolates legacy braces in literal text around an expression", () => {
+    expect(resolveHref("https://x/{service}/{{ id }}", { service: "api", id: 7 })).toBe("https://x/api/7");
+  });
 });
