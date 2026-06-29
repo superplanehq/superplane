@@ -70,15 +70,18 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, schema.Properties["message"].Description, "commit_files")
 }
 
-func TestAppAgentToolSchemaWarnsAgainstTemplateFieldsInCanvasYAML(t *testing.T) {
+func TestAppAgentToolSchemaUsesPatchDraftForDraftUpdates(t *testing.T) {
 	tool := NewAppAgentTool(AppAgentToolOptions{})
 
 	schema := tool.InputSchema()
-	canvasYAMLSchema := schema.Properties["canvas_yaml"]
+	actionSchema := schema.Properties["action"]
 
-	assert.Contains(t, canvasYAMLSchema.Description, "canonical live canvas.yaml")
-	assert.Contains(t, canvasYAMLSchema.Description, "Unknown fields are rejected")
-	assert.Contains(t, canvasYAMLSchema.Description, "metadata.isTemplate")
+	assert.Contains(t, actionSchema.Enum, "patch_draft")
+	assert.NotContains(t, actionSchema.Enum, "update_draft")
+	assert.NotContains(t, schema.Properties, "canvas_yaml")
+	assert.Contains(t, schema.Properties, "console_yaml")
+	assert.Contains(t, schema.Properties["console_yaml"].Description, "For patch_draft")
+	assert.Contains(t, schema.Properties["auto_layout"].Description, "applies layout only")
 }
 
 func TestAppAgentToolSchemaIncludesDraftVersionIDForUpdates(t *testing.T) {

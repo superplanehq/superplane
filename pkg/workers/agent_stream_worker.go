@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -716,13 +717,22 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 		}
 		toolUses[id] = toolUse
 
+		logCustomToolExecutionStarted(session, toolUse)
+		startedAt := time.Now()
 		result := w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)
+		logCustomToolExecutionFinished(session, toolUse, result, time.Since(startedAt))
 		results = append(results, result)
 	}
 
+	logCustomToolResultsSendStarted(session, results)
+	startedAt := time.Now()
 	if err := sender.SendCustomToolResults(ctx, session.ProviderSessionID, results); err != nil {
+		log.WithError(err).WithFields(customToolResultsLogFields(session, results, time.Since(startedAt))).
+			Warn("agent stream: failed to send custom tool results")
 		return err
 	}
+	log.WithFields(customToolResultsLogFields(session, results, time.Since(startedAt))).
+		Info("agent stream: sent custom tool results")
 
 	for _, result := range results {
 		toolUse := toolUses[result.CustomToolUseID]
@@ -743,6 +753,86 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 
 	customTools.markResolved()
 	return nil
+}
+
+func logCustomToolExecutionStarted(session *models.AgentSession, toolUse agents.CustomToolUse) {
+	log.WithFields(customToolUseLogFields(session, toolUse)).
+		Info("agent stream: executing custom tool")
+}
+
+func logCustomToolExecutionFinished(session *models.AgentSession, toolUse agents.CustomToolUse, result agents.CustomToolResult, elapsed time.Duration) {
+	fields := customToolUseLogFields(session, toolUse)
+	fields["elapsed_ms"] = elapsed.Milliseconds()
+	fields["result_content_bytes"] = len(result.Content)
+	fields["is_error"] = result.IsError
+	log.WithFields(fields).Info("agent stream: custom tool execution finished")
+}
+
+func logCustomToolResultsSendStarted(session *models.AgentSession, results []agents.CustomToolResult) {
+	fields := customToolResultsLogFields(session, results, 0)
+	delete(fields, "elapsed_ms")
+	log.WithFields(fields).Info("agent stream: sending custom tool results")
+}
+
+func customToolUseLogFields(session *models.AgentSession, toolUse agents.CustomToolUse) log.Fields {
+	fields := log.Fields{
+		"session_id":            session.ID,
+		"provider_session_id":   session.ProviderSessionID,
+		"organization_id":       session.OrganizationID,
+		"custom_tool_use_id":    toolUse.ID,
+		"custom_tool_name":      toolUse.Name,
+		"tool_input_bytes":      len(toolUse.Input),
+		"tool_input_json_valid": json.Valid([]byte(toolUse.Input)),
+	}
+
+	for key, value := range customToolInputSummary(toolUse.Input) {
+		fields[key] = value
+	}
+
+	return fields
+}
+
+func customToolInputSummary(input string) log.Fields {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(input), &payload); err != nil {
+		return nil
+	}
+
+	fields := log.Fields{}
+	if action, ok := payload["action"].(string); ok && strings.TrimSpace(action) != "" {
+		fields["tool_action"] = strings.TrimSpace(action)
+	}
+	if consoleYAML, ok := payload["console_yaml"].(string); ok {
+		fields["console_yaml_bytes"] = len(consoleYAML)
+	}
+	if patchOperations, ok := payload["patch_operations"].([]any); ok {
+		fields["patch_operations_count"] = len(patchOperations)
+	}
+	return fields
+}
+
+func customToolResultsLogFields(session *models.AgentSession, results []agents.CustomToolResult, elapsed time.Duration) log.Fields {
+	errorCount := 0
+	contentBytes := 0
+	resultIDs := make([]string, 0, len(results))
+	for _, result := range results {
+		contentBytes += len(result.Content)
+		resultIDs = append(resultIDs, result.CustomToolUseID)
+		if result.IsError {
+			errorCount++
+		}
+	}
+
+	return log.Fields{
+		"session_id":                session.ID,
+		"provider_session_id":       session.ProviderSessionID,
+		"organization_id":           session.OrganizationID,
+		"custom_tool_result_count":  len(results),
+		"custom_tool_result_ids":    resultIDs,
+		"custom_tool_error_count":   errorCount,
+		"custom_tool_content_bytes": contentBytes,
+		"elapsed_ms":                elapsed.Milliseconds(),
+	}
 }
 
 func agentSessionContext(session *models.AgentSession) agents.AgentSessionContext {
