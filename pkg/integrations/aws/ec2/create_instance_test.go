@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -75,6 +76,48 @@ func Test__CreateInstance__Setup(t *testing.T) {
 		assert.Equal(t, "Ubuntu", stored.ImageOSLabel)
 		assert.Equal(t, "t3.micro", stored.InstanceType)
 	})
+}
+
+func Test__CreateInstance__ConfigurationIncludesProductionLaunchFields(t *testing.T) {
+	component := &CreateInstance{}
+	fields := component.Configuration()
+
+	securityGroup := findConfigurationField(t, fields, "securityGroup")
+	require.NotNil(t, securityGroup.TypeOptions)
+	require.NotNil(t, securityGroup.TypeOptions.Resource)
+	assert.Equal(t, "ec2.securityGroup", securityGroup.TypeOptions.Resource.Type)
+	assert.True(t, securityGroup.TypeOptions.Resource.Multi)
+
+	iamProfile := findConfigurationField(t, fields, "iamInstanceProfile")
+	require.NotNil(t, iamProfile.TypeOptions)
+	require.NotNil(t, iamProfile.TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeIAMInstanceProfile, iamProfile.TypeOptions.Resource.Type)
+
+	tags := findConfigurationField(t, fields, "tags")
+	require.NotNil(t, tags.TypeOptions)
+	require.NotNil(t, tags.TypeOptions.List)
+	assert.ElementsMatch(t, []string{"key", "value"}, configurationFieldNames(tags.TypeOptions.List.ItemDefinition.Schema))
+
+	blockDevices := findConfigurationField(t, fields, "additionalBlockDevices")
+	require.NotNil(t, blockDevices.TypeOptions)
+	require.NotNil(t, blockDevices.TypeOptions.List)
+	assert.Contains(t, configurationFieldNames(blockDevices.TypeOptions.List.ItemDefinition.Schema), "deviceName")
+	assert.Contains(t, configurationFieldNames(blockDevices.TypeOptions.List.ItemDefinition.Schema), "kmsKeyId")
+
+	timeout := findConfigurationField(t, fields, "waitForRunningTimeoutSeconds")
+	require.NotNil(t, timeout.TypeOptions)
+	require.NotNil(t, timeout.TypeOptions.Number)
+	require.NotNil(t, timeout.TypeOptions.Number.Max)
+	assert.Equal(t, maxWaitTimeoutSeconds, *timeout.TypeOptions.Number.Max)
+
+	assert.ElementsMatch(t, []string{createInstanceCreated, createInstanceFailed}, outputChannelNames(component.OutputChannels(nil)))
+
+	output := component.ExampleOutput()
+	data, ok := output["data"].(map[string]any)
+	require.True(t, ok)
+	for _, key := range []string{"instanceId", "publicDnsName", "publicIpAddress", "privateDnsName", "privateIpAddress", "name", "state", "availabilityZone", "instanceType", "imageId", "tags"} {
+		assert.Contains(t, data, key)
+	}
 }
 
 func Test__CreateInstance__Execute(t *testing.T) {
@@ -219,6 +262,126 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(body), "NetworkInterface.1.AssociatePublicIpAddress=false")
 	})
+
+	t.Run("IAM profile, tags, and multiple security groups are sent", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<RunInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<requestId>req-789</requestId>
+							<instancesSet>
+								<item>
+									<instanceId>i-ghi789</instanceId>
+									<instanceState><name>pending</name></instanceState>
+								</item>
+							</instancesSet>
+						</RunInstancesResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            []any{"sg-base", "sg-service"},
+				"iamInstanceProfile":       "superplane-release-canary-ec2",
+				"associatePublicIpAddress": true,
+				"tags": []any{
+					map[string]any{"key": "purpose", "value": "release-canary"},
+					map[string]any{"key": "target", "value": "demo"},
+				},
+			},
+			HTTP:     httpContext,
+			Metadata: &contexts.MetadataContext{},
+			Requests: &contexts.RequestContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, "NetworkInterface.1.SecurityGroupId.1=sg-base")
+		assert.Contains(t, bodyString, "NetworkInterface.1.SecurityGroupId.2=sg-service")
+		assert.Contains(t, bodyString, "IamInstanceProfile.Name=superplane-release-canary-ec2")
+		assert.Contains(t, bodyString, "TagSpecification.1.ResourceType=instance")
+		assert.Contains(t, bodyString, "TagSpecification.1.Tag.1.Key=Name")
+		assert.Contains(t, bodyString, "TagSpecification.1.Tag.1.Value=builder")
+		assert.Contains(t, bodyString, "TagSpecification.1.Tag.2.Key=purpose")
+		assert.Contains(t, bodyString, "TagSpecification.1.Tag.2.Value=release-canary")
+		assert.Contains(t, bodyString, "TagSpecification.1.Tag.3.Key=target")
+		assert.Contains(t, bodyString, "TagSpecification.2.ResourceType=volume")
+		assert.Contains(t, bodyString, "TagSpecification.2.Tag.1.Key=Name")
+		assert.Contains(t, bodyString, "TagSpecification.2.Tag.2.Key=purpose")
+	})
+
+	t.Run("RunInstances API error emits failed output", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>InsufficientInstanceCapacity</Code>
+									<Message>We currently do not have sufficient capacity.</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"associatePublicIpAddress": true,
+			},
+			HTTP:           httpContext,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceFailed, executionState.Channel)
+		payload := emittedPayloadData(t, executionState)
+		assert.Contains(t, payload["error"], "failed to run instance")
+		assert.Equal(t, "InsufficientInstanceCapacity", payload["awsErrorCode"])
+		assert.Equal(t, "", payload["instanceId"])
+		assert.Equal(t, "", payload["lastObservedState"])
+	})
 }
 
 func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
@@ -244,8 +407,10 @@ func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
 										<privateDnsName>ip-10-0-1-25.ec2.internal</privateDnsName>
 										<subnetId>subnet-123</subnetId>
 										<vpcId>vpc-123</vpcId>
+										<placement><availabilityZone>us-east-1a</availabilityZone></placement>
 										<tagSet>
 											<item><key>Name</key><value>builder</value></item>
+											<item><key>purpose</key><value>release-canary</value></item>
 										</tagSet>
 									</item>
 								</instancesSet>
@@ -281,8 +446,21 @@ func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, executionState.Passed)
+	assert.Equal(t, createInstanceCreated, executionState.Channel)
 	assert.Equal(t, CreateInstancePayloadType, executionState.Type)
 	require.Len(t, executionState.Payloads, 1)
+	payload := emittedPayloadData(t, executionState)
+	assert.Equal(t, "i-abc123", payload["instanceId"])
+	assert.Equal(t, "ec2-54-198-10-42.compute-1.amazonaws.com", payload["publicDnsName"])
+	assert.Equal(t, "54.198.10.42", payload["publicIpAddress"])
+	assert.Equal(t, "ip-10-0-1-25.ec2.internal", payload["privateDnsName"])
+	assert.Equal(t, "10.0.1.25", payload["privateIpAddress"])
+	assert.Equal(t, "builder", payload["name"])
+	assert.Equal(t, "running", payload["state"])
+	assert.Equal(t, "us-east-1a", payload["availabilityZone"])
+	assert.Equal(t, "t3.micro", payload["instanceType"])
+	assert.Equal(t, "ami-123", payload["imageId"])
+	assert.Len(t, payload["tags"], 2)
 }
 
 func Test__CreateInstance__PollReschedulesWhenInstanceShuttingDown(t *testing.T) {
@@ -335,6 +513,62 @@ func Test__CreateInstance__PollReschedulesWhenInstanceShuttingDown(t *testing.T)
 	assert.Equal(t, "poll", requests.Action, "shutting-down is transient; poll should be rescheduled")
 }
 
+func Test__CreateInstance__PollTimeoutEmitsFailed(t *testing.T) {
+	component := &CreateInstance{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`
+					<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+						<reservationSet>
+							<item>
+								<instancesSet>
+									<item>
+										<instanceId>i-abc123</instanceId>
+										<instanceState><name>pending</name></instanceState>
+									</item>
+								</instancesSet>
+							</item>
+						</reservationSet>
+					</DescribeInstancesResponse>
+				`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name: "poll",
+		Configuration: map[string]any{
+			"region":                       "us-east-1",
+			"waitForRunningTimeoutSeconds": 1,
+			"associatePublicIpAddress":     true,
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		},
+		Metadata: &contexts.MetadataContext{
+			Metadata: CreateInstanceExecutionMetadata{InstanceID: "i-abc123"},
+		},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, createInstanceFailed, executionState.Channel)
+	payload := emittedPayloadData(t, executionState)
+	assert.Contains(t, payload["error"], "timed out waiting for instance i-abc123")
+	assert.Equal(t, "i-abc123", payload["instanceId"])
+	assert.Equal(t, "pending", payload["lastObservedState"])
+}
+
 func Test__CreateInstance__PollFailsImmediatelyOnNonRecoverableState(t *testing.T) {
 	for _, state := range []string{"terminated", "stopped", "stopping"} {
 		t.Run(state, func(t *testing.T) {
@@ -360,6 +594,7 @@ func Test__CreateInstance__PollFailsImmediatelyOnNonRecoverableState(t *testing.
 					},
 				},
 			}
+			executionState := &contexts.ExecutionStateContext{}
 
 			err := component.HandleHook(core.ActionHookContext{
 				Name: "poll",
@@ -378,11 +613,16 @@ func Test__CreateInstance__PollFailsImmediatelyOnNonRecoverableState(t *testing.
 					Metadata: CreateInstanceExecutionMetadata{InstanceID: "i-abc123"},
 				},
 				Requests:       &contexts.RequestContext{},
-				ExecutionState: &contexts.ExecutionStateContext{},
+				ExecutionState: executionState,
 				Logger:         logrus.NewEntry(logrus.New()),
 			})
 
-			require.ErrorContains(t, err, "will not reach running without intervention")
+			require.NoError(t, err)
+			assert.Equal(t, createInstanceFailed, executionState.Channel)
+			payload := emittedPayloadData(t, executionState)
+			assert.Contains(t, payload["error"], "will not reach running without intervention")
+			assert.Equal(t, "i-abc123", payload["instanceId"])
+			assert.Equal(t, state, payload["lastObservedState"])
 		})
 	}
 }
@@ -402,6 +642,51 @@ func Test__CreateInstance__PollErrorsWhenMetadataMissingInstanceID(t *testing.T)
 	})
 
 	require.ErrorContains(t, err, "poll metadata is missing instanceId")
+}
+
+func Test__ListInstanceProfiles(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`
+					<ListInstanceProfilesResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+						<ListInstanceProfilesResult>
+							<InstanceProfiles>
+								<member>
+									<InstanceProfileName>superplane-release-canary-ec2</InstanceProfileName>
+									<Arn>arn:aws:iam::123456789012:instance-profile/superplane-release-canary-ec2</Arn>
+								</member>
+							</InstanceProfiles>
+							<IsTruncated>false</IsTruncated>
+						</ListInstanceProfilesResult>
+					</ListInstanceProfilesResponse>
+				`)),
+			},
+		},
+	}
+
+	resources, err := ListInstanceProfiles(core.ListResourcesContext{
+		HTTP: httpContext,
+		Parameters: map[string]string{
+			"region": "us-east-1",
+		},
+		Integration: &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		},
+	}, ResourceTypeIAMInstanceProfile)
+
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, ResourceTypeIAMInstanceProfile, resources[0].Type)
+	assert.Equal(t, "superplane-release-canary-ec2", resources[0].Name)
+	assert.Equal(t, "superplane-release-canary-ec2", resources[0].ID)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, "iam.amazonaws.com", httpContext.Requests[0].URL.Host)
 }
 
 func Test__CreateInstance__ExecuteCreatesSecurityGroup(t *testing.T) {
@@ -615,4 +900,44 @@ func Test__CreateInstance__Cancel(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+}
+
+func emittedPayloadData(t *testing.T, executionState *contexts.ExecutionStateContext) map[string]any {
+	t.Helper()
+
+	require.Len(t, executionState.Payloads, 1)
+	wrapped, ok := executionState.Payloads[0].(map[string]any)
+	require.True(t, ok)
+	payload, ok := wrapped["data"].(map[string]any)
+	require.True(t, ok)
+	return payload
+}
+
+func findConfigurationField(t *testing.T, fields []configuration.Field, name string) configuration.Field {
+	t.Helper()
+
+	for _, field := range fields {
+		if field.Name == name {
+			return field
+		}
+	}
+
+	require.Failf(t, "missing field", "field %s not found", name)
+	return configuration.Field{}
+}
+
+func configurationFieldNames(fields []configuration.Field) []string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, field.Name)
+	}
+	return names
+}
+
+func outputChannelNames(channels []core.OutputChannel) []string {
+	names := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		names = append(names, channel.Name)
+	}
+	return names
 }
