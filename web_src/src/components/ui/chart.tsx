@@ -7,6 +7,16 @@ import { cn } from "@/lib/utils";
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
 
+/** Map a chart config / data series key to a valid CSS custom-property suffix. */
+export function toChartColorVarName(key: string): string {
+  const trimmed = key.trim();
+  if (!trimmed) return "empty";
+  return trimmed
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
 type TooltipNameType = number | string;
 type TooltipContentProps = RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>;
@@ -92,7 +102,7 @@ ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ?? itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    return color ? `  --color-${toChartColorVarName(key)}: ${color};` : null;
   })
   .join("\n")}
 }
@@ -356,7 +366,7 @@ function ChartLegendContent({
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.color,
+                    backgroundColor: itemConfig?.color ?? item.color,
                   }}
                 />
               )}
