@@ -121,7 +121,7 @@ describe("WidgetTable row styles — background tone", () => {
     const firstRow = view.container.querySelector("table tbody tr");
     expect(firstRow).not.toBeNull();
     expect(firstRow!.className).toContain("bg-red-100");
-    expect(firstRow!.className).not.toContain("bg-emerald-");
+    expect(firstRow!.className).not.toContain("bg-green-");
   });
 });
 
@@ -185,7 +185,7 @@ describe("WidgetTable link column href", () => {
 });
 
 describe("WidgetTable column formatting", () => {
-  it("renders status and badge columns as pills with the same classes", () => {
+  it("renders status columns as colored pills and badge columns as neutral tags", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const renderWithFormat = (format: "status" | "badge") =>
       render(
@@ -212,14 +212,17 @@ describe("WidgetTable column formatting", () => {
     const statusPill = statusView.container.querySelector("table tbody tr td:nth-child(2) span");
     expect(statusPill).not.toBeNull();
     expect(statusPill!.textContent).toBe("failed");
-    const statusClass = statusPill!.getAttribute("class") ?? "";
+    expect(statusPill!.className).toContain("bg-red-500");
+    expect(statusPill!.className).toContain("text-white");
     statusView.unmount();
 
     const badgeView = renderWithFormat("badge");
     const badgePill = badgeView.container.querySelector("table tbody tr td:nth-child(2) span");
     expect(badgePill).not.toBeNull();
     expect(badgePill!.textContent).toBe("failed");
-    expect(badgePill!.getAttribute("class")).toBe(statusClass);
+    expect(badgePill!.className).toContain("bg-transparent");
+    expect(badgePill!.className).toContain("outline-slate-950/15");
+    expect(badgePill!.className).toContain("text-slate-700");
   });
 });
 

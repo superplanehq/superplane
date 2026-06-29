@@ -36,15 +36,25 @@ interface WidgetTableProps {
 }
 
 const STATUS_PILL_CLASS: Record<string, string> = {
-  passed: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  failed: "bg-red-100 text-red-700 ring-red-300",
-  cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
-  running: "bg-sky-100 text-sky-700 ring-sky-300",
-  pending: "bg-amber-100 text-amber-700 ring-amber-300",
-  ready: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  active: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  idle: "bg-slate-100 text-slate-600 ring-slate-300",
+  passed: "bg-emerald-500 text-white",
+  ready: "bg-emerald-500 text-white",
+  active: "bg-emerald-500 text-white",
+  "very low": "bg-emerald-500 text-white",
+  low: "bg-emerald-500 text-white",
+  failed: "bg-red-500 text-white",
+  critical: "bg-red-500 text-white",
+  high: "bg-orange-500 text-white",
+  running: "bg-blue-500 text-white",
+  medium: "bg-yellow-500 text-white",
+  cancelled: "bg-gray-500 text-white",
+  pending: "bg-gray-500 text-white",
+  idle: "bg-gray-500 text-white",
 };
+
+const STATUS_PILL_BASE_CLASS = "inline-flex rounded-full border-none px-2 py-0.5 text-[11px] font-medium";
+
+const BADGE_PILL_CLASS =
+  "inline-flex rounded-full bg-transparent px-2 py-0.5 text-[11px] font-medium text-slate-700 outline outline-1 -outline-offset-1 outline-slate-950/15";
 
 const ACTION_ICONS = {
   play: Play,
@@ -176,19 +186,21 @@ function WidgetTableGrid({
   const hasActions = Boolean(render.rowActions && render.rowActions.length > 0);
   return (
     <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
-      <table className="w-full border-collapse text-xs">
-        <thead className="bg-slate-50">
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
           <tr>
             {render.columns.map((col, i) => (
               <th
                 key={`${col.field}-${i}`}
-                className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
+                className="border-b border-slate-200 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500"
               >
                 {col.label ?? col.field}
               </th>
             ))}
             {hasActions ? (
-              <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">Actions</th>
+              <th className="border-b border-slate-200 px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Actions
+              </th>
             ) : null}
           </tr>
         </thead>
@@ -201,7 +213,7 @@ function WidgetTableGrid({
                 key={rowKey}
                 data-row-tone={toneClass ? "true" : undefined}
                 className={cn(
-                  "border-b border-slate-100 last:border-0",
+                  "border-b border-black/10 last:border-0",
                   // Drop the default hover wash when a tone is applied so the
                   // tint isn't overridden — the row already has a deliberate
                   // background and a hover bg would mask it.
@@ -242,11 +254,11 @@ function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolea
     >
       <Button
         type="button"
-        size="sm"
+        size="xs"
         variant="outline"
         onClick={onLoadMore}
         disabled={isFetchingMore}
-        className="h-7 gap-1 text-xs"
+        className="gap-1"
         data-testid="widget-table-load-more-button"
       >
         {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
@@ -263,16 +275,21 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
-  // `badge` is an alias for `status`: both render the value as a colored
-  // pill so authors can pick whichever name reads more naturally for the
-  // column (e.g. "status" for run outcomes, "badge" for arbitrary tags).
-  if (col.format === "status" || col.format === "badge") {
-    const classes = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
+  // `status` renders semantic values (passed, failed, risk levels) as colored
+  // pills. `badge` is for neutral tags (service names, categories) with a
+  // lighter outlined treatment.
+  if (col.format === "badge") {
     return (
       <td className="px-3 py-1.5">
-        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset", classes)}>
-          {formatted}
-        </span>
+        <span className={BADGE_PILL_CLASS}>{formatted}</span>
+      </td>
+    );
+  }
+  if (col.format === "status") {
+    const toneClass = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-gray-500 text-white";
+    return (
+      <td className="px-3 py-1.5">
+        <span className={cn(STATUS_PILL_BASE_CLASS, toneClass)}>{formatted}</span>
       </td>
     );
   }
@@ -288,7 +305,12 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
     const href = col.href ? resolveHref(col.href, row) : String(value ?? "");
     return (
       <td className="px-3 py-1.5">
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline underline-offset-2">
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sky-600 no-underline hover:!underline underline-offset-2 decoration-current"
+        >
           {formatted || href}
         </a>
       </td>
@@ -297,7 +319,7 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   if (col.format === "code") {
     return (
       <td className="px-3 py-1.5">
-        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{formatted}</code>
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[13px] text-slate-800">{formatted}</code>
       </td>
     );
   }
@@ -372,12 +394,6 @@ function disabledTooltip(reason: ActionDisabledReason, node: string): string | u
     default:
       return undefined;
   }
-}
-
-function actionVariantClass(variant: WidgetRowAction["variant"]): string | undefined {
-  if (variant === "danger") return "border-red-200 text-red-700 hover:bg-red-50";
-  if (variant === "primary") return "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100";
-  return undefined;
 }
 
 type ResolvedNode = NonNullable<ReturnType<typeof resolveConsoleNode>>;
@@ -478,7 +494,6 @@ function RowActionButton({
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
-  const variantClass = actionVariantClass(action.variant);
 
   const { fire, error, pending } = useRowActionFire({
     action,
@@ -505,13 +520,12 @@ function RowActionButton({
     <div className="inline-flex flex-col items-end gap-0.5">
       <Button
         type="button"
-        size="sm"
+        size="xs"
         variant="outline"
         onClick={handleClick}
         disabled={disabled || pending}
         aria-disabled={disabled}
         title={tooltip}
-        className={variantClass}
         data-testid={testId}
         data-variant={action.variant ?? "default"}
         data-disabled-reason={reason ?? undefined}

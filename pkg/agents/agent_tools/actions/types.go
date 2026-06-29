@@ -10,8 +10,8 @@ type Input struct {
 	UseDraft            *bool             `json:"use_draft,omitempty"`
 	IncludeConsole      bool              `json:"include_console,omitempty"`
 	IncludeIntegrations bool              `json:"include_integrations,omitempty"`
-	CanvasYAML          string            `json:"canvas_yaml,omitempty"`
 	ConsoleYAML         string            `json:"console_yaml,omitempty"`
+	PatchOperations     []PatchOperation  `json:"patch_operations,omitempty"`
 	AutoLayout          *AutoLayoutInput  `json:"auto_layout,omitempty"`
 	IntegrationID       string            `json:"integration_id,omitempty"`
 	ResourceType        string            `json:"resource_type,omitempty"`
@@ -30,6 +30,35 @@ type Input struct {
 	Content             string            `json:"content,omitempty"`
 	Message             string            `json:"message,omitempty"`
 	Query               string            `json:"query,omitempty"`
+}
+
+// PatchOperation describes one small graph edit for patch_draft.
+type PatchOperation struct {
+	Op     string     `json:"op"`
+	NodeID string     `json:"node_id,omitempty"`
+	Node   *PatchNode `json:"node,omitempty"`
+	Edge   *PatchEdge `json:"edge,omitempty"`
+}
+
+type PatchNode struct {
+	ID            string         `json:"id,omitempty"`
+	Name          string         `json:"name,omitempty"`
+	Component     string         `json:"component,omitempty"`
+	Configuration map[string]any `json:"configuration,omitempty"`
+	IntegrationID string         `json:"integration_id,omitempty"`
+	Position      *PatchPosition `json:"position,omitempty"`
+	IsCollapsed   *bool          `json:"is_collapsed,omitempty"`
+}
+
+type PatchEdge struct {
+	SourceID string `json:"source_id,omitempty"`
+	TargetID string `json:"target_id,omitempty"`
+	Channel  string `json:"channel,omitempty"`
+}
+
+type PatchPosition struct {
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 // AutoLayoutInput configures optional backend auto-layout for draft updates.
