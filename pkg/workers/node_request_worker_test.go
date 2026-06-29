@@ -1,17 +1,21 @@
 package workers
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -641,6 +645,78 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T
 
 	err := worker.LockAndProcessRequest(request)
 	require.NoError(t, err)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+}
+
+func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {
+	cancelCalled := false
+	componentName := "cancel_failing_" + uuid.New().String()
+
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		CancelFunc: func(ctx core.ExecutionContext) error {
+			cancelCalled = true
+			return errors.New("cancel failed")
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, canvasNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateStarted,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "noop",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.True(t, cancelCalled, "component Cancel should be invoked")
 
 	var updatedRequest models.CanvasNodeRequest
 	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
