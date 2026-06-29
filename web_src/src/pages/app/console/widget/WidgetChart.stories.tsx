@@ -2,7 +2,8 @@ import type { ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { TypedPanelShell } from "../TypedPanelShell";
-import { PanelFrame, serviceRows, timeseriesRows } from "../__stories__/storyHelpers";
+import { PanelFrame } from "../__stories__/storyDecorators";
+import { serviceRows, timeseriesRows } from "../__stories__/storyFixtures";
 import { WidgetChart } from "./WidgetChart";
 
 /**

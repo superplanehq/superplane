@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
-import { PanelFrame } from "./__stories__/storyHelpers";
+import { PanelFrame } from "./__stories__/storyDecorators";
 
 /**
  * HTML panel content renderer. Like the markdown panel, the real card resolves

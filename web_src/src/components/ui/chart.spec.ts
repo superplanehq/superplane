@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toChartColorVarName } from "./chart";
+import { toChartColorVarName } from "./chartColorVarName";
 
 describe("toChartColorVarName", () => {
   it("slugifies display names for CSS custom properties", () => {

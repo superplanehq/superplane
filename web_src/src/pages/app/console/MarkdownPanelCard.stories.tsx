@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
-import { PanelFrame, prRiskReviewMarkdownBody, prRiskReviewMarkdownPanelSize } from "./__stories__/storyHelpers";
+import { PanelFrame } from "./__stories__/storyDecorators";
+import { prRiskReviewMarkdownBody, prRiskReviewMarkdownPanelSize } from "./__stories__/storyFixtures";
 
 /**
  * Markdown panel content renderer.

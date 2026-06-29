@@ -2,7 +2,8 @@ import type { ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { TypedPanelShell } from "../TypedPanelShell";
-import { PanelFrame, memoryEntries, metricRows } from "../__stories__/storyHelpers";
+import { PanelFrame } from "../__stories__/storyDecorators";
+import { memoryEntries, metricRows } from "../__stories__/storyFixtures";
 import type { MemoryNumberSource } from "../panelTypes";
 import { WidgetNumber } from "./WidgetNumber";
 

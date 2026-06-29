@@ -4,18 +4,10 @@ import type { TooltipPayloadEntry, TooltipValueType } from "recharts";
 
 import { cn } from "@/lib/utils";
 
+import { toChartColorVarName } from "./chartColorVarName";
+
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
-
-/** Map a chart config / data series key to a valid CSS custom-property suffix. */
-export function toChartColorVarName(key: string): string {
-  const trimmed = key.trim();
-  if (!trimmed) return "empty";
-  return trimmed
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
 type TooltipNameType = number | string;

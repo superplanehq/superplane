@@ -44,7 +44,7 @@ const STACK_ID = "stack";
 /** Ignore Recharts/row props and always paint bars with the resolved series color. */
 function barShapeWithColor(seriesColor: string) {
   return (props: BarShapeProps) => {
-    const { x, y, width, height, radius, isActive, onTransitionEnd } = props;
+    const { x, y, width, height, radius } = props;
     return (
       <Rectangle
         x={x}
@@ -52,8 +52,6 @@ function barShapeWithColor(seriesColor: string) {
         width={width}
         height={height}
         radius={radius}
-        isActive={isActive}
-        onTransitionEnd={onTransitionEnd}
         isAnimationActive={false}
         isUpdateAnimationActive={false}
         fill={seriesColor}

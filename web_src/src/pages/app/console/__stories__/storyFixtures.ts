@@ -1,21 +1,17 @@
-import type { ReactNode } from "react";
-import type { Decorator } from "@storybook/react-vite";
-
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
-import { ConsoleContext, type ConsoleContextValue, type ConsoleNodeStatus } from "../ConsoleContext";
+import type { ConsoleContextValue, ConsoleNodeStatus } from "../ConsoleContext";
 import type { WidgetChartRender, WidgetNumberRender, WidgetTableRender } from "../widget/types";
 
 /**
- * Shared fixtures and decorators for the console panel stories.
- *
- * The panel renderers (`WidgetTable`, `WidgetChart`, `WidgetNumber`) take their
- * data as plain props, so the stories feed them static rows directly and never
- * touch `useWidgetData`. The node/nodes panels only need a `ConsoleContext`, so
- * `MockConsoleProvider` supplies a realistic one with sample nodes and trigger
- * callbacks wired to `console.log`.
+ * Shared fixtures for console panel Storybook stories. Panel renderers take
+ * plain props, so stories feed static rows directly and never touch
+ * `useWidgetData`.
  */
+
+/** No-op callbacks for Storybook mocks. */
+export function storyNoop(..._args: unknown[]): void {}
 
 /** Sample canvas nodes used for node-reference resolution in the node panels. */
 export const sampleNodes: SuperplaneComponentsNode[] = [
@@ -33,56 +29,16 @@ const sampleNodeStatuses: Record<string, ConsoleNodeStatus> = {
   "node-notify": "pending",
 };
 
-/** Default mock console context — viewer can run nodes; actions log to console. */
+/** Default mock console context for node panel stories. */
 export const mockConsoleContextValue: ConsoleContextValue = {
   canvasId: "canvas-story",
   organizationId: "org-story",
   nodes: sampleNodes,
   nodeStatuses: sampleNodeStatuses,
   canRunNodes: true,
-  onTriggerNode: (nodeId, options) => console.log("onTriggerNode", nodeId, options),
-  onOpenNode: (nodeId) => console.log("onOpenNode", nodeId),
+  onTriggerNode: storyNoop,
+  onOpenNode: storyNoop,
 };
-
-/** Wrap children in a mock `ConsoleContext`. Pass overrides to vary behavior. */
-export function MockConsoleProvider({
-  children,
-  value,
-}: {
-  children: ReactNode;
-  value?: Partial<ConsoleContextValue>;
-}) {
-  return <ConsoleContext.Provider value={{ ...mockConsoleContextValue, ...value }}>{children}</ConsoleContext.Provider>;
-}
-
-/** Decorator variant of {@link MockConsoleProvider} for meta-level `decorators`. */
-export const withConsoleContext: Decorator = (Story) => (
-  <MockConsoleProvider>
-    <Story />
-  </MockConsoleProvider>
-);
-
-/**
- * Fixed-size frame approximating a real dashboard grid cell so panels render at
- * realistic dimensions against the console's slate background.
- */
-export function PanelFrame({
-  children,
-  width = 420,
-  height = 280,
-}: {
-  children: ReactNode;
-  width?: number;
-  height?: number;
-}) {
-  return (
-    <div className="bg-slate-100 p-4">
-      <div style={{ width, height }}>{children}</div>
-    </div>
-  );
-}
-
-// --- Sample rows -----------------------------------------------------------
 
 /** Execution-like rows for table widgets (status, duration, owner, links). */
 export const executionRows: Record<string, unknown>[] = [
@@ -170,8 +126,6 @@ export const memoryEntries: CanvasMemoryEntry[] = [
   { id: "m2", namespace: "rollbacks", values: { count: 2 }, source: "node" },
 ];
 
-// --- Ready-made render configs --------------------------------------------
-
 export const baseTableRender: WidgetTableRender = {
   kind: "table",
   columns: [
@@ -198,8 +152,6 @@ export const baseNumberRender: WidgetNumberRender = {
   field: "total",
   label: "Total runs",
 };
-
-// --- PR Risk Review console (internal org fixture) -------------------------
 
 /** Memory rows for the `prRiskChecks` namespace (`checks-table` panel). */
 export const prRiskCheckRows: Record<string, unknown>[] = [

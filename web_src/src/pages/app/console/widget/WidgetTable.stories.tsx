@@ -2,14 +2,13 @@ import type { ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { TypedPanelShell } from "../TypedPanelShell";
+import { MockConsoleProvider, PanelFrame } from "../__stories__/storyDecorators";
 import {
-  PanelFrame,
   executionRows,
   prRiskCheckRows,
   prRiskChecksPanelSize,
   prRiskChecksTableRender,
-  withConsoleContext,
-} from "../__stories__/storyHelpers";
+} from "../__stories__/storyFixtures";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
 
@@ -24,7 +23,13 @@ const meta = {
   component: WidgetTable,
   parameters: { layout: "centered" },
   tags: ["autodocs"],
-  decorators: [withConsoleContext],
+  decorators: [
+    (Story) => (
+      <MockConsoleProvider>
+        <Story />
+      </MockConsoleProvider>
+    ),
+  ],
   argTypes: {
     isLoading: { control: "boolean" },
   },

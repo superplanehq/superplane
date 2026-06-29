@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 
 import { NodePanelCard } from "./NodePanelCard";
-import { MockConsoleProvider, PanelFrame } from "./__stories__/storyHelpers";
+import { MockConsoleProvider, PanelFrame } from "./__stories__/storyDecorators";
 
 /**
  * Single-node panel. Renders the real `NodePanelCard`, which only needs a
