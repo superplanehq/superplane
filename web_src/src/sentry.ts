@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react";
+import { dash0TelemetryNoisePatterns, isDash0TelemetryNoiseEvent } from "@/lib/sentryDash0Noise";
 
 interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_DSN?: string;
@@ -18,6 +19,10 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
+    ignoreErrors: dash0TelemetryNoisePatterns,
+    beforeSend(event, hint) {
+      return isDash0TelemetryNoiseEvent(event, hint) ? null : event;
+    },
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
