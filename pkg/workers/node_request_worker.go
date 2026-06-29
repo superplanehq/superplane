@@ -144,9 +144,14 @@ func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
-	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
+	node, err := models.FindUnscopedCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return fmt.Errorf("failed to find node: %w", err)
+	}
+
+	if node.DeletedAt.Valid {
+		logger.Infof("Node %s deleted - completing request", request.NodeID)
+		return request.Complete(tx)
 	}
 
 	switch node.Type {
@@ -311,9 +316,21 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 ) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return fmt.Errorf("failed to find node: %w", err)
+	}
+
+	//
+	// If node was deleted, we cancel the execution before completing the request.
+	//
+	if node.DeletedAt.Valid {
+		logger.Infof("Node %s deleted - cancelling execution and completing request", execution.NodeID)
+		if err := w.cancelExecutionForDeletedNode(logger, tx, node, execution); err != nil {
+			return err
+		}
+
+		return request.Complete(tx)
 	}
 
 	spec := request.Spec.Data()
@@ -371,4 +388,62 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Request completed")
 	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) cancelExecutionForDeletedNode(logger *log.Entry, tx *gorm.DB, node *models.CanvasNode, execution *models.CanvasNodeExecution) error {
+	if execution.State == models.CanvasNodeExecutionStateFinished {
+		return nil
+	}
+
+	ref := node.Ref.Data()
+	if node.Type != models.NodeTypeComponent || ref.Component == nil {
+		return execution.CancelInTransaction(tx, nil)
+	}
+
+	action, err := w.registry.GetAction(ref.Component.Name)
+	if err != nil {
+		return execution.CancelInTransaction(tx, nil)
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("canvas not found: %w", err)
+	}
+
+	ctx := core.ExecutionContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID.String(),
+		OrganizationID: canvas.OrganizationID.String(),
+		CanvasName:     canvas.Name,
+		NodeID:         execution.NodeID,
+		NodeName:       node.Name,
+		Configuration:  execution.Configuration.Data(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Auth:           contexts.NewAuthReader(tx, canvas.OrganizationID, w.authService, nil),
+	}
+
+	if node.AppInstallationID != nil {
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			logger.Errorf("error finding app installation: %v", err)
+		} else {
+			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, w.encryptor, w.registry, nil)
+		}
+	}
+
+	ctx.Logger = logging.WithExecution(logger, execution)
+
+	//
+	// Best-effort for calling the Cancel() on the component implementation.
+	// If an error happens, we log it and continue with the execution cancellation.
+	//
+	err = action.Cancel(ctx)
+	if err != nil {
+		logger.Errorf("failed to cancel execution: %v", err)
+	}
+
+	return execution.CancelInTransaction(tx, nil)
 }
