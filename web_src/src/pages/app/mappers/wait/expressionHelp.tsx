@@ -30,7 +30,7 @@ export const ExpressionTooltip: React.FC<{ expression: string; children: React.R
 };
 
 const EXPRESSION_TOKEN_PATTERN =
-  /({{|}}|\$|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b(?:root|previous|date|duration|now|timezone|int)\b|\b(?:true|false|null)\b|==|!=|>=|<=|&&|\|\||[?:+\-*/%().,[\]]|[A-Za-z_][A-Za-z0-9_]*|\s+)/g;
+  /({{|}}|\$|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b(?:root|previous|secrets|date|duration|now|timezone|int)\b|\b(?:true|false|null)\b|==|!=|>=|<=|&&|\|\||[?:+\-*/%().,[\]]|[A-Za-z_][A-Za-z0-9_]*|\s+)/g;
 
 function tokenClass(token: string): string | undefined {
   if (/^\s+$/.test(token)) return undefined;
@@ -38,7 +38,7 @@ function tokenClass(token: string): string | undefined {
   if (token === "$") return "text-emerald-700";
   if (token.startsWith('"') || token.startsWith("'")) return "text-amber-700";
   if (/^\b\d+(\.\d+)?\b$/.test(token)) return "text-blue-700";
-  if (/^\b(?:root|previous|date|duration|now|timezone|int)\b$/.test(token)) return "text-purple-700";
+  if (/^\b(?:root|previous|secrets|date|duration|now|timezone|int)\b$/.test(token)) return "text-purple-700";
   if (/^\b(?:true|false|null)\b$/.test(token)) return "text-emerald-700";
   if (/^(==|!=|>=|<=|&&|\|\||[?:+\-*/%().,[\]])$/.test(token)) return "text-gray-600";
   return "text-gray-800 dark:text-gray-100";
@@ -72,6 +72,10 @@ export function ExpressionEnvironment() {
         </li>
         <li>
           <span className="font-mono">previous()</span>: previous node outputs (optional depth)
+        </li>
+        <li>
+          <span className="font-mono">secrets(&quot;name&quot;).key</span>: organization secret value (resolved at
+          execution time)
         </li>
       </ul>
     </div>
