@@ -91,16 +91,16 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-slate-800" data-testid="nodes-panel-row-name">
+        <div className="truncate text-[13px] font-medium text-slate-800" data-testid="nodes-panel-row-name">
           {displayName}
         </div>
         {entry.description ? (
-          <p className="truncate text-xs text-slate-500" title={entry.description}>
+          <p className="truncate text-[13px] text-slate-500" title={entry.description}>
             {entry.description}
           </p>
         ) : null}
         {!resolved ? (
-          <p className="truncate text-[11px] text-amber-600">
+          <p className="truncate text-[13px] text-amber-600">
             Node {JSON.stringify(entry.node)} not found in this canvas.
           </p>
         ) : null}
@@ -131,7 +131,7 @@ function NodesPanelRunControl({
     <>
       <Button
         type="button"
-        size="sm"
+        size="xs"
         variant="outline"
         onClick={() => setOpen(true)}
         disabled={!canRun}

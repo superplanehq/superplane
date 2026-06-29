@@ -90,21 +90,44 @@ interface NumberDisplayProps {
 }
 
 function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps) {
-  const display =
-    value == null
-      ? "—"
-      : `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
+  const formatted = value == null ? null : formatValue(value, render.format ?? "number");
   const className =
     variant === "inline"
       ? "flex flex-col items-start justify-center gap-1 text-left"
       : "flex h-full flex-col items-start justify-center gap-1 p-4";
+  const valueClassName = "text-4xl font-medium text-slate-900";
+  const suffixClassName =
+    variant === "inline" ? "text-base font-semibold text-slate-900" : "text-xl font-semibold text-slate-900";
+  const hasSuffix = formatted != null && Boolean(render.suffix);
+  const hasSparkline = sparkline != null && sparkline.length > 1;
+  const valueBlock =
+    formatted == null ? (
+      <span className={valueClassName}>—</span>
+    ) : hasSuffix ? (
+      <div className="flex items-baseline gap-0.5">
+        {render.prefix ? <span className={valueClassName}>{render.prefix}</span> : null}
+        <span className={valueClassName}>{formatted}</span>
+        <span className={suffixClassName}>{render.suffix}</span>
+      </div>
+    ) : (
+      <span className={valueClassName}>
+        {render.prefix ?? ""}
+        {formatted}
+      </span>
+    );
   return (
     <div className={className} data-testid="widget-number">
       {render.label ? (
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{render.label}</span>
       ) : null}
-      <span className="text-2xl font-semibold text-slate-900">{display}</span>
-      {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} /> : null}
+      {hasSparkline ? (
+        <div className={variant === "inline" ? "flex flex-col gap-2" : "flex flex-col gap-3"}>
+          {valueBlock}
+          <Sparkline values={sparkline} />
+        </div>
+      ) : (
+        valueBlock
+      )}
     </div>
   );
 }
@@ -112,6 +135,12 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
 function Sparkline({ values }: { values: number[] }) {
   const width = 120;
   const height = 28;
+  const strokeWidth = 1.5;
+  // Inset the plot so round joins / stroke width aren't clipped at the SVG edges.
+  const padY = Math.ceil(strokeWidth / 2) + 1;
+  const plotTop = padY;
+  const plotBottom = height - padY;
+  const plotHeight = plotBottom - plotTop;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -120,18 +149,25 @@ function Sparkline({ values }: { values: number[] }) {
   // the SVG renders as a filled area underneath the line.
   const linePoints = values.map((v, i) => {
     const x = i * stepX;
-    const y = height - ((v - min) / range) * height;
+    const y = plotTop + plotHeight - ((v - min) / range) * plotHeight;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   const lineCoords = linePoints.join(" ");
   const firstX = (0).toFixed(1);
   const lastX = ((values.length - 1) * stepX).toFixed(1);
-  const baselineY = height.toFixed(1);
+  const baselineY = plotBottom.toFixed(1);
   const areaPath = `M${linePoints[0]} L${linePoints.slice(1).join(" L")} L${lastX},${baselineY} L${firstX},${baselineY} Z`;
   return (
-    <svg width={width} height={height} className="text-sky-500" viewBox={`0 0 ${width} ${height}`} aria-hidden>
+    <svg width={width} height={height} className="block text-sky-500" viewBox={`0 0 ${width} ${height}`} aria-hidden>
       <path d={areaPath} fill="currentColor" fillOpacity={0.2} stroke="none" />
-      <polyline points={lineCoords} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={lineCoords}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
