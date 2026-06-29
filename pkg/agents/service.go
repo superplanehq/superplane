@@ -641,7 +641,7 @@ func getDraftStatus(canvasID uuid.UUID) string {
 				draftCreatedAt(draft),
 			)
 		}
-		result += "These drafts may belong to other sessions or users. To continue a known draft branch, pass its version_id to 'superplane_app' actions 'read', 'patch_draft', and 'update_draft'. patch_draft and update_draft always require version_id. Use 'create_draft' when read returned live/no version_id, or when the user explicitly wants another draft branch. Do not assume an unrelated draft is yours.\n"
+		result += "These drafts may belong to other sessions or users. To continue a known draft branch, pass its version_id to 'superplane_app' actions 'read' and 'patch_draft'. patch_draft always requires version_id. Use 'create_draft' when read returned live/no version_id, or when the user explicitly wants another draft branch. Do not assume an unrelated draft is yours.\n"
 		return result
 	}
 
@@ -752,7 +752,7 @@ func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVer
 	return "draft", true
 }
 
-const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you need to edit the app, call 'superplane_app' action 'create_draft' first, then pass the returned version_id to 'patch_draft' or 'update_draft'. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you need to edit the app, call 'superplane_app' action 'create_draft' first, then pass the returned version_id to 'patch_draft'. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
 
 func draftCreatedAt(draft models.CanvasVersion) string {
 	if draft.CreatedAt == nil {
