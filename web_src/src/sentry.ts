@@ -7,7 +7,6 @@ interface SentryWindow extends Window {
 
 let dsn: string | undefined;
 let environment: string | undefined;
-const release = import.meta.env.VITE_SENTRY_RELEASE?.trim() || undefined;
 
 if (typeof window !== "undefined") {
   const sentryWindow = window as SentryWindow;
@@ -19,7 +18,6 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
-    release,
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
