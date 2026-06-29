@@ -10,7 +10,7 @@ Prefer adding an action to `superplane_app` when the capability is app-related:
 
 - reading app/canvas or Console YAML (served from the effective staged draft content the UI editor reads: the draft's pending staged edits when present, otherwise the committed draft)
 - listing, reading, staging, deleting, or committing normal app repository files such as `README.md`, `AGENTS.md`, or scripts used by file-backed components
-- updating the draft app (`update_draft` saves edits as the draft's pending staged changes instead of committing them to the draft, exactly like edits made in the UI editor, so the user reviews and commits them)
+- updating the draft app (`patch_draft` saves graph, Console, and layout edits as the draft's pending staged changes instead of committing them to the draft, exactly like edits made in the UI editor, so the user reviews and commits them)
 - inspecting agent token permissions (`access`) and runtime state (`read_runtime`)
 - listing connected integrations for the current app context
 - validating or preparing app-specific backend state
@@ -65,8 +65,8 @@ Action rules:
 
 - Always stay scoped to the current `AgentSessionContext`.
 - Reject or ignore attempts to operate on another canvas.
-- Never publish drafts from an agent action. `update_draft` saves edits as the draft's pending staged changes (exactly like edits made in the UI editor) and never commits the draft or publishes; the user reviews and commits the staged changes.
-- Treat `canvas.yaml` and `console.yaml` as spec files. Agents should update them through `update_draft`; normal repository file actions are for additional app files.
+- Never publish drafts from an agent action. `patch_draft` saves graph, Console, and layout edits as the draft's pending staged changes (exactly like edits made in the UI editor) and never commits the draft or publishes; the user reviews and commits the staged changes.
+- Treat `canvas.yaml` and `console.yaml` as spec files. Agents should update them through `patch_draft`; normal repository file actions are for additional app files.
 - When exposing repository file reads, preserve the same draft semantics as `read`: if exactly one owned draft exists, read its effective staged content; if multiple owned drafts exist, require an explicit `version_id`.
 - Return concise JSON payloads; avoid dumping large unrelated data.
 - Prefer backend APIs and model methods over invoking the CLI.
