@@ -42,6 +42,22 @@ func Test__LockNodeRequest__OnlyLocksDuePendingRequests(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("locks due pending request for deleted node", func(t *testing.T) {
+		request := createCanvasNodeRequest(t, canvas.ID, "schedule-trigger", models.NodeExecutionRequestStatePending, time.Now().Add(-time.Second))
+
+		var node models.CanvasNode
+		require.NoError(t, database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "schedule-trigger").First(&node).Error)
+		require.NoError(t, database.Conn().Delete(&node).Error)
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			locked, err := models.LockNodeRequest(tx, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, request.ID, locked.ID)
+			return nil
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("does not lock completed request", func(t *testing.T) {
 		request := createCanvasNodeRequest(t, canvas.ID, "schedule-trigger", models.NodeExecutionRequestStateCompleted, time.Now().Add(-time.Second))
 

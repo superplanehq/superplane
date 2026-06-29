@@ -520,18 +520,16 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
+func Test__NodeRequestWorker_CompletesDeletedNodeRequests(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
 
 	amqpURL, _ := config.RabbitMQURL()
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
-	//
-	// Create a simple canvas with a schedule trigger node.
-	//
 	triggerNode := "trigger-1"
 	canvas, canvasNodes := support.CreateCanvas(
 		t,
@@ -553,9 +551,6 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	//
-	// Create a node request for the trigger.
-	//
 	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
 		WorkflowID: canvas.ID,
@@ -571,18 +566,11 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	//
-	// Soft delete the workflow node.
-	//
 	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
-	//
-	// Verify that ListNodeRequests does not return the request for the deleted node.
-	//
 	requests, err := models.ListNodeRequests()
 	require.NoError(t, err)
 
-	// Check that our request is not in the list
 	found := false
 	for _, req := range requests {
 		if req.ID == request.ID {
@@ -590,9 +578,80 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 			break
 		}
 	}
-	assert.False(t, found, "Request for deleted node should not be returned by ListNodeRequests")
+	assert.True(t, found, "Request for deleted node should be returned by ListNodeRequests")
+
+	err = worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, canvasNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state": models.CanvasNodeExecutionStateStarted,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "noop",
+				Parameters: map[string]interface{}{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
 }
 
 func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
