@@ -233,7 +233,7 @@ Each column needs a non-empty `field`. Optional fields:
 | `label` | Header text. Falls back to `field`. |
 | `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
 | `show` | Row expression controlling whether the cell is visible. |
-| `href` | Link template for `link` columns. |
+| `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
 
