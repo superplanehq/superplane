@@ -350,54 +350,16 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
 
-	var organizations []models.OrganizationWithCounts
-	var total int64
-	err := telemetry.RunSpan(ctx, "organizations.list", func(ctx context.Context) error {
-		var listErr error
-		organizations, total, listErr = models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
-		return listErr
-	})
+	organizations, total, err := listAllOrganizations(ctx, search, limit, offset, sortBy, sortDirection)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
 		return
 	}
 
-	type orgItem struct {
-		ID          string  `json:"id"`
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		CanvasCount int64   `json:"canvas_count"`
-		MemberCount int64   `json:"member_count"`
-		CreatedAt   *string `json:"created_at,omitempty"`
-	}
+	type orgItem = adminOrgItem
 
-	var items []orgItem
-	_ = telemetry.RunSpan(ctx, "organizations.serialize", func(ctx context.Context) error {
-		items = make([]orgItem, 0, len(organizations))
-		for _, org := range organizations {
-			item := orgItem{
-				ID:          org.ID.String(),
-				Name:        org.Name,
-				Description: org.Description,
-				CanvasCount: org.CanvasCount,
-				MemberCount: org.MemberCount,
-			}
-
-			if org.CreatedAt != nil {
-				formatted := org.CreatedAt.Format(time.RFC3339)
-				item.CreatedAt = &formatted
-			}
-
-			items = append(items, item)
-		}
-
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			span.SetAttributes(attribute.Int("organizations.count", len(items)))
-		}
-
-		return nil
-	})
+	items := serializeAdminOrganizations(ctx, organizations)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(paginatedResponse{
@@ -770,4 +732,50 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "disabled"})
+}
+
+type adminOrgItem struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	CanvasCount int64   `json:"canvas_count"`
+	MemberCount int64   `json:"member_count"`
+	CreatedAt   *string `json:"created_at,omitempty"`
+}
+
+func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
+	ctx, done := telemetry.Span(ctx, "organizations.list")
+	defer done(&err)
+
+	return models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+}
+
+func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {
+	var err error
+	ctx, done := telemetry.Span(ctx, "organizations.serialize")
+	defer done(&err)
+
+	items := make([]adminOrgItem, 0, len(organizations))
+	for _, org := range organizations {
+		item := adminOrgItem{
+			ID:          org.ID.String(),
+			Name:        org.Name,
+			Description: org.Description,
+			CanvasCount: org.CanvasCount,
+			MemberCount: org.MemberCount,
+		}
+
+		if org.CreatedAt != nil {
+			formatted := org.CreatedAt.Format(time.RFC3339)
+			item.CreatedAt = &formatted
+		}
+
+		items = append(items, item)
+	}
+
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("organizations.count", len(items)))
+	}
+
+	return items
 }

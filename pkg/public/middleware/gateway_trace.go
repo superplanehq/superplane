@@ -22,16 +22,17 @@ func TraceGatewayServe(ctx context.Context, w http.ResponseWriter, gateway http.
 		return
 	}
 
-	_ = telemetry.RunSpan(ctx, "grpc_gateway.serve", func(ctx context.Context) error {
-		capture := &tracedGatewayResponseWriter{
-			ResponseWriter: w,
-			ctx:            ctx,
-			statusCode:     http.StatusOK,
-		}
-		gateway.ServeHTTP(capture, r.WithContext(ctx))
-		capture.finish()
-		return nil
-	})
+	var err error
+	ctx, done := telemetry.Span(ctx, "grpc_gateway.serve")
+	defer done(&err)
+
+	capture := &tracedGatewayResponseWriter{
+		ResponseWriter: w,
+		ctx:            ctx,
+		statusCode:     http.StatusOK,
+	}
+	gateway.ServeHTTP(capture, r.WithContext(ctx))
+	capture.finish()
 }
 
 /*
