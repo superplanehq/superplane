@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,6 +26,7 @@ export const baseMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "OpenAI",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -68,4 +70,39 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventId: execution.rootEvent!.id!,
     },
   ];
+}
+
+type ResponseNodeMetadata = {
+  model?: string;
+  structuredOutput?: boolean;
+};
+
+type ResponseConfiguration = {
+  model?: string;
+  outputSchema?: unknown;
+};
+
+// metadataList surfaces the configured model and structured-output state on the
+// canvas node tile. It prefers backend node metadata (set in Setup) and falls
+// back to the node configuration so the model shows before the first execution.
+function metadataList(node: NodeInfo): MetadataItem[] {
+  const items: MetadataItem[] = [];
+  const meta = node.metadata as ResponseNodeMetadata | undefined;
+  const config = node.configuration as ResponseConfiguration | undefined;
+
+  const model = meta?.model || config?.model;
+  if (model) {
+    items.push({ icon: "sparkles", label: model });
+  }
+
+  const structured = meta?.structuredOutput ?? hasSchema(config?.outputSchema);
+  if (structured) {
+    items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  return items;
+}
+
+function hasSchema(schema: unknown): boolean {
+  return !!schema && typeof schema === "object" && Object.keys(schema as Record<string, unknown>).length > 0;
 }
