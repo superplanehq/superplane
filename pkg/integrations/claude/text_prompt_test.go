@@ -428,3 +428,40 @@ func TestExtractMessageText(t *testing.T) {
 		})
 	}
 }
+
+func TestTextPrompt_NodeMetadata(t *testing.T) {
+	c := &TextPrompt{}
+	md := &contexts.MetadataContext{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"model":     "claude-3-test",
+			"prompt":    "hi",
+			"maxTokens": 500,
+			"outputSchema": map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{"x": map[string]any{"type": "string"}},
+				"required":             []any{"x"},
+				"additionalProperties": false,
+			},
+		},
+		Metadata: md,
+	}
+
+	if err := c.Setup(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	meta, ok := md.Metadata.(TextPromptNodeMetadata)
+	if !ok {
+		t.Fatalf("expected TextPromptNodeMetadata, got %T", md.Metadata)
+	}
+	if meta.Model != "claude-3-test" {
+		t.Errorf("expected model claude-3-test, got %q", meta.Model)
+	}
+	if meta.MaxTokens != 500 {
+		t.Errorf("expected maxTokens 500, got %d", meta.MaxTokens)
+	}
+	if !meta.StructuredOutput {
+		t.Error("expected structuredOutput true")
+	}
+}

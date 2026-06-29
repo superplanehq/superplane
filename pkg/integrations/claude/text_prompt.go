@@ -38,6 +38,14 @@ type MessagePayload struct {
 	Response   *CreateMessageResponse `json:"response"`
 }
 
+// TextPromptNodeMetadata is node-level metadata surfaced in the UI so the
+// configured model and options are visible on the node without opening it.
+type TextPromptNodeMetadata struct {
+	Model            string `json:"model" mapstructure:"model"`
+	MaxTokens        int    `json:"maxTokens" mapstructure:"maxTokens"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
+}
+
 func (c *TextPrompt) Name() string {
 	return "claude.textPrompt"
 }
@@ -219,6 +227,18 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		if err := validateClaudeOutputSchema(schema, ""); err != nil {
 			return err
 		}
+	}
+
+	if ctx.Metadata != nil {
+		maxTokens := spec.MaxTokens
+		if maxTokens == 0 {
+			maxTokens = 4096
+		}
+		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
+			Model:            spec.Model,
+			MaxTokens:        maxTokens,
+			StructuredOutput: schema != nil,
+		})
 	}
 
 	return nil

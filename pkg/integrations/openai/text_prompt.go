@@ -31,6 +31,13 @@ type ResponsePayload struct {
 	Response *OpenAIResponse `json:"response"`
 }
 
+// ResponseNodeMetadata is node-level metadata surfaced in the UI so the
+// configured model and options are visible on the node without opening it.
+type ResponseNodeMetadata struct {
+	Model            string `json:"model" mapstructure:"model"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
+}
+
 func (c *CreateResponse) Name() string {
 	return "openai.textPrompt"
 }
@@ -145,6 +152,13 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 		if err := validateStrictJSONSchema(schema, ""); err != nil {
 			return err
 		}
+	}
+
+	if ctx.Metadata != nil {
+		_ = ctx.Metadata.Set(ResponseNodeMetadata{
+			Model:            spec.Model,
+			StructuredOutput: schema != nil,
+		})
 	}
 
 	return nil

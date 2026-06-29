@@ -175,3 +175,30 @@ func Test__CreateResponse__Execute__structuredOutput(t *testing.T) {
 		}
 	})
 }
+
+func Test__CreateResponse__NodeMetadata(t *testing.T) {
+	c := &CreateResponse{}
+	md := &contexts.MetadataContext{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"model": "gpt-5.2",
+			"input": "hi",
+		},
+		Metadata: md,
+	}
+
+	if err := c.Setup(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	meta, ok := md.Metadata.(ResponseNodeMetadata)
+	if !ok {
+		t.Fatalf("expected ResponseNodeMetadata, got %T", md.Metadata)
+	}
+	if meta.Model != "gpt-5.2" {
+		t.Errorf("expected model gpt-5.2, got %q", meta.Model)
+	}
+	if meta.StructuredOutput {
+		t.Error("expected structuredOutput false (no schema)")
+	}
+}
