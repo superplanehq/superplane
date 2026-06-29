@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/structuredoutput"
 )
 
 const ResponsePayloadType = "openai.response"
@@ -19,7 +20,7 @@ type CreateResponse struct{}
 type CreateResponseSpec struct {
 	Model        string `json:"model"`
 	Input        string `json:"input"`
-	OutputSchema any    `json:"outputSchema"`
+	OutputFields any    `json:"outputFields"`
 }
 
 type ResponsePayload struct {
@@ -64,7 +65,7 @@ func (c *CreateResponse) Documentation() string {
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
-- **Structured Output Schema**: (Optional) A JSON Schema that constrains the response to JSON, returned on the parsed output. OpenAI strict mode requires the root to be an object, every object to set additionalProperties:false, and every property to be listed in required (use a nullable type for optional fields).
+- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and the model returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema (OpenAI strict mode, including nullable handling for optional fields) is built for you.
 
 ## Output
 
@@ -73,7 +74,7 @@ Returns the generated response including:
 - **model**: The model used for generation
 - **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
 - **id**: Response ID for tracking
-- **parsed**: When a Structured Output Schema is set, the response parsed into an object.
+- **parsed**: When Structured Output is configured, the response parsed into an object.
 
 ## Notes
 
@@ -117,16 +118,11 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "Enter the prompt text",
 		},
-		{
-			Name:        "outputSchema",
-			Label:       "Structured Output Schema",
-			Type:        configuration.FieldTypeObject,
-			Required:    false,
-			Togglable:   true,
-			Default:     map[string]any{},
-			Description: "JSON Schema for the response, returned on the `parsed` output field. OpenAI strict mode requires the root to be an object, every object to set `additionalProperties: false`, and every property to be listed in `required` (use a nullable type like [\"string\",\"null\"] for optional fields).",
-			Placeholder: `{"type":"object","properties":{},"required":[],"additionalProperties":false}`,
-		},
+		structuredoutput.ConfigField(
+			"outputFields",
+			"Structured Output",
+			"Define the fields the model should return. The response is constrained to a JSON object with these fields (available on the `parsed` output). Supports nested objects and lists.",
+		),
 	}
 }
 
@@ -144,20 +140,18 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	schema, err := decodeOutputSchema(spec.OutputSchema)
+	fields, err := structuredoutput.Decode(spec.OutputFields)
 	if err != nil {
 		return err
 	}
-	if schema != nil {
-		if err := validateStrictJSONSchema(schema, ""); err != nil {
-			return err
-		}
+	if err := structuredoutput.Validate(fields); err != nil {
+		return err
 	}
 
 	if ctx.Metadata != nil {
 		_ = ctx.Metadata.Set(ResponseNodeMetadata{
 			Model:            spec.Model,
-			StructuredOutput: schema != nil,
+			StructuredOutput: len(fields) > 0,
 		})
 	}
 
@@ -178,7 +172,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	schema, err := decodeOutputSchema(spec.OutputSchema)
+	fields, err := structuredoutput.Decode(spec.OutputFields)
 	if err != nil {
 		return err
 	}
@@ -189,12 +183,12 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := CreateResponseRequest{Model: spec.Model, Input: spec.Input}
-	if schema != nil {
+	if len(fields) > 0 {
 		req.Text = &ResponseTextConfig{
 			Format: &ResponseFormat{
 				Type:   "json_schema",
 				Name:   "structured_output",
-				Schema: schema,
+				Schema: structuredoutput.BuildSchema(fields, true),
 				Strict: true,
 			},
 		}
@@ -217,7 +211,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 	// When a schema is configured, surface a refusal as text (it arrives on a
 	// dedicated content item that extractResponseText skips) and otherwise parse
 	// the JSON response into a structured object.
-	if schema != nil {
+	if len(fields) > 0 {
 		if refusal := extractRefusal(response); refusal != "" {
 			if payload.Text == "" {
 				payload.Text = refusal

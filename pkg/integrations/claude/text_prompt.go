@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/integrations/structuredoutput"
 )
 
 const MessagePayloadType = "claude.message"
@@ -25,7 +26,7 @@ type TextPromptSpec struct {
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
 	Files         []string `json:"files"`
-	OutputSchema  any      `json:"outputSchema"`
+	OutputFields  any      `json:"outputFields"`
 }
 
 type MessagePayload struct {
@@ -74,7 +75,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
-- **Structured Output Schema**: (Optional) A JSON Schema that constrains the response to JSON, returned on the parsed output. Root must be an object and every object must set additionalProperties:false.
+- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and Claude returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema is built for you.
 
 ## Output
 
@@ -83,7 +84,7 @@ Returns a payload containing:
 - **usage**: Input and output token counts.
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
-- **parsed**: When a Structured Output Schema is set, the response parsed into an object (only on a normal end_turn completion).
+- **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
 
 ## Notes
 
@@ -167,16 +168,11 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "outputSchema",
-			Label:       "Structured Output Schema",
-			Type:        configuration.FieldTypeObject,
-			Required:    false,
-			Togglable:   true,
-			Default:     map[string]any{},
-			Description: "JSON Schema for the response. When set, Claude returns JSON conforming to this schema, available on the `parsed` output field. The root must be an object and every object must set `additionalProperties: false`.",
-			Placeholder: `{"type":"object","properties":{},"required":[],"additionalProperties":false}`,
-		},
+		structuredoutput.ConfigField(
+			"outputFields",
+			"Structured Output",
+			"Define the fields Claude should return. The response is constrained to a JSON object with these fields (available on the `parsed` output). Supports nested objects and lists.",
+		),
 	}
 }
 
@@ -219,14 +215,12 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	schema, err := decodeOutputSchema(spec.OutputSchema)
+	fields, err := structuredoutput.Decode(spec.OutputFields)
 	if err != nil {
 		return err
 	}
-	if schema != nil {
-		if err := validateClaudeOutputSchema(schema, ""); err != nil {
-			return err
-		}
+	if err := structuredoutput.Validate(fields); err != nil {
+		return err
 	}
 
 	if ctx.Metadata != nil {
@@ -237,7 +231,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
 			Model:            spec.Model,
 			MaxTokens:        maxTokens,
-			StructuredOutput: schema != nil,
+			StructuredOutput: len(fields) > 0,
 		})
 	}
 
@@ -264,7 +258,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
-	schema, err := decodeOutputSchema(spec.OutputSchema)
+	fields, err := structuredoutput.Decode(spec.OutputFields)
 	if err != nil {
 		return err
 	}
@@ -296,9 +290,9 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		req.System = spec.SystemMessage
 	}
 
-	if schema != nil {
+	if len(fields) > 0 {
 		req.OutputConfig = &OutputConfig{
-			Format: &OutputFormat{Type: "json_schema", Schema: schema},
+			Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.BuildSchema(fields, false)},
 		}
 	}
 
@@ -321,7 +315,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	// When a schema is configured, parse the model's JSON text into a structured
 	// object. Only trust the output on a normal completion (end_turn); a refusal
 	// or truncation (max_tokens) may not conform to the schema.
-	if schema != nil && response.StopReason == "end_turn" && text != "" {
+	if len(fields) > 0 && response.StopReason == "end_turn" && text != "" {
 		var parsed any
 		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
 			payload.Parsed = parsed
@@ -349,28 +343,6 @@ func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 
 func (c *TextPrompt) Cleanup(ctx core.SetupContext) error {
 	return nil
-}
-
-// decodeOutputSchema normalizes the optional structured-output JSON schema from
-// the component configuration. It returns a nil map when no schema is configured
-// (field absent, or toggled on but empty). The schema must be a JSON object; a
-// string value (e.g. an expression) is rejected because the schema cannot be
-// templated.
-func decodeOutputSchema(raw any) (map[string]any, error) {
-	if raw == nil {
-		return nil, nil
-	}
-	schema, ok := raw.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("outputSchema must be a JSON object (expressions are not supported in the schema)")
-	}
-	if len(schema) == 0 {
-		return nil, nil
-	}
-	if t, _ := schema["type"].(string); t != "object" {
-		return nil, fmt.Errorf("outputSchema root must have \"type\": \"object\"")
-	}
-	return schema, nil
 }
 
 func extractMessageText(response *CreateMessageResponse) string {

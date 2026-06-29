@@ -26,7 +26,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
 		"temperature":   {false, string(configuration.FieldTypeNumber)},
 		"files":         {false, string(configuration.FieldTypeList)},
-		"outputSchema":  {false, string(configuration.FieldTypeObject)},
+		"outputFields":  {false, string(configuration.FieldTypeList)},
 	}
 
 	for _, field := range config {
@@ -75,57 +75,58 @@ func TestTextPrompt_Setup(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "Invalid output schema (not an object)",
+			name: "Valid output fields",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputFields": []any{
+					map[string]any{"name": "sentiment", "type": "string", "required": true},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Field missing name",
 			config: map[string]interface{}{
 				"model":        "claude-3-opus",
 				"prompt":       "Hello",
-				"outputSchema": map[string]any{"type": "string"},
+				"outputFields": []any{map[string]any{"type": "string"}},
 			},
 			expectError: true,
 		},
 		{
-			name: "Valid output schema",
+			name: "Object field without sub-fields",
+			config: map[string]interface{}{
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputFields": []any{map[string]any{"name": "addr", "type": "object"}},
+			},
+			expectError: true,
+		},
+		{
+			name: "Nested object field valid",
 			config: map[string]interface{}{
 				"model":  "claude-3-opus",
 				"prompt": "Hello",
-				"outputSchema": map[string]any{
-					"type":                 "object",
-					"properties":           map[string]any{"name": map[string]any{"type": "string"}},
-					"required":             []any{"name"},
-					"additionalProperties": false,
+				"outputFields": []any{
+					map[string]any{"name": "addr", "type": "object", "fields": []any{
+						map[string]any{"name": "city", "type": "string"},
+					}},
 				},
 			},
 			expectError: false,
 		},
 		{
-			name: "Object missing additionalProperties:false",
+			name: "Duplicate field name",
 			config: map[string]interface{}{
 				"model":  "claude-3-opus",
 				"prompt": "Hello",
-				"outputSchema": map[string]any{
-					"type":       "object",
-					"properties": map[string]any{"name": map[string]any{"type": "string"}},
-					"required":   []any{"name"},
+				"outputFields": []any{
+					map[string]any{"name": "a", "type": "string"},
+					map[string]any{"name": "a", "type": "number"},
 				},
 			},
 			expectError: true,
-		},
-		{
-			name: "Optional field allowed (Claude permits, unlike OpenAI strict)",
-			config: map[string]interface{}{
-				"model":  "claude-3-opus",
-				"prompt": "Hello",
-				"outputSchema": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"name": map[string]any{"type": "string"},
-						"age":  map[string]any{"type": "number"},
-					},
-					"required":             []any{"name"},
-					"additionalProperties": false,
-				},
-			},
-			expectError: false,
 		},
 	}
 
@@ -290,11 +291,8 @@ func TestTextPrompt_Execute(t *testing.T) {
 func TestTextPrompt_StructuredOutput(t *testing.T) {
 	c := &TextPrompt{}
 
-	schema := map[string]any{
-		"type":                 "object",
-		"properties":           map[string]any{"sentiment": map[string]any{"type": "string"}},
-		"required":             []any{"sentiment"},
-		"additionalProperties": false,
+	outputFields := []any{
+		map[string]any{"name": "sentiment", "type": "string", "required": true},
 	}
 
 	run := func(t *testing.T, responseBody string) (MessagePayload, []byte) {
@@ -311,7 +309,7 @@ func TestTextPrompt_StructuredOutput(t *testing.T) {
 			Configuration: map[string]any{
 				"model":        "claude-3-test",
 				"prompt":       "classify",
-				"outputSchema": schema,
+				"outputFields": outputFields,
 			},
 			ExecutionState: execState,
 			HTTP:           httpCtx,
@@ -437,11 +435,8 @@ func TestTextPrompt_NodeMetadata(t *testing.T) {
 			"model":     "claude-3-test",
 			"prompt":    "hi",
 			"maxTokens": 500,
-			"outputSchema": map[string]any{
-				"type":                 "object",
-				"properties":           map[string]any{"x": map[string]any{"type": "string"}},
-				"required":             []any{"x"},
-				"additionalProperties": false,
+			"outputFields": []any{
+				map[string]any{"name": "x", "type": "string", "required": true},
 			},
 		},
 		Metadata: md,

@@ -79,7 +79,7 @@ type ResponseNodeMetadata = {
 
 type ResponseConfiguration = {
   model?: string;
-  outputSchema?: unknown;
+  outputFields?: unknown[];
 };
 
 // metadataList surfaces the configured model and structured-output state on the
@@ -95,7 +95,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "sparkles", label: model });
   }
 
-  const structured = meta?.structuredOutput ?? hasSchema(config?.outputSchema);
+  const structured = meta?.structuredOutput ?? hasFields(config?.outputFields);
   if (structured) {
     items.push({ icon: "braces", label: "Structured output" });
   }
@@ -103,6 +103,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function hasSchema(schema: unknown): boolean {
-  return !!schema && typeof schema === "object" && Object.keys(schema as Record<string, unknown>).length > 0;
+function hasFields(fields: unknown): boolean {
+  return Array.isArray(fields) && fields.length > 0;
 }

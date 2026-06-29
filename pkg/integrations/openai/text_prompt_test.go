@@ -18,54 +18,39 @@ func Test__CreateResponse__Configuration(t *testing.T) {
 	for _, f := range fields {
 		found[f.Name] = f.Type
 	}
-	if found["outputSchema"] != "object" {
-		t.Errorf("expected outputSchema field of type object, got %q", found["outputSchema"])
+	if found["outputFields"] != "list" {
+		t.Errorf("expected outputFields field of type list, got %q", found["outputFields"])
 	}
 }
 
-func Test__CreateResponse__Setup__schemaValidation(t *testing.T) {
+func Test__CreateResponse__Setup__fieldValidation(t *testing.T) {
 	c := &CreateResponse{}
 
 	tests := []struct {
 		name        string
-		schema      any
+		fields      any
 		expectError bool
 	}{
 		{
-			name: "valid strict schema",
-			schema: map[string]any{
-				"type":                 "object",
-				"properties":           map[string]any{"name": map[string]any{"type": "string"}},
-				"required":             []any{"name"},
-				"additionalProperties": false,
+			name: "valid fields",
+			fields: []any{
+				map[string]any{"name": "name", "type": "string", "required": true},
 			},
 			expectError: false,
 		},
 		{
-			name:        "non-object root rejected",
-			schema:      map[string]any{"type": "string"},
+			name:        "missing name",
+			fields:      []any{map[string]any{"type": "string"}},
 			expectError: true,
 		},
 		{
-			name: "missing additionalProperties rejected",
-			schema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{"name": map[string]any{"type": "string"}},
-				"required":   []any{"name"},
-			},
+			name:        "object without sub-fields",
+			fields:      []any{map[string]any{"name": "addr", "type": "object"}},
 			expectError: true,
 		},
 		{
-			name: "optional property not in required rejected",
-			schema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"name": map[string]any{"type": "string"},
-					"age":  map[string]any{"type": "number"},
-				},
-				"required":             []any{"name"},
-				"additionalProperties": false,
-			},
+			name:        "unknown type",
+			fields:      []any{map[string]any{"name": "x", "type": "weird"}},
 			expectError: true,
 		},
 	}
@@ -76,7 +61,7 @@ func Test__CreateResponse__Setup__schemaValidation(t *testing.T) {
 				Configuration: map[string]any{
 					"model":        "gpt-5.2",
 					"input":        "hi",
-					"outputSchema": tt.schema,
+					"outputFields": tt.fields,
 				},
 			}
 			err := c.Setup(ctx)
@@ -92,11 +77,8 @@ func Test__CreateResponse__Setup__schemaValidation(t *testing.T) {
 
 func Test__CreateResponse__Execute__structuredOutput(t *testing.T) {
 	c := &CreateResponse{}
-	schema := map[string]any{
-		"type":                 "object",
-		"properties":           map[string]any{"city": map[string]any{"type": "string"}},
-		"required":             []any{"city"},
-		"additionalProperties": false,
+	outputFields := []any{
+		map[string]any{"name": "city", "type": "string", "required": true},
 	}
 
 	run := func(t *testing.T, responseBody string) (ResponsePayload, []byte) {
@@ -113,7 +95,7 @@ func Test__CreateResponse__Execute__structuredOutput(t *testing.T) {
 			Configuration: map[string]any{
 				"model":        "gpt-5.2",
 				"input":        "where?",
-				"outputSchema": schema,
+				"outputFields": outputFields,
 			},
 			ExecutionState: execState,
 			HTTP:           httpCtx,
