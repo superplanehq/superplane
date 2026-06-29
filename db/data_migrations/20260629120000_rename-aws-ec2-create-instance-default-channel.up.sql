@@ -14,7 +14,7 @@ AS $$
   SELECT COALESCE(
     jsonb_agg(
       CASE
-        WHEN COALESCE(edge->>'channel', '') = 'default'
+        WHEN COALESCE(edge->>'channel', 'default') IN ('', 'default')
           AND COALESCE(edge->>'source_id', edge->>'sourceId') IN (
             SELECT node_id FROM ec2_create_instance_nodes
           )
@@ -39,7 +39,7 @@ WHERE EXISTS (
 AND EXISTS (
   SELECT 1
   FROM jsonb_array_elements(edges) AS edge(item)
-  WHERE COALESCE(item->>'channel', '') = 'default'
+  WHERE COALESCE(item->>'channel', 'default') IN ('', 'default')
 );
 
 DROP FUNCTION rename_ec2_create_instance_default_edges(jsonb, jsonb);

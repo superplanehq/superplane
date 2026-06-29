@@ -440,6 +440,54 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.Contains(t, bodyString, "BlockDeviceMapping.1.Ebs.KmsKeyId=alias%2Febs")
 	})
 
+	t.Run("DescribeImage API error emits failed output", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>InvalidAMIID.NotFound</Code>
+									<Message>The image id '[ami-missing]' does not exist</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"image":                    "ami-missing",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"associatePublicIpAddress": true,
+				"configureRootVolume":      true,
+				"volumeSizeGiB":            30,
+				"volumeType":               "gp3",
+			},
+			HTTP:           httpContext,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Integration:    awsIntegrationContext(),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceFailed, executionState.Channel)
+		payload := emittedPayloadData(t, executionState)
+		assert.Contains(t, payload["error"], "failed to describe image")
+		assert.Equal(t, "InvalidAMIID.NotFound", payload["awsErrorCode"])
+	})
+
 	t.Run("RunInstances API error emits failed output", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

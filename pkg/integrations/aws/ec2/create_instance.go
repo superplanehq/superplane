@@ -688,7 +688,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 	if config.ConfigureRootVolume {
 		image, err := client.DescribeImage(config.ImageID)
 		if err != nil {
-			return fmt.Errorf("failed to describe image: %w", err)
+			return emitCreateInstanceFailure(ctx.ExecutionState, createInstanceFailurePayload(fmt.Errorf("failed to describe image: %w", err), "", ""))
 		}
 
 		volumeSize := config.VolumeSizeGiB
