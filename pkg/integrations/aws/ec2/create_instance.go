@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -98,6 +99,7 @@ type CreateInstanceExecutionMetadata struct {
 	InstanceID        string `json:"instanceId" mapstructure:"instanceId"`
 	PollErrors        int    `json:"pollErrors" mapstructure:"pollErrors"`
 	PollAttempts      int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	StartedAtUnix     int64  `json:"startedAtUnix" mapstructure:"startedAtUnix"`
 	LastObservedState string `json:"lastObservedState,omitempty" mapstructure:"lastObservedState"`
 }
 
@@ -715,7 +717,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 		return emitCreateInstanceFailure(ctx.ExecutionState, createInstanceFailurePayload(fmt.Errorf("failed to run instance: %w", err), "", ""))
 	}
 
-	if err := ctx.Metadata.Set(CreateInstanceExecutionMetadata{InstanceID: output.InstanceID}); err != nil {
+	if err := ctx.Metadata.Set(newCreateInstanceExecutionMetadata(output.InstanceID, time.Now())); err != nil {
 		return err
 	}
 
@@ -747,6 +749,11 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 	}
 	if metadata.InstanceID == "" {
 		return fmt.Errorf("poll metadata is missing instanceId: execution state may be corrupted")
+	}
+
+	now := time.Now()
+	if metadata.StartedAtUnix == 0 {
+		metadata.StartedAtUnix = now.Unix()
 	}
 
 	config, err := decodeCreateInstanceConfiguration(ctx.Configuration)
@@ -807,7 +814,7 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 				return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
 			}
 			if !status.OK() {
-				if createInstanceTimedOut(metadata.PollAttempts, config.WaitForRunningTimeoutSeconds) {
+				if createInstanceTimedOut(metadata, config.WaitForRunningTimeoutSeconds, now) {
 					return emitCreateInstanceFailure(
 						ctx.ExecutionState,
 						createInstanceFailurePayload(fmt.Errorf("timed out waiting for status checks on instance %s after %d seconds (instance status: %s, system status: %s)", instance.InstanceID, config.WaitForRunningTimeoutSeconds, status.InstanceStatus, status.SystemStatus), instance.InstanceID, instance.State),
@@ -826,7 +833,7 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 			createInstanceFailurePayload(fmt.Errorf("instance %s entered state %q and will not reach running without intervention", instance.InstanceID, instance.State), instance.InstanceID, instance.State),
 		)
 	default:
-		if createInstanceTimedOut(metadata.PollAttempts, config.WaitForRunningTimeoutSeconds) {
+		if createInstanceTimedOut(metadata, config.WaitForRunningTimeoutSeconds, now) {
 			return emitCreateInstanceFailure(
 				ctx.ExecutionState,
 				createInstanceFailurePayload(fmt.Errorf("timed out waiting for instance %s to reach running after %d seconds (state: %s)", instance.InstanceID, config.WaitForRunningTimeoutSeconds, instance.State), instance.InstanceID, instance.State),
@@ -1248,8 +1255,20 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func createInstanceTimedOut(pollAttempts int, timeoutSeconds int) bool {
-	return pollAttempts*int(instancePollInterval.Seconds()) >= timeoutSeconds
+func newCreateInstanceExecutionMetadata(instanceID string, now time.Time) CreateInstanceExecutionMetadata {
+	return CreateInstanceExecutionMetadata{
+		InstanceID:    instanceID,
+		StartedAtUnix: now.Unix(),
+	}
+}
+
+func createInstanceTimedOut(metadata CreateInstanceExecutionMetadata, timeoutSeconds int, now time.Time) bool {
+	if metadata.StartedAtUnix == 0 {
+		return false
+	}
+
+	startedAt := time.Unix(metadata.StartedAtUnix, 0)
+	return !now.Before(startedAt.Add(time.Duration(timeoutSeconds) * time.Second))
 }
 
 func createInstanceFailurePayload(err error, instanceID string, lastObservedState string) map[string]any {

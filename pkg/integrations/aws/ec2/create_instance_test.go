@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,51 @@ func Test__CreateInstance__Setup(t *testing.T) {
 		assert.Equal(t, "ubuntu", stored.ImageOS)
 		assert.Equal(t, "Ubuntu", stored.ImageOSLabel)
 		assert.Equal(t, "t3.micro", stored.InstanceType)
+	})
+
+	t.Run("invalid root volume IOPS -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"imageOs":                  "ubuntu",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"configureRootVolume":      true,
+				"volumeSizeGiB":            30,
+				"volumeType":               "io2",
+				"volumeIops":               99,
+				"associatePublicIpAddress": true,
+			},
+		})
+		require.ErrorContains(t, err, "root volume IOPS must be at least 100 for io2 volume type")
+	})
+
+	t.Run("invalid additional block device volume type -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"imageOs":                  "ubuntu",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"associatePublicIpAddress": true,
+				"additionalBlockDevices": []any{
+					map[string]any{
+						"deviceName":    "/dev/sdf",
+						"volumeSizeGiB": 10,
+						"volumeType":    "st1",
+					},
+				},
+			},
+		})
+		require.ErrorContains(t, err, "additional block device volume type \"st1\" is not supported")
 	})
 }
 
@@ -330,6 +376,70 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		assert.Contains(t, bodyString, "TagSpecification.2.Tag.2.Key=purpose")
 	})
 
+	t.Run("additional block devices preserve explicit delete-on-termination false", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<RunInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<requestId>req-block-device</requestId>
+							<instancesSet>
+								<item>
+									<instanceId>i-block123</instanceId>
+									<instanceState><name>pending</name></instanceState>
+								</item>
+							</instancesSet>
+						</RunInstancesResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"associatePublicIpAddress": true,
+				"additionalBlockDevices": []any{
+					map[string]any{
+						"deviceName":          "/dev/sdf",
+						"volumeSizeGiB":       10,
+						"volumeType":          "gp3",
+						"deleteOnTermination": false,
+						"encrypted":           true,
+						"kmsKeyId":            "alias/ebs",
+					},
+				},
+			},
+			HTTP:     httpContext,
+			Metadata: &contexts.MetadataContext{},
+			Requests: &contexts.RequestContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, "BlockDeviceMapping.1.DeviceName=%2Fdev%2Fsdf")
+		assert.Contains(t, bodyString, "BlockDeviceMapping.1.Ebs.DeleteOnTermination=false")
+		assert.Contains(t, bodyString, "BlockDeviceMapping.1.Ebs.Encrypted=true")
+		assert.Contains(t, bodyString, "BlockDeviceMapping.1.Ebs.KmsKeyId=alias%2Febs")
+	})
+
 	t.Run("RunInstances API error emits failed output", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -463,6 +573,151 @@ func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
 	assert.Len(t, payload["tags"], 2)
 }
 
+func Test__CreateInstance__PollWaitsForStatusChecks(t *testing.T) {
+	component := &CreateInstance{}
+
+	t.Run("status checks passed -> emits created", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				runningInstanceResponse(),
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeInstanceStatusResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<instanceStatusSet>
+								<item>
+									<instanceId>i-abc123</instanceId>
+									<instanceState><name>running</name></instanceState>
+									<systemStatus><status>ok</status></systemStatus>
+									<instanceStatus><status>ok</status></instanceStatus>
+								</item>
+							</instanceStatusSet>
+						</DescribeInstanceStatusResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"region":              "us-east-1",
+				"waitForStatusChecks": true,
+			},
+			HTTP:        httpContext,
+			Integration: awsIntegrationContext(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now()),
+			},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceCreated, executionState.Channel)
+		require.Len(t, httpContext.Requests, 2)
+		statusBody, err := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(statusBody), "Action=DescribeInstanceStatus")
+		assert.Contains(t, string(statusBody), "IncludeAllInstances=true")
+	})
+
+	t.Run("status check API error -> reschedules", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now()),
+		}
+		requests := &contexts.RequestContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				runningInstanceResponse(),
+				{
+					StatusCode: http.StatusServiceUnavailable,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>ServiceUnavailable</Code>
+									<Message>try again</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"region":              "us-east-1",
+				"waitForStatusChecks": true,
+			},
+			HTTP:           httpContext,
+			Integration:    awsIntegrationContext(),
+			Metadata:       metadata,
+			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requests.Action)
+		stored, ok := metadata.Get().(CreateInstanceExecutionMetadata)
+		require.True(t, ok)
+		assert.Equal(t, 1, stored.PollErrors)
+	})
+
+	t.Run("status checks not passed before timeout -> emits failed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				runningInstanceResponse(),
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<DescribeInstanceStatusResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<instanceStatusSet>
+								<item>
+									<instanceId>i-abc123</instanceId>
+									<instanceState><name>running</name></instanceState>
+									<systemStatus><status>ok</status></systemStatus>
+									<instanceStatus><status>initializing</status></instanceStatus>
+								</item>
+							</instanceStatusSet>
+						</DescribeInstanceStatusResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"region":                       "us-east-1",
+				"waitForStatusChecks":          true,
+				"waitForRunningTimeoutSeconds": 1,
+			},
+			HTTP:        httpContext,
+			Integration: awsIntegrationContext(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now().Add(-5*time.Second)),
+			},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceFailed, executionState.Channel)
+		payload := emittedPayloadData(t, executionState)
+		assert.Contains(t, payload["error"], "timed out waiting for status checks")
+		assert.Equal(t, "i-abc123", payload["instanceId"])
+		assert.Equal(t, "running", payload["lastObservedState"])
+	})
+}
+
 func Test__CreateInstance__PollReschedulesWhenInstanceShuttingDown(t *testing.T) {
 	component := &CreateInstance{}
 	httpContext := &contexts.HTTPContext{
@@ -513,6 +768,54 @@ func Test__CreateInstance__PollReschedulesWhenInstanceShuttingDown(t *testing.T)
 	assert.Equal(t, "poll", requests.Action, "shutting-down is transient; poll should be rescheduled")
 }
 
+func Test__CreateInstance__PollDoesNotTimeoutBeforeElapsedDeadline(t *testing.T) {
+	component := &CreateInstance{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`
+					<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+						<reservationSet>
+							<item>
+								<instancesSet>
+									<item>
+										<instanceId>i-abc123</instanceId>
+										<instanceState><name>pending</name></instanceState>
+									</item>
+								</instancesSet>
+							</item>
+						</reservationSet>
+					</DescribeInstancesResponse>
+				`)),
+			},
+		},
+	}
+	requests := &contexts.RequestContext{}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name: "poll",
+		Configuration: map[string]any{
+			"region":                       "us-east-1",
+			"waitForRunningTimeoutSeconds": 1,
+			"associatePublicIpAddress":     true,
+		},
+		HTTP:        httpContext,
+		Integration: awsIntegrationContext(),
+		Metadata: &contexts.MetadataContext{
+			Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now()),
+		},
+		Requests:       requests,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	assert.False(t, executionState.Passed)
+	assert.Equal(t, "poll", requests.Action)
+}
+
 func Test__CreateInstance__PollTimeoutEmitsFailed(t *testing.T) {
 	component := &CreateInstance{}
 	httpContext := &contexts.HTTPContext{
@@ -554,7 +857,7 @@ func Test__CreateInstance__PollTimeoutEmitsFailed(t *testing.T) {
 			},
 		},
 		Metadata: &contexts.MetadataContext{
-			Metadata: CreateInstanceExecutionMetadata{InstanceID: "i-abc123"},
+			Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now().Add(-5*time.Second)),
 		},
 		Requests:       &contexts.RequestContext{},
 		ExecutionState: executionState,
@@ -900,6 +1203,49 @@ func Test__CreateInstance__Cancel(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+}
+
+func runningInstanceResponse() *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(`
+			<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+				<requestId>req-running</requestId>
+				<reservationSet>
+					<item>
+						<instancesSet>
+							<item>
+								<instanceId>i-abc123</instanceId>
+								<instanceType>t3.micro</instanceType>
+								<imageId>ami-123</imageId>
+								<instanceState><name>running</name></instanceState>
+								<privateIpAddress>10.0.1.25</privateIpAddress>
+								<ipAddress>54.198.10.42</ipAddress>
+								<dnsName>ec2-54-198-10-42.compute-1.amazonaws.com</dnsName>
+								<privateDnsName>ip-10-0-1-25.ec2.internal</privateDnsName>
+								<subnetId>subnet-123</subnetId>
+								<vpcId>vpc-123</vpcId>
+								<placement><availabilityZone>us-east-1a</availabilityZone></placement>
+								<tagSet>
+									<item><key>Name</key><value>builder</value></item>
+								</tagSet>
+							</item>
+						</instancesSet>
+					</item>
+				</reservationSet>
+			</DescribeInstancesResponse>
+		`)),
+	}
+}
+
+func awsIntegrationContext() *contexts.IntegrationContext {
+	return &contexts.IntegrationContext{
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+			"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+			"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+		},
+	}
 }
 
 func emittedPayloadData(t *testing.T, executionState *contexts.ExecutionStateContext) map[string]any {
