@@ -17,14 +17,10 @@ type OrganizationInviteLink struct {
 	UpdatedAt      time.Time
 }
 
-func FindInviteLinkByOrganizationID(organizationID string) (*OrganizationInviteLink, error) {
-	return FindInviteLinkByOrganizationIDInTransaction(database.Conn(), organizationID)
-}
-
-func FindInviteLinkByOrganizationIDInTransaction(tx *gorm.DB, organizationID string) (*OrganizationInviteLink, error) {
+func FindInviteLinkByOrganizationID(db *gorm.DB, organizationID string) (*OrganizationInviteLink, error) {
 	var inviteLink OrganizationInviteLink
 
-	err := tx.
+	err := db.
 		Where("organization_id = ?", organizationID).
 		First(&inviteLink).
 		Error

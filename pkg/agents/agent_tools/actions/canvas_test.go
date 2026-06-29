@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -19,6 +20,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
 func TestResolveCustomToolAutoLayout_DefaultsGraphUpdatesToFullCanvas(t *testing.T) {
@@ -146,6 +148,59 @@ func TestAppAgentTool_UpdateDraftStagesEdits(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.NotEmpty(t, staged)
+}
+
+func TestAppAgentTool_ListResources(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			assert.Equal(t, "repository", resourceType)
+			assert.Equal(t, "repository", ctx.Parameters["type"])
+			assert.Equal(t, "superplanehq", ctx.Parameters["owner"])
+			return []core.IntegrationResource{
+				{Type: "repository", ID: "superplanehq/superplane", Name: "superplane"},
+				{Type: "repository", ID: "superplanehq/docs", Name: "docs"},
+			}, nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Registry:    r.Registry,
+		AuthService: r.AuthService,
+	})
+	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       uuid.NewString(),
+	}, Input{
+		Action:        "list_resources",
+		IntegrationID: integration.ID.String(),
+		ResourceType:  "repository",
+		Parameters:    map[string]string{"owner": "superplanehq"},
+		Limit:         1,
+	})
+
+	require.NoError(t, err)
+	resources, ok := result.(resourcesResult)
+	require.True(t, ok)
+	assert.Equal(t, "list_resources", resources.Action)
+	assert.Equal(t, integration.ID.String(), resources.IntegrationID)
+	assert.Equal(t, "repository", resources.ResourceType)
+	assert.Equal(t, 2, resources.Count)
+	assert.True(t, resources.Truncated)
+	require.Len(t, resources.Resources, 1)
+	assert.Equal(t, integrationResourceResult{
+		Type: "repository",
+		ID:   "superplanehq/superplane",
+		Name: "superplane",
+	}, resources.Resources[0])
 }
 
 func TestAppAgentTool_CreateDraftCreatesAnotherDraftBranch(t *testing.T) {
@@ -725,6 +780,8 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.True(t, toolActions["create_draft"].Allowed)
 	require.Contains(t, toolActions, "update_draft")
 	assert.True(t, toolActions["update_draft"].Allowed)
+	require.Contains(t, toolActions, "list_resources")
+	assert.True(t, toolActions["list_resources"].Allowed)
 	require.Contains(t, toolActions, "read_runtime")
 	assert.True(t, toolActions["read_runtime"].Allowed)
 	require.Contains(t, toolActions, "list_files")
