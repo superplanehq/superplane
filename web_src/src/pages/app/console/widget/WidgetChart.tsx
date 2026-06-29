@@ -11,8 +11,10 @@ import {
   LineChart,
   Pie,
   PieChart,
+  Rectangle,
   XAxis,
   YAxis,
+  type BarShapeProps,
 } from "recharts";
 
 import {
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/chart";
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
+import { resolveChartColor } from "./chartColors";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
 import { formatValue } from "./widgetFormat";
 import { WidgetEmptyState } from "../WidgetEmptyState";
@@ -36,8 +39,29 @@ interface WidgetChartProps {
   isLoading: boolean;
 }
 
-const DEFAULT_PALETTE = ["#0284c7", "#16a34a", "#dc2626", "#a855f7", "#f59e0b", "#0ea5e9"];
 const STACK_ID = "stack";
+
+/** Ignore Recharts/row props and always paint bars with the resolved series color. */
+function barShapeWithColor(seriesColor: string) {
+  return (props: BarShapeProps) => {
+    const { x, y, width, height, radius, isActive, onTransitionEnd } = props;
+    return (
+      <Rectangle
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        radius={radius}
+        isActive={isActive}
+        onTransitionEnd={onTransitionEnd}
+        isAnimationActive={false}
+        isUpdateAnimationActive={false}
+        fill={seriesColor}
+        style={{ fill: seriesColor }}
+      />
+    );
+  };
+}
 
 interface ChartSeries extends WidgetChartSeries {
   key: string;
@@ -64,11 +88,14 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   // chartConfig / Recharts layers) when only data values change.
   const configuredSeries = useMemo<ChartSeries[]>(
     () =>
-      render.series.map((s, idx) => ({
-        ...s,
-        key: s.label ?? s.field ?? `series-${idx}`,
-        color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
-      })),
+      render.series.map((s, idx) => {
+        const key = s.label ?? s.field ?? `series-${idx}`;
+        return {
+          ...s,
+          key,
+          color: resolveChartColor(key, idx),
+        };
+      }),
     [render.series],
   );
   const pivotedSeries = useMemo<ChartSeries[]>(() => {
@@ -78,7 +105,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
       ...valueSeries,
       key,
       label: key,
-      color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+      color: resolveChartColor(key, idx),
     }));
   }, [seriesField, sorted, valueSeries]);
   const series = seriesField ? pivotedSeries : configuredSeries;
@@ -189,6 +216,7 @@ function CartesianChartView({
               fill={s.color}
               fillOpacity={0.2}
               strokeWidth={2}
+              isAnimationActive={false}
             />
           ))}
         </AreaChart>
@@ -205,6 +233,7 @@ function CartesianChartView({
               strokeWidth={2}
               dot={{ r: 2.5, fill: s.color }}
               activeDot={{ r: 4 }}
+              isAnimationActive={false}
             />
           ))}
         </LineChart>
@@ -217,9 +246,15 @@ function CartesianChartView({
               key={s.key}
               dataKey={s.key}
               fill={s.color}
+              shape={barShapeWithColor(s.color)}
               stackId={stacked ? STACK_ID : undefined}
               radius={stacked ? 0 : [3, 3, 0, 0]}
-            />
+              isAnimationActive={false}
+            >
+              {data.map((_, idx) => (
+                <Cell key={`${s.key}-${idx}`} fill={s.color} />
+              ))}
+            </Bar>
           ))}
         </BarChart>
       )}
@@ -340,11 +375,14 @@ function DonutChartView({
   const seriesKey = series?.key ?? "";
   const sliceData = useMemo(() => {
     if (!seriesKey) return [];
-    return data.map((row, idx) => ({
-      x: String(row.x ?? ""),
-      value: Number(row[seriesKey]) || 0,
-      color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
-    }));
+    return data.map((row, idx) => {
+      const x = String(row.x ?? "");
+      return {
+        x,
+        value: Number(row[seriesKey]) || 0,
+        color: resolveChartColor(x, idx),
+      };
+    });
   }, [data, seriesKey]);
 
   const total = useMemo(() => sliceData.reduce((acc, slice) => acc + slice.value, 0), [sliceData]);

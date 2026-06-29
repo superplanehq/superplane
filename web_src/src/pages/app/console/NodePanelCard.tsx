@@ -77,12 +77,12 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <div className="text-sm font-semibold text-slate-800" data-testid="node-panel-name">
+      <div className="text-[13px] font-semibold text-slate-800" data-testid="node-panel-name">
         {displayName}
       </div>
       {content.showRun && isTrigger ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
       {!resolved && content.node ? (
-        <p className="text-xs text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
+        <p className="text-[13px] text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
       ) : null}
     </div>
   );
@@ -108,7 +108,7 @@ function NodePanelRunControl({
     <>
       <Button
         type="button"
-        size="sm"
+        size="xs"
         variant="outline"
         onClick={() => setOpen(true)}
         disabled={!canRun}

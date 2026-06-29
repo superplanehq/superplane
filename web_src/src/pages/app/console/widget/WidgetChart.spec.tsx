@@ -139,6 +139,70 @@ describe("WidgetChart bar variants", () => {
     expect(layers.length).toBe(3);
   });
 
+  it("applies resolved palette hex fills on pivoted stacked bars", () => {
+    const rows = [
+      { date: "May 01", model: "Claude Haiku 4.5", cost: 100 },
+      { date: "May 01", model: "Claude Sonnet 4.6", cost: 200 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "stacked-bar",
+        xField: "date",
+        seriesField: "model",
+        series: [{ field: "cost", label: "Cost" }],
+      },
+      { rows },
+    );
+
+    const style = container.querySelector("style")?.textContent ?? "";
+    expect(style).toContain("--color-claude-haiku-4-5: #2563eb");
+    expect(style).toContain("--color-claude-sonnet-4-6: #3b82f6");
+
+    const paths = [...container.querySelectorAll(".recharts-bar-rectangle path")];
+    const fills = paths.map((el) => el.getAttribute("fill"));
+    expect(fills).toContain("#2563eb");
+    expect(fills).toContain("#3b82f6");
+    expect(fills.every((fill) => !fill?.startsWith("var("))).toBe(true);
+    // Theme fallback seen in DevTools when palette colors fail to apply.
+    expect(fills.every((fill) => fill?.toLowerCase() !== "#c4627d")).toBe(true);
+    for (const path of paths) {
+      expect(path.getAttribute("style")).toContain("fill:");
+    }
+  });
+
+  it("ignores stored series colors and uses the default palette for multi-series stacked bars", () => {
+    const rows = [
+      {
+        date: "May 01",
+        claude_sonnet_46: 200,
+        claude_opus_47: 100,
+        claude_haiku_45: 50,
+      },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "stacked-bar",
+        xField: "date",
+        series: [
+          { field: "claude_sonnet_46", label: "Claude Sonnet 4.6", color: "#c4627d" },
+          { field: "claude_opus_47", label: "Claude Opus 4.7", color: "#c5c6e0" },
+          { field: "claude_haiku_45", label: "Claude Haiku 4.5", color: "#e0d6c5" },
+        ],
+      },
+      { rows },
+    );
+
+    const fills = [...container.querySelectorAll(".recharts-bar-rectangle path")].map((el) =>
+      el.getAttribute("fill")?.toLowerCase(),
+    );
+    expect(fills).toContain("#2563eb");
+    expect(fills).toContain("#3b82f6");
+    expect(fills).toContain("#60a5fa");
+    expect(fills.every((fill) => fill !== "#c4627d")).toBe(true);
+  });
+
   it("renders a bar layer for rows with a missing seriesField value", () => {
     const rows = [
       { date: "2026-05-26", service: "ec2", cost_usd: 10 },
