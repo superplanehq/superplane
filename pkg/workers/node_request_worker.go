@@ -146,12 +146,7 @@ func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	node, err := models.FindUnscopedCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("Node %s not found - completing request", request.NodeID)
-			return request.Complete(tx)
-		}
-
-		return fmt.Errorf("node not found: %w", err)
+		return fmt.Errorf("failed to find node: %w", err)
 	}
 
 	if node.DeletedAt.Valid {
@@ -323,19 +318,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("node not found: %w", err)
-		}
-
-		//
-		// If the node record does not exist, we cancel the execution before completing the request.
-		//
-		logger.Infof("Node %s not found - cancelling execution and completing request", execution.NodeID)
-		if err := w.cancelExecutionForDeletedNode(logger, tx, node, execution); err != nil {
-			return err
-		}
-
-		return request.Complete(tx)
+		return fmt.Errorf("failed to find node: %w", err)
 	}
 
 	//
