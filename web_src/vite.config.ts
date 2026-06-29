@@ -1,8 +1,8 @@
-import { defineConfig } from "vite";
-import type { ResolvedConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import * as path from "path";
+import type { ResolvedConfig } from "vite";
+import { defineConfig } from "vite";
 
 // Plugin that sets HMR port to be the same as server port
 // This is useful when you can't use WebSockets in your proxy
@@ -76,7 +76,7 @@ export default defineConfig(() => {
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
       emptyOutDir: true,
-      sourcemap: true,
+      sourcemap: false,
       manifest: false, // do not generate manifest.json
       // rollupOptions: {
       //   input: {
